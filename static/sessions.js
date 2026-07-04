@@ -6196,7 +6196,7 @@ function _sessionDisplayTitle(s){
 
 function _sessionTitleIsDefaultWebUI(rawTitle){
   const title=String(rawTitle||'').replace(/\s+/g,' ').trim();
-  return title==='Hermes WebUI'||/^Hermes WebUI #\d+$/.test(title);
+  return title==='SynthPulse Control'||/^SynthPulse Control #\d+$/.test(title);
 }
 
 function _sessionTitleTags(rawTitle){
