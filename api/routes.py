@@ -709,6 +709,47 @@ def _active_skill_search_dirs(skills_dir: Path) -> list[Path]:
     return [p for p in dirs if p.exists()]
 
 
+def _skill_ownership_lookup(skill_dir) -> tuple:
+    """Return (registry_key, entry) for a resolved skill directory.
+
+    Only skills under the active profile's LOCAL skills root can be
+    registry-owned (that is where /api/skills/save writes). Skills from
+    external search roots and plugin skills return (None, None) and stay
+    global. ``entry`` is None for unregistered (global) skills.
+    """
+    if skill_dir is None:
+        return None, None
+    from api import skill_ownership
+
+    skills_dir = _active_skills_dir()
+    try:
+        rel = Path(skill_dir).resolve().relative_to(skills_dir.resolve())
+    except (OSError, ValueError):
+        return None, None
+    parts = rel.parts
+    if not parts:
+        return None, None
+    category = parts[0] if len(parts) >= 2 else None
+    key = skill_ownership.skill_key(parts[-1], category)
+    return key, skill_ownership.get(key)
+
+
+def _skill_dir_visible_to_request(handler, skill_dir) -> bool:
+    """Return whether the skill at ``skill_dir`` is visible to the request.
+
+    Global (unregistered) and approved skills are visible to everyone.
+    Pending user-added skills are visible only to admins and their owner,
+    mirroring the session/project ownership rule (foreign rows 404).
+    """
+    _key, entry = _skill_ownership_lookup(skill_dir)
+    if entry is None:
+        return True
+    from api import skill_ownership
+    from api.ownership import request_owner_scope
+
+    return skill_ownership.entry_visible_to_scope(entry, request_owner_scope(handler))
+
+
 def _worktree_retained_payload(session) -> dict:
     """Return explicit no-cleanup metadata for worktree-backed session actions."""
     worktree_path = getattr(session, "worktree_path", None) if session else None
@@ -793,12 +834,20 @@ def _normalize_disabled_set(values) -> set:
     return {str(v).strip() for v in values if str(v).strip()}
 
 
-def _skills_list_from_dir(skills_dir: Path, category: str | None = None) -> dict:
+def _skills_list_from_dir(
+    skills_dir: Path, category: str | None = None, ownership_scope: str | None = None
+) -> dict:
     """List skills using an explicit local skills directory.
 
     This mirrors ``tools.skills_tool.skills_list`` closely, but keeps the local
     scan root explicit so per-client WebUI profile switches do not race on or
     leak through the skills tool's module-global ``SKILLS_DIR``.
+
+    ``ownership_scope`` (api.ownership.request_owner_scope semantics) enables
+    per-user skill filtering and annotation: 'all' keeps every skill and
+    annotates registered ones with added_by/approval_status; an email scope
+    hides other users' pending skills; None (default) skips the ownership
+    registry entirely for internal callers that only need names.
     """
     from agent.skill_utils import iter_skill_index_files
     from tools.skills_tool import (
@@ -823,6 +872,10 @@ def _skills_list_from_dir(skills_dir: Path, category: str | None = None) -> dict
     disabled = _get_disabled_skill_names_for_profile()
     search_dirs = _active_skill_search_dirs(skills_dir)
 
+    from api import skill_ownership
+
+    ownership_registry = skill_ownership.load() if ownership_scope is not None else None
+
     for scan_dir in search_dirs:
         for skill_md in iter_skill_index_files(scan_dir, "SKILL.md"):
             if any(part in _EXCLUDED_SKILL_DIRS for part in skill_md.parts):
@@ -845,17 +898,36 @@ def _skills_list_from_dir(skills_dir: Path, category: str | None = None) -> dict
                             break
                 if len(description) > MAX_DESCRIPTION_LENGTH:
                     description = description[: MAX_DESCRIPTION_LENGTH - 3] + "..."
-                seen_names.add(name)
-                all_skills.append(
-                    {
-                        "name": name,
-                        "description": description,
-                        "category": _skill_category_from_path(
-                            skill_md, search_dirs, local_skills_dir=skills_dir
-                        ),
-                        "disabled": name in disabled,
-                    }
+                skill_category = _skill_category_from_path(
+                    skill_md, search_dirs, local_skills_dir=skills_dir
                 )
+                ownership_entry = None
+                if ownership_registry is not None and scan_dir == skills_dir:
+                    ownership_entry = ownership_registry.get(
+                        skill_ownership.skill_key(skill_dir.name, skill_category)
+                    )
+                if ownership_entry is not None and not skill_ownership.entry_visible_to_scope(
+                    ownership_entry, ownership_scope
+                ):
+                    # Another user's pending skill: hide the row entirely and
+                    # leave the name unclaimed so a same-named global skill
+                    # from a later search root can still surface.
+                    continue
+                seen_names.add(name)
+                skill_row = {
+                    "name": name,
+                    "description": description,
+                    "category": skill_category,
+                    "disabled": name in disabled,
+                }
+                if ownership_entry is not None:
+                    skill_row["added_by"] = (
+                        str(ownership_entry.get("owner_email") or "").strip().lower() or None
+                    )
+                    skill_row["approval_status"] = str(
+                        ownership_entry.get("status") or skill_ownership.STATUS_PENDING
+                    )
+                all_skills.append(skill_row)
             except (UnicodeDecodeError, PermissionError) as e:
                 logger.debug("Failed to read skill file %s: %s", skill_md, e)
             except Exception as e:
@@ -12638,9 +12710,15 @@ def handle_get(handler, parsed) -> bool:
 
     # ── Skills API (GET) ──
     if parsed.path == "/api/skills":
+        from api.ownership import request_owner_scope
+
         qs = parse_qs(parsed.query)
         category = qs.get("category", [None])[0]
-        data = _skills_list_from_dir(_active_skills_dir(), category=category)
+        data = _skills_list_from_dir(
+            _active_skills_dir(),
+            category=category,
+            ownership_scope=request_owner_scope(handler),
+        )
         return j(handler, {"skills": data.get("skills", [])})
 
     if parsed.path == "/api/skills/usage":
@@ -12697,6 +12775,9 @@ def handle_get(handler, parsed) -> bool:
             )
             if not skill_dir:
                 return bad(handler, "Skill not found", 404)
+            if not _skill_dir_visible_to_request(handler, skill_dir):
+                # Another user's pending skill: identical 404 to a missing one.
+                return bad(handler, "Skill not found", 404)
             target = (skill_dir / file_path).resolve()
             try:
                 target.relative_to(skill_dir.resolve())
@@ -12709,6 +12790,11 @@ def handle_get(handler, parsed) -> bool:
                 {"content": target.read_text(encoding="utf-8"), "path": file_path},
             )
         data = _skill_view_from_active_dir(name)
+        if data.get("skill_dir") and not _skill_dir_visible_to_request(
+            handler, data.get("skill_dir")
+        ):
+            # Another user's pending skill: identical 404 to a missing one.
+            return bad(handler, "Skill not found", 404)
         if not isinstance(data.get("linked_files"), dict):
             data["linked_files"] = {}
         return j(handler, data)
@@ -23320,11 +23406,38 @@ def _handle_skill_save(handler, body):
         skill_dir.resolve().relative_to(skills_dir.resolve())
     except ValueError:
         return bad(handler, "Invalid skill path")
+
+    from api import skill_ownership
+    from api.ownership import request_owner_scope
+
+    registry_key = skill_ownership.skill_key(skill_name, category or None)
+    owner_scope = request_owner_scope(handler)
+    if owner_scope != "all":
+        # Non-admin: may create new skills and edit their own; editing an
+        # existing global skill or another user's skill is rejected.
+        if not owner_scope:
+            return bad(handler, "You can only edit skills you added", 403)
+        if skills_dir.exists():
+            for existing_md in skills_dir.rglob("SKILL.md"):
+                if existing_md.parent.name != skill_name:
+                    continue
+                _existing_key, existing_entry = _skill_ownership_lookup(existing_md.parent)
+                if (
+                    existing_entry is None
+                    or str(existing_entry.get("owner_email") or "").strip().lower()
+                    != owner_scope
+                ):
+                    return bad(handler, "You can only edit skills you added", 403)
+
     skill_dir.mkdir(parents=True, exist_ok=True)
     skill_file = skill_dir / "SKILL.md"
     if skill_file.is_symlink():
         return bad(handler, "Cannot save to a symlinked skill file")
     skill_file.write_text(body["content"], encoding="utf-8")
+    if owner_scope != "all":
+        # Register (idempotent) so the new skill is pending and owned by the
+        # requester; re-saving an owned skill keeps its owner and status.
+        skill_ownership.register_skill(registry_key, owner_scope)
     _SKILLS_STATS_CACHE.clear()
     return j(handler, {"ok": True, "name": skill_name, "path": str(skill_file)})
 
@@ -23344,7 +23457,24 @@ def _handle_skill_delete(handler, body):
     if not matches:
         return bad(handler, "Skill not found", 404)
     skill_dir = matches[0].parent
+
+    from api import skill_ownership
+    from api.ownership import request_owner_scope
+
+    registry_key, ownership_entry = _skill_ownership_lookup(skill_dir)
+    owner_scope = request_owner_scope(handler)
+    if owner_scope != "all":
+        # Non-admin: may delete only skills they added (registry owner match).
+        if (
+            ownership_entry is None
+            or not owner_scope
+            or str(ownership_entry.get("owner_email") or "").strip().lower() != owner_scope
+        ):
+            return bad(handler, "You can only delete skills you added", 403)
+
     shutil.rmtree(str(skill_dir))
+    if registry_key and ownership_entry is not None:
+        skill_ownership.remove(registry_key)
     _SKILLS_STATS_CACHE.clear()
     return j(handler, {"ok": True, "name": body["name"]})
 
