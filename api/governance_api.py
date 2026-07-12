@@ -695,6 +695,156 @@ def _handle_user_delete(handler, parsed, policy, subject, access) -> bool:
     return _mutate_policy(handler, parsed, subject, op="user_delete", target=email, mutate=mutate)
 
 
+# ── Skill approvals ──────────────────────────────────────────────────────────
+
+def _skill_key_parts(key) -> tuple | None:
+    """Split a registry skill key into (category, name), or None when malformed.
+
+    Keys are on-disk directory names: ``name`` or ``category/name`` (see
+    api.skill_ownership.skill_key). Anything with empty segments, extra
+    segments, traversal tokens, or path separators is rejected so a corrupted
+    or crafted key can never resolve outside the skills root.
+    """
+    raw = str(key or "").strip()
+    if not raw:
+        return None
+    parts = raw.split("/")
+    if len(parts) == 1:
+        category, name = None, parts[0]
+    elif len(parts) == 2:
+        category, name = parts[0], parts[1]
+    else:
+        return None
+    for part in parts:
+        if not part.strip() or part in (".", "..") or "\\" in part or "\x00" in part:
+            return None
+    return category, name
+
+
+def _audit_approval(subject: GovernanceSubject, mode: str, parsed, *, op: str, key: str, owner: str) -> None:
+    """Audit an approval decision; a broken audit sink never undoes it."""
+    try:
+        append_audit_event(
+            "approval_decision",
+            subject_email=subject.email,
+            subject_user_id=subject.user_id,
+            path=parsed.path,
+            method="POST",
+            reason=op,
+            mode=mode,
+            extra={"op": op, "target": key, "key": key, "owner": owner},
+        )
+    except Exception:
+        return
+
+
+def _handle_approvals_get(handler, parsed, policy, subject, access) -> bool:
+    """Pending user-added skills awaiting an admin decision."""
+    if not _require_governance_admin(handler, access, subject, policy):
+        return True
+    from api import skill_ownership
+
+    pending = []
+    for row in skill_ownership.list_pending():
+        key = str(row.get("key") or "")
+        parts = _skill_key_parts(key)
+        category, name = parts if parts else (None, key)
+        pending.append(
+            {
+                "key": key,
+                "name": name,
+                "category": category,
+                "owner_email": row.get("owner_email"),
+                "added_at": row.get("added_at"),
+            }
+        )
+    j(handler, {"pending": pending})
+    return True
+
+
+def _handle_approvals_decide(handler, parsed, policy, subject, access) -> bool:
+    """Approve or reject a pending user-added skill.
+
+    Approve flips the registry status to approved (the skill becomes global,
+    visible to everyone). Reject deletes the skill directory from disk and
+    removes the registry entry. Both paths are audited.
+    """
+    if not _require_governance_admin(handler, access, subject, policy):
+        return True
+    body = _read_json(handler)
+    if body is None:
+        return True
+    kind = str(body.get("kind") or "").strip().lower()
+    if kind != "skill":
+        j(handler, {"error": "invalid_payload", "message": "kind must be 'skill'"}, status=400)
+        return True
+    key = str(body.get("key") or "").strip()
+    if not key or _skill_key_parts(key) is None:
+        j(handler, {"error": "invalid_payload", "message": "key must be a valid skill key"}, status=400)
+        return True
+    decision = str(body.get("decision") or "").strip().lower()
+    if decision not in ("approve", "reject"):
+        j(
+            handler,
+            {"error": "invalid_payload", "message": "decision must be 'approve' or 'reject'"},
+            status=400,
+        )
+        return True
+
+    from api import skill_ownership
+
+    entry = skill_ownership.get(key)
+    if entry is None:
+        j(handler, {"error": "not_found", "message": f"unknown skill approval: {key}"}, status=404)
+        return True
+    owner = str(entry.get("owner_email") or "").strip().lower()
+
+    if decision == "approve":
+        skill_ownership.set_status(key, skill_ownership.STATUS_APPROVED)
+        _audit_approval(subject, policy.mode, parsed, op="approvals.approve", key=key, owner=owner)
+        j(handler, {"ok": True, "key": key, "status": skill_ownership.STATUS_APPROVED})
+        return True
+
+    # Reject: delete the skill directory, then drop the registry entry. The
+    # key is validated above (no traversal tokens) and the resolved path is
+    # re-checked against the skills root, mirroring _handle_skill_save.
+    import shutil
+
+    from api import routes as api_routes  # late import (routes imports this module)
+
+    skills_dir = api_routes._active_skills_dir()
+    skill_dir = skills_dir / key
+    try:
+        skill_dir.resolve().relative_to(skills_dir.resolve())
+    except (OSError, ValueError):
+        j(
+            handler,
+            {"error": "invalid_payload", "message": "key resolves outside the skills directory"},
+            status=400,
+        )
+        return True
+    removed = False
+    try:
+        if skill_dir.is_symlink():
+            skill_dir.unlink()
+            removed = True
+        elif skill_dir.is_dir():
+            shutil.rmtree(str(skill_dir))
+            removed = True
+    except OSError:
+        logger.exception("Failed to remove rejected skill directory %s", skill_dir)
+        j(handler, {"error": "internal_error", "message": "failed to remove skill directory"}, status=500)
+        return True
+    skill_ownership.remove(key)
+    try:
+        api_routes._SKILLS_STATS_CACHE.clear()
+    except Exception:
+        pass
+    _audit_approval(subject, policy.mode, parsed, op="approvals.reject", key=key, owner=owner)
+    j(handler, {"ok": True, "key": key, "removed": removed})
+    return True
+
+
 # ── Dispatch ─────────────────────────────────────────────────────────────────
 
 _GET_ROUTES = {
@@ -704,6 +854,7 @@ _GET_ROUTES = {
     "/api/governance/groups": lambda h, p, pol, s, a: _handle_collection_get(h, p, pol, s, a, key="groups"),
     "/api/governance/audit": _handle_audit_get,
     "/api/governance/usage": _handle_usage_get,
+    "/api/governance/approvals": _handle_approvals_get,
 }
 
 _POST_ROUTES = {
@@ -716,6 +867,7 @@ _POST_ROUTES = {
     "/api/governance/users": _handle_user_create,
     "/api/governance/users/update": _handle_user_update,
     "/api/governance/users/delete": _handle_user_delete,
+    "/api/governance/approvals/decide": _handle_approvals_decide,
 }
 
 

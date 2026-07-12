@@ -2171,6 +2171,8 @@
   .skill-desc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;font-size:11px;opacity:.7;}
   .skill-item.disabled{opacity:.5;}
   .skill-item.disabled .skill-name{opacity:.45;}
+  .skill-badge{flex-shrink:0;font-size:9px;line-height:1.4;padding:0 5px;border-radius:6px;border:1px solid var(--border2);color:var(--muted);white-space:nowrap;margin-top:2px;max-width:140px;overflow:hidden;text-overflow:ellipsis;}
+  .skill-badge-pending{color:var(--accent);border-color:var(--accent);}
   .skill-toggle{flex-shrink:0;width:28px;height:14px;border-radius:7px;border:1px solid var(--border2);background:var(--border);cursor:pointer;position:relative;transition:all .15s;margin-top:3px;}
   .skill-toggle.enabled{background:var(--accent-bg-strong);border-color:var(--accent);}
   .skill-toggle::after{content:'';position:absolute;top:1px;left:1px;width:10px;height:10px;border-radius:50%;background:var(--muted);transition:transform .15s;}
@@ -7016,6 +7018,8 @@ html,body{background:var(--bg)!important;color:var(--text);font-family:var(--fon
 .gov-tab{background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-size:13px;font-weight:600;padding:8px 10px;cursor:pointer;}
 .gov-tab:hover{color:var(--text);}
 .gov-tab.active{color:var(--text);border-bottom-color:var(--accent);}
+.gov-tab-badge{display:inline-block;min-width:16px;margin-left:6px;padding:1px 5px;border-radius:999px;background:var(--accent);color:#fff;font-size:10px;font-weight:700;text-align:center;vertical-align:middle;}
+.gov-grants-title{margin-top:14px;}
 .gov-content{flex:1;overflow-y:auto;padding:16px;}
 .gov-tab-pane{display:none;}
 .gov-tab-pane.active{display:block;}
