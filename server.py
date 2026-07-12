@@ -109,6 +109,7 @@ def _env_int(name: str, default: int, minimum: int) -> int:
     return max(minimum, value)
 
 from api.auth import check_auth
+from api.governance.enforce import enforce_request
 from api.config import HOST, PORT, STATE_DIR, SESSION_DIR, DEFAULT_WORKSPACE
 from api.helpers import (
     j,
@@ -388,6 +389,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             parsed = urlparse(self.path)
             if not check_auth(self, parsed): return
+            if not enforce_request(self, parsed, "GET"): return
             result = handle_get(self, parsed)
             if result is False:
                 return j(self, {'error': 'not found'}, status=404)
@@ -416,6 +418,7 @@ class Handler(BaseHTTPRequestHandler):
                 parsed.path == "/api/csp-report" and self.command == "POST"
             )
             if not _is_csp_report_post and not check_auth(self, parsed): return
+            if not _is_csp_report_post and not enforce_request(self, parsed, self.command): return
             result = route_func(self, parsed)
             if result is False:
                 return j(self, {'error': 'not found'}, status=404)

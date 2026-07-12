@@ -143,6 +143,23 @@ def complete_authorization_code_flow(
         allow_claim=cfg.get("allow_claim"),
         allow_values=cfg.get("allow_values") or [],
     )
+    # Stage the caller's identity for the create_session() call that follows in
+    # the login route; claims_subset stays bounded (never the full raw claims).
+    from api import auth as _auth  # late import to avoid a module cycle
+
+    groups_claim = claims.get("groups") or claims.get("roles") or []
+    if isinstance(groups_claim, str):
+        groups_claim = [groups_claim]
+    _auth.stage_session_identity({
+        "email": str(claims.get("email") or "").lower(),
+        "groups": [str(g) for g in groups_claim],
+        "claims_subset": {
+            k: claims[k]
+            for k in ("sub", "email", "name", "preferred_username")
+            if k in claims
+        },
+        "method": "oidc",
+    })
     return {
         "next_path": pending["next_path"],
         "subject": str(claims.get("sub") or ""),

@@ -21,7 +21,7 @@ from api.config import STATE_DIR, get_config, load_settings
 logger = logging.getLogger(__name__)
 
 
-# Default session TTL — 30 days. Kept as a module-level constant for backwards
+# Default session TTL: 30 days. Kept as a module-level constant for backwards
 # compatibility with downstream code and regression tests that import it.
 # At runtime, prefer ``_resolve_session_ttl()`` which honours the env var and
 # settings.json overrides; this constant is the floor / fallback.
@@ -71,7 +71,7 @@ def _resolve_cookie_name() -> str:
 
     Honours ``HERMES_WEBUI_COOKIE_NAME`` so multiple WebUI instances sharing a
     hostname (different ports) can use distinct cookie names instead of
-    trampling each other's session — browsers scope cookies by host, not
+    trampling each other's session: browsers scope cookies by host, not
     host+port (RFC 6265). Falls back to ``COOKIE_NAME`` when the env var is
     unset, empty, or not a valid RFC 6265 token.
     """
@@ -102,8 +102,26 @@ def _warn_auth_persistence_failure(prefix: str, artifact: Path, exc: Exception, 
 _SESSIONS_FILE = STATE_DIR / '.sessions.json'
 
 
-def _load_sessions() -> dict[str, float]:
+def _session_expiry(value) -> float:
+    """Return the expiry timestamp for a session store entry.
+
+    Entries are either a plain float expiry (legacy anonymous sessions,
+    kept as-is forever) or a dict ``{"exp": float, "email": str,
+    "groups": [str], "claims_subset": dict, "method": str}`` (identity-aware
+    sessions). Unknown shapes resolve to 0.0 so they are treated as expired.
+    """
+    if isinstance(value, dict):
+        exp = value.get('exp')
+        return float(exp) if isinstance(exp, (int, float)) else 0.0
+    return float(value) if isinstance(value, (int, float)) else 0.0
+
+
+def _load_sessions() -> dict[str, float | dict]:
     """Load persisted sessions from STATE_DIR, pruning expired entries.
+
+    Values are either a float expiry (legacy anonymous sessions) or an
+    identity dict carrying ``exp`` (see ``_session_expiry``). Legacy float
+    entries are kept as floats (no in-place migration, rollback-safe).
 
     Returns an empty dict on any read or parse error so startup is never
     blocked by a corrupt or missing sessions file.
@@ -140,11 +158,18 @@ def _load_sessions() -> dict[str, float]:
         )
         return {}
     now = time.time()
-    return {t: exp for t, exp in data.items()
-            if isinstance(t, str) and isinstance(exp, (int, float)) and exp > now}
+    sessions: dict[str, float | dict] = {}
+    for t, v in data.items():
+        if not isinstance(t, str):
+            continue
+        if isinstance(v, (int, float)) and v > now:
+            sessions[t] = v  # legacy anonymous entry, kept as a float
+        elif isinstance(v, dict) and _session_expiry(v) > now:
+            sessions[t] = v  # identity-aware entry
+    return sessions
 
 
-def _save_sessions(sessions: dict[str, float]) -> None:
+def _save_sessions(sessions: dict[str, float | dict]) -> None:
     """Atomically persist sessions to STATE_DIR/.sessions.json (0600).
 
     Uses a temp file + os.replace() so a crash mid-write never leaves a
@@ -173,7 +198,8 @@ def _save_sessions(sessions: dict[str, float]) -> None:
         )
 
 
-# Active sessions: token -> expiry timestamp (persisted across restarts via STATE_DIR)
+# Active sessions: token -> float expiry (legacy anonymous) or identity dict
+# with an 'exp' key (persisted across restarts via STATE_DIR).
 _sessions = _load_sessions()
 _SESSIONS_LOCK = threading.Lock()
 
@@ -189,7 +215,7 @@ def _load_login_attempts() -> dict[str, list[float]]:
         if _LOGIN_ATTEMPTS_FILE.exists():
             data = json.loads(_LOGIN_ATTEMPTS_FILE.read_text(encoding='utf-8'))
             if not isinstance(data, dict):
-                raise ValueError('malformed login-attempts file — expected dict')
+                raise ValueError('malformed login-attempts file: expected dict')
             now = time.time()
             attempts: dict[str, list[float]] = {}
             for ip, raw_times in data.items():
@@ -373,12 +399,12 @@ def get_password_hash() -> str | None:
     """
     global _AUTH_HASH_COMPUTED, _AUTH_HASH_CACHE
 
-    # Fast path — no lock needed once cache is populated.
+    # Fast path: no lock needed once cache is populated.
     if _AUTH_HASH_COMPUTED:
         return _AUTH_HASH_CACHE
 
     with _AUTH_HASH_LOCK:
-        # Re-check inside lock — another thread may have populated while
+        # Re-check inside lock: another thread may have populated while
         # we were waiting to acquire.
         if _AUTH_HASH_COMPUTED:
             return _AUTH_HASH_CACHE
@@ -538,11 +564,58 @@ def verify_password(plain: str) -> bool:
     return False
 
 
-def create_session() -> str:
-    """Create a new auth session. Returns signed cookie value."""
+# Identity staged by the login flow for the next create_session() call on the
+# same thread. http.server handles each request start-to-finish on one thread,
+# so the OIDC callback can stage its identity and the existing create_session()
+# call sites in routes.py pick it up without any signature change there.
+_PENDING_IDENTITY = threading.local()
+
+
+def stage_session_identity(identity: dict) -> None:
+    """Stage an identity dict for the next create_session() on this thread.
+
+    Shape: {"email": str, "groups": [str], "claims_subset": dict, "method": str}.
+    Consumed exactly once by create_session().
+    """
+    _PENDING_IDENTITY.value = dict(identity)
+
+
+def _pop_pending_identity() -> dict | None:
+    """Return and clear the identity staged on this thread, if any."""
+    value = getattr(_PENDING_IDENTITY, 'value', None)
+    _PENDING_IDENTITY.value = None
+    return value
+
+
+def _local_login_identity() -> dict:
+    """Identity attached to local (password/passkey/bootstrap) logins.
+
+    Single-owner installs map local logins to the governance bootstrap admin;
+    override via HERMES_WEBUI_PASSWORD_IDENTITY for multi-user local setups.
+    The default email is configuration, not a secret.
+    """
+    email = os.getenv('HERMES_WEBUI_PASSWORD_IDENTITY', '').strip() or 'michael@synthwave.solutions'
+    return {'email': email.lower(), 'groups': [], 'claims_subset': {}, 'method': 'local'}
+
+
+def create_session(identity: dict | None = None) -> str:
+    """Create a new auth session. Returns signed cookie value.
+
+    The session records who logged in: the explicit *identity* argument wins,
+    then the identity staged on this thread by the OIDC callback (see
+    stage_session_identity), then the local password/passkey identity mapping.
+    Cookie format and signing are unchanged.
+    """
     token = secrets.token_hex(32)
+    identity = identity or _pop_pending_identity() or _local_login_identity()
+    exp = time.time() + _resolve_session_ttl()
+    if identity:
+        entry: float | dict = {k: v for k, v in identity.items() if k != 'exp'}
+        entry['exp'] = exp
+    else:
+        entry = exp  # anonymous legacy behavior, kept for safety
     with _SESSIONS_LOCK:
-        _sessions[token] = time.time() + _resolve_session_ttl()
+        _sessions[token] = entry
         _save_sessions(_sessions)
     sig = hmac.new(_signing_key(), token.encode(), hashlib.sha256).hexdigest()
     return f"{token}.{sig}"
@@ -552,7 +625,7 @@ def _prune_expired_sessions():
     """Remove all expired session entries to prevent unbounded memory growth."""
     now = time.time()
     with _SESSIONS_LOCK:
-        expired = [t for t, exp in _sessions.items() if now > exp]
+        expired = [t for t, v in _sessions.items() if now > _session_expiry(v)]
         if expired:
             for token in expired:
                 _sessions.pop(token, None)
@@ -575,12 +648,31 @@ def verify_session(cookie_value: str) -> bool:
     if not valid:
         return False
     with _SESSIONS_LOCK:
-        expiry = _sessions.get(token)
-        if not expiry or time.time() > expiry:
+        entry = _sessions.get(token)
+        if entry is None or time.time() > _session_expiry(entry):
             _sessions.pop(token, None)
             _save_sessions(_sessions)
             return False
     return True
+
+
+def get_session_identity(cookie_value: str) -> dict | None:
+    """Return the identity dict for a valid session cookie, or None.
+
+    Shape: {"email": str, "groups": [str], "claims_subset": dict, "method": str}.
+    None means the cookie is invalid/expired or the session is a legacy
+    anonymous float entry (created before identity-aware sessions).
+    """
+    if not cookie_value or not verify_session(cookie_value):
+        return None
+    token = _session_token_from_cookie_value(cookie_value)
+    if not token:
+        return None
+    with _SESSIONS_LOCK:
+        entry = _sessions.get(token)
+    if not isinstance(entry, dict):
+        return None
+    return {k: v for k, v in entry.items() if k != 'exp'}
 
 
 def _session_token_from_cookie_value(cookie_value: str) -> str | None:
@@ -713,7 +805,7 @@ def check_auth(handler, parsed) -> bool:
         #   (a) multi-param query strings get truncated at the first inner `&`
         #       (e.g. `/api/sessions?limit=50&offset=0` would round-trip as
         #       just `/api/sessions?limit=50` after the browser parses the
-        #       outer URL — `offset=0` becomes a separate top-level query
+        #       outer URL: `offset=0` becomes a separate top-level query
         #       parameter that the login page ignores).
         #   (b) attacker-controlled paths could inject a second `next=`
         #       parameter; per RFC 3986 the duplicate behaviour is undefined
