@@ -49,6 +49,7 @@ from api.session_events import (
     unsubscribe_session_events,
 )
 from api.gateway_restart import restart_active_profile_gateway
+from api import governance_api
 
 logger = logging.getLogger(__name__)
 
@@ -11074,6 +11075,9 @@ def handle_get(handler, parsed) -> bool:
     if proxy_result is not False:
         return proxy_result
 
+    if governance_api.handle_governance_api(handler, parsed, "GET"):
+        return True
+
     if parsed.path.startswith("/session/static/"):
         # Strip the leading "/session" so _serve_static() sees a path that
         # starts with "/static/" (its required prefix). _serve_static enforces
@@ -12856,6 +12860,10 @@ def handle_post(handler, parsed) -> bool:
         finally:
             if diag:
                 diag.finish()
+
+    if governance_api.handle_governance_api(handler, parsed, "POST"):
+        return True
+
     proxy_result = _handle_extension_sidecar_proxy(
         handler,
         parsed,
