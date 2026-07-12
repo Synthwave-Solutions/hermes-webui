@@ -547,3 +547,98 @@ def test_coerce_numeric_claim_rejects_non_finite_values(value):
 
     with pytest.raises(OIDCAuthError, match="claim exp was not numeric"):
         auth_oidc._coerce_numeric_claim({"exp": value}, "exp")
+
+
+def _prime_oidc_flow(monkeypatch, claims):
+    """Wire complete_authorization_code_flow so it reaches the email_verified
+    gate with the given id_token claims, mocking out network + crypto."""
+    import api.auth_oidc as auth_oidc
+
+    monkeypatch.setattr(
+        auth_oidc,
+        "_resolve_oidc_config",
+        lambda: {
+            "issuer": "https://issuer.example",
+            "client_id": "webui-client",
+            "client_secret": "",
+            "redirect_uri": "",
+            "scopes": ["openid", "email"],
+            "allow_claim": "email",
+            "allow_values": [claims.get("email", "")],
+        },
+    )
+    monkeypatch.setattr(
+        auth_oidc,
+        "_get_discovery_document",
+        lambda _issuer: {
+            "issuer": "https://issuer.example",
+            "token_endpoint": "https://issuer.example/token",
+            "jwks_uri": "https://issuer.example/jwks",
+        },
+    )
+    monkeypatch.setattr(
+        auth_oidc, "_post_form_json", lambda *a, **k: {"id_token": "stub-id-token"}
+    )
+    monkeypatch.setattr(auth_oidc, "_validate_id_token", lambda *a, **k: dict(claims))
+    auth_oidc._pending_flows.clear()
+    auth_oidc._pending_flows["state-token"] = {
+        "created_at": time.time(),
+        "nonce": "nonce-token",
+        "code_verifier": "verifier",
+        "next_path": "/",
+    }
+    return auth_oidc
+
+
+def test_oidc_rejects_unverified_email(monkeypatch):
+    # FINDING 2: an allowlisted account whose IdP reports email_verified=false
+    # must not confer identity (and thus never-deny bootstrap-admin) access.
+    from api.auth_oidc import OIDCAuthError
+
+    auth_oidc = _prime_oidc_flow(
+        monkeypatch,
+        {"sub": "abc", "email": "attacker@example.com", "email_verified": False},
+    )
+    staged = {}
+    from api import auth as _auth
+
+    monkeypatch.setattr(_auth, "stage_session_identity", lambda d: staged.update(d))
+
+    with pytest.raises(OIDCAuthError, match="not verified"):
+        auth_oidc.complete_authorization_code_flow(
+            "http://localhost:8787", "state-token", "code-token"
+        )
+    assert staged == {}  # identity was never staged
+
+
+def test_oidc_accepts_verified_email(monkeypatch):
+    # FINDING 2: Google-style IdPs that send email_verified=true still work.
+    auth_oidc = _prime_oidc_flow(
+        monkeypatch,
+        {"sub": "abc", "email": "user@example.com", "email_verified": True},
+    )
+    staged = {}
+    from api import auth as _auth
+
+    monkeypatch.setattr(_auth, "stage_session_identity", lambda d: staged.update(d))
+
+    result = auth_oidc.complete_authorization_code_flow(
+        "http://localhost:8787", "state-token", "code-token"
+    )
+    assert result["email"] == "user@example.com"
+    assert staged["email"] == "user@example.com"
+
+
+def test_oidc_accepts_email_when_verified_claim_absent(monkeypatch):
+    # FINDING 2: IdPs that omit email_verified are not downgraded.
+    auth_oidc = _prime_oidc_flow(
+        monkeypatch, {"sub": "abc", "email": "user@example.com"}
+    )
+    from api import auth as _auth
+
+    monkeypatch.setattr(_auth, "stage_session_identity", lambda d: None)
+
+    result = auth_oidc.complete_authorization_code_flow(
+        "http://localhost:8787", "state-token", "code-token"
+    )
+    assert result["email"] == "user@example.com"

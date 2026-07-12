@@ -54,6 +54,16 @@ class OIDCAuthError(Exception):
         self.status_code = status_code
 
 
+def _is_truthy_claim(value: Any) -> bool:
+    """Interpret an OIDC boolean-ish claim (email_verified may arrive as a real
+    bool or the string 'true'/'false', per the spec and real-world IdPs)."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() == "true"
+    return bool(value)
+
+
 def is_oidc_enabled() -> bool:
     cfg = _resolve_oidc_config()
     return bool(
@@ -143,6 +153,14 @@ def complete_authorization_code_flow(
         allow_claim=cfg.get("allow_claim"),
         allow_values=cfg.get("allow_values") or [],
     )
+    # The email claim confers identity (and, for a bootstrap admin, never-deny
+    # wildcard access). At IdPs that allow unverified or user-editable emails,
+    # an allowlisted account could set its email to the bootstrap admin's and
+    # steal that access. When the IdP tells us the email is not verified,
+    # reject the login. IdPs like Google send email_verified=true, which passes;
+    # IdPs that omit the claim entirely are left as-is (no downgrade).
+    if "email_verified" in claims and not _is_truthy_claim(claims.get("email_verified")):
+        raise OIDCAuthError("OIDC email address is not verified", status_code=403)
     # Stage the caller's identity for the create_session() call that follows in
     # the login route; claims_subset stays bounded (never the full raw claims).
     from api import auth as _auth  # late import to avoid a module cycle
