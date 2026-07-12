@@ -939,6 +939,7 @@
           <button type="button" class="gov-tab active" data-gov-tab="overview" onclick="_govSwitchTab('overview')" data-i18n="governance_overview">Overview</button>
           <button type="button" class="gov-tab" data-gov-tab="users" onclick="_govSwitchTab('users')" data-i18n="governance_users">Users</button>
           <button type="button" class="gov-tab" data-gov-tab="groups" onclick="_govSwitchTab('groups')" data-i18n="governance_groups">Groups</button>
+          <button type="button" class="gov-tab" data-gov-tab="approvals" onclick="_govSwitchTab('approvals')"><span data-i18n="governance_approvals">Approvals</span><span class="gov-tab-badge" id="govApprovalsBadge" style="display:none"></span></button>
           <button type="button" class="gov-tab" data-gov-tab="preview" onclick="_govSwitchTab('preview')" data-i18n="governance_preview">Preview access</button>
           <button type="button" class="gov-tab" data-gov-tab="audit" onclick="_govSwitchTab('audit')" data-i18n="governance_audit">Audit</button>
         </div>
@@ -946,6 +947,7 @@
           <div class="gov-tab-pane active" id="govPaneOverview"><div class="gov-muted" data-i18n="loading">Loading...</div></div>
           <div class="gov-tab-pane" id="govPaneUsers"></div>
           <div class="gov-tab-pane" id="govPaneGroups"></div>
+          <div class="gov-tab-pane" id="govPaneApprovals"></div>
           <div class="gov-tab-pane" id="govPanePreview">
             <div class="gov-form">
               <div class="gov-form-title" data-i18n="governance_preview_title">Preview effective access</div>

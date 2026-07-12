@@ -4612,7 +4612,23 @@ function renderSkills(skills) {
       const descEl = document.createElement('span');
       descEl.className = 'skill-desc';
       descEl.textContent = skill.description || '';
-      el.append(toggle, nameEl, descEl);
+      el.append(toggle, nameEl);
+      // User-added skills carry added_by / approval_status from /api/skills
+      // (admin view sees every row; owners see their own pending rows).
+      if (skill.added_by) {
+        const ownerBadge = document.createElement('span');
+        ownerBadge.className = 'skill-badge skill-badge-owner';
+        ownerBadge.textContent = 'added by ' + skill.added_by;
+        ownerBadge.title = 'added by ' + skill.added_by;
+        el.appendChild(ownerBadge);
+      }
+      if (skill.approval_status === 'pending') {
+        const pendingBadge = document.createElement('span');
+        pendingBadge.className = 'skill-badge skill-badge-pending';
+        pendingBadge.textContent = 'pending approval';
+        el.appendChild(pendingBadge);
+      }
+      el.appendChild(descEl);
       el.onclick = () => openSkill(skill.name, el);
       sec.appendChild(el);
     }

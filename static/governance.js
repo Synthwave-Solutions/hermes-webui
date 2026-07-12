@@ -57,12 +57,13 @@ async function loadGovernance() {
   const me = await _govFetchMe();
   govApplyVisibility(me);
   if (!_govIsAdmin(me)) return false;
+  _govRefreshApprovalsBadge();
   await _govSwitchTab(_govTab || 'overview');
   return true;
 }
 
 async function _govSwitchTab(name) {
-  const tab = ['overview', 'users', 'groups', 'preview', 'audit'].includes(name) ? name : 'overview';
+  const tab = ['overview', 'users', 'groups', 'approvals', 'preview', 'audit'].includes(name) ? name : 'overview';
   _govTab = tab;
   document.querySelectorAll('#mainGovernance .gov-tab').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.govTab === tab);
@@ -73,6 +74,7 @@ async function _govSwitchTab(name) {
   if (tab === 'overview') await _govLoadOverview();
   if (tab === 'users') await _govLoadUsers();
   if (tab === 'groups') await _govLoadGroups();
+  if (tab === 'approvals') await _govLoadApprovals();
   if (tab === 'audit') await _govLoadAudit();
   // preview tab is form-driven; nothing to preload
 }
@@ -204,12 +206,30 @@ async function _govLoadUsers() {
         '<input id="govUserRoles" type="text" placeholder="viewer, operator"></div>' +
       '<div class="gov-form-row"><label for="govUserGroups">' + _govT('governance_groups_csv', 'Groups (comma separated)') + '</label>' +
         '<input id="govUserGroups" type="text" placeholder="sw-engineering"></div>' +
+      '<div class="gov-form-title gov-grants-title">' + _govT('governance_grants_title', 'Per-user grants (optional)') + '</div>' +
+      '<div class="gov-form-row"><label for="govUserSkillsView">' + _govT('governance_grants_skills_view', 'Skills view (comma separated)') + '</label>' +
+        '<input id="govUserSkillsView" type="text" placeholder="my-skill, *"></div>' +
+      '<div class="gov-form-row"><label for="govUserSkillsLoad">' + _govT('governance_grants_skills_load', 'Skills load (comma separated)') + '</label>' +
+        '<input id="govUserSkillsLoad" type="text" placeholder="my-skill"></div>' +
+      '<div class="gov-form-row"><label for="govUserSkillsManage">' + _govT('governance_grants_skills_manage', 'Skills manage (comma separated)') + '</label>' +
+        '<input id="govUserSkillsManage" type="text" placeholder="my-skill"></div>' +
+      '<div class="gov-form-row"><label for="govUserMcpServers">' + _govT('governance_grants_mcp_servers', 'MCP servers (comma separated)') + '</label>' +
+        '<input id="govUserMcpServers" type="text" placeholder="notion, playwright"></div>' +
+      '<div class="gov-form-row"><label for="govUserCliCommands">' + _govT('governance_grants_cli_commands', 'CLI commands (comma separated)') + '</label>' +
+        '<input id="govUserCliCommands" type="text" placeholder="git, gh"></div>' +
       '<div class="gov-form-actions">' +
         '<button type="button" class="gov-btn primary" onclick="_govSaveUser()">' + _govT('governance_save', 'Save') + '</button>' +
         '<button type="button" class="gov-btn" onclick="_govResetUserForm()">' + _govT('governance_cancel', 'Cancel') + '</button>' +
       '</div>' +
     '</div>';
   _govResetUserForm();
+}
+
+const _GOV_USER_GRANT_FIELDS = ['govUserSkillsView', 'govUserSkillsLoad', 'govUserSkillsManage', 'govUserMcpServers', 'govUserCliCommands'];
+
+function _govSetInput(id, value) {
+  const el = $(id);
+  if (el) el.value = value;
 }
 
 function _govResetUserForm() {
@@ -222,6 +242,7 @@ function _govResetUserForm() {
   if (roles) roles.value = '';
   const groups = $('govUserGroups');
   if (groups) groups.value = '';
+  _GOV_USER_GRANT_FIELDS.forEach(id => _govSetInput(id, ''));
 }
 
 function _govEditUser(email) {
@@ -235,6 +256,53 @@ function _govEditUser(email) {
   if (roles) roles.value = (entry.roles || []).join(', ');
   const groups = $('govUserGroups');
   if (groups) groups.value = (entry.groups || []).join(', ');
+  const grants = (entry.grants && typeof entry.grants === 'object') ? entry.grants : {};
+  const skills = (grants.skills && typeof grants.skills === 'object') ? grants.skills : {};
+  const mcp = (grants.mcp && typeof grants.mcp === 'object') ? grants.mcp : {};
+  const cli = (grants.cli && typeof grants.cli === 'object') ? grants.cli : {};
+  _govSetInput('govUserSkillsView', (skills.view || []).join(', '));
+  _govSetInput('govUserSkillsLoad', (skills.load || []).join(', '));
+  _govSetInput('govUserSkillsManage', (skills.manage || []).join(', '));
+  _govSetInput('govUserMcpServers', (mcp.servers || []).join(', '));
+  // cli.commands entries may be strings or {id/argv0} objects per the policy schema
+  const commands = (cli.commands || []).map(c => (typeof c === 'string') ? c : ((c && (c.id || c.argv0)) || '')).filter(Boolean);
+  _govSetInput('govUserCliCommands', commands.join(', '));
+}
+
+/**
+ * Build the grants object from the form fields, or null when every field is
+ * empty. Grant keys the form does not edit (mcp.tools, cli.workdir_roots,
+ * usage_caps, ...) are carried over from the entry being edited so a save
+ * never silently drops them.
+ */
+function _govCollectUserGrants() {
+  const existing = (_govEditingUser && (window.__GOV_USERS__ || {})[_govEditingUser]) || {};
+  const prior = (existing.grants && typeof existing.grants === 'object') ? existing.grants : {};
+  const grants = {};
+  for (const k of Object.keys(prior)) {
+    if (k !== 'skills' && k !== 'mcp' && k !== 'cli') grants[k] = prior[k];
+  }
+  const skills = {};
+  const view = _govCsv(($('govUserSkillsView') || {}).value);
+  const load = _govCsv(($('govUserSkillsLoad') || {}).value);
+  const manage = _govCsv(($('govUserSkillsManage') || {}).value);
+  if (view.length) skills.view = view;
+  if (load.length) skills.load = load;
+  if (manage.length) skills.manage = manage;
+  if (Object.keys(skills).length) grants.skills = skills;
+  const mcp = {};
+  const priorMcp = (prior.mcp && typeof prior.mcp === 'object') ? prior.mcp : {};
+  if (priorMcp.tools && Object.keys(priorMcp.tools).length) mcp.tools = priorMcp.tools;
+  const servers = _govCsv(($('govUserMcpServers') || {}).value);
+  if (servers.length) mcp.servers = servers;
+  if (Object.keys(mcp).length) grants.mcp = mcp;
+  const cli = {};
+  const priorCli = (prior.cli && typeof prior.cli === 'object') ? prior.cli : {};
+  if (Array.isArray(priorCli.workdir_roots) && priorCli.workdir_roots.length) cli.workdir_roots = priorCli.workdir_roots;
+  const commands = _govCsv(($('govUserCliCommands') || {}).value);
+  if (commands.length) cli.commands = commands;
+  if (Object.keys(cli).length) grants.cli = cli;
+  return Object.keys(grants).length ? grants : null;
 }
 
 async function _govSaveUser() {
@@ -247,6 +315,8 @@ async function _govSaveUser() {
     roles: _govCsv(($('govUserRoles') || {}).value),
     groups: _govCsv(($('govUserGroups') || {}).value),
   };
+  const grants = _govCollectUserGrants();
+  if (grants) entry.grants = grants;
   const path = _govEditingUser ? '/api/governance/users/update' : '/api/governance/users';
   try {
     const res = await _govPost(path, { email: email, entry: entry });
@@ -372,6 +442,76 @@ async function _govDeleteGroup(name) {
     await _govLoadGroups();
   } catch (e) {
     if (!_govHandleConflict(e) && typeof showToast === 'function') showToast(e.message || 'delete failed', 4000, 'error');
+  }
+}
+
+// ── Approvals tab ─────────────────────────────────────────────────────────
+// Pending user-added skills (api/skill_ownership registry). Approve makes a
+// skill global; reject deletes it from disk. Server-gated by governance:write.
+
+function _govUpdateApprovalsBadge(count) {
+  const badge = $('govApprovalsBadge');
+  if (!badge) return;
+  const n = Number(count) || 0;
+  badge.textContent = n > 0 ? String(n) : '';
+  badge.style.display = n > 0 ? '' : 'none';
+}
+
+/** Refresh the pending-count badge without switching to the tab. */
+async function _govRefreshApprovalsBadge() {
+  try {
+    const data = await api('/api/governance/approvals', { redirect401: false, timeoutToast: false, timeoutMs: 15000 });
+    _govUpdateApprovalsBadge((data.pending || []).length);
+  } catch (e) { /* not an admin or endpoint unavailable; leave badge hidden */ }
+}
+
+async function _govLoadApprovals() {
+  const el = $('govPaneApprovals');
+  if (!el) return;
+  el.innerHTML = '<div class="gov-muted">' + _govT('loading', 'Loading...') + '</div>';
+  let data;
+  try {
+    data = await api('/api/governance/approvals', { redirect401: false });
+  } catch (e) {
+    _govError(e, 'govPaneApprovals');
+    return;
+  }
+  const pending = data.pending || [];
+  _govUpdateApprovalsBadge(pending.length);
+  const rows = pending.map(item => {
+    let when = '';
+    const ts = Number(item.added_at);
+    if (Number.isFinite(ts) && ts > 0) when = new Date(ts * 1000).toLocaleString();
+    return '<tr>' +
+      '<td>' + _govEsc(item.key || '') + '</td>' +
+      '<td>' + _govEsc(item.owner_email || '') + '</td>' +
+      '<td class="gov-nowrap">' + _govEsc(when) + '</td>' +
+      '<td class="gov-row-actions">' +
+        '<button type="button" class="gov-btn primary" onclick="_govDecideApproval(' + _govEsc(JSON.stringify(item.key)) + ', \'approve\')">' + _govT('governance_approve', 'Approve') + '</button>' +
+        '<button type="button" class="gov-btn danger" onclick="_govDecideApproval(' + _govEsc(JSON.stringify(item.key)) + ', \'reject\')">' + _govT('governance_reject', 'Reject') + '</button>' +
+      '</td></tr>';
+  }).join('');
+  el.innerHTML =
+    '<table class="gov-table"><thead><tr>' +
+      '<th>' + _govT('governance_col_skill', 'Skill') + '</th>' +
+      '<th>' + _govT('governance_col_added_by', 'Added by') + '</th>' +
+      '<th>' + _govT('governance_col_added_at', 'Added') + '</th><th></th>' +
+    '</tr></thead><tbody>' +
+    (rows || '<tr><td colspan="4" class="gov-muted">' + _govT('governance_no_pending', 'No pending skill approvals.') + '</td></tr>') +
+    '</tbody></table>' +
+    '<div class="gov-muted">' + _govT('governance_approvals_note',
+      'Approve makes the skill available to every user. Reject deletes the skill from disk.') + '</div>';
+}
+
+async function _govDecideApproval(key, decision) {
+  try {
+    await _govPost('/api/governance/approvals/decide', { kind: 'skill', key: key, decision: decision });
+    if (typeof showToast === 'function') {
+      showToast(decision === 'approve' ? _govT('governance_approved', 'Approved') : _govT('governance_rejected', 'Rejected'), 2500);
+    }
+    await _govLoadApprovals();
+  } catch (e) {
+    if (!_govHandleConflict(e) && typeof showToast === 'function') showToast(e.message || 'decision failed', 4000, 'error');
   }
 }
 
