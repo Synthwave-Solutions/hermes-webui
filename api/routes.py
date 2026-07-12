@@ -9216,10 +9216,9 @@ button:hover{background:#0087dc;border-color:#0087dc}
   <div class="logo"><img src="static/synthwave-symbol.png" alt="Synthwave Solutions"></div>
   <h1>SynthPulse Control</h1>
   <p class="sub">{{LOGIN_SUBTITLE}}</p>
+  {{SSO_FIRST_NOTICE}}
   <form id="login-form" data-invalid-pw="{{LOGIN_INVALID_PW}}" data-conn-failed="{{LOGIN_CONN_FAILED}}">
-    <input type="password" id="pw" placeholder="{{LOGIN_PLACEHOLDER}}" autofocus>
-    <button type="submit">{{LOGIN_BTN}}</button>
-    <button type="button" id="passkey-login" class="passkey-login" style="display:none">Sign in with passkey</button>
+    {{PASSWORD_FIELDS}}
     {{OIDC_LOGIN_HTML}}
   </form>
   <div class="err" id="err"></div>
@@ -9267,6 +9266,66 @@ def _oidc_login_html(parsed) -> str:
         '<a id="oidc-login" class="oidc-login" '
         f'href="{_html.escape(href, quote=True)}">Continue with SSO</a>'
     )
+
+
+def _password_fields_html(login_strings) -> str:
+    """The standard password input + submit + passkey button block."""
+    placeholder = _html.escape(login_strings["placeholder"])
+    btn = _html.escape(login_strings["btn"])
+    return (
+        f'<input type="password" id="pw" placeholder="{placeholder}" autofocus>'
+        f'<button type="submit">{btn}</button>'
+        '<button type="button" id="passkey-login" class="passkey-login" '
+        'style="display:none">Sign in with passkey</button>'
+    )
+
+
+def _login_two_step_fragments(handler, parsed, login_strings) -> tuple[str, str, str]:
+    """Return (sso_first_notice, password_fields, oidc_login_html) for /login.
+
+    When require_sso_first() is OFF this returns the classic page unchanged:
+    an empty notice, the full password block, and the usual SSO link.
+
+    When ON:
+      - no valid pending-SSO cookie: render ONLY the Google/SSO button, hide the
+        password field, and show a "Sign in with Google to continue" line.
+      - valid pending-SSO cookie: render the password step only, with a
+        "Signed in as <email> via Google" line (email escaped). The SSO link is
+        hidden so the flow reads as a single second step.
+    """
+    from api.auth import parse_sso_pending_cookie, require_sso_first, verify_sso_pending
+
+    if not require_sso_first():
+        return "", _password_fields_html(login_strings), _oidc_login_html(parsed)
+
+    pending_cookie = parse_sso_pending_cookie(handler)
+    identity = verify_sso_pending(pending_cookie) if pending_cookie else None
+
+    if identity is None:
+        # Step 1: SSO required first. Hide password, show only the SSO button.
+        notice = (
+            '<p class="sub" id="sso-first-notice">'
+            'Sign in with Google to continue</p>'
+        )
+        oidc_html = _oidc_login_html(parsed)
+        if not oidc_html:
+            # SSO not configured but the toggle is on: surface a clear message
+            # instead of a dead page (no password path is available).
+            oidc_html = (
+                '<p class="err" style="display:block">'
+                'SSO is required but not configured. Contact your administrator.'
+                '</p>'
+            )
+        return notice, "", oidc_html
+
+    # Step 2: valid pending SSO. Show the password step only.
+    email = _html.escape(str(identity.get("email") or ""))
+    notice = (
+        '<p class="sub" id="sso-signed-in">'
+        f'Signed in as {email} via Google. '
+        'Enter the dashboard password to continue.</p>'
+    )
+    return notice, _password_fields_html(login_strings), ""
 
 
 # ── Logs endpoint ─────────────────────────────────────────────────────────────
@@ -11133,6 +11192,9 @@ def handle_get(handler, parsed) -> bool:
         from urllib.parse import quote
         from api.updates import WEBUI_VERSION
         version_token = quote(WEBUI_VERSION, safe="")
+        _sso_notice, _password_fields, _oidc_html = _login_two_step_fragments(
+            handler, parsed, _login_strings
+        )
         _page = (
             _LOGIN_PAGE_HTML.replace("{{BOT_NAME}}", _bn)
             .replace("{{BOT_NAME_INITIAL}}", _bn[0].upper())
@@ -11140,15 +11202,13 @@ def handle_get(handler, parsed) -> bool:
             .replace("{{LANG}}", _html.escape(_login_strings["lang"]))
             .replace("{{LOGIN_TITLE}}", _html.escape(_login_strings["title"]))
             .replace("{{LOGIN_SUBTITLE}}", _html.escape(_login_strings["subtitle"]))
-            .replace(
-                "{{LOGIN_PLACEHOLDER}}", _html.escape(_login_strings["placeholder"])
-            )
-            .replace("{{LOGIN_BTN}}", _html.escape(_login_strings["btn"]))
             .replace("{{LOGIN_INVALID_PW}}", _html.escape(_login_strings["invalid_pw"]))
             .replace(
                 "{{LOGIN_CONN_FAILED}}", _html.escape(_login_strings["conn_failed"])
             )
-            .replace("{{OIDC_LOGIN_HTML}}", _oidc_login_html(parsed))
+            .replace("{{SSO_FIRST_NOTICE}}", _sso_notice)
+            .replace("{{PASSWORD_FIELDS}}", _password_fields)
+            .replace("{{OIDC_LOGIN_HTML}}", _oidc_html)
         )
         return t(handler, _page, content_type="text/html; charset=utf-8")
 
@@ -11175,7 +11235,13 @@ def handle_get(handler, parsed) -> bool:
         return True
 
     if parsed.path == "/api/auth/oidc/callback":
-        from api.auth import create_session, set_auth_cookie
+        from api.auth import (
+            create_session,
+            create_sso_pending,
+            require_sso_first,
+            set_auth_cookie,
+            set_sso_pending_cookie,
+        )
         from api.auth_oidc import OIDCAuthError, OIDCConfigError, complete_authorization_code_flow
 
         query = parse_qs(parsed.query or "")
@@ -11195,6 +11261,34 @@ def handle_get(handler, parsed) -> bool:
             return j(handler, {"error": str(exc)}, status=404)
         except OIDCAuthError as exc:
             return j(handler, {"error": str(exc)}, status=exc.status_code)
+        # Two-step login (SSO first, then password): stash the validated SSO
+        # identity in the pending store and bounce back to /login for the
+        # password step. NO full session is created here.
+        if require_sso_first():
+            from api.auth import _pop_pending_identity
+
+            # complete_authorization_code_flow() staged the identity on this
+            # thread for create_session(); consume it and re-key it as pending.
+            staged = _pop_pending_identity() or {
+                "email": result.get("email"),
+                "groups": result.get("groups") or [],
+                "claims_subset": result.get("claims_subset") or {},
+            }
+            from urllib.parse import quote as _quote
+
+            pending_cookie = create_sso_pending(staged)
+            next_path = _safe_login_redirect_path(result.get("next_path"))
+            login_location = "/login"
+            if next_path != "/":
+                login_location += "?next=" + _quote(next_path, safe="/")
+            handler.send_response(302)
+            handler.send_header("Location", login_location)
+            handler.send_header("Cache-Control", "no-store")
+            _security_headers(handler)
+            set_sso_pending_cookie(handler, pending_cookie)
+            handler.send_header("Content-Length", "0")
+            handler.end_headers()
+            return True
         cookie_val = create_session()
         handler.send_response(302)
         handler.send_header(
@@ -14996,6 +15090,13 @@ def handle_post(handler, parsed) -> bool:
             is_auth_enabled,
         )
         from api.auth import _check_login_rate, _record_login_attempt, _clear_login_attempts
+        from api.auth import (
+            clear_sso_pending_cookie,
+            consume_sso_pending,
+            parse_sso_pending_cookie,
+            require_sso_first,
+            verify_sso_pending,
+        )
 
         if not is_auth_enabled():
             return j(handler, {"ok": True, "message": "Auth not enabled"})
@@ -15006,12 +15107,32 @@ def handle_post(handler, parsed) -> bool:
                 {"error": "Too many attempts. Try again in a minute."},
                 status=429,
             )
+        # Two-step login: when SSO-first is on, a prior successful SSO in this
+        # browser is mandatory. Reject a password-only attempt BEFORE checking
+        # the password so a leaked password alone cannot create a session.
+        sso_identity = None
+        if require_sso_first():
+            pending_cookie = parse_sso_pending_cookie(handler)
+            sso_identity = verify_sso_pending(pending_cookie) if pending_cookie else None
+            if sso_identity is None:
+                return bad(handler, "sso_required", 401)
         password = body.get("password", "")
         if not verify_password(password):
             _record_login_attempt(client_ip)
             return bad(handler, "Invalid password", 401)
         _clear_login_attempts(client_ip)
-        cookie_val = create_session()
+        if require_sso_first():
+            # Consume the pending SSO entry (delete it) and mint the full session
+            # with the SSO identity. method reflects the two-factor path.
+            identity = consume_sso_pending(pending_cookie) or sso_identity
+            cookie_val = create_session({
+                "email": str(identity.get("email") or "").lower(),
+                "groups": list(identity.get("groups") or []),
+                "claims_subset": dict(identity.get("claims_subset") or {}),
+                "method": "sso+password",
+            })
+        else:
+            cookie_val = create_session()
         body = json.dumps({"ok": True}).encode()
         handler.send_response(200)
         handler.send_header("Content-Type", "application/json")
@@ -15019,6 +15140,8 @@ def handle_post(handler, parsed) -> bool:
         handler.send_header("Cache-Control", "no-store")
         _security_headers(handler)
         set_auth_cookie(handler, cookie_val)
+        if require_sso_first():
+            clear_sso_pending_cookie(handler)
         handler.end_headers()
         handler.wfile.write(body)
         return True
