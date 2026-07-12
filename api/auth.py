@@ -587,6 +587,146 @@ def _pop_pending_identity() -> dict | None:
     return value
 
 
+def require_sso_first() -> bool:
+    """Return True when the mandatory two-step (SSO first, then password) login is on.
+
+    Gated by the ``HERMES_WEBUI_REQUIRE_SSO_FIRST`` env var (truthy = 1/true/yes/on),
+    DEFAULT OFF. When off, the login flow behaves exactly as before this feature
+    landed, so the code can be deployed safely before the toggle is switched on.
+    """
+    return os.getenv('HERMES_WEBUI_REQUIRE_SSO_FIRST', '').strip().lower() in {
+        '1', 'true', 'yes', 'on',
+    }
+
+
+# ── Pending-SSO store (two-step login handoff) ──────────────────────────────
+# When require_sso_first() is on, a successful OIDC callback does NOT create a
+# full session. Instead it stashes the validated identity here for a short TTL
+# and hands the browser a signed, HttpOnly cookie (token.hmacsig). The password
+# step then consumes that pending entry to build the full session. This mirrors
+# the server-side _sessions store: the cookie carries only an opaque token, the
+# identity never leaves the server. In-memory only (a ~10 minute handoff); not
+# persisted, and a cold start simply forces the user to redo the SSO step.
+SSO_PENDING_COOKIE_NAME = 'HERMES_WEBUI_SSO_PENDING'
+_SSO_PENDING_TTL = 600  # seconds
+
+_sso_pending: dict[str, dict] = {}
+_SSO_PENDING_LOCK = threading.Lock()
+
+
+def _prune_sso_pending() -> None:
+    """Drop expired pending-SSO entries (called on every access)."""
+    now = time.time()
+    with _SSO_PENDING_LOCK:
+        expired = [t for t, v in _sso_pending.items() if now > float(v.get('exp', 0))]
+        for token in expired:
+            _sso_pending.pop(token, None)
+
+
+def create_sso_pending(identity: dict) -> str:
+    """Stash a validated SSO identity and return a signed pending cookie value.
+
+    *identity* shape: {"email": str, "groups": [str], "claims_subset": dict}.
+    Returns ``token.hmacsig`` (signed with _signing_key()) for the pending
+    cookie. Consume it later with consume_sso_pending().
+    """
+    _prune_sso_pending()
+    token = secrets.token_hex(32)
+    entry = {
+        'email': str(identity.get('email') or '').lower(),
+        'groups': [str(g) for g in (identity.get('groups') or [])],
+        'claims_subset': dict(identity.get('claims_subset') or {}),
+        'exp': time.time() + _SSO_PENDING_TTL,
+    }
+    with _SSO_PENDING_LOCK:
+        _sso_pending[token] = entry
+    sig = hmac.new(_signing_key(), token.encode(), hashlib.sha256).hexdigest()
+    return f"{token}.{sig}"
+
+
+def _sso_pending_token(cookie_value: str) -> str | None:
+    """Verify the signature on a pending cookie and return its raw token."""
+    if not cookie_value or '.' not in cookie_value:
+        return None
+    token, sig = cookie_value.rsplit('.', 1)
+    if not token or not sig:
+        return None
+    expected = hmac.new(_signing_key(), token.encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(str(sig), expected):
+        return None
+    return token
+
+
+def verify_sso_pending(cookie_value: str) -> dict | None:
+    """Return the pending SSO identity for a valid cookie, or None.
+
+    Rejects a bad signature, an unknown token, or an expired entry. Does NOT
+    delete the entry (use consume_sso_pending() for that).
+    """
+    token = _sso_pending_token(cookie_value)
+    if not token:
+        return None
+    _prune_sso_pending()
+    with _SSO_PENDING_LOCK:
+        entry = _sso_pending.get(token)
+        if entry is None or time.time() > float(entry.get('exp', 0)):
+            _sso_pending.pop(token, None)
+            return None
+        return {k: v for k, v in entry.items() if k != 'exp'}
+
+
+def consume_sso_pending(cookie_value: str) -> dict | None:
+    """Verify + delete a pending SSO entry, returning its identity or None."""
+    token = _sso_pending_token(cookie_value)
+    if not token:
+        return None
+    _prune_sso_pending()
+    with _SSO_PENDING_LOCK:
+        entry = _sso_pending.pop(token, None)
+    if entry is None or time.time() > float(entry.get('exp', 0)):
+        return None
+    return {k: v for k, v in entry.items() if k != 'exp'}
+
+
+def set_sso_pending_cookie(handler, cookie_value: str) -> None:
+    """Set the short-lived pending-SSO cookie on the response."""
+    cookie = http.cookies.SimpleCookie()
+    name = SSO_PENDING_COOKIE_NAME
+    cookie[name] = cookie_value
+    cookie[name]['httponly'] = True
+    cookie[name]['samesite'] = 'Lax'
+    cookie[name]['path'] = '/'
+    cookie[name]['max-age'] = str(_SSO_PENDING_TTL)
+    if _is_secure_context(handler):
+        cookie[name]['secure'] = True
+    handler.send_header('Set-Cookie', cookie[name].OutputString())
+
+
+def clear_sso_pending_cookie(handler) -> None:
+    """Clear the pending-SSO cookie on the response."""
+    cookie = http.cookies.SimpleCookie()
+    name = SSO_PENDING_COOKIE_NAME
+    cookie[name] = ''
+    cookie[name]['httponly'] = True
+    cookie[name]['path'] = '/'
+    cookie[name]['max-age'] = '0'
+    handler.send_header('Set-Cookie', cookie[name].OutputString())
+
+
+def parse_sso_pending_cookie(handler) -> str | None:
+    """Extract the pending-SSO cookie value from the request headers."""
+    cookie_header = handler.headers.get('Cookie', '')
+    if not cookie_header:
+        return None
+    cookie = http.cookies.SimpleCookie()
+    try:
+        cookie.load(cookie_header)
+    except http.cookies.CookieError:
+        return None
+    morsel = cookie.get(SSO_PENDING_COOKIE_NAME)
+    return morsel.value if morsel else None
+
+
 def _local_login_identity() -> dict:
     """Identity attached to local (password/passkey/bootstrap) logins.
 

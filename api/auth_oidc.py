@@ -165,24 +165,47 @@ def complete_authorization_code_flow(
     # the login route; claims_subset stays bounded (never the full raw claims).
     from api import auth as _auth  # late import to avoid a module cycle
 
+    identity = _identity_from_claims(claims, method="oidc")
+    _auth.stage_session_identity(identity)
+    return {
+        "next_path": pending["next_path"],
+        "subject": str(claims.get("sub") or ""),
+        "email": str(claims.get("email") or ""),
+        "groups": list(identity["groups"]),
+        "claims_subset": dict(identity["claims_subset"]),
+        "claims": claims,
+    }
+
+
+def _identity_from_claims(claims: dict[str, Any], *, method: str = "oidc") -> dict[str, Any]:
+    """Build the WebUI session identity from validated OIDC claims.
+
+    Groups come from the configured group/role claim, PLUS a pseudo-group
+    ``hd:<hosted_domain>`` when the id_token carries Google's ``hd`` claim
+    (Workspace hosted domain). That lets a governance policy map an entire
+    Workspace domain to a baseline role via ``sso_groups: ["hd:<domain>"]``,
+    independent of whether the allowlist is keyed on email or hd. The raw
+    id_token is never logged or persisted here; only the bounded claims_subset
+    below travels with the session.
+    """
     groups_claim = claims.get("groups") or claims.get("roles") or []
     if isinstance(groups_claim, str):
         groups_claim = [groups_claim]
-    _auth.stage_session_identity({
+    groups = [str(g) for g in groups_claim]
+    hd = str(claims.get("hd") or "").strip().lower()
+    if hd:
+        pseudo = f"hd:{hd}"
+        if pseudo not in groups:
+            groups.append(pseudo)
+    return {
         "email": str(claims.get("email") or "").lower(),
-        "groups": [str(g) for g in groups_claim],
+        "groups": groups,
         "claims_subset": {
             k: claims[k]
             for k in ("sub", "email", "name", "preferred_username")
             if k in claims
         },
-        "method": "oidc",
-    })
-    return {
-        "next_path": pending["next_path"],
-        "subject": str(claims.get("sub") or ""),
-        "email": str(claims.get("email") or ""),
-        "claims": claims,
+        "method": method,
     }
 
 
