@@ -414,6 +414,31 @@ def _handle_policy_replace(handler, parsed, policy, subject, access) -> bool:
         old_etag = policy_etag(current)
         if not _check_if_match(handler, current):
             return True
+
+        # Lock-out guard: a governance:write caller could POST a policy that
+        # drops (or empties) bootstrap_admins and flips mode to enforce,
+        # permanently locking out the never-deny owner(s). Refuse unless every
+        # CURRENT bootstrap admin survives the replace, or the caller is
+        # themselves a bootstrap admin (they own the never-deny set and may
+        # rotate it deliberately). Mirrors the users/delete protection shape.
+        current_bootstrap = {_norm_email(str(a)) for a in current_policy.bootstrap_admins}
+        new_bootstrap = {
+            _norm_email(str(a))
+            for a in (body.get("bootstrap_admins") or [])
+            if str(a).strip()
+        }
+        if current_bootstrap and not _is_bootstrap(subject, current_policy):
+            if not current_bootstrap.issubset(new_bootstrap):
+                j(
+                    handler,
+                    {
+                        "error": "bootstrap_admin_protected",
+                        "message": "policy replace must retain all current bootstrap admins",
+                    },
+                    status=400,
+                )
+                return True
+
         before = _policy_summary(current)
         try:
             save_governance_policy(body)

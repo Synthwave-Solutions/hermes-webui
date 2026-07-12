@@ -468,6 +468,43 @@ def test_bootstrap_admin_delete_refused(policy_file, as_user):
     assert BOOTSTRAP in loader.get_policy().raw["users"]
 
 
+def test_policy_replace_dropping_bootstrap_admin_refused(policy_file, as_user):
+    # FINDING 3: a governance:write caller who is NOT a bootstrap admin cannot
+    # replace the policy with an empty/reduced bootstrap_admins set, which would
+    # permanently lock out the never-deny owner.
+    policy_file()
+    as_user("admin@example.test")
+    etag = _current_etag()
+    stripped = json.loads(json.dumps(POLICY))
+    stripped["bootstrap_admins"] = []
+    stripped["mode"] = "enforce"
+    _, handler = _call(
+        "/api/governance/policy", "POST",
+        body=stripped, headers={"If-Match": f'"{etag}"'},
+    )
+    assert handler.status == 400
+    assert handler.body["error"] == "bootstrap_admin_protected"
+    # the on-disk policy still names the bootstrap admin
+    assert BOOTSTRAP in loader.get_policy().raw["bootstrap_admins"]
+
+
+def test_policy_replace_bootstrap_admin_may_rotate_own_set(policy_file, as_user):
+    # FINDING 3: the bootstrap admin owns the never-deny set and may
+    # deliberately rotate it (here: replace themselves with another admin).
+    policy_file()
+    as_user(BOOTSTRAP)
+    etag = _current_etag()
+    rotated = json.loads(json.dumps(POLICY))
+    rotated["bootstrap_admins"] = ["successor@example.test"]
+    _, handler = _call(
+        "/api/governance/policy", "POST",
+        body=rotated, headers={"If-Match": f'"{etag}"'},
+    )
+    assert handler.status is None or handler.status == 200, handler.body
+    assert handler.body.get("ok") is True
+    assert loader.get_policy().raw["bootstrap_admins"] == ["successor@example.test"]
+
+
 # ── admin gate holds in every mode ──────────────────────────────────────────
 
 @pytest.mark.parametrize("mode", ["enforce", "report_only", "off"])
