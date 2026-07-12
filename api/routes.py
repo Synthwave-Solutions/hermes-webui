@@ -14180,6 +14180,19 @@ def handle_post(handler, parsed) -> bool:
         name = body.get("name", "").strip()
         if not name:
             return bad(handler, "name is required")
+        # Governance profile scoping: the enforce hook only inspects the
+        # ?profile= query target, so this body-sourced switch (which then mints
+        # a PERSISTENT signed profile cookie) would otherwise bypass profile
+        # scoping. Reject a switch to a profile the caller is not scoped for.
+        # TODO(governance): the other body-profile sinks (/api/chat, /api/goal,
+        # /api/projects/create) still skip is_profile_allowed_for and should be
+        # wired the same way; this handler is the persistent-cookie vector.
+        try:
+            from api.governance.enforce import _request_identity, is_profile_allowed_for
+            if not is_profile_allowed_for(_request_identity(handler), name):
+                return bad(handler, "profile_not_allowed", 403)
+        except Exception:
+            logger.warning("profile switch governance check failed for %s", name, exc_info=True)
         try:
             from api.profiles import switch_profile, _validate_profile_name
             from api.helpers import build_profile_cookie
