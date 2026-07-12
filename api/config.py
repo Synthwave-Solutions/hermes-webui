@@ -8135,7 +8135,7 @@ _SETTINGS_DEFAULTS = {
     "composer_control_order": [],  # user-defined composer footer control order; invalid/duplicate keys are ignored
     "language": "en",  # UI locale code; must match a key in static/i18n.js LOCALES
     "bot_name": os.getenv(
-        "HERMES_WEBUI_BOT_NAME", "Hermes"
+        "HERMES_WEBUI_BOT_NAME", "SynthPulse"
     ),  # display name for the assistant
     "sound_enabled": False,  # play notification sound when assistant finishes
     "rtl": False,  # right-to-left chat layout (chat messages + composer only)
@@ -8194,6 +8194,7 @@ _SETTINGS_SKIN_VALUES = {
     "verdigris",
     "neon-soft",
     "neon-paint",
+    "synthpulse",
 }
 _SETTINGS_LEGACY_THEME_MAP = {
     # Legacy full themes now map onto the closest supported theme + accent skin pair.

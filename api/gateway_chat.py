@@ -35,6 +35,17 @@ from api.run_journal import RunJournalWriter
 
 logger = logging.getLogger(__name__)
 
+def _env_int(name: str, default: int, minimum: int) -> int:
+    try:
+        value = int(os.getenv(name, str(default)))
+    except (TypeError, ValueError):
+        value = default
+    return max(minimum, value)
+
+
+_GATEWAY_RUN_CREATE_TIMEOUT = _env_int("HERMES_WEBUI_GATEWAY_RUN_CREATE_TIMEOUT", 120, 30)
+_GATEWAY_STREAM_TIMEOUT = _env_int("HERMES_WEBUI_GATEWAY_STREAM_TIMEOUT", 1800, 600)
+
 # Maps stream_id -> gateway run_id for approval response relay.
 _STREAM_RUN_IDS: dict[str, str] = {}
 
@@ -353,7 +364,7 @@ def _run_gateway_runs_api_streaming(
         method="POST",
     )
     update_active_run(stream_id, phase="gateway-request")
-    with urllib.request.urlopen(req, timeout=30) as resp:
+    with urllib.request.urlopen(req, timeout=_GATEWAY_RUN_CREATE_TIMEOUT) as resp:
         run_data = json.loads(resp.read(65536))
     run_id = str(run_data.get("run_id") or run_data.get("id") or "").strip()
     if not run_id:
@@ -368,7 +379,7 @@ def _run_gateway_runs_api_streaming(
     final_text = ""
     usage: dict = {}
     sse_event = "message"
-    with urllib.request.urlopen(req_events, timeout=600) as resp:
+    with urllib.request.urlopen(req_events, timeout=_GATEWAY_STREAM_TIMEOUT) as resp:
         for raw_line in resp:
             if cancel_event.is_set():
                 put_gateway_event("cancel", {"message": "Cancelled by user"})
@@ -717,7 +728,7 @@ def _run_gateway_chat_streaming(
             update_active_run(stream_id, phase="gateway-request")
             last_payload = {}
             sse_event = "message"
-            with urllib.request.urlopen(req, timeout=600) as resp:
+            with urllib.request.urlopen(req, timeout=_GATEWAY_STREAM_TIMEOUT) as resp:
                 for raw_line in resp:
                     if cancel_event.is_set():
                         put_gateway_event("cancel", {"message": "Cancelled by user"})

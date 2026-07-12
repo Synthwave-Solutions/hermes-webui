@@ -9021,7 +9021,7 @@ _LOGIN_LOCALE = {
     "en": {
         "lang": "en",
         "title": "Sign in",
-        "subtitle": "Enter your password to continue",
+        "subtitle": "Secure access for Synthwave Solutions operations",
         "placeholder": "Password",
         "btn": "Sign in",
         "invalid_pw": "Invalid password",
@@ -9184,36 +9184,36 @@ def _resolve_login_locale_key(raw_lang: str | None) -> str:
 # ── Login page (self-contained, no external deps) ────────────────────────────
 _LOGIN_PAGE_HTML = """<!doctype html>
 <html lang="{{LANG}}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{{BOT_NAME}} — {{LOGIN_TITLE}}</title>
+<title>SynthPulse Control — {{LOGIN_TITLE}}</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#1a1a2e;color:#e8e8f0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
-  height:100vh;display:flex;align-items:center;justify-content:center}
-.card{background:#16213e;border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:36px 32px;
-  width:320px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.3)}
-.logo{width:48px;height:48px;border-radius:12px;background:linear-gradient(145deg,#e8a030,#e94560);
-  display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px;color:#fff;
-  margin:0 auto 12px;box-shadow:0 2px 12px rgba(233,69,96,.3)}
-h1{font-size:18px;font-weight:600;margin-bottom:4px}
-.sub{font-size:12px;color:#8888aa;margin-bottom:24px}
-input{width:100%;padding:10px 14px;border-radius:10px;border:1px solid rgba(255,255,255,.1);
-  background:rgba(255,255,255,.04);color:#e8e8f0;font-size:14px;outline:none;margin-bottom:14px;
-  transition:border-color .15s}
-input:focus{border-color:rgba(124,185,255,.5);box-shadow:0 0 0 3px rgba(124,185,255,.1)}
-button{width:100%;padding:10px;border-radius:10px;border:none;background:rgba(124,185,255,.15);
-  border:1px solid rgba(124,185,255,.3);color:#7cb9ff;font-size:14px;font-weight:600;cursor:pointer;
+body{background:radial-gradient(circle at top left,rgba(0,157,255,.22),transparent 32%),linear-gradient(135deg,#07111f 0%,#0f172a 54%,#08111d 100%);color:#eaf6ff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,system-ui,sans-serif;
+  min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.card{background:rgba(255,255,255,.94);border:1px solid rgba(0,157,255,.22);border-radius:22px;padding:36px 32px;
+  width:min(360px,100%);text-align:center;box-shadow:0 24px 80px rgba(0,0,0,.34),0 0 0 1px rgba(255,255,255,.45);color:#0f172a}
+.logo{width:64px;height:64px;border-radius:18px;background:linear-gradient(145deg,#f6fbff,#e8f6ff);
+  display:flex;align-items:center;justify-content:center;margin:0 auto 14px;box-shadow:0 10px 28px rgba(0,157,255,.22);overflow:hidden;border:1px solid rgba(0,157,255,.2)}
+.logo img{width:44px;height:44px;display:block;object-fit:contain}
+h1{font-size:20px;font-weight:750;margin-bottom:4px;letter-spacing:-.02em;color:#0f172a}
+.sub{font-size:12px;color:#587086;margin-bottom:24px}
+input{width:100%;padding:11px 14px;border-radius:12px;border:1px solid rgba(15,23,42,.14);
+  background:#f7fbff;color:#0f172a;font-size:14px;outline:none;margin-bottom:14px;
+  transition:border-color .15s,box-shadow .15s}
+input:focus{border-color:rgba(0,157,255,.55);box-shadow:0 0 0 3px rgba(0,157,255,.14)}
+button{width:100%;padding:11px;border-radius:12px;border:none;background:#009dff;
+  border:1px solid #009dff;color:#fff;font-size:14px;font-weight:700;cursor:pointer;
   transition:all .15s}
-button:hover{background:rgba(124,185,255,.25)}
-.oidc-login{display:block;margin-top:10px;padding:10px;border-radius:10px;text-decoration:none;
-  background:rgba(255,255,255,.04);border:1px solid rgba(111,214,164,.35);color:#6fd6a4;
-  font-size:14px;font-weight:600;cursor:pointer;transition:all .15s}
-.oidc-login:hover{background:rgba(111,214,164,.12)}
-.passkey-login{margin-top:10px;background:rgba(255,255,255,.04);border-color:rgba(232,160,48,.35);color:#e8a030}
-.err{color:#e94560;font-size:12px;margin-top:10px;display:none}
+button:hover{background:#0087dc;border-color:#0087dc}
+.oidc-login{display:block;margin-top:10px;padding:10px;border-radius:12px;text-decoration:none;
+  background:rgba(57,217,138,.09);border:1px solid rgba(57,217,138,.35);color:#087446;
+  font-size:14px;font-weight:700;cursor:pointer;transition:all .15s}
+.oidc-login:hover{background:rgba(57,217,138,.15)}
+.passkey-login{margin-top:10px;background:#fff;border-color:rgba(0,157,255,.3);color:#0078c5}
+.err{color:#d92d20;font-size:12px;margin-top:10px;display:none}
 </style></head><body>
 <div class="card">
-  <div class="logo">{{BOT_NAME_INITIAL}}</div>
-  <h1>{{BOT_NAME}}</h1>
+  <div class="logo"><img src="static/synthwave-symbol.png" alt="Synthwave Solutions"></div>
+  <h1>SynthPulse Control</h1>
   <p class="sub">{{LOGIN_SUBTITLE}}</p>
   <form id="login-form" data-invalid-pw="{{LOGIN_INVALID_PW}}" data-conn-failed="{{LOGIN_CONN_FAILED}}">
     <input type="password" id="pw" placeholder="{{LOGIN_PLACEHOLDER}}" autofocus>
@@ -11121,7 +11121,7 @@ def handle_get(handler, parsed) -> bool:
 
     if parsed.path == "/login":
         _settings = load_settings()
-        _bn = _html.escape(_settings.get("bot_name") or "Hermes")
+        _bn = _html.escape(_settings.get("bot_name") or "SynthPulse")
         _lang = _settings.get("language", "en")
         _login_strings = _LOGIN_LOCALE[
             _resolve_login_locale_key(_lang)

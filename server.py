@@ -100,6 +100,14 @@ from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
+
+def _env_int(name: str, default: int, minimum: int) -> int:
+    try:
+        value = int(os.getenv(name, str(default)))
+    except (TypeError, ValueError):
+        value = default
+    return max(minimum, value)
+
 from api.auth import check_auth
 from api.config import HOST, PORT, STATE_DIR, SESSION_DIR, DEFAULT_WORKSPACE
 from api.helpers import (
@@ -294,7 +302,7 @@ class QuietHTTPServer(ThreadingHTTPServer):
 class Handler(BaseHTTPRequestHandler):
     # HTTP/1.1 keep-alive stays on, so every response must declare framing.
     protocol_version = "HTTP/1.1"
-    timeout = 30  # seconds — kills idle/incomplete connections to prevent thread exhaustion
+    timeout = _env_int("HERMES_WEBUI_SOCKET_TIMEOUT", 120, 30)  # seconds — tolerate slow mobile/tailnet links without pinning idle sockets forever
     
     def setup(self):
         """Set socket options for each accepted connection."""
@@ -320,7 +328,7 @@ class Handler(BaseHTTPRequestHandler):
             except OSError:
                 pass
     _ver_suffix = WEBUI_VERSION.removeprefix('v')
-    server_version = ('HermesWebUI/' + _ver_suffix) if _ver_suffix != 'unknown' else 'HermesWebUI'
+    server_version = ('SynthPulseControl/' + _ver_suffix) if _ver_suffix != 'unknown' else 'SynthPulseControl'
     _CSP_REPORT_TO = '{"group":"csp-endpoint","max_age":10886400,"endpoints":[{"url":"/api/csp-report"}]}'
 
     @classmethod
