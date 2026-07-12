@@ -324,6 +324,132 @@ def test_toggle_on_full_flow_creates_session_with_sso_identity(monkeypatch):
     assert "Max-Age=0" in cleared
 
 
+# ── Passkey login two-step enforcement (FINDING 1 + FINDING 2) ───────────────
+
+
+def _enable_passkey(monkeypatch):
+    """Enable the passkey feature flag + auth and stub finish_login to succeed."""
+    import api.passkeys as passkeys
+
+    monkeypatch.setattr(auth, "_passkey_feature_flag_enabled", lambda: True)
+    monkeypatch.setattr(auth, "is_auth_enabled", lambda: True)
+    monkeypatch.setattr(passkeys, "finish_login", lambda body, handler: {"ok": True})
+
+
+def test_toggle_on_passkey_without_pending_rejected(monkeypatch):
+    # FINDING 1: with SSO-first on and passkeys enabled, a passkey-only login is
+    # a full bypass of the mandatory SSO+password flow. It must be rejected
+    # before authenticating, with no session cookie.
+    monkeypatch.setenv("HERMES_WEBUI_REQUIRE_SSO_FIRST", "1")
+    _enable_passkey(monkeypatch)
+    verified = {"finish": False}
+
+    import api.passkeys as passkeys
+
+    def _spy_finish(body, handler):
+        verified["finish"] = True
+        return {"ok": True}
+
+    monkeypatch.setattr(passkeys, "finish_login", _spy_finish)
+
+    handler = RouteFakeHandler(body={"id": "cred"})
+    routes.handle_post(handler, SimpleNamespace(path="/api/auth/passkey/login", query=""))
+
+    assert handler.status == 401
+    assert handler.json_body()["error"] == "sso_required"
+    assert handler.set_cookie_for(auth.COOKIE_NAME) is None
+    # Rejected before verifying the passkey.
+    assert verified["finish"] is False
+
+
+def test_toggle_on_passkey_full_flow_mints_sso_passkey_session(monkeypatch):
+    # FINDING 1: with a valid pending-SSO cookie, the passkey second factor mints
+    # a session from the consumed SSO identity, method "sso+passkey".
+    monkeypatch.setenv("HERMES_WEBUI_REQUIRE_SSO_FIRST", "1")
+    _enable_passkey(monkeypatch)
+    ident = _identity(email="pat@synthwave.solutions", groups=["hd:synthwave.solutions", "ops"])
+    pending_cookie = auth.create_sso_pending(ident)
+    pending_token = auth._sso_pending_token(pending_cookie)
+    assert pending_token in auth._sso_pending
+
+    handler = RouteFakeHandler(
+        cookie=f"{auth.SSO_PENDING_COOKIE_NAME}={pending_cookie}",
+        body={"id": "cred"},
+    )
+    routes.handle_post(handler, SimpleNamespace(path="/api/auth/passkey/login", query=""))
+
+    assert handler.status == 200
+    assert handler.json_body() == {"ok": True}
+    session_cookie = handler.set_cookie_for(auth.COOKIE_NAME)
+    assert session_cookie is not None
+    session_value = session_cookie.split("=", 1)[1].split(";", 1)[0]
+    assert auth.verify_session(session_value)
+    session_identity = auth.get_session_identity(session_value)
+    assert session_identity["email"] == "pat@synthwave.solutions"
+    assert "hd:synthwave.solutions" in session_identity["groups"]
+    assert "ops" in session_identity["groups"]
+    assert session_identity["method"] == "sso+passkey"
+    # Pending token consumed + pending cookie cleared.
+    assert pending_token not in auth._sso_pending
+    cleared = handler.set_cookie_for(auth.SSO_PENDING_COOKIE_NAME)
+    assert cleared is not None
+    assert "Max-Age=0" in cleared
+
+
+def test_toggle_on_passkey_second_use_of_consumed_pending_rejected(monkeypatch):
+    # FINDING 2 (applied to the passkey path): the pending token is single-use.
+    # A second passkey login with the same (now-consumed) pending cookie is a
+    # hard failure, not a fallback that mints a second session.
+    monkeypatch.setenv("HERMES_WEBUI_REQUIRE_SSO_FIRST", "1")
+    _enable_passkey(monkeypatch)
+    ident = _identity(email="q@synthwave.solutions")
+    pending_cookie = auth.create_sso_pending(ident)
+    # First use consumes the entry.
+    assert auth.consume_sso_pending(pending_cookie) is not None
+
+    handler = RouteFakeHandler(
+        cookie=f"{auth.SSO_PENDING_COOKIE_NAME}={pending_cookie}",
+        body={"id": "cred"},
+    )
+    routes.handle_post(handler, SimpleNamespace(path="/api/auth/passkey/login", query=""))
+
+    assert handler.status == 401
+    assert handler.json_body()["error"] == "sso_required"
+    assert handler.set_cookie_for(auth.COOKIE_NAME) is None
+
+
+def test_toggle_off_passkey_login_works_standalone(monkeypatch):
+    # With SSO-first OFF, passkey login behaves exactly as before (no pending
+    # cookie required, mints a plain session).
+    _enable_passkey(monkeypatch)
+
+    handler = RouteFakeHandler(body={"id": "cred"})
+    routes.handle_post(handler, SimpleNamespace(path="/api/auth/passkey/login", query=""))
+
+    assert handler.status == 200
+    assert handler.json_body() == {"ok": True}
+    assert handler.set_cookie_for(auth.COOKIE_NAME) is not None
+
+
+def test_password_strict_consume_second_use_rejected(monkeypatch):
+    # FINDING 2 (password path): after the pending token is consumed, a second
+    # password login with the same cookie is rejected (no fallback session).
+    monkeypatch.setenv("HERMES_WEBUI_REQUIRE_SSO_FIRST", "1")
+    ident = _identity(email="r@synthwave.solutions")
+    pending_cookie = auth.create_sso_pending(ident)
+    assert auth.consume_sso_pending(pending_cookie) is not None
+
+    handler = RouteFakeHandler(
+        cookie=f"{auth.SSO_PENDING_COOKIE_NAME}={pending_cookie}",
+        body={"password": "correct horse battery staple"},
+    )
+    routes.handle_post(handler, SimpleNamespace(path="/api/auth/login", query=""))
+
+    assert handler.status == 401
+    assert handler.json_body()["error"] == "sso_required"
+    assert handler.set_cookie_for(auth.COOKIE_NAME) is None
+
+
 # ── Pending cookie tamper resistance ─────────────────────────────────────────
 
 
@@ -371,6 +497,7 @@ def test_hd_claim_yields_pseudo_group():
     claims = {
         "sub": "s1",
         "email": "carol@synthwave.solutions",
+        "iss": "https://accounts.google.com",
         "hd": "synthwave.solutions",
         "groups": ["ops"],
     }
@@ -381,7 +508,12 @@ def test_hd_claim_yields_pseudo_group():
 
 
 def test_hd_claim_absent_no_pseudo_group():
-    claims = {"sub": "s1", "email": "dan@example.test", "groups": ["ops"]}
+    claims = {
+        "sub": "s1",
+        "email": "dan@example.test",
+        "iss": "https://accounts.google.com",
+        "groups": ["ops"],
+    }
     identity = auth_oidc._identity_from_claims(claims)
     assert not any(g.startswith("hd:") for g in identity["groups"])
 
@@ -390,8 +522,37 @@ def test_hd_pseudo_group_not_duplicated():
     claims = {
         "sub": "s1",
         "email": "e@synthwave.solutions",
+        "iss": "https://accounts.google.com",
         "hd": "synthwave.solutions",
         "groups": ["hd:synthwave.solutions"],
     }
     identity = auth_oidc._identity_from_claims(claims)
     assert identity["groups"].count("hd:synthwave.solutions") == 1
+
+
+def test_hd_claim_ignored_for_non_google_issuer():
+    # FINDING 3: hd is only authoritative for Google Workspace. A non-Google
+    # issuer that sends an hd claim (possibly attacker-controlled) must NOT get
+    # the hd:<domain> pseudo-group synthesized.
+    claims = {
+        "sub": "s1",
+        "email": "mallory@evil.test",
+        "iss": "https://evil-idp.example.com",
+        "hd": "synthwave.solutions",
+        "groups": ["ops"],
+    }
+    identity = auth_oidc._identity_from_claims(claims)
+    assert not any(g.startswith("hd:") for g in identity["groups"])
+    assert "ops" in identity["groups"]
+
+
+def test_hd_claim_ignored_when_issuer_missing():
+    # No issuer claim at all -> cannot confirm Google -> no hd pseudo-group.
+    claims = {
+        "sub": "s1",
+        "email": "no-iss@synthwave.solutions",
+        "hd": "synthwave.solutions",
+        "groups": ["ops"],
+    }
+    identity = auth_oidc._identity_from_claims(claims)
+    assert not any(g.startswith("hd:") for g in identity["groups"])

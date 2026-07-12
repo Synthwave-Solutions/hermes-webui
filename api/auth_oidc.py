@@ -187,13 +187,23 @@ def _identity_from_claims(claims: dict[str, Any], *, method: str = "oidc") -> di
     independent of whether the allowlist is keyed on email or hd. The raw
     id_token is never logged or persisted here; only the bounded claims_subset
     below travels with the session.
+
+    The ``hd`` claim is ONLY authoritative for Google Workspace; other IdPs may
+    send an ``hd`` claim with any meaning (or attacker-controlled value), so the
+    pseudo-group is synthesized only when the issuer is Google. For every other
+    issuer the ``hd`` claim is ignored to prevent cross-issuer group forgery.
     """
     groups_claim = claims.get("groups") or claims.get("roles") or []
     if isinstance(groups_claim, str):
         groups_claim = [groups_claim]
     groups = [str(g) for g in groups_claim]
+    issuer = str(claims.get("iss") or "").strip()
+    is_google_issuer = (
+        issuer == "https://accounts.google.com"
+        or issuer.startswith("https://accounts.google.com")
+    )
     hd = str(claims.get("hd") or "").strip().lower()
-    if hd:
+    if hd and is_google_issuer:
         pseudo = f"hd:{hd}"
         if pseudo not in groups:
             groups.append(pseudo)

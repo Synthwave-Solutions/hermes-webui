@@ -14379,6 +14379,7 @@ def handle_post(handler, parsed) -> bool:
             get_password_hash,
             is_auth_enabled,
             parse_cookie,
+            require_sso_first,
             set_auth_cookie,
             verify_password,
             verify_session,
@@ -14516,8 +14517,13 @@ def handle_post(handler, parsed) -> bool:
         new_cookie = None
 
         if auth_just_enabled and not logged_in_before:
-            new_cookie = create_session()
-            logged_in_after = True
+            # Two-step login: when SSO-first is mandatory, do NOT auto-mint a
+            # bootstrap session from the first-password step alone. That would
+            # bypass the required SSO factor. Leave the user logged out so they
+            # must complete the full SSO+password flow.
+            if not require_sso_first():
+                new_cookie = create_session()
+                logged_in_after = True
 
         saved["auth_enabled"] = auth_enabled_after
         saved["password_auth_enabled"] = get_password_hash() is not None
@@ -15124,7 +15130,13 @@ def handle_post(handler, parsed) -> bool:
         if require_sso_first():
             # Consume the pending SSO entry (delete it) and mint the full session
             # with the SSO identity. method reflects the two-factor path.
-            identity = consume_sso_pending(pending_cookie) or sso_identity
+            # Strict single-use: a failed consume (e.g. another concurrent request
+            # already consumed the same pending token) is a hard failure. Do NOT
+            # fall back to the earlier non-destructive read, or two racing requests
+            # could each mint a session from one pending token.
+            identity = consume_sso_pending(pending_cookie)
+            if identity is None:
+                return bad(handler, "sso_required", 401)
             cookie_val = create_session({
                 "email": str(identity.get("email") or "").lower(),
                 "groups": list(identity.get("groups") or []),
@@ -15164,6 +15176,13 @@ def handle_post(handler, parsed) -> bool:
     if parsed.path == "/api/auth/passkey/login":
         from api.auth import _passkey_feature_flag_enabled, create_session, is_auth_enabled, set_auth_cookie
         from api.auth import _check_login_rate, _record_login_attempt
+        from api.auth import (
+            clear_sso_pending_cookie,
+            consume_sso_pending,
+            parse_sso_pending_cookie,
+            require_sso_first,
+            verify_sso_pending,
+        )
         from api.passkeys import PasskeyError, finish_login
 
         if not _passkey_feature_flag_enabled():
@@ -15173,17 +15192,45 @@ def handle_post(handler, parsed) -> bool:
         client_ip = handler.client_address[0]
         if not _check_login_rate(client_ip):
             return j(handler, {"error": "Too many attempts. Try again in a minute."}, status=429)
+        # Two-step login: when SSO-first is on, a prior successful SSO in this
+        # browser is mandatory. A passkey is a second factor, NOT a bypass of the
+        # mandatory SSO+password flow. Reject a passkey-only attempt BEFORE
+        # verifying the passkey so a stolen/registered passkey alone cannot mint
+        # a session. Mirrors the password endpoint above.
+        pending_cookie = None
+        if require_sso_first():
+            pending_cookie = parse_sso_pending_cookie(handler)
+            sso_identity = verify_sso_pending(pending_cookie) if pending_cookie else None
+            if sso_identity is None:
+                return bad(handler, "sso_required", 401)
         try:
             finish_login(body, handler)
         except PasskeyError as e:
             _record_login_attempt(client_ip)
             return bad(handler, str(e), status=401)
-        cookie_val = create_session()
+        if require_sso_first():
+            # Strict single-use consume of the pending SSO entry (delete it). A
+            # failed consume (e.g. a concurrent request already consumed the same
+            # token) is a hard failure; do NOT fall back to the non-destructive
+            # read. Mint the session from the consumed SSO identity.
+            identity = consume_sso_pending(pending_cookie)
+            if identity is None:
+                return bad(handler, "sso_required", 401)
+            cookie_val = create_session({
+                "email": str(identity.get("email") or "").lower(),
+                "groups": list(identity.get("groups") or []),
+                "claims_subset": dict(identity.get("claims_subset") or {}),
+                "method": "sso+passkey",
+            })
+        else:
+            cookie_val = create_session()
         handler.send_response(200)
         handler.send_header("Content-Type", "application/json")
         handler.send_header("Cache-Control", "no-store")
         _security_headers(handler)
         set_auth_cookie(handler, cookie_val)
+        if require_sso_first():
+            clear_sso_pending_cookie(handler)
         handler.end_headers()
         handler.wfile.write(json.dumps({"ok": True}).encode())
         return True
