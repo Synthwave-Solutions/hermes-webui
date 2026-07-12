@@ -1030,7 +1030,7 @@ class Session:
                  model_provider=None,
                  messages=None, created_at=None, updated_at=None,
                  tool_calls=None, pinned: bool=False, archived: bool=False,
-                 project_id: str=None, profile=None,
+                 project_id: str=None, profile=None, owner_email=None,
                  input_tokens: int=0, output_tokens: int=0, estimated_cost=None,
                  cache_read_tokens: int=0, cache_write_tokens: int=0,
                  personality=None,
@@ -1078,6 +1078,9 @@ class Session:
         self.archived = bool(archived)
         self.project_id = project_id or None
         self.profile = profile
+        # Per-user ownership (docs/user-isolation-design.md): lowercased email
+        # of the creating identity, or None for legacy/cron/CLI rows (admin-only).
+        self.owner_email = str(owner_email).strip().lower() if owner_email else None
         self.input_tokens = input_tokens or 0
         self.output_tokens = output_tokens or 0
         self.estimated_cost = estimated_cost
@@ -1162,7 +1165,7 @@ class Session:
         # Fields are listed in the order they should appear in the JSON file.
         METADATA_FIELDS = [
             'session_id', 'title', 'workspace', 'model', 'model_provider', 'created_at', 'updated_at',
-            'pinned', 'archived', 'project_id', 'profile',
+            'pinned', 'archived', 'project_id', 'profile', 'owner_email',
             'input_tokens', 'output_tokens', 'estimated_cost',
             'cache_read_tokens', 'cache_write_tokens',
             'personality', 'active_stream_id',
@@ -1400,6 +1403,7 @@ class Session:
             'archived': self.archived,
             'project_id': self.project_id,
             'profile': self.profile,
+            'owner_email': getattr(self, 'owner_email', None),
             'input_tokens': self.input_tokens,
             'output_tokens': self.output_tokens,
             'estimated_cost': self.estimated_cost,

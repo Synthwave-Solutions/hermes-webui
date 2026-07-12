@@ -520,6 +520,28 @@ def _session_visible_to_active_profile(session_profile, handler=None) -> bool:
     return _profiles_match(session_profile, active_profile)
 
 
+def _session_owner_visible_to_request(owner_email, handler=None) -> bool:
+    """Return whether a session owned by ``owner_email`` is request-visible.
+
+    Per-user isolation (docs/user-isolation-design.md): admins and
+    identity-less requests see everything; non-admins see only their own
+    rows; unowned rows (legacy/cron/CLI) are admin-only. Applies on top of
+    the profile boundary, never instead of it.
+    """
+    if handler is None:
+        return True
+    from api.ownership import row_visible_to
+
+    return row_visible_to(owner_email, handler)
+
+
+def _session_visible_to_request(session, handler=None) -> bool:
+    """Combined profile AND ownership visibility for a loaded session object."""
+    if not _session_visible_to_active_profile(getattr(session, "profile", None) or None, handler):
+        return False
+    return _session_owner_visible_to_request(getattr(session, "owner_email", None), handler)
+
+
 def _request_session_visibility_exempt(method: str, path: str | None) -> bool:
     if not path:
         return False
@@ -545,7 +567,7 @@ def _session_id_visible_to_request_profile(handler, sid, *, emit_error: bool = T
         session = get_session(sid, metadata_only=True)
     except KeyError:
         return True
-    if not _session_visible_to_active_profile(getattr(session, "profile", None), handler):
+    if not _session_visible_to_request(session, handler):
         if emit_error:
             bad(handler, "Session not found", 404)
         return False
@@ -1891,6 +1913,7 @@ def _session_list_cache_key(
     archived_limit: int | None = None,
     archived_offset: int = 0,
     show_claude_code_sessions: bool = True,
+    owner_scope: str = "all",
 ) -> tuple:
     return _route_session_list_cache_key(
         active_profile=active_profile,
@@ -1906,6 +1929,7 @@ def _session_list_cache_key(
         sidebar_source=sidebar_source,
         archived_limit=archived_limit,
         archived_offset=archived_offset,
+        owner_scope=owner_scope,
     ) + (bool(show_claude_code_sessions),)
 
 _ROUTE_SESSION_LIST_CACHE_DYNAMIC_EXPORTS = {
@@ -2151,6 +2175,7 @@ def _build_session_list_cache_payload(
     sidebar_source: str | None = None,
     archived_limit: int | None = None,
     archived_offset: int = 0,
+    owner_scope: str = "all",
     diag=None,
 ) -> dict:
     diag_stage = diag.stage if diag is not None else lambda *_a, **_k: None
@@ -2367,6 +2392,20 @@ def _build_session_list_cache_payload(
         key=lambda s: s.get("last_message_at") or s.get("updated_at", 0) or 0,
         reverse=True,
     )
+    # Per-user ownership scoping (user isolation): applied BEFORE profile
+    # scoping so other_profile_count never leaks foreign users' row counts.
+    # 'all' (admins/identity-less/isolation-off) keeps every row; any other
+    # scope keeps only rows stamped with that owner email. Unowned rows
+    # (legacy chats, cron/CLI imports) are admin-only by construction.
+    if owner_scope is not None and str(owner_scope) != "all":
+        diag_stage("ownership_scope")
+        normalized_owner_scope = str(owner_scope).strip().lower()
+        merged = [
+            s for s in merged
+            if isinstance(s, dict)
+            and str(s.get("owner_email") or "").strip().lower()
+            and str(s.get("owner_email") or "").strip().lower() == normalized_owner_scope
+        ]
     # ── Profile scoping (#1611) ────────────────────────────────────────
     # Default: filter to the active profile. ?all_profiles=1 opts into
     # the aggregate view used by the "All profiles" sidebar toggle.
@@ -4819,7 +4858,8 @@ def _handle_session_anchor_scene(handler, body):
     # this an authenticated request under profile A could persist anchor scenes
     # onto a session owned by profile B (cross-profile write). Reject as 404 —
     # same shape the read path uses — and leave anchor_activity_scenes untouched.
-    if not _session_visible_to_active_profile(getattr(s, "profile", None) or None, handler):
+    # Ownership visibility applies too (user isolation).
+    if not _session_visible_to_request(s, handler):
         return bad(handler, "Session not found", 404)
     with _get_session_agent_lock(sid):
         idx, message = _find_anchor_scene_message(
@@ -11722,7 +11762,7 @@ def handle_get(handler, parsed) -> bool:
             _t1 = _time.monotonic()
             s = get_session(sid, metadata_only=(not load_messages))
             _session_profile = getattr(s, 'profile', None) or None
-            if not _session_visible_to_active_profile(_session_profile, handler):
+            if not _session_visible_to_request(s, handler):
                 return bad(handler, "Session not found", 404)
             original_stream_id = getattr(s, "active_stream_id", None)
             _clear_stale_stream_state(s)
@@ -12051,6 +12091,10 @@ def handle_get(handler, parsed) -> bool:
             _session_profile = (cli_meta or {}).get("profile") or None
             if not _session_visible_to_active_profile(_session_profile, handler):
                 return bad(handler, "Session not found", 404)
+            # Foreign-store sessions have no interactive creator, so they are
+            # admin-only under user isolation (owner_email is None).
+            if not _session_owner_visible_to_request((cli_meta or {}).get("owner_email"), handler):
+                return bad(handler, "Session not found", 404)
             synth, reason = _claim_or_synthesize_cli_session(sid, cli_meta=cli_meta or {})
             if reason == "was_webui":
                 # Deleted WebUI session: 404 so the client self-heals
@@ -12180,6 +12224,11 @@ def handle_get(handler, parsed) -> bool:
             sidebar_source = parse_qs(parsed.query).get("sidebar_source", [""])[0].strip().lower() or None
             if sidebar_source not in ("webui", "cli"):
                 sidebar_source = None
+            # Per-user isolation: resolve the ownership scope once per request
+            # and key the cache on it so users never see each other's lists.
+            from api.ownership import request_owner_scope
+
+            owner_scope = request_owner_scope(handler)
             # /api/sessions is the default sidebar contract, so keep the route-owned
             # visible-row filter in the shared cache builder for both cache hits and misses.
             key = _session_list_cache_key(
@@ -12197,6 +12246,7 @@ def handle_get(handler, parsed) -> bool:
                 sidebar_source=sidebar_source,
                 archived_limit=archived_limit,
                 archived_offset=archived_offset,
+                owner_scope=owner_scope,
             )
             # Keep the visible /api/sessions contract unchanged even though the
             # heavy lifting now lives in the cache builder: profile scoping via
@@ -12219,6 +12269,7 @@ def handle_get(handler, parsed) -> bool:
                     sidebar_source=sidebar_source,
                     archived_limit=archived_limit,
                     archived_offset=archived_offset,
+                    owner_scope=owner_scope,
                     diag=diag,
                 ),
                 diag=diag,
@@ -12236,6 +12287,19 @@ def handle_get(handler, parsed) -> bool:
 
         active_profile = profiles_api.get_active_profile_name()
         all_projects = load_projects()
+        # Per-user ownership scoping (user isolation): applied BEFORE profile
+        # scoping so other_profile_count never leaks foreign users' rows.
+        # Unowned legacy projects are admin-only.
+        from api.ownership import request_owner_scope
+
+        owner_scope = request_owner_scope(handler)
+        if owner_scope != "all":
+            all_projects = [
+                p for p in all_projects
+                if isinstance(p, dict)
+                and str(p.get("owner_email") or "").strip().lower()
+                and str(p.get("owner_email") or "").strip().lower() == owner_scope
+            ]
         isolated_profile_mode = _is_isolated_profile_mode()
         all_profiles = _all_profiles_enabled(parsed)
         if all_profiles:
@@ -13193,6 +13257,11 @@ def handle_post(handler, parsed) -> bool:
             worktree_info=worktree_info,
             enabled_toolsets=enabled_toolsets,
         )
+        # Stamp the creating identity so the placeholder stays visible to its
+        # creator under user isolation (persisted on the first save).
+        from api.ownership import request_owner_email as _request_owner_email
+
+        s.owner_email = _request_owner_email(handler)
         if worktree_info:
             publish_session_list_changed(
                 "session_new",
@@ -13272,6 +13341,10 @@ def handle_post(handler, parsed) -> bool:
                 created_at=time.time(),
                 updated_at=time.time(),
             )
+            # The duplicate belongs to whoever made it (user isolation).
+            from api.ownership import request_owner_email as _request_owner_email
+
+            copied_session.owner_email = _request_owner_email(handler)
 
             with LOCK:
                 SESSIONS[copied_session.session_id] = copied_session
@@ -13948,6 +14021,10 @@ def handle_post(handler, parsed) -> bool:
             parent_session_id=source.session_id,
             session_source="fork",
         )
+        # The fork belongs to whoever made it (user isolation).
+        from api.ownership import request_owner_email as _request_owner_email
+
+        branch.owner_email = _request_owner_email(handler)
         with LOCK:
             SESSIONS[branch.session_id] = branch
             SESSIONS.move_to_end(branch.session_id)
@@ -14857,11 +14934,14 @@ def handle_post(handler, parsed) -> bool:
             from api.profiles import _PROFILE_ID_RE
             if not _PROFILE_ID_RE.fullmatch(_requested_profile):
                 return bad(handler, "invalid profile")
+        from api.ownership import request_owner_email as _request_owner_email
+
         proj = {
             "project_id": uuid.uuid4().hex[:12],
             "name": name,
             "color": color,
             "profile": _requested_profile or get_active_profile_name() or 'default',
+            "owner_email": _request_owner_email(handler),
             "created_at": time.time(),
         }
         projects.append(proj)
@@ -14884,6 +14964,11 @@ def handle_post(handler, parsed) -> bool:
         # #1614: a project can only be renamed by the profile that owns it.
         active_profile = get_active_profile_name()
         if not _profiles_match(proj.get("profile"), active_profile):
+            return bad(handler, "Project not found", 404)
+        # Ownership boundary (user isolation): non-admins cannot rename a
+        # foreign or unowned project. 404 keeps it indistinguishable.
+        from api.ownership import row_visible_to as _row_visible_to
+        if not _row_visible_to(proj.get("owner_email"), handler):
             return bad(handler, "Project not found", 404)
         proj["name"] = body["name"].strip()[:128]
         if "color" in body:
@@ -14908,6 +14993,11 @@ def handle_post(handler, parsed) -> bool:
         # #1614: a project can only be deleted by the profile that owns it.
         active_profile = get_active_profile_name()
         if not _profiles_match(proj.get("profile"), active_profile):
+            return bad(handler, "Project not found", 404)
+        # Ownership boundary (user isolation): non-admins cannot delete a
+        # foreign or unowned project. 404 keeps it indistinguishable.
+        from api.ownership import row_visible_to as _row_visible_to
+        if not _row_visible_to(proj.get("owner_email"), handler):
             return bad(handler, "Project not found", 404)
         projects = [p for p in projects if p["project_id"] != body["project_id"]]
         save_projects(projects)
@@ -15623,6 +15713,16 @@ def _handle_sessions_search(handler, parsed):
     active_profile = get_active_profile_name()
     all_profiles = _all_profiles_enabled(parsed)
     sessions = all_sessions()
+    # Per-user ownership scoping (user isolation): search must not leak
+    # foreign users' titles or content previews. Unowned rows are admin-only.
+    from api.ownership import request_owner_scope as _request_owner_scope
+    owner_scope = _request_owner_scope(handler)
+    if owner_scope != "all":
+        sessions = [
+            s for s in sessions
+            if str(s.get("owner_email") or "").strip().lower()
+            and str(s.get("owner_email") or "").strip().lower() == owner_scope
+        ]
     if not all_profiles:
         sessions = [
             s for s in sessions
@@ -16318,6 +16418,13 @@ def _handle_gateway_sse_stream(handler, parsed):
 
     # Check if the feature is enabled
     if not settings.get('show_cli_sessions'):
+        return j(handler, {'error': 'agent sessions not enabled'}, status=404)
+
+    # Per-user isolation: this stream pushes full CLI/agent session rows,
+    # which are unowned (admin-only) under the ownership rule. Non-admin
+    # identities get the same 404 as the feature-disabled path.
+    from api.ownership import request_owner_scope as _request_owner_scope
+    if _request_owner_scope(handler) != 'all':
         return j(handler, {'error': 'agent sessions not enabled'}, status=404)
 
     # Same watcher_alive semantics as the probe path — centralised via
@@ -20071,6 +20178,7 @@ def _handle_chat_start(handler, body, diag=None):
         except ValueError as e:
             return bad(handler, str(e))
         diag.stage("get_session") if diag else None
+        claimed_new_session = False
         try:
             s = _get_or_materialize_session(body["session_id"], refresh_cli_messages=True)
         except KeyError:
@@ -20125,6 +20233,7 @@ def _handle_chat_start(handler, body, diag=None):
                     500,
                 )
             s = synth
+            claimed_new_session = True
             try:
                 with LOCK:
                     SESSIONS[s.session_id] = s
@@ -20164,6 +20273,20 @@ def _handle_chat_start(handler, body, diag=None):
                 s.profile = requested_profile
             else:
                 return bad(handler, "Session not found", 404)
+        # Per-user ownership visibility (user isolation). An unowned empty
+        # placeholder is claimable by the requester; anything else that fails
+        # the ownership check is indistinguishable from a missing session.
+        if not _session_owner_visible_to_request(getattr(s, "owner_email", None), handler):
+            if has_persisted_turns or getattr(s, "owner_email", None):
+                return bad(handler, "Session not found", 404)
+        if getattr(s, "owner_email", None) is None and (
+            claimed_new_session or not has_persisted_turns
+        ):
+            # Stamp the creating identity on new/claimed sessions only; never
+            # overwrite an existing owner and never back-stamp legacy rows.
+            from api.ownership import request_owner_email
+
+            s.owner_email = request_owner_email(handler)
         diag.stage("normalize_message") if diag else None
         msg = str(body.get("message", "")).strip()
         if not msg:
@@ -23461,6 +23584,10 @@ def _handle_session_import_cli(handler, body):
                 return bad(handler, "Session not found in CLI store", 404)
         elif not _session_visible_to_active_profile(existing_profile, handler):
             return bad(handler, "Session not found in CLI store", 404)
+        # Ownership boundary (user isolation): a foreign-owned or unowned
+        # existing sidecar must not be read/refreshed by a non-admin.
+        if not _session_owner_visible_to_request(getattr(existing, "owner_email", None), handler):
+            return bad(handler, "Session not found in CLI store", 404)
         refresh_profile = requested_profile or existing_profile
         cli_meta = _resolve_cli_import_metadata(
             sid,
@@ -23645,6 +23772,11 @@ def _handle_session_import_cli(handler, body):
     s.session_key = cli_session_key
     s.platform = cli_platform
     s._cli_origin = sid
+    if getattr(s, "owner_email", None) is None:
+        # Stamp the importing identity; never overwrite an existing owner.
+        from api.ownership import request_owner_email as _request_owner_email
+
+        s.owner_email = _request_owner_email(handler)
     s.save(touch_updated_at=False)
     publish_session_list_changed(
         "session_import_cli",
@@ -23687,6 +23819,8 @@ def _handle_session_import(handler, body):
     except (TypeError, ValueError) as e:
         return bad(handler, str(e))
     model = body.get("model", DEFAULT_MODEL)
+    from api.ownership import request_owner_email as _request_owner_email
+
     s = Session(
         title=title,
         workspace=workspace,
@@ -23694,6 +23828,7 @@ def _handle_session_import(handler, body):
         messages=messages,
         tool_calls=body.get("tool_calls", []),
         profile=get_active_profile_name(),
+        owner_email=_request_owner_email(handler),
     )
     s.pinned = body.get("pinned", False)
     with LOCK:
