@@ -4778,8 +4778,9 @@ main.main > #mainKanban,
 main.main > #mainWorkspaces,
 main.main > #mainProfiles,
 main.main > #mainInsights,
-main.main > #mainLogs{display:none;}
-main.main:not(.showing-settings):not(.showing-skills):not(.showing-memory):not(.showing-tasks):not(.showing-kanban):not(.showing-workspaces):not(.showing-profiles):not(.showing-insights):not(.showing-logs):not(.showing-plugin) > #mainChat{display:flex;}
+main.main > #mainLogs,
+main.main > #mainGovernance{display:none;}
+main.main:not(.showing-settings):not(.showing-skills):not(.showing-memory):not(.showing-tasks):not(.showing-kanban):not(.showing-workspaces):not(.showing-profiles):not(.showing-insights):not(.showing-logs):not(.showing-governance):not(.showing-plugin) > #mainChat{display:flex;}
 main.main.showing-settings > #mainSettings{display:flex;overflow-y:auto;}
 main.main.showing-skills > #mainSkills{display:flex;}
 main.main.showing-memory > #mainMemory{display:flex;}
@@ -4788,6 +4789,7 @@ main.main.showing-kanban > #mainKanban{display:flex;overflow-y:auto;}
 main.main.showing-workspaces > #mainWorkspaces{display:flex;}
 main.main.showing-profiles > #mainProfiles{display:flex;}
 main.main.showing-logs > #mainLogs{display:flex;}
+main.main.showing-governance > #mainGovernance{display:flex;}
 main.main.showing-plugin > #mainPlugin{display:flex;}
 main.main > #mainPlugin{display:none;}
 #mainPlugin .main-view-body{flex:1;display:flex;flex-direction:column;overflow:hidden;}
@@ -7007,3 +7009,45 @@ html,body{background:var(--bg)!important;color:var(--text);font-family:var(--fon
 .session-item.active::before{background:#009dff!important;}
 .rail-btn.active,.nav-tab.active{background:rgba(0,157,255,.10)!important;color:#0078c5!important;border-color:rgba(0,157,255,.2)!important;}
 .panel-head,.settings-section-title,.topbar-title{color:#0f172a!important;font-weight:720!important;letter-spacing:-.015em;}
+
+/* ── Governance panel ─────────────────────────────────────────────────────────── */
+.gov-main-body{flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden;}
+.gov-tab-bar{display:flex;gap:4px;padding:10px 16px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;}
+.gov-tab{background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-size:13px;font-weight:600;padding:8px 10px;cursor:pointer;}
+.gov-tab:hover{color:var(--text);}
+.gov-tab.active{color:var(--text);border-bottom-color:var(--accent);}
+.gov-content{flex:1;overflow-y:auto;padding:16px;}
+.gov-tab-pane{display:none;}
+.gov-tab-pane.active{display:block;}
+.gov-muted{color:var(--muted);font-size:12px;}
+.gov-error{color:#e05;font-size:12px;padding:8px 0;}
+.gov-overview-head{margin-bottom:12px;}
+.gov-overview-note{margin-top:12px;}
+.gov-mode-badge{display:inline-block;font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;border:1px solid var(--border);color:var(--text);}
+.gov-mode-enforce{border-color:#e05;color:#e05;}
+.gov-mode-report_only{border-color:#d90;color:#d90;}
+.gov-mode-off{border-color:var(--border);color:var(--muted);}
+.gov-stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;}
+.gov-stat{border:1px solid var(--border);border-radius:10px;padding:12px;background:var(--input-bg);}
+.gov-stat-value{font-size:20px;font-weight:700;color:var(--text);}
+.gov-stat-label{font-size:11px;color:var(--muted);margin-top:2px;}
+.gov-table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px;}
+.gov-table th{text-align:left;color:var(--muted);font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.08em;padding:6px 8px;border-bottom:1px solid var(--border);}
+.gov-table td{padding:6px 8px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:top;word-break:break-word;}
+.gov-nowrap{white-space:nowrap;}
+.gov-path{font-family:var(--mono,monospace);font-size:11px;}
+.gov-row-actions{white-space:nowrap;text-align:right;}
+.gov-row-actions .gov-btn{margin-left:6px;}
+.gov-btn{background:var(--input-bg);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-size:12px;cursor:pointer;}
+.gov-btn:hover{border-color:var(--accent);}
+.gov-btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+.gov-btn.danger{color:#e05;border-color:#e05;}
+.gov-form{border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:16px;max-width:520px;}
+.gov-form-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px;}
+.gov-form-row{display:flex;flex-direction:column;gap:4px;margin-bottom:8px;}
+.gov-form-row label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);}
+.gov-form-row input{background:var(--input-bg);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:7px 9px;font-size:12px;}
+.gov-form-actions{display:flex;gap:8px;margin-top:6px;}
+.gov-audit-actions{margin-bottom:10px;}
+.gov-preview-section{margin-bottom:12px;}
+.gov-chip{display:inline-block;background:var(--input-bg);border:1px solid var(--border);border-radius:999px;padding:2px 8px;font-size:11px;color:var(--text);margin:2px 2px 2px 0;}

@@ -49,6 +49,7 @@ from api.session_events import (
     unsubscribe_session_events,
 )
 from api.gateway_restart import restart_active_profile_gateway
+from api import governance_api
 
 logger = logging.getLogger(__name__)
 
@@ -9215,10 +9216,9 @@ button:hover{background:#0087dc;border-color:#0087dc}
   <div class="logo"><img src="static/synthwave-symbol.png" alt="Synthwave Solutions"></div>
   <h1>SynthPulse Control</h1>
   <p class="sub">{{LOGIN_SUBTITLE}}</p>
+  {{SSO_FIRST_NOTICE}}
   <form id="login-form" data-invalid-pw="{{LOGIN_INVALID_PW}}" data-conn-failed="{{LOGIN_CONN_FAILED}}">
-    <input type="password" id="pw" placeholder="{{LOGIN_PLACEHOLDER}}" autofocus>
-    <button type="submit">{{LOGIN_BTN}}</button>
-    <button type="button" id="passkey-login" class="passkey-login" style="display:none">Sign in with passkey</button>
+    {{PASSWORD_FIELDS}}
     {{OIDC_LOGIN_HTML}}
   </form>
   <div class="err" id="err"></div>
@@ -9266,6 +9266,66 @@ def _oidc_login_html(parsed) -> str:
         '<a id="oidc-login" class="oidc-login" '
         f'href="{_html.escape(href, quote=True)}">Continue with SSO</a>'
     )
+
+
+def _password_fields_html(login_strings) -> str:
+    """The standard password input + submit + passkey button block."""
+    placeholder = _html.escape(login_strings["placeholder"])
+    btn = _html.escape(login_strings["btn"])
+    return (
+        f'<input type="password" id="pw" placeholder="{placeholder}" autofocus>'
+        f'<button type="submit">{btn}</button>'
+        '<button type="button" id="passkey-login" class="passkey-login" '
+        'style="display:none">Sign in with passkey</button>'
+    )
+
+
+def _login_two_step_fragments(handler, parsed, login_strings) -> tuple[str, str, str]:
+    """Return (sso_first_notice, password_fields, oidc_login_html) for /login.
+
+    When require_sso_first() is OFF this returns the classic page unchanged:
+    an empty notice, the full password block, and the usual SSO link.
+
+    When ON:
+      - no valid pending-SSO cookie: render ONLY the Google/SSO button, hide the
+        password field, and show a "Sign in with Google to continue" line.
+      - valid pending-SSO cookie: render the password step only, with a
+        "Signed in as <email> via Google" line (email escaped). The SSO link is
+        hidden so the flow reads as a single second step.
+    """
+    from api.auth import parse_sso_pending_cookie, require_sso_first, verify_sso_pending
+
+    if not require_sso_first():
+        return "", _password_fields_html(login_strings), _oidc_login_html(parsed)
+
+    pending_cookie = parse_sso_pending_cookie(handler)
+    identity = verify_sso_pending(pending_cookie) if pending_cookie else None
+
+    if identity is None:
+        # Step 1: SSO required first. Hide password, show only the SSO button.
+        notice = (
+            '<p class="sub" id="sso-first-notice">'
+            'Sign in with Google to continue</p>'
+        )
+        oidc_html = _oidc_login_html(parsed)
+        if not oidc_html:
+            # SSO not configured but the toggle is on: surface a clear message
+            # instead of a dead page (no password path is available).
+            oidc_html = (
+                '<p class="err" style="display:block">'
+                'SSO is required but not configured. Contact your administrator.'
+                '</p>'
+            )
+        return notice, "", oidc_html
+
+    # Step 2: valid pending SSO. Show the password step only.
+    email = _html.escape(str(identity.get("email") or ""))
+    notice = (
+        '<p class="sub" id="sso-signed-in">'
+        f'Signed in as {email} via Google. '
+        'Enter the dashboard password to continue.</p>'
+    )
+    return notice, _password_fields_html(login_strings), ""
 
 
 # ── Logs endpoint ─────────────────────────────────────────────────────────────
@@ -11074,6 +11134,9 @@ def handle_get(handler, parsed) -> bool:
     if proxy_result is not False:
         return proxy_result
 
+    if governance_api.handle_governance_api(handler, parsed, "GET"):
+        return True
+
     if parsed.path.startswith("/session/static/"):
         # Strip the leading "/session" so _serve_static() sees a path that
         # starts with "/static/" (its required prefix). _serve_static enforces
@@ -11129,6 +11192,9 @@ def handle_get(handler, parsed) -> bool:
         from urllib.parse import quote
         from api.updates import WEBUI_VERSION
         version_token = quote(WEBUI_VERSION, safe="")
+        _sso_notice, _password_fields, _oidc_html = _login_two_step_fragments(
+            handler, parsed, _login_strings
+        )
         _page = (
             _LOGIN_PAGE_HTML.replace("{{BOT_NAME}}", _bn)
             .replace("{{BOT_NAME_INITIAL}}", _bn[0].upper())
@@ -11136,15 +11202,13 @@ def handle_get(handler, parsed) -> bool:
             .replace("{{LANG}}", _html.escape(_login_strings["lang"]))
             .replace("{{LOGIN_TITLE}}", _html.escape(_login_strings["title"]))
             .replace("{{LOGIN_SUBTITLE}}", _html.escape(_login_strings["subtitle"]))
-            .replace(
-                "{{LOGIN_PLACEHOLDER}}", _html.escape(_login_strings["placeholder"])
-            )
-            .replace("{{LOGIN_BTN}}", _html.escape(_login_strings["btn"]))
             .replace("{{LOGIN_INVALID_PW}}", _html.escape(_login_strings["invalid_pw"]))
             .replace(
                 "{{LOGIN_CONN_FAILED}}", _html.escape(_login_strings["conn_failed"])
             )
-            .replace("{{OIDC_LOGIN_HTML}}", _oidc_login_html(parsed))
+            .replace("{{SSO_FIRST_NOTICE}}", _sso_notice)
+            .replace("{{PASSWORD_FIELDS}}", _password_fields)
+            .replace("{{OIDC_LOGIN_HTML}}", _oidc_html)
         )
         return t(handler, _page, content_type="text/html; charset=utf-8")
 
@@ -11171,7 +11235,13 @@ def handle_get(handler, parsed) -> bool:
         return True
 
     if parsed.path == "/api/auth/oidc/callback":
-        from api.auth import create_session, set_auth_cookie
+        from api.auth import (
+            create_session,
+            create_sso_pending,
+            require_sso_first,
+            set_auth_cookie,
+            set_sso_pending_cookie,
+        )
         from api.auth_oidc import OIDCAuthError, OIDCConfigError, complete_authorization_code_flow
 
         query = parse_qs(parsed.query or "")
@@ -11191,6 +11261,34 @@ def handle_get(handler, parsed) -> bool:
             return j(handler, {"error": str(exc)}, status=404)
         except OIDCAuthError as exc:
             return j(handler, {"error": str(exc)}, status=exc.status_code)
+        # Two-step login (SSO first, then password): stash the validated SSO
+        # identity in the pending store and bounce back to /login for the
+        # password step. NO full session is created here.
+        if require_sso_first():
+            from api.auth import _pop_pending_identity
+
+            # complete_authorization_code_flow() staged the identity on this
+            # thread for create_session(); consume it and re-key it as pending.
+            staged = _pop_pending_identity() or {
+                "email": result.get("email"),
+                "groups": result.get("groups") or [],
+                "claims_subset": result.get("claims_subset") or {},
+            }
+            from urllib.parse import quote as _quote
+
+            pending_cookie = create_sso_pending(staged)
+            next_path = _safe_login_redirect_path(result.get("next_path"))
+            login_location = "/login"
+            if next_path != "/":
+                login_location += "?next=" + _quote(next_path, safe="/")
+            handler.send_response(302)
+            handler.send_header("Location", login_location)
+            handler.send_header("Cache-Control", "no-store")
+            _security_headers(handler)
+            set_sso_pending_cookie(handler, pending_cookie)
+            handler.send_header("Content-Length", "0")
+            handler.end_headers()
+            return True
         cookie_val = create_session()
         handler.send_response(302)
         handler.send_header(
@@ -12856,6 +12954,10 @@ def handle_post(handler, parsed) -> bool:
         finally:
             if diag:
                 diag.finish()
+
+    if governance_api.handle_governance_api(handler, parsed, "POST"):
+        return True
+
     proxy_result = _handle_extension_sidecar_proxy(
         handler,
         parsed,
@@ -14172,6 +14274,19 @@ def handle_post(handler, parsed) -> bool:
         name = body.get("name", "").strip()
         if not name:
             return bad(handler, "name is required")
+        # Governance profile scoping: the enforce hook only inspects the
+        # ?profile= query target, so this body-sourced switch (which then mints
+        # a PERSISTENT signed profile cookie) would otherwise bypass profile
+        # scoping. Reject a switch to a profile the caller is not scoped for.
+        # TODO(governance): the other body-profile sinks (/api/chat, /api/goal,
+        # /api/projects/create) still skip is_profile_allowed_for and should be
+        # wired the same way; this handler is the persistent-cookie vector.
+        try:
+            from api.governance.enforce import _request_identity, is_profile_allowed_for
+            if not is_profile_allowed_for(_request_identity(handler), name):
+                return bad(handler, "profile_not_allowed", 403)
+        except Exception:
+            logger.warning("profile switch governance check failed for %s", name, exc_info=True)
         try:
             from api.profiles import switch_profile, _validate_profile_name
             from api.helpers import build_profile_cookie
@@ -14264,6 +14379,7 @@ def handle_post(handler, parsed) -> bool:
             get_password_hash,
             is_auth_enabled,
             parse_cookie,
+            require_sso_first,
             set_auth_cookie,
             verify_password,
             verify_session,
@@ -14401,8 +14517,13 @@ def handle_post(handler, parsed) -> bool:
         new_cookie = None
 
         if auth_just_enabled and not logged_in_before:
-            new_cookie = create_session()
-            logged_in_after = True
+            # Two-step login: when SSO-first is mandatory, do NOT auto-mint a
+            # bootstrap session from the first-password step alone. That would
+            # bypass the required SSO factor. Leave the user logged out so they
+            # must complete the full SSO+password flow.
+            if not require_sso_first():
+                new_cookie = create_session()
+                logged_in_after = True
 
         saved["auth_enabled"] = auth_enabled_after
         saved["password_auth_enabled"] = get_password_hash() is not None
@@ -14975,6 +15096,13 @@ def handle_post(handler, parsed) -> bool:
             is_auth_enabled,
         )
         from api.auth import _check_login_rate, _record_login_attempt, _clear_login_attempts
+        from api.auth import (
+            clear_sso_pending_cookie,
+            consume_sso_pending,
+            parse_sso_pending_cookie,
+            require_sso_first,
+            verify_sso_pending,
+        )
 
         if not is_auth_enabled():
             return j(handler, {"ok": True, "message": "Auth not enabled"})
@@ -14985,12 +15113,38 @@ def handle_post(handler, parsed) -> bool:
                 {"error": "Too many attempts. Try again in a minute."},
                 status=429,
             )
+        # Two-step login: when SSO-first is on, a prior successful SSO in this
+        # browser is mandatory. Reject a password-only attempt BEFORE checking
+        # the password so a leaked password alone cannot create a session.
+        sso_identity = None
+        if require_sso_first():
+            pending_cookie = parse_sso_pending_cookie(handler)
+            sso_identity = verify_sso_pending(pending_cookie) if pending_cookie else None
+            if sso_identity is None:
+                return bad(handler, "sso_required", 401)
         password = body.get("password", "")
         if not verify_password(password):
             _record_login_attempt(client_ip)
             return bad(handler, "Invalid password", 401)
         _clear_login_attempts(client_ip)
-        cookie_val = create_session()
+        if require_sso_first():
+            # Consume the pending SSO entry (delete it) and mint the full session
+            # with the SSO identity. method reflects the two-factor path.
+            # Strict single-use: a failed consume (e.g. another concurrent request
+            # already consumed the same pending token) is a hard failure. Do NOT
+            # fall back to the earlier non-destructive read, or two racing requests
+            # could each mint a session from one pending token.
+            identity = consume_sso_pending(pending_cookie)
+            if identity is None:
+                return bad(handler, "sso_required", 401)
+            cookie_val = create_session({
+                "email": str(identity.get("email") or "").lower(),
+                "groups": list(identity.get("groups") or []),
+                "claims_subset": dict(identity.get("claims_subset") or {}),
+                "method": "sso+password",
+            })
+        else:
+            cookie_val = create_session()
         body = json.dumps({"ok": True}).encode()
         handler.send_response(200)
         handler.send_header("Content-Type", "application/json")
@@ -14998,6 +15152,8 @@ def handle_post(handler, parsed) -> bool:
         handler.send_header("Cache-Control", "no-store")
         _security_headers(handler)
         set_auth_cookie(handler, cookie_val)
+        if require_sso_first():
+            clear_sso_pending_cookie(handler)
         handler.end_headers()
         handler.wfile.write(body)
         return True
@@ -15020,6 +15176,13 @@ def handle_post(handler, parsed) -> bool:
     if parsed.path == "/api/auth/passkey/login":
         from api.auth import _passkey_feature_flag_enabled, create_session, is_auth_enabled, set_auth_cookie
         from api.auth import _check_login_rate, _record_login_attempt
+        from api.auth import (
+            clear_sso_pending_cookie,
+            consume_sso_pending,
+            parse_sso_pending_cookie,
+            require_sso_first,
+            verify_sso_pending,
+        )
         from api.passkeys import PasskeyError, finish_login
 
         if not _passkey_feature_flag_enabled():
@@ -15029,17 +15192,45 @@ def handle_post(handler, parsed) -> bool:
         client_ip = handler.client_address[0]
         if not _check_login_rate(client_ip):
             return j(handler, {"error": "Too many attempts. Try again in a minute."}, status=429)
+        # Two-step login: when SSO-first is on, a prior successful SSO in this
+        # browser is mandatory. A passkey is a second factor, NOT a bypass of the
+        # mandatory SSO+password flow. Reject a passkey-only attempt BEFORE
+        # verifying the passkey so a stolen/registered passkey alone cannot mint
+        # a session. Mirrors the password endpoint above.
+        pending_cookie = None
+        if require_sso_first():
+            pending_cookie = parse_sso_pending_cookie(handler)
+            sso_identity = verify_sso_pending(pending_cookie) if pending_cookie else None
+            if sso_identity is None:
+                return bad(handler, "sso_required", 401)
         try:
             finish_login(body, handler)
         except PasskeyError as e:
             _record_login_attempt(client_ip)
             return bad(handler, str(e), status=401)
-        cookie_val = create_session()
+        if require_sso_first():
+            # Strict single-use consume of the pending SSO entry (delete it). A
+            # failed consume (e.g. a concurrent request already consumed the same
+            # token) is a hard failure; do NOT fall back to the non-destructive
+            # read. Mint the session from the consumed SSO identity.
+            identity = consume_sso_pending(pending_cookie)
+            if identity is None:
+                return bad(handler, "sso_required", 401)
+            cookie_val = create_session({
+                "email": str(identity.get("email") or "").lower(),
+                "groups": list(identity.get("groups") or []),
+                "claims_subset": dict(identity.get("claims_subset") or {}),
+                "method": "sso+passkey",
+            })
+        else:
+            cookie_val = create_session()
         handler.send_response(200)
         handler.send_header("Content-Type", "application/json")
         handler.send_header("Cache-Control", "no-store")
         _security_headers(handler)
         set_auth_cookie(handler, cookie_val)
+        if require_sso_first():
+            clear_sso_pending_cookie(handler)
         handler.end_headers()
         handler.wfile.write(json.dumps({"ok": True}).encode())
         return True

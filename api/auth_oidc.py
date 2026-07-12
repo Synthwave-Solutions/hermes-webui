@@ -54,6 +54,16 @@ class OIDCAuthError(Exception):
         self.status_code = status_code
 
 
+def _is_truthy_claim(value: Any) -> bool:
+    """Interpret an OIDC boolean-ish claim (email_verified may arrive as a real
+    bool or the string 'true'/'false', per the spec and real-world IdPs)."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() == "true"
+    return bool(value)
+
+
 def is_oidc_enabled() -> bool:
     cfg = _resolve_oidc_config()
     return bool(
@@ -143,11 +153,69 @@ def complete_authorization_code_flow(
         allow_claim=cfg.get("allow_claim"),
         allow_values=cfg.get("allow_values") or [],
     )
+    # The email claim confers identity (and, for a bootstrap admin, never-deny
+    # wildcard access). At IdPs that allow unverified or user-editable emails,
+    # an allowlisted account could set its email to the bootstrap admin's and
+    # steal that access. When the IdP tells us the email is not verified,
+    # reject the login. IdPs like Google send email_verified=true, which passes;
+    # IdPs that omit the claim entirely are left as-is (no downgrade).
+    if "email_verified" in claims and not _is_truthy_claim(claims.get("email_verified")):
+        raise OIDCAuthError("OIDC email address is not verified", status_code=403)
+    # Stage the caller's identity for the create_session() call that follows in
+    # the login route; claims_subset stays bounded (never the full raw claims).
+    from api import auth as _auth  # late import to avoid a module cycle
+
+    identity = _identity_from_claims(claims, method="oidc")
+    _auth.stage_session_identity(identity)
     return {
         "next_path": pending["next_path"],
         "subject": str(claims.get("sub") or ""),
         "email": str(claims.get("email") or ""),
+        "groups": list(identity["groups"]),
+        "claims_subset": dict(identity["claims_subset"]),
         "claims": claims,
+    }
+
+
+def _identity_from_claims(claims: dict[str, Any], *, method: str = "oidc") -> dict[str, Any]:
+    """Build the WebUI session identity from validated OIDC claims.
+
+    Groups come from the configured group/role claim, PLUS a pseudo-group
+    ``hd:<hosted_domain>`` when the id_token carries Google's ``hd`` claim
+    (Workspace hosted domain). That lets a governance policy map an entire
+    Workspace domain to a baseline role via ``sso_groups: ["hd:<domain>"]``,
+    independent of whether the allowlist is keyed on email or hd. The raw
+    id_token is never logged or persisted here; only the bounded claims_subset
+    below travels with the session.
+
+    The ``hd`` claim is ONLY authoritative for Google Workspace; other IdPs may
+    send an ``hd`` claim with any meaning (or attacker-controlled value), so the
+    pseudo-group is synthesized only when the issuer is Google. For every other
+    issuer the ``hd`` claim is ignored to prevent cross-issuer group forgery.
+    """
+    groups_claim = claims.get("groups") or claims.get("roles") or []
+    if isinstance(groups_claim, str):
+        groups_claim = [groups_claim]
+    groups = [str(g) for g in groups_claim]
+    issuer = str(claims.get("iss") or "").strip()
+    is_google_issuer = (
+        issuer == "https://accounts.google.com"
+        or issuer.startswith("https://accounts.google.com")
+    )
+    hd = str(claims.get("hd") or "").strip().lower()
+    if hd and is_google_issuer:
+        pseudo = f"hd:{hd}"
+        if pseudo not in groups:
+            groups.append(pseudo)
+    return {
+        "email": str(claims.get("email") or "").lower(),
+        "groups": groups,
+        "claims_subset": {
+            k: claims[k]
+            for k in ("sub", "email", "name", "preferred_username")
+            if k in claims
+        },
+        "method": method,
     }
 
 
