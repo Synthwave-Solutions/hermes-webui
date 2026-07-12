@@ -16,7 +16,7 @@ from urllib.parse import parse_qs
 
 from . import loader
 from .audit import append_audit_event
-from .catalog import _SELF_ROUTES, route_permission
+from .catalog import _ANON_ROUTES, _SELF_ROUTES, route_permission
 from .models import GovernanceSubject
 from .resolver import resolve_effective_access
 
@@ -24,9 +24,10 @@ from .resolver import resolve_effective_access
 @dataclass(frozen=True)
 class Decision:
     allow: bool
-    reason: str          # governance_off | non_api | bootstrap_admin | allowed |
-                         # unauthenticated | route_not_allowed | unknown_route |
-                         # permission_not_allowed | profile_not_allowed | policy_error
+    reason: str          # governance_off | non_api | anon_route | bootstrap_admin |
+                         # allowed | unauthenticated | route_not_allowed |
+                         # unknown_route | permission_not_allowed |
+                         # profile_not_allowed | policy_error
     resource: str        # permission name from the catalog, "" when not applicable
     mode: str            # off | report_only | enforce
 
@@ -88,6 +89,16 @@ def evaluate_request(identity: dict | None, method: str, path: str) -> Decision:
     ``path`` may carry a querystring; it is split internally (the query is
     used only for the ?profile= target check).
     """
+    route_path, _, query = path.partition("?")
+
+    # Pre-auth public login surface: exempt BEFORE the policy is even read, so
+    # these endpoints stay reachable under enforce AND under a broken policy.
+    # They carry no identity by construction; denying them would 403 every
+    # login attempt (including the bootstrap admin's). Returning allow=True
+    # also keeps them out of the report_only audit trail.
+    if route_path in _ANON_ROUTES:
+        return Decision(True, "anon_route", "", "enforce")
+
     try:
         policy = loader.get_policy()
     except Exception:
@@ -97,8 +108,6 @@ def evaluate_request(identity: dict | None, method: str, path: str) -> Decision:
 
     if not policy.enabled:
         return Decision(True, "governance_off", "", policy.mode)
-
-    route_path, _, query = path.partition("?")
 
     if not route_path.startswith("/api/"):
         # Page loads and static assets are not route-governed; panels are
@@ -137,6 +146,38 @@ def evaluate_request(identity: dict | None, method: str, path: str) -> Decision:
                 return Decision(False, "profile_not_allowed", perm or "", policy.mode)
 
     return Decision(True, "allowed", perm or "", policy.mode)
+
+
+def is_profile_allowed_for(identity: dict | None, profile: str) -> bool:
+    """Body-sink profile scoping check.
+
+    The enforce hook only inspects the ?profile= query target; endpoints that
+    take the profile from the JSON body (POST /api/profile/switch, which then
+    mints a signed profile cookie, plus /api/chat, /api/goal,
+    /api/projects/create) bypass it. Consumers of a body profile call this to
+    reuse the resolver's EffectiveAccess scoping.
+
+    Fails OPEN when governance is off / not loaded / the bootstrap admin is the
+    caller, matching evaluate_request; fails CLOSED (False) only when a loaded,
+    enabled policy scopes the caller's profiles and the target is not in scope.
+    The "active"/empty sentinels and "default" resolve via is_profile_allowed.
+    """
+    target = str(profile or "").strip()
+    if not target or target == "active":
+        return True
+    try:
+        policy = loader.get_policy()
+    except Exception:
+        # Policy unreadable: do not brick profile switching here. The enforce
+        # hook already fails closed on the request itself under policy_error.
+        return True
+    if not policy.enabled:
+        return True
+    subject = subject_from_identity(identity)
+    if subject.normalized_email and subject.normalized_email in {a.lower() for a in policy.bootstrap_admins}:
+        return True
+    access = resolve_effective_access(policy, subject)
+    return access.is_profile_allowed(target)
 
 
 def _auth_disabled_identity() -> dict:

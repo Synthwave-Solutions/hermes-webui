@@ -234,6 +234,68 @@ def test_policy_error_fails_closed():
         loader.set_policy_loader(None)
 
 
+def test_anon_login_routes_pass_enforce_without_identity(enforce_policy):
+    # FINDING 1: the pre-auth public login surface must pass under enforce even
+    # with no identity, otherwise mode=enforce 403s every login attempt.
+    login = evaluate_request(None, "POST", "/api/auth/login")
+    assert login.allow is True
+    assert login.reason == "anon_route"
+
+    callback = evaluate_request(None, "GET", "/api/auth/oidc/callback?code=x&state=y")
+    assert callback.allow is True
+    assert callback.reason == "anon_route"
+
+    # A non-exempt /api route with no identity still fails closed.
+    assert evaluate_request(None, "GET", "/api/session").reason == "unauthenticated"
+
+
+def test_anon_login_routes_pass_under_policy_error():
+    # FINDING 1: exemption must hold even when the policy cannot be loaded,
+    # otherwise a broken policy bricks all login.
+    def _boom():
+        raise GovernancePolicyError("bad policy")
+
+    loader.set_policy_loader(_boom)
+    try:
+        login = evaluate_request(None, "POST", "/api/auth/login")
+        assert login.allow is True
+        assert login.reason == "anon_route"
+
+        callback = evaluate_request(None, "GET", "/api/auth/oidc/callback")
+        assert callback.allow is True
+        assert callback.reason == "anon_route"
+
+        # A non-exempt route still fails closed under a broken policy.
+        assert evaluate_request(None, "GET", "/api/session").reason == "policy_error"
+    finally:
+        loader.set_policy_loader(None)
+
+
+def test_anon_routes_match_auth_public_login_paths():
+    # FINDING 1: keep _ANON_ROUTES in sync with the login endpoints in
+    # api.auth.PUBLIC_PATHS so a new public login route cannot silently become
+    # un-exempt under enforce.
+    from api import auth
+    from api.governance.catalog import _ANON_ROUTES
+
+    login_public_paths = {p for p in auth.PUBLIC_PATHS if p.startswith("/api/auth/")}
+    assert _ANON_ROUTES == frozenset(login_public_paths)
+
+
+def test_is_profile_allowed_for_body_sink(enforce_policy):
+    # FINDING 4: the resolver-backed helper used by body-profile sinks
+    # (POST /api/profile/switch) must scope the same way as the query check.
+    operator = _identity("operator@example.test")
+    from api.governance.enforce import is_profile_allowed_for
+
+    assert is_profile_allowed_for(operator, "finance") is False
+    assert is_profile_allowed_for(operator, "default") is True
+    assert is_profile_allowed_for(operator, "active") is True
+    assert is_profile_allowed_for(operator, "") is True
+    # bootstrap admin is never scoped out
+    assert is_profile_allowed_for(_identity(BOOTSTRAP), "finance") is True
+
+
 def test_subject_from_identity_mapping():
     subject = subject_from_identity(
         {

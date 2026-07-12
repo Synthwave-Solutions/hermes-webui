@@ -12,6 +12,23 @@ from dataclasses import dataclass
 
 _MUTATION_METHODS: frozenset[str] = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
+# Pre-auth public login surface: these /api/* endpoints are reached BEFORE a
+# session identity exists, so governance must let them through under enforce
+# and even under a broken policy, otherwise mode=enforce (or a policy-load
+# error) would 403 every login attempt and brick the bootstrap admin too.
+# Kept in sync with the login endpoints in api.auth.PUBLIC_PATHS; a coverage
+# test asserts the two stay aligned so a new public login route cannot silently
+# become un-exempt. Non-login public paths (pages, static, manifests) are not
+# listed here because they are already handled by the non-/api passthrough.
+_ANON_ROUTES: frozenset[str] = frozenset({
+    "/api/auth/login",
+    "/api/auth/status",
+    "/api/auth/oidc/start",
+    "/api/auth/oidc/callback",
+    "/api/auth/passkey/options",
+    "/api/auth/passkey/login",
+})
+
 # Authenticated session self-management: no permission required beyond a
 # valid identity. route_permission returns None for these; enforcement
 # exempts them from the unknown_route fail-closed rule.
