@@ -44,7 +44,7 @@ POLICY = {
         "admin": {
             "grants": {
                 "permissions": [
-                    "sessions:read", "sessions:write", "chat:use",
+                    "sessions:read", "sessions:write", "chat:use", "terminal:use",
                     "config:read", "config:write", "files:read", "files:write",
                 ],
                 "profiles": ["*"],

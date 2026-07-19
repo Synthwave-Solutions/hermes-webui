@@ -104,10 +104,10 @@ ROUTE_CATALOG: tuple[RouteRule, ...] = (
     RouteRule("/api/transcribe",          "chat:use", "chat:use", match="exact"),
     RouteRule("/api/tts",                 "chat:use", "chat:use", match="exact"),
 
-    # terminal + commands (RCE-grade; follows the reference precedent that
-    # maps the hermes-agent PTY to chat:use; tightenable via policy later)
-    RouteRule("/api/terminal",            "chat:use", "chat:use"),
-    RouteRule("/api/commands/exec",       "chat:use", "chat:use", match="exact"),
+    # terminal + commands (RCE-grade; deliberately split off chat:use so chat
+    # access no longer implies shell access; grant terminal:use explicitly)
+    RouteRule("/api/terminal",            "terminal:use", "terminal:use"),
+    RouteRule("/api/commands/exec",       "terminal:use", "terminal:use", match="exact"),
     RouteRule("/api/commands",            "config:read", "config:read"),
 
     # files and workspace

@@ -5277,6 +5277,7 @@ async function submitMemorySave() {
 
 // ── Workspace management ──
 let _workspaceList = [];  // cached from /api/workspaces
+let _workspaceViewerIsAdmin = false;  // server-provided viewer_is_admin from /api/workspaces
 let _wsSuggestTimer = null;
 let _wsSuggestReq = 0;
 let _wsSuggestIndex = -1;
@@ -5415,6 +5416,7 @@ async function loadWorkspaceList(){
     const data = await api('/api/workspaces');
     if(typeof syncTerminalBackendState==='function') syncTerminalBackendState(data);
     _workspaceList = data.workspaces || [];
+    _workspaceViewerIsAdmin = !!data.viewer_is_admin;
     syncWorkspaceDisplays();
     if(typeof syncTerminalButton==='function') syncTerminalButton();
     return data;
@@ -5643,10 +5645,13 @@ function renderWorkspacesPanel(workspaces){
     row.draggable=true;
     const isActive = w.path === activePath;
     const activeBadge = isActive ? `<span class="detail-badge active" style="margin-left:6px;font-size:9px;padding:1px 6px">${esc(t('profile_active'))}</span>` : '';
+    // Ownership badge: owner's local-part for owned entries, "Shared" for legacy ownerless ones.
+    const ownerLabel = w.owner_email ? String(w.owner_email).split('@')[0] : (w.legacy_unowned ? 'Shared' : '');
+    const ownerBadge = ownerLabel ? `<span class="detail-badge" style="margin-left:6px;font-size:9px;padding:1px 6px">${esc(ownerLabel)}</span>` : '';
     row.innerHTML=`
       <span class="ws-drag-handle" title="${esc(t('workspace_drag_hint'))}">${li('grip-vertical',12)}</span>
       <div class="ws-row-info">
-        <div class="ws-row-name">${esc(w.name)}${activeBadge}</div>
+        <div class="ws-row-name">${esc(w.name)}${activeBadge}${ownerBadge}</div>
         <div class="ws-row-path">${esc(w.path)}</div>
       </div>`;
     // Click on info area only — not on drag handle
@@ -5733,6 +5738,19 @@ function _renderWorkspaceDetail(ws){
     ? `<span class="detail-badge active">${esc(t('profile_active'))}</span>`
     : `<span class="detail-badge">Inactive</span>`;
   const defaultBadge = isDefault ? ` <span class="detail-badge">${esc(t('profile_default_label'))}</span>` : '';
+  const ownerValue = ws.owner_email ? esc(ws.owner_email) : 'Shared (unowned)';
+  const membersRow = (ws.members && ws.members.length)
+    ? `<div class="detail-row"><div class="detail-row-label">Members</div><div class="detail-row-value">${esc(ws.members.join(', '))}</div></div>`
+    : '';
+  // Admin-only assign control: owner + comma-separated member emails posted
+  // to /api/workspaces/assign (server re-enforces admin in the handler).
+  const assignCard = _workspaceViewerIsAdmin ? `
+      <div class="detail-card" style="margin-top:12px">
+        <div class="detail-card-title">Ownership</div>
+        <div class="detail-row"><div class="detail-row-label">Owner</div><div class="detail-row-value"><input type="text" id="wsAssignOwner" value="${esc(ws.owner_email || '')}" placeholder="owner email (empty = shared)" autocomplete="off" style="width:100%"></div></div>
+        <div class="detail-row"><div class="detail-row-label">Members</div><div class="detail-row-value"><input type="text" id="wsAssignMembers" value="${esc((ws.members || []).join(', '))}" placeholder="comma separated emails" autocomplete="off" style="width:100%"></div></div>
+        <div style="padding:8px 0"><button type="button" class="btn" id="wsAssignSaveBtn">Save ownership</button></div>
+      </div>` : '';
   body.innerHTML = `
     <div class="main-view-content">
       <div class="detail-card">
@@ -5740,7 +5758,9 @@ function _renderWorkspaceDetail(ws){
         <div class="detail-row"><div class="detail-row-label">Name</div><div class="detail-row-value">${esc(ws.name || '')}</div></div>
         <div class="detail-row"><div class="detail-row-label">Path</div><div class="detail-row-value"><code>${esc(ws.path)}</code></div></div>
         <div class="detail-row"><div class="detail-row-label">Status</div><div class="detail-row-value">${statusBadge}${defaultBadge}</div></div>
-      </div>
+        <div class="detail-row"><div class="detail-row-label">Owner</div><div class="detail-row-value">${ownerValue}</div></div>
+        ${membersRow}
+      </div>${assignCard}
       <div class="detail-card" style="margin-top:12px">
         <div class="detail-card-title">${esc(t('checkpoint_title'))}</div>
         <div id="checkpointListContainer">
@@ -5750,9 +5770,32 @@ function _renderWorkspaceDetail(ws){
     </div>`;
   body.style.display = '';
   if (empty) empty.style.display = 'none';
+  const assignBtn = $('wsAssignSaveBtn');
+  if (assignBtn) assignBtn.onclick = saveWorkspaceAssignment;
   _workspaceMode = 'read';
   _setWorkspaceHeaderButtons('read', ws);
   _loadCheckpoints(ws.path);
+}
+
+async function saveWorkspaceAssignment(){
+  if (!_currentWorkspaceDetail) return;
+  const path = _currentWorkspaceDetail.path;
+  const ownerEl = $('wsAssignOwner');
+  const membersEl = $('wsAssignMembers');
+  const owner = (ownerEl ? ownerEl.value : '').trim();
+  const members = (membersEl ? membersEl.value : '').split(',').map(s => s.trim()).filter(Boolean);
+  try {
+    const data = await api('/api/workspaces/assign', { method:'POST', body: JSON.stringify({ path, owner_email: owner, members }) });
+    if (data && data.ok) {
+      _workspaceList = data.workspaces || _workspaceList;
+      renderWorkspacesPanel(_workspaceList);
+      const refreshed = _workspaceList.find(w => w.path === path) || data.workspace;
+      if (refreshed) _renderWorkspaceDetail(refreshed);
+      showToast('Ownership saved');
+    }
+  } catch (e) {
+    showToast('Ownership save failed: ' + e.message, 'error');
+  }
 }
 
 function _setWorkspaceHeaderButtons(mode, ws){

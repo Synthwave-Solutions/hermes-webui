@@ -12395,12 +12395,20 @@ def handle_get(handler, parsed) -> bool:
         return _handle_session_export(handler, parsed)
 
     if parsed.path == "/api/workspaces":
+        # Per-user ownership scoping (user isolation): non-admins see only
+        # entries they own / are assigned to, plus LEGACY ownerless entries
+        # (shared picker, behavior-preserving). Filtering lives here in the
+        # route, never inside load_workspaces(): that helper has identity-less
+        # internal callers (build_workspace, last-workspace fallbacks).
+        from api.ownership import request_is_admin
+
         return j(
             handler,
             {
-                "workspaces": load_workspaces(),
+                "workspaces": _workspaces_response_list(load_workspaces(), handler),
                 "last": get_last_workspace(),
                 "terminal_remote_backend": _terminal_remote_backend_enabled(),
+                "viewer_is_admin": request_is_admin(handler),
             },
         )
 
@@ -14364,6 +14372,9 @@ def handle_post(handler, parsed) -> bool:
 
     if parsed.path == "/api/workspaces/reorder":
         return _handle_workspace_reorder(handler, body)
+
+    if parsed.path == "/api/workspaces/assign":
+        return _handle_workspace_assign(handler, body)
 
     # ── Approval (POST) ──
     if parsed.path == "/api/approval/respond":
@@ -21835,6 +21846,69 @@ def _handle_file_open_vscode(handler, body):
         return bad(handler, _sanitize_error(e))
 
 
+def _workspace_entry_emails(w) -> set:
+    """Return the lowercased owner plus member emails for a workspace entry.
+
+    Empty set means a LEGACY ownerless entry (pre-ownership data or a
+    single-user install with auth disabled).
+    """
+    emails = set()
+    owner = str(w.get("owner_email") or "").strip().lower()
+    if owner:
+        emails.add(owner)
+    members = w.get("members")
+    if isinstance(members, list):
+        for m in members:
+            m = str(m or "").strip().lower()
+            if m:
+                emails.add(m)
+    return emails
+
+
+def _workspace_visible_to(w, handler) -> bool:
+    """Workspace-entry visibility/mutation rule for a request.
+
+    Admins and identity-less requests see everything. Owned entries require
+    an owner or member match. LEGACY ownerless entries stay visible (and
+    mutable) for ALL authenticated users: this deliberately deviates from
+    row_visible_to's admin-only default for unowned rows, because workspace
+    entries are shared filesystem roots (not private chat data) and hiding
+    them would empty the picker for existing non-admin users.
+    """
+    from api.ownership import request_owner_scope
+
+    scope = request_owner_scope(handler)
+    if scope == "all":
+        return True
+    emails = _workspace_entry_emails(w)
+    if not emails:
+        return True
+    return scope in emails
+
+
+def _workspaces_response_list(wss, handler) -> list:
+    """Filter + annotate a workspace list for the requesting identity.
+
+    Non-admins get only entries they own / are assigned to plus legacy
+    ownerless ones; legacy entries are marked ``legacy_unowned`` so the admin
+    UI can offer an assign affordance. Entries are copied so annotation never
+    leaks into the persisted list.
+    """
+    from api.ownership import request_owner_scope
+
+    scope = request_owner_scope(handler)
+    out = []
+    for w in wss:
+        emails = _workspace_entry_emails(w)
+        if emails and scope != "all" and scope not in emails:
+            continue
+        entry = dict(w)
+        if not emails:
+            entry["legacy_unowned"] = True
+        out.append(entry)
+    return out
+
+
 def _handle_workspace_add(handler, body):
     # Strip surrounding paired quotes BEFORE any further processing — macOS
     # Finder's "Copy as Pathname" wraps paths in single quotes, and users
@@ -21883,9 +21957,18 @@ def _handle_workspace_add(handler, body):
     wss = load_workspaces()
     if any(w["path"] == str(p) for w in wss):
         return bad(handler, "Workspace already in list")
-    wss.append({"path": str(p), "name": name or p.name})
+    # Ownership stamping (user isolation): same idiom as project create.
+    # None when auth is off / identity-less, which keeps single-user installs
+    # on the legacy (ownerless, shared) path.
+    from api.ownership import request_owner_email as _request_owner_email
+
+    entry = {"path": str(p), "name": name or p.name}
+    owner_email = _request_owner_email(handler)
+    if owner_email:
+        entry["owner_email"] = owner_email
+    wss.append(entry)
     save_workspaces(wss)
-    return j(handler, {"ok": True, "workspaces": wss})
+    return j(handler, {"ok": True, "workspaces": _workspaces_response_list(wss, handler)})
 
 
 def _handle_workspace_remove(handler, body):
@@ -21893,9 +21976,15 @@ def _handle_workspace_remove(handler, body):
     if not path_str:
         return bad(handler, "path is required")
     wss = load_workspaces()
+    # Ownership boundary (user isolation): non-admins cannot remove a foreign
+    # owned entry. Legacy ownerless entries stay removable by everyone
+    # (behavior-preserving for shared pickers).
+    target = next((w for w in wss if w["path"] == path_str), None)
+    if target is not None and not _workspace_visible_to(target, handler):
+        return bad(handler, "forbidden", 403)
     wss = [w for w in wss if w["path"] != path_str]
     save_workspaces(wss)
-    return j(handler, {"ok": True, "workspaces": wss})
+    return j(handler, {"ok": True, "workspaces": _workspaces_response_list(wss, handler)})
 
 
 def _handle_workspace_rename(handler, body):
@@ -21906,12 +21995,16 @@ def _handle_workspace_rename(handler, body):
     wss = load_workspaces()
     for w in wss:
         if w["path"] == path_str:
+            # Ownership boundary (user isolation): only owner/members/admins
+            # may rename an owned entry; legacy ownerless stays open.
+            if not _workspace_visible_to(w, handler):
+                return bad(handler, "forbidden", 403)
             w["name"] = name
             break
     else:
         return bad(handler, "Workspace not found", 404)
     save_workspaces(wss)
-    return j(handler, {"ok": True, "workspaces": wss})
+    return j(handler, {"ok": True, "workspaces": _workspaces_response_list(wss, handler)})
 
 
 def _handle_workspace_reorder(handler, body):
@@ -21939,7 +22032,60 @@ def _handle_workspace_reorder(handler, body):
         if w["path"] not in seen:
             reordered.append(w)
     save_workspaces(reordered)
-    return j(handler, {"ok": True, "workspaces": reordered})
+    # The safety net above also makes reorder safe for ownership-filtered
+    # clients: entries hidden from the requester are appended, never lost.
+    return j(handler, {"ok": True, "workspaces": _workspaces_response_list(reordered, handler)})
+
+
+def _handle_workspace_assign(handler, body):
+    """Admin-only: set the owner and/or member emails for a workspace entry.
+
+    Body: {"path": str, "owner_email": str (empty string clears back to a
+    legacy shared entry), "members": [emails] (empty list clears)}. Omitted
+    keys are left unchanged. The governance catalog maps this route to
+    files:write via the /api/workspaces prefix rule, and files:write is NOT
+    admin-scoped (sw-ops/sw-freelancers may hold it), so the admin
+    restriction MUST live here in the handler.
+    """
+    from api.ownership import request_is_admin
+
+    if not request_is_admin(handler):
+        return bad(handler, "forbidden", 403)
+    path_str = str(body.get("path") or "").strip()
+    if not path_str:
+        return bad(handler, "path is required")
+    wss = load_workspaces()
+    target = next((w for w in wss if w["path"] == path_str), None)
+    if target is None:
+        return bad(handler, "Workspace not found", 404)
+    if "owner_email" in body:
+        owner = str(body.get("owner_email") or "").strip().lower()
+        if owner:
+            target["owner_email"] = owner
+        else:
+            # Empty owner clears the entry back to legacy shared.
+            target.pop("owner_email", None)
+    if "members" in body:
+        raw_members = body.get("members")
+        if raw_members is None:
+            raw_members = []
+        if not isinstance(raw_members, list):
+            return bad(handler, "members must be a list of emails")
+        members = []
+        for m in raw_members:
+            m = str(m or "").strip().lower()
+            if m and m not in members:
+                members.append(m)
+        if members:
+            target["members"] = members
+        else:
+            target.pop("members", None)
+    save_workspaces(wss)
+    return j(handler, {
+        "ok": True,
+        "workspace": dict(target),
+        "workspaces": _workspaces_response_list(wss, handler),
+    })
 
 
 def _resolve_approval_legacy(sid: str, approval_id: str, choice: str) -> bool:

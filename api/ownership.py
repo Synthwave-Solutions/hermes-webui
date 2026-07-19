@@ -126,6 +126,18 @@ def request_owner_scope(handler) -> str:
     return str(identity.get("email") or "").strip().lower()
 
 
+def request_is_admin(handler) -> bool:
+    """Return whether the request identity resolves to an admin.
+
+    Public wrapper over identity_is_admin so route handlers that need an
+    admin-only gate (e.g. workspace ownership assignment) do not have to
+    import the private _request_identity helper. Identity-less requests with
+    auth enabled are non-admin; the auth-disabled synthetic identity counts
+    as admin (trusted local single-user mode).
+    """
+    return identity_is_admin(_request_identity(handler))
+
+
 def row_visible_to(owner_email_of_row, handler) -> bool:
     """Return whether a row owned by ``owner_email_of_row`` is request-visible.
 

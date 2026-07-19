@@ -30,7 +30,7 @@ POLICY = {
                 "permissions": [
                     "governance:read", "governance:write", "governance:preview",
                     "governance:audit:read", "governance:usage:read",
-                    "sessions:read", "sessions:write", "chat:use",
+                    "sessions:read", "sessions:write", "chat:use", "terminal:use",
                     "files:read", "files:write", "git:read", "git:write",
                     "config:read", "config:write", "model:read", "model:write",
                     "profiles:read", "profiles:admin", "skills:read", "skills:write",
@@ -46,7 +46,7 @@ POLICY = {
         "operator": {
             "grants": {
                 "permissions": [
-                    "chat:use", "sessions:read", "sessions:write",
+                    "chat:use", "terminal:use", "sessions:read", "sessions:write",
                     "files:read", "files:write", "git:read", "model:read",
                     "profiles:read", "status:read", "memory:read",
                 ],
@@ -160,6 +160,48 @@ def test_permission_not_allowed_for_viewer_write(enforce_policy):
     assert decision.allow is False
     assert decision.reason == "permission_not_allowed"
     assert decision.resource == "files:write"
+
+
+def test_terminal_requires_dedicated_permission(inject_policy):
+    # TRACK C: chat access must no longer imply shell access. A user with
+    # chat:use but without terminal:use is denied on the terminal and
+    # command-exec routes; adding terminal:use opens them.
+    inject_policy({
+        "version": 1,
+        "mode": "enforce",
+        "default_effect": "deny",
+        "bootstrap_admins": [],
+        "roles": {
+            "chat_only": {
+                "grants": {"permissions": ["chat:use"], "profiles": ["*"], "routes": ["*"]},
+            },
+            "chat_and_terminal": {
+                "grants": {"permissions": ["chat:use", "terminal:use"], "profiles": ["*"], "routes": ["*"]},
+            },
+        },
+        "users": {
+            "chatonly@example.test": {"roles": ["chat_only"]},
+            "shell@example.test": {"roles": ["chat_and_terminal"]},
+        },
+    })
+
+    chat_only = _identity("chatonly@example.test")
+    for method, path in (
+        ("POST", "/api/terminal/start"),
+        ("GET", "/api/terminal/output"),
+        ("POST", "/api/commands/exec"),
+    ):
+        decision = evaluate_request(chat_only, method, path)
+        assert decision.allow is False, (method, path, decision)
+        assert decision.reason == "permission_not_allowed", (method, path, decision)
+        assert decision.resource == "terminal:use", (method, path, decision)
+
+    # chat itself still works on chat:use alone
+    assert evaluate_request(chat_only, "POST", "/api/chat/start").allow is True
+
+    with_terminal = _identity("shell@example.test")
+    assert evaluate_request(with_terminal, "POST", "/api/terminal/start").allow is True
+    assert evaluate_request(with_terminal, "POST", "/api/commands/exec").allow is True
 
 
 def test_unknown_route_fails_closed_even_with_wildcard_routes(enforce_policy):

@@ -43,6 +43,11 @@ from api.config import (
     _main_model_request_overrides,
 )
 from api.helpers import redact_session_data, _redact_text
+from api.governance.agent_context import (
+    GovernanceBindingError,
+    bind_governed_agent_turn,
+    reset_governed_agent_turn,
+)
 from api.compression_anchor import is_context_compression_marker, visible_messages_for_anchor
 from api.metering import meter
 from api.run_journal import RunJournalWriter
@@ -6677,6 +6682,7 @@ def _run_agent_streaming(
     # Placed ABOVE the _checkpoint_stop cluster so that cluster stays adjacent
     # to the `try:` (preserves the Issue #765 static-locator invariant).
     _turn_session_identity_tokens = None
+    _governance_turn_token = None
     _streaming_cron_profile_home_token = None
     # Initialised here (before any code that may raise) so the outer `finally`
     # block can safely check `if _checkpoint_stop is not None` even when an
@@ -6692,6 +6698,25 @@ def _run_agent_streaming(
         # in the outer finally next to _clear_thread_env().
         _turn_session_identity_tokens = _set_turn_session_identity(session_id)
         s = get_session(session_id)
+        # Track A: bind the per-user dashboard-governance principal to THIS
+        # worker thread so the (otherwise dormant) agent-side enforcement in
+        # hermes_cli.dashboard_governance sees it for the whole turn: tool
+        # schema filtering, per-dispatch tool/argument gates, usage caps and
+        # the init_agent model policy (which fires at AIAgent construction
+        # below, so the bind must precede it). The single bind also covers
+        # cached-agent refresh and both self-heal run_conversation retries;
+        # tool-executor threads inherit it via propagate_context_to_thread.
+        # Admins, ownerless sessions and disabled policies bind nothing
+        # (unrestricted, current behavior); a non-admin bind failure under
+        # mode enforce raises GovernanceBindingError (fail closed) which the
+        # generic error path below surfaces to the user. Reset lives in the
+        # outer finally next to _reset_turn_session_identity.
+        _governance_turn_token = bind_governed_agent_turn(
+            getattr(s, 'owner_email', None),
+            active_profile=str(getattr(s, 'profile', None) or 'default'),
+            session_id=session_id,
+            request_id=stream_id,
+        )
         update_active_run(stream_id, phase="running", session_id=session_id)
         s.workspace = str(Path(workspace).expanduser().resolve())
         _last_persisted_model = None
@@ -9463,7 +9488,16 @@ def _run_agent_streaming(
         _exc_is_interrupted = _classification['type'] == 'interrupted'
 
         # The user hint still points to Settings / `hermes model` from _classify_provider_error().
-        if _exc_is_quota:
+        if isinstance(e, GovernanceBindingError):
+            # Track A fail-closed refusal (non-admin under mode enforce whose
+            # governance context could not be built/bound): surface the safe
+            # message verbatim instead of running the provider-error
+            # heuristics or credential self-heal over it. The label already
+            # carries the "Access restricted" prefix, so strip it from the
+            # message body to avoid printing it twice.
+            _exc_label, _exc_type, _exc_hint = ('Access restricted', 'governance_denied', '')
+            err_str = re.sub(r'^access restricted:\s*', '', err_str, flags=re.IGNORECASE)
+        elif _exc_is_quota:
             _exc_label, _exc_type, _exc_hint = (
                 _classification['label'], _classification['type'], _classification['hint'],
             )
@@ -9669,6 +9703,11 @@ def _run_agent_streaming(
         # CLI/cron env fallback resumes — same lifecycle slot as the env
         # restore above.
         _reset_turn_session_identity(_turn_session_identity_tokens)
+        # Track A: restore the per-turn governance principal (reset-token
+        # semantics, None-safe) so a reused thread-pool worker or the next
+        # turn on this thread leaks no grants. Same lifecycle slot as the
+        # session-identity restore above.
+        reset_governed_agent_turn(_governance_turn_token)
         with STREAMS_LOCK:
             STREAMS.pop(stream_id, None)
             CANCEL_FLAGS.pop(stream_id, None)
