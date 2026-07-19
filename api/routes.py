@@ -19325,6 +19325,11 @@ def _handle_btw(handler, body):
         model_provider=model_provider,
         profile=getattr(s, 'profile', None),
     )
+    # Stamp the caller identity so the ephemeral turn binds the same
+    # governance principal as the parent chat (falling back to the parent
+    # session's owner); identity-less (auth off / legacy) stays ownerless.
+    from api.ownership import request_owner_email as _request_owner_email
+    ephemeral.owner_email = _request_owner_email(handler) or getattr(s, 'owner_email', None)
     # Copy conversation history for context (agent reads from messages)
     ephemeral.messages = list(s.messages or [])
     ephemeral.title = f"btw: {question[:60]}"
@@ -19374,6 +19379,11 @@ def _handle_background(handler, body):
         model_provider=model_provider,
         profile=getattr(s, 'profile', None),
     )
+    # Stamp the caller identity so the background turn binds the same
+    # governance principal as the parent chat (falling back to the parent
+    # session's owner); identity-less (auth off / legacy) stays ownerless.
+    from api.ownership import request_owner_email as _request_owner_email
+    bg.owner_email = _request_owner_email(handler) or getattr(s, 'owner_email', None)
     bg.title = f"bg: {prompt[:60]}"
     bg.save()
     stream_id = uuid.uuid4().hex
@@ -20543,7 +20553,16 @@ def _handle_chat_sync(handler, body):
         s.model = model
         s.model_provider = model_provider
     from api.streaming import _ENV_LOCK
+    from api.governance.agent_context import (
+        GovernanceBindingError,
+        governed_agent_turn,
+    )
+    from api.ownership import request_owner_email as _request_owner_email
 
+    # Caller identity for the per-turn governance bind (Track A). Mirror the
+    # streaming path: prefer the request identity, fall back to the session
+    # owner; both empty keeps the ownerless/legacy turn unbound as today.
+    _governed_identity = _request_owner_email(handler) or getattr(s, "owner_email", None)
     with _ENV_LOCK:
         old_cwd = os.environ.get("TERMINAL_CWD")
         os.environ["TERMINAL_CWD"] = str(workspace)
@@ -20554,7 +20573,15 @@ def _handle_chat_sync(handler, body):
     try:
         from run_agent import AIAgent
 
-        with CHAT_LOCK:
+        # The bind must precede AIAgent construction (the agent-side
+        # init_agent model policy fires at construction) and span
+        # run_conversation; this sync fallback runs on the handler thread, so
+        # binding here scopes the whole turn correctly.
+        with governed_agent_turn(
+            _governed_identity,
+            active_profile=str(getattr(s, "profile", None) or "default"),
+            session_id=s.session_id,
+        ), CHAT_LOCK:
             from api.config import (
                 resolve_model_provider,
                 resolve_custom_provider_connection,
@@ -20648,6 +20675,15 @@ def _handle_chat_sync(handler, body):
                 task_id=s.session_id,
                 persist_user_message=msg,
             )
+    except GovernanceBindingError:
+        # Non-admin under mode enforce whose governance context could not be
+        # built or bound: refuse the turn (fail closed), same posture as the
+        # streaming path.
+        return j(
+            handler,
+            {"error": "Access restricted: governance context unavailable, ask your admin"},
+            status=403,
+        )
     finally:
         with _ENV_LOCK:
             if old_cwd is None:
@@ -22017,23 +22053,46 @@ def _handle_workspace_reorder(handler, body):
     paths = body.get("paths", [])
     if not paths or not isinstance(paths, list):
         return bad(handler, "paths is required and must be a list")
+    from api.ownership import request_is_admin
+
     wss = load_workspaces()
-    by_path = {w["path"]: w for w in wss}
-    # Build reordered list: given order first, then any omitted entries
-    reordered = []
-    seen = set()
-    for p in paths:
-        p = p.strip()
-        if p in by_path and p not in seen:
-            reordered.append(by_path[p])
-            seen.add(p)
-    # Append any workspaces not mentioned (safety net)
-    for w in wss:
-        if w["path"] not in seen:
-            reordered.append(w)
+    if request_is_admin(handler):
+        # Admins reorder the full list: given order first, then any omitted
+        # entries appended at the end (safety net, preserves data).
+        by_path = {w["path"]: w for w in wss}
+        reordered = []
+        seen = set()
+        for p in paths:
+            p = p.strip()
+            if p in by_path and p not in seen:
+                reordered.append(by_path[p])
+                seen.add(p)
+        for w in wss:
+            if w["path"] not in seen:
+                reordered.append(w)
+    else:
+        # Non-admins (user isolation): permute only the requester-visible
+        # subset in place. Entries hidden from the requester keep their
+        # original indices, so foreign ordering is never perturbed and no
+        # entry is ever lost. When everything is visible (legacy/identity-less
+        # installs) this degenerates to the full reorder above.
+        visible_idx = [i for i, w in enumerate(wss) if _workspace_visible_to(w, handler)]
+        visible_by_path = {wss[i]["path"]: wss[i] for i in visible_idx}
+        ordered_visible = []
+        seen = set()
+        for p in paths:
+            p = p.strip()
+            if p in visible_by_path and p not in seen:
+                ordered_visible.append(visible_by_path[p])
+                seen.add(p)
+        # Visible entries omitted from the request keep their relative order.
+        for i in visible_idx:
+            if wss[i]["path"] not in seen:
+                ordered_visible.append(wss[i])
+        reordered = list(wss)
+        for slot, w in zip(visible_idx, ordered_visible):
+            reordered[slot] = w
     save_workspaces(reordered)
-    # The safety net above also makes reorder safe for ownership-filtered
-    # clients: entries hidden from the requester are appended, never lost.
     return j(handler, {"ok": True, "workspaces": _workspaces_response_list(reordered, handler)})
 
 
@@ -22073,7 +22132,11 @@ def _handle_workspace_assign(handler, body):
             return bad(handler, "members must be a list of emails")
         members = []
         for m in raw_members:
-            m = str(m or "").strip().lower()
+            if not isinstance(m, str):
+                # str() coercion would persist junk like "{'a': 1}" as a
+                # member email; reject the request instead.
+                return bad(handler, "members must be a list of email strings")
+            m = m.strip().lower()
             if m and m not in members:
                 members.append(m)
         if members:

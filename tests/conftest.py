@@ -882,6 +882,44 @@ def test_server():
     os.environ.setdefault('HERMES_WEBUI_TEST_PORT', str(TEST_PORT))
     # os.environ already set at module level above; no-op here.
 
+    # Strip auth-enabling env vars that a repo-root .env can inject during
+    # COLLECTION. Importing bootstrap.py at module level (as
+    # test_bootstrap_discover_agent.py and test_bootstrap_python_selection.py
+    # do) runs _load_repo_dotenv() as an import side effect, which sources
+    # <repo>/.env into os.environ and OVERRIDES existing values. On a machine
+    # whose repo .env carries a real HERMES_WEBUI_PASSWORD plus a complete
+    # HERMES_WEBUI_OIDC_* quartet, a full-tree run therefore booted the shared
+    # test server with OIDC auth enabled (the env.update below already blanked
+    # the password, but the OIDC vars sailed through os.environ.copy()) and
+    # every live-HTTP test 401-cascaded. Running the same tests by explicit
+    # path never imported bootstrap, so the cascade only appeared under
+    # full-tree collection. Popping the vars from os.environ here (the fixture
+    # runs after ALL collection imports, so nothing can re-pollute) keeps both
+    # the pytest process and the spawned server hermetic: auth stays OFF for
+    # the shared server regardless of what the developer's .env contains.
+    # Tests that exercise auth set these vars themselves per test via
+    # monkeypatch (test_auth.py, test_1560_password_env_var_no_op.py,
+    # test_issue3825_oidc_auth.py) and are unaffected by a session-start strip.
+    _AUTH_ENV_KEYS = (
+        'HERMES_WEBUI_PASSWORD',
+        'HERMES_WEBUI_PASSWORD_IDENTITY',
+        'HERMES_WEBUI_PASSKEY',
+        'HERMES_WEBUI_TRUST_FORWARDED_PROTO',
+        'HERMES_WEBUI_SKIP_ONBOARDING',
+    )
+    for _k in list(os.environ):
+        if _k in _AUTH_ENV_KEYS or _k.startswith('HERMES_WEBUI_OIDC_'):
+            os.environ.pop(_k, None)
+    # If api.auth already computed its password-hash cache while the polluted
+    # values were live, drop it so in-process auth checks re-read the now
+    # clean environment.
+    _auth_mod = sys.modules.get('api.auth')
+    if _auth_mod is not None:
+        try:
+            _auth_mod._invalidate_password_hash_cache()
+        except Exception:
+            pass
+
     env = os.environ.copy()
     # Strip ANY real credential env var so the test subprocess never inherits
     # production creds. The test server uses a mock/isolated config — no real

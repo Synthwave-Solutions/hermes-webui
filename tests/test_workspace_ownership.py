@@ -13,6 +13,7 @@ from api.routes import (
     _handle_workspace_add,
     _handle_workspace_remove,
     _handle_workspace_rename,
+    _handle_workspace_reorder,
     _handle_workspace_assign,
     _workspaces_response_list,
     _workspace_visible_to,
@@ -230,6 +231,92 @@ class TestWorkspaceAssignEndpoint:
         _handle_workspace_assign(handler, {"path": "/home/user/a", "members": "not-a-list"})
         handler.send_response.assert_called_with(400)
         mock_save.assert_not_called()
+
+    @patch("api.ownership.request_is_admin", return_value=True)
+    @patch("api.routes.save_workspaces")
+    @patch("api.routes.load_workspaces")
+    def test_assign_rejects_non_string_member_elements(self, mock_load, mock_save, _admin):
+        """A dict/int element must 400, not persist as a str() junk member."""
+        mock_load.return_value = [{"path": "/home/user/a", "name": "A"}]
+        handler = _make_handler()
+        _handle_workspace_assign(handler, {
+            "path": "/home/user/a",
+            "members": [MICHAEL, {"email": STEVE}],
+        })
+        handler.send_response.assert_called_with(400)
+        mock_save.assert_not_called()
+
+
+class TestWorkspaceReorderOwnership:
+    """Non-admin reorder permutes only the requester-visible subset in place;
+    hidden foreign entries keep their original indices. Admins keep the full
+    reorder. No entry is ever lost either way."""
+
+    WSS = [
+        {"path": "/home/user/foreign1", "name": "F1", "owner_email": MICHAEL},
+        {"path": "/home/user/own-a", "name": "A", "owner_email": STEVE},
+        {"path": "/home/user/foreign2", "name": "F2", "owner_email": MICHAEL},
+        {"path": "/home/user/own-b", "name": "B", "owner_email": STEVE},
+        {"path": "/home/user/legacy", "name": "L"},
+    ]
+
+    @patch("api.ownership.request_owner_scope", return_value=STEVE)
+    @patch("api.ownership.request_is_admin", return_value=False)
+    @patch("api.routes.save_workspaces")
+    @patch("api.routes.load_workspaces")
+    def test_non_admin_reorder_keeps_hidden_positions(self, mock_load, mock_save, _admin, _scope):
+        mock_load.return_value = [dict(w) for w in self.WSS]
+        handler = _make_handler()
+        _handle_workspace_reorder(handler, {
+            "paths": ["/home/user/own-b", "/home/user/own-a"],
+        })
+        mock_save.assert_called_once()
+        saved = [w["path"] for w in mock_save.call_args[0][0]]
+        # Visible slots (1, 3, 4) hold the requested order plus the omitted
+        # visible legacy entry; hidden foreign entries stay at 0 and 2.
+        assert saved == [
+            "/home/user/foreign1",
+            "/home/user/own-b",
+            "/home/user/foreign2",
+            "/home/user/own-a",
+            "/home/user/legacy",
+        ]
+
+    @patch("api.ownership.request_owner_scope", return_value=STEVE)
+    @patch("api.ownership.request_is_admin", return_value=False)
+    @patch("api.routes.save_workspaces")
+    @patch("api.routes.load_workspaces")
+    def test_non_admin_cannot_move_foreign_entries(self, mock_load, mock_save, _admin, _scope):
+        """Foreign paths smuggled into the request are ignored, not moved."""
+        mock_load.return_value = [dict(w) for w in self.WSS]
+        handler = _make_handler()
+        _handle_workspace_reorder(handler, {
+            "paths": ["/home/user/foreign2", "/home/user/own-a"],
+        })
+        saved = [w["path"] for w in mock_save.call_args[0][0]]
+        assert saved.index("/home/user/foreign1") == 0
+        assert saved.index("/home/user/foreign2") == 2
+        assert len(saved) == len(self.WSS)  # nothing lost
+
+    @patch("api.ownership.request_owner_scope", return_value="all")
+    @patch("api.ownership.request_is_admin", return_value=True)
+    @patch("api.routes.save_workspaces")
+    @patch("api.routes.load_workspaces")
+    def test_admin_keeps_full_reorder(self, mock_load, mock_save, _admin, _scope):
+        mock_load.return_value = [dict(w) for w in self.WSS]
+        handler = _make_handler()
+        _handle_workspace_reorder(handler, {
+            "paths": ["/home/user/legacy", "/home/user/foreign2"],
+        })
+        saved = [w["path"] for w in mock_save.call_args[0][0]]
+        # Requested order first, then omitted entries appended (safety net).
+        assert saved == [
+            "/home/user/legacy",
+            "/home/user/foreign2",
+            "/home/user/foreign1",
+            "/home/user/own-a",
+            "/home/user/own-b",
+        ]
 
 
 class TestCleanWorkspaceListPreservesOwnership:

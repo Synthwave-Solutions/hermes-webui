@@ -282,3 +282,56 @@ def test_nested_turns_restore_outer_binding(enforce_policy):
 
 def test_reset_is_none_safe():
     reset_governed_agent_turn(None)  # must never raise in a teardown finally
+
+
+# ── webui / agent-side model field parity ────────────────────────────────────
+
+def _agent_models_module():
+    """The real agent-side models module when the hermes-agent checkout is on
+    the box (the live deployment case); otherwise skip, same posture as
+    _real_agent_module."""
+    try:
+        import api.config  # noqa: F401  (side effect: hermes-agent root on sys.path)
+        from hermes_cli.dashboard_governance import models as agent_models
+        return agent_models
+    except Exception:
+        pytest.skip("hermes_cli.dashboard_governance not importable in this environment")
+
+
+def test_grantset_and_subject_field_parity_with_agent_side():
+    """GrantSet and GovernanceSubject are vendored twice (webui and agent
+    side) and bridged by duck-typing in _translate_context. The bridge is loud
+    when a dimension is added AGENT-side (AttributeError on the shim), but a
+    dimension added WEBUI-side only would be dropped silently for every
+    governed turn; this parity check makes drift loud in both directions."""
+    import dataclasses
+
+    agent_models = _agent_models_module()
+    from api.governance import models as webui_models
+
+    for name in ("GrantSet", "GovernanceSubject"):
+        webui_fields = {f.name for f in dataclasses.fields(getattr(webui_models, name))}
+        agent_fields = {f.name for f in dataclasses.fields(getattr(agent_models, name))}
+        assert webui_fields == agent_fields, (
+            f"{name} field drift between webui and agent copies: "
+            f"webui-only={sorted(webui_fields - agent_fields)}, "
+            f"agent-only={sorted(agent_fields - webui_fields)}"
+        )
+
+
+def test_serialized_grant_payload_covers_every_grant_field():
+    """The env payload is the only webui-to-agent grant path (only the agent
+    side owns the serializer; the webui duck-types through it), so a GrantSet
+    field missing from _serialize_grants would silently drop that grant
+    dimension for every governed turn even with field-identical dataclasses."""
+    import dataclasses
+
+    agent_models = _agent_models_module()
+    from hermes_cli.dashboard_governance import context as agent_ctx
+
+    grant_fields = {f.name for f in dataclasses.fields(agent_models.GrantSet)}
+    payload_keys = set(agent_ctx._serialize_grants(agent_models.GrantSet()).keys())
+    assert payload_keys == grant_fields, (
+        f"grant serializer drift: missing={sorted(grant_fields - payload_keys)}, "
+        f"extra={sorted(payload_keys - grant_fields)}"
+    )
