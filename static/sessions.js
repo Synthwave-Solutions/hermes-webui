@@ -27,6 +27,109 @@ let _loadingSessionId = null;
 // to carry forward (initial load, switch-to-different-session, etc.).
 let _pendingCarryForwardSnapshot = null;
 
+// A scene is the complete client state needed to paint a recently visited
+// conversation without waiting for the network. Map insertion order is the LRU
+// order: reads reinsert entries at the end, and eviction removes from the front.
+const _SESSION_SCENE_CACHE_MAX_ENTRIES = 15;
+const _SESSION_SCENE_CACHE_MAX_BYTES = 32 * 1024 * 1024;
+const _sessionSceneCache = new Map();
+let _sessionSceneCacheBytes = 0;
+
+function _cloneSessionSceneValue(value) {
+  if (value == null) return value;
+  if (typeof structuredClone === 'function') {
+    try { return structuredClone(value); } catch (_) {}
+  }
+  try { return JSON.parse(JSON.stringify(value)); } catch (_) { return value; }
+}
+
+function _sessionSceneRevision(session) {
+  if (!session) return '';
+  return String(session.revision || session.updated_at || session.last_message_at || '');
+}
+
+function _estimateSessionSceneBytes(scene) {
+  try { return new Blob([JSON.stringify(scene)]).size; }
+  catch (_) {
+    try { return JSON.stringify(scene).length * 2; } catch (_err) { return 0; }
+  }
+}
+
+function _invalidateSessionSceneCache(sid) {
+  const previous = sid ? _sessionSceneCache.get(sid) : null;
+  if (!previous) return;
+  _sessionSceneCacheBytes = Math.max(0, _sessionSceneCacheBytes - Number(previous.byteSize || 0));
+  _sessionSceneCache.delete(sid);
+}
+
+function _getSessionSceneCache(sid) {
+  const scene = sid ? _sessionSceneCache.get(sid) : null;
+  if (!scene) return null;
+  _sessionSceneCache.delete(sid);
+  _sessionSceneCache.set(sid, scene);
+  return scene;
+}
+
+function _putSessionSceneCache(sid, scene) {
+  if (!sid || !scene) return;
+  _invalidateSessionSceneCache(sid);
+  scene.byteSize = _estimateSessionSceneBytes(scene);
+  _sessionSceneCache.set(sid, scene);
+  _sessionSceneCacheBytes += scene.byteSize;
+  while (_sessionSceneCache.size > _SESSION_SCENE_CACHE_MAX_ENTRIES
+      || _sessionSceneCacheBytes > _SESSION_SCENE_CACHE_MAX_BYTES) {
+    const oldestSid = _sessionSceneCache.keys().next().value;
+    if (!oldestSid) break;
+    _invalidateSessionSceneCache(oldestSid);
+  }
+}
+
+function _captureActiveSessionScene() {
+  const session = S.session;
+  const sid = session && session.session_id;
+  if (!sid || !Array.isArray(S.messages)) return;
+  const {messages: _ignoredMessages, ...metadata} = session;
+  const container = $('messages');
+  _putSessionSceneCache(sid, {
+    metadata: _cloneSessionSceneValue(metadata),
+    revision: _sessionSceneRevision(session),
+    messages: _cloneSessionSceneValue(S.messages),
+    toolCalls: _cloneSessionSceneValue(S.toolCalls || []),
+    messagesTruncated: !!_messagesTruncated,
+    oldestIdx: Number(_oldestIdx || 0),
+    scrollTop: container ? Number(container.scrollTop || 0) : 0,
+    scrollPinned: typeof _scrollPinned === 'undefined' ? true : !!_scrollPinned,
+  });
+}
+
+function _restoreSessionScene(scene) {
+  if (!scene || !scene.metadata) return null;
+  S.messages = _cloneSessionSceneValue(scene.messages || []);
+  S.toolCalls = _cloneSessionSceneValue(scene.toolCalls || []);
+  _messagesTruncated = !!scene.messagesTruncated;
+  _oldestIdx = Number(scene.oldestIdx || 0);
+  if (typeof _scrollPinned !== 'undefined') _scrollPinned = !!scene.scrollPinned;
+  return {..._cloneSessionSceneValue(scene.metadata), messages:S.messages, tool_calls:S.toolCalls};
+}
+
+async function _validateCachedSessionScene(sid, scene) {
+  try {
+    const data = await api(`/api/session?session_id=${encodeURIComponent(sid)}&messages=0&resolve_model=0`, {timeoutToast:false});
+    if (!data || !data.session) return;
+    const remoteRevision = _sessionSceneRevision(data.session);
+    const localCount = Number(scene && scene.metadata && scene.metadata.message_count || 0);
+    const remoteCount = Number(data.session.message_count || 0);
+    if (remoteRevision !== String(scene.revision || '') || remoteCount !== localCount) {
+      _invalidateSessionSceneCache(sid);
+      if (S.session && S.session.session_id === sid && _loadingSessionId === null) {
+        void loadSession(sid, {force:true, keepStaleUntilLoaded:true});
+      }
+    }
+  } catch (_) {
+    // Cached content remains useful during a transient metadata failure.
+  }
+}
+
 // ── Composer draft persistence ────────────────────────────────────────────────
 
 // Debounced save — prevents hammering the server on every keystroke.
@@ -247,28 +350,26 @@ function _rememberComposerDraftPayloadState(sid, text, files) {
 
 // Immediate save used before session switches.
 function _saveComposerDraftNow(sid, text, files) {
-  if (!sid) return Promise.resolve();
+  if (!sid) return false;
   clearTimeout(_draftSaveTimer);
   const normalizedText = String(text || '');
   const normalizedFiles = _composerDraftFilesForPersist(files);
+  const nextSignature = _composerDraftPayloadSignature(normalizedText, normalizedFiles);
+  const savedSignature = _composerDraftPayloadSignatureForSid(sid)
+    || _composerDraftPayloadSignature('', []);
+  // A switch only waits when local composer state differs from the last known
+  // server draft. This covers both edits and clearing a previously saved draft.
+  if (nextSignature === savedSignature) return false;
   if (_composerDraftHasPayload(normalizedText, normalizedFiles)) {
     _clearComposerDraftRestoreSuppression(sid);
-  }
-  // Most chat switches leave an empty composer. Avoid putting the switch path
-  // behind a network POST unless there is new local draft content or an existing
-  // server draft that must be cleared.
-  if (!_composerDraftHasPayload(normalizedText, normalizedFiles)
-      && S.session && S.session.session_id === sid
-      && !_sessionComposerDraftHasPayload(S.session)
-      && !_composerDraftKnownPayloadSessions.has(sid)) {
-    return Promise.resolve();
   }
   return api('/api/session/draft', {
     method: 'POST',
     body: JSON.stringify({ session_id: sid, text: normalizedText, files: normalizedFiles }),
   }).then(() => {
     _rememberComposerDraftPayloadState(sid, normalizedText, normalizedFiles);
-  }).catch(() => {});
+    return true;
+  }).catch(() => false);
 }
 
 // Restore composer draft from server onto #msg textarea.
@@ -4716,6 +4817,12 @@ async function _runRenderSessionListRefresh(opts, _gen){
     // switch-owned render (after the embargo lifts) is the only one allowed to resolve the
     // skeleton; if the switch itself fails, its catch clears the skeleton + embargo.
     if (_profileSwitchListEmbargo) return;
+    // Governance enforce mode: /api/sessions returned 403 for this user. Back
+    // the 30s gateway fallback poll off to once per 5 minutes so a denied tab
+    // does not hammer the audit log; the manual Retry button still works.
+    if (e && Number(e.status) === 403 && _gatewayPollTimer) {
+      startGatewayPollFallback(300000);
+    }
     _showSessionListLoadError(e);
     // Only fall back to the cached rows if they were loaded under the SAME
     // scope we're requesting now. After a profile switch the cache holds the
@@ -4801,6 +4908,7 @@ async function renderSessionList(opts={}){
 let _gatewaySSE = null;
 let _gatewayPollTimer = null;
 let _gatewayProbeInFlight = false;
+let _gatewayProbeForbiddenUntil = 0; // governance 403 backoff: suppress probes until this timestamp
 let _gatewaySSEWarningShown = false;
 const _gatewayFallbackPollMs = 30000;
 const _streamingPollMs = 30000;
@@ -5244,10 +5352,18 @@ function _isDuplicateGatewaySessionSnapshot(sessions){
 
 async function probeGatewaySSEStatus(){
   if(_gatewayProbeInFlight || !window._showCliSessions) return;
+  // Governance enforce mode: after a 403 suppress re-probes for 5 minutes so
+  // the EventSource error path cannot hammer the audit log with denied probes.
+  if(_gatewayProbeForbiddenUntil && Date.now() < _gatewayProbeForbiddenUntil) return;
   _gatewayProbeInFlight = true;
   try{
     const resp = await fetch(new URL('api/sessions/gateway/stream?probe=1', document.baseURI || location.href).href, { credentials:'same-origin' });
     const data = await resp.json().catch(() => ({}));
+    if(resp.status === 403){
+      _gatewayProbeForbiddenUntil = Date.now() + 300000;
+      stopGatewayPollFallback();
+      return;
+    }
     if(resp.ok && data.watcher_running){
       stopGatewayPollFallback();
       _gatewaySSEWarningShown = false;

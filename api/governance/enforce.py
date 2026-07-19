@@ -99,6 +99,16 @@ def evaluate_request(identity: dict | None, method: str, path: str) -> Decision:
     if route_path in _ANON_ROUTES:
         return Decision(True, "anon_route", "", "enforce")
 
+    # Non-API passthrough BEFORE the policy is read: page loads and static
+    # assets (/login, /static/*, /sw.js, /health, ...) are not route-governed;
+    # panels are gated by their APIs. Deciding this pre-policy means a broken
+    # or unparseable policy file can never brick the login page: only /api/*
+    # fails closed under policy_error. The mode is unreadable here, so the
+    # Decision reports enforce like the anon_route branch; the adapter only
+    # consults decision.mode on deny paths, so allow=True keeps it coherent.
+    if not route_path.startswith("/api/"):
+        return Decision(True, "non_api", "", "enforce")
+
     try:
         policy = loader.get_policy()
     except Exception:
@@ -108,11 +118,6 @@ def evaluate_request(identity: dict | None, method: str, path: str) -> Decision:
 
     if not policy.enabled:
         return Decision(True, "governance_off", "", policy.mode)
-
-    if not route_path.startswith("/api/"):
-        # Page loads and static assets are not route-governed; panels are
-        # gated by their APIs.
-        return Decision(True, "non_api", "", policy.mode)
 
     subject = subject_from_identity(identity)
 

@@ -1,3 +1,15 @@
+// Dedup guard for governance 403 notices: one non-blocking toast per unique
+// resource+reason for the lifetime of the tab, so a denied poller cannot
+// spam the user (or re-surface the same restriction on every retry).
+const _forbiddenNoticeShown=new Set();
+function _notifyForbidden(resource,reason){
+  const key=String(resource||'')+'|'+String(reason||'');
+  if(_forbiddenNoticeShown.has(key)) return;
+  _forbiddenNoticeShown.add(key);
+  const what=resource||reason||'this feature';
+  if(typeof showToast==='function') showToast('Access restricted: '+what+' - ask your admin',6000);
+}
+
 async function api(path,opts={}){
   // Strip leading slash so URL resolves relative to location.href (supports subpath mounts)
   const rel = path.startsWith('/') ? path.slice(1) : path;
@@ -54,13 +66,24 @@ async function api(path,opts={}){
           // Parse JSON error body and surface the human-readable message,
           // rather than showing raw JSON like {"error":"Profile 'x' does not exist."}
           let message=text;
-          try{const j=JSON.parse(text);message=j.error||j.message||text;}catch(e){}
+          let errBody=null;
+          try{errBody=JSON.parse(text);message=errBody.error||errBody.message||text;}catch(e){}
           // Attach the raw HTTP context so callers can branch on status (404 stale-session
           // cleanup, 401 redirect, 503 retry, etc.) without re-parsing the message string.
           const err=new Error(message);
           err.status=res.status;
           err.statusText=res.statusText;
           err.body=text;
+          // 403 = governance enforce mode denied an authenticated-but-under-privileged
+          // user: {"error":"forbidden","reason":...,"resource":...}. Preserve the
+          // structured fields so callers (pollers, governance UI) can branch, and show
+          // a ONE-TIME per resource+reason notice instead of toasting on every poll tick.
+          // No redirect: 401 already owns the login flow.
+          if(res.status===403){
+            err.reason=(errBody&&errBody.reason)||null;
+            err.resource=(errBody&&errBody.resource)||null;
+            _notifyForbidden(err.resource,err.reason);
+          }
           throw err;
         }
         const ct=res.headers.get('content-type')||'';
@@ -842,8 +865,9 @@ function renderCodePreviewContent(path, content){
   pre.appendChild(codeEl);
   // Only invoke Prism when we actually assigned a language; otherwise the
   // class-less <code> would inherit any ancestor language-* class.
-  if(lang&&typeof Prism!=='undefined'&&typeof Prism.highlightElement==='function'){
-    Prism.highlightElement(codeEl);
+  if(lang){
+    if(typeof Prism!=='undefined'&&typeof Prism.highlightElement==='function') Prism.highlightElement(codeEl);
+    else if(typeof ensurePrism==='function') ensurePrism().then(()=>Prism.highlightElement(codeEl)).catch(()=>{});
   }
 }
 

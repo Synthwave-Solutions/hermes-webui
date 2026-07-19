@@ -274,12 +274,45 @@ def test_anon_login_routes_pass_under_policy_error():
 def test_anon_routes_match_auth_public_login_paths():
     # FINDING 1: keep _ANON_ROUTES in sync with the login endpoints in
     # api.auth.PUBLIC_PATHS so a new public login route cannot silently become
-    # un-exempt under enforce.
+    # un-exempt under enforce. /api/csp-report is the one extra anon route
+    # (defense in depth for the server.py dispatch special-case).
     from api import auth
     from api.governance.catalog import _ANON_ROUTES
 
     login_public_paths = {p for p in auth.PUBLIC_PATHS if p.startswith("/api/auth/")}
-    assert _ANON_ROUTES == frozenset(login_public_paths)
+    assert _ANON_ROUTES == frozenset(login_public_paths) | {"/api/csp-report"}
+
+
+def test_non_api_paths_pass_under_policy_error():
+    # ORDERING BUG: the non-API passthrough must run BEFORE the policy load,
+    # otherwise a broken policy file returns policy_error deny for /login,
+    # /static/* and /sw.js too, bricking the login page itself.
+    def _boom():
+        raise GovernancePolicyError("bad policy")
+
+    loader.set_policy_loader(_boom)
+    try:
+        for path in ("/login", "/static/app.js", "/health"):
+            decision = evaluate_request(None, "GET", path)
+            assert decision.allow is True, path
+            assert decision.reason == "non_api", path
+
+        # /api/* still fails closed under a broken policy.
+        denied = evaluate_request(None, "GET", "/api/sessions")
+        assert denied.allow is False
+        assert denied.reason == "policy_error"
+        assert denied.mode == "enforce"
+    finally:
+        loader.set_policy_loader(None)
+
+
+def test_csp_report_is_anon_allowed(enforce_policy):
+    # DEFENSE IN DEPTH: browsers POST CSP violation reports without
+    # credentials; the route must stay reachable through governance even if
+    # the server.py dispatch special-case ever moves.
+    decision = evaluate_request(None, "POST", "/api/csp-report")
+    assert decision.allow is True
+    assert decision.reason == "anon_route"
 
 
 def test_is_profile_allowed_for_body_sink(enforce_policy):

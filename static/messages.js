@@ -6670,7 +6670,16 @@ function _startApprovalFallbackPoll(sid) {
           stopApprovalPollingForSession(sid);
         }
       }
-    } catch(e) { /* ignore poll errors */ }
+    } catch(e) {
+      // Governance enforce mode: a 403 means this user cannot read approvals.
+      // Back the poll off to once per 5 minutes instead of hammering the audit
+      // log at the 1.5s cadence; api() already surfaced the one-time notice.
+      if (e && e.status === 403 && _approvalPollTimer) {
+        clearInterval(_approvalPollTimer);
+        _approvalPollTimer = setInterval(_tick, 300000);
+      }
+      /* ignore other poll errors */
+    }
     finally { _approvalFallbackPollInFlight = false; }
   };
   _approvalPollTimer = setInterval(_tick, 1500);  // matches the v0.50.247 polling cadence so degraded-mode users see the same responsiveness
@@ -7806,6 +7815,16 @@ function _startClarifyFallbackPoll(sid) {
           }
         }
         stopClarifyPolling();
+        return;
+      }
+      // Governance enforce mode: a 403 means this user cannot read clarify
+      // state. Back the poll off to once per 5 minutes instead of the 3s
+      // cadence; api() already surfaced the one-time notice.
+      if (status === 403) {
+        if (_clarifyFallbackTimer) {
+          clearInterval(_clarifyFallbackTimer);
+          _clarifyFallbackTimer = setInterval(_tick, 300000);
+        }
         return;
       }
       // Structured diagnostics: unexpected clarify poll failures should be

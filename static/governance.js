@@ -106,7 +106,12 @@ function _govHandleConflict(e) {
 
 function _govError(e, containerId) {
   const el = $(containerId);
-  const msg = (e && e.message) ? e.message : 'request failed';
+  let msg = (e && e.message) ? e.message : 'request failed';
+  // Governance 403s carry structured reason/resource (attached by api());
+  // surface them instead of the bare "forbidden".
+  if (e && Number(e.status) === 403 && (e.reason || e.resource)) {
+    msg = 'Access restricted' + (e.resource ? ': ' + e.resource : '') + (e.reason ? ' (' + e.reason + ')' : '');
+  }
   if (el) el.innerHTML = '<div class="gov-error">' + _govEsc(msg) + '</div>';
 }
 

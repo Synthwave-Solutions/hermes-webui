@@ -20,6 +20,10 @@ _MUTATION_METHODS: frozenset[str] = frozenset({"POST", "PUT", "PATCH", "DELETE"}
 # test asserts the two stay aligned so a new public login route cannot silently
 # become un-exempt. Non-login public paths (pages, static, manifests) are not
 # listed here because they are already handled by the non-/api passthrough.
+# /api/csp-report is listed as defense in depth: browsers POST CSP violation
+# reports without credentials, and today the endpoint bypasses the hook via a
+# server.py dispatch special-case; the entry here keeps it reachable even if
+# that special-case ever moves.
 _ANON_ROUTES: frozenset[str] = frozenset({
     "/api/auth/login",
     "/api/auth/status",
@@ -27,6 +31,7 @@ _ANON_ROUTES: frozenset[str] = frozenset({
     "/api/auth/oidc/callback",
     "/api/auth/passkey/options",
     "/api/auth/passkey/login",
+    "/api/csp-report",
 })
 
 # Authenticated session self-management: no permission required beyond a

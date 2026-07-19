@@ -219,7 +219,7 @@ The cron `run` special case is kept verbatim from the reference: `POST` on a pat
 
 The extension sidecar proxy (`/api/extensions/<id>/sidecar[/...]`, any method) is covered by the `/api/extensions` prefix rule: GET resolves `plugins:read`, mutations `plugins:write`.
 
-`POST /api/csp-report` never reaches the hook (it bypasses `check_auth` in server.py and the hook sits after `check_auth`); it stays unauthenticated by design and needs no rule.
+`POST /api/csp-report` never reaches the hook today (it bypasses `check_auth` in server.py and the hook sits after `check_auth`); it stays unauthenticated by design and needs no permission rule. As defense in depth it is also listed in `_ANON_ROUTES`, so it stays reachable even if that server.py dispatch special-case ever moves.
 
 ### 1.8 `api/governance/enforce.py`
 The only rewritten module (the reference `enforcement.py` is FastAPI-coupled). Framework-free core + one thin `http.server` adapter.
@@ -255,10 +255,10 @@ def evaluate_request(identity: dict | None, method: str, path: str) -> Decision:
 
 `evaluate_request` order of checks (preserving the reference `governance_decision` order exactly, with the two port-specific additions marked NEW):
 
-1. `policy = loader.get_policy()`; on `GovernancePolicyError`: `Decision(False, "policy_error", "", "enforce")` (fail closed; the adapter still honors report_only ONLY if the mode could be read, which it cannot here, so policy errors always deny under a previously-enforcing deployment and are audited).
-2. `if not policy.enabled: return Decision(True, "governance_off", "", policy.mode)`.
-3. Split `path` on `"?"` into `route_path`, `query`.
-4. NEW `if not route_path.startswith("/api/"): return Decision(True, "non_api", "", policy.mode)` (page loads and static assets are not route-governed; panels are gated by their APIs).
+1. Split `path` on `"?"` into `route_path`, `query`; `if route_path in _ANON_ROUTES: return Decision(True, "anon_route", "", "enforce")` (pre-auth public login surface plus `/api/csp-report`, exempt BEFORE the policy is even read).
+2. NEW `if not route_path.startswith("/api/"): return Decision(True, "non_api", "", "enforce")` (page loads and static assets are not route-governed; panels are gated by their APIs). This also runs BEFORE the policy load, so a broken policy file can never brick `/login`, `/static/*` or `/sw.js`; the mode is unreadable pre-policy, so the Decision reports enforce like the anon_route branch (the adapter only consults mode on deny).
+3. `policy = loader.get_policy()`; on `GovernancePolicyError`: `Decision(False, "policy_error", "", "enforce")` (only `/api/*` reaches this point, so it alone fails closed; the adapter still honors report_only ONLY if the mode could be read, which it cannot here, so policy errors always deny under a previously-enforcing deployment and are audited).
+4. `if not policy.enabled: return Decision(True, "governance_off", "", policy.mode)`.
 5. `subject = subject_from_identity(identity)`.
 6. NEW bootstrap short-circuit: `if subject.normalized_email and subject.normalized_email in {a.lower() for a in policy.bootstrap_admins}: return Decision(True, "bootstrap_admin", route_permission(route_path, method) or "", policy.mode)`. The bootstrap admin can NEVER be denied, even by catalog gaps (`unknown_route`) or a route whitelist mistake. (The resolver also grants wildcard; this guard protects against everything else.)
 7. `if not subject.user_id and not subject.email: return Decision(False, "unauthenticated", "", policy.mode)` (anonymous/legacy sessions).
