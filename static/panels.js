@@ -5794,7 +5794,9 @@ async function saveWorkspaceAssignment(){
       showToast('Ownership saved');
     }
   } catch (e) {
-    showToast('Ownership save failed: ' + e.message, 'error');
+    // showToast signature is (msg, ms, type): pass null for ms so the error
+    // toast keeps its default duration instead of dismissing instantly.
+    showToast('Ownership save failed: ' + e.message, null, 'error');
   }
 }
 

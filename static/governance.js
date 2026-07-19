@@ -57,13 +57,15 @@ async function loadGovernance() {
   const me = await _govFetchMe();
   govApplyVisibility(me);
   if (!_govIsAdmin(me)) return false;
+  _govEnsureWorkspacesTab();
   _govRefreshApprovalsBadge();
   await _govSwitchTab(_govTab || 'overview');
   return true;
 }
 
 async function _govSwitchTab(name) {
-  const tab = ['overview', 'users', 'groups', 'approvals', 'preview', 'audit'].includes(name) ? name : 'overview';
+  _govEnsureWorkspacesTab();
+  const tab = ['overview', 'users', 'groups', 'workspaces', 'approvals', 'preview', 'audit'].includes(name) ? name : 'overview';
   _govTab = tab;
   document.querySelectorAll('#mainGovernance .gov-tab').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.govTab === tab);
@@ -74,6 +76,7 @@ async function _govSwitchTab(name) {
   if (tab === 'overview') await _govLoadOverview();
   if (tab === 'users') await _govLoadUsers();
   if (tab === 'groups') await _govLoadGroups();
+  if (tab === 'workspaces') await _govLoadWorkspaces();
   if (tab === 'approvals') await _govLoadApprovals();
   if (tab === 'audit') await _govLoadAudit();
   // preview tab is form-driven; nothing to preload
@@ -448,6 +451,201 @@ async function _govDeleteGroup(name) {
   } catch (e) {
     if (!_govHandleConflict(e) && typeof showToast === 'function') showToast(e.message || 'delete failed', 4000, 'error');
   }
+}
+
+// ── Workspaces tab ────────────────────────────────────────────────────────
+// Admin management of workspace ownership: owner_email plus members on the
+// entries in the per-profile workspaces.json. Data comes from GET
+// /api/workspaces (an admin caller receives EVERY entry including
+// owner_email, members and the legacy_unowned annotation) and every write
+// goes through POST /api/workspaces/assign (admin-only, enforced server
+// side). NOTE: unlike /api/governance/* these routes are NOT etag-guarded,
+// so mutations are plain api() POSTs without If-Match (last write wins on
+// the workspaces store). The tab button and pane are injected here because
+// the static markup for the governance panel lives in index.html.
+
+let _govWsUserFilter = '';   // lowercased email of the per-user lens, '' = off
+
+function _govEnsureWorkspacesTab() {
+  const bar = document.querySelector('#mainGovernance .gov-tab-bar');
+  const content = document.querySelector('#mainGovernance .gov-content');
+  if (!bar || !content) return;
+  if (!bar.querySelector('[data-gov-tab="workspaces"]')) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'gov-tab';
+    btn.dataset.govTab = 'workspaces';
+    btn.textContent = 'Workspaces';
+    btn.addEventListener('click', () => { _govSwitchTab('workspaces'); });
+    bar.insertBefore(btn, bar.querySelector('[data-gov-tab="approvals"]') || null);
+  }
+  if (!document.getElementById('govPaneWorkspaces')) {
+    const pane = document.createElement('div');
+    pane.className = 'gov-tab-pane';
+    pane.id = 'govPaneWorkspaces';
+    content.appendChild(pane);
+  }
+}
+
+async function _govLoadWorkspaces() {
+  const el = $('govPaneWorkspaces');
+  if (!el) return;
+  el.innerHTML = '<div class="gov-muted">' + _govT('loading', 'Loading...') + '</div>';
+  let data;
+  try {
+    data = await api('/api/workspaces', { redirect401: false });
+  } catch (e) {
+    _govError(e, 'govPaneWorkspaces');
+    return;
+  }
+  window.__GOV_WS__ = Array.isArray(data.workspaces) ? data.workspaces : [];
+  window.__GOV_WS_ADMIN__ = !!data.viewer_is_admin;
+  _govRenderWorkspaces();
+}
+
+/** All known emails for the per-user datalist: workspace owners plus members
+ *  plus policy users (when the users tab already cached them). */
+function _govWsKnownEmails() {
+  const out = new Set();
+  (window.__GOV_WS__ || []).forEach(w => {
+    const owner = String(w.owner_email || '').trim().toLowerCase();
+    if (owner) out.add(owner);
+    (Array.isArray(w.members) ? w.members : []).forEach(m => {
+      const email = String(m || '').trim().toLowerCase();
+      if (email) out.add(email);
+    });
+  });
+  Object.keys(window.__GOV_USERS__ || {}).forEach(email => {
+    const norm = String(email || '').trim().toLowerCase();
+    if (norm) out.add(norm);
+  });
+  return Array.from(out).sort();
+}
+
+function _govWsMembersLower(w) {
+  return (Array.isArray(w.members) ? w.members : []).map(m => String(m || '').trim().toLowerCase()).filter(Boolean);
+}
+
+function _govRenderWorkspaces() {
+  const el = $('govPaneWorkspaces');
+  if (!el) return;
+  const list = window.__GOV_WS__ || [];
+  const isAdmin = !!window.__GOV_WS_ADMIN__;
+  const filter = _govWsUserFilter;
+  const options = _govWsKnownEmails().map(email => '<option value="' + _govEsc(email) + '"></option>').join('');
+  const lensHeader = filter ? '<th>' + _govEsc(filter) + '</th>' : '';
+  const rows = list.map((w, idx) => {
+    const owner = String(w.owner_email || '').trim().toLowerCase();
+    const members = _govWsMembersLower(w);
+    const legacyBadge = w.legacy_unowned ? ' <span class="gov-chip">Legacy shared</span>' : '';
+    let lensCell = '';
+    if (filter) {
+      let state, action = '';
+      if (owner === filter) {
+        state = '<span class="gov-chip">Owner</span>';
+      } else if (members.includes(filter)) {
+        state = '<span class="gov-chip">Member</span>';
+        if (isAdmin) action = ' <button type="button" class="gov-btn danger" onclick="_govWsToggleMember(' + idx + ', false)">Remove ' + _govEsc(filter) + '</button>';
+      } else {
+        state = w.legacy_unowned
+          ? '<span class="gov-muted">Shared (legacy)</span>'
+          : '<span class="gov-muted">No access</span>';
+        if (isAdmin) action = ' <button type="button" class="gov-btn primary" onclick="_govWsToggleMember(' + idx + ', true)">Add ' + _govEsc(filter) + '</button>';
+      }
+      lensCell = '<td class="gov-nowrap">' + state + action + '</td>';
+    }
+    const ownerCell = isAdmin
+      ? '<input id="govWsOwner_' + idx + '" type="text" placeholder="owner@example.com" value="' + _govEsc(owner) + '">'
+      : (_govEsc(owner) || '<span class="gov-muted">Shared (unowned)</span>');
+    const membersCell = isAdmin
+      ? '<input id="govWsMembers_' + idx + '" type="text" placeholder="a@example.com, b@example.com" value="' + _govEsc(members.join(', ')) + '">'
+      : (_govEsc(members.join(', ')) || '<span class="gov-muted">none</span>');
+    const actionsCell = isAdmin
+      ? '<td class="gov-row-actions"><button type="button" class="gov-btn primary" onclick="_govSaveWorkspaceAssign(' + idx + ')">Save</button></td>'
+      : '<td></td>';
+    return '<tr>' +
+      '<td>' + _govEsc(w.name || '') + legacyBadge + '</td>' +
+      '<td class="gov-path">' + _govEsc(w.path || '') + '</td>' +
+      '<td>' + ownerCell + '</td>' +
+      '<td>' + membersCell + '</td>' +
+      lensCell +
+      actionsCell +
+    '</tr>';
+  }).join('');
+  const colCount = filter ? 6 : 5;
+  el.innerHTML =
+    '<div class="gov-form">' +
+      '<div class="gov-form-title">Per-user view</div>' +
+      '<div class="gov-form-row"><label for="govWsUserFilter">User email</label>' +
+        '<input id="govWsUserFilter" type="text" list="govWsUserEmails" placeholder="name@example.com" value="' + _govEsc(filter) + '" onchange="_govApplyWsUserFilter()"></div>' +
+      '<datalist id="govWsUserEmails">' + options + '</datalist>' +
+      '<div class="gov-form-actions">' +
+        '<button type="button" class="gov-btn primary" onclick="_govApplyWsUserFilter()">Apply</button>' +
+        '<button type="button" class="gov-btn" onclick="_govClearWsUserFilter()">Clear</button>' +
+      '</div>' +
+    '</div>' +
+    (isAdmin ? '' : '<div class="gov-muted">You are not a workspace admin: the list below only shows your own entries and editing is disabled.</div>') +
+    '<table class="gov-table"><thead><tr>' +
+      '<th>Name</th><th>Path</th><th>Owner</th><th>Members</th>' + lensHeader + '<th></th>' +
+    '</tr></thead><tbody>' +
+    (rows || '<tr><td colspan="' + colCount + '" class="gov-muted">No workspaces configured.</td></tr>') +
+    '</tbody></table>' +
+    '<div class="gov-muted">Owner and members control who sees a workspace. An entry without either is legacy shared: visible to every signed-in user. Clearing the owner field returns an entry to legacy shared.</div>';
+}
+
+function _govApplyWsUserFilter() {
+  _govWsUserFilter = String(($('govWsUserFilter') || {}).value || '').trim().toLowerCase();
+  _govRenderWorkspaces();
+}
+
+function _govClearWsUserFilter() {
+  _govWsUserFilter = '';
+  _govRenderWorkspaces();
+}
+
+/** POST /api/workspaces/assign and refresh the cached list from the reply. */
+async function _govWsAssign(body, okMsg) {
+  try {
+    const res = await api('/api/workspaces/assign', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      redirect401: false,
+    });
+    if (Array.isArray(res.workspaces)) window.__GOV_WS__ = res.workspaces;
+    if (typeof showToast === 'function') showToast(okMsg, 2500);
+    _govRenderWorkspaces();
+  } catch (e) {
+    // 403 forbidden (not a workspace admin) or 400 validation from the server
+    let msg = (e && e.message) ? e.message : 'request failed';
+    if (e && Number(e.status) === 403 && (e.reason || e.resource)) {
+      msg = 'Access restricted' + (e.resource ? ': ' + e.resource : '') + (e.reason ? ' (' + e.reason + ')' : '');
+    }
+    if (typeof showToast === 'function') showToast('Ownership save failed: ' + msg, 4000, 'error');
+  }
+}
+
+async function _govSaveWorkspaceAssign(idx) {
+  const w = (window.__GOV_WS__ || [])[idx];
+  if (!w) return;
+  const owner = String(($('govWsOwner_' + idx) || {}).value || '').trim().toLowerCase();
+  const seen = new Set();
+  const members = _govCsv(($('govWsMembers_' + idx) || {}).value)
+    .map(m => m.toLowerCase())
+    .filter(m => (seen.has(m) ? false : (seen.add(m), true)));
+  // owner_email '' clears the owner (back to legacy shared); [] clears members
+  await _govWsAssign({ path: w.path, owner_email: owner, members: members }, 'Ownership saved');
+}
+
+/** Quick add/remove of the per-user lens email as a member. Owner untouched
+ *  (the request only carries the members key, so owner_email is unchanged). */
+async function _govWsToggleMember(idx, add) {
+  const w = (window.__GOV_WS__ || [])[idx];
+  const email = _govWsUserFilter;
+  if (!w || !email) return;
+  const members = _govWsMembersLower(w).filter(m => m !== email);
+  if (add) members.push(email);
+  await _govWsAssign({ path: w.path, members: members }, add ? 'Member added' : 'Member removed');
 }
 
 // ── Approvals tab ─────────────────────────────────────────────────────────
