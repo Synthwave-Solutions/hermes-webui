@@ -250,6 +250,9 @@ def _clean_workspace_list(workspaces: list) -> list:
       (e.g. ~/.hermes/profiles/X/... should not appear on a different profile).
     - Rename any entry whose name is literally 'default' to 'Home' (avoids
       confusion with the 'default' profile name).
+    - Preserve any extra per-entry keys (owner_email, members, ...): this
+      function runs on EVERY load and persists its result, so dropping unknown
+      keys would silently destroy ownership metadata stamped by the routes.
     Returns the cleaned list (may be empty).
     """
     hermes_profiles = (_home_path() / '.hermes' / 'profiles').resolve()
@@ -278,7 +281,10 @@ def _clean_workspace_list(workspaces: list) -> list:
         # Rename confusing 'default' label to 'Home'
         if name.lower() == 'default':
             name = 'Home'
-        result.append({'path': str(p), 'name': name})
+        entry = dict(w)
+        entry['path'] = str(p)
+        entry['name'] = name
+        result.append(entry)
     return result
 
 

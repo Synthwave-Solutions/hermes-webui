@@ -319,7 +319,7 @@ async function _maybeBindFreshDefaultWorkspaceSession(prefillIntent=null){
     await newSession(false, {awaitWorkspaceLoad: true, worktree: false});
     return true;
   }catch(e){
-    console.warn('[hermes] failed to bind fresh default workspace session', e);
+    console.warn('[synthpulse] failed to bind fresh default workspace session', e);
     return false;
   }
 }
@@ -678,7 +678,7 @@ function _micToastKeyForRecognitionError(error){
   // Persist SR failure across reloads (e.g. Tailscale/network error)
   const _micForceMediaRecorderKey='mic_force_mediarecorder';
   const _micForceMediaRecorderStored=localStorage.getItem(_micForceMediaRecorderKey);
-  // Prefer Hermes server-side STT (MediaRecorder -> /api/transcribe) only
+  // Prefer SynthPulse server-side STT (MediaRecorder -> /api/transcribe) only
   // after the server confirms an STT provider is available. No stored key must
   // keep browser SpeechRecognition as the first-click default until then; that
   // avoids dropping the first dictation on installs without server STT.
@@ -2055,13 +2055,13 @@ $('btnDownload').onclick=()=>{
   if(!S.session)return;
   const blob=new Blob([transcript()],{type:'text/markdown'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
-  a.download=`hermes-${S.session.session_id}.md`;a.click();URL.revokeObjectURL(a.href);
+  a.download=`synthpulse-${S.session.session_id}.md`;a.click();URL.revokeObjectURL(a.href);
 };
 $('btnExportJSON').onclick=()=>{
   if(!S.session)return;
   const url=`/api/session/export?session_id=${encodeURIComponent(S.session.session_id)}`;
   const a=document.createElement('a');a.href=url;
-  a.download=`hermes-${S.session.session_id}.json`;a.click();
+  a.download=`synthpulse-${S.session.session_id}.json`;a.click();
 };
 $('btnShareSession').onclick=async()=>{
   if(!S.session) return;
@@ -2138,7 +2138,7 @@ function exportSessionHTML(session){
   const paletteB64=btoa(unescape(encodeURIComponent(JSON.stringify(clean))));
   const url=`/api/session/export?session_id=${encodeURIComponent(sid)}&format=html&theme=${theme}&palette=${encodeURIComponent(paletteB64)}`;
   const a=document.createElement('a');a.href=url;
-  a.download=`hermes-${sid}.html`;a.click();
+  a.download=`synthpulse-${sid}.html`;a.click();
 }
 $('btnExportHTML').onclick=()=>exportSessionHTML();
 $('btnImportJSON').onclick=()=>$('importFileInput').click();
@@ -2239,7 +2239,7 @@ $('modelSelect').onchange=async()=>{
   // re-reverts a cross-family pick (the #3737 bug, Codex catch). send() clears it
   // after reading a matching pending pick. (#3739/#3737)
   _applySessionContextMetadataUpdate(data);
-  // Warn if selected model belongs to a different provider than what Hermes is configured for
+  // Warn if selected model belongs to a different provider than what SynthPulse is configured for
   if(typeof _checkProviderMismatch==='function'){
     const warn=_checkProviderMismatch(selectedModel);
     if(warn&&typeof showToast==='function') showToast(warn,4000);
@@ -2650,7 +2650,8 @@ const _SKINS=[
   {name:'Sienna',   colors:['#D97757','#C06A49','#9A523A']},
   {name:'Catppuccin',colors:['#CBA6F7','#B4BEFE','#8839EF']},
   {name:'Hepburn',   colors:['#c6246a','#ec5597','#f2abca']},
-  {name:'Nous',     colors:['#4682B4','#3A6E9A','#2C5F88']},
+  {name:'Steel',    value:'nous', colors:['#4682B4','#3A6E9A','#2C5F88']},
+  {name:'SynthPulse', colors:['#009DFF','#0F172A','#39D98A']},
   {name:'Neon',     colors:['#B347FF','#C76BFF','#00DDFF']},
   {name:'Neon Soft', value:'neon-soft', colors:['#B347FF','#C76BFF','#00DDFF']},
   {name:'Neon Paint', value:'neon-paint', colors:['#FF2D95','#00E5FF','#FFB800']},
@@ -3294,7 +3295,7 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
     _applyComposerControlOrder(window._composerControlOrder);
     window._showTitlebarProfile=!!s.show_titlebar_profile;
     _applyTitlebarProfileVisibility();
-    window._botName=s.bot_name||'Hermes';
+    window._botName=s.bot_name||'SynthPulse';
     if(s.default_model_provider) window._activeProvider=s.default_model_provider;
     if(s.default_model){
       window._defaultModel=s.default_model;
@@ -3432,7 +3433,7 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
     window._composerControlVisibility=_composerControlVisibilityFromSettings(null);
     window._composerControlOrder=[];
     _applyComposerControlOrder(window._composerControlOrder);
-    window._botName='Hermes';
+    window._botName='SynthPulse';
     _bootSettings={check_for_updates:false};
     if(typeof setLocale==='function'){
       const _lang=typeof resolvePreferredLocale==='function'
@@ -3795,7 +3796,7 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
   // Start real-time gateway session sync if setting is enabled
   if(typeof startGatewaySSE==='function') startGatewaySSE();
 })().catch(e=>{
-  console.error('[hermes] boot failed', e);
+  console.error('[synthpulse] boot failed', e);
   try{S._bootReady=true;}catch(_){}
   try{syncTopbar();}catch(_){}
   try{syncWorkspacePanelState();}catch(_){}
@@ -3857,8 +3858,8 @@ window.addEventListener('pageshow', async (event) => {
 
 async function shutdownServer() {
   const ok = await showConfirmDialog({
-    title: (typeof t === 'function' ? t('settings_shutdown_confirm_title') : 'Stop Hermes WebUI'),
-    message: (typeof t === 'function' ? t('settings_shutdown_confirm_message') : 'Stop the Hermes WebUI server?'),
+    title: (typeof t === 'function' ? t('settings_shutdown_confirm_title') : 'Stop SynthPulse WebUI'),
+    message: (typeof t === 'function' ? t('settings_shutdown_confirm_message') : 'Stop the SynthPulse WebUI server?'),
     confirmLabel: (typeof t === 'function' ? t('settings_shutdown_confirm_btn') : 'Stop'),
     danger: true,
   });

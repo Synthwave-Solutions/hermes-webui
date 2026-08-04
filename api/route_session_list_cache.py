@@ -131,6 +131,7 @@ def _session_list_cache_key(
     sidebar_source: str | None = None,
     archived_limit: int | None = None,
     archived_offset: int = 0,
+    owner_scope: str = "all",
 ) -> tuple:
     normalized_archived_limit = None
     if archived_limit is not None:
@@ -156,6 +157,10 @@ def _session_list_cache_key(
         sidebar_source,
         normalized_archived_limit,
         normalized_archived_offset,
+        # Per-user isolation: 'all' for admins/identity-less/isolation-off,
+        # else the request identity email (possibly empty, which matches no
+        # rows and must NOT collide with the admin 'all' entry).
+        str(owner_scope) if owner_scope is not None else "all",
     )
 
 

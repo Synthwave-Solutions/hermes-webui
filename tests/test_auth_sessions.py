@@ -1,5 +1,5 @@
 """
-Tests for auth session lifecycle — session creation, verification, expiry,
+Tests for auth session lifecycle: session creation, verification, expiry,
 and lazy pruning of expired entries.
 """
 import time
@@ -44,7 +44,7 @@ class TestSessionPruning(unittest.TestCase):
         # _sessions has 3 entries, 2 expired
         self.assertEqual(len(auth._sessions), 3)
 
-        # Call verify_session — this triggers _prune_expired_sessions()
+        # Call verify_session: this triggers _prune_expired_sessions()
         # Cookie format is token.signature, so we need a dot to pass the early check
         auth.verify_session("fake_token.fake_sig")
 
@@ -93,16 +93,17 @@ class TestSessionPruning(unittest.TestCase):
         """Newly created sessions should have the expected 24-hour TTL."""
         auth._sessions.clear()
         token_hex = auth.create_session().split(".")[0]
-        # The _sessions dict stores token -> expiry_time
+        # The _sessions dict stores token -> expiry (float, legacy) or an
+        # identity dict carrying 'exp'; _session_expiry normalizes both.
         # We can check the expiry is approximately SESSION_TTL seconds from now
         # by looking up the raw entry via the token
-        from api.auth import _sessions, SESSION_TTL
+        from api.auth import _sessions, _session_expiry, SESSION_TTL
         # find our entry
-        for t, exp in _sessions.items():
+        for t, entry in _sessions.items():
             if t == token_hex:
                 # expiry should be within 5 seconds of now + SESSION_TTL
                 expected = time.time() + SESSION_TTL
-                self.assertAlmostEqual(exp, expected, delta=5)
+                self.assertAlmostEqual(_session_expiry(entry), expected, delta=5)
                 break
         else:
             self.fail("Session token not found in _sessions")
@@ -244,13 +245,13 @@ class TestSessionTtlResolution(unittest.TestCase):
         auth._sessions.clear()
         os.environ["HERMES_WEBUI_SESSION_TTL"] = "3600"
         token_hex = auth.create_session().split(".")[0]
-        from api.auth import _sessions
-        for t, exp in _sessions.items():
+        from api.auth import _sessions, _session_expiry
+        for t, entry in _sessions.items():
             if t == token_hex:
                 # The resolved env-var value (3600s) should be applied, not
                 # the SESSION_TTL fallback default.
                 expected = time.time() + 3600
-                self.assertAlmostEqual(exp, expected, delta=5)
+                self.assertAlmostEqual(_session_expiry(entry), expected, delta=5)
                 break
         else:
             self.fail("Session token not found in _sessions")

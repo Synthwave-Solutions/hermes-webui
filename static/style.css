@@ -2197,6 +2197,8 @@
   .skill-desc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;font-size:11px;opacity:.7;}
   .skill-item.disabled{opacity:.5;}
   .skill-item.disabled .skill-name{opacity:.45;}
+  .skill-badge{flex-shrink:0;font-size:9px;line-height:1.4;padding:0 5px;border-radius:6px;border:1px solid var(--border2);color:var(--muted);white-space:nowrap;margin-top:2px;max-width:140px;overflow:hidden;text-overflow:ellipsis;}
+  .skill-badge-pending{color:var(--accent);border-color:var(--accent);}
   .skill-toggle{flex-shrink:0;width:28px;height:14px;border-radius:7px;border:1px solid var(--border2);background:var(--border);cursor:pointer;position:relative;transition:all .15s;margin-top:3px;}
   .skill-toggle.enabled{background:var(--accent-bg-strong);border-color:var(--accent);}
   .skill-toggle::after{content:'';position:absolute;top:1px;left:1px;width:10px;height:10px;border-radius:50%;background:var(--muted);transition:transform .15s;}
@@ -4912,8 +4914,9 @@ main.main > #mainKanban,
 main.main > #mainWorkspaces,
 main.main > #mainProfiles,
 main.main > #mainInsights,
-main.main > #mainLogs{display:none;}
-main.main:not(.showing-settings):not(.showing-skills):not(.showing-memory):not(.showing-tasks):not(.showing-kanban):not(.showing-workspaces):not(.showing-profiles):not(.showing-insights):not(.showing-logs):not(.showing-plugin) > #mainChat{display:flex;}
+main.main > #mainLogs,
+main.main > #mainGovernance{display:none;}
+main.main:not(.showing-settings):not(.showing-skills):not(.showing-memory):not(.showing-tasks):not(.showing-kanban):not(.showing-workspaces):not(.showing-profiles):not(.showing-insights):not(.showing-logs):not(.showing-governance):not(.showing-plugin) > #mainChat{display:flex;}
 main.main.showing-settings > #mainSettings{display:flex;overflow-y:auto;}
 main.main.showing-skills > #mainSkills{display:flex;}
 main.main.showing-memory > #mainMemory{display:flex;}
@@ -4922,6 +4925,7 @@ main.main.showing-kanban > #mainKanban{display:flex;overflow-y:auto;}
 main.main.showing-workspaces > #mainWorkspaces{display:flex;}
 main.main.showing-profiles > #mainProfiles{display:flex;}
 main.main.showing-logs > #mainLogs{display:flex;}
+main.main.showing-governance > #mainGovernance{display:flex;}
 main.main.showing-plugin > #mainPlugin{display:flex;}
 main.main > #mainPlugin{display:none;}
 #mainPlugin .main-view-body{flex:1;display:flex;flex-direction:column;overflow:hidden;}
@@ -7276,3 +7280,85 @@ html[data-conversation-outline="enabled"] #outlineToggleBtn:not([hidden]){displa
 /* Settings field highlight (mirrors msg-question-highlight / _highlightQuestionRow pattern) */
 .settings-field-highlight { animation: settings-field-pulse 1.6s ease-out; }
 @keyframes settings-field-pulse { 0% { box-shadow: 0 0 0 0 var(--focus-ring); } 35% { box-shadow: 0 0 0 4px var(--focus-ring); } 100% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0); } }
+
+/* ── SynthPulse Control brand override (local deployment) ───────────────── */
+:root,
+:root.dark,
+:root[data-skin],
+:root.dark[data-skin]{
+  color-scheme:light;
+  --bg:#f6fbff;--sidebar:#ffffff;--surface:#ffffff;--surface-subtle:#eef7ff;--surface-subtle-hover:#e4f2ff;
+  --border:#d8e8f5;--border2:#b9d6ea;--border-subtle:#e3eef7;--border-muted:#c9deef;
+  --text:#0f172a;--strong:#07111f;--muted:#5a7184;--em:#26394d;
+  --accent:#009dff;--accent-hover:#0087dc;--accent-bg:rgba(0,157,255,.09);--accent-bg-strong:rgba(0,157,255,.17);--accent-text:#0078c5;
+  --blue:#009dff;--gold:#009dff;--focus-ring:rgba(0,157,255,.24);--focus-glow:rgba(0,157,255,.10);
+  --input-bg:#f7fbff;--hover-bg:rgba(0,157,255,.06);--code-bg:#eef5fb;--code-inline-bg:rgba(0,157,255,.10);--code-text:#0f4f7a;--pre-text:#0f172a;
+  --topbar-bg:rgba(255,255,255,.90);--main-bg:#f6fbff;
+  --error:#d92d20;--success:#159a62;--warning:#b7791f;--info:#009dff;
+  --user-bubble-bg:#e7f4ff;--user-bubble-border:#bae0ff;--user-bubble-text:#0f172a;--user-bubble-placeholder:#5a7184;
+  --font-ui:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,system-ui,sans-serif;
+}
+html,body{background:var(--bg)!important;color:var(--text);font-family:var(--font-ui)!important;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
+.app-titlebar,.rail,.sidebar,.rightpanel,.topbar,.composer-wrap{background:rgba(255,255,255,.92)!important;border-color:var(--border)!important;box-shadow:none!important;backdrop-filter:blur(18px);}
+.main,.chat,.panel-view{background:linear-gradient(180deg,#f6fbff 0%,#ffffff 100%)!important;}
+.app-titlebar{border-bottom:1px solid var(--border)!important;}
+.synthpulse-titlebar-logo-wrap{width:22px!important;height:22px!important;border-radius:8px;background:linear-gradient(145deg,#ffffff,#e8f6ff);box-shadow:0 0 0 1px rgba(0,157,255,.18),0 8px 22px rgba(0,157,255,.15);display:inline-flex!important;align-items:center;justify-content:center;overflow:hidden;}
+.synthpulse-titlebar-logo{width:16px;height:16px;display:block;object-fit:contain;}
+.app-titlebar-title{font-weight:760!important;letter-spacing:-.025em!important;color:#0f172a!important;}
+.app-titlebar-title::after{content:' Control';font-weight:620;color:#587086;}
+.empty-logo.synthpulse-empty-logo{background:linear-gradient(145deg,#ffffff,#e8f6ff)!important;border:1px solid rgba(0,157,255,.18)!important;box-shadow:0 18px 50px rgba(0,157,255,.18)!important;}
+.empty-logo.synthpulse-empty-logo img{display:block;object-fit:contain;filter:drop-shadow(0 8px 20px rgba(0,157,255,.18));}
+.new-chat-btn,button.send-btn:not(:disabled),.btn.primary,.update-primary,.clarify-submit{background:#009dff!important;border-color:#009dff!important;color:#fff!important;font-weight:700!important;box-shadow:none!important;}
+.new-chat-btn:hover,button.send-btn:not(:disabled):hover,.btn.primary:hover,.update-primary:hover,.clarify-submit:hover{background:#0087dc!important;border-color:#0087dc!important;}
+.composer-box{background:#ffffff!important;border-color:var(--border2)!important;border-radius:16px!important;box-shadow:0 10px 34px rgba(15,23,42,.06)!important;}
+.composer-box:focus-within{border-color:#009dff!important;box-shadow:0 0 0 3px rgba(0,157,255,.14)!important;}
+.msg-row[data-role="user"] .msg-body{background:var(--user-bubble-bg)!important;border-color:var(--user-bubble-border)!important;color:var(--user-bubble-text)!important;}
+.tool-card,.activity-card,.thinking-card{background:#f8fbff!important;border-color:var(--border-subtle)!important;box-shadow:none!important;}
+.session-item.active{background:#eaf6ff!important;border-color:#bae0ff!important;color:#0f172a!important;}
+.session-item.active::before{background:#009dff!important;}
+.rail-btn.active,.nav-tab.active{background:rgba(0,157,255,.10)!important;color:#0078c5!important;border-color:rgba(0,157,255,.2)!important;}
+.panel-head,.settings-section-title,.topbar-title{color:#0f172a!important;font-weight:720!important;letter-spacing:-.015em;}
+
+/* ── Governance panel ─────────────────────────────────────────────────────────── */
+.gov-main-body{flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden;}
+.gov-tab-bar{display:flex;gap:4px;padding:10px 16px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;}
+.gov-tab{background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-size:13px;font-weight:600;padding:8px 10px;cursor:pointer;}
+.gov-tab:hover{color:var(--text);}
+.gov-tab.active{color:var(--text);border-bottom-color:var(--accent);}
+.gov-tab-badge{display:inline-block;min-width:16px;margin-left:6px;padding:1px 5px;border-radius:999px;background:var(--accent);color:#fff;font-size:10px;font-weight:700;text-align:center;vertical-align:middle;}
+.gov-grants-title{margin-top:14px;}
+.gov-content{flex:1;overflow-y:auto;padding:16px;}
+.gov-tab-pane{display:none;}
+.gov-tab-pane.active{display:block;}
+.gov-muted{color:var(--muted);font-size:12px;}
+.gov-error{color:#e05;font-size:12px;padding:8px 0;}
+.gov-overview-head{margin-bottom:12px;}
+.gov-overview-note{margin-top:12px;}
+.gov-mode-badge{display:inline-block;font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;border:1px solid var(--border);color:var(--text);}
+.gov-mode-enforce{border-color:#e05;color:#e05;}
+.gov-mode-report_only{border-color:#d90;color:#d90;}
+.gov-mode-off{border-color:var(--border);color:var(--muted);}
+.gov-stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;}
+.gov-stat{border:1px solid var(--border);border-radius:10px;padding:12px;background:var(--input-bg);}
+.gov-stat-value{font-size:20px;font-weight:700;color:var(--text);}
+.gov-stat-label{font-size:11px;color:var(--muted);margin-top:2px;}
+.gov-table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:16px;}
+.gov-table th{text-align:left;color:var(--muted);font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.08em;padding:6px 8px;border-bottom:1px solid var(--border);}
+.gov-table td{padding:6px 8px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:top;word-break:break-word;}
+.gov-nowrap{white-space:nowrap;}
+.gov-path{font-family:var(--mono,monospace);font-size:11px;}
+.gov-row-actions{white-space:nowrap;text-align:right;}
+.gov-row-actions .gov-btn{margin-left:6px;}
+.gov-btn{background:var(--input-bg);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-size:12px;cursor:pointer;}
+.gov-btn:hover{border-color:var(--accent);}
+.gov-btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+.gov-btn.danger{color:#e05;border-color:#e05;}
+.gov-form{border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:16px;max-width:520px;}
+.gov-form-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px;}
+.gov-form-row{display:flex;flex-direction:column;gap:4px;margin-bottom:8px;}
+.gov-form-row label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);}
+.gov-form-row input{background:var(--input-bg);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:7px 9px;font-size:12px;}
+.gov-form-actions{display:flex;gap:8px;margin-top:6px;}
+.gov-audit-actions{margin-bottom:10px;}
+.gov-preview-section{margin-bottom:12px;}
+.gov-chip{display:inline-block;background:var(--input-bg);border:1px solid var(--border);border-radius:999px;padding:2px 8px;font-size:11px;color:var(--text);margin:2px 2px 2px 0;}

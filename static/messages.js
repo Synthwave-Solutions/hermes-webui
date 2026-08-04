@@ -6609,7 +6609,7 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
                 ? _isMessageReaderUnpinned()
                 : (typeof _messageUserUnpinned!=='undefined' && _messageUserUnpinned));
             clearLiveToolCards();if(!assistantText)removeThinking();
-            const cancelAgentName=(assistantDisplayName()+'').trim()||'Hermes';
+            const cancelAgentName=(assistantDisplayName()+'').trim()||'SynthPulse';
             S.messages.push({role:'assistant',content:`**Task cancelled:** Task cancelled.\n\n*The run was cancelled by the user before ${cancelAgentName} finished. No provider failure occurred.*`,provider_details:'Task cancelled.',provider_details_label:'Cancellation details',_error:true});
             _attachProjectedAnchorSceneToLastAssistant(S.messages);
             renderMessages({preserveScroll:true});
@@ -6894,7 +6894,7 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
 }
 
 function transcript(){
-  const lines=[`# Hermes session ${S.session?.session_id||''}`,``,
+  const lines=[`# SynthPulse session ${S.session?.session_id||''}`,``,
     `Workspace: ${S.session?.workspace||''}`,`Model: ${S.session?.model||''}`,``];
   for(const m of S.messages){
     if(!m||m.role==='tool')continue;
@@ -7439,7 +7439,16 @@ function _startApprovalFallbackPoll(sid) {
           stopApprovalPollingForSession(sid);
         }
       }
-    } catch(e) { /* ignore poll errors */ }
+    } catch(e) {
+      // Governance enforce mode: a 403 means this user cannot read approvals.
+      // Back the poll off to once per 5 minutes instead of hammering the audit
+      // log at the 1.5s cadence; api() already surfaced the one-time notice.
+      if (e && e.status === 403 && _approvalPollTimer) {
+        clearInterval(_approvalPollTimer);
+        _approvalPollTimer = setInterval(_tick, 300000);
+      }
+      /* ignore other poll errors */
+    }
     finally { _approvalFallbackPollInFlight = false; }
   };
   _approvalPollTimer = setInterval(_tick, 1500);  // matches the v0.50.247 polling cadence so degraded-mode users see the same responsiveness
@@ -8579,6 +8588,16 @@ function _startClarifyFallbackPoll(sid) {
           }
         }
         stopClarifyPolling();
+        return;
+      }
+      // Governance enforce mode: a 403 means this user cannot read clarify
+      // state. Back the poll off to once per 5 minutes instead of the 3s
+      // cadence; api() already surfaced the one-time notice.
+      if (status === 403) {
+        if (_clarifyFallbackTimer) {
+          clearInterval(_clarifyFallbackTimer);
+          _clarifyFallbackTimer = setInterval(_tick, 300000);
+        }
         return;
       }
       // Structured diagnostics: unexpected clarify poll failures should be

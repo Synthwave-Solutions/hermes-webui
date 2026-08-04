@@ -51,7 +51,7 @@ function parseCommand(text){
 const DESKTOP_COMPANION_EXTENSION_ID='desktop-companion';
 const DESKTOP_COMPANION_NAME='Desktop Companion';
 const DESKTOP_COMPANION_INSTALL_PATH='Settings -> Extensions -> Gallery -> Desktop Companion';
-const DESKTOP_COMPANION_SETUP_GUIDE_URL='https://github.com/franksong2702/hermes-webui-desktop-companion#after-gallery-install';
+const DESKTOP_COMPANION_SETUP_GUIDE_URL='https://synthwave.solutions/';
 const DESKTOP_COMPANION_LOCAL_APP_LABEL='Desktop Companion app';
 
 function _getDesktopCompanionStatusGlobal(){
@@ -161,7 +161,7 @@ async function handlePetSlashCommand(rawCommandText,meta){
       }
     }catch(_e){
       if(typeof console!=='undefined'&&console.error){
-        console.error('[hermes] Desktop Companion /pet hook error:',_e);
+        console.error('[synthpulse] Desktop Companion /pet hook error:',_e);
       }
       return {handled:false,message:_desktopCompanionHookErrorMessage()};
     }
@@ -419,9 +419,9 @@ function cliOnlyCommandResponse(cmdName, meta){
   const detail=desc?`\n\n${desc}`:'';
   let extra='';
   if(name==='browser'){
-    extra='\n\nBrowser tools in WebUI must be configured server-side with the agent/browser environment. Once configured, ask the model to use browser tools directly; `/browser` itself only works in `hermes chat`.';
+    extra='\n\nBrowser tools in WebUI must be configured server-side with the agent/browser environment. Once configured, ask the model to use browser tools directly; `/browser` itself only works in the CLI.';
   }
-  return `\`/${name}\` is a Hermes CLI-only command and cannot run inside the WebUI.${detail}${extra}`;
+  return `\`/${name}\` is a CLI-only command and cannot run inside SynthPulse Control.${detail}${extra}`;
 }
 
 async function executeAgentCommand(text,_meta){
