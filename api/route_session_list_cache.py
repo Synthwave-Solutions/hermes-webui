@@ -1,11 +1,11 @@
 """Session-list cache helpers extracted from api.routes."""
 
 import os
-import copy
 import threading
 import time
 from collections import OrderedDict
 from pathlib import Path
+from types import MappingProxyType
 
 from api.config import LOCK, SESSION_DIR, SESSIONS, SETTINGS_FILE
 from api.models import _active_state_db_path, _active_stream_ids
@@ -33,6 +33,42 @@ _SESSIONS_CACHE_INFLIGHT: dict[tuple, threading.Event] = {}
 _SESSIONS_CACHE_GLOBAL_INVALIDATION_VERSION = 0
 _SESSIONS_CACHE_ALL_PROFILES_INVALIDATION_VERSION = 0
 _SESSIONS_CACHE_PROFILE_INVALIDATION_VERSION: dict[str, int] = {}
+
+
+def _freeze_session_list_snapshot(value):
+    """Create a one-time immutable internal cache snapshot."""
+    if isinstance(value, dict):
+        return MappingProxyType({
+            key: _freeze_session_list_snapshot(item) for key, item in value.items()
+        })
+    if isinstance(value, (list, tuple)):
+        return tuple(_freeze_session_list_snapshot(item) for item in value)
+    if isinstance(value, set):
+        return frozenset(_freeze_session_list_snapshot(item) for item in value)
+    return value
+
+
+def _materialize_session_list_snapshot(value):
+    """Return the cache's public JSON-compatible dict/list response shape.
+
+    The immutable representation must never escape to route consumers: runtime
+    overlay mutates rows and the JSON encoder does not support MappingProxyType.
+    """
+    if isinstance(value, (dict, MappingProxyType)):
+        return {
+            key: _materialize_session_list_snapshot(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        return [_materialize_session_list_snapshot(item) for item in value]
+    if isinstance(value, (set, frozenset)):
+        return {_materialize_session_list_snapshot(item) for item in value}
+    return value
+
+
+def _session_list_cache_size() -> int:
+    with _SESSIONS_CACHE_LOCK:
+        return len(_SESSIONS_CACHE)
 
 
 def _session_list_cache_session_dir() -> Path:
@@ -178,7 +214,7 @@ def _session_list_cache_get(
         if stamp != current_stamp:
             if allow_stale:
                 _SESSIONS_CACHE.move_to_end(key)
-                return copy.deepcopy(payload), False
+                return _materialize_session_list_snapshot(payload), False
             _SESSIONS_CACHE.pop(key, None)
             return None, False
         # #4808: widen the freshness window while a turn is streaming so the fixed
@@ -189,10 +225,10 @@ def _session_list_cache_get(
         fresh = (now - ts) < ttl
         if fresh:
             _SESSIONS_CACHE.move_to_end(key)
-            return copy.deepcopy(payload), True
+            return _materialize_session_list_snapshot(payload), True
         if allow_stale:
             _SESSIONS_CACHE.move_to_end(key)
-            return copy.deepcopy(payload), False
+            return _materialize_session_list_snapshot(payload), False
         _SESSIONS_CACHE.pop(key, None)
         return None, False
 
@@ -221,7 +257,9 @@ def _session_list_cache_set(key: tuple, payload: dict) -> None:
         return
     stamp = _session_list_cache_resolved_source_stamp(key)
     with _SESSIONS_CACHE_LOCK:
-        _SESSIONS_CACHE[key] = (time.monotonic(), stamp, copy.deepcopy(payload))
+        _SESSIONS_CACHE[key] = (
+            time.monotonic(), stamp, _freeze_session_list_snapshot(payload)
+        )
         _SESSIONS_CACHE.move_to_end(key)
         while len(_SESSIONS_CACHE) > _SESSIONS_CACHE_MAX_ENTRIES:
             _SESSIONS_CACHE.popitem(last=False)

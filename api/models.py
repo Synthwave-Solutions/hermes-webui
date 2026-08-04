@@ -1306,9 +1306,14 @@ class Session:
         p = SESSION_DIR / f'{sid}.json'
         if not p.exists():
             return None
-        data = json.loads(p.read_text(encoding='utf-8'))
+        raw_json = p.read_text(encoding='utf-8')
+        data = json.loads(raw_json)
         data['messages'], _collapsed_partials = _collapse_adjacent_duplicate_partials(data.get('messages'))
         session = cls(**data)
+        # Serialized UTF-8 length is a cheap, stable lower-bound estimate. Avoid
+        # recursively walking the parsed object graph, which would add latency
+        # and temporary allocations on the very hot full-session load path.
+        session._cache_estimated_bytes = len(raw_json.encode('utf-8'))
         if _collapsed_partials:
             try:
                 # Self-heal bloated sessions on first full load without touching
@@ -3110,8 +3115,28 @@ def _session_is_evictable(s) -> bool:
     return disk_count >= in_memory_count
 
 
-def _evict_sessions_over_cap(cap: int | None = None) -> int:
-    """Evict clean, persisted, non-active sessions until len(SESSIONS) <= cap.
+def _session_cache_estimated_bytes(session) -> int:
+    try:
+        estimate = int(getattr(session, '_cache_estimated_bytes', 0) or 0)
+    except (TypeError, ValueError):
+        estimate = 0
+    if estimate > 0:
+        return estimate
+    try:
+        return max(0, int(session.path.stat().st_size))
+    except (AttributeError, OSError, TypeError, ValueError):
+        return 0
+
+
+def _sessions_cache_total_estimated_bytes() -> int:
+    return sum(_session_cache_estimated_bytes(session) for session in SESSIONS.values())
+
+
+def _evict_sessions_over_cap(
+    cap: int | None = None,
+    byte_cap: int | None = None,
+) -> int:
+    """Evict clean persisted sessions until count and byte bounds are met.
 
     Replaces the previous blind ``SESSIONS.popitem(last=False)`` loops (#4765).
     The blind loops could evict the least-recently-used entry even if it was
@@ -3135,23 +3160,30 @@ def _evict_sessions_over_cap(cap: int | None = None) -> int:
             cap = SESSIONS_MAX
     if not isinstance(cap, int) or cap < 1:
         cap = SESSIONS_MAX if isinstance(SESSIONS_MAX, int) and SESSIONS_MAX >= 1 else 1
+    if byte_cap is None:
+        try:
+            byte_cap = _cfg.get_sessions_cache_max_bytes()
+        except Exception:
+            byte_cap = 150 * 1024 * 1024
+    if not isinstance(byte_cap, int) or byte_cap < 1:
+        byte_cap = 150 * 1024 * 1024
+    total_bytes = _sessions_cache_total_estimated_bytes()
     evicted = 0
-    # Iterate over a snapshot of ids in LRU order (oldest first). We stop as
-    # soon as we are at/below the cap. Skipping a non-evictable oldest entry and
-    # moving on lets us reclaim a slightly-newer clean entry instead of blocking
-    # eviction entirely behind one pinned active session.
+    # Iterate over a snapshot of ids in LRU order (oldest first). Skipping a
+    # pinned oldest entry lets a slightly newer clean session reclaim memory.
     for sid in list(SESSIONS.keys()):
-        if len(SESSIONS) <= cap:
+        if len(SESSIONS) <= cap and total_bytes <= byte_cap:
             break
         candidate = SESSIONS.get(sid)
         if _session_is_evictable(candidate):
+            total_bytes -= _session_cache_estimated_bytes(candidate)
             SESSIONS.pop(sid, None)
             evicted += 1
-    if len(SESSIONS) > cap:
+    if len(SESSIONS) > cap or total_bytes > byte_cap:
         logger.debug(
-            "SESSIONS cache above cap (%d > %d) after eviction pass: remaining "
+            "SESSIONS cache above bound (items=%d/%d, bytes=%d/%d): remaining "
             "entries are active or unsaved and were preserved (#4765)",
-            len(SESSIONS), cap,
+            len(SESSIONS), cap, total_bytes, byte_cap,
         )
     return evicted
 

@@ -18562,18 +18562,29 @@ function postProcessRenderedMessages(container) {
   initTreeViews(container);
 }
 
+let _prismLoadPromise=null;
+function _loadExternalScript(src,integrity){
+  return new Promise((resolve,reject)=>{const s=document.createElement('script');s.src=src;s.crossOrigin='anonymous';if(integrity)s.integrity=integrity;s.onload=resolve;s.onerror=()=>reject(new Error('Failed to load '+src));document.head.appendChild(s);});
+}
+function ensurePrism(){
+  if(typeof Prism!=='undefined')return Promise.resolve(Prism);
+  if(_prismLoadPromise)return _prismLoadPromise;
+  if(!$('prism-theme')){const link=document.createElement('link');link.id='prism-theme';link.rel='stylesheet';link.href='https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css';link.crossOrigin='anonymous';document.head.appendChild(link);}
+  _prismLoadPromise=_loadExternalScript('https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js','sha384-MXybTpajaBV0AkcBaCPT4KIvo0FzoCiWXgcihYsw4FUkEz0Pv3JGV6tk2G8vJtDc').then(()=>_loadExternalScript('https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js','sha384-Uq05+JLko69eOiPr39ta9bh7kld5PKZoU+fF7g0EXTAriEollhZ+DrN8Q/Oi8J2Q')).then(()=>Prism).catch(err=>{_prismLoadPromise=null;console.warn('[prism] lazy load failed',err);throw err;});
+  return _prismLoadPromise;
+}
 function highlightCode(container) {
   // Apply Prism.js syntax highlighting only to *new* code blocks.
   // Previously every renderMessages() called Prism.highlightAllUnder() which
   // re-scanned and re-highlighted every <pre> in the container — expensive in
   // long sessions with dozens of code blocks.  Now we only touch blocks that
   // don't already have the data-highlighted marker.
-  if(typeof Prism === 'undefined') return;
   const el = container || $('msgInner');
   if(!el) return;
   // Prefer per-element highlight (avoids the full DOM walk of highlightAllUnder)
   const blocks = el.querySelectorAll('pre code:not([data-highlighted])');
   if(blocks.length === 0) return;
+  if(typeof Prism==='undefined'){ensurePrism().then(()=>highlightCode(el)).catch(()=>{});return;}
   for(let i = 0; i < blocks.length; i++){
     const block = blocks[i];
     if(typeof Prism.highlightElement === 'function') Prism.highlightElement(block);

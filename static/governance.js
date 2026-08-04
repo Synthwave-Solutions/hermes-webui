@@ -215,33 +215,157 @@ async function _govLoadUsers() {
       '<div class="gov-form-row"><label for="govUserGroups">' + _govT('governance_groups_csv', 'Groups (comma separated)') + '</label>' +
         '<input id="govUserGroups" type="text" placeholder="sw-engineering"></div>' +
       '<div class="gov-form-title gov-grants-title">' + _govT('governance_grants_title', 'Per-user grants (optional)') + '</div>' +
-      '<div class="gov-form-row"><label for="govUserSkillsView">' + _govT('governance_grants_skills_view', 'Skills view (comma separated)') + '</label>' +
-        '<input id="govUserSkillsView" type="text" placeholder="my-skill, *"></div>' +
-      '<div class="gov-form-row"><label for="govUserSkillsLoad">' + _govT('governance_grants_skills_load', 'Skills load (comma separated)') + '</label>' +
-        '<input id="govUserSkillsLoad" type="text" placeholder="my-skill"></div>' +
-      '<div class="gov-form-row"><label for="govUserSkillsManage">' + _govT('governance_grants_skills_manage', 'Skills manage (comma separated)') + '</label>' +
-        '<input id="govUserSkillsManage" type="text" placeholder="my-skill"></div>' +
-      '<div class="gov-form-row"><label for="govUserMcpServers">' + _govT('governance_grants_mcp_servers', 'MCP servers (comma separated)') + '</label>' +
-        '<input id="govUserMcpServers" type="text" placeholder="notion, playwright"></div>' +
-      '<div class="gov-form-row"><label for="govUserCliCommands">' + _govT('governance_grants_cli_commands', 'CLI commands (comma separated)') + '</label>' +
-        '<input id="govUserCliCommands" type="text" placeholder="git, gh"></div>' +
+      _govChipFieldHtml('govUserSkillsView', _govT('governance_grants_skills_view', 'Skills view'), 'govDlSkills', 'my-skill, *') +
+      _govChipFieldHtml('govUserSkillsLoad', _govT('governance_grants_skills_load', 'Skills load'), 'govDlSkills', 'my-skill') +
+      _govChipFieldHtml('govUserSkillsManage', _govT('governance_grants_skills_manage', 'Skills manage'), 'govDlSkills', 'my-skill') +
+      _govChipFieldHtml('govUserMcpServers', _govT('governance_grants_mcp_servers', 'MCP servers'), 'govDlMcp', 'notion, playwright') +
+      _govChipFieldHtml('govUserCliCommands', _govT('governance_grants_cli_commands', 'CLI commands'), 'govDlCli', 'git, gh') +
+      _govChipFieldHtml('govUserCliApproval', _govT('governance_grants_cli_approval', 'CLI commands requiring approval'), 'govDlCli', 'rm, sudo') +
+      '<div class="gov-form-title gov-grants-title">' + _govT('governance_deny_title', 'Off-toggles (deny)') + '</div>' +
+      '<div class="gov-muted">' + _govT('governance_deny_note',
+        'Switched-off items override every role and group grant for this user. A specific off-toggle cannot narrow a wildcard (*) grant.') + '</div>' +
+      _govChipFieldHtml('govUserDenySkills', _govT('governance_deny_skills', 'Skills off'), 'govDlSkills', 'my-skill') +
+      _govChipFieldHtml('govUserDenyCli', _govT('governance_deny_cli', 'CLI commands off'), 'govDlCli', 'rm') +
+      _govChipFieldHtml('govUserDenyMcp', _govT('governance_deny_mcp', 'MCP servers off'), 'govDlMcp', 'playwright') +
+      '<div id="govUserEffective"></div>' +
+      '<datalist id="govDlSkills"></datalist>' +
+      '<datalist id="govDlCli"></datalist>' +
+      '<datalist id="govDlMcp"></datalist>' +
       '<div class="gov-form-actions">' +
         '<button type="button" class="gov-btn primary" onclick="_govSaveUser()">' + _govT('governance_save', 'Save') + '</button>' +
         '<button type="button" class="gov-btn" onclick="_govResetUserForm()">' + _govT('governance_cancel', 'Cancel') + '</button>' +
       '</div>' +
     '</div>';
   _govResetUserForm();
+  _govEnsureCatalogs().then(_govFillCatalogDatalists).catch(() => {});
 }
 
-const _GOV_USER_GRANT_FIELDS = ['govUserSkillsView', 'govUserSkillsLoad', 'govUserSkillsManage', 'govUserMcpServers', 'govUserCliCommands'];
+const _GOV_USER_GRANT_FIELDS = ['govUserSkillsView', 'govUserSkillsLoad', 'govUserSkillsManage', 'govUserMcpServers', 'govUserCliCommands', 'govUserCliApproval'];
+const _GOV_USER_DENY_FIELDS = ['govUserDenySkills', 'govUserDenyCli', 'govUserDenyMcp'];
 
-function _govSetInput(id, value) {
-  const el = $(id);
-  if (el) el.value = value;
+// ── Chip multi-select with datalist autocomplete ──────────────────────────
+// Values live in _govChipState (fieldId -> ordered unique array); the DOM is
+// re-rendered from that state. Datalists are filled from _govEnsureCatalogs.
+
+let _govChipState = {};
+
+function _govChipsGet(id) { return _govChipState[id] || []; }
+
+function _govChipsSet(id, values) {
+  const seen = new Set();
+  _govChipState[id] = (values || []).map(v => String(v).trim()).filter(v => v && !seen.has(v) && seen.add(v));
+  _govRenderChipField(id);
+}
+
+function _govChipFieldHtml(id, label, datalistId, placeholder) {
+  return '<div class="gov-form-row"><label for="' + id + 'Input">' + _govEsc(label) + '</label>' +
+    '<div class="gov-chipbox" id="' + id + 'Box" onclick="(function(i){if(i)i.focus();})($(\'' + id + 'Input\'))">' +
+      '<input id="' + id + 'Input" type="text" list="' + _govEsc(datalistId) + '" placeholder="' + _govEsc(placeholder || '') + '" autocomplete="off"' +
+      ' onkeydown="_govChipKey(event, \'' + id + '\')" onchange="_govChipCommit(\'' + id + '\')" onblur="_govChipCommit(\'' + id + '\')">' +
+    '</div></div>';
+}
+
+function _govRenderChipField(id) {
+  const box = $(id + 'Box');
+  const input = $(id + 'Input');
+  if (!box || !input) return;
+  box.querySelectorAll('.gov-chip-item').forEach(n => n.remove());
+  _govChipsGet(id).forEach(value => {
+    const chip = document.createElement('span');
+    chip.className = 'gov-chip gov-chip-item';
+    chip.textContent = value;
+    const x = document.createElement('button');
+    x.type = 'button';
+    x.className = 'gov-chip-x';
+    x.textContent = '×';
+    x.title = _govT('governance_remove', 'Remove');
+    x.addEventListener('click', ev => { ev.stopPropagation(); _govChipRemove(id, value); });
+    chip.appendChild(x);
+    box.insertBefore(chip, input);
+  });
+  // deny fields drive the effective on/off view
+  if (_GOV_USER_DENY_FIELDS.includes(id)) _govRenderUserEffective();
+}
+
+function _govChipAdd(id, value) {
+  const v = String(value || '').trim().replace(/,+$/, '').trim();
+  if (!v) return;
+  const values = _govChipsGet(id);
+  if (!values.includes(v)) _govChipsSet(id, values.concat([v]));
+}
+
+function _govChipRemove(id, value) {
+  _govChipsSet(id, _govChipsGet(id).filter(v => v !== value));
+}
+
+function _govChipCommit(id) {
+  const input = $(id + 'Input');
+  if (!input) return;
+  // a paste/typed value may itself be a comma list
+  _govCsv(input.value).forEach(v => _govChipAdd(id, v));
+  input.value = '';
+}
+
+function _govChipKey(event, id) {
+  if (event.key === 'Enter' || event.key === ',') {
+    event.preventDefault();
+    _govChipCommit(id);
+  } else if (event.key === 'Backspace' && !event.target.value) {
+    const values = _govChipsGet(id);
+    if (values.length) _govChipRemove(id, values[values.length - 1]);
+  }
+}
+
+// ── Autocomplete catalogs (skills, MCP servers, CLI commands) ─────────────
+// Skills and MCP servers come from their live catalogs; CLI command ids have
+// no catalog endpoint, so the union of every cli.commands already in the
+// policy is offered (free text still works for new commands).
+
+async function _govEnsureCatalogs(force) {
+  if (window.__GOV_CAT__ && !force) return window.__GOV_CAT__;
+  const cat = { skills: [], mcp: [], cli: [] };
+  const opts = { redirect401: false, timeoutToast: false, timeoutMs: 15000 };
+  await Promise.all([
+    api('/api/skills', opts).then(d => {
+      cat.skills = (d.skills || []).map(s => s && s.name).filter(Boolean).sort();
+    }).catch(() => {}),
+    api('/api/mcp/servers', opts).then(d => {
+      cat.mcp = (d.servers || []).map(s => s && s.name).filter(Boolean).sort();
+    }).catch(() => {}),
+    api('/api/governance/policy', opts).then(d => {
+      const seen = new Set();
+      const walk = grants => {
+        const cli = (grants && grants.cli && typeof grants.cli === 'object') ? grants.cli : {};
+        (Array.isArray(cli.commands) ? cli.commands : []).forEach(c => {
+          const v = (typeof c === 'string') ? c : ((c && (c.id || c.argv0)) || '');
+          if (v && v !== '*') seen.add(v);
+        });
+      };
+      const policy = d.policy || {};
+      Object.values(policy.roles || {}).forEach(r => walk((r || {}).grants));
+      Object.values(policy.groups || {}).forEach(g => walk((g || {}).grants));
+      Object.values(policy.users || {}).forEach(u => { walk((u || {}).grants); walk((u || {}).deny); });
+      cat.cli = Array.from(seen).sort();
+      if (d.etag) _govEtag = d.etag;
+    }).catch(() => {}),
+  ]);
+  window.__GOV_CAT__ = cat;
+  return cat;
+}
+
+function _govFillCatalogDatalists(cat) {
+  const fill = (id, values) => {
+    const dl = $(id);
+    if (dl) dl.innerHTML = values.map(v => '<option value="' + _govEsc(v) + '"></option>').join('');
+  };
+  fill('govDlSkills', cat.skills);
+  fill('govDlMcp', cat.mcp);
+  fill('govDlCli', cat.cli);
 }
 
 function _govResetUserForm() {
   _govEditingUser = null;
+  _govUserEffective = null;
   const title = $('govUserFormTitle');
   if (title) title.textContent = _govT('governance_user_add', 'Add user');
   const email = $('govUserEmail');
@@ -250,7 +374,8 @@ function _govResetUserForm() {
   if (roles) roles.value = '';
   const groups = $('govUserGroups');
   if (groups) groups.value = '';
-  _GOV_USER_GRANT_FIELDS.forEach(id => _govSetInput(id, ''));
+  _GOV_USER_GRANT_FIELDS.concat(_GOV_USER_DENY_FIELDS).forEach(id => _govChipsSet(id, []));
+  _govRenderUserEffective();
 }
 
 function _govEditUser(email) {
@@ -268,13 +393,89 @@ function _govEditUser(email) {
   const skills = (grants.skills && typeof grants.skills === 'object') ? grants.skills : {};
   const mcp = (grants.mcp && typeof grants.mcp === 'object') ? grants.mcp : {};
   const cli = (grants.cli && typeof grants.cli === 'object') ? grants.cli : {};
-  _govSetInput('govUserSkillsView', (skills.view || []).join(', '));
-  _govSetInput('govUserSkillsLoad', (skills.load || []).join(', '));
-  _govSetInput('govUserSkillsManage', (skills.manage || []).join(', '));
-  _govSetInput('govUserMcpServers', (mcp.servers || []).join(', '));
+  _govChipsSet('govUserSkillsView', skills.view || []);
+  _govChipsSet('govUserSkillsLoad', skills.load || []);
+  _govChipsSet('govUserSkillsManage', skills.manage || []);
+  _govChipsSet('govUserMcpServers', mcp.servers || []);
   // cli.commands entries may be strings or {id/argv0} objects per the policy schema
   const commands = (cli.commands || []).map(c => (typeof c === 'string') ? c : ((c && (c.id || c.argv0)) || '')).filter(Boolean);
-  _govSetInput('govUserCliCommands', commands.join(', '));
+  _govChipsSet('govUserCliCommands', commands);
+  _govChipsSet('govUserCliApproval', cli.approval_commands || []);
+  const deny = (entry.deny && typeof entry.deny === 'object') ? entry.deny : {};
+  const denySkills = (deny.skills && typeof deny.skills === 'object') ? deny.skills : {};
+  const denyMcp = (deny.mcp && typeof deny.mcp === 'object') ? deny.mcp : {};
+  const denyCli = (deny.cli && typeof deny.cli === 'object') ? deny.cli : {};
+  // the single "skills off" toggle covers view+load; the union round-trips
+  // hand-edited asymmetric deny entries into a symmetric one on save
+  _govChipsSet('govUserDenySkills', Array.from(new Set([].concat(denySkills.view || [], denySkills.load || []))));
+  const denyCommands = (denyCli.commands || []).map(c => (typeof c === 'string') ? c : ((c && (c.id || c.argv0)) || '')).filter(Boolean);
+  _govChipsSet('govUserDenyCli', denyCommands);
+  _govChipsSet('govUserDenyMcp', denyMcp.servers || []);
+  _govLoadUserEffective(email);
+}
+
+// ── Effective access on/off view ──────────────────────────────────────────
+// Edit mode only: the union of the user's effective grants (post-deny, from
+// the preview endpoint) and the current deny chips, rendered as clickable
+// on/off toggles that write into the deny chip fields.
+
+let _govUserEffective = null;
+
+async function _govLoadUserEffective(email) {
+  const el = $('govUserEffective');
+  if (el) el.innerHTML = '<div class="gov-muted">' + _govT('loading', 'Loading...') + '</div>';
+  try {
+    const data = await api('/api/governance/preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email }),
+      redirect401: false,
+      timeoutToast: false,
+    });
+    _govUserEffective = ((data.effective_access || {}).grants) || null;
+  } catch (e) {
+    _govUserEffective = null;
+  }
+  _govRenderUserEffective();
+}
+
+function _govRenderUserEffective() {
+  const el = $('govUserEffective');
+  if (!el) return;
+  if (!_govEditingUser || !_govUserEffective) { el.innerHTML = ''; return; }
+  const g = _govUserEffective;
+  const sections = [
+    { label: _govT('governance_eff_skills', 'Skills'), denyField: 'govUserDenySkills', granted: ((g.skills || {}).load) || [] },
+    { label: _govT('governance_eff_cli', 'CLI commands'), denyField: 'govUserDenyCli', granted: ((g.cli || {}).commands) || [] },
+    { label: _govT('governance_eff_mcp', 'MCP servers'), denyField: 'govUserDenyMcp', granted: ((g.mcp || {}).servers) || [] },
+  ];
+  const body = sections.map(sec => {
+    const deny = _govChipsGet(sec.denyField);
+    const wildcard = sec.granted.includes('*');
+    const items = Array.from(new Set(sec.granted.filter(v => v !== '*').concat(deny))).sort();
+    const chips = items.map(v => {
+      const off = deny.includes(v);
+      return '<button type="button" class="gov-chip gov-toggle ' + (off ? 'off' : 'on') +
+        '" onclick="_govEffToggle(\'' + sec.denyField + '\', ' + _govEsc(JSON.stringify(v)) + ')" title="' +
+        _govT('governance_toggle_hint', 'Click to toggle on/off') + '">' + _govEsc(v) + '</button>';
+    }).join(' ');
+    const wildcardNote = (wildcard && deny.length)
+      ? '<div class="gov-error">' + _govT('governance_deny_wildcard_warn',
+          'This user has a wildcard (*) grant here: specific off-toggles have no effect until the wildcard is replaced by an explicit list.') + '</div>'
+      : (wildcard ? '<div class="gov-muted">' + _govT('governance_eff_wildcard', 'Wildcard (*) grant: everything is allowed.') + '</div>' : '');
+    return '<div class="gov-preview-section"><div class="gov-form-title">' + _govEsc(sec.label) + '</div>' +
+      (chips || '<span class="gov-muted">' + _govT('governance_none', 'none') + '</span>') + wildcardNote + '</div>';
+  }).join('');
+  el.innerHTML =
+    '<div class="gov-form-title gov-grants-title">' + _govT('governance_eff_title', 'Effective access (click to toggle)') + '</div>' +
+    '<div class="gov-muted">' + _govT('governance_eff_note',
+      'Union of role, group and user grants after off-toggles. Save to apply; unsaved grant edits above are not reflected yet.') + '</div>' +
+    body;
+}
+
+function _govEffToggle(denyField, value) {
+  if (_govChipsGet(denyField).includes(value)) _govChipRemove(denyField, value);
+  else _govChipAdd(denyField, value);
 }
 
 /**
@@ -291,9 +492,9 @@ function _govCollectUserGrants() {
     if (k !== 'skills' && k !== 'mcp' && k !== 'cli') grants[k] = prior[k];
   }
   const skills = {};
-  const view = _govCsv(($('govUserSkillsView') || {}).value);
-  const load = _govCsv(($('govUserSkillsLoad') || {}).value);
-  const manage = _govCsv(($('govUserSkillsManage') || {}).value);
+  const view = _govChipsGet('govUserSkillsView');
+  const load = _govChipsGet('govUserSkillsLoad');
+  const manage = _govChipsGet('govUserSkillsManage');
   if (view.length) skills.view = view;
   if (load.length) skills.load = load;
   if (manage.length) skills.manage = manage;
@@ -301,16 +502,56 @@ function _govCollectUserGrants() {
   const mcp = {};
   const priorMcp = (prior.mcp && typeof prior.mcp === 'object') ? prior.mcp : {};
   if (priorMcp.tools && Object.keys(priorMcp.tools).length) mcp.tools = priorMcp.tools;
-  const servers = _govCsv(($('govUserMcpServers') || {}).value);
+  const servers = _govChipsGet('govUserMcpServers');
   if (servers.length) mcp.servers = servers;
   if (Object.keys(mcp).length) grants.mcp = mcp;
   const cli = {};
   const priorCli = (prior.cli && typeof prior.cli === 'object') ? prior.cli : {};
   if (Array.isArray(priorCli.workdir_roots) && priorCli.workdir_roots.length) cli.workdir_roots = priorCli.workdir_roots;
-  const commands = _govCsv(($('govUserCliCommands') || {}).value);
+  const commands = _govChipsGet('govUserCliCommands');
   if (commands.length) cli.commands = commands;
+  const approvalCommands = _govChipsGet('govUserCliApproval');
+  if (approvalCommands.length) cli.approval_commands = approvalCommands;
   if (Object.keys(cli).length) grants.cli = cli;
   return Object.keys(grants).length ? grants : null;
+}
+
+/**
+ * Build the deny object from the off-toggle chip fields, or null when empty.
+ * The single "skills off" field writes both deny.skills.view and .load so an
+ * off-toggle really switches the skill off; deny keys the form does not edit
+ * (permissions, routes, skills.manage, mcp.tools, cli.workdir_roots, ...) are
+ * carried over from the entry being edited so a save never drops them.
+ */
+function _govCollectUserDeny() {
+  const existing = (_govEditingUser && (window.__GOV_USERS__ || {})[_govEditingUser]) || {};
+  const prior = (existing.deny && typeof existing.deny === 'object') ? existing.deny : {};
+  const deny = {};
+  for (const k of Object.keys(prior)) {
+    if (k !== 'skills' && k !== 'mcp' && k !== 'cli') deny[k] = prior[k];
+  }
+  const skills = {};
+  const priorSkills = (prior.skills && typeof prior.skills === 'object') ? prior.skills : {};
+  const skillsOff = _govChipsGet('govUserDenySkills');
+  if (skillsOff.length) {
+    skills.view = skillsOff.slice();
+    skills.load = skillsOff.slice();
+  }
+  if (Array.isArray(priorSkills.manage) && priorSkills.manage.length) skills.manage = priorSkills.manage;
+  if (Object.keys(skills).length) deny.skills = skills;
+  const mcp = {};
+  const priorMcp = (prior.mcp && typeof prior.mcp === 'object') ? prior.mcp : {};
+  if (priorMcp.tools && Object.keys(priorMcp.tools).length) mcp.tools = priorMcp.tools;
+  const servers = _govChipsGet('govUserDenyMcp');
+  if (servers.length) mcp.servers = servers;
+  if (Object.keys(mcp).length) deny.mcp = mcp;
+  const cli = {};
+  const priorCli = (prior.cli && typeof prior.cli === 'object') ? prior.cli : {};
+  if (Array.isArray(priorCli.workdir_roots) && priorCli.workdir_roots.length) cli.workdir_roots = priorCli.workdir_roots;
+  const commands = _govChipsGet('govUserDenyCli');
+  if (commands.length) cli.commands = commands;
+  if (Object.keys(cli).length) deny.cli = cli;
+  return Object.keys(deny).length ? deny : null;
 }
 
 async function _govSaveUser() {
@@ -325,6 +566,8 @@ async function _govSaveUser() {
   };
   const grants = _govCollectUserGrants();
   if (grants) entry.grants = grants;
+  const deny = _govCollectUserDeny();
+  if (deny) entry.deny = deny;
   const path = _govEditingUser ? '/api/governance/users/update' : '/api/governance/users';
   try {
     const res = await _govPost(path, { email: email, entry: entry });

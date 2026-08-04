@@ -2260,7 +2260,16 @@ def _build_session_list_cache_payload(
         """
         if not isinstance(session, dict):
             return False
-        if _numeric_count(session.get("message_count")) > 0:
+        # ``message_count`` comes from the sidebar sidecar/index and can lag
+        # behind the persisted transcript during the first-turn settle window.
+        # ``actual_message_count`` is the state.db-backed recovery count added by
+        # the models layer; either positive count proves the row is not empty.
+        # Without this second signal a completed session can disappear as soon
+        # as its temporary streaming/pending flags are cleared.
+        if (
+            _numeric_count(session.get("message_count")) > 0
+            or _numeric_count(session.get("actual_message_count")) > 0
+        ):
             return True
 
         attention = session.get("attention")
@@ -8990,6 +8999,7 @@ from api.route_approvals import (  # noqa: F401 — re-exports for backward comp
     _approval_sse_notify_locked,
     _approval_sse_notify,
     _GATEWAY_MIRROR_FLAG,
+    approval_required_approver,
     _gateway_mirrored_pending_run_id,
     reconcile_gateway_pending_mirror_locked,
     submit_gateway_pending_mirror,
@@ -11373,6 +11383,18 @@ def handle_get(handler, parsed) -> bool:
             return j(handler, {"error": str(exc)}, status=404)
         except OIDCAuthError as exc:
             return j(handler, {"error": str(exc)}, status=exc.status_code)
+        # Auto-provision: a validated SSO identity gets its per-user Hermes
+        # profile (skills/mcp/governance prompt) created or refreshed from
+        # the governance policy in the background. Fail-safe: login never
+        # breaks on a sync problem.
+        try:
+            from api.governance.profile_sync import trigger_profile_sync
+
+            login_email = str(result.get("email") or "").strip().lower()
+            if login_email:
+                trigger_profile_sync(login_email, reason="login")
+        except Exception:
+            pass
         # Two-step login (SSO first, then password): stash the validated SSO
         # identity in the pending store and bounce back to /login for the
         # password step. NO full session is created here.
@@ -22222,7 +22244,8 @@ def _resolve_approval_legacy(sid: str, approval_id: str, choice: str) -> bool:
     # Collect keys from both _pending and _gateway_queues
     keys_from_pending = pending.get("pattern_keys") or [pending.get("pattern_key", "")] if pending else []
     all_keys = [k for k in keys_from_pending if k] + [k for k in gateway_keys if k]
-    if choice in ("once", "session"):
+    governance_one_shot = bool(pending and pending.get("approval_kind") == "governance_cli")
+    if choice in ("once", "session") and not governance_one_shot:
         for k in all_keys:
             approve_session(sid, k)
     elif choice == "always":
@@ -22299,6 +22322,29 @@ def _handle_approval_respond(handler, body):
     if choice not in ("once", "session", "always", "deny"):
         return bad(handler, f"Invalid choice: {choice}")
     approval_id = body.get("approval_id", "")
+
+    # Governance command escalations are approver-bound. The governed user may
+    # deny/cancel their own request, but only the explicitly named approver may
+    # grant once/session. Fail closed before local or remote resolution.
+    required_approver = approval_required_approver(sid, approval_id)
+    if required_approver and choice not in ("once", "deny"):
+        return j(handler, {
+            "ok": False,
+            "choice": choice,
+            "code": "governance_one_shot_only",
+            "error": "Governance command approvals are one-shot only",
+        }, status=400)
+    if required_approver and choice != "deny":
+        from api.ownership import request_owner_email
+
+        responder = str(request_owner_email(handler) or "").strip().lower()
+        if responder != required_approver:
+            return j(handler, {
+                "ok": False,
+                "choice": choice,
+                "code": "governance_approver_required",
+                "error": f"Approval requires {required_approver}",
+            }, status=403)
 
     # Gateway relay: forward choice to the runs API when session has an active run,
     # or recover the run_id from the mirrored gateway approval entry if the

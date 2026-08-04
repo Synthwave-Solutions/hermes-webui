@@ -7362,3 +7362,11 @@ html,body{background:var(--bg)!important;color:var(--text);font-family:var(--fon
 .gov-audit-actions{margin-bottom:10px;}
 .gov-preview-section{margin-bottom:12px;}
 .gov-chip{display:inline-block;background:var(--input-bg);border:1px solid var(--border);border-radius:999px;padding:2px 8px;font-size:11px;color:var(--text);margin:2px 2px 2px 0;}
+.gov-chipbox{display:flex;flex-wrap:wrap;align-items:center;gap:2px;background:var(--input-bg);border:1px solid var(--border);border-radius:8px;padding:4px 6px;cursor:text;}
+.gov-chipbox input{flex:1 1 120px;min-width:120px;border:none !important;background:transparent !important;outline:none;padding:3px 2px !important;font-size:12px;color:var(--text);}
+.gov-chip-x{border:none;background:transparent;color:var(--muted);margin-left:5px;padding:0;font-size:12px;line-height:1;cursor:pointer;vertical-align:baseline;}
+.gov-chip-x:hover{color:#e05;}
+.gov-toggle{cursor:pointer;transition:opacity .12s ease;}
+.gov-toggle.on{border-color:var(--accent, #2ea1ff);}
+.gov-toggle.off{opacity:.45;text-decoration:line-through;}
+.gov-toggle:hover{opacity:.8;}

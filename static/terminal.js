@@ -122,6 +122,21 @@ function _xtermReady(){
   return typeof window.Terminal==='function';
 }
 
+let _xtermLoadPromise=null;
+function _loadXtermScript(src,integrity){
+  return new Promise((resolve,reject)=>{const s=document.createElement('script');s.src=src;s.integrity=integrity;s.crossOrigin='anonymous';s.onload=resolve;s.onerror=()=>reject(new Error('Failed to load '+src));document.head.appendChild(s);});
+}
+function _loadXterm(){
+  if(_xtermReady())return Promise.resolve();
+  if(_xtermLoadPromise)return _xtermLoadPromise;
+  if(!document.getElementById('xterm-theme')){const link=document.createElement('link');link.id='xterm-theme';link.rel='stylesheet';link.href='https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css';link.integrity='sha384-LJcOxlx9IMbNXDqJ2axpfEQKkAYbFjJfhXexLfiRJhjDU81mzgkiQq8rkV0j6dVh';link.crossOrigin='anonymous';document.head.appendChild(link);}
+  _xtermLoadPromise=_loadXtermScript('https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js','sha384-/nfmYPUzWMS6v2atn8hbljz7NE0EI1iGx34lJaNzyVjWGDzMv+ciUZUeJpKA3Glc')
+    .then(()=>_loadXtermScript('https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js','sha384-AQLWHRKAgdTxkolJcLOELg4E9rE89CPE2xMy3tIRFn08NcGKPTsELdvKomqji+DL'))
+    .then(()=>_loadXtermScript('https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.9.0/lib/xterm-addon-web-links.js','sha384-U4fBROT3kCM582gaYiNaOSQiJbXPzd9SfR1598Y7yeGSYVBzikXrNg0XyuU+mOnl'))
+    .catch(err=>{_xtermLoadPromise=null;throw err;});
+  return _xtermLoadPromise;
+}
+
 function _ensureXterm(){
   const {surface}= _terminalEls();
   if(!surface)return null;
@@ -473,6 +488,7 @@ async function _startComposerTerminal(restart=false){
     syncTerminalButton();
     return;
   }
+  await _loadXterm();
   const term=_ensureXterm();
   if(!term)return;
   _fitTerminal();

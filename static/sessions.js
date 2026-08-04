@@ -7638,7 +7638,13 @@ function _attachProjectQuickCreateButton(chip, project){
       return;
     }
     const previousProject=(typeof _activeProject!=='undefined')?_activeProject:NO_PROJECT_FILTER;
-    _setActiveProjectFilter(project.project_id);
+    // Keep the unfiltered "All" view unfiltered. The small project-chip + is an
+    // assignment shortcut, not an implicit navigation action: switching from
+    // All to the target project made every other conversation appear to vanish
+    // as soon as a new project-scoped chat was created. If the user is already
+    // browsing a filtered project view, switching to the target project remains
+    // intentional so the newly-created row is visible in that filtered scope.
+    if(previousProject) _setActiveProjectFilter(project.project_id);
     try{
       await newSession(false,{project_id:project.project_id});
       // newSession() does not repaint the sidebar (callers own that — see the

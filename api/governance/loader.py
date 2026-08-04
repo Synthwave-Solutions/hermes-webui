@@ -83,6 +83,7 @@ def _parse_user(email: str, raw: Any) -> GovernanceUser:
         roles=tuple(str(v) for v in (data.get("roles") or []) if str(v).strip()),
         groups=tuple(str(v) for v in (data.get("groups") or []) if str(v).strip()),
         grants=GrantSet.from_mapping(data.get("grants")),
+        deny=GrantSet.from_mapping(data.get("deny")),
     )
 
 
@@ -163,6 +164,7 @@ def save_governance_policy(
         except OSError:
             pass
         raise
+    _clear_policy_cache()
     return policy_path
 
 
@@ -182,16 +184,64 @@ def policy_mutation_lock() -> threading.Lock:
     return _POLICY_MUTATION_LOCK
 
 
-# Injectable policy accessor: tests (and future caching) swap the loader
-# without touching the enforcement hook or the admin API.
+# Injectable policy accessor: tests swap the loader without touching the
+# enforcement hook or the admin API. The production accessor is cached because
+# governance runs before every API handler.
 _policy_loader: Callable[[], GovernancePolicy] | None = None
+_POLICY_CACHE_LOCK = threading.Lock()
+_POLICY_CACHE_PATH: Path | None = None
+_POLICY_CACHE_SIGNATURE: tuple[bool, int, int, int] | None = None
+_POLICY_CACHE_VALUE: GovernancePolicy | None = None
+
+
+def _policy_file_signature(path: Path) -> tuple[bool, int, int, int]:
+    """Return a cheap identity for hot-path policy cache invalidation."""
+    try:
+        stat = path.stat()
+    except FileNotFoundError:
+        return (False, 0, 0, 0)
+    return (True, stat.st_mtime_ns, stat.st_size, getattr(stat, "st_ino", 0))
+
+
+def _clear_policy_cache() -> None:
+    global _POLICY_CACHE_PATH, _POLICY_CACHE_SIGNATURE, _POLICY_CACHE_VALUE
+    with _POLICY_CACHE_LOCK:
+        _POLICY_CACHE_PATH = None
+        _POLICY_CACHE_SIGNATURE = None
+        _POLICY_CACHE_VALUE = None
+
+
+def _get_cached_policy() -> GovernancePolicy:
+    """Load once per file version while preserving hot policy reloads.
+
+    Path + inode + nanosecond mtime + size keep the common path to one stat
+    call, while atomic replacements and in-place edits are observed on the next
+    request. The final signature avoids pinning a stale version if a replacement
+    races the read.
+    """
+    global _POLICY_CACHE_PATH, _POLICY_CACHE_SIGNATURE, _POLICY_CACHE_VALUE
+    path = resolve_policy_path()
+    signature = _policy_file_signature(path)
+    with _POLICY_CACHE_LOCK:
+        if (
+            _POLICY_CACHE_VALUE is not None
+            and _POLICY_CACHE_PATH == path
+            and _POLICY_CACHE_SIGNATURE == signature
+        ):
+            return _POLICY_CACHE_VALUE
+        policy = load_governance_policy(path=path)
+        _POLICY_CACHE_PATH = path
+        _POLICY_CACHE_SIGNATURE = _policy_file_signature(path)
+        _POLICY_CACHE_VALUE = policy
+        return policy
 
 
 def set_policy_loader(fn: Callable[[], GovernancePolicy] | None) -> None:
     global _policy_loader
     _policy_loader = fn
+    _clear_policy_cache()
 
 
 def get_policy() -> GovernancePolicy:
-    loader = _policy_loader or load_governance_policy
+    loader = _policy_loader or _get_cached_policy
     return loader()

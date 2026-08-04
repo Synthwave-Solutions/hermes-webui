@@ -81,6 +81,21 @@ def _session_rows():
             "default_hidden": False,
         },
         {
+            "session_id": "stale-index-with-persisted-messages",
+            "title": "Settled first turn",
+            "profile": "default",
+            "archived": False,
+            "message_count": 0,
+            "actual_message_count": 2,
+            "updated_at": 750,
+            "last_message_at": 740,
+            "source": "webui",
+            "raw_source": "webui",
+            "session_source": "webui",
+            "source_tag": "webui",
+            "default_hidden": False,
+        },
+        {
             "session_id": "active-stream-row",
             "title": "Streaming row",
             "profile": "default",
@@ -205,6 +220,7 @@ def test_default_sidebar_excludes_hidden_and_plain_zero_message_rows(monkeypatch
     assert handler.status == 200
     assert [r["session_id"] for r in body["sessions"]] == [
         "visible-with-message",
+        "stale-index-with-persisted-messages",
         "active-stream-row",
         "attention-row",
         "pending-flag-row",
@@ -231,6 +247,29 @@ def test_zero_message_rows_with_visibility_signals_survive(monkeypatch):
     assert by_id["attention-row"]["attention"]["kind"] == "clarify"
     assert by_id["pending-flag-row"]["has_pending_user_message"] is True
     assert by_id["pending-user-row"]["title"] == "Pending user row"
+
+
+def test_completed_first_turn_survives_after_runtime_flags_clear(monkeypatch):
+    """Persisted messages keep the row visible after optimistic stream state ends."""
+    rows = _session_rows()
+    settled = next(
+        row for row in rows
+        if row["session_id"] == "stale-index-with-persisted-messages"
+    )
+    assert settled["message_count"] == 0
+    assert settled["actual_message_count"] == 2
+    assert not settled.get("active_stream_id")
+    assert not settled.get("pending_user_message")
+    _install_common_monkeypatches(monkeypatch, rows)
+
+    handler = _handle_sessions(
+        "http://example.com/api/sessions?sidebar_source=webui&exclude_hidden=1"
+    )
+
+    assert handler.status == 200
+    assert "stale-index-with-persisted-messages" in {
+        row["session_id"] for row in handler.json_body()["sessions"]
+    }
 
 
 def test_omit_exclude_hidden_still_returns_default_hidden_rows(monkeypatch):

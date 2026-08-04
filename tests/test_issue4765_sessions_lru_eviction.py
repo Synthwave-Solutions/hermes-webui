@@ -150,6 +150,16 @@ def test_cache_cap_preserves_environment_fallback():
         _cfg.SESSIONS_MAX = old_sessions_max
 
 
+def test_session_cache_byte_budget_defaults_and_env(monkeypatch):
+    from api import config as _cfg
+
+    assert _cfg.DEFAULT_SESSION_CACHE_BYTES == 150 * 1024 * 1024
+    monkeypatch.setenv("HERMES_WEBUI_SESSION_CACHE_MB", "12")
+    assert _cfg.get_sessions_cache_max_bytes() == 12 * 1024 * 1024
+    monkeypatch.setenv("HERMES_WEBUI_SESSION_CACHE_MB", "invalid")
+    assert _cfg.get_sessions_cache_max_bytes() == _cfg.DEFAULT_SESSION_CACHE_BYTES
+
+
 # ─────────────────────────── invariant 1: eviction ──────────────────────────
 
 def test_eviction_happens_past_the_cap(isolated_session_env):
@@ -175,6 +185,39 @@ def test_eviction_happens_past_the_cap(isolated_session_env):
     kept = set(SESSIONS.keys())
     assert created[-1].session_id in kept
     assert created[0].session_id not in kept
+
+
+def test_eviction_happens_past_the_byte_budget_in_lru_order(isolated_session_env):
+    from api.config import LOCK, SESSIONS
+    from api.models import _evict_sessions_over_cap
+
+    created = [_make_persisted_session(i) for i in range(3)]
+    with LOCK:
+        for session in created:
+            session._cache_estimated_bytes = 60
+            SESSIONS[session.session_id] = session
+        evicted = _evict_sessions_over_cap(cap=10, byte_cap=100)
+
+    assert evicted == 2
+    assert list(SESSIONS) == [created[-1].session_id]
+
+
+def test_byte_eviction_preserves_active_session(isolated_session_env):
+    from api.config import LOCK, SESSIONS
+    from api.models import _evict_sessions_over_cap
+
+    active = _make_persisted_session(0)
+    active.active_stream_id = "live-stream"
+    active.pending_user_message = "still running"
+    active._cache_estimated_bytes = 80
+    clean = _make_persisted_session(1)
+    clean._cache_estimated_bytes = 80
+    with LOCK:
+        SESSIONS[active.session_id] = active
+        SESSIONS[clean.session_id] = clean
+        _evict_sessions_over_cap(cap=10, byte_cap=100)
+
+    assert list(SESSIONS) == [active.session_id]
 
 
 # ────────────────────── invariant 2: never evict active ──────────────────────

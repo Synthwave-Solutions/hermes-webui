@@ -28,6 +28,7 @@ from api.governance.loader import (
     save_governance_policy,
 )
 from api.governance.models import GovernanceSubject, _norm_email
+from api.governance.profile_sync import trigger_profile_sync
 from api.governance.resolver import resolve_effective_access
 from api.governance.usage import read_usage_state
 from api.helpers import j, read_body
@@ -41,7 +42,7 @@ _AUDIT_LIMIT_MAX = 500
 # Whitelist of keys accepted in group/user policy entries (the rest of the
 # schema is owned by the full-document POST /api/governance/policy replace).
 _GROUP_ENTRY_KEYS = frozenset({"description", "sso_groups", "roles", "grants"})
-_USER_ENTRY_KEYS = frozenset({"description", "roles", "groups", "grants"})
+_USER_ENTRY_KEYS = frozenset({"description", "roles", "groups", "grants", "deny"})
 
 
 # ── Caller resolution ────────────────────────────────────────────────────────
@@ -238,15 +239,36 @@ def _validated_entry(handler, raw_entry, *, kind: str) -> dict | None:
                 status=400,
             )
             return None
-    grants = raw_entry.get("grants")
-    if grants is not None and not isinstance(grants, dict):
+    for grants_key in ("grants", "deny"):
+        value = raw_entry.get(grants_key)
+        if value is not None and not isinstance(value, dict):
+            j(
+                handler,
+                {"error": "invalid_payload", "message": f"{kind} {grants_key} must be an object"},
+                status=400,
+            )
+            return None
+    return dict(raw_entry)
+
+
+def _reject_bootstrap_admin_deny(handler, policy, email: str, entry: dict) -> bool:
+    """True (after a 400) when the entry puts a deny on a bootstrap admin.
+
+    The resolver already ignores such denies (never-deny principals); reject
+    them at the API too so the policy file never records a lockout attempt.
+    """
+    deny = entry.get("deny")
+    if not deny:
+        return False
+    admins = {str(a).strip().lower() for a in getattr(policy, "bootstrap_admins", ())}
+    if email in admins:
         j(
             handler,
-            {"error": "invalid_payload", "message": f"{kind} grants must be an object"},
+            {"error": "invalid_payload", "message": "deny is not allowed on a bootstrap admin"},
             status=400,
         )
-        return None
-    return dict(raw_entry)
+        return True
+    return False
 
 
 def _audit_policy_change(
@@ -328,6 +350,14 @@ def _mutate_policy(handler, parsed, subject: GovernanceSubject, *, op: str, targ
         old_etag=old_etag,
         new_etag=new_etag,
     )
+    # Re-provision Hermes profiles from the new policy in the background.
+    # User edits sync just that user; role/group edits fan out to everyone.
+    # Deletes keep the profile dir (data is never destroyed automatically).
+    if op != "user_delete":
+        trigger_profile_sync(
+            target if op in ("user_create", "user_update") else None,
+            reason=op,
+        )
     j(handler, {"ok": True, "etag": new_etag})
     return True
 
@@ -461,6 +491,7 @@ def _handle_policy_replace(handler, parsed, policy, subject, access) -> bool:
         old_etag=old_etag,
         new_etag=new_etag,
     )
+    trigger_profile_sync(None, reason="policy_replace")
     j(handler, {"ok": True, "etag": new_etag})
     return True
 
@@ -512,6 +543,20 @@ def _handle_preview(handler, parsed, policy, subject, access) -> bool:
                 "permissions": sorted(preview.permissions),
                 "profiles": sorted(preview.profiles),
                 "routes": sorted(preview.routes),
+                # Grant detail for the admin UI's per-user on/off toggles.
+                # Post-deny (the resolver already subtracted users[email].deny).
+                "grants": {
+                    "skills": {
+                        "view": sorted(preview.grants.skills_view),
+                        "load": sorted(preview.grants.skills_load),
+                        "manage": sorted(preview.grants.skills_manage),
+                    },
+                    "mcp": {"servers": sorted(preview.grants.mcp_servers)},
+                    "cli": {
+                        "commands": sorted(preview.grants.cli_commands),
+                        "approval_commands": sorted(preview.grants.cli_approval_commands),
+                    },
+                },
             },
             "grant_sources": list(preview.grant_sources),
             "permission_sources": {
@@ -611,6 +656,8 @@ def _handle_user_create(handler, parsed, policy, subject, access) -> bool:
     entry = _validated_entry(handler, body.get("entry"), kind="user")
     if entry is None:
         return True
+    if _reject_bootstrap_admin_deny(handler, policy, email, entry):
+        return True
 
     def mutate(raw: dict):
         users = dict(raw.get("users")) if isinstance(raw.get("users"), dict) else {}
@@ -636,6 +683,8 @@ def _handle_user_update(handler, parsed, policy, subject, access) -> bool:
         return True
     entry = _validated_entry(handler, body.get("entry"), kind="user")
     if entry is None:
+        return True
+    if _reject_bootstrap_admin_deny(handler, policy, email, entry):
         return True
 
     def mutate(raw: dict):

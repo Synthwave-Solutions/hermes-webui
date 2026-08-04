@@ -5410,6 +5410,46 @@ def _agent_result_terminal_failure(result) -> bool:
     return False
 
 
+def _repair_healthy_final_response_transcript(result, previous_context, msg_text):
+    """Materialize a healthy ``final_response`` missing from result messages.
+
+    Hermes can stream a complete final answer and return it in
+    ``result['final_response']`` while a compression or transcript handoff leaves
+    ``result['messages']`` ending at the current user turn. Treating that shape
+    as a provider failure discards an answer the provider demonstrably returned.
+    Repair only normal text-response exits; explicit failed/partial results keep
+    their existing terminal-error path.
+    """
+    if not isinstance(result, dict) or _agent_result_terminal_failure(result):
+        return result
+    final_response = str(result.get('final_response') or '').strip()
+    exit_reason = str(result.get('turn_exit_reason') or '')
+    if (
+        not final_response
+        or final_response == '(empty)'
+        or not exit_reason.startswith('text_response(')
+    ):
+        return result
+    messages = list(result.get('messages') or [])
+    if _assistant_reply_added_after_current_turn(
+        messages,
+        list(previous_context or []),
+        msg_text,
+    ):
+        return result
+    repaired = dict(result)
+    repaired['messages'] = messages + [{
+        'role': 'assistant',
+        'content': final_response,
+        'finish_reason': 'stop',
+        '_webui_recovered_final_response': True,
+    }]
+    logger.warning(
+        '[webui] Recovered healthy final_response missing from result transcript'
+    )
+    return repaired
+
+
 _TOOL_RESULT_SNIPPET_MAX = 4000
 
 # Tool-arg keys whose values are card content / diff-reconstruction inputs.
@@ -8367,7 +8407,16 @@ def _run_agent_streaming(
                 # workspace-aware helper from this branch while still
                 # preserving the pre-turn length for downstream self-heal
                 # checks introduced on master.
+                result = _repair_healthy_final_response_transcript(
+                    result,
+                    _previous_context_messages,
+                    msg_text,
+                )
                 _all_result_messages = result.get('messages') or []
+                _recovered_final_response = bool(
+                    _all_result_messages
+                    and _all_result_messages[-1].get('_webui_recovered_final_response')
+                )
                 _prev_len = len(_previous_context_messages)
                 _assistant_added = _assistant_reply_added_after_current_turn(
                     _all_result_messages,
@@ -8387,13 +8436,17 @@ def _run_agent_streaming(
                     or bool(getattr(agent, '_last_error', None))
                     or ('error' in result and result.get('error') is not None)
                 )
-                _saved_transcript_lacks_final_answer = _merged_transcript_lacks_final_assistant_answer(
-                    _previous_messages,
-                    _previous_context_messages,
-                    _all_result_messages,
-                    msg_text,
-                    source=getattr(s, 'pending_user_source', None) or 'webui',
-                    drop_replayed_assistant=_drop_replayed_assistant,
+                _saved_transcript_lacks_final_answer = (
+                    False
+                    if _recovered_final_response
+                    else _merged_transcript_lacks_final_assistant_answer(
+                        _previous_messages,
+                        _previous_context_messages,
+                        _all_result_messages,
+                        msg_text,
+                        source=getattr(s, 'pending_user_source', None) or 'webui',
+                        drop_replayed_assistant=_drop_replayed_assistant,
+                    )
                 )
                 _terminal_failure = (
                     _agent_result_terminal_failure(result)

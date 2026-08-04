@@ -46,7 +46,7 @@ def test_quick_create_button_attaches_filter_align_and_request_path():
     src = _read(SESSIONS_JS)
     helper = _extract_function(src, "_attachProjectQuickCreateButton")
     assert "project-chip-quick-create" in helper
-    assert "_setActiveProjectFilter(project.project_id)" in helper
+    assert "if(previousProject) _setActiveProjectFilter(project.project_id)" in helper
     assert "newSession(false,{project_id:project.project_id})" in helper
     assert "if(_newSessionInFlight)" in helper
     assert "_setActiveProjectFilter(previousProject)" in helper
@@ -326,7 +326,7 @@ const touchEv = {
 def _run_quick_create_case(
     project_id="example-project",
     *,
-    active_project="active-project",
+    active_project: str | None = "active-project",
     fail_new_session=False,
     new_session_inflight=None,
     new_session_inflight_reject=None,
@@ -378,6 +378,15 @@ def test_project_chip_quick_create_keeps_active_filter_and_uses_project_override
     assert out["touchStopCount"] >= 2
     assert out["touchPreventCount"] == 0
     assert out["touchStopImmediateCount"] >= 2
+
+
+@pytest.mark.skipif(NODE is None, reason="node not on PATH")
+def test_project_chip_quick_create_keeps_all_view_unfiltered():
+    """Creating under a project from All must not hide every other project row."""
+    out = _run_quick_create_case("project-123", active_project=None)
+    assert out["filterProjectId"] is None
+    assert out["newSession"] == {"flash": False, "options": {"project_id": "project-123"}}
+    assert {"type": "set-filter", "projectId": "project-123"} not in out["calls"]
 
 
 @pytest.mark.skipif(NODE is None, reason="node not on PATH")

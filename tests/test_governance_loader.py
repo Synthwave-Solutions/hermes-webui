@@ -15,12 +15,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from api.governance.loader import (  # noqa: E402
     GovernancePolicyError,
+    get_policy,
     load_governance_policy,
     parse_governance_policy,
     policy_etag,
     policy_mutation_lock,
     resolve_policy_path,
     save_governance_policy,
+    set_policy_loader,
 )
 
 
@@ -106,6 +108,45 @@ def test_missing_policy_defaults_to_off(tmp_path):
     assert policy.default_effect == "deny"
     assert policy.enabled is False
     assert policy.roles == {}
+
+
+def test_get_policy_caches_unchanged_file(tmp_path, monkeypatch):
+    path = tmp_path / "dashboard-governance.yaml"
+    path.write_text("version: 1\nmode: enforce\ndefault_effect: deny\n", encoding="utf-8")
+    monkeypatch.setenv("HERMES_WEBUI_GOVERNANCE_POLICY", str(path))
+
+    import api.governance.loader as loader_module
+
+    real_load = loader_module.load_governance_policy
+    calls = []
+
+    def counted_load(**kwargs):
+        calls.append(kwargs)
+        return real_load(**kwargs)
+
+    monkeypatch.setattr(loader_module, "load_governance_policy", counted_load)
+    set_policy_loader(None)
+    try:
+        assert get_policy().mode == "enforce"
+        assert get_policy().mode == "enforce"
+        assert len(calls) == 1
+    finally:
+        set_policy_loader(None)
+
+
+def test_get_policy_reloads_after_atomic_replace(tmp_path, monkeypatch):
+    path = tmp_path / "dashboard-governance.yaml"
+    path.write_text("version: 1\nmode: report_only\ndefault_effect: deny\n", encoding="utf-8")
+    monkeypatch.setenv("HERMES_WEBUI_GOVERNANCE_POLICY", str(path))
+    set_policy_loader(None)
+    try:
+        assert get_policy().mode == "report_only"
+        replacement = tmp_path / "replacement.yaml"
+        replacement.write_text("version: 1\nmode: enforce\ndefault_effect: deny\n", encoding="utf-8")
+        replacement.replace(path)
+        assert get_policy().mode == "enforce"
+    finally:
+        set_policy_loader(None)
 
 
 def test_canonical_policy_shape_parses(tmp_path):

@@ -3222,6 +3222,7 @@ function _mirrorSpeechSettingsFromServer(s){
 window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
 
 (async()=>{
+  if(window.i18nReady) await window.i18nReady;
   // Load send key preference
   let _bootSettings={};
   const prefillIntent=(typeof _composerPrefillIntentFromLocation==='function')?_composerPrefillIntentFromLocation():null;

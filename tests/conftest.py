@@ -180,6 +180,10 @@ os.environ['HERMES_BASE_HOME'] = str(TEST_STATE_DIR)
 # ~/.hermes/config.yaml.  Override it before any product modules are imported so
 # tests that read/write config.yaml stay inside the isolated test home.
 os.environ['HERMES_CONFIG_PATH'] = str(TEST_STATE_DIR / 'config.yaml')
+# Governance mutation handlers fire a background per-user Hermes profile
+# provisioning subprocess against the REAL home policy; tests must never
+# spawn those. Unit tests for the trigger itself delenv this explicitly.
+os.environ.setdefault('HERMES_WEBUI_DISABLE_PROFILE_SYNC', '1')
 
 # Model-selection env overrides must NOT leak from the runner into tests.
 # get_effective_default_model() (api/config.py) treats HERMES_MODEL / OPENAI_MODEL

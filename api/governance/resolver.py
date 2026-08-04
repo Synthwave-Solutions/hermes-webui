@@ -98,6 +98,14 @@ def resolve_effective_access(policy: GovernancePolicy, subject: GovernanceSubjec
             grants = _merge_grant(grants, group.grants, f"group:{group_name}", sources, permission_sources)
     if user:
         grants = _merge_grant(grants, user.grants, f"user:{email}", sources, permission_sources)
+    if user and not user.deny.is_empty() and email not in policy.bootstrap_admins:
+        # Per-user off-toggles subtract AFTER the full union so they win from
+        # any role/group grant. Bootstrap admins are exempt (never-deny
+        # principals: a stray deny: "*" must not brick the owner).
+        grants = grants.subtract(user.deny)
+        sources.append(f"deny:user:{email}")
+        for permission in user.deny.permissions:
+            permission_sources.pop(permission, None)
 
     return EffectiveAccess(
         subject=subject,

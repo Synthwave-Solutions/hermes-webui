@@ -43,8 +43,63 @@ def _deep_merge_grants(base: "GrantSet", other: "GrantSet") -> "GrantSet":
         file_write_roots=base.file_write_roots | other.file_write_roots,
         file_denied_globs=base.file_denied_globs | other.file_denied_globs,
         cli_commands=base.cli_commands | other.cli_commands,
+        cli_approval_commands=base.cli_approval_commands | other.cli_approval_commands,
+        cli_denied_commands=base.cli_denied_commands | other.cli_denied_commands,
         cli_workdir_roots=base.cli_workdir_roots | other.cli_workdir_roots,
         usage_caps={**base.usage_caps, **other.usage_caps},
+    )
+
+
+def _subtract_set(base: frozenset[str], deny: frozenset[str]) -> frozenset[str]:
+    if not deny:
+        return base
+    if "*" in deny:
+        return frozenset()
+    return base - deny
+
+
+def _subtract_grants(base: "GrantSet", deny: "GrantSet") -> "GrantSet":
+    """Remove denied entries from a merged grant set (per-user off-toggles).
+
+    Set subtraction on concrete whitelists; a deny of "*" empties the
+    category. NOTE: a specific deny cannot narrow a wildcard allow ("*"
+    stays "*"), so denies are only meaningful on explicit whitelists; the
+    admin API warns when a deny targets a wildcard-granted category.
+    usage_caps are limits, not grants, and are never subtracted.
+    """
+    mcp_tools: dict[str, frozenset[str]] = {}
+    for server, names in base.mcp_tools.items():
+        if "*" in deny.mcp_servers or server in deny.mcp_servers:
+            continue
+        denied_names = deny.mcp_tools.get(server, frozenset())
+        kept = _subtract_set(names, denied_names)
+        if kept:
+            mcp_tools[server] = kept
+    return GrantSet(
+        permissions=_subtract_set(base.permissions, deny.permissions),
+        profiles=_subtract_set(base.profiles, deny.profiles),
+        routes=_subtract_set(base.routes, deny.routes),
+        settings_read=_subtract_set(base.settings_read, deny.settings_read),
+        settings_write=_subtract_set(base.settings_write, deny.settings_write),
+        toolsets=_subtract_set(base.toolsets, deny.toolsets),
+        tools=_subtract_set(base.tools, deny.tools),
+        skills_view=_subtract_set(base.skills_view, deny.skills_view),
+        skills_load=_subtract_set(base.skills_load, deny.skills_load),
+        skills_manage=_subtract_set(base.skills_manage, deny.skills_manage),
+        mcp_servers=_subtract_set(base.mcp_servers, deny.mcp_servers),
+        mcp_tools=mcp_tools,
+        model_providers=_subtract_set(base.model_providers, deny.model_providers),
+        models=_subtract_set(base.models, deny.models),
+        file_read_roots=_subtract_set(base.file_read_roots, deny.file_read_roots),
+        file_write_roots=_subtract_set(base.file_write_roots, deny.file_write_roots),
+        # denied_globs is itself a denylist: a "deny" here would WIDEN access,
+        # so it is never subtracted.
+        file_denied_globs=base.file_denied_globs,
+        cli_commands=_subtract_set(base.cli_commands, deny.cli_commands),
+        cli_approval_commands=base.cli_approval_commands,
+        cli_denied_commands=base.cli_denied_commands | deny.cli_commands,
+        cli_workdir_roots=_subtract_set(base.cli_workdir_roots, deny.cli_workdir_roots),
+        usage_caps=dict(base.usage_caps),
     )
 
 
@@ -76,6 +131,8 @@ class GrantSet:
     file_write_roots: frozenset[str] = field(default_factory=frozenset)
     file_denied_globs: frozenset[str] = field(default_factory=frozenset)
     cli_commands: frozenset[str] = field(default_factory=frozenset)
+    cli_approval_commands: frozenset[str] = field(default_factory=frozenset)
+    cli_denied_commands: frozenset[str] = field(default_factory=frozenset)
     cli_workdir_roots: frozenset[str] = field(default_factory=frozenset)
     usage_caps: dict[str, Any] = field(default_factory=dict)
 
@@ -103,6 +160,9 @@ class GrantSet:
                     command_ids.add(str(ident))
             elif item:
                 command_ids.add(str(item))
+        approval_command_ids = _string_set(
+            cli.get("approval_commands") if isinstance(cli, Mapping) else None
+        )
         return cls(
             permissions=_string_set(data.get("permissions")),
             profiles=_string_set(data.get("profiles")),
@@ -122,12 +182,28 @@ class GrantSet:
             file_write_roots=_string_set(files.get("write_roots") if isinstance(files, Mapping) else None),
             file_denied_globs=_string_set(files.get("denied_globs") if isinstance(files, Mapping) else None),
             cli_commands=frozenset(command_ids),
+            cli_approval_commands=approval_command_ids,
             cli_workdir_roots=_string_set(cli.get("workdir_roots") if isinstance(cli, Mapping) else None),
             usage_caps=dict(data.get("usage_caps") or {}),
         )
 
     def merge(self, other: "GrantSet") -> "GrantSet":
         return _deep_merge_grants(self, other)
+
+    def subtract(self, deny: "GrantSet") -> "GrantSet":
+        return _subtract_grants(self, deny)
+
+    def is_empty(self) -> bool:
+        return not any((
+            self.permissions, self.profiles, self.routes, self.settings_read,
+            self.settings_write, self.toolsets, self.tools, self.skills_view,
+            self.skills_load, self.skills_manage, self.mcp_servers,
+            self.mcp_tools, self.model_providers, self.models,
+            self.file_read_roots, self.file_write_roots,
+            self.file_denied_globs, self.cli_commands, self.cli_approval_commands,
+            self.cli_denied_commands, self.cli_workdir_roots,
+            self.usage_caps,
+        ))
 
 
 @dataclass(frozen=True)
@@ -152,6 +228,10 @@ class GovernanceUser:
     roles: tuple[str, ...] = ()
     groups: tuple[str, ...] = ()
     grants: GrantSet = field(default_factory=GrantSet)
+    # Per-user off-toggles: subtracted from the merged role/group/user grants
+    # AFTER the union, so an admin can switch individual skills/CLIs/MCP
+    # servers off for one user without editing the shared role.
+    deny: GrantSet = field(default_factory=GrantSet)
 
 
 @dataclass(frozen=True)

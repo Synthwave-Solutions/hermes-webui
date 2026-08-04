@@ -135,3 +135,49 @@ def test_merged_wrapper_delegates_to_turn_evaluator():
     assert calls[0]["drop_replayed_assistant"] is True
     assert calls[0]["active_turn_identity"] is None
     assert calls[0]["merged_len"] >= 1
+
+
+def test_healthy_streamed_final_response_repairs_missing_transcript_tail():
+    previous = [
+        {"role": "assistant", "content": "earlier answer"},
+        {"role": "user", "content": "continue the task"},
+    ]
+    result = {
+        "final_response": "Completed the requested work.",
+        "turn_exit_reason": "text_response(finish_reason=stop)",
+        "messages": list(previous),
+        "failed": False,
+        "partial": False,
+    }
+
+    repaired = streaming._repair_healthy_final_response_transcript(
+        result,
+        previous,
+        "continue the task",
+    )
+
+    assert repaired is not result
+    assert repaired["messages"][-1]["role"] == "assistant"
+    assert repaired["messages"][-1]["content"] == "Completed the requested work."
+    assert repaired["messages"][-1]["_webui_recovered_final_response"] is True
+    assert streaming._assistant_reply_added_after_current_turn(
+        repaired["messages"],
+        previous,
+        "continue the task",
+    ) is True
+
+
+def test_failed_result_is_never_repaired_into_success():
+    previous = [{"role": "user", "content": "continue the task"}]
+    result = {
+        "final_response": "partial fragment",
+        "turn_exit_reason": "partial_stream_recovery",
+        "messages": list(previous),
+        "failed": True,
+    }
+
+    assert streaming._repair_healthy_final_response_transcript(
+        result,
+        previous,
+        "continue the task",
+    ) is result
