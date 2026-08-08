@@ -154,20 +154,33 @@ async function _govLoadOverview() {
       return Number.isFinite(ts) && ts >= cutoff;
     }).length;
   } catch (e) { /* audit permission may be missing; leave blank */ }
-  const stat = (label, value) => (
-    '<div class="gov-stat"><div class="gov-stat-value">' + _govEsc(value) + '</div>' +
-    '<div class="gov-stat-label">' + _govEsc(label) + '</div></div>'
+  const stat = (label, value, iconSvg) => (
+    '<div class="gov-stat">' +
+      '<div class="gov-stat-value">' + _govEsc(String(value)) + '</div>' +
+      '<div class="gov-stat-label">' + iconSvg + ' ' + _govEsc(label) + '</div></div>'
   );
+  const svg = (path) => '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px" aria-hidden="true">' + path + '</svg>';
+  const iconRole = svg('<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>');
+  const iconGroup = svg('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>');
+  const iconUser = svg('<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>');
+  const iconAdmin = svg('<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/>');
+  const iconDeny = svg('<circle cx="12" cy="12" r="10"/><path d="M4.93 4.93l14.14 14.14"/>');
+  const modeLabels = {
+    enforce: _govT('governance_mode_enforce_desc', 'Policies are actively enforced: access outside the policy is denied.'),
+    report_only: _govT('governance_mode_report_desc', 'Report-only: violations are logged, but access is not blocked yet.'),
+    off: _govT('governance_mode_off_desc', 'Governance is switched off — every signed-in user has full access.'),
+  };
   el.innerHTML =
     '<div class="gov-overview-head">' +
       '<span class="gov-mode-badge gov-mode-' + _govEsc(mode) + '">' + _govT('governance_mode', 'Mode') + ': ' + _govEsc(mode) + '</span>' +
+      '<span class="gov-muted">' + _govEsc(modeLabels[mode] || modeLabels.off) + '</span>' +
     '</div>' +
     '<div class="gov-stat-grid">' +
-      stat(_govT('governance_stat_roles', 'Roles'), counts.roles) +
-      stat(_govT('governance_stat_groups', 'Groups'), counts.groups) +
-      stat(_govT('governance_stat_users', 'Users'), counts.users) +
-      stat(_govT('governance_stat_admins', 'Bootstrap admins'), counts.admins) +
-      stat(_govT('governance_stat_denials', 'Denials (24h)'), denials24h === null ? '?' : denials24h) +
+      stat(_govT('governance_stat_roles', 'Roles'), counts.roles, iconRole) +
+      stat(_govT('governance_stat_groups', 'Groups'), counts.groups, iconGroup) +
+      stat(_govT('governance_stat_users', 'Users'), counts.users, iconUser) +
+      stat(_govT('governance_stat_admins', 'Bootstrap admins'), counts.admins, iconAdmin) +
+      stat(_govT('governance_stat_denials', 'Denials (24h)'), denials24h === null ? '?' : denials24h, iconDeny) +
     '</div>' +
     '<div class="gov-muted gov-overview-note">' + _govT('governance_overview_note',
       'Policy file: dashboard-governance.yaml. Denials include report-only would-deny events.') + '</div>';
@@ -207,32 +220,40 @@ async function _govLoadUsers() {
       '<th>' + _govT('governance_col_groups', 'Groups') + '</th><th></th>' +
     '</tr></thead><tbody>' + (rows || '<tr><td colspan="4" class="gov-muted">' + _govT('governance_no_users', 'No user entries in the policy.') + '</td></tr>') + '</tbody></table>' +
     '<div class="gov-form" id="govUserForm">' +
-      '<div class="gov-form-title" id="govUserFormTitle">' + _govT('governance_user_add', 'Add user') + '</div>' +
-      '<div class="gov-form-row"><label for="govUserEmail">' + _govT('governance_col_email', 'Email') + '</label>' +
-        '<input id="govUserEmail" type="text" placeholder="name@example.com"></div>' +
-      '<div class="gov-form-row"><label for="govUserRoles">' + _govT('governance_roles_csv', 'Roles (comma separated)') + '</label>' +
-        '<input id="govUserRoles" type="text" placeholder="viewer, operator"></div>' +
-      '<div class="gov-form-row"><label for="govUserGroups">' + _govT('governance_groups_csv', 'Groups (comma separated)') + '</label>' +
-        '<input id="govUserGroups" type="text" placeholder="sw-engineering"></div>' +
-      '<div class="gov-form-title gov-grants-title">' + _govT('governance_grants_title', 'Per-user grants (optional)') + '</div>' +
-      _govChipFieldHtml('govUserSkillsView', _govT('governance_grants_skills_view', 'Skills view'), 'govDlSkills', 'my-skill, *') +
-      _govChipFieldHtml('govUserSkillsLoad', _govT('governance_grants_skills_load', 'Skills load'), 'govDlSkills', 'my-skill') +
-      _govChipFieldHtml('govUserSkillsManage', _govT('governance_grants_skills_manage', 'Skills manage'), 'govDlSkills', 'my-skill') +
-      _govChipFieldHtml('govUserMcpServers', _govT('governance_grants_mcp_servers', 'MCP servers'), 'govDlMcp', 'notion, playwright') +
-      _govChipFieldHtml('govUserCliCommands', _govT('governance_grants_cli_commands', 'CLI commands'), 'govDlCli', 'git, gh') +
-      _govChipFieldHtml('govUserCliApproval', _govT('governance_grants_cli_approval', 'CLI commands requiring approval'), 'govDlCli', 'rm, sudo') +
-      '<div class="gov-form-title gov-grants-title">' + _govT('governance_deny_title', 'Off-toggles (deny)') + '</div>' +
-      '<div class="gov-muted">' + _govT('governance_deny_note',
-        'Switched-off items override every role and group grant for this user. A specific off-toggle cannot narrow a wildcard (*) grant.') + '</div>' +
-      _govChipFieldHtml('govUserDenySkills', _govT('governance_deny_skills', 'Skills off'), 'govDlSkills', 'my-skill') +
-      _govChipFieldHtml('govUserDenyCli', _govT('governance_deny_cli', 'CLI commands off'), 'govDlCli', 'rm') +
-      _govChipFieldHtml('govUserDenyMcp', _govT('governance_deny_mcp', 'MCP servers off'), 'govDlMcp', 'playwright') +
+      '<div class="gov-form-section">' +
+        '<div class="gov-form-title" id="govUserFormTitle">' + _govT('governance_user_add', 'Add user') + '</div>' +
+        '<div class="gov-form-row"><label for="govUserEmail">' + _govT('governance_col_email', 'Email') + '</label>' +
+          '<input id="govUserEmail" type="text" placeholder="name@example.com" autocomplete="off"></div>' +
+        '<div class="gov-form-row"><label for="govUserRoles">' + _govT('governance_roles_csv', 'Roles') + '</label>' +
+          '<input id="govUserRoles" type="text" placeholder="viewer, operator" autocomplete="off"></div>' +
+        '<div class="gov-form-row"><label for="govUserGroups">' + _govT('governance_groups_csv', 'Groups') + '</label>' +
+          '<input id="govUserGroups" type="text" placeholder="sw-engineering" autocomplete="off"></div>' +
+      '</div>' +
+      '<div class="gov-form-section">' +
+        '<div class="gov-form-title">' + _govT('governance_grants_title', 'Capabilities & grants') + '</div>' +
+        '<div class="gov-muted" style="margin-bottom:10px">' + _govT('governance_user_grants_note',
+          'Per-user grants on top of roles and groups (optional).') + '</div>' +
+        _govChipFieldHtml('govUserSkillsView', _govT('governance_grants_skills_view', 'Skills view'), 'govDlSkills', 'my-skill, *') +
+        _govChipFieldHtml('govUserSkillsLoad', _govT('governance_grants_skills_load', 'Skills load'), 'govDlSkills', 'my-skill') +
+        _govChipFieldHtml('govUserSkillsManage', _govT('governance_grants_skills_manage', 'Skills manage'), 'govDlSkills', 'my-skill') +
+        _govChipFieldHtml('govUserMcpServers', _govT('governance_grants_mcp_servers', 'MCP servers'), 'govDlMcp', 'notion, playwright') +
+        _govChipFieldHtml('govUserCliCommands', _govT('governance_grants_cli_commands', 'CLI commands'), 'govDlCli', 'git, gh') +
+        _govChipFieldHtml('govUserCliApproval', _govT('governance_grants_cli_approval', 'CLI commands requiring approval'), 'govDlCli', 'rm, sudo') +
+      '</div>' +
+      '<div class="gov-form-section">' +
+        '<div class="gov-form-title">' + _govT('governance_deny_title', 'Off-toggles (deny)') + '</div>' +
+        '<div class="gov-muted">' + _govT('governance_deny_note',
+          'Switched-off items override every role and group grant for this user. A specific off-toggle cannot narrow a wildcard (*) grant.') + '</div>' +
+        _govChipFieldHtml('govUserDenySkills', _govT('governance_deny_skills', 'Skills off'), 'govDlSkills', 'my-skill') +
+        _govChipFieldHtml('govUserDenyCli', _govT('governance_deny_cli', 'CLI commands off'), 'govDlCli', 'rm') +
+        _govChipFieldHtml('govUserDenyMcp', _govT('governance_deny_mcp', 'MCP servers off'), 'govDlMcp', 'playwright') +
+      '</div>' +
       '<div id="govUserEffective"></div>' +
       '<datalist id="govDlSkills"></datalist>' +
       '<datalist id="govDlCli"></datalist>' +
       '<datalist id="govDlMcp"></datalist>' +
       '<div class="gov-form-actions">' +
-        '<button type="button" class="gov-btn primary" onclick="_govSaveUser()">' + _govT('governance_save', 'Save') + '</button>' +
+        '<button type="button" class="gov-btn primary" onclick="_govSaveUser()">' + _govT('governance_save', 'Save user') + '</button>' +
         '<button type="button" class="gov-btn" onclick="_govResetUserForm()">' + _govT('governance_cancel', 'Cancel') + '</button>' +
       '</div>' +
     '</div>';
@@ -361,6 +382,11 @@ function _govFillCatalogDatalists(cat) {
   fill('govDlSkills', cat.skills);
   fill('govDlMcp', cat.mcp);
   fill('govDlCli', cat.cli);
+  // Group-form datalists use distinct ids so they never collide with the
+  // users-form ids when both panes are in the DOM.
+  fill('govDlSkillsGrp', cat.skills);
+  fill('govDlMcpGrp', cat.mcp);
+  fill('govDlCliGrp', cat.cli);
 }
 
 function _govResetUserForm() {
@@ -591,64 +617,220 @@ async function _govDeleteUser(email) {
 }
 
 // ── Groups tab ────────────────────────────────────────────────────────────
+// Groups carry description, sso_groups, roles and grants (same grant schema
+// as users). The backend has supported group grants all along; this editor
+// exposes them with the same chip/datalist UX as the users tab.
+
+const _GOV_GROUP_SECTION_FIELDS = ['govGroupSkillsView', 'govGroupSkillsLoad', 'govGroupSkillsManage', 'govGroupMcpServers', 'govGroupCliCommands', 'govGroupCliApproval'];
+
+function _govGroupGrantsHtml() {
+  return '<div class="gov-form-section">' +
+    '<div class="gov-form-title">' + _govT('governance_grants_title', 'Capabilities & grants') + '</div>' +
+    '<div class="gov-muted" style="margin-bottom:10px">' + _govT('governance_group_grants_note',
+      'Skills, MCP servers and CLI commands granted to every user in this group (merged with role and user grants).') + '</div>' +
+    _govChipFieldHtml('govGroupSkillsView', _govT('governance_grants_skills_view', 'Skills view'), 'govDlSkillsGrp', 'my-skill, *') +
+    _govChipFieldHtml('govGroupSkillsLoad', _govT('governance_grants_skills_load', 'Skills load'), 'govDlSkillsGrp', 'my-skill') +
+    _govChipFieldHtml('govGroupSkillsManage', _govT('governance_grants_skills_manage', 'Skills manage'), 'govDlSkillsGrp', 'my-skill') +
+    _govChipFieldHtml('govGroupMcpServers', _govT('governance_grants_mcp_servers', 'MCP servers'), 'govDlMcpGrp', 'notion, playwright') +
+    _govChipFieldHtml('govGroupCliCommands', _govT('governance_grants_cli_commands', 'CLI commands'), 'govDlCliGrp', 'git, gh') +
+    _govChipFieldHtml('govGroupCliApproval', _govT('governance_grants_cli_approval', 'CLI commands requiring approval'), 'govDlCliGrp', 'rm, sudo') +
+    '<datalist id="govDlSkillsGrp"></datalist><datalist id="govDlCliGrp"></datalist><datalist id="govDlMcpGrp"></datalist>' +
+  '</div>';
+}
+
+/** Group templates for quick start ("automatic" group creation). */
+const _GOV_GROUP_TEMPLATES = [
+  {
+    key: 'viewers',
+    name: 'viewers',
+    description: 'Read-only: view sessions, insights and skills',
+    roles: ['viewer'],
+    grants: { skills: { view: ['*'] } },
+  },
+  {
+    key: 'operators',
+    name: 'operators',
+    description: 'Daily operators: load skills, run common CLI tools',
+    roles: ['operator'],
+    grants: { skills: { load: ['*'] }, cli: { commands: ['git', 'gh', 'ls'] } },
+  },
+  {
+    key: 'engineers',
+    name: 'engineers',
+    description: 'Full capability set: manage skills, MCP servers and CLI',
+    roles: ['operator', 'engineer'],
+    grants: { skills: { load: ['*'], manage: ['*'] }, cli: { commands: ['*'] } },
+  },
+];
+
+function _govGroupTemplateChipsHtml() {
+  const chips = _GOV_GROUP_TEMPLATES.map(tmp =>
+    '<button type="button" class="gov-chip gov-chip-role" onclick="_govApplyGroupTemplate(\'' +
+    _govEsc(tmp.key) + '\')" title="' + _govT('governance_group_template_use', 'Start from this template') + '">' +
+    _govEsc(tmp.name) + '</button>'
+  ).join('');
+  return '<div class="gov-form-section">' +
+    '<div class="gov-form-title">' + _govT('governance_group_templates', 'Quick start') + '</div>' +
+    '<div class="gov-muted" style="margin-bottom:8px">' + _govT('governance_group_templates_note', 'Pick a starting point and adjust before saving.') + '</div>' +
+    '<div class="gov-group-card-meta">' + chips + '</div>' +
+  '</div>';
+}
+
+function _govCapabilityPills(group) {
+  const grants = (group && group.grants && typeof group.grants === 'object') ? group.grants : {};
+  const skills = (grants.skills && typeof grants.skills === 'object') ? grants.skills : {};
+  const mcp = (grants.mcp && typeof grants.mcp === 'object') ? grants.mcp : {};
+  const cli = (grants.cli && typeof grants.cli === 'object') ? grants.cli : {};
+  const countSkills = new Set([].concat(skills.view || [], skills.load || [], skills.manage || [])).size;
+  const countMcp = (mcp.servers || []).length;
+  const countCli = (cli.commands || []).length + (cli.approval_commands || []).length;
+  if (!countSkills && !countMcp && !countCli) {
+    return '<span class="gov-muted">' + _govT('governance_no_grants', 'No capabilities granted') + '</span>';
+  }
+  const svg = (path) => '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px" aria-hidden="true">' + path + '</svg>';
+  const pill = (cls, iconSvg, count, label) => (
+    '<span class="gov-cap-pill ' + cls + '" title="' + _govEsc(label) + '">' + iconSvg + '<span class="gov-cap-count">' + count + '</span>' +
+    '<span>' + _govEsc(label) + '</span></span>'
+  );
+  const iconSkill = svg('<polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>');
+  const iconMcp = svg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>');
+  const iconCli = svg('<polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>');
+  return '<div class="gov-group-capabilities">' +
+    (countSkills ? pill('gov-cap-skill', iconSkill, countSkills, 'skills') : '') +
+    (countMcp ? pill('gov-cap-mcp', iconMcp, countMcp, 'MCP') : '') +
+    (countCli ? pill('gov-cap-cli', iconCli, countCli, 'CLI') : '') +
+  '</div>';
+}
+
+/** Count policy users whose groups array contains this group name. */
+function _govGroupMemberCount(name, users) {
+  let n = 0;
+  Object.keys(users || {}).forEach(email => {
+    const entry = users[email] || {};
+    if ((entry.groups || []).includes(name)) n += 1;
+  });
+  return n;
+}
 
 async function _govLoadGroups() {
   const el = $('govPaneGroups');
   if (!el) return;
   el.innerHTML = '<div class="gov-muted">' + _govT('loading', 'Loading...') + '</div>';
-  let data;
+  let data, users;
   try {
-    data = await api('/api/governance/groups', { redirect401: false });
+    const opts = { redirect401: false, timeoutToast: false };
+    [data, users] = await Promise.all([
+      api('/api/governance/groups', opts),
+      api('/api/governance/users', opts).catch(() => ({ users: {} })),
+    ]);
   } catch (e) {
     _govError(e, 'govPaneGroups');
     return;
   }
   _govEtag = data.etag || _govEtag;
+  window.__GOV_USERS__ = (users && users.users) || window.__GOV_USERS__ || {};
   const groups = data.groups || {};
-  const rows = Object.keys(groups).sort().map(name => {
+  window.__GOV_GROUPS__ = groups;
+  const cards = Object.keys(groups).sort().map(name => {
     const entry = groups[name] || {};
-    return '<tr>' +
-      '<td>' + _govEsc(name) + '</td>' +
-      '<td>' + _govEsc((entry.sso_groups || []).join(', ')) + '</td>' +
-      '<td>' + _govEsc((entry.roles || []).join(', ')) + '</td>' +
-      '<td class="gov-row-actions">' +
+    const roles = Array.isArray(entry.roles) ? entry.roles : [];
+    const sso = Array.isArray(entry.sso_groups) ? entry.sso_groups : [];
+    const members = _govGroupMemberCount(name, window.__GOV_USERS__);
+    const roleChips = roles.map(r => '<span class="gov-chip gov-chip-role">' + _govEsc(r) + '</span>').join('');
+    const ssoChips = sso.map(s => '<span class="gov-chip">SSO: ' + _govEsc(s) + '</span>').join('');
+    const memberBadge = members
+      ? '<span class="gov-chip" title="' + _govEsc(String(members)) + ' direct user(s)">' + members + ' member' + (members === 1 ? '' : 's') + '</span>'
+      : '';
+    return '<div class="gov-group-card">' +
+      '<div class="gov-group-card-head">' +
+        '<div><div class="gov-group-card-name">' + _govEsc(name) + '</div>' +
+        '<div class="gov-group-card-desc">' + (_govEsc(entry.description || '') || '<span class="gov-muted">' + _govT('governance_no_description', 'No description') + '</span>') + '</div></div>' +
+      '</div>' +
+      '<div class="gov-group-card-meta">' + roleChips + ssoChips + memberBadge + '</div>' +
+      _govCapabilityPills(entry) +
+      '<div class="gov-group-card-actions">' +
         '<button type="button" class="gov-btn" onclick="_govEditGroup(' + _govEsc(JSON.stringify(name)) + ')">' + _govT('governance_edit', 'Edit') + '</button>' +
         '<button type="button" class="gov-btn danger" onclick="_govDeleteGroup(' + _govEsc(JSON.stringify(name)) + ')">' + _govT('governance_delete', 'Delete') + '</button>' +
-      '</td></tr>';
+      '</div>' +
+    '</div>';
   }).join('');
-  window.__GOV_GROUPS__ = groups;
   el.innerHTML =
-    '<table class="gov-table"><thead><tr>' +
-      '<th>' + _govT('governance_col_name', 'Name') + '</th>' +
-      '<th>' + _govT('governance_col_sso_groups', 'SSO groups') + '</th>' +
-      '<th>' + _govT('governance_col_roles', 'Roles') + '</th><th></th>' +
-    '</tr></thead><tbody>' + (rows || '<tr><td colspan="4" class="gov-muted">' + _govT('governance_no_groups', 'No group entries in the policy.') + '</td></tr>') + '</tbody></table>' +
-    '<div class="gov-form" id="govGroupForm">' +
-      '<div class="gov-form-title" id="govGroupFormTitle">' + _govT('governance_group_add', 'Add group') + '</div>' +
-      '<div class="gov-form-row"><label for="govGroupName">' + _govT('governance_col_name', 'Name') + '</label>' +
-        '<input id="govGroupName" type="text" placeholder="sw-engineering"></div>' +
-      '<div class="gov-form-row"><label for="govGroupSso">' + _govT('governance_sso_csv', 'SSO groups (comma separated)') + '</label>' +
-        '<input id="govGroupSso" type="text" placeholder="engineering@example.com"></div>' +
-      '<div class="gov-form-row"><label for="govGroupRoles">' + _govT('governance_roles_csv', 'Roles (comma separated)') + '</label>' +
-        '<input id="govGroupRoles" type="text" placeholder="operator"></div>' +
+    '<div class="gov-toolbar" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">' +
+      '<div style="font-size:13px;color:var(--muted)">' + Object.keys(groups).length + ' ' + _govT('governance_groups', 'groups') + '</div>' +
+      '<button type="button" class="gov-btn primary" onclick="_govToggleGroupForm()">+ ' + _govT('governance_group_add', 'New group') + '</button>' +
+    '</div>' +
+    (cards
+      ? '<div class="gov-group-grid">' + cards + '</div>'
+      : '<div class="gov-form" style="max-width:none"><div class="gov-muted">' + _govT('governance_no_groups', 'No group entries in the policy.') + ' ' + _govT('governance_group_empty_hint', 'Create your first group below.') + '</div></div>') +
+    '<div class="gov-form" id="govGroupForm" style="' + (window.__GOV_GROUP_FORM_OPEN__ ? '' : 'display:none') + '">' +
+      _govGroupTemplateChipsHtml() +
+      '<div class="gov-form-section" style="border-top:none;padding-top:0">' +
+        '<div class="gov-form-title" id="govGroupFormTitle">' + _govT('governance_group_add', 'New group') + '</div>' +
+        '<div class="gov-form-row"><label for="govGroupName">' + _govT('governance_col_name', 'Name') + '</label>' +
+          '<input id="govGroupName" type="text" placeholder="sw-engineering" autocomplete="off"></div>' +
+        '<div class="gov-form-row"><label for="govGroupDesc">' + _govT('governance_col_description', 'Description') + '</label>' +
+          '<input id="govGroupDesc" type="text" placeholder="What is this group for?" autocomplete="off"></div>' +
+        '<div class="gov-form-row"><label for="govGroupSso">' + _govT('governance_sso_csv', 'SSO groups') + '</label>' +
+          '<input id="govGroupSso" type="text" list="govDlSso" placeholder="engineering@example.com" autocomplete="off"></div>' +
+        '<div class="gov-form-row"><label for="govGroupRoles">' + _govT('governance_roles_csv', 'Roles') + '</label>' +
+          '<input id="govGroupRoles" type="text" list="govDlRoles" placeholder="operator" autocomplete="off"></div>' +
+        '<datalist id="govDlSso"></datalist><datalist id="govDlRoles"></datalist>' +
+      '</div>' +
+      _govGroupGrantsHtml() +
       '<div class="gov-form-actions">' +
-        '<button type="button" class="gov-btn primary" onclick="_govSaveGroup()">' + _govT('governance_save', 'Save') + '</button>' +
+        '<button type="button" class="gov-btn primary" onclick="_govSaveGroup()">' + _govT('governance_save', 'Save group') + '</button>' +
         '<button type="button" class="gov-btn" onclick="_govResetGroupForm()">' + _govT('governance_cancel', 'Cancel') + '</button>' +
       '</div>' +
     '</div>';
   _govResetGroupForm();
+  _govEnsureCatalogs().then(_govFillCatalogDatalists).catch(() => {});
+}
+
+function _govToggleGroupForm() {
+  window.__GOV_GROUP_FORM_OPEN__ = !window.__GOV_GROUP_FORM_OPEN__;
+  const form = $('govGroupForm');
+  if (form) form.style.display = window.__GOV_GROUP_FORM_OPEN__ ? '' : 'none';
+}
+
+function _govApplyGroupTemplate(key) {
+  const tmp = _GOV_GROUP_TEMPLATES.find(t => t.key === key);
+  if (!tmp) return;
+  _govResetGroupForm();
+  const name = $('govGroupName');
+  if (name) name.value = tmp.name;
+  const desc = $('govGroupDesc');
+  if (desc) desc.value = tmp.description;
+  const roles = $('govGroupRoles');
+  if (roles) roles.value = (tmp.roles || []).join(', ');
+  const grants = (tmp.grants && typeof tmp.grants === 'object') ? tmp.grants : {};
+  const skills = (grants.skills && typeof grants.skills === 'object') ? grants.skills : {};
+  _govChipsSet('govGroupSkillsView', skills.view || []);
+  _govChipsSet('govGroupSkillsLoad', skills.load || []);
+  _govChipsSet('govGroupSkillsManage', skills.manage || []);
+  const mcp = (grants.mcp && typeof grants.mcp === 'object') ? grants.mcp : {};
+  _govChipsSet('govGroupMcpServers', mcp.servers || []);
+  const cli = (grants.cli && typeof grants.cli === 'object') ? grants.cli : {};
+  _govChipsSet('govGroupCliCommands', (cli.commands || []).map(_govChipIdOf));
+  _govChipsSet('govGroupCliApproval', (cli.approval_commands || []).map(_govChipIdOf));
+  window.__GOV_GROUP_FORM_OPEN__ = true;
+  const form = $('govGroupForm');
+  if (form) { form.style.display = ''; const first = $('govGroupName'); if (first) first.focus(); }
+  if (typeof showToast === 'function') showToast(_govT('governance_template_applied', 'Template applied — adjust and save'), 2500);
 }
 
 function _govResetGroupForm() {
   _govEditingGroup = null;
   const title = $('govGroupFormTitle');
-  if (title) title.textContent = _govT('governance_group_add', 'Add group');
+  if (title) title.textContent = _govT('governance_group_add', 'New group');
   const name = $('govGroupName');
   if (name) { name.value = ''; name.disabled = false; }
+  const desc = $('govGroupDesc');
+  if (desc) desc.value = '';
   const sso = $('govGroupSso');
   if (sso) sso.value = '';
   const roles = $('govGroupRoles');
   if (roles) roles.value = '';
+  _GOV_GROUP_SECTION_FIELDS.forEach(id => _govChipsSet(id, []));
 }
 
 function _govEditGroup(name) {
@@ -658,10 +840,66 @@ function _govEditGroup(name) {
   if (title) title.textContent = _govT('governance_group_edit', 'Edit group');
   const nameEl = $('govGroupName');
   if (nameEl) { nameEl.value = name; nameEl.disabled = true; }
+  const desc = $('govGroupDesc');
+  if (desc) desc.value = entry.description || '';
   const sso = $('govGroupSso');
   if (sso) sso.value = (entry.sso_groups || []).join(', ');
   const roles = $('govGroupRoles');
   if (roles) roles.value = (entry.roles || []).join(', ');
+  const grants = (entry.grants && typeof entry.grants === 'object') ? entry.grants : {};
+  const skills = (grants.skills && typeof grants.skills === 'object') ? grants.skills : {};
+  _govChipsSet('govGroupSkillsView', skills.view || []);
+  _govChipsSet('govGroupSkillsLoad', skills.load || []);
+  _govChipsSet('govGroupSkillsManage', skills.manage || []);
+  const mcp = (grants.mcp && typeof grants.mcp === 'object') ? grants.mcp : {};
+  _govChipsSet('govGroupMcpServers', mcp.servers || []);
+  const cli = (grants.cli && typeof grants.cli === 'object') ? grants.cli : {};
+  _govChipsSet('govGroupCliCommands', (cli.commands || []).map(_govChipIdOf));
+  _govChipsSet('govGroupCliApproval', (cli.approval_commands || []).map(_govChipIdOf));
+  window.__GOV_GROUP_FORM_OPEN__ = true;
+  const form = $('govGroupForm');
+  if (form) form.style.display = '';
+  const first = $('govGroupDesc');
+  if (first) first.focus();
+}
+
+function _govChipIdOf(entry) {
+  return (typeof entry === 'string') ? entry : ((entry && (entry.id || entry.argv0)) || '');
+}
+
+/** Build the grants object from the group form, or null when every field is
+ *  empty. Non-edited grant keys (mcp.tools, cli.workdir_roots, usage_caps, ...)
+ *  are carried over from the entry being edited. */
+function _govCollectGroupGrants() {
+  const existing = (_govEditingGroup && (window.__GOV_GROUPS__ || {})[_govEditingGroup]) || {};
+  const prior = (existing.grants && typeof existing.grants === 'object') ? existing.grants : {};
+  const grants = {};
+  for (const k of Object.keys(prior)) {
+    if (k !== 'skills' && k !== 'mcp' && k !== 'cli') grants[k] = prior[k];
+  }
+  const skills = {};
+  const view = _govChipsGet('govGroupSkillsView');
+  const load = _govChipsGet('govGroupSkillsLoad');
+  const manage = _govChipsGet('govGroupSkillsManage');
+  if (view.length) skills.view = view;
+  if (load.length) skills.load = load;
+  if (manage.length) skills.manage = manage;
+  if (Object.keys(skills).length) grants.skills = skills;
+  const mcp = {};
+  const priorMcp = (prior.mcp && typeof prior.mcp === 'object') ? prior.mcp : {};
+  if (priorMcp.tools && Object.keys(priorMcp.tools).length) mcp.tools = priorMcp.tools;
+  const servers = _govChipsGet('govGroupMcpServers');
+  if (servers.length) mcp.servers = servers;
+  if (Object.keys(mcp).length) grants.mcp = mcp;
+  const cli = {};
+  const priorCli = (prior.cli && typeof prior.cli === 'object') ? prior.cli : {};
+  if (Array.isArray(priorCli.workdir_roots) && priorCli.workdir_roots.length) cli.workdir_roots = priorCli.workdir_roots;
+  const commands = _govChipsGet('govGroupCliCommands');
+  if (commands.length) cli.commands = commands;
+  const approvalCommands = _govChipsGet('govGroupCliApproval');
+  if (approvalCommands.length) cli.approval_commands = approvalCommands;
+  if (Object.keys(cli).length) grants.cli = cli;
+  return Object.keys(grants).length ? grants : null;
 }
 
 async function _govSaveGroup() {
@@ -671,14 +909,18 @@ async function _govSaveGroup() {
     return;
   }
   const entry = {
+    description: String(($('govGroupDesc') || {}).value || '').trim(),
     sso_groups: _govCsv(($('govGroupSso') || {}).value),
     roles: _govCsv(($('govGroupRoles') || {}).value),
   };
+  const grants = _govCollectGroupGrants();
+  if (grants) entry.grants = grants;
   const path = _govEditingGroup ? '/api/governance/groups/update' : '/api/governance/groups';
   try {
     const res = await _govPost(path, { name: name, entry: entry });
     _govEtag = res.etag || _govEtag;
-    if (typeof showToast === 'function') showToast(_govT('governance_saved', 'Saved'), 2500);
+    if (typeof showToast === 'function') showToast(_govT('governance_saved', 'Group saved'), 2500);
+    window.__GOV_GROUP_FORM_OPEN__ = false;
     await _govLoadGroups();
   } catch (e) {
     if (!_govHandleConflict(e) && typeof showToast === 'function') showToast(e.message || 'save failed', 4000, 'error');
@@ -686,6 +928,14 @@ async function _govSaveGroup() {
 }
 
 async function _govDeleteGroup(name) {
+  const parents = Object.keys(window.__GOV_USERS__ || {}).filter(email => {
+    const groups = ((window.__GOV_USERS__ || {})[email] || {}).groups;
+    return Array.isArray(groups) && groups.includes(name);
+  });
+  if (parents.length) {
+    if (typeof showToast === 'function') showToast('Group is assigned to ' + parents.length + ' user(s): reassign them first', 4500, 'error');
+    return;
+  }
   try {
     const res = await _govPost('/api/governance/groups/delete', { name: name });
     _govEtag = res.etag || _govEtag;
@@ -986,16 +1236,24 @@ async function _govRunPreview() {
     return;
   }
   const access = data.effective_access || {};
-  const chips = list => (list || []).map(v => '<span class="gov-chip">' + _govEsc(v) + '</span>').join(' ') ||
+  const svg = (path) => '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px" aria-hidden="true">' + path + '</svg>';
+  const chips = list => (list || []).map(v => '<span class="gov-chip gov-chip-role">' + _govEsc(v) + '</span>').join(' ') ||
     '<span class="gov-muted">' + _govT('governance_none', 'none') + '</span>';
-  const section = (label, body) => '<div class="gov-preview-section"><div class="gov-form-title">' + _govEsc(label) + '</div>' + body + '</div>';
+  const section = (label, body, iconSvg) => '<div class="gov-stat" style="margin-bottom:10px;padding:12px 14px">' +
+    '<div class="gov-stat-label" style="margin-bottom:6px">' + iconSvg + ' ' + _govEsc(label) + '</div>' + body + '</div>';
+  const iconRole = svg('<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>');
+  const iconGroup = svg('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>');
+  const iconPerm = svg('<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>');
+  const iconProfile = svg('<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.09-3.09a2 2 0 0 0-2.82 0L6 21"/>');
+  const iconRoutes = svg('<circle cx="6" cy="19" r="3"/><circle cx="18" cy="5" r="3"/><path d="M8.6 13.5l6.8 4"/><path d="M15.4 6.5 8.6 10.5"/>');
+  const iconSources = svg('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>');
   out.innerHTML =
-    section(_govT('governance_col_roles', 'Roles'), chips(access.roles)) +
-    section(_govT('governance_col_groups', 'Groups'), chips(access.groups)) +
-    section(_govT('governance_permissions', 'Permissions'), chips(access.permissions)) +
-    section(_govT('governance_profiles', 'Profiles'), chips(access.profiles)) +
-    section(_govT('governance_routes', 'Routes'), chips(access.routes)) +
-    section(_govT('governance_grant_sources', 'Grant sources'), chips(data.grant_sources));
+    section(_govT('governance_col_roles', 'Roles'), chips(access.roles), iconRole) +
+    section(_govT('governance_col_groups', 'Groups'), chips(access.groups), iconGroup) +
+    section(_govT('governance_permissions', 'Permissions'), chips(access.permissions), iconPerm) +
+    section(_govT('governance_profiles', 'Profiles'), chips(access.profiles), iconProfile) +
+    section(_govT('governance_routes', 'Routes'), chips(access.routes), iconRoutes) +
+    section(_govT('governance_grant_sources', 'Grant sources'), chips(data.grant_sources), iconSources);
 }
 
 // ── Audit tab ─────────────────────────────────────────────────────────────
