@@ -8,11 +8,13 @@ import math
 import os
 import secrets
 import socket
+import subprocess
 import threading
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from pathlib import Path
 from typing import Any
 
 from cryptography.exceptions import InvalidSignature
@@ -28,6 +30,15 @@ _PENDING_TTL_SECONDS = 600
 _MAX_PENDING_FLOWS = 128
 _CLOCK_SKEW_SECONDS = 60
 _CACHE_TTL_SECONDS = 300
+
+# Just in time provisioning of a verified SSO identity. The provisioner is the
+# shared no-restart helper: it takes its own lock, is idempotent, and refuses
+# any address outside the company domain. Set HERMES_WEBUI_DISABLE_JIT_PROVISION
+# to fall back to the plain allowlist refusal.
+_ALLOW_VALUES_ENV = "HERMES_WEBUI_OIDC_ALLOW_VALUES"
+_JIT_PROVISION_SCRIPT = Path.home() / ".hermes" / "scripts" / "jit_provision.py"
+_JIT_PROVISION_TIMEOUT_S = 120
+_JIT_PROVISION_DOMAIN = "@synthwave.solutions"
 
 _pending_lock = threading.Lock()
 _pending_flows: dict[str, dict[str, Any]] = {}
@@ -148,11 +159,25 @@ def complete_authorization_code_flow(
         nonce=pending["nonce"],
         jwks_uri=str(discovery.get("jwks_uri") or "").strip(),
     )
-    _enforce_allowlist(
-        claims,
-        allow_claim=cfg.get("allow_claim"),
-        allow_values=cfg.get("allow_values") or [],
-    )
+    try:
+        _enforce_allowlist(
+            claims,
+            allow_claim=cfg.get("allow_claim"),
+            allow_values=cfg.get("allow_values") or [],
+        )
+    except OIDCAuthError as allowlist_error:
+        # Just in time onboarding. The id_token is already cryptographically
+        # validated at this point, so the address below is proven, not user
+        # supplied. The allowlist that just refused it comes from the process
+        # environment, which is a snapshot taken at start, so a colleague who
+        # was provisioned after the last restart is refused here even though
+        # the system of record already knows them. Give that verified identity
+        # exactly one second chance; every failure re-raises this same refusal.
+        _enforce_allowlist_with_jit(
+            claims,
+            allow_claim=str(cfg.get("allow_claim") or ""),
+            original=allowlist_error,
+        )
     # The email claim confers identity (and, for a bootstrap admin, never-deny
     # wildcard access). At IdPs that allow unverified or user-editable emails,
     # an allowlisted account could set its email to the bootstrap admin's and
@@ -739,6 +764,185 @@ def _enforce_allowlist(
         return
     if not actual_values:
         raise OIDCAuthError("OIDC identity is not allowed", status_code=403)
+
+
+def _dotenv_path() -> Path:
+    """Path of the .env file systemd loads for this unit (repo root)."""
+    override = os.getenv("HERMES_WEBUI_DOTENV", "").strip()
+    if override:
+        return Path(override).expanduser()
+    return Path(__file__).resolve().parent.parent / ".env"
+
+
+def _allow_values_from_dotenv() -> list[str]:
+    """Re-read the OIDC allowlist straight from the .env file on disk.
+
+    The process environment is a snapshot taken when the unit started, so an
+    address appended to .env afterwards stays invisible until a restart. This
+    reads the file back so a running server can observe a freshly provisioned
+    colleague. The result is only ever used to widen a refusal that already
+    happened, never to deny an identity the running config allows.
+    """
+    try:
+        raw = _dotenv_path().read_text(encoding="utf-8")
+    except Exception:
+        logger.debug("Could not read the webui .env for the OIDC allowlist", exc_info=True)
+        return []
+    value: str | None = None
+    for line in raw.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("export "):
+            stripped = stripped[len("export ") :].strip()
+        if not stripped.startswith(_ALLOW_VALUES_ENV + "="):
+            continue
+        # Last assignment wins, matching how the shell sources the file.
+        value = stripped.split("=", 1)[1].strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+            value = value[1:-1]
+    if value is None:
+        return []
+    return _normalize_allow_values(value)
+
+
+def _audit_jit_event(email: str, status: str, detail: str) -> None:
+    """Record a JIT provisioning attempt in the governance audit trail.
+
+    The audit sink hashes the subject address by design, so the readable
+    address goes to the service log instead. Never raises.
+    """
+    try:
+        from api.governance.audit import append_audit_event
+
+        append_audit_event(
+            "jit_provision",
+            subject_email=email,
+            path="/api/auth/oidc/callback",
+            method="GET",
+            reason=status,
+            mode="enforce",
+            report_only=False,
+            extra={"resource": "oidc_allowlist", "detail": detail},
+        )
+    except Exception:
+        logger.debug("Could not append the JIT provisioning audit event", exc_info=True)
+    logger.info("JIT provisioning for %s: status=%s (%s)", email, status, detail)
+
+
+def _run_jit_provision(email: str) -> dict[str, Any]:
+    """Run the shared one shot provisioner for one verified address.
+
+    Returns the helper's JSON object, or a synthetic failure dict. Never
+    raises, never restarts a service: the helper is the no-restart variant by
+    contract, which is what makes it safe to call from a request handler.
+    """
+    if not _JIT_PROVISION_SCRIPT.exists():
+        return {"ok": False, "status": "unavailable", "reason": "provisioner not installed"}
+    try:
+        completed = subprocess.run(
+            ["python3", str(_JIT_PROVISION_SCRIPT), "--email", email, "--json"],
+            capture_output=True,
+            text=True,
+            timeout=_JIT_PROVISION_TIMEOUT_S,
+        )
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "status": "timeout", "reason": "provisioner exceeded the time budget"}
+    except Exception as exc:
+        return {"ok": False, "status": "error", "reason": type(exc).__name__}
+    payload: dict[str, Any] = {}
+    for line in (completed.stdout or "").splitlines():
+        candidate = line.strip()
+        if not candidate.startswith("{"):
+            continue
+        try:
+            parsed = json.loads(candidate)
+        except Exception:
+            continue
+        if isinstance(parsed, dict):
+            payload = parsed
+    if completed.returncode != 0:
+        payload["ok"] = False
+        payload.setdefault("status", "error")
+        payload.setdefault("reason", f"exit code {completed.returncode}")
+    return payload
+
+
+def _governance_grants_profile(email: str) -> bool:
+    """True when the governance policy on disk now scopes a profile to email.
+
+    The policy file is the system of record and is re-read per request, so
+    this is the authoritative confirmation that provisioning really landed.
+    """
+    try:
+        from api.governance import loader as _gov_loader
+        from api.governance.models import GovernanceSubject
+        from api.governance.resolver import resolve_effective_access
+
+        policy = _gov_loader.get_policy()
+        if not policy.enabled:
+            return False
+        normalized = email.strip().lower()
+        if normalized not in policy.users:
+            return False
+        access = resolve_effective_access(policy, GovernanceSubject(email=normalized))
+        return bool(access.profiles)
+    except Exception:
+        logger.debug("Could not evaluate the governance profile grant", exc_info=True)
+        return False
+
+
+def _enforce_allowlist_with_jit(
+    claims: dict[str, Any],
+    *,
+    allow_claim: str,
+    original: OIDCAuthError,
+) -> None:
+    """Second chance for an identity the configured allowlist just refused.
+
+    Only reachable after _validate_id_token accepted the id_token, so the
+    email below is proven by the IdP signature. Two escalating retries:
+      1. re-read the allowlist from .env on disk, no subprocess involved
+      2. ask the shared provisioner to onboard this address once, then confirm
+         against the refreshed allowlist or the governance policy
+    Every path that does not positively confirm access re-raises the caller's
+    original refusal, so the failure mode is exactly the old behaviour.
+    """
+    email = str(claims.get("email") or "").strip().lower()
+    if allow_claim:
+        disk_values = _allow_values_from_dotenv()
+        if disk_values:
+            try:
+                _enforce_allowlist(claims, allow_claim=allow_claim, allow_values=disk_values)
+                return
+            except OIDCAuthError:
+                pass
+    if os.getenv("HERMES_WEBUI_DISABLE_JIT_PROVISION"):
+        raise original
+    if not email or not email.endswith(_JIT_PROVISION_DOMAIN):
+        raise original
+    if not _is_truthy_claim(claims.get("email_verified")):
+        # Never provision from an address the IdP will not vouch for.
+        _audit_jit_event(email, "refused", "email_verified claim was not true")
+        raise original
+    result = _run_jit_provision(email)
+    status = str(result.get("status") or ("created" if result.get("ok") else "error"))
+    detail = str(result.get("reason") or "")
+    if not result.get("ok") or not str(result.get("profile") or "").strip():
+        _audit_jit_event(email, status, detail or "provisioner refused")
+        raise original
+    if allow_claim:
+        refreshed = _allow_values_from_dotenv()
+        if refreshed:
+            try:
+                _enforce_allowlist(claims, allow_claim=allow_claim, allow_values=refreshed)
+                _audit_jit_event(email, status, "allowed via the refreshed allowlist")
+                return
+            except OIDCAuthError:
+                pass
+    if _governance_grants_profile(email):
+        _audit_jit_event(email, status, "allowed via the governance profile grant")
+        return
+    _audit_jit_event(email, status, "provisioned but still not allowed")
+    raise original
 
 
 def _get_claim_path(claims: dict[str, Any], dotted_key: str) -> Any:

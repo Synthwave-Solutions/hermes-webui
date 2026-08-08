@@ -300,6 +300,23 @@ class QuietHTTPServer(ThreadingHTTPServer):
         super().handle_error(request, client_address)
 
 
+def _set_owner_context(handler) -> None:
+    """Bind the current request to this thread for ownership stamping."""
+    try:
+        from api.ownership import set_request_context
+        set_request_context(handler)
+    except Exception:
+        pass
+
+
+def _clear_owner_context() -> None:
+    try:
+        from api.ownership import clear_request_context
+        clear_request_context()
+    except Exception:
+        pass
+
+
 class Handler(BaseHTTPRequestHandler):
     # HTTP/1.1 keep-alive stays on, so every response must declare framing.
     protocol_version = "HTTP/1.1"
@@ -383,6 +400,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         self._req_t0 = time.time()
+        _set_owner_context(self)
         cookie_profile = get_profile_cookie(self)
         if cookie_profile:
             set_request_profile(cookie_profile)
@@ -406,9 +424,11 @@ class Handler(BaseHTTPRequestHandler):
                 self._safe_webui_print(traceback.format_exc())
         finally:
             clear_request_profile()
+            _clear_owner_context()
 
     def _handle_write(self, route_func) -> None:
         self._req_t0 = time.time()
+        _set_owner_context(self)
         cookie_profile = get_profile_cookie(self)
         if cookie_profile:
             set_request_profile(cookie_profile)
@@ -435,6 +455,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._safe_webui_print(traceback.format_exc())
         finally:
             clear_request_profile()
+            _clear_owner_context()
 
     def do_POST(self) -> None:
         self._handle_write(handle_post)

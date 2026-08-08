@@ -1160,6 +1160,19 @@ class Session:
             )
         if touch_updated_at:
             self.updated_at = time.time()
+        # Every persisted chat carries an owner. Rows created outside an
+        # interactive request (API, CLI import, cron) would otherwise stay
+        # ownerless, and ownerless rows are visible to every admin. Resolve
+        # from the request identity on this thread, else the configured
+        # default owner. An owner that is already set is never overwritten.
+        if not str(getattr(self, 'owner_email', '') or '').strip():
+            try:
+                from api.ownership import resolve_new_owner
+                resolved = resolve_new_owner()
+                if resolved:
+                    self.owner_email = resolved
+            except Exception:
+                logger.debug("Owner stamping on save failed for %s", self.session_id, exc_info=True)
         # Write metadata fields first so load_metadata_only() can read them
         # without parsing the full messages array (which may be 400KB+).
         # Fields are listed in the order they should appear in the JSON file.
@@ -3378,6 +3391,11 @@ def new_session(workspace=None, model=None, profile=None, model_provider=None, p
         worktree_created_at=wt.get('created_at') if wt else None,
         enabled_toolsets=enabled_toolsets,
     )
+    try:
+        from api.ownership import resolve_new_owner
+        s.owner_email = resolve_new_owner(getattr(s, 'owner_email', None))
+    except Exception:
+        logger.debug("Owner stamping at creation failed", exc_info=True)
     # #4985: defensive — auto-generated uuids don't collide with the
     # tombstone, but if a future caller ever passes an explicit id that
     # was previously pruned, clear the entry so the new session isn't
@@ -4867,6 +4885,11 @@ def import_cli_session(
         updated_at=updated_at,
         parent_session_id=parent_session_id,
     )
+    try:
+        from api.ownership import resolve_new_owner
+        s.owner_email = resolve_new_owner(getattr(s, 'owner_email', None))
+    except Exception:
+        logger.debug("Owner stamping at creation failed", exc_info=True)
     # #4985: import_cli_session uses an explicit sid (the CLI sidecar's id).
     # If that sid was previously tombstoned as a webui zero-message orphan,
     # clear the tombstone entry so the freshly-imported session is visible
@@ -4889,7 +4912,11 @@ def import_cli_session(
 
 CLAUDE_CODE_SOURCE = 'claude_code'
 CLAUDE_CODE_SOURCE_LABEL = 'Claude Code'
-CLAUDE_CODE_MAX_FILES = 200
+# Keep the Claude Code bridge high enough to expose the full local transcript
+# set. The sidebar/API may still apply its own presentation window, but the
+# importer must not silently discard older JSONL histories at an arbitrary 200
+# file cutoff. The scanner remains bounded for pathological directories.
+CLAUDE_CODE_MAX_FILES = 1000
 CLAUDE_CODE_MAX_FILE_BYTES = 10 * 1024 * 1024
 CLAUDE_CODE_MAX_MESSAGES_PER_FILE = 1000
 CLAUDE_CODE_MAX_CONTENT_CHARS = 200_000

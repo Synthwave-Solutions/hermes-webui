@@ -86,6 +86,23 @@ def test_claude_code_scan_skips_symlinks_and_oversized_files(tmp_path):
     assert models.get_claude_code_sessions(projects_dir=root_link) == []
 
 
+def test_claude_code_scan_includes_more_than_previous_200_file_cutoff(tmp_path):
+    import api.models as models
+
+    projects_dir = tmp_path / "claude" / "projects"
+    project_dir = projects_dir / "project-a"
+    project_dir.mkdir(parents=True)
+    for index in range(205):
+        _write_jsonl(
+            project_dir / f"session-{index:03d}.jsonl",
+            [{"message": {"role": "user", "content": f"session {index}"}}],
+        )
+
+    sessions = models.get_claude_code_sessions(projects_dir=projects_dir)
+
+    assert len(sessions) == 205
+
+
 def test_get_cli_sessions_reuses_short_ttl_cache(monkeypatch, tmp_path):
     import api.models as models
     import api.profiles as profiles

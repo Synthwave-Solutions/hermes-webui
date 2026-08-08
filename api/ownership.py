@@ -32,6 +32,18 @@ def user_isolation_enabled() -> bool:
     return raw not in ("0", "false")
 
 
+def admin_sees_all() -> bool:
+    """Return whether admins may see rows owned by other users (default on).
+
+    Set ``HERMES_WEBUI_ADMIN_SEES_ALL=0`` to give admins the same per-user
+    view as everyone else: their own rows only. Admin-only routes (governance,
+    approvals, workspace ownership) are unaffected; this flag changes list
+    visibility of sessions and projects, nothing else.
+    """
+    raw = str(os.getenv("HERMES_WEBUI_ADMIN_SEES_ALL", "") or "").strip().lower()
+    return raw not in ("0", "false")
+
+
 def _request_identity(handler):
     """Resolve the authenticated identity dict for a request handler.
 
@@ -121,7 +133,7 @@ def request_owner_scope(handler) -> str:
     identity = _request_identity(handler)
     if not identity:
         return "all"
-    if identity_is_admin(identity):
+    if identity_is_admin(identity) and admin_sees_all():
         return "all"
     return str(identity.get("email") or "").strip().lower()
 
@@ -136,6 +148,57 @@ def request_is_admin(handler) -> bool:
     as admin (trusted local single-user mode).
     """
     return identity_is_admin(_request_identity(handler))
+
+
+_CURRENT_REQUEST = threading.local()
+
+
+def set_request_context(handler) -> None:
+    """Remember the handler of the request being served on this thread.
+
+    Used so code paths far from the HTTP layer (session creation, CLI import,
+    background saves) can still resolve who is creating a row. Cleared in a
+    finally block by the server, so a pooled thread never carries a stale
+    identity into the next request.
+    """
+    _CURRENT_REQUEST.handler = handler
+
+
+def clear_request_context() -> None:
+    """Forget the handler for this thread."""
+    _CURRENT_REQUEST.handler = None
+
+
+def default_owner_email() -> str | None:
+    """Return the fallback owner for rows created without an identity.
+
+    Set ``HERMES_WEBUI_DEFAULT_OWNER`` so API, CLI and cron-created chats get a
+    real owner instead of staying ownerless. Without it those rows fall back to
+    the old admin-only behaviour.
+    """
+    return str(os.getenv("HERMES_WEBUI_DEFAULT_OWNER", "") or "").strip().lower() or None
+
+
+def resolve_new_owner(explicit=None) -> str | None:
+    """Return the owner to stamp on a newly created row.
+
+    Order: an explicitly passed owner, then the identity of the request being
+    served on this thread, then the configured default owner. Never guesses
+    from data already on disk, so loading a row can not re-own it.
+    """
+    owner = str(explicit or "").strip().lower()
+    if owner:
+        return owner
+    handler = getattr(_CURRENT_REQUEST, "handler", None)
+    if handler is not None:
+        try:
+            owner = request_owner_email(handler) or ""
+        except Exception:
+            logger.debug("Owner resolution from request context failed", exc_info=True)
+            owner = ""
+        if owner:
+            return owner
+    return default_owner_email()
 
 
 def row_visible_to(owner_email_of_row, handler) -> bool:
