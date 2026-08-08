@@ -9903,43 +9903,9 @@ function _renderUpdateWhatsNewLinks(data){
   }
   _appendUpdateDiffLinks(container,targets,"What's new: ");
 }
-function _showUpdateBanner(data){
-  const parts=[];
-  const webuiPart=_formatUpdateTargetStatus('WebUI',data.webui);
-  const agentPart=_formatUpdateTargetStatus('Agent',data.agent);
-  if(webuiPart) parts.push(webuiPart);
-  if(agentPart) parts.push(agentPart);
-  window._updateData=data;
-  const btnApply=$('btnApplyUpdate');
-  if(btnApply){
-    const webuiManual=!!(data&&data.webui&&data.webui.manual_update&&data.webui.behind>0);
-    const webuiUpdatable=!!(data&&data.webui&&data.webui.behind>0&&!webuiManual);
-    const agentUpdatable=!!(data&&data.agent&&data.agent.behind>0);
-    const hasApplyTargets=webuiUpdatable||agentUpdatable;
-    btnApply.disabled=!hasApplyTargets;
-    btnApply.style.display=hasApplyTargets?'':'none';
-    if(webuiManual){
-      const forceBtn=$('btnForceUpdate');
-      if(forceBtn){forceBtn.disabled=true;forceBtn.style.display='none';forceBtn.dataset.target='';}
-      const clearLockBtn=$('btnClearUpdateLock');
-      if(clearLockBtn){clearLockBtn.disabled=true;clearLockBtn.style.display='none';clearLockBtn.dataset.target='';}
-    }
-  }
-  if(!parts.length){
-    _renderUpdateWhatsNewLinks(data);
-    const staleBanner=$('updateBanner');
-    if(staleBanner) staleBanner.classList.remove('visible');
-    return;
-  }
-  const msg=$('updateMsg');
-  if(msg){
-    const manualInstruction=_formatManualUpdateInstruction(data&&data.webui);
-    msg.textContent='\u2B06 '+parts.join(', ')+' available'+(manualInstruction?' · '+manualInstruction:'');
-  }
-  const banner=$('updateBanner');
-  if(banner) banner.classList.add('visible');
-  const summaryMode=window._whatsNewSummaryEnabled===true?'summary':'diff';
-  _renderUpdateWhatsNewLinks(data,{mode:summaryMode});
+function _showUpdateBanner(_data){
+  // Update banner removed — no-op
+  return;
 }
 function _i18nUpdateText(key, fallback){
   if(typeof t==='function'){
@@ -9949,8 +9915,8 @@ function _i18nUpdateText(key, fallback){
   return fallback;
 }
 function dismissUpdate(){
-  const b=$('updateBanner');if(b)b.classList.remove('visible');
-  sessionStorage.setItem('hermes-update-dismissed','1');
+  // Update banner removed — no-op
+  return;
 }
 function _isUpdateApplyNetworkError(error){
   if(error && error.status) return false;

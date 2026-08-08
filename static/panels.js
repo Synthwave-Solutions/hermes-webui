@@ -12054,15 +12054,15 @@ async function checkUpdatesNow(channelOverride){
         if(manualInstruction) txt+=' · '+manualInstruction;
         if(noGitParts.length) txt+=' · '+t('settings_update_no_git');
         if(status){status.textContent=txt;status.style.color='var(--accent)';}
-        // Also trigger the update banner
-        if(typeof _showUpdateBanner==='function') _showUpdateBanner(data);
+        // Update banner removed — no popup trigger
+        // (was: _showUpdateBanner(data))
       } else if(errorParts.length){
         if(status){status.textContent=t('settings_update_check_failed')+': '+errorParts.join(', ');status.style.color='var(--error)';}
       } else if(noGitParts.length){
         if(status){status.textContent=t('settings_update_no_git');status.style.color='var(--muted)';}
       } else {
         if(status){status.textContent=t('settings_up_to_date');status.style.color='var(--success)';}
-        if(typeof _showUpdateBanner==='function') _showUpdateBanner(data);
+        // Update banner removed — no popup trigger
       }
     }
   } catch(e){

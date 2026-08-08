@@ -2303,14 +2303,31 @@ if (_healthResponseServerIdentity({{ server_started_at: null, uptime_seconds: nu
 
 
 class TestUpdateBannerUx:
-    def test_update_banner_includes_release_labels(self):
+    """The update banner UI was removed on purpose (2026-08): no popup should
+    ever appear for agent/front-end/back-end updates. The formatter helpers
+    survive (Settings still shows update status text) but the banner render
+    path `_showUpdateBanner` must stay a no-op."""
+
+    def test_update_banner_helpers_still_exist(self):
         src = read('static/ui.js')
         assert 'function _formatUpdateTargetStatus' in src
         assert 'info.release_based' in src
         assert 'info.current_version' in src
         assert 'info.latest_version' in src
-        assert "_formatUpdateTargetStatus('WebUI',data.webui)" in src
-        assert "_formatUpdateTargetStatus('Agent',data.agent)" in src
+
+    def test_show_update_banner_is_noop(self):
+        src = read('static/ui.js')
+        start = src.find('function _showUpdateBanner')
+        assert start != -1, "_showUpdateBanner not found in ui.js"
+        fn = src[start:src.find('function _i18nUpdateText', start)]
+        # The popup renderer must not touch banner DOM or show anything.
+        assert 'classList.add' not in fn
+        assert 'updateMsg' not in fn
+        assert 'btnApplyUpdate' not in fn
+        assert 'return;' in fn, "_showUpdateBanner must be a no-op"
+        # The old inline render calls must be gone from ui.js entirely.
+        assert "_formatUpdateTargetStatus('WebUI',data.webui)" not in src
+        assert "_formatUpdateTargetStatus('Agent',data.agent)" not in src
 
     def test_settings_update_check_uses_same_repo_branch_formatter(self):
         src = read('static/panels.js')
@@ -2349,10 +2366,10 @@ if(_formatUpdateTargetStatus('WebUI', {{ no_git: true, behind: 1 }}) !== null) t
 """.strip()
         subprocess.run(["node", "-e", script], check=True, capture_output=True, text=True)
 
-    def test_manual_webui_banner_hides_apply_button(self):
+    def test_manual_webui_banner_is_noop(self):
+        """Calling _showUpdateBanner must not touch any DOM state: no banner
+        text, no button toggles, no classList changes. The popup is removed."""
         src = read('static/ui.js')
-        format_fn = extract_js_function(src, '_formatUpdateTargetStatus')
-        instruction_fn = extract_js_function(src, '_formatManualUpdateInstruction')
         show_fn = extract_js_function(src, '_showUpdateBanner')
         script = f"""
 const state = {{
@@ -2366,12 +2383,7 @@ const state = {{
 global.window = {{}};
 global.$ = (id) => state[id] || null;
 global._renderUpdateWhatsNewLinks = () => {{}};
-global.t = (key, ...args) => {{
-  const values = {{ settings_update_manual_docker: 'Manual update required: run {{0}}, then recreate the container.' }};
-  return (values[key] || key).replace(/\{{(\d+)\}}/g, (_, i) => args[Number(i)] ?? '');
-}};
-{format_fn}
-{instruction_fn}
+global.t = (key, ...args) => key;
 {show_fn}
 _showUpdateBanner({{
   webui: {{
@@ -2385,16 +2397,13 @@ _showUpdateBanner({{
   }},
   agent: null,
 }});
-if(state.updateMsg.textContent.indexOf('WebUI') === -1) throw new Error('manual update must still render banner text');
-if(state.updateMsg.textContent.indexOf('docker pull ghcr.io/nesquena/hermes-webui:latest') === -1) throw new Error('manual update must render pull guidance');
-if(state.btnApplyUpdate.style.display !== 'none') throw new Error('manual webui update must hide the apply button');
-if(state.btnApplyUpdate.disabled !== true) throw new Error('manual webui update must disable the apply button');
-if(state.btnForceUpdate.style.display !== 'none') throw new Error('manual webui update must hide the force button');
-if(state.btnForceUpdate.disabled !== true) throw new Error('manual webui update must disable the force button');
-if(state.btnClearUpdateLock.style.display !== 'none') throw new Error('manual webui update must hide the clear lock button');
-if(state.btnClearUpdateLock.disabled !== true) throw new Error('manual webui update must disable the clear lock button');
-if(state.updateBanner.classList.added !== true) throw new Error('manual update must show the banner');
-""".strip()
+if(state.updateMsg.textContent !== '') throw new Error('no-op banner must not set updateMsg');
+if(state.updateBanner.classList.added !== false) throw new Error('no-op banner must not show the banner');
+if(state.btnApplyUpdate.style.display !== '') throw new Error('no-op banner must not touch the apply button');
+if(state.btnForceUpdate.style.display !== 'inline-block') throw new Error('no-op banner must not touch the force button');
+if(state.btnClearUpdateLock.style.display !== 'inline-block') throw new Error('no-op banner must not touch the clear-lock button');
+if(state.updateWhatsNewLinks.cleared !== undefined) throw new Error('no-op banner must not touch the whats-new links');
+"""
         subprocess.run(["node", "-e", script], check=True, capture_output=True, text=True)
 
     def test_settings_manual_webui_update_includes_pull_guidance(self):
@@ -2458,60 +2467,45 @@ function _showUpdateBanner() {{}}
 # ── static/index.html ─────────────────────────────────────────────────────────
 
 class TestIndexHtmlBanner:
-    """#813 — update banner HTML must include error element and force button."""
+    """The update banner markup was removed from index.html on purpose
+    (2026-08). These tests guard that none of the popup elements return."""
 
-    def test_update_error_element_exists(self):
+    def test_update_error_element_removed(self):
         src = read('static/index.html')
-        assert 'id="updateError"' in src, (
-            "index.html must have #updateError element for persistent error display"
+        assert 'id="updateError"' not in src, (
+            "index.html must NOT contain #updateError — the update banner was removed"
         )
 
-    def test_force_update_button_exists(self):
+    def test_force_update_button_removed(self):
         src = read('static/index.html')
-        assert 'id="btnForceUpdate"' in src, (
-            "index.html must have #btnForceUpdate button (hidden by default)"
+        assert 'id="btnForceUpdate"' not in src, (
+            "index.html must NOT contain #btnForceUpdate — the update banner was removed"
         )
 
-    def test_force_update_button_hidden_by_default(self):
+    def test_update_banner_block_removed(self):
         src = read('static/index.html')
-        m = re.search(r'id="btnForceUpdate"[^>]*>', src)
-        assert m, "#btnForceUpdate not found"
-        tag = m.group(0)
-        assert 'display:none' in tag, (
-            "#btnForceUpdate must be hidden by default (display:none)"
+        assert 'id="updateBanner"' not in src, (
+            "index.html must NOT contain #updateBanner — the update banner was removed"
         )
 
 
 class TestClearLockButton:
-    """PR #5688 follow-up: clear-lock button must exist in index.html and be
-    hidden by default. Without this, the v2 frontend recovery path is dead --
-    $('btnClearUpdateLock') returns null at runtime so the lock-only error
-    branch in _showUpdateError() never reveals a clickable affordance (P1).
-    """
+    """PR #5688's clear-lock affordance lived inside the update banner. The
+    banner is removed (2026-08), so the lock recovery path is gone with it;
+    guard that the element never comes back."""
 
-    def test_clear_lock_button_exists(self):
+    def test_clear_lock_button_removed(self):
         src = read('static/index.html')
-        assert 'id="btnClearUpdateLock"' in src, (
-            "index.html must have #btnClearUpdateLock button (hidden by "
-            "default) -- PR #5688 v2 frontend path"
+        assert 'id="btnClearUpdateLock"' not in src, (
+            "index.html must NOT contain #btnClearUpdateLock — the update banner was removed"
         )
 
-    def test_clear_lock_button_hidden_by_default(self):
+    def test_clear_lock_handler_not_banner_bound(self):
+        # The handler function may still exist for programmatic use, but it
+        # must not be wired to the removed banner button anymore.
         src = read('static/index.html')
-        m = re.search(r'id="btnClearUpdateLock"[^>]*>', src)
-        assert m, "#btnClearUpdateLock not found"
-        tag = m.group(0)
-        assert 'display:none' in tag, (
-            "#btnClearUpdateLock must be hidden by default (display:none)"
-        )
-
-    def test_clear_lock_button_calls_applyClearUpdateLock_handler(self):
-        src = read('static/index.html')
-        m = re.search(r'id="btnClearUpdateLock"[^>]*>', src)
-        assert m, "#btnClearUpdateLock not found"
-        tag = m.group(0)
-        assert 'applyClearUpdateLock(this)' in tag, (
-            "#btnClearUpdateLock onclick must invoke applyClearUpdateLock"
+        assert 'applyClearUpdateLock' not in src, (
+            "index.html must not wire applyClearUpdateLock to any button — the update banner was removed"
         )
 
 
@@ -2612,42 +2606,36 @@ class TestUpdateCompareSource:
         assert '"repo_url": "https://github.com/NousResearch/hermes-agent"' in src
         assert '"compare_url": "https://github.com/NousResearch/hermes-agent/compare/aaa0001...bbb0002"' in src
 
-    def test_update_banner_html_uses_multi_target_links_container(self):
+    def test_update_banner_html_links_container_removed(self):
         src = read('static/index.html')
-        assert 'id="updateWhatsNewLinks"' in src
-        assert 'id="updateWhatsNew"' not in src
+        assert 'id="updateWhatsNewLinks"' not in src
+        assert 'id="updateBanner"' not in src
 
-    def test_update_banner_frontend_uses_data_driven_compare_helpers(self):
+    def test_update_banner_frontend_helpers_are_banner_free(self):
         src = read('static/ui.js')
         assert 'function _isSafeUpdateCompareUrl(url)' in src
         assert 'function _updateCompareUrl(info)' in src
         assert 'function _updateWhatsNewTargets(data)' in src
         assert 'function _renderUpdateWhatsNewLinks(data)' in src
-        assert "$('updateWhatsNewLinks')" in src
-        assert "compare_url" in src
-        assert "repo_url+'/compare/'+currentSha+'...'+latestSha" in src
-        assert "_isSafeUpdateCompareUrl(compareUrl)?compareUrl:null" in src
-        assert "_renderUpdateWhatsNewLinks(data);" in src
-        assert "data.webui.repo_url" not in src
-        assert "$('updateWhatsNew')" not in src
+        # Banner render path must stay a no-op; no updateBanner DOM writes.
+        assert '$(updateBanner)' not in src.replace("'", '')
+        assert 'updateBanner' not in src[src.find('function _showUpdateBanner'):src.find('function _i18nUpdateText')]
 
-    def test_update_banner_clears_stale_links_when_no_updates_remain(self):
+    def test_show_update_banner_handles_no_dom(self):
         src = read('static/ui.js')
-        start = src.find('function _showUpdateBanner(data)')
+        start = src.find('function _showUpdateBanner')
         assert start != -1, "_showUpdateBanner not found"
-        fn = src[start:src.find('function dismissUpdate()', start)]
-        empty_idx = fn.find('if(!parts.length)')
-        assert empty_idx != -1, "_showUpdateBanner must handle empty update payloads"
-        empty_block = fn[empty_idx:fn.find('return;', empty_idx) + len('return;')]
-        assert '_renderUpdateWhatsNewLinks(data);' in empty_block
-        assert "classList.remove('visible')" in empty_block
+        fn = src[start:src.find('function _i18nUpdateText', start)]
+        # Removed banner: must not reference any banner element.
+        for banned in ('updateBanner', 'updateMsg', 'updateWhatsNewLinks', 'btnApplyUpdate', 'btnForceUpdate', 'btnClearUpdateLock'):
+            assert banned not in fn, f"_showUpdateBanner must not touch {banned}"
 
-    def test_manual_up_to_date_check_clears_update_banner(self):
+    def test_manual_up_to_date_check_does_not_show_banner(self):
         src = read('static/panels.js')
         up_to_date_idx = src.find("settings_up_to_date")
         assert up_to_date_idx != -1, "manual update up-to-date branch not found"
         block = src[up_to_date_idx:up_to_date_idx + 300]
-        assert "_showUpdateBanner(data)" in block
+        assert "_showUpdateBanner" not in block
 
 
 class TestWhatsNewSummaryToggle:
