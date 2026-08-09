@@ -3230,6 +3230,26 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
     const s=await api('/api/settings');
     _bootSettings=s;
     if(typeof checkWebUIVersionSkew==='function'){try{checkWebUIVersionSkew(s);}catch(_){}}
+    // Tab visibility/order: the server value is authoritative at boot. The
+    // pre-paint inline script and _restoreTabVisibility() can only read
+    // localStorage, so a hidden_tabs change made server-side (or under another
+    // browser) otherwise stays invisible until the user opens Settings.
+    try{
+      const bootHidden=Array.isArray(s.hidden_tabs)
+        ? s.hidden_tabs.filter(function(x){return typeof x==='string'&&x.trim();})
+        : null;
+      const bootOrder=Array.isArray(s.tab_order)
+        ? s.tab_order.filter(function(x){return typeof x==='string'&&x.trim();})
+        : null;
+      if(bootOrder&&typeof _setTabOrder==='function'){
+        _setTabOrder(bootOrder);
+        if(typeof _applyTabOrder==='function') _applyTabOrder(bootOrder);
+      }
+      if(bootHidden&&typeof _setHiddenTabs==='function'){
+        _setHiddenTabs(bootHidden);
+        if(typeof _applyTabVisibility==='function') _applyTabVisibility(bootHidden);
+      }
+    }catch(_){}
     window._sendKey=s.send_key||'enter';
     // Persist default workspace so the blank new-chat page can show it
     // and workspace actions (New file/folder) work before the first session (#804).
