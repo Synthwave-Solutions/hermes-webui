@@ -21955,16 +21955,64 @@ def _workspaces_response_list(wss, handler) -> list:
     from api.ownership import request_owner_scope
 
     scope = request_owner_scope(handler)
+    if scope == "all":
+        return [dict(w) for w in wss]
+
+    # De governance is de bron: `grants.workspaces` per persoon, met "*" voor
+    # wie alles mag zien. Valt die lijst niet op te halen, dan vallen we terug
+    # op de ledenlijst in het bestand, en pas als die ook leeg is op tonen.
+    # Zo kan een storing in de policy nooit stilletjes alles openzetten voor
+    # iemand die niets had mogen zien: een lege lijst betekent hier niets tonen.
+    toegestaan = _governance_workspace_names(scope)
     out = []
     for w in wss:
+        naam = str(w.get("name") or "")
+        if toegestaan is not None:
+            if "*" not in toegestaan and naam.lower() not in toegestaan:
+                continue
+            out.append(dict(w))
+            continue
         emails = _workspace_entry_emails(w)
-        if emails and scope != "all" and scope not in emails:
+        if emails and scope not in emails:
             continue
         entry = dict(w)
         if not emails:
             entry["legacy_unowned"] = True
         out.append(entry)
     return out
+
+
+def _governance_workspace_names(email: str):
+    """De workspace-namen die deze persoon volgens de governance mag zien.
+
+    Geeft None terug als de policy niet te lezen is of de persoon er niet in
+    staat; dan beslist de aanroeper met de oude regel. Namen worden
+    kleingeschreven vergeleken, want een beheerder typt ze met de hand.
+    """
+    try:
+        from api.governance.loader import get_policy
+        from api.governance.models import GovernanceSubject
+        from api.governance.resolver import resolve_effective_access
+
+        policy = get_policy()
+        if policy is None:
+            return None
+        access = resolve_effective_access(
+            policy, GovernanceSubject(email=email, groups=[]))
+        namen = getattr(getattr(access, "grants", None), "workspaces", None)
+        if namen:
+            return {str(n).strip().lower() for n in namen}
+        # Leeg is niet hetzelfde als onbekend. Staat deze persoon in het
+        # beleid, dan is een lege lijst een besluit: hij ziet geen enkele
+        # workspace. Alleen wie helemaal niet in het beleid voorkomt valt
+        # terug op de oude ledenlijst.
+        gebruikers = getattr(policy, "users", None) or {}
+        if email.strip().lower() in {str(k).strip().lower() for k in gebruikers}:
+            return set()
+        return None
+    except Exception:
+        logger.debug("workspace-grants niet op te halen", exc_info=True)
+        return None
 
 
 def _handle_workspace_add(handler, body):

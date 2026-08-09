@@ -46,6 +46,7 @@ def _deep_merge_grants(base: "GrantSet", other: "GrantSet") -> "GrantSet":
         cli_approval_commands=base.cli_approval_commands | other.cli_approval_commands,
         cli_denied_commands=base.cli_denied_commands | other.cli_denied_commands,
         cli_workdir_roots=base.cli_workdir_roots | other.cli_workdir_roots,
+        workspaces=base.workspaces | other.workspaces,
         usage_caps={**base.usage_caps, **other.usage_caps},
     )
 
@@ -99,6 +100,7 @@ def _subtract_grants(base: "GrantSet", deny: "GrantSet") -> "GrantSet":
         cli_approval_commands=base.cli_approval_commands,
         cli_denied_commands=base.cli_denied_commands | deny.cli_commands,
         cli_workdir_roots=_subtract_set(base.cli_workdir_roots, deny.cli_workdir_roots),
+        workspaces=_subtract_set(base.workspaces, deny.workspaces),
         usage_caps=dict(base.usage_caps),
     )
 
@@ -134,6 +136,9 @@ class GrantSet:
     cli_approval_commands: frozenset[str] = field(default_factory=frozenset)
     cli_denied_commands: frozenset[str] = field(default_factory=frozenset)
     cli_workdir_roots: frozenset[str] = field(default_factory=frozenset)
+    # Zie hermes-agent: workspaces horen in de governance, niet in een los
+    # bestand naast de rechten.
+    workspaces: frozenset[str] = field(default_factory=frozenset)
     usage_caps: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
@@ -184,6 +189,7 @@ class GrantSet:
             cli_commands=frozenset(command_ids),
             cli_approval_commands=approval_command_ids,
             cli_workdir_roots=_string_set(cli.get("workdir_roots") if isinstance(cli, Mapping) else None),
+            workspaces=_string_set(data.get("workspaces")),
             usage_caps=dict(data.get("usage_caps") or {}),
         )
 
