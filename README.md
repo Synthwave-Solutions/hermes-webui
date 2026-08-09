@@ -330,6 +330,7 @@ If an AI assistant is helping with install, reinstall, bootstrap, provider setup
 | State directory | `HERMES_WEBUI_STATE_DIR` env, then `$HERMES_HOME/webui` (Windows default `%LOCALAPPDATA%\hermes\webui`, POSIX default `~/.hermes/webui`) |
 | Default workspace | `HERMES_WEBUI_DEFAULT_WORKSPACE` env, then `~/workspace`, then state dir |
 | Port | `HERMES_WEBUI_PORT` env or first argument, default `8787` |
+| Hidden sidebar tabs on a fresh install | `HERMES_WEBUI_DEFAULT_HIDDEN_TABS` env, a comma separated panel list (default none; chat and settings are always visible). Only the baseline: once a user saves tab visibility in Settings, the stored value wins |
 
 If discovery finds everything, nothing else is required.
 

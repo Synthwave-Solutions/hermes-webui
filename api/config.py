@@ -8080,6 +8080,22 @@ def _get_session_agent_lock(session_id: str) -> threading.Lock:
 
 # ── Settings persistence ─────────────────────────────────────────────────────
 
+def _default_hidden_tabs() -> list:
+    """Sidebar panels hidden on a fresh install (no saved hidden_tabs yet).
+
+    Empty by default, so a plain install shows every panel. A deployment can
+    ship its own baseline with HERMES_WEBUI_DEFAULT_HIDDEN_TABS as a comma
+    separated panel list (SynthPulse sets "logs"). Chat and settings are always
+    visible and are dropped here as well as in save_settings().
+    """
+    out = []
+    for part in os.getenv("HERMES_WEBUI_DEFAULT_HIDDEN_TABS", "").split(","):
+        name = part.strip()
+        if name and name not in {"chat", "settings"} and name not in out:
+            out.append(name)
+    return out
+
+
 _SETTINGS_DEFAULTS = {
     "default_workspace": str(DEFAULT_WORKSPACE),
     "onboarding_completed": False,
@@ -8147,7 +8163,7 @@ _SETTINGS_DEFAULTS = {
     "inflight_state_max_tool_calls": 48,  # max recent tool-call records kept per recovery snapshot
     "inflight_state_max_string_chars": 60000,  # max string length kept inside a recovery snapshot field
     "inflight_state_max_json_chars": 1500000,  # max serialized recovery snapshot payload before pruning
-    "hidden_tabs": [],  # sidebar tab panel names hidden by user (e.g. ["tasks","kanban"]); chat and settings are always visible
+    "hidden_tabs": _default_hidden_tabs(),  # sidebar tab panel names hidden by user (e.g. ["tasks","kanban"]); chat and settings are always visible; deployment baseline via HERMES_WEBUI_DEFAULT_HIDDEN_TABS
     "tab_order": [],  # user-defined sidebar/rail tab order for reorderable tabs; chat/settings stay fixed
     "composer_control_order": [],  # user-defined composer footer control order; invalid/duplicate keys are ignored
     "language": "en",  # UI locale code; must match a key in static/i18n.js LOCALES
