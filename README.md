@@ -5,6 +5,12 @@
 Hermes WebUI is a lightweight, dark-themed web app interface in your browser for [Hermes Agent](https://hermes-agent.nousresearch.com/).
 Full parity with the CLI experience - everything you can do from a terminal, you can do from this UI. No build step, no framework, no bundler. Just Python and vanilla JS.
 
+> **This repository is the Synthwave Solutions fork (the SynthPulse WebUI).** The
+> application below is upstream's work; our fork adds governance, per-user
+> isolation and a client-deployable packaging on top. Start at
+> [SynthPulse fork](#synthpulse-fork-team-dashboard-of-the-agentic-workstation),
+> or go straight to [docs/SYNTHPULSE.md](docs/SYNTHPULSE.md).
+
 Layout: three-panel. Left sidebar for sessions and navigation, center for chat,
 right for workspace file browsing. Model, profile, and workspace controls live in
 the **composer footer** — always visible while composing. A circular context ring
@@ -45,11 +51,65 @@ This gives you nearly **1:1 parity with Hermes CLI from a convenient web UI** wh
 
 ---
 
+## SynthPulse fork: team dashboard of the Agentic Workstation
+
+*This section, and the `docs/SYNTHPULSE*.md` files it links to, describe the
+Synthwave Solutions fork. Everything else in this README is upstream
+documentation for the application itself.*
+
+This fork is the **SynthPulse WebUI**: the governed, multi-user team dashboard of
+the SynthPulse Agentic Workstation. Upstream gives one person a full-featured web
+interface to their own agent. Our additions turn that into a surface a client's
+whole team can share:
+
+- **Route governance.** A whitelist-first, deny-by-default policy (`off`,
+  `report_only`, `enforce`) evaluated on every API request from a policy file
+  shared with the engine, with roles, groups, per-user grants and per-user deny
+  toggles. Lives in `api/governance/` plus one hook in `server.py`.
+- **Per-user data isolation.** Sessions, projects, workspaces and skills are
+  owned: a person sees their own, never someone else's. Ownership is stamped at
+  creation from the authenticated identity.
+- **Skill approvals.** Anyone may add a skill; it starts `pending` and visible
+  only to its owner and to admins until an admin approves it.
+- **Workspaces as a grant category**, so what the workspace picker may show comes
+  from the policy rather than from a file next to it.
+- **Admin surface.** `/api/governance/*` plus a `static/governance.js` panel
+  (overview, users, groups, workspaces, approvals, preview access, audit),
+  admin-only and enforced server side.
+- **Login posture for a deployment.** OIDC with just-in-time provisioning of a
+  verified identity, an optional mandatory two-step SSO-then-password flow, and
+  a password break-glass that keeps an operator out of a locked deployment.
+- **Deployment behaviour.** A hidden-tabs baseline
+  (`HERMES_WEBUI_DEFAULT_HIDDEN_TABS`) with the server value authoritative at
+  boot, the update banner removed (image tags are the update mechanism), and the
+  SynthPulse brand overlay.
+
+How it reaches a client: the hub repository `synthpulse-agentic-workstation`
+builds a pinned commit of this fork into
+`ghcr.io/synthwave-solutions/synthpulse-webui` with `Dockerfile.webui`, which is
+`FROM` the core image because this application imports the engine in-process, and
+pins the commit in `ARG SP_WEBUI_REF`. The container publishes no host port: it is
+reached only through the ingress reverse proxy.
+
+Read next:
+
+| Document | Contents |
+|---|---|
+| [docs/SYNTHPULSE.md](docs/SYNTHPULSE.md) | Product placement, how the image is built and published, local run and build, CI, configuration and secrets, repository layout |
+| [docs/SYNTHPULSE-GOVERNANCE.md](docs/SYNTHPULSE-GOVERNANCE.md) | Code-level reference for governance, isolation, approvals, workspaces and the auth posture |
+| [docs/SYNTHPULSE-UPSTREAM.md](docs/SYNTHPULSE-UPSTREAM.md) | What is ours versus upstream, the licence, the refresh procedure, recurring conflicts and known drift |
+
+For anything client-facing (turn-on via `client.yaml`, backup, the policy apply
+chain, troubleshooting) see the hub repo `docs/WEBUI.md`.
+
+---
+
 ## Contents
 
 [<img width="750" alt="image" src="https://github.com/user-attachments/assets/7e9544a7-ba47-4fc7-8142-1d9d16b17065" />
 ](https://get-hermes.ai/setup/) 
 
+- [SynthPulse fork](#synthpulse-fork-team-dashboard-of-the-agentic-workstation): what this fork adds, and how it ships to a client
 - [Why Hermes](#why-hermes) — what it is and how it compares
 - [Quick start](#quick-start) — clone + `bootstrap.py` / `start.sh` / `ctl.sh`
 - [Features](#features) — chat, sessions, workspace, voice, profiles, security, themes, panels, mobile
@@ -694,6 +754,12 @@ The WebUI is still coupled to Hermes Agent internals for runtime execution, prov
 - [`docs/UIUX-GUIDE.md`](docs/UIUX-GUIDE.md) — UI/UX principles sourced from the design docs and visual inventories
 - [`docs/CONTRACTS.md`](docs/CONTRACTS.md) — project contract/RFC/design index for contributors and agents
 - [`docs/rfcs/README.md`](docs/rfcs/README.md) — RFC index for larger architecture and durability proposals
+
+**SynthPulse fork (this fork only)**
+- [`docs/SYNTHPULSE.md`](docs/SYNTHPULSE.md) : product placement, image build and publish, local run, CI, configuration, layout
+- [`docs/SYNTHPULSE-GOVERNANCE.md`](docs/SYNTHPULSE-GOVERNANCE.md) : governance, per-user isolation, skill approvals, workspaces, auth posture
+- [`docs/SYNTHPULSE-UPSTREAM.md`](docs/SYNTHPULSE-UPSTREAM.md) : fork relationship, licence, refresh procedure, recurring conflicts, known drift
+- [`docs/governance-port-design.md`](docs/governance-port-design.md), [`docs/user-isolation-design.md`](docs/user-isolation-design.md) : the original design notes and decision log
 
 **Release history & plan**
 - [`CHANGELOG.md`](CHANGELOG.md) — release notes per version
