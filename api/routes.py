@@ -1609,6 +1609,37 @@ def _available_cron_profile_names() -> set[str]:
     return names
 
 
+def _cron_admin_allowed(handler) -> bool:
+    """Whether the caller may schedule/inspect cron jobs across profiles.
+
+    Granted by the ``cron:admin`` permission (bootstrap admins pass inside the
+    governance helper). Fails open only when governance itself fails open.
+    """
+    try:
+        from api.governance.enforce import _request_identity, identity_has_permission
+        return identity_has_permission(_request_identity(handler), "cron:admin")
+    except Exception:
+        logger.warning("cron admin governance check failed", exc_info=True)
+        return False
+
+
+def _cron_profile_target_allowed(handler, profile: str) -> bool:
+    """Body-sink guard for the cron ``profile`` target field.
+
+    A caller may aim a job at a profile they are scoped for; ``cron:admin``
+    (or bootstrap admin) unlocks every profile.
+    """
+    try:
+        from api.governance.enforce import _request_identity, is_profile_allowed_for
+        identity = _request_identity(handler)
+        if is_profile_allowed_for(identity, profile):
+            return True
+    except Exception:
+        logger.warning("cron profile governance check failed for %s", profile, exc_info=True)
+        return False
+    return _cron_admin_allowed(handler)
+
+
 def _normalize_cron_profile_value(value) -> str | None:
     if value is None:
         return None
@@ -12687,7 +12718,7 @@ def handle_get(handler, parsed) -> bool:
             if exc.name in ("cron", "cron.jobs"):
                 return j(handler, {"jobs": [], "cron_unavailable": True})
             raise
-        all_profiles = _all_profiles_enabled(parsed)
+        all_profiles = _all_profiles_enabled(parsed) and _cron_admin_allowed(handler)
         jobs = active_jobs + other_jobs if all_profiles else active_jobs
         hidden_other_count = 0 if all_profiles else len(other_jobs)
         return j(handler, {
@@ -20834,6 +20865,8 @@ def _handle_cron_create(handler, body):
         from cron.jobs import create_job, update_job
 
         profile = _normalize_cron_profile_value(body.get("profile"))
+        if profile is not None and not _cron_profile_target_allowed(handler, profile):
+            return bad(handler, "profile_not_allowed", 403)
         toast_notifications = body.get("toast_notifications") is not False
         requested_model = body.get("model") or None
         requested_provider = body.get("provider") or None
@@ -20893,7 +20926,10 @@ def _handle_cron_update(handler, body):
             if k == "job_id":
                 continue
             if k == "profile":
-                updates[k] = _normalize_cron_profile_value(v)
+                target = _normalize_cron_profile_value(v)
+                if target is not None and not _cron_profile_target_allowed(handler, target):
+                    return bad(handler, "profile_not_allowed", 403)
+                updates[k] = target
             elif k in ("model", "provider"):
                 updates[k] = v if v else None
             elif v is not None:

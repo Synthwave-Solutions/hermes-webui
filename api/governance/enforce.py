@@ -185,6 +185,28 @@ def is_profile_allowed_for(identity: dict | None, profile: str) -> bool:
     return access.is_profile_allowed(target)
 
 
+def identity_has_permission(identity: dict | None, permission: str) -> bool:
+    """Body-sink permission check, mirroring is_profile_allowed_for semantics.
+
+    Endpoints that gate an in-body capability (e.g. the cron ``profile`` target,
+    which the route-level enforce hook cannot see) call this to reuse the
+    resolver. Fails OPEN when governance is off / not loaded / the bootstrap
+    admin is the caller; fails CLOSED only when a loaded, enabled policy does
+    not grant the permission.
+    """
+    try:
+        policy = loader.get_policy()
+    except Exception:
+        return True
+    if not policy.enabled:
+        return True
+    subject = subject_from_identity(identity)
+    if subject.normalized_email and subject.normalized_email in {a.lower() for a in policy.bootstrap_admins}:
+        return True
+    access = resolve_effective_access(policy, subject)
+    return access.has_permission(permission)
+
+
 def _auth_disabled_identity() -> dict:
     """Trusted local single-user mode: map the request to the bootstrap admin
     so governance cannot brick an auth-off install."""
