@@ -134,6 +134,7 @@ ROUTE_CATALOG: tuple[RouteRule, ...] = (
     RouteRule("/api/model",               "model:read", "model:write"),
     RouteRule("/api/default-model",       "model:write", "model:write", match="exact"),
     RouteRule("/api/providers",           "config:read", "config:write"),
+    RouteRule("/api/integrations",        "config:read", "config:write"),
     RouteRule("/api/provider",            "analytics:read"),
     RouteRule("/api/personalities",       "config:read", match="exact"),
     RouteRule("/api/personality",         "config:write", "config:write"),

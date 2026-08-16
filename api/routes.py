@@ -12543,6 +12543,30 @@ def handle_get(handler, parsed) -> bool:
         }
         return j(handler, {"git": info})
 
+    if parsed.path == "/api/integrations/catalog":
+        from api.integrations import get_catalog
+        from api.ownership import request_is_admin, request_owner_email
+
+        if request_owner_email(handler) is None and not request_is_admin(handler):
+            return j(handler, {"error": "authentication required"}, status=401)
+        try:
+            return j(handler, get_catalog())
+        except RuntimeError as e:
+            return bad(handler, _sanitize_error(e), 502)
+
+    if parsed.path == "/api/integrations/connections":
+        from api.integrations import list_connections
+        from api.ownership import request_is_admin, request_owner_email
+
+        owner = request_owner_email(handler)
+        is_admin = request_is_admin(handler)
+        if owner is None and not is_admin:
+            return j(handler, {"error": "authentication required"}, status=401)
+        try:
+            return j(handler, {"connections": list_connections(owner, is_admin=is_admin)})
+        except RuntimeError as e:
+            return bad(handler, _sanitize_error(e), 502)
+
     if parsed.path == "/api/commands":
         from api.commands import list_commands
         return j(handler, {"commands": list_commands()})
@@ -14454,6 +14478,23 @@ def handle_post(handler, parsed) -> bool:
         except RuntimeError as e:
             return bad(handler, _sanitize_error(e), 500)
 
+    if parsed.path == "/api/integrations/connect":
+        from api.integrations import create_connect_session
+        from api.ownership import request_is_admin, request_owner_email
+
+        owner = request_owner_email(handler)
+        if owner is None and not request_is_admin(handler):
+            return j(handler, {"error": "authentication required"}, status=401)
+        provider_config_key = str(body.get("provider_config_key", "") or "").strip()
+        if not provider_config_key:
+            return bad(handler, "provider_config_key is required")
+        try:
+            return j(handler, create_connect_session(owner, provider_config_key))
+        except ValueError as e:
+            return bad(handler, str(e), 400)
+        except RuntimeError as e:
+            return bad(handler, _sanitize_error(e), 502)
+
     if parsed.path == "/api/commands/exec":
         from api.commands import execute_agent_command, execute_plugin_command
 
@@ -15620,6 +15661,35 @@ def handle_delete(handler, parsed) -> bool:
         prompts = [p for p in _load_saved_prompts() if p.get("id") != pid]
         _save_saved_prompts(prompts)
         return j(handler, {"ok": True})
+
+    if parsed.path.startswith("/api/integrations/connections/"):
+        from urllib.parse import unquote
+
+        from api.integrations import delete_connection
+        from api.ownership import request_is_admin, request_owner_email
+
+        owner = request_owner_email(handler)
+        is_admin = request_is_admin(handler)
+        if owner is None and not is_admin:
+            return j(handler, {"error": "authentication required"}, status=401)
+        connection_id = unquote(parsed.path[len("/api/integrations/connections/"):])
+        qs = parse_qs(parsed.query or "")
+        provider_config_key = (qs.get("provider_config_key") or [""])[0]
+        try:
+            return j(
+                handler,
+                delete_connection(
+                    owner, connection_id, provider_config_key, is_admin=is_admin
+                ),
+            )
+        except ValueError as e:
+            return bad(handler, str(e), 400)
+        except PermissionError as e:
+            return bad(handler, str(e), 403)
+        except KeyError as e:
+            return bad(handler, str(e.args[0]) if e.args else "not found", 404)
+        except RuntimeError as e:
+            return bad(handler, _sanitize_error(e), 502)
 
     if parsed.path.startswith("/api/kanban/"):
         from api.kanban_bridge import handle_kanban_delete
