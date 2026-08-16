@@ -31,7 +31,7 @@ import socket as _socket
 from collections import defaultdict
 from pathlib import Path
 from contextlib import closing
-from urllib.parse import parse_qs, quote, urljoin, urlsplit
+from urllib.parse import parse_qs, quote, unquote, urljoin, urlsplit
 from urllib.error import HTTPError, URLError
 from urllib.request import HTTPRedirectHandler, HTTPSHandler, ProxyHandler, Request, build_opener
 from api.agent_sessions import (
@@ -12557,6 +12557,31 @@ def handle_get(handler, parsed) -> bool:
             return j(handler, get_catalog(owner, is_admin=is_admin))
         except RuntimeError as e:
             return bad(handler, _sanitize_error(e), 502)
+
+    if parsed.path.startswith("/api/integrations/logo/"):
+        # Provider logo proxied from Nango so the grid stays same-origin (CSP)
+        # and works for browsers with no route to the Nango port.
+        from api.integrations import get_provider_logo
+        from api.ownership import request_is_admin, request_owner_email
+
+        if request_owner_email(handler) is None and not request_is_admin(handler):
+            return j(handler, {"error": "authentication required"}, status=401)
+        key = parsed.path[len("/api/integrations/logo/") :]
+        try:
+            body, ctype = get_provider_logo(unquote(key))
+        except KeyError:
+            return bad(handler, "unknown provider logo", 404)
+        except RuntimeError as e:
+            return bad(handler, _sanitize_error(e), 502)
+        handler.send_response(200)
+        handler.send_header("Content-Type", ctype)
+        handler.send_header("Content-Length", str(len(body)))
+        # Immutable per provider; let the browser keep them for a day.
+        handler.send_header("Cache-Control", "private, max-age=86400")
+        handler.send_header("X-Content-Type-Options", "nosniff")
+        handler.end_headers()
+        handler.wfile.write(body)
+        return True
 
     if parsed.path == "/api/integrations/connections":
         from api.integrations import list_connections

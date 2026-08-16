@@ -386,8 +386,14 @@ function _intgRenderGrid() {
     const docs = (!p.configured && p.docs)
       ? '<a class="intg-docs-link" href="' + _intgEsc(p.docs) + '" target="_blank" rel="noopener noreferrer">' + _intgEsc(_intgT('integrations_docs', 'Docs')) + '</a>'
       : '';
+    // Same-origin logo proxied by our backend; hide the img on a 404 so
+    // providers without a logo fall back to the plain text card.
+    const logo = p.logo
+      ? '<img class="intg-card-logo" src="' + _intgEsc(p.logo) + '" alt="" loading="lazy" onerror="this.remove()">'
+      : '';
     return '<div class="intg-card' + (p.configured ? ' configured' : '') + '">'
-      + '<div class="intg-card-name">' + _intgEsc(p.display_name || p.key) + '</div>'
+      + '<div class="intg-card-head">' + logo
+      + '<div class="intg-card-name">' + _intgEsc(p.display_name || p.key) + '</div></div>'
       + '<div class="intg-card-key">' + _intgEsc(p.key) + '</div>'
       + '<div class="intg-card-badges">' + badges + '</div>'
       + '<div class="intg-card-actions">' + action + docs + '</div>'
@@ -434,6 +440,24 @@ function _intgMarkPending(providerConfigKey) {
 }
 
 async function _intgConnect(providerConfigKey) {
+  // Open the popup SYNCHRONOUSLY, inside the click's user-gesture stack, and
+  // navigate it once the session token arrives. Opening it after the await
+  // instead is what browsers block by default: the window.open no longer
+  // counts as user-initiated, and the click silently did nothing.
+  let popup = null;
+  try {
+    popup = window.open('about:blank', 'hermesNangoConnect', 'popup=yes,width=480,height=720');
+  } catch (_) { popup = null; }
+  if (popup) {
+    try {
+      popup.document.write(
+        '<!doctype html><meta charset="utf-8"><title>Connecting…</title>' +
+        '<body style="font:14px system-ui;padding:24px;color:#333">Preparing the secure connect window…</body>'
+      );
+    } catch (_) { /* cross-origin write can fail harmlessly */ }
+  }
+  const closePopup = () => { try { if (popup && !popup.closed) popup.close(); } catch (_) {} };
+
   let data;
   try {
     // Session tokens expire after 30 minutes (Nango hardcoded); mint a fresh
@@ -444,11 +468,13 @@ async function _intgConnect(providerConfigKey) {
       redirect401: false,
     });
   } catch (e) {
+    closePopup();
     if (typeof showToast === 'function') showToast((e && e.message) || 'connect failed', 5000, 'error');
     return;
   }
   // 202: the request was queued for an admin instead of minting a session.
   if (data && String(data.status || '') === 'pending_approval') {
+    closePopup();
     if (typeof showToast === 'function') {
       showToast(_intgT('integrations_access_requested', 'Access requested. An admin has to approve it.'), 5000);
     }
@@ -459,16 +485,28 @@ async function _intgConnect(providerConfigKey) {
   const base = String((data && data.connect_url) || '').replace(/\/+$/, '');
   const token = String((data && data.token) || '');
   if (!base || !token) {
+    closePopup();
     if (typeof showToast === 'function') showToast(_intgT('integrations_connect_failed', 'Connect session could not be created.'), 5000, 'error');
     return;
   }
   const apiUrl = _intgApiUrlFor(base);
   let url = base + '/?session_token=' + encodeURIComponent(token);
   if (apiUrl) url += '&apiURL=' + encodeURIComponent(apiUrl);
-  const popup = window.open(url, 'hermesNangoConnect', 'popup=yes,width=480,height=720');
-  if (!popup) {
-    if (typeof showToast === 'function') showToast(_intgT('integrations_popup_blocked', 'Popup blocked - allow popups for this site and try again.'), 6000, 'error');
-    return;
+  if (!popup || popup.closed) {
+    // Blocked, or the user closed the placeholder. Try once more now that we
+    // have the URL, and fall back to telling them rather than failing silently.
+    try { popup = window.open(url, 'hermesNangoConnect', 'popup=yes,width=480,height=720'); } catch (_) { popup = null; }
+    if (!popup) {
+      if (typeof showToast === 'function') showToast(_intgT('integrations_popup_blocked', 'Popup blocked: allow popups for this site and try again.'), 6000, 'error');
+      return;
+    }
+  } else {
+    try {
+      popup.location.replace(url);
+    } catch (_) {
+      try { popup.location.href = url; } catch (_) { closePopup(); return; }
+    }
+    try { popup.focus(); } catch (_) {}
   }
   _intgPopup = popup;
   _intgStartPolling();

@@ -7491,6 +7491,8 @@ html,body{background:var(--bg)!important;color:var(--text);font-family:var(--fon
 .intg-card{border:1px solid var(--border);border-radius:12px;padding:14px;background:var(--input-bg);display:flex;flex-direction:column;gap:6px;transition:border-color .15s ease;}
 .intg-card.configured:hover{border-color:var(--accent);}
 .intg-card:not(.configured){opacity:.72;}
+.intg-card-head{display:flex;align-items:center;gap:8px;}
+.intg-card-logo{width:24px;height:24px;flex:0 0 24px;object-fit:contain;border-radius:5px;background:#fff;padding:2px;}
 .intg-card-name{font-size:14px;font-weight:700;color:var(--text);line-height:1.3;}
 .intg-card-key{font-family:var(--mono,monospace);font-size:11px;color:var(--muted);}
 .intg-card-badges{display:flex;flex-wrap:wrap;gap:4px;min-height:18px;}

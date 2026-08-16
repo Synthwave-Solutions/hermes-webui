@@ -61,6 +61,8 @@ _NANGO_CONNECTIONS_LIMIT = 2000
 # Bound on any Nango response body we are willing to buffer (providers.yaml
 # derived catalogs and 2000-connection listings fit comfortably).
 _MAX_RESPONSE_BYTES = 8 * 1024 * 1024
+# Provider logos are small SVGs; anything larger is not a logo.
+_LOGO_MAX_BYTES = 512 * 1024
 
 # Fields the catalog surfaces from each providers.yaml entry. ``alias`` is
 # consumed during resolution and never surfaced.
@@ -517,7 +519,57 @@ def _catalog_item(key: str, entry: dict) -> dict:
         "docs": str(entry.get("docs") or ""),
         "configured": False,
         "unique_key": None,
+        # Served through our own backend rather than linking straight at the
+        # Nango host: the browser then needs no route to the Nango port, and
+        # the URL stays same-origin so the dashboard CSP never blocks it.
+        "logo": f"/api/integrations/logo/{urllib.parse.quote(key, safe='')}",
     }
+
+
+# Provider logos are small static SVGs; cache them in-process so a 951-tile
+# grid does not hammer Nango on every page load.
+_LOGO_CACHE: dict[str, tuple[bytes, str]] = {}
+_LOGO_CACHE_MAX = 1200
+_LOGO_KEY_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$")
+
+
+def get_provider_logo(key: str) -> tuple[bytes, str]:
+    """Return (bytes, content_type) for a provider logo, via Nango.
+
+    Raises KeyError for an unusable key and RuntimeError when Nango cannot be
+    reached, so the route can answer 404/502 in the house style.
+    """
+    key = str(key or "").strip()
+    if not _LOGO_KEY_RE.match(key):
+        raise KeyError(key)
+    cached = _LOGO_CACHE.get(key)
+    if cached is not None:
+        return cached
+    base = _nango_api_url().rstrip("/")
+    url = f"{base}/images/template-logos/{urllib.parse.quote(key, safe='')}.svg"
+    req = urllib.request.Request(url, method="GET")
+    try:
+        with _OPENER.open(req, timeout=_NANGO_TIMEOUT_SECONDS) as resp:
+            if resp.status != 200:
+                raise KeyError(key)
+            body = resp.read(_LOGO_MAX_BYTES + 1)
+            ctype = resp.headers.get("Content-Type") or "image/svg+xml"
+            # Nango answers unknown logos with its SPA index (200 text/html);
+            # only real images may pass, or every broken tile caches junk.
+            if "image" not in ctype.split(";", 1)[0]:
+                raise KeyError(key)
+    except urllib.error.HTTPError as e:
+        raise KeyError(key) from e
+    except KeyError:
+        raise
+    except Exception as e:  # network/DNS/timeout
+        raise RuntimeError(f"could not reach Nango for logo {key}: {e}") from e
+    if len(body) > _LOGO_MAX_BYTES:
+        raise KeyError(key)
+    if len(_LOGO_CACHE) >= _LOGO_CACHE_MAX:
+        _LOGO_CACHE.clear()
+    _LOGO_CACHE[key] = (body, ctype)
+    return _LOGO_CACHE[key]
 
 
 def get_catalog(owner_email: str | None = None, *, is_admin: bool = False) -> dict:
