@@ -15,6 +15,17 @@ their own. Admins (api.ownership.identity_is_admin) see all connections.
 This holds in ALL governance modes (off / report_only / enforce), mirroring
 the ownership rules elsewhere in the webui.
 
+Approval gate (api/approvals.py, kind ``integration``): being configured in
+Nango is no longer enough for a non-admin to connect a provider. A provider
+must ALSO be approved before a self-service connect mints a session; an
+unapproved provider turns the connect call into a pending request that an
+admin decides from the governance approvals queue. Admins bypass the gate,
+and an admin connecting a provider implicitly approves it for everyone (see
+create_connect_session). Providers that were never requested are "none":
+approval is a per-provider, globally shared decision, not a per-connection
+one, so an approved provider is one-click for every user afterwards and
+existing connections are never touched.
+
 Config (env, read at call time so profile .env switches are honoured):
 
 - ``HERMES_WEBUI_NANGO_API_URL``        Nango server base URL
@@ -54,6 +65,24 @@ _MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 # Fields the catalog surfaces from each providers.yaml entry. ``alias`` is
 # consumed during resolution and never surfaced.
 _SCALAR_FIELDS = ("display_name", "auth_mode", "docs", "alias")
+
+# ── Approval gate constants ─────────────────────────────────────────────────
+# Connect outcomes. "ready" carries a Nango session token; "pending_approval"
+# never does (the route answers it with HTTP 202).
+CONNECT_STATUS_READY = "ready"
+CONNECT_STATUS_PENDING = "pending_approval"
+
+# Catalog ``approval`` values. Deliberately only three, so the UI has one
+# field to switch a button on: anything that is not "approved" or "pending"
+# is "none" (never requested, or requested and rejected). The raw registry
+# status stays available as ``approval_status``.
+APPROVAL_APPROVED = "approved"
+APPROVAL_PENDING = "pending"
+APPROVAL_NONE = "none"
+
+# Owner recorded for an implicit admin approval on an identity-less install
+# (auth disabled / local single-user), where there is no email to attribute.
+_ADMIN_OWNER_FALLBACK = "admin"
 
 
 # ── Config (env read at call time; profile .env loads into os.environ) ───────
@@ -317,6 +346,167 @@ def load_provider_entries() -> dict[str, dict]:
     return resolved
 
 
+# ── Approval gate (api/approvals.py, kind "integration") ────────────────────
+
+def _approval_entries() -> dict[str, dict]:
+    """Every integration approval entry as {provider_config_key: entry}.
+
+    Total by design: a missing or corrupt registry degrades to "nothing was
+    ever requested" so the catalog still renders.
+    """
+    try:
+        from api import approvals
+
+        rows = approvals.list_all(kinds=approvals.KIND_INTEGRATION)
+    except Exception:
+        logger.debug("Failed to read integration approvals", exc_info=True)
+        return {}
+    out: dict[str, dict] = {}
+    for entry in rows:
+        key = str(entry.get("key") or "").strip()
+        if key:
+            out[key] = entry
+    return out
+
+
+def _approval_view(entry: dict | None, owner_email: str | None, *, is_admin: bool = False) -> dict:
+    """The approval fields the catalog and the connect endpoint both return.
+
+    An integration approval enables a provider for the whole install, so its
+    pending/approved state is not private and is shown to every caller; only
+    the requester's email is narrowed to that requester and to admins.
+    """
+    from api import approvals
+
+    caller = str(owner_email or "").strip().lower()
+    view = {
+        "approval": APPROVAL_NONE,
+        "approval_status": None,
+        "approval_reason": None,
+        "approval_owner": None,
+        "requested_by_me": False,
+    }
+    if not isinstance(entry, dict):
+        return view
+    status = str(entry.get("status") or "").strip().lower() or None
+    owner = str(entry.get("owner_email") or "").strip().lower() or None
+    mine = bool(caller) and caller == owner
+    approved = status == approvals.STATUS_APPROVED and (
+        # Owner-scoped approvals (payload {"scope": "owner"}) only count for
+        # their requester; integrations request globally, but an admin may
+        # narrow one, so honour it here too.
+        approvals.approval_scope(entry) != approvals.SCOPE_OWNER
+        or is_admin
+        or mine
+    )
+    if approved:
+        view["approval"] = APPROVAL_APPROVED
+    elif status == approvals.STATUS_PENDING:
+        view["approval"] = APPROVAL_PENDING
+    view["approval_status"] = status
+    view["approval_reason"] = entry.get("reason") or None
+    view["approval_owner"] = owner if (is_admin or mine) else None
+    view["requested_by_me"] = mine
+    return view
+
+
+def provider_approval(
+    provider_config_key: str,
+    owner_email: str | None = None,
+    *,
+    is_admin: bool = False,
+) -> dict:
+    """Approval view of a single provider from one caller's point of view."""
+    key = str(provider_config_key or "").strip()
+    return _approval_view(_approval_entries().get(key), owner_email, is_admin=is_admin)
+
+
+def _provider_label(key: str) -> str:
+    """Human-readable provider name for an approval row (falls back to the key)."""
+    try:
+        entry = load_provider_entries().get(key)
+    except RuntimeError:
+        entry = None
+    if isinstance(entry, dict):
+        name = str(entry.get("display_name") or "").strip()
+        if name:
+            return name
+    return key
+
+
+def _record_admin_approval(key: str, admin_email: str | None, entry: dict | None) -> None:
+    """Implicitly approve a provider because an admin connected it.
+
+    An admin already has the authority to decide this request, and clicking
+    connect IS that decision: recording it means the next (non-admin) user
+    gets a one-click connect instead of a queue entry an admin would only
+    rubber-stamp. A previously rejected provider is re-approved the same way,
+    since the admin is deliberately overriding the earlier decision. Never
+    raises: bookkeeping must not break an admin's own connect.
+    """
+    try:
+        from api import approvals
+
+        owner = str(admin_email or "").strip().lower() or _ADMIN_OWNER_FALLBACK
+        decider = str(admin_email or "").strip().lower() or _ADMIN_OWNER_FALLBACK
+        if not isinstance(entry, dict):
+            approvals.request(
+                approvals.KIND_INTEGRATION, key, owner, label=_provider_label(key)
+            )
+            entry = None
+        if not isinstance(entry, dict) or str(entry.get("status") or "") != approvals.STATUS_APPROVED:
+            approvals.decide(
+                approvals.KIND_INTEGRATION,
+                key,
+                approvals.DECISION_APPROVE,
+                decided_by=decider,
+                reason="approved implicitly by an admin connecting this provider",
+            )
+    except Exception:
+        logger.warning("Failed to record implicit admin approval for %s", key, exc_info=True)
+
+
+def request_provider_approval(owner_email: str | None, provider_config_key: str) -> dict:
+    """Record a pending approval request for a provider (no Nango session).
+
+    Used by the request-only endpoint and by the connect path when the
+    provider is not approved yet. Idempotent through api.approvals.request:
+    a second request never resets a status or reassigns the owner.
+    """
+    from api import approvals
+
+    key = str(provider_config_key or "").strip()
+    if not key:
+        raise ValueError("provider_config_key is required")
+    owner = str(owner_email or "").strip().lower()
+    if not owner:
+        raise PermissionError("authentication required to request an integration")
+    label = _provider_label(key)
+    entry = approvals.request(approvals.KIND_INTEGRATION, key, owner, label=label)
+    view = _approval_view(entry, owner)
+    # request() is a no-op on an already decided provider, so report what the
+    # registry actually says instead of always claiming "pending".
+    if view["approval"] == APPROVAL_APPROVED:
+        message = f"{label} is approved: you can connect it now."
+        status = APPROVAL_APPROVED
+    elif view["approval_status"] == approvals.STATUS_REJECTED:
+        message = f"{label} was rejected by an admin."
+        if view["approval_reason"]:
+            message += f" Reason: {view['approval_reason']}"
+        status = approvals.STATUS_REJECTED
+    else:
+        message = f"{label} needs an admin approval before it can be connected."
+        status = CONNECT_STATUS_PENDING
+    return {
+        "status": status,
+        "provider_config_key": key,
+        "display_name": label,
+        "requested_at": entry.get("requested_at"),
+        "message": message,
+        **view,
+    }
+
+
 def _catalog_item(key: str, entry: dict) -> dict:
     categories = entry.get("categories")
     return {
@@ -330,13 +520,20 @@ def _catalog_item(key: str, entry: dict) -> dict:
     }
 
 
-def get_catalog() -> dict:
+def get_catalog(owner_email: str | None = None, *, is_admin: bool = False) -> dict:
     """Provider catalog merged with which providers have a Nango integration.
 
     Degrades gracefully: when the Nango API is down the yaml-derived catalog
     is still returned with every ``configured`` flag false and the failure
     surfaced under ``nango`` so the screen can render a banner instead of a
     hard error.
+
+    Every provider additionally carries the approval fields (``approval``,
+    ``approval_status``, ``approval_reason``, ``approval_owner``,
+    ``requested_by_me``) so the UI can render connect / waiting-for-admin /
+    request without a second round trip. Both arguments are optional and
+    default to an anonymous read, keeping the old ``get_catalog()`` call
+    shape working.
     """
     items = {
         key: _catalog_item(key, entry)
@@ -361,6 +558,13 @@ def get_catalog() -> dict:
     except NangoError as exc:
         logger.warning("Nango integrations fetch failed: %s", exc)
         nango = {"available": False, "error": str(exc)}
+    # Approval state is read once for the whole catalog (one registry read,
+    # not one per provider). The lookup prefers the Nango unique_key, since
+    # that is the provider_config_key the connect endpoint is called with.
+    entries = _approval_entries()
+    for item in items.values():
+        entry = entries.get(str(item.get("unique_key") or "")) or entries.get(item["key"])
+        item.update(_approval_view(entry, owner_email, is_admin=is_admin))
     providers = sorted(items.values(), key=lambda p: str(p["display_name"]).lower())
     return {"providers": providers, "nango": nango}
 
@@ -411,21 +615,63 @@ def list_connections(owner_email: str | None, *, is_admin: bool = False) -> list
     return out
 
 
-def create_connect_session(owner_email: str | None, provider_config_key: str) -> dict:
+def create_connect_session(
+    owner_email: str | None,
+    provider_config_key: str,
+    *,
+    is_admin: bool = False,
+) -> dict:
     """Mint a Nango connect session for the caller and one integration.
 
     Only integrations actually configured in Nango are allowed (the Nango
     server would also reject unknown keys, but validating here yields a clean
-    400 instead of a passthrough error). Returns ``{token, connect_url,
-    expires_at}``; the frontend opens ``connect_url`` with the token (session
-    tokens expire after 30 minutes, so a fresh session is minted per attempt).
+    400 instead of a passthrough error).
+
+    Approval gate, applied AFTER that check so an unknown key still 400s:
+
+    - approved provider  -> unchanged behaviour, returns ``{status: "ready",
+      token, connect_url, expires_at}`` and the frontend opens ``connect_url``
+      with the token (session tokens expire after 30 minutes, so a fresh
+      session is minted per attempt).
+    - not approved yet   -> NO session. The call records a pending request
+      (idempotently) and returns ``{status: "pending_approval", ...}``, which
+      the route answers with HTTP 202 so the UI can say "waiting for an
+      admin".
+    - rejected           -> PermissionError (-> 403) carrying the admin's
+      reason. Re-opening a rejected provider is an admin action, not a retry.
+    - admin caller       -> bypasses the gate entirely and its connect
+      IMPLICITLY APPROVES the provider globally (see _record_admin_approval),
+      so the next user gets a one-click connect.
+
+    Existing connections are untouched by all of this: the gate sits on
+    minting NEW sessions only, so providers that are already connected keep
+    working, and listing/deleting connections is unchanged.
     """
+    from api import approvals
+
     key = str(provider_config_key or "").strip()
     if not key:
         raise ValueError("provider_config_key is required")
     configured = {str(row.get("unique_key") or "") for row in _list_integrations()}
     if key not in configured:
         raise ValueError(f"integration '{key}' is not configured in Nango")
+
+    entry = _approval_entries().get(key)
+    view = _approval_view(entry, owner_email, is_admin=is_admin)
+    if is_admin:
+        _record_admin_approval(key, owner_email, entry)
+    elif view["approval"] != APPROVAL_APPROVED:
+        if view["approval_status"] == approvals.STATUS_REJECTED:
+            label = _provider_label(key)
+            reason = view["approval_reason"]
+            raise PermissionError(
+                f"{label} was rejected by an admin"
+                + (f": {reason}" if reason else "")
+            )
+        # Not approved (and not rejected): record the ask, hand back a
+        # pending response instead of a session token.
+        return request_provider_approval(owner_email, key)
+
     end_user: dict[str, Any] = {"id": end_user_id(owner_email)}
     email = str(owner_email or "").strip().lower()
     # Nango requires a syntactically valid email of length >= 5 when present;
@@ -443,6 +689,8 @@ def create_connect_session(owner_email: str | None, provider_config_key: str) ->
     if not token:
         raise RuntimeError("Nango did not return a connect session token")
     return {
+        "status": CONNECT_STATUS_READY,
+        "approval": APPROVAL_APPROVED,
         "token": token,
         "connect_url": _nango_connect_url(),
         "expires_at": data.get("expires_at"),

@@ -744,7 +744,7 @@ def _handle_user_delete(handler, parsed, policy, subject, access) -> bool:
     return _mutate_policy(handler, parsed, subject, op="user_delete", target=email, mutate=mutate)
 
 
-# ── Skill approvals ──────────────────────────────────────────────────────────
+# ── Approvals (skills + self-service installs) ───────────────────────────────
 
 def _skill_key_parts(key) -> tuple | None:
     """Split a registry skill key into (category, name), or None when malformed.
@@ -787,46 +787,213 @@ def _audit_approval(subject: GovernanceSubject, mode: str, parsed, *, op: str, k
         return
 
 
-def _handle_approvals_get(handler, parsed, policy, subject, access) -> bool:
-    """Pending user-added skills awaiting an admin decision."""
-    if not _require_governance_admin(handler, access, subject, policy):
-        return True
-    from api import skill_ownership
+def _approval_row(entry: dict) -> dict:
+    """Serialize a registry entry for the approvals API.
 
-    pending = []
-    for row in skill_ownership.list_pending():
-        key = str(row.get("key") or "")
+    The four fields the skills UI already binds to (key, name, category,
+    owner_email, added_at) keep their exact meaning and position; kind,
+    label, status, requested_at and payload are added on top so a client can
+    render the other install kinds without a second endpoint.
+    """
+    from api import approvals
+
+    kind = str(entry.get("kind") or approvals.KIND_SKILL).strip().lower()
+    key = str(entry.get("key") or "")
+    if kind == approvals.KIND_SKILL:
         parts = _skill_key_parts(key)
         category, name = parts if parts else (None, key)
-        pending.append(
-            {
-                "key": key,
-                "name": name,
-                "category": category,
-                "owner_email": row.get("owner_email"),
-                "added_at": row.get("added_at"),
-            }
-        )
+    else:
+        category, name = None, str(entry.get("label") or "").strip() or key
+    payload = entry.get("payload")
+    return {
+        "kind": kind,
+        "key": key,
+        "name": name,
+        "category": category,
+        "label": str(entry.get("label") or "").strip() or name,
+        "owner_email": entry.get("owner_email"),
+        "added_at": entry.get("requested_at"),
+        "requested_at": entry.get("requested_at"),
+        "status": entry.get("status"),
+        "decided_by": entry.get("decided_by"),
+        "decided_at": entry.get("decided_at"),
+        "reason": entry.get("reason"),
+        "payload": payload if isinstance(payload, dict) else {},
+    }
+
+
+def _approval_kinds_param(parsed) -> tuple | None:
+    """Optional ?kind= filter (repeatable and/or comma separated)."""
+    from api import approvals
+
+    raw = []
+    for value in parse_qs(parsed.query or "").get("kind", []):
+        raw.extend(part for part in str(value).split(","))
+    wanted = [k.strip().lower() for k in raw if k.strip()]
+    if not wanted:
+        return None
+    return tuple(k for k in wanted if k in approvals.KINDS) or ()
+
+
+def _handle_approvals_get(handler, parsed, policy, subject, access) -> bool:
+    """Pending self-service requests (skills, integrations, MCP, CLI).
+
+    Skill rows come from api/skill_ownership through the approvals adapter,
+    so the existing skills queue is unchanged; the other kinds come from the
+    STATE_DIR approvals registry. Optional ?kind= narrows the queue.
+    """
+    if not _require_governance_admin(handler, access, subject, policy):
+        return True
+    from api import approvals
+
+    kinds = _approval_kinds_param(parsed)
+    pending = [_approval_row(entry) for entry in approvals.list_pending(kinds=kinds)]
     j(handler, {"pending": pending})
     return True
 
 
-def _handle_approvals_decide(handler, parsed, policy, subject, access) -> bool:
-    """Approve or reject a pending user-added skill.
+def _handle_approvals_mine(handler, parsed, policy, subject, access) -> bool:
+    """The caller's OWN requests and their current status.
 
-    Approve flips the registry status to approved (the skill becomes global,
-    visible to everyone). Reject deletes the skill directory from disk and
-    removes the registry entry. Both paths are audited.
+    Deliberately not admin-gated: a non-admin must be able to see whether
+    what they asked for is still pending, approved or rejected. The response
+    is scoped to the caller's identity, so it never leaks another user's
+    requests, and the route is listed in catalog._SELF_ROUTES so a plain
+    authenticated session reaches it under enforce.
+    """
+    from api import approvals
+
+    email = subject.normalized_email or str(subject.email or "").strip().lower()
+    if not email:
+        # No identity email (auth disabled without bootstrap admins): nothing
+        # can be attributed to the caller, so the list is empty by definition.
+        j(handler, {"requests": [], "owner_email": None})
+        return True
+    kinds = _approval_kinds_param(parsed)
+    rows = [
+        _approval_row(entry)
+        for entry in approvals.list_all(kinds=kinds, owner_scope=email)
+    ]
+    j(handler, {"requests": rows, "owner_email": email})
+    return True
+
+
+def _handle_approvals_decide_generic(handler, parsed, policy, subject, body, kind) -> bool:
+    """Approve or reject a non-skill request through api/approvals.
+
+    Approve marks the entry approved (global, or owner-only when the request
+    payload carries {"scope": "owner"}); reject keeps the row as rejected so
+    the requester sees the outcome and the reason. Nothing is installed or
+    removed here: the surface that owns the kind (MCP, integrations, CLI)
+    reads api.approvals.is_approved before acting.
+    """
+    from api import approvals
+
+    key = str(body.get("key") or "").strip()
+    if not key:
+        j(handler, {"error": "invalid_payload", "message": "key is required"}, status=400)
+        return True
+    decision = str(body.get("decision") or "").strip().lower()
+    if decision not in ("approve", "reject"):
+        j(
+            handler,
+            {"error": "invalid_payload", "message": "decision must be 'approve' or 'reject'"},
+            status=400,
+        )
+        return True
+    reason = str(body.get("reason") or "").strip() or None
+
+    entry = approvals.get(kind, key)
+    if entry is None:
+        j(
+            handler,
+            {"error": "not_found", "message": f"unknown {kind} approval: {key}"},
+            status=404,
+        )
+        return True
+    owner = str(entry.get("owner_email") or "").strip().lower()
+    decided_by = subject.normalized_email or str(subject.email or "").strip().lower()
+    try:
+        updated = approvals.decide(kind, key, decision, decided_by, reason=reason)
+    except ValueError as exc:
+        j(handler, {"error": "invalid_payload", "message": str(exc)}, status=400)
+        return True
+    except KeyError:
+        j(
+            handler,
+            {"error": "not_found", "message": f"unknown {kind} approval: {key}"},
+            status=404,
+        )
+        return True
+    except OSError:
+        logger.exception("Failed to persist approval decision for %s:%s", kind, key)
+        j(
+            handler,
+            {"error": "internal_error", "message": "failed to persist the decision"},
+            status=500,
+        )
+        return True
+
+    if kind == approvals.KIND_MCP:
+        # Make the decision take effect on the MCP surface immediately.
+        # Approve installs the entry (idempotent, never overwrites an admin's
+        # own server) instead of waiting for someone to open the MCP panel;
+        # reject UNINSTALLS an already installed server, otherwise a rejected
+        # item stays live and "approved then rejected" is not revocable.
+        # Neither call can raise into this handler.
+        from api import mcp_requests
+
+        if decision == "approve":
+            mcp_requests.sync_approved_quietly(decided_by, path=parsed.path)
+        else:
+            mcp_requests.uninstall_quietly(key, decided_by, path=parsed.path)
+
+    op = "approvals.approve" if decision == "approve" else "approvals.reject"
+    _audit_approval(subject, policy.mode, parsed, op=op, key=f"{kind}:{key}", owner=owner)
+    j(
+        handler,
+        {
+            "ok": True,
+            "kind": kind,
+            "key": key,
+            "status": updated.get("status"),
+            "entry": _approval_row(updated),
+        },
+    )
+    return True
+
+
+def _handle_approvals_decide(handler, parsed, policy, subject, access) -> bool:
+    """Approve or reject a pending self-service request.
+
+    Skills keep their original semantics unchanged: approve flips the
+    skill_ownership status to approved (the skill becomes global, visible to
+    everyone), reject deletes the skill directory from disk and removes the
+    registry entry. The other kinds (integration, mcp, cli) are decided in
+    the approvals registry and installed by their own surface. All paths are
+    audited with the same approval_decision event.
     """
     if not _require_governance_admin(handler, access, subject, policy):
         return True
     body = _read_json(handler)
     if body is None:
         return True
+    from api import approvals
+
     kind = str(body.get("kind") or "").strip().lower()
-    if kind != "skill":
-        j(handler, {"error": "invalid_payload", "message": "kind must be 'skill'"}, status=400)
+    if kind not in approvals.KINDS:
+        j(
+            handler,
+            {
+                "error": "invalid_payload",
+                "message": "kind must be one of: " + ", ".join(approvals.KINDS),
+            },
+            status=400,
+        )
         return True
+    if kind != approvals.KIND_SKILL:
+        return _handle_approvals_decide_generic(handler, parsed, policy, subject, body, kind)
+
     key = str(body.get("key") or "").strip()
     if not key or _skill_key_parts(key) is None:
         j(handler, {"error": "invalid_payload", "message": "key must be a valid skill key"}, status=400)
@@ -904,6 +1071,7 @@ _GET_ROUTES = {
     "/api/governance/audit": _handle_audit_get,
     "/api/governance/usage": _handle_usage_get,
     "/api/governance/approvals": _handle_approvals_get,
+    "/api/governance/approvals/mine": _handle_approvals_mine,
 }
 
 _POST_ROUTES = {

@@ -12547,10 +12547,14 @@ def handle_get(handler, parsed) -> bool:
         from api.integrations import get_catalog
         from api.ownership import request_is_admin, request_owner_email
 
-        if request_owner_email(handler) is None and not request_is_admin(handler):
+        owner = request_owner_email(handler)
+        is_admin = request_is_admin(handler)
+        if owner is None and not is_admin:
             return j(handler, {"error": "authentication required"}, status=401)
         try:
-            return j(handler, get_catalog())
+            # Approval state is per caller (owner-scoped approvals, own
+            # requests), so the catalog is rendered from the caller's view.
+            return j(handler, get_catalog(owner, is_admin=is_admin))
         except RuntimeError as e:
             return bad(handler, _sanitize_error(e), 502)
 
@@ -12939,6 +12943,10 @@ def handle_get(handler, parsed) -> bool:
     # ── MCP Tools (GET) ──
     if parsed.path == "/api/mcp/tools":
         return _handle_mcp_tools_list(handler)
+
+    # ── MCP self-service requests (GET) ──
+    if parsed.path == "/api/mcp/requests":
+        return _handle_mcp_requests_list(handler)
 
     if parsed.path == "/api/notes/sources":
         return _handle_notes_sources_list(handler)
@@ -14479,21 +14487,59 @@ def handle_post(handler, parsed) -> bool:
             return bad(handler, _sanitize_error(e), 500)
 
     if parsed.path == "/api/integrations/connect":
-        from api.integrations import create_connect_session
+        from api.integrations import CONNECT_STATUS_PENDING, create_connect_session
         from api.ownership import request_is_admin, request_owner_email
 
         owner = request_owner_email(handler)
-        if owner is None and not request_is_admin(handler):
+        is_admin = request_is_admin(handler)
+        if owner is None and not is_admin:
             return j(handler, {"error": "authentication required"}, status=401)
         provider_config_key = str(body.get("provider_config_key", "") or "").strip()
         if not provider_config_key:
             return bad(handler, "provider_config_key is required")
         try:
-            return j(handler, create_connect_session(owner, provider_config_key))
+            result = create_connect_session(owner, provider_config_key, is_admin=is_admin)
         except ValueError as e:
             return bad(handler, str(e), 400)
+        except PermissionError as e:
+            return bad(handler, str(e), 403)
         except RuntimeError as e:
             return bad(handler, _sanitize_error(e), 502)
+        # 202: the request was accepted and is queued for an admin, but no
+        # session token was minted. Anything else is the unchanged 200 with
+        # the token.
+        if result.get("status") == CONNECT_STATUS_PENDING:
+            return j(handler, result, status=202)
+        return j(handler, result)
+
+    if parsed.path == "/api/integrations/request":
+        from api.integrations import CONNECT_STATUS_PENDING, request_provider_approval
+        from api.ownership import request_owner_email
+
+        owner = request_owner_email(handler)
+        if owner is None:
+            # Deliberately no admin fallback: an approval request must be
+            # attributable to the person who asked for it.
+            return j(handler, {"error": "authentication required"}, status=401)
+        provider_config_key = str(body.get("provider_config_key", "") or "").strip()
+        if not provider_config_key:
+            return bad(handler, "provider_config_key is required")
+        try:
+            result = request_provider_approval(owner, provider_config_key)
+        except ValueError as e:
+            return bad(handler, str(e), 400)
+        except PermissionError as e:
+            return bad(handler, str(e), 403)
+        if result.get("status") == CONNECT_STATUS_PENDING:
+            return j(handler, result, status=202)
+        return j(handler, result)
+
+    # ── MCP self-service (POST) ──
+    if parsed.path == "/api/mcp/servers/request":
+        return _handle_mcp_server_request(handler, body)
+
+    if parsed.path == "/api/mcp/servers/sync-approved":
+        return _handle_mcp_sync_approved(handler)
 
     if parsed.path == "/api/commands/exec":
         from api.commands import execute_agent_command, execute_plugin_command
@@ -25172,8 +25218,175 @@ def _handle_notes_item(handler, parsed):
         return j(handler, {"source": "joplin", "error": str(exc)}, status=502)
 
 
+def _mcp_configured_servers() -> dict:
+    """The active profile's mcp_servers mapping (always a dict)."""
+    servers = get_config().get("mcp_servers", {})
+    return servers if isinstance(servers, dict) else {}
+
+
+def _mcp_request_row(entry, servers=None) -> dict:
+    """Serialize an approvals entry of kind 'mcp' for the API."""
+    payload = entry.get("payload") if isinstance(entry.get("payload"), dict) else {}
+    name = str(entry.get("key") or "")
+    if servers is None:
+        servers = _mcp_configured_servers()
+    return {
+        "kind": "mcp",
+        "key": name,
+        "name": name,
+        "label": entry.get("label") or name,
+        "url": payload.get("url"),
+        "auth_header": payload.get("auth_header"),
+        "description": payload.get("description"),
+        "profile": payload.get("profile") or "",
+        "status": entry.get("status"),
+        "owner_email": entry.get("owner_email"),
+        "requested_at": entry.get("requested_at"),
+        "decided_by": entry.get("decided_by"),
+        "decided_at": entry.get("decided_at"),
+        "reason": entry.get("reason"),
+        "installed": name in servers,
+    }
+
+
+def _handle_mcp_requests_list(handler):
+    """Self-service MCP requests: the caller's own rows, all of them for admins."""
+    from api import mcp_requests
+    from api.ownership import request_owner_scope
+
+    scope = request_owner_scope(handler)
+    servers = _mcp_configured_servers()
+    if not scope:
+        # Identity without an email under isolation: owns nothing, sees
+        # nothing (an empty scope must never fall through to "no filter").
+        return j(handler, {"requests": [], "owner_scope": ""})
+    rows = [_mcp_request_row(entry, servers) for entry in mcp_requests.list_requests(scope)]
+    return j(handler, {"requests": rows, "owner_scope": scope})
+
+
+def _handle_mcp_server_request(handler, body):
+    """Request a remote MCP server (POST /api/mcp/servers/request).
+
+    Non-admins never write config.yaml here: the request is recorded as
+    pending and answered with 202. Admins bypass the queue (their own request
+    is approved on the spot, mirroring the integrations rule that an admin
+    performing the action IS the decision), and an already-approved request
+    is installed on this call so an approved server actually becomes active.
+    """
+    from api import approvals, mcp_requests
+    from api.ownership import request_is_admin, request_owner_email
+
+    owner = request_owner_email(handler)
+    is_admin = request_is_admin(handler)
+    if owner is None and not is_admin:
+        return j(handler, {"error": "authentication required"}, status=401)
+    # Identity-less local admin (auth disabled): attribute to "admin" so the
+    # request is still recorded instead of silently skipped.
+    requester = owner or "admin"
+    try:
+        mcp_requests.reject_secret_fields(body)
+        entry = mcp_requests.request_server(
+            requester,
+            body.get("name"),
+            body.get("url"),
+            body.get("auth_header"),
+            body.get("description"),
+            # An admin takes over a squatted name instead of inheriting the
+            # squatter's URL; a normal user gets 409 and must pick another name.
+            is_admin=is_admin,
+        )
+    except approvals.PayloadConflict as e:
+        return j(
+            handler,
+            {
+                "error": "name_taken",
+                "message": (
+                    "another request already uses this name for a different server; "
+                    "pick a different name or ask an admin"
+                ),
+                "existing": {
+                    "owner_email": e.entry.get("owner_email"),
+                    "status": e.entry.get("status"),
+                    "requested_at": e.entry.get("requested_at"),
+                },
+            },
+            status=409,
+        )
+    except ValueError as e:
+        return bad(handler, str(e), 400)
+    except PermissionError as e:
+        return bad(handler, str(e), 403)
+
+    name = str(entry.get("key") or "")
+    status = str(entry.get("status") or "")
+    if is_admin and status != approvals.STATUS_APPROVED:
+        try:
+            entry = approvals.decide(
+                approvals.KIND_MCP,
+                name,
+                approvals.DECISION_APPROVE,
+                decided_by=requester,
+                reason="approved implicitly by an admin adding this server",
+            )
+            status = str(entry.get("status") or "")
+        except Exception:
+            logger.warning("Implicit admin approval failed for MCP server %s", name, exc_info=True)
+    if status == approvals.STATUS_REJECTED:
+        message = f"MCP server '{name}' was rejected by an admin"
+        if entry.get("reason"):
+            message += f": {entry['reason']}"
+        return bad(handler, message, 403)
+    if status != approvals.STATUS_APPROVED:
+        return j(
+            handler,
+            {
+                "status": mcp_requests.STATUS_PENDING_APPROVAL,
+                "request": _mcp_request_row(entry),
+                "message": f"MCP server '{name}' needs an admin approval before it is added.",
+            },
+            status=202,
+        )
+    install = mcp_requests.sync_approved(requester, path="/api/mcp/servers/request")
+    installed = next((row for row in install["installed"] if row.get("name") == name), None)
+    return j(
+        handler,
+        {
+            "ok": True,
+            "status": mcp_requests.STATUS_ACTIVE,
+            "request": _mcp_request_row(entry),
+            "install": install,
+            "needs_secret": bool(installed and installed.get("needs_secret")),
+            "message": (
+                f"MCP server '{name}' is approved and was added disabled: set the "
+                "auth header value and enable it."
+                if installed and installed.get("needs_secret")
+                else f"MCP server '{name}' is approved and configured."
+            ),
+        },
+    )
+
+
+def _handle_mcp_sync_approved(handler):
+    """Install every approved MCP request into config.yaml (admin only)."""
+    from api import mcp_requests
+    from api.ownership import request_is_admin, request_owner_email
+
+    if not request_is_admin(handler):
+        return bad(handler, "admin required", 403)
+    result = mcp_requests.sync_approved(
+        request_owner_email(handler), path="/api/mcp/servers/sync-approved"
+    )
+    return j(handler, {"ok": True, **result})
+
+
 def _handle_mcp_servers_list(handler):
     """List configured MCP servers with safe, read-only runtime visibility."""
+    # Materialize approved self-service requests first, so a server an admin
+    # approved in the governance queue actually shows up here. Idempotent,
+    # never overwrites an existing entry, and can never raise into the list.
+    from api import mcp_requests
+
+    mcp_requests.sync_approved_quietly(path="/api/mcp/servers")
     cfg = get_config()
     servers = cfg.get("mcp_servers", {})
     if not isinstance(servers, dict):
@@ -25191,11 +25404,20 @@ def _handle_mcp_servers_list(handler):
 
 
 def _handle_mcp_server_delete(handler, name):
-    """Delete an MCP server by name."""
+    """Delete an MCP server by name (admin only)."""
     from urllib.parse import unquote
+
+    from api.ownership import request_is_admin
     name = unquote(name)
     if not name:
         return bad(handler, "name is required")
+    # Deleting is an admin action in EVERY governance mode, like the create
+    # path: the mcp:write route permission is only enforced under
+    # mode=enforce, and this handler also revokes the approval entry
+    # (mcp_requests.forget), so a non-admin could otherwise drop an approved
+    # server and erase the record that it was ever approved.
+    if not request_is_admin(handler):
+        return bad(handler, "MCP servers can only be deleted by an admin", 403)
     cfg = get_config()
     servers = cfg.get("mcp_servers", {})
     if not isinstance(servers, dict):
@@ -25206,15 +25428,29 @@ def _handle_mcp_server_delete(handler, name):
     cfg["mcp_servers"] = servers
     _save_yaml_config_file(_get_config_path(), cfg)
     reload_config()
+    # A self-service server that was approved would otherwise be reinstalled
+    # by the next approved-request sync, so deleting it also revokes its
+    # approval. No-op for servers an admin configured directly.
+    from api import mcp_requests
+
+    mcp_requests.forget(name)
     return j(handler, {"ok": True, "deleted": name})
 
 
 def _handle_mcp_server_toggle(handler, name, body):
-    """Toggle enabled state for an MCP server (PATCH /api/mcp/servers/{name})."""
+    """Toggle enabled state for an MCP server (PATCH, admin only)."""
     from urllib.parse import unquote
+
+    from api.ownership import request_is_admin
     name = unquote(name)
     if not name:
         return bad(handler, "name is required")
+    # An approved request that named an auth header is installed DISABLED on
+    # purpose, so an admin can fill the secret before it ever connects.
+    # Enabling is therefore an admin decision in every governance mode; the
+    # mcp:write permission alone only holds under mode=enforce.
+    if not request_is_admin(handler):
+        return bad(handler, "MCP servers can only be enabled or disabled by an admin", 403)
     if "enabled" not in body:
         return bad(handler, "enabled field is required")
     enabled = bool(body["enabled"])
@@ -25254,8 +25490,17 @@ def _strip_masked_values(submitted, existing):
 
 
 def _handle_mcp_server_update(handler, name, body):
-    """Add or update an MCP server."""
+    """Add or update an MCP server.
+
+    Direct writes stay an admin action. A non-admin ADDING a server is
+    routed into the approvals queue instead (the same 202 as POST
+    /api/mcp/servers/request), because an MCP server is executable surface:
+    a stdio entry is a literal shell command, and a remote one is an
+    exfiltration channel. Editing an already-configured server is unchanged.
+    """
     from urllib.parse import unquote
+
+    from api.ownership import request_is_admin
     name = unquote(name)
     if not name:
         return bad(handler, "name is required")
@@ -25265,6 +25510,15 @@ def _handle_mcp_server_update(handler, name, body):
     servers = cfg.get("mcp_servers", {})
     if not isinstance(servers, dict):
         servers = {}
+    if not request_is_admin(handler):
+        if name not in servers:
+            return _handle_mcp_server_request(handler, {**(body or {}), "name": name})
+        # Editing a CONFIGURED server is an admin action too. Rewriting the
+        # url or the headers of an already approved server turns it into an
+        # attacker-controlled endpoint (exfiltration + tool injection) with
+        # no approval at all, which is exactly the surface the create path is
+        # gated on; a stdio edit is a literal shell command on top of that.
+        return bad(handler, "MCP servers can only be modified by an admin", 403)
     existing_cfg = servers.get(name, {})
     if body.get("url"):
         server_cfg["url"] = body["url"].strip()

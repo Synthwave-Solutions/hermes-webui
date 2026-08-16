@@ -7396,6 +7396,11 @@ html,body{background:var(--bg)!important;color:var(--text);font-family:var(--fon
 .gov-chip.gov-chip-mcp{border-color:rgba(138,126,255,.3);color:#a89eff;}
 .gov-chip.gov-chip-cli{border-color:rgba(232,164,76,.3);color:#e8a44c;}
 .gov-chip.gov-chip-role{border-color:rgba(72,199,116,.3);color:#5cd58a;}
+.gov-chip.gov-chip-integration{border-color:rgba(72,199,116,.3);color:#5cd58a;}
+
+/* Approvals: kind group header row inside the pending table */
+.gov-approval-group td{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding-top:14px;border-bottom:1px solid var(--border);}
+.gov-table tbody tr.gov-approval-group:hover{background:none;}
 
 /* Chip box (multi-select input) */
 .gov-chipbox{display:flex;flex-wrap:wrap;align-items:center;gap:3px;background:var(--input-bg);border:1px solid var(--border);border-radius:8px;padding:6px 8px;cursor:text;min-height:36px;transition:border-color .15s ease;}
@@ -7465,7 +7470,10 @@ html,body{background:var(--bg)!important;color:var(--text);font-family:var(--fon
 .intg-btn:hover{border-color:var(--accent);color:var(--accent);}
 .intg-btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
 .intg-btn.primary:hover{opacity:.88;color:#fff;}
+.intg-btn[disabled]{opacity:.45;cursor:not-allowed;}
+.intg-btn[disabled]:hover{border-color:var(--border);color:var(--text);}
 .intg-btn.primary[disabled]{opacity:.45;cursor:not-allowed;}
+.intg-btn.primary[disabled]:hover{color:#fff;}
 .intg-btn.danger{color:#f0717b;border-color:rgba(240,113,123,.35);}
 .intg-btn.danger:hover{background:rgba(240,113,123,.08);border-color:#f0717b;color:#f0717b;}
 
@@ -7490,6 +7498,8 @@ html,body{background:var(--bg)!important;color:var(--text);font-family:var(--fon
 .intg-badge-cat{color:#5cc8ff;border-color:rgba(46,161,255,.3);}
 .intg-badge-ok{color:#5cd58a;border-color:rgba(72,199,116,.4);}
 .intg-badge-error{color:#f0717b;border-color:rgba(240,113,123,.4);}
+.intg-badge-pending{color:#e8a44c;border-color:rgba(232,164,76,.4);}
+.intg-requests{display:flex;flex-wrap:wrap;align-items:center;gap:4px;font-size:12px;margin-bottom:14px;line-height:1.5;}
 .intg-card-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:auto;padding-top:6px;}
 .intg-docs-link{font-size:11px;color:var(--muted);text-decoration:none;font-weight:600;}
 .intg-docs-link:hover{color:var(--accent);text-decoration:underline;}

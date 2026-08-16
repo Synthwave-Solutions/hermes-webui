@@ -17,11 +17,20 @@
 // (port 3009); override with window.HERMES_NANGO_API_URL when that differs.
 // While the popup is open we poll the connections list every 3s and stop
 // when it closes.
+//
+// Approvals: each catalog provider carries an "approval" field from the
+// approvals registry (api/approvals.py) - "approved" (or absent, for the
+// admin-managed globals that predate the registry) means connect straight
+// away, "none" means the caller must request access first, and "pending"
+// means an admin has not decided yet. Requesting access is the same POST
+// /api/integrations/connect call; the server answers 202 with
+// {"status":"pending_approval"} instead of minting a connect session.
 // CSRF: the global fetch wrapper in index.html injects X-Hermes-CSRF-Token
 // on every mutation automatically; this file never sets that header.
 
 let _intgCatalog = null;      // last /api/integrations/catalog payload
 let _intgConnections = null;  // last connections array
+let _intgRequests = null;     // caller's own approval requests (any status)
 let _intgMe = null;           // /api/governance/me payload (for email/admin)
 let _intgSearch = '';
 let _intgCategory = '';
@@ -95,7 +104,7 @@ async function loadIntegrations() {
       ? _intgT('integrations_all_connections', 'All connections')
       : _intgT('integrations_my_connections', 'My connections');
   }
-  await Promise.all([_intgLoadCatalog(), _intgRefreshConnections()]);
+  await Promise.all([_intgLoadCatalog(), _intgRefreshConnections(), _intgRefreshRequests()]);
   return true;
 }
 
@@ -129,6 +138,25 @@ async function _intgRefreshConnections() {
   _intgRenderGrid(); // "Connected" chips depend on the connection list
 }
 
+// The caller's own approval requests, scoped server-side to their identity.
+// Not admin-gated; a missing endpoint (older backend) just leaves the line
+// hidden, so the panel keeps working exactly as before.
+async function _intgRefreshRequests() {
+  let data;
+  try {
+    data = await api('/api/governance/approvals/mine?kind=integration', {
+      redirect401: false, timeoutToast: false, timeoutMs: 15000,
+    });
+  } catch (e) {
+    if (_intgRequests === null) _intgRequests = [];
+    _intgRenderRequests();
+    return;
+  }
+  _intgRequests = (data && Array.isArray(data.requests)) ? data.requests : [];
+  _intgRenderRequests();
+  _intgRenderGrid(); // pending chips also come from the request list
+}
+
 // ── Rendering ─────────────────────────────────────────────────────────────
 
 function _intgRenderNotice() {
@@ -145,6 +173,50 @@ function _intgRenderNotice() {
     el.style.display = 'none';
     el.innerHTML = '';
   }
+}
+
+// Approval state of a catalog provider. A provider without the field is an
+// admin-managed global that predates the registry: connect straight away.
+function _intgApprovalOf(p) {
+  const value = String((p && p.approval) || '').trim().toLowerCase();
+  if (value === 'pending' || value === 'none' || value === 'rejected') return value;
+  return 'approved';
+}
+
+// Provider keys with a pending request of the caller's own, from
+// /api/governance/approvals/mine (authoritative even when the catalog is
+// cached or does not carry the approval field yet).
+function _intgPendingRequestKeys() {
+  const keys = new Set();
+  (_intgRequests || []).forEach(r => {
+    if (String((r && r.status) || '') !== 'pending') return;
+    const key = String((r && r.key) || '');
+    if (key) keys.add(key);
+  });
+  return keys;
+}
+
+function _intgRenderRequests() {
+  const el = $('intgRequests');
+  if (!el) return;
+  const pending = (_intgRequests || []).filter(r => String((r && r.status) || '') === 'pending');
+  if (!pending.length) {
+    el.style.display = 'none';
+    el.innerHTML = '';
+    return;
+  }
+  const chips = pending.map(r => {
+    const key = String(r.key || '');
+    // _intgProviderName echoes the key back when the catalog has no match.
+    const known = _intgProviderName(key);
+    const label = (known && known !== key) ? known : (String(r.label || '') || key);
+    return '<span class="intg-badge intg-badge-pending">' + _intgEsc(label) + '</span>';
+  }).join(' ');
+  el.style.display = '';
+  el.innerHTML = '<div class="intg-requests">'
+    + '<span class="intg-muted">' + _intgEsc(_intgT('integrations_my_requests', 'My requests')) + ':</span> '
+    + chips
+    + '</div>';
 }
 
 function _intgOwnConnectionKeys() {
@@ -279,6 +351,7 @@ function _intgRenderGrid() {
   if (!grid || !_intgCatalog) return;
   const providers = _intgFilteredProviders();
   const connectedKeys = _intgOwnConnectionKeys();
+  const pendingKeys = _intgPendingRequestKeys();
   const nangoUp = !((_intgCatalog.nango || {}).available === false);
   if (!providers.length) {
     grid.innerHTML = '<div class="intg-muted">' + _intgEsc(_intgT('integrations_no_results', 'No providers match your search.')) + '</div>';
@@ -288,14 +361,25 @@ function _intgRenderGrid() {
     const authLabel = _intgAuthModeLabel(p.auth_mode);
     const cats = (p.categories || []).slice(0, 3);
     const connected = p.configured && p.unique_key && connectedKeys.has(p.unique_key);
+    let approval = _intgApprovalOf(p);
+    if (p.unique_key && pendingKeys.has(p.unique_key)) approval = 'pending';
     const badges = (authLabel ? '<span class="intg-badge">' + _intgEsc(authLabel) + '</span>' : '')
       + cats.map(c => '<span class="intg-badge intg-badge-cat">' + _intgEsc(c) + '</span>').join('')
-      + (connected ? '<span class="intg-badge intg-badge-ok">' + _intgEsc(_intgT('integrations_connected', 'Connected')) + '</span>' : '');
+      + (connected ? '<span class="intg-badge intg-badge-ok">' + _intgEsc(_intgT('integrations_connected', 'Connected')) + '</span>' : '')
+      + (approval === 'pending' ? '<span class="intg-badge intg-badge-pending">' + _intgEsc(_intgT('integrations_awaiting_approval', 'Waiting for admin approval')) + '</span>' : '');
     let action;
-    if (p.configured && p.unique_key) {
+    if (p.configured && p.unique_key && approval === 'pending') {
+      // Requested, no admin decision yet: nothing to do from here.
+      action = '<button type="button" class="intg-btn" disabled>'
+        + _intgEsc(_intgT('integrations_waiting_approval', 'Waiting for approval')) + '</button>';
+    } else if (p.configured && p.unique_key) {
+      // "none" means the caller has to ask first; same endpoint either way.
+      const label = approval === 'none'
+        ? _intgT('integrations_request_access', 'Request access')
+        : _intgT('integrations_connect', 'Connect');
       action = '<button type="button" class="intg-btn primary" data-intg-action="connect" data-key="' + _intgEsc(p.unique_key) + '"'
         + (nangoUp ? '' : ' disabled')
-        + '>' + _intgEsc(_intgT('integrations_connect', 'Connect')) + '</button>';
+        + '>' + _intgEsc(label) + '</button>';
     } else {
       action = '<span class="intg-muted">' + _intgEsc(_intgT('integrations_not_configured', 'Not configured')) + '</span>';
     }
@@ -338,6 +422,17 @@ function _intgApiUrlFor(connectUrl) {
   }
 }
 
+// Flip a provider to "pending" locally so the card updates immediately,
+// before the requests refresh (and even if that call fails).
+function _intgMarkPending(providerConfigKey) {
+  const key = String(providerConfigKey || '');
+  const providers = (_intgCatalog && _intgCatalog.providers) || [];
+  providers.forEach(p => {
+    if (p && (p.unique_key === key || p.key === key)) p.approval = 'pending';
+  });
+  _intgRenderGrid();
+}
+
 async function _intgConnect(providerConfigKey) {
   let data;
   try {
@@ -350,6 +445,15 @@ async function _intgConnect(providerConfigKey) {
     });
   } catch (e) {
     if (typeof showToast === 'function') showToast((e && e.message) || 'connect failed', 5000, 'error');
+    return;
+  }
+  // 202: the request was queued for an admin instead of minting a session.
+  if (data && String(data.status || '') === 'pending_approval') {
+    if (typeof showToast === 'function') {
+      showToast(_intgT('integrations_access_requested', 'Access requested. An admin has to approve it.'), 5000);
+    }
+    _intgMarkPending(providerConfigKey);
+    await _intgRefreshRequests();
     return;
   }
   const base = String((data && data.connect_url) || '').replace(/\/+$/, '');

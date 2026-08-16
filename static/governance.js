@@ -1142,8 +1142,54 @@ async function _govWsToggleMember(idx, add) {
 }
 
 // ── Approvals tab ─────────────────────────────────────────────────────────
-// Pending user-added skills (api/skill_ownership registry). Approve makes a
-// skill global; reject deletes it from disk. Server-gated by governance:write.
+// Pending user-requested capabilities (api/approvals registry): skills, third
+// party integrations, MCP servers and CLI commands. Approve grants the item;
+// rejecting a skill also deletes it from disk. Server-gated by governance:write.
+//
+// Rows carry their kind, so the decide POST sends {kind, key, decision} with
+// the row's own kind instead of the hardcoded 'skill' this tab started with.
+
+// Display order of the kind groups; unknown kinds sort last, alphabetically.
+const _GOV_APPROVAL_KINDS = ['skill', 'integration', 'mcp', 'cli'];
+
+function _govApprovalKind(item) {
+  return String((item && item.kind) || 'skill').trim().toLowerCase() || 'skill';
+}
+
+function _govKindLabel(kind) {
+  switch (kind) {
+    case 'skill': return _govT('governance_kind_skill', 'Skill');
+    case 'integration': return _govT('governance_kind_integration', 'Integration');
+    case 'mcp': return _govT('governance_kind_mcp', 'MCP');
+    case 'cli': return _govT('governance_kind_cli', 'CLI');
+    default: return kind;
+  }
+}
+
+// Reuse the capability chip colours already used by the users/groups tabs.
+function _govKindChipClass(kind) {
+  if (kind === 'skill' || kind === 'mcp' || kind === 'cli' || kind === 'integration') {
+    return ' gov-chip-' + kind;
+  }
+  return '';
+}
+
+/** Compact one-line rendering of an approval payload (mcp command, provider, ...). */
+function _govPayloadSummary(payload) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return '';
+  const parts = [];
+  Object.keys(payload).forEach(k => {
+    const v = payload[k];
+    if (v === null || v === undefined || v === '') return;
+    let text;
+    if (Array.isArray(v)) text = v.join(' ');
+    else if (typeof v === 'object') text = JSON.stringify(v);
+    else text = String(v);
+    if (text.length > 120) text = text.slice(0, 117) + '...';
+    parts.push(k + ': ' + text);
+  });
+  return parts.slice(0, 4).join(' | ');
+}
 
 function _govUpdateApprovalsBadge(count) {
   const badge = $('govApprovalsBadge');
@@ -1156,9 +1202,40 @@ function _govUpdateApprovalsBadge(count) {
 /** Refresh the pending-count badge without switching to the tab. */
 async function _govRefreshApprovalsBadge() {
   try {
+    // The queue returns every kind, so the badge counts every kind too.
     const data = await api('/api/governance/approvals', { redirect401: false, timeoutToast: false, timeoutMs: 15000 });
     _govUpdateApprovalsBadge((data.pending || []).length);
   } catch (e) { /* not an admin or endpoint unavailable; leave badge hidden */ }
+}
+
+/** One pending row. Skill rows keep rendering their full key, as before. */
+function _govApprovalRow(item) {
+  const kind = _govApprovalKind(item);
+  const key = String(item.key || '');
+  const label = String(item.label || item.name || '');
+  let when = '';
+  // added_at / requested_at are epoch seconds (float) on every kind.
+  const ts = Number(item.added_at !== undefined && item.added_at !== null ? item.added_at : item.requested_at);
+  if (Number.isFinite(ts) && ts > 0) when = new Date(ts * 1000).toLocaleString();
+  const primary = (kind === 'skill' || !label) ? key : label;
+  const secondary = (primary !== key && key)
+    ? '<div class="gov-path gov-muted">' + _govEsc(key) + '</div>'
+    : '';
+  const summary = _govPayloadSummary(item.payload);
+  const detail = summary ? '<div class="gov-muted">' + _govEsc(summary) + '</div>' : '';
+  const btn = (decision, cls, label2) => '<button type="button" class="gov-btn ' + cls + '"' +
+    ' data-gov-approval="' + decision + '"' +
+    ' data-kind="' + _govEsc(kind) + '"' +
+    ' data-key="' + _govEsc(key) + '">' + label2 + '</button>';
+  return '<tr>' +
+    '<td class="gov-nowrap"><span class="gov-chip' + _govKindChipClass(kind) + '">' + _govEsc(_govKindLabel(kind)) + '</span></td>' +
+    '<td>' + _govEsc(primary) + secondary + detail + '</td>' +
+    '<td>' + _govEsc(item.owner_email || '') + '</td>' +
+    '<td class="gov-nowrap">' + _govEsc(when) + '</td>' +
+    '<td class="gov-row-actions">' +
+      btn('approve', 'primary', _govT('governance_approve', 'Approve')) +
+      btn('reject', 'danger', _govT('governance_reject', 'Reject')) +
+    '</td></tr>';
 }
 
 async function _govLoadApprovals() {
@@ -1174,34 +1251,47 @@ async function _govLoadApprovals() {
   }
   const pending = data.pending || [];
   _govUpdateApprovalsBadge(pending.length);
-  const rows = pending.map(item => {
-    let when = '';
-    const ts = Number(item.added_at);
-    if (Number.isFinite(ts) && ts > 0) when = new Date(ts * 1000).toLocaleString();
-    return '<tr>' +
-      '<td>' + _govEsc(item.key || '') + '</td>' +
-      '<td>' + _govEsc(item.owner_email || '') + '</td>' +
-      '<td class="gov-nowrap">' + _govEsc(when) + '</td>' +
-      '<td class="gov-row-actions">' +
-        '<button type="button" class="gov-btn primary" onclick="_govDecideApproval(' + _govEsc(JSON.stringify(item.key)) + ', \'approve\')">' + _govT('governance_approve', 'Approve') + '</button>' +
-        '<button type="button" class="gov-btn danger" onclick="_govDecideApproval(' + _govEsc(JSON.stringify(item.key)) + ', \'reject\')">' + _govT('governance_reject', 'Reject') + '</button>' +
-      '</td></tr>';
+  // Group by kind, keeping the server's oldest-first order inside each group.
+  const groups = new Map();
+  pending.forEach(item => {
+    const kind = _govApprovalKind(item);
+    if (!groups.has(kind)) groups.set(kind, []);
+    groups.get(kind).push(item);
+  });
+  const kinds = Array.from(groups.keys()).sort((a, b) => {
+    const ia = _GOV_APPROVAL_KINDS.indexOf(a);
+    const ib = _GOV_APPROVAL_KINDS.indexOf(b);
+    if (ia !== ib) return (ia === -1 ? _GOV_APPROVAL_KINDS.length : ia) - (ib === -1 ? _GOV_APPROVAL_KINDS.length : ib);
+    return a.localeCompare(b);
+  });
+  const showHeaders = kinds.length > 1;
+  const rows = kinds.map(kind => {
+    const items = groups.get(kind) || [];
+    const header = showHeaders
+      ? '<tr class="gov-approval-group"><td colspan="5">' + _govEsc(_govKindLabel(kind)) + ' (' + items.length + ')</td></tr>'
+      : '';
+    return header + items.map(_govApprovalRow).join('');
   }).join('');
   el.innerHTML =
     '<table class="gov-table"><thead><tr>' +
-      '<th>' + _govT('governance_col_skill', 'Skill') + '</th>' +
-      '<th>' + _govT('governance_col_added_by', 'Added by') + '</th>' +
-      '<th>' + _govT('governance_col_added_at', 'Added') + '</th><th></th>' +
+      '<th>' + _govT('governance_col_kind', 'Kind') + '</th>' +
+      '<th>' + _govT('governance_col_item', 'Item') + '</th>' +
+      '<th>' + _govT('governance_col_requested_by', 'Requested by') + '</th>' +
+      '<th>' + _govT('governance_col_requested_at', 'Requested') + '</th><th></th>' +
     '</tr></thead><tbody>' +
-    (rows || '<tr><td colspan="4" class="gov-muted">' + _govT('governance_no_pending', 'No pending skill approvals.') + '</td></tr>') +
+    (rows || '<tr><td colspan="5" class="gov-muted">' + _govT('governance_no_pending', 'No pending approvals.') + '</td></tr>') +
     '</tbody></table>' +
     '<div class="gov-muted">' + _govT('governance_approvals_note',
-      'Approve makes the skill available to every user. Reject deletes the skill from disk.') + '</div>';
+      'Approve grants the request. Rejecting a skill also deletes it from disk.') + '</div>';
 }
 
-async function _govDecideApproval(key, decision) {
+async function _govDecideApproval(kind, key, decision) {
   try {
-    await _govPost('/api/governance/approvals/decide', { kind: 'skill', key: key, decision: decision });
+    await _govPost('/api/governance/approvals/decide', {
+      kind: String(kind || 'skill'),
+      key: key,
+      decision: decision,
+    });
     if (typeof showToast === 'function') {
       showToast(decision === 'approve' ? _govT('governance_approved', 'Approved') : _govT('governance_rejected', 'Rejected'), 2500);
     }
@@ -1303,4 +1393,19 @@ async function _govLoadAudit() {
 
 document.addEventListener('DOMContentLoaded', () => {
   _govFetchMe().then(govApplyVisibility).catch(() => {});
+  // Event delegation for the JS-rendered approval rows: kind and key live in
+  // data attributes, never inline JS (an MCP server name or a CLI command can
+  // carry quotes, dots or colons that would break an inline onclick).
+  const approvals = document.getElementById('govPaneApprovals');
+  if (approvals) {
+    approvals.addEventListener('click', (ev) => {
+      const btn = ev.target && ev.target.closest ? ev.target.closest('[data-gov-approval]') : null;
+      if (!btn || btn.disabled) return;
+      _govDecideApproval(
+        btn.getAttribute('data-kind') || 'skill',
+        btn.getAttribute('data-key') || '',
+        btn.getAttribute('data-gov-approval') || '',
+      );
+    });
+  }
 });

@@ -45,6 +45,23 @@ _SELF_ROUTES: frozenset[str] = frozenset({
     "/api/auth/passkey/register",
     "/api/auth/passkey/delete",
     "/api/governance/me",
+    # The caller's own self-service install requests and their status. Read
+    # only, scoped to the requesting identity by the handler, and deliberately
+    # not admin-gated: a user must be able to see whether what they asked for
+    # is still pending. The admin queue (/api/governance/approvals) stays
+    # governance:write.
+    "/api/governance/approvals/mine",
+    # Asking for something is not the same as getting it. These three write
+    # nothing but a pending row in the approvals registry (or, for an
+    # already-approved item, install what an admin already decided), so they
+    # deliberately do not require mcp:write / config:write: that is exactly
+    # the permission a non-admin does not have and should not need in order
+    # to ASK. The install itself stays gated on an admin decision, and the
+    # role's route allowlist still applies (a role without /api/mcp/* or
+    # /api/integrations/* in routes cannot reach these at all).
+    "/api/mcp/servers/request",
+    "/api/mcp/requests",
+    "/api/integrations/request",
 })
 
 
@@ -134,7 +151,12 @@ ROUTE_CATALOG: tuple[RouteRule, ...] = (
     RouteRule("/api/model",               "model:read", "model:write"),
     RouteRule("/api/default-model",       "model:write", "model:write", match="exact"),
     RouteRule("/api/providers",           "config:read", "config:write"),
-    RouteRule("/api/integrations",        "config:read", "config:write"),
+    # Self-service integrations get their OWN permission pair rather than
+    # riding on config:read/config:write. Connecting your own Gmail account
+    # must not require the permission that also rewrites dashboard settings,
+    # and the approval gate (governance:write) is what stops a user enabling a
+    # provider for everyone.
+    RouteRule("/api/integrations",        "integrations:read", "integrations:connect"),
     RouteRule("/api/provider",            "analytics:read"),
     RouteRule("/api/personalities",       "config:read", match="exact"),
     RouteRule("/api/personality",         "config:write", "config:write"),
