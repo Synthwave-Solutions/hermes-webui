@@ -227,6 +227,19 @@ function _intgOwnConnectionKeys() {
   return keys;
 }
 
+// Keys with ANY visible connection, for the "Connected" badge. The server
+// already scopes the list to the caller's own connections for non-admins;
+// for admins this also covers org-level rows without an end_user link
+// (seeded synthwave-* connections), which _intgIsOwnConnection excludes.
+function _intgConnectedKeys() {
+  const keys = new Set();
+  (_intgConnections || []).forEach(c => {
+    const k = String((c && c.provider_config_key) || '');
+    if (k) keys.add(k);
+  });
+  return keys;
+}
+
 function _intgFmtDate(value) {
   if (!value) return '';
   const d = new Date(value);
@@ -350,7 +363,7 @@ function _intgRenderGrid() {
   const grid = $('intgGrid');
   if (!grid || !_intgCatalog) return;
   const providers = _intgFilteredProviders();
-  const connectedKeys = _intgOwnConnectionKeys();
+  const connectedKeys = _intgConnectedKeys();
   const pendingKeys = _intgPendingRequestKeys();
   const nangoUp = !((_intgCatalog.nango || {}).available === false);
   if (!providers.length) {
@@ -362,7 +375,7 @@ function _intgRenderGrid() {
     const cats = (p.categories || []).slice(0, 3);
     const connected = p.configured && p.unique_key && connectedKeys.has(p.unique_key);
     let approval = _intgApprovalOf(p);
-    if (p.unique_key && pendingKeys.has(p.unique_key)) approval = 'pending';
+    if ((p.unique_key && pendingKeys.has(p.unique_key)) || pendingKeys.has(p.key)) approval = 'pending';
     const badges = (authLabel ? '<span class="intg-badge">' + _intgEsc(authLabel) + '</span>' : '')
       + cats.map(c => '<span class="intg-badge intg-badge-cat">' + _intgEsc(c) + '</span>').join('')
       + (connected ? '<span class="intg-badge intg-badge-ok">' + _intgEsc(_intgT('integrations_connected', 'Connected')) + '</span>' : '')
@@ -380,8 +393,18 @@ function _intgRenderGrid() {
       action = '<button type="button" class="intg-btn primary" data-intg-action="connect" data-key="' + _intgEsc(p.unique_key) + '"'
         + (nangoUp ? '' : ' disabled')
         + '>' + _intgEsc(label) + '</button>';
+    } else if (approval === 'pending') {
+      // Requested but no Nango integration yet: the admin still has to decide.
+      action = '<button type="button" class="intg-btn" disabled>'
+        + _intgEsc(_intgT('integrations_waiting_approval', 'Waiting for approval')) + '</button>';
+    } else if (approval === 'approved') {
+      // Approved, but the admin has not created the Nango integration yet.
+      action = '<span class="intg-muted">' + _intgEsc(_intgT('integrations_approved_setup', 'Approved. An admin is setting it up.')) + '</span>';
     } else {
-      action = '<span class="intg-muted">' + _intgEsc(_intgT('integrations_not_configured', 'Not configured')) + '</span>';
+      // Any provider can be requested: /api/integrations/request queues an
+      // admin approval, after which the admin configures it in Nango.
+      action = '<button type="button" class="intg-btn" data-intg-action="request" data-key="' + _intgEsc(p.key) + '">'
+        + _intgEsc(_intgT('integrations_request_access', 'Request access')) + '</button>';
     }
     const docs = (!p.configured && p.docs)
       ? '<a class="intg-docs-link" href="' + _intgEsc(p.docs) + '" target="_blank" rel="noopener noreferrer">' + _intgEsc(_intgT('integrations_docs', 'Docs')) + '</a>'
@@ -437,6 +460,34 @@ function _intgMarkPending(providerConfigKey) {
     if (p && (p.unique_key === key || p.key === key)) p.approval = 'pending';
   });
   _intgRenderGrid();
+}
+
+// Ask for a provider that has no Nango integration yet. No popup involved:
+// this only queues an admin approval (POST /api/integrations/request).
+async function _intgRequestAccess(providerKey) {
+  let data;
+  try {
+    data = await api('/api/integrations/request', {
+      method: 'POST',
+      body: JSON.stringify({ provider_config_key: providerKey }),
+      redirect401: false,
+    });
+  } catch (e) {
+    if (typeof showToast === 'function') showToast((e && e.message) || 'request failed', 5000, 'error');
+    return;
+  }
+  const status = String((data && data.status) || '');
+  if (status === 'approved') {
+    // Race: an admin already approved it. The message explains what to do.
+    if (typeof showToast === 'function') showToast(String(data.message || 'Approved.'), 5000);
+    loadIntegrations();
+    return;
+  }
+  if (typeof showToast === 'function') {
+    showToast(_intgT('integrations_access_requested', 'Access requested. An admin has to approve it.'), 5000);
+  }
+  _intgMarkPending(providerKey);
+  _intgRefreshRequests();
 }
 
 async function _intgConnect(providerConfigKey) {
@@ -577,6 +628,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const action = btn.getAttribute('data-intg-action');
       if (action === 'connect') {
         _intgConnect(btn.getAttribute('data-key') || '');
+      } else if (action === 'request') {
+        _intgRequestAccess(btn.getAttribute('data-key') || '');
       } else if (action === 'disconnect') {
         _intgDisconnect(btn.getAttribute('data-cid') || '', btn.getAttribute('data-key') || '');
       } else if (action === 'category') {
