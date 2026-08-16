@@ -365,6 +365,7 @@ function _intgRenderGrid() {
   const providers = _intgFilteredProviders();
   const connectedKeys = _intgConnectedKeys();
   const pendingKeys = _intgPendingRequestKeys();
+  const isAdminUser = _intgIsAdmin(_intgMe);
   const nangoUp = !((_intgCatalog.nango || {}).available === false);
   if (!providers.length) {
     grid.innerHTML = '<div class="intg-muted">' + _intgEsc(_intgT('integrations_no_results', 'No providers match your search.')) + '</div>';
@@ -393,6 +394,11 @@ function _intgRenderGrid() {
       action = '<button type="button" class="intg-btn primary" data-intg-action="connect" data-key="' + _intgEsc(p.unique_key) + '"'
         + (nangoUp ? '' : ' disabled')
         + '>' + _intgEsc(label) + '</button>';
+    } else if (isAdminUser) {
+      // An admin does not request: enabling creates the Nango integration
+      // directly (and implicitly approves it for everyone).
+      action = '<button type="button" class="intg-btn primary" data-intg-action="enable" data-key="' + _intgEsc(p.key) + '">'
+        + _intgEsc(_intgT('integrations_enable', 'Enable')) + '</button>';
     } else if (approval === 'pending') {
       // Requested but no Nango integration yet: the admin still has to decide.
       action = '<button type="button" class="intg-btn" disabled>'
@@ -460,6 +466,31 @@ function _intgMarkPending(providerConfigKey) {
     if (p && (p.unique_key === key || p.key === key)) p.approval = 'pending';
   });
   _intgRenderGrid();
+}
+
+// Admin path: create the Nango integration for a provider so it becomes
+// connectable for everyone (POST /api/integrations/enable, admin-gated).
+async function _intgEnable(providerKey) {
+  let data;
+  try {
+    data = await api('/api/integrations/enable', {
+      method: 'POST',
+      body: JSON.stringify({ provider_config_key: providerKey }),
+      redirect401: false,
+    });
+  } catch (e) {
+    if (typeof showToast === 'function') showToast((e && e.message) || 'enable failed', 5000, 'error');
+    return;
+  }
+  if (typeof showToast === 'function') {
+    if (data && data.needs_credentials) {
+      showToast(_intgT('integrations_enabled_needs_credentials',
+        'Enabled. Add the OAuth client credentials in the Nango dashboard before connecting.'), 8000);
+    } else {
+      showToast(_intgT('integrations_enabled', 'Enabled. It can be connected now.'), 4000);
+    }
+  }
+  loadIntegrations();
 }
 
 // Ask for a provider that has no Nango integration yet. No popup involved:
@@ -630,6 +661,8 @@ document.addEventListener('DOMContentLoaded', () => {
         _intgConnect(btn.getAttribute('data-key') || '');
       } else if (action === 'request') {
         _intgRequestAccess(btn.getAttribute('data-key') || '');
+      } else if (action === 'enable') {
+        _intgEnable(btn.getAttribute('data-key') || '');
       } else if (action === 'disconnect') {
         _intgDisconnect(btn.getAttribute('data-cid') || '', btn.getAttribute('data-key') || '');
       } else if (action === 'category') {

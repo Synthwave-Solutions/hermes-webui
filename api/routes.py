@@ -14537,6 +14537,25 @@ def handle_post(handler, parsed) -> bool:
             return j(handler, result, status=202)
         return j(handler, result)
 
+    if parsed.path == "/api/integrations/enable":
+        # Admin-only: create the Nango integration for a catalog provider so
+        # it becomes connectable, and record the implicit approval.
+        from api.integrations import enable_integration
+        from api.ownership import request_is_admin, request_owner_email
+
+        if not request_is_admin(handler):
+            return j(handler, {"error": "admin required"}, status=403)
+        provider_config_key = str(body.get("provider_config_key", "") or "").strip()
+        if not provider_config_key:
+            return bad(handler, "provider_config_key is required")
+        try:
+            result = enable_integration(request_owner_email(handler), provider_config_key)
+        except ValueError as e:
+            return bad(handler, str(e), 400)
+        except RuntimeError as e:
+            return bad(handler, _sanitize_error(e), 502)
+        return j(handler, result)
+
     if parsed.path == "/api/integrations/request":
         from api.integrations import CONNECT_STATUS_PENDING, request_provider_approval
         from api.ownership import request_owner_email

@@ -667,6 +667,38 @@ def list_connections(owner_email: str | None, *, is_admin: bool = False) -> list
     return out
 
 
+def enable_integration(admin_email: str | None, provider_config_key: str) -> dict:
+    """Create the Nango integration for a catalog provider (admin path).
+
+    The unique_key mirrors the provider key, matching how the pre-seeded
+    integrations were made. Recording the implicit admin approval means
+    non-admins get one-click connect afterwards instead of a queue entry.
+    Idempotent: enabling an already-configured provider only (re)records the
+    approval. OAuth/APP providers are created without client credentials;
+    those still have to be added in the Nango dashboard before a connect can
+    succeed, which the returned ``needs_credentials`` flag surfaces.
+    """
+    key = str(provider_config_key or "").strip()
+    if not key:
+        raise ValueError("provider_config_key is required")
+    entry = load_provider_entries().get(key)
+    if entry is None:
+        raise ValueError(f"unknown provider: {key}")
+    configured = {str(row.get("unique_key") or "") for row in _list_integrations()}
+    if key not in configured:
+        _nango_request("POST", "/integrations", payload={"provider": key, "unique_key": key})
+    _record_admin_approval(key, admin_email, _approval_entries().get(key))
+    auth_mode = str(entry.get("auth_mode") or "").upper()
+    return {
+        "status": "enabled",
+        "provider_config_key": key,
+        "display_name": _provider_label(key),
+        "auth_mode": auth_mode,
+        # OAuth-family integrations need a client id/secret before connects work.
+        "needs_credentials": auth_mode.startswith("OAUTH") or auth_mode == "APP",
+    }
+
+
 def create_connect_session(
     owner_email: str | None,
     provider_config_key: str,
