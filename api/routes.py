@@ -16523,8 +16523,17 @@ def _handle_terminal_output(handler, parsed):
     return True
 
 
-def _gateway_sse_probe_payload(settings, watcher):
-    enabled = bool(settings.get('show_cli_sessions'))
+def _gateway_sse_probe_payload(settings, watcher, isolated=False):
+    """Build the probe body/status for /api/sessions/gateway/stream?probe=1.
+
+    ``isolated`` is True when the caller is a non-admin identity under
+    per-user isolation. Such a caller can never open the stream, so the
+    probe must report the feature as absent for them too, using the exact
+    same shape as the feature-disabled answer. Reporting anything greener
+    here than the stream will answer sends the frontend into a reconnect
+    loop.
+    """
+    enabled = bool(settings.get('show_cli_sessions')) and not isolated
     # Use the public is_alive() accessor where available (current GatewayWatcher);
     # fall back to the private _thread check for any older in-memory instance
     # that might still be hanging around mid-upgrade, and for test doubles that
@@ -16561,20 +16570,32 @@ def _handle_gateway_sse_stream(handler, parsed):
     from api.gateway_watcher import get_watcher
     watcher = get_watcher()
 
+    # Per-user isolation: this stream pushes full CLI/agent session rows,
+    # which are unowned (admin-only) under the ownership rule. Non-admin
+    # identities get the same 404 as the feature-disabled path.
+    #
+    # This gate runs BEFORE the probe branch on purpose. While it only
+    # guarded the stream, a non-admin got a green probe (200,
+    # watcher_running=true) and a 404 on the stream itself: the frontend
+    # read the probe as healthy, opened the EventSource, took the 404, and
+    # re-probed from onerror, over and over. Measured at ~23 req/s per open
+    # tab, with the paired client-event error POSTs saturating their rate
+    # limiter. Probe and stream must answer identically for every identity.
+    from api.ownership import request_owner_scope as _request_owner_scope
+    isolated = _request_owner_scope(handler) != 'all'
+
     probe = parse_qs(parsed.query).get('probe', [''])[0].lower() in {'1', 'true', 'yes'}
     if probe:
-        payload, status = _gateway_sse_probe_payload(settings, watcher)
+        payload, status = _gateway_sse_probe_payload(
+            settings, watcher, isolated=isolated
+        )
         return j(handler, payload, status=status)
 
     # Check if the feature is enabled
     if not settings.get('show_cli_sessions'):
         return j(handler, {'error': 'agent sessions not enabled'}, status=404)
 
-    # Per-user isolation: this stream pushes full CLI/agent session rows,
-    # which are unowned (admin-only) under the ownership rule. Non-admin
-    # identities get the same 404 as the feature-disabled path.
-    from api.ownership import request_owner_scope as _request_owner_scope
-    if _request_owner_scope(handler) != 'all':
+    if isolated:
         return j(handler, {'error': 'agent sessions not enabled'}, status=404)
 
     # Same watcher_alive semantics as the probe path — centralised via

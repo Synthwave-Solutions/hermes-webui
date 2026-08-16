@@ -5804,7 +5804,7 @@ async function renderSessionList(opts={}){
 let _gatewaySSE = null;
 let _gatewayPollTimer = null;
 let _gatewayProbeInFlight = false;
-let _gatewayProbeForbiddenUntil = 0; // governance 403 backoff: suppress probes until this timestamp
+let _gatewayProbeForbiddenUntil = 0; // 403/404 backoff: suppress probes AND stream opens until this timestamp
 let _gatewaySSEWarningShown = false;
 const _gatewayFallbackPollMs = 30000;
 const _streamingPollMs = 30000;
@@ -6275,18 +6275,36 @@ function _isDuplicateGatewaySessionSnapshot(sessions){
   return _gatewaySessionSnapshotKey(incoming)===_gatewaySessionSnapshotKey(currentGatewaySessions);
 }
 
+// Clear the 403/404 backoff so the next startGatewaySSE()/probe gets one
+// fresh attempt. Called when the user changes the underlying condition
+// (Settings applied show_cli_sessions), so an admin who just enabled agent
+// sessions does not sit out the remainder of the 5 minute window. A caller
+// who is still denied simply re-arms the backoff on the next answer.
+function resetGatewayProbeBackoff(){
+  _gatewayProbeForbiddenUntil = 0;
+}
+if(typeof window!=='undefined') window.resetGatewayProbeBackoff = resetGatewayProbeBackoff;
+
 async function probeGatewaySSEStatus(){
   if(_gatewayProbeInFlight || !window._showCliSessions) return;
-  // Governance enforce mode: after a 403 suppress re-probes for 5 minutes so
-  // the EventSource error path cannot hammer the audit log with denied probes.
+  // After a 403 (governance denied) or 404 (feature absent for this identity)
+  // suppress re-probes for 5 minutes, so the EventSource error path cannot
+  // hammer the audit log with denied probes.
   if(_gatewayProbeForbiddenUntil && Date.now() < _gatewayProbeForbiddenUntil) return;
   _gatewayProbeInFlight = true;
   try{
     const resp = await fetch(new URL('api/sessions/gateway/stream?probe=1', document.baseURI || location.href).href, { credentials:'same-origin' });
     const data = await resp.json().catch(() => ({}));
-    if(resp.status === 403){
+    if(resp.status === 403 || resp.status === 404){
+      // 403 = governance denied. 404 = the feature does not exist for this
+      // identity (agent sessions disabled, or a non-admin under per-user
+      // isolation). Both are permanent for the next few minutes and neither
+      // is fixed by polling, so suppress re-probes instead of letting the
+      // EventSource onerror path re-enter here immediately. Without this the
+      // 404 case spun a tight probe/connect/fail loop, ~23 req/s per tab.
+      // stopGatewaySSE() also clears any poll fallback that was started.
       _gatewayProbeForbiddenUntil = Date.now() + 300000;
-      stopGatewayPollFallback();
+      stopGatewaySSE();
       return;
     }
     if(resp.ok && data.watcher_running){
@@ -6332,6 +6350,11 @@ function startGatewaySSE(){
   // Don't open when tab is hidden OR the window has lost focus (PWA blur) —
   // saves connection pool slots (#4151).
   if(_sidebarSseBackgrounded()) return;
+  // Don't re-open a stream the server has already denied. This function has
+  // ~12 direct callers (boot, workspace switch, settings, visibilitychange),
+  // so guarding only probeGatewaySSEStatus() would let any of them restart
+  // the 403/404 reconnect loop before the backoff window has expired.
+  if(_gatewayProbeForbiddenUntil && Date.now() < _gatewayProbeForbiddenUntil) return;
   try{
     _gatewaySSE = new EventSource('api/sessions/gateway/stream');
     _gatewaySSE.addEventListener('sessions_changed', (ev) => {

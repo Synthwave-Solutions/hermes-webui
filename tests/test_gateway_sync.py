@@ -2728,3 +2728,77 @@ def test_probe_payload_prefers_public_is_alive():
     assert calls == ['is_alive'], (
         "probe must prefer the public is_alive() method over poking _thread"
     )
+
+
+# ── Regression: probe and stream must agree for isolated (non-admin) callers ──
+# The probe used to skip the per-user isolation gate that the stream applies.
+# A non-admin therefore got probe 200 (watcher_running=true) and stream 404:
+# the frontend read the probe as healthy, opened the EventSource, took the 404,
+# and re-probed from onerror. Measured on the live server at ~23 req/s per open
+# tab (10.8k stream 404s plus 10.3k rate-limited client-event POSTs in 24h).
+
+
+class _AliveWatcher:
+    def is_alive(self):
+        return True
+
+
+def test_probe_payload_isolated_reports_feature_absent():
+    """A non-admin under per-user isolation gets the feature-disabled answer,
+    even with the feature on and the watcher alive."""
+    body, status = _gateway_sse_probe_payload(
+        {'show_cli_sessions': True}, watcher=_AliveWatcher(), isolated=True
+    )
+    assert status == 404
+    assert body['enabled'] is False
+    assert body['ok'] is False
+    assert body['error'] == 'agent sessions not enabled'
+
+
+def test_probe_payload_isolated_default_is_false():
+    """Existing two-arg callers keep the pre-isolation behaviour."""
+    body, status = _gateway_sse_probe_payload(
+        {'show_cli_sessions': True}, watcher=_AliveWatcher()
+    )
+    assert status == 200
+    assert body['ok'] is True
+
+
+def _gateway_stream_status(monkeypatch, owner_scope, query):
+    """Drive _handle_gateway_sse_stream with a stubbed identity and capture the
+    status it answers with."""
+    import api.routes as routes
+    import api.ownership as ownership
+    import api.gateway_watcher as gateway_watcher
+    from urllib.parse import urlparse
+
+    captured = {}
+
+    def _fake_j(handler, payload, status=200, **kwargs):
+        captured['payload'] = payload
+        captured['status'] = status
+        return True
+
+    monkeypatch.setattr(routes, 'j', _fake_j)
+    monkeypatch.setattr(routes, 'load_settings', lambda: {'show_cli_sessions': True})
+    monkeypatch.setattr(gateway_watcher, 'get_watcher', lambda *a, **k: _AliveWatcher())
+    monkeypatch.setattr(ownership, 'request_owner_scope', lambda handler: owner_scope)
+
+    parsed = urlparse('/api/sessions/gateway/stream' + query)
+    routes._handle_gateway_sse_stream(object(), parsed)
+    return captured['status']
+
+
+def test_isolated_probe_and_stream_return_the_same_status(monkeypatch):
+    """The loop-preventing invariant: for one identity, probe and stream must
+    answer the same. A green probe with a 404 stream is a reconnect loop."""
+    probe_status = _gateway_stream_status(monkeypatch, 'user@example.com', '?probe=1')
+    stream_status = _gateway_stream_status(monkeypatch, 'user@example.com', '')
+    assert probe_status == 404
+    assert stream_status == 404
+    assert probe_status == stream_status
+
+
+def test_admin_probe_still_green(monkeypatch):
+    """Admins (owner scope 'all') keep the 200 probe that starts the stream."""
+    assert _gateway_stream_status(monkeypatch, 'all', '?probe=1') == 200

@@ -11966,7 +11966,12 @@ function _applySavedSettingsUi(saved, body, opts){
     maxTokensField.dataset.initialValue=maxTokensField.value;
   }
   if(typeof startGatewaySSE==='function'){
-    if(showCliSessions) startGatewaySSE();
+    if(showCliSessions){
+      // Settings just told us the feature is on: give the stream one fresh
+      // attempt even if a previous 403/404 armed the probe backoff.
+      if(typeof resetGatewayProbeBackoff==='function') resetGatewayProbeBackoff();
+      startGatewaySSE();
+    }
     else if(typeof stopGatewaySSE==='function') stopGatewaySSE();
   }
   _setSettingsAuthButtonsVisible(!!saved.auth_enabled);
