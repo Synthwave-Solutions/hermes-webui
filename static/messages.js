@@ -2017,6 +2017,8 @@ function closeOtherLiveStreams(activeSid){
 
 function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
   if(!activeSid||!streamId) return;
+  // A live turn mutates the transcript; any cached scene for this sid is stale.
+  if(typeof _invalidateSessionSceneCache==='function') _invalidateSessionSceneCache(activeSid);
   const reconnecting=!!options.reconnecting;
   // #4416: start (or, on reconnect for the SAME stream, keep) tracking whether
   // the tab was hidden during this stream so the done-notification fires for a
@@ -7783,6 +7785,8 @@ function startSessionStream(sid) {
         const d = JSON.parse(e.data || '{}');
         const evSid = d.session_id || sid;
         if (evSid !== sid) return;
+        // The session moved server-side; a cached scene for it is stale.
+        if (typeof _invalidateSessionSceneCache === 'function') _invalidateSessionSceneCache(sid);
         // Only act when this session is the one on screen and we're idle (no
         // live turn rendering — that path owns its own message updates).
         const isCurrent = (typeof _isSessionCurrentPane === 'function')
@@ -7816,6 +7820,8 @@ function startSessionStream(sid) {
         const evSid = d.session_id || sid;
         const streamId = String(d.stream_id || '');
         if (!streamId || evSid !== sid) return;
+        // A server-initiated turn is running; drop any cached scene for it.
+        if (typeof _invalidateSessionSceneCache === 'function') _invalidateSessionSceneCache(sid);
         // `recovered` marks an on-subscribe replay from the server: the tab
         // (re)connected to /api/session/stream AFTER the original
         // fire-and-forget server_turn_started had already been broadcast, so
@@ -7926,6 +7932,8 @@ function _handleBgTaskCompleteEvent(e, expectedSid, opts) {
     const evt_id = d.event_id ? String(d.event_id) : '';
     if (!evt_id) return;  // server contract requires event_id; ignore otherwise
     if (_bgTaskCompleteRingBufferAdd(sid, evt_id)) return;  // duplicate
+    // Background completion appended to this session; drop its cached scene.
+    if (typeof _invalidateSessionSceneCache === 'function') _invalidateSessionSceneCache(sid);
     const pid = String(d.task_id || '');
     const _viewed = typeof _isSessionActivelyViewed === 'function' && _isSessionActivelyViewed(sid);
     if (_viewed) {

@@ -48,11 +48,6 @@ function _cloneSessionSceneValue(value) {
   try { return JSON.parse(JSON.stringify(value)); } catch (_) { return value; }
 }
 
-function _sessionSceneRevision(session) {
-  if (!session) return '';
-  return String(session.revision || session.updated_at || session.last_message_at || '');
-}
-
 function _estimateSessionSceneBytes(scene) {
   try { return new Blob([JSON.stringify(scene)]).size; }
   catch (_) {
@@ -67,6 +62,12 @@ function _invalidateSessionSceneCache(sid) {
   _sessionSceneCache.delete(sid);
 }
 
+// Profile switches change the whole session universe; scenes never survive one.
+function _clearSessionSceneCache() {
+  _sessionSceneCache.clear();
+  _sessionSceneCacheBytes = 0;
+}
+
 function _getSessionSceneCache(sid) {
   const scene = sid ? _sessionSceneCache.get(sid) : null;
   if (!scene) return null;
@@ -77,7 +78,11 @@ function _getSessionSceneCache(sid) {
 
 function _putSessionSceneCache(sid, scene) {
   if (!sid || !scene) return;
-  _invalidateSessionSceneCache(sid);
+  const previous = _sessionSceneCache.get(sid);
+  if (previous) {
+    _sessionSceneCacheBytes = Math.max(0, _sessionSceneCacheBytes - Number(previous.byteSize || 0));
+    _sessionSceneCache.delete(sid);
+  }
   scene.byteSize = _estimateSessionSceneBytes(scene);
   _sessionSceneCache.set(sid, scene);
   _sessionSceneCacheBytes += scene.byteSize;
@@ -93,6 +98,14 @@ function _captureActiveSessionScene() {
   const session = S.session;
   const sid = session && session.session_id;
   if (!sid || !Array.isArray(S.messages)) return;
+  // Never cache a conversation with a live or pending turn: the INFLIGHT
+  // machinery owns its recovery and the transcript is about to change.
+  if (S.busy || S.activeStreamId) return;
+  if (typeof INFLIGHT !== 'undefined' && INFLIGHT && INFLIGHT[sid]) return;
+  if (session.active_stream_id || session.pending_user_message) return;
+  // A half-loaded transcript (switched away before the message fetch landed)
+  // must not be cached as if it were the real tail window.
+  if (Number(session.message_count || 0) > 0 && S.messages.length === 0) return;
   const {messages: _ignoredMessages, ...metadata} = session;
   const container = $('messages');
   _putSessionSceneCache(sid, {
@@ -107,14 +120,33 @@ function _captureActiveSessionScene() {
   });
 }
 
+// Version signal for stale-while-revalidate: server revision when present,
+// otherwise updated_at / last_message_at.
+function _sessionSceneRevision(session) {
+  if (!session) return '';
+  return String(session.revision || session.updated_at || session.last_message_at || '');
+}
+
+// Empty-payload drafts and null compare equal; file identity is by count so
+// server-side file canonicalization does not read as a draft change.
+function _sessionSceneDraftSignature(draft) {
+  const hasPayload = !!(draft && (String(draft.text || '') || (Array.isArray(draft.files) && draft.files.length)));
+  if (!hasPayload) return '';
+  return JSON.stringify({t: String(draft.text || ''), f: Array.isArray(draft.files) ? draft.files.length : 0});
+}
+
 function _restoreSessionScene(scene) {
   if (!scene || !scene.metadata) return null;
+  if (scene.metadata.active_stream_id || scene.metadata.pending_user_message) return null;
   S.messages = _cloneSessionSceneValue(scene.messages || []);
   S.toolCalls = _cloneSessionSceneValue(scene.toolCalls || []);
   _messagesTruncated = !!scene.messagesTruncated;
   _oldestIdx = Number(scene.oldestIdx || 0);
   if (typeof _scrollPinned !== 'undefined') _scrollPinned = !!scene.scrollPinned;
-  return {..._cloneSessionSceneValue(scene.metadata), messages:S.messages, tool_calls:S.toolCalls};
+  if (typeof _messageUserUnpinned !== 'undefined') _messageUserUnpinned = !scene.scrollPinned;
+  // The returned object stands in for the metadata payload; keep it
+  // metadata-only so S.session never carries a duplicate transcript array.
+  return _cloneSessionSceneValue(scene.metadata);
 }
 
 async function _validateCachedSessionScene(sid, scene) {
@@ -124,11 +156,25 @@ async function _validateCachedSessionScene(sid, scene) {
     const remoteRevision = _sessionSceneRevision(data.session);
     const localCount = Number(scene && scene.metadata && scene.metadata.message_count || 0);
     const remoteCount = Number(data.session.message_count || 0);
-    if (remoteRevision !== String(scene.revision || '') || remoteCount !== localCount) {
+    const remoteLive = !!(data.session.active_stream_id || data.session.pending_user_message);
+    const draftChanged = _sessionSceneDraftSignature(data.session.composer_draft)
+      !== _sessionSceneDraftSignature(scene && scene.metadata && scene.metadata.composer_draft);
+    if (remoteLive || draftChanged || remoteRevision !== String(scene.revision || '') || remoteCount !== localCount) {
       _invalidateSessionSceneCache(sid);
-      if (S.session && S.session.session_id === sid && _loadingSessionId === null) {
+      // Re-render from the authoritative server copy only while the stale scene
+      // is still on screen and no live turn owns the pane. The warm load that
+      // spawned this validation may still hold _loadingSessionId when a fast
+      // response lands, so retry briefly instead of dropping the refresh.
+      let _retriesLeft = 20;
+      const _applyFreshScene = () => {
+        if (!(S.session && S.session.session_id === sid) || S.busy || S.activeStreamId) return;
+        if (_loadingSessionId !== null) {
+          if (_retriesLeft-- > 0) setTimeout(_applyFreshScene, 150);
+          return;
+        }
         void loadSession(sid, {force:true, keepStaleUntilLoaded:true});
-      }
+      };
+      _applyFreshScene();
     }
   } catch (_) {
     // Cached content remains useful during a transient metadata failure.
@@ -364,7 +410,8 @@ function _saveComposerDraftNow(sid, text, files) {
     || _composerDraftPayloadSignature('', []);
   // A switch only waits when local composer state differs from the last known
   // server draft. This covers both edits and clearing a previously saved draft.
-  if (nextSignature === savedSignature) return false;
+  // Resolve as a promise so awaiting callers pay one microtask, not a POST.
+  if (nextSignature === savedSignature) return Promise.resolve(false);
   if (_composerDraftHasPayload(normalizedText, normalizedFiles)) {
     _clearComposerDraftRestoreSuppression(sid);
   }
@@ -1738,6 +1785,8 @@ async function _switchProfileForSessionLoad(profile){
     const data=await api('/api/profile/switch',{method:'POST',body:JSON.stringify({name}),timeoutToast:false});
     S.activeProfile=data.active||name;
     S.activeProfileIsDefault=!!data.is_default;
+    // Scenes are per-profile state; never let one leak across a switch.
+    _clearSessionSceneCache();
     if(typeof _resetCronUnreadForProfileSwitch==='function'){
       _resetCronUnreadForProfileSwitch();
     }
@@ -1788,6 +1837,10 @@ async function loadSession(sid){
   const forceReload = !!opts.force;
   const currentSid = S.session ? S.session.session_id : null;
   const sameSessionForceReload = forceReload && currentSid===sid;
+  // A force reload distrusts local state (external refresh, self-heal, edits);
+  // drop any cached scene for this sid so a later warm switch cannot resurrect
+  // the pre-reload transcript. typeof-guarded for extracted-function harnesses.
+  if (forceReload && typeof _invalidateSessionSceneCache === 'function') _invalidateSessionSceneCache(sid);
   // Clicking the already-open session in the sidebar is a no-op. Reloading it
   // tears down active pane state and can reset the long-session scroll window
   // to the top even though the user did not navigate anywhere. Explicit
@@ -1846,6 +1899,10 @@ async function loadSession(sid){
     // close streams for the session the user actually landed on (#1060 guard,
     // extended to cover the new pre-switch await).
     if (!_isCurrentLoad()) return;
+    // Snapshot the outgoing conversation for an instant warm switch-back.
+    // Runs after the awaited draft flush above so the scene's metadata carries
+    // the just-persisted composer_draft; skips live/pending sessions itself.
+    if (typeof _captureActiveSessionScene === 'function') _captureActiveSessionScene();
     // Snapshot the live turn before msgInner is replaced. Preserves the activity
     // timer, partial response, and tool cards so switching back does not rebuild
     // the stream UI from scratch.
@@ -1914,11 +1971,33 @@ async function loadSession(sid){
     const _msgInner = $('msgInner');
     if (_msgInner && currentSid !== sid) _msgInner.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:14px;padding:40px;text-align:center;">Loading conversation...</div>';
   }
+  // Warm switch: repaint a recently viewed idle conversation straight from the
+  // in-memory scene cache (zero blocking round-trips), then validate the scene
+  // against the server in the background: stale-while-revalidate. On mismatch
+  // the validator invalidates and forces a keepStaleUntilLoaded reload.
+  // typeof guards keep extracted-function test harnesses (which inject
+  // loadSession without the scene-cache block) on the cold path.
+  let data;
+  let restoredFromScene = false;
+  let restoredScene = null;
+  if (typeof _getSessionSceneCache === 'function' && !INFLIGHT[sid]) {
+    const cachedScene = !forceReload ? _getSessionSceneCache(sid) : null;
+    if (cachedScene) {
+      data = {session:_restoreSessionScene(cachedScene)};
+      if (data.session) {
+        restoredFromScene = true;
+        restoredScene = cachedScene;
+        void _validateCachedSessionScene(sid, cachedScene);
+      } else {
+        data = undefined;
+      }
+    }
+  }
   // Phase 1: Load metadata only (~1KB) for fast session switching. Keep model
   // resolution out of the first-paint path; old provider-shaped model IDs are
   // repaired by the deferred resolver after S.session is assigned.
   // Guard against network/server failures to prevent a permanently stuck loading state.
-  let data;
+  if (!restoredFromScene) {
   try {
     data = await api(`/api/session?session_id=${encodeURIComponent(sid)}&messages=0&resolve_model=0`);
   } catch(e) {
@@ -2021,6 +2100,7 @@ async function loadSession(sid){
     }
     return;
   }
+  } // end cold-switch metadata fetch (scene-cache miss)
   // Guard: api() may have redirected (401) and returned undefined; in that case
   // the browser is already navigating away, so abort the rest of this flow.
   // No self-heal: 401 is transient auth expiry — the session still exists
@@ -2414,6 +2494,13 @@ async function loadSession(sid){
       // with file-tree / git badge IO.
       _deferWorkspaceRefreshForSession(sid);
     }
+  }
+
+  // Warm-switch scroll restore: pinned scenes land at the bottom via
+  // renderMessages; an unpinned scene returns to where the reader left off.
+  if (restoredFromScene && restoredScene && !restoredScene.scrollPinned && _isCurrentLoad()) {
+    const _sceneScroller = $('messages');
+    if (_sceneScroller) _sceneScroller.scrollTop = Number(restoredScene.scrollTop || 0);
   }
 
   // Sync context usage indicator from session data
@@ -4393,6 +4480,7 @@ function _renderBatchActionBar(){
     if(!ok)return;
     try{
       const results=await Promise.all(ids.map(async sid=>{
+        _invalidateSessionSceneCache(sid);
         const response=await api('/api/session/delete',{method:'POST',body:JSON.stringify({session_id:sid})});
         return {response,session:sessionsById.get(sid)||null};
       }));
@@ -6190,6 +6278,10 @@ function ensureSessionEventsSSE(){
       let eventTargetsActiveSession = false;
       try {
         const payload = typeof ev?.data === 'string' ? JSON.parse(ev.data) : {};
+        // A change to a cached conversation makes its scene stale; drop it
+        // before any profile filtering so a warm switch cannot paint outdated
+        // messages (invalidating an uncached sid is a no-op).
+        if (payload && payload.session_id) _invalidateSessionSceneCache(payload.session_id);
         const eventProfile = payload && typeof payload.profile === 'string' ? payload.profile : '';
         if (!_sessionEventProfilesMatch(eventProfile, activeProfile)) {
           return;
@@ -6368,6 +6460,10 @@ function startGatewaySSE(){
       try{
         const data = JSON.parse(ev.data);
         if(data.sessions){
+          // Gateway-side changes invalidate cached scenes for the touched sids.
+          for(const _gwSession of data.sessions){
+            if(_gwSession && _gwSession.session_id) _invalidateSessionSceneCache(_gwSession.session_id);
+          }
           stopGatewayPollFallback();
           _gatewaySSEWarningShown = false;
           if(!_isDuplicateGatewaySessionSnapshot(data.sessions)){
@@ -9163,6 +9259,7 @@ async function deleteSession(sid, beforeDelete=null){
   const beforeDeleteHold=beforeDelete?Promise.resolve().then(beforeDelete):null;
   const previousSessions=_allSessions;
   let optimisticRendered=false;
+  _invalidateSessionSceneCache(sid);
   const deleteRequest=api('/api/session/delete',{method:'POST',body:JSON.stringify({session_id:sid})}).then(response=>{
     _clearHandoffStorageForSession(sid);
     return {response};
