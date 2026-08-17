@@ -5,6 +5,13 @@
 
 ### Changed
 
+- **Switching back to a recently viewed chat now paints instantly.** A bounded in-memory scene cache (15 scenes, 32MB LRU) restores the transcript synchronously on switch-back and revalidates in the background against revision, message count, live-turn state, and composer-draft signature; any mismatch reloads in place. Only idle conversations are cached, and every mutation path invalidates: sends, stream attaches, queued messages, background-task completions, session SSE updates, force reloads, deletes, and profile switches (full clear).
+
+- **Metadata-only session polls dropped from up to 458KB gzip and 0.9-3s to under 1KB and ~45ms.** Two causes fixed: an active stream made the handler replay the entire multi-MB run journal into `runtime_journal_snapshot` even though metadata pollers never read it (now built only for `?include=journal_snapshot`, which the session-switch live-recovery path requests), and sidecars whose pre-messages metadata outgrew the 64KB prefix cap silently degraded every poll to a full uncached parse (cap now 1MB with a linear scanner). `?include=full` restores the old shape; `messages=1` responses are byte-for-byte unchanged.
+
+- **The default message render now recycles unchanged DOM rows.** The keyed node-recycle machinery from the virtualized path also arms for same-session re-renders, so a new message or tool completion no longer wipes and rebuilds every row. Session switches and scrollbar drags keep the fresh-build path.
+
+
 - **Session switching and chat-turn startup are 5-7x faster on grown configs.** A live py-spy profile showed two hot spots burning most of every `/api/session` and chat-start request: (1) `_read_profile_model_config` / `_load_profile_config_dict` re-parsed the profile's `config.yaml` from scratch on every call (~340ms per parse on a ~300KB config); they now go through the existing mtime-memoized YAML cache (`load_profile_yaml_cached`, ~3ms warm). (2) `_ordered_custom_provider_model_ids` deduped via list membership, turning a 5k-model OmniRoute catalog entry into an O(n^2) scan of ~30M comparisons; it now dedupes through a set. Measured on a real deployment: session load 1.4-2.0s to 270-320ms, `/api/chat/start` to under 140ms of server-side work.
 
 - **The gateway watcher polls every 15s instead of 5s (overridable via `HERMES_WEBUI_GATEWAY_POLL_INTERVAL`).** Its "cheap" change fingerprint runs a sessions scan plus a per-session messages aggregate; on a grown state.db (12k+ sessions) that is ~450ms of SQLite per poll, a steady ~9% of a core that also competes with chat-path reads when WAL is unavailable. WebUI-originated changes never depended on this poll; only external CLI/gateway session freshness in the sidebar moves to a 15s cadence.
