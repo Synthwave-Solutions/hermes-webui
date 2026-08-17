@@ -1920,7 +1920,10 @@ async function loadSession(sid){
   // Guard against network/server failures to prevent a permanently stuck loading state.
   let data;
   try {
-    data = await api(`/api/session?session_id=${encodeURIComponent(sid)}&messages=0&resolve_model=0`);
+    // include=journal_snapshot: this is the one metadata-only caller that
+    // needs runtime_journal_snapshot (mid-stream switch recovery below); the
+    // slim metadata default omits it.
+    data = await api(`/api/session?session_id=${encodeURIComponent(sid)}&messages=0&resolve_model=0&include=journal_snapshot`);
   } catch(e) {
     const profileMismatch=_sessionProfileMismatchFromError(e);
     if(profileMismatch && profileMismatch.profile && !opts.skipProfileResolve){
@@ -3296,6 +3299,13 @@ async function _ensureMessagesLoaded(sid, opts) {
       S.session.todo_state = data.session.todo_state;
     }else{
       delete S.session.todo_state;
+    }
+    // The messages=0 metadata fetch in loadSession() no longer carries the
+    // (unbounded) compression_anchor_summary; the messages=1 response is now
+    // its authoritative source, so sync it onto S.session for the
+    // compression-anchor banner in renderMessages().
+    if(typeof data.session.compression_anchor_summary === 'string'){
+      S.session.compression_anchor_summary = data.session.compression_anchor_summary;
     }
     if(typeof _hydrateTodosFromSession === 'function'){
       _hydrateTodosFromSession(S.session);
