@@ -3,7 +3,8 @@
 `HERMES_WEBUI_CSP_FRAME_EXTRA` lets an operator widen what the WebUI page may
 embed in an <iframe> (e.g. a self-hosted dashboard pinned as an extension tab),
 opt-in and default-off. The base policy is same-origin only, and the knob never
-touches `frame-ancestors` (who may embed the WebUI), which stays 'none'.
+touches `frame-ancestors` (who may embed the WebUI), which stays same-origin
+only ('self') so the split view can frame the app itself.
 """
 
 from __future__ import annotations
@@ -16,8 +17,9 @@ def test_csp_frame_src_default_is_self_only(monkeypatch):
 
     policy = Handler.csp_report_only_policy()
     assert "frame-src 'self'; " in policy
-    # frame-ancestors must remain locked down regardless.
-    assert "frame-ancestors 'none'" in policy
+    # frame-ancestors must stay same-origin only regardless (split view
+    # frames the app itself; cross-origin embedding stays blocked).
+    assert "frame-ancestors 'self'" in policy
 
 
 def test_csp_frame_src_includes_valid_extra_origins(monkeypatch):

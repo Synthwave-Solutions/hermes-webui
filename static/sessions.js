@@ -6158,6 +6158,9 @@ function _closeSessionEventsSSE(){
 }
 
 function ensureSessionEventsSSE(){
+  // Same per-origin connection-budget reasoning as startGatewaySSE: split-view
+  // panes fetch the sidebar list on demand instead of holding a live stream.
+  if(window.__HERMES_PANE_MODE) return;
   if(typeof document !== 'undefined' && !document._hermesSessionEventsVisibilityHook){
     document.addEventListener('visibilitychange', () => {
       if(document.hidden){
@@ -6334,6 +6337,10 @@ async function probeGatewaySSEStatus(){
 
 function startGatewaySSE(){
   stopGatewaySSE();
+  // Split-view panes skip the global gateway stream: eight panes of
+  // persistent SSE would exhaust the browser's per-origin HTTP/1.1
+  // connection budget and starve the chat streams (static/split.js).
+  if(window.__HERMES_PANE_MODE) return;
   if(!window._showCliSessions) return;
   // Visibility hook (install once) — mirror ensureSessionEventsSSE() pattern
   if(typeof document !== 'undefined' && !document._hermesGatewaySSEVisibilityHook){

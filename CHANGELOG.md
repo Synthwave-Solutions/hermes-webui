@@ -17,6 +17,9 @@
 
 ### Added
 
+- **Split view: run up to 8 chats side by side.** A new titlebar button opens a same-origin grid of chat panes (2, 3, 4, 6, or 8) so several conversations can run and stream at the same time. Each pane is the full app in a slim "pane mode" (`?pane=1`): reload/profile chrome hidden, sidebar collapsed but reachable through the hamburger, and per-pane global SSE disabled so eight panes cannot exhaust the browser's per-origin connection budget on HTTP/1.1. The layout and each pane's active session persist in localStorage and are restored on the next toggle, panes report session switches to the parent, and exiting the split drops all frames so background panes stop consuming resources. To allow the app to frame itself, `frame-ancestors` moves from `'none'` to `'self'` and `X-Frame-Options` from `DENY` to `SAMEORIGIN`: cross-origin embedding stays blocked.
+
+
 - **Each settled assistant turn's footer now shows the model that actually served it.** In transparent-stream mode the turn footer gains a compact model chip (e.g. `8s · claude-opus-4-8 · TTFT 640ms · …`), read *after* the turn completes so a mid-turn fallback shows the real model that answered rather than the one originally requested. The label renders exactly once per turn — a gateway/failover turn keeps its existing routing chip and the additive chip is suppressed — and the footer wraps gracefully at narrow widths and on mobile instead of stretching. The used-model is persisted with the session so it survives a reload. Thanks @franksong2702. (#6113, #6068)
 
 ### Fixed

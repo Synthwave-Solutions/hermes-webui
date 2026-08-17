@@ -75,7 +75,7 @@ _CSP_HEADER_NAME = 'Content-Security-Policy'
 _CSP_SHARED_POLICY_TEMPLATE = (
     "default-src 'self' https://*.cloudflareaccess.com; "
     "object-src 'none'; "
-    "frame-ancestors 'none'; "
+    "frame-ancestors 'self'; "
     "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://static.cloudflareinsights.com blob:; "
     "worker-src blob: 'self' https://cdn.jsdelivr.net; "
     "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; "
@@ -91,7 +91,9 @@ _CSP_SHARED_POLICY_TEMPLATE = (
 # dashboard/extension iframes keep working). An operator can widen it, opt-in,
 # via HERMES_WEBUI_CSP_FRAME_EXTRA — e.g. to embed a self-hosted dashboard in an
 # extension tab. This governs what THIS page may embed; it does NOT affect
-# frame-ancestors (who may embed the WebUI), which stays 'none'.
+# frame-ancestors (who may embed the WebUI), which stays same-origin only
+# ('self', paired with X-Frame-Options SAMEORIGIN) so the split view can
+# frame the app itself while cross-origin embedding stays blocked.
 _CSP_FRAME_BASE = "'self'"
 
 
@@ -182,7 +184,7 @@ def _security_headers(handler):
     handler._csp_extra_connect_src = extra_connect_src
     handler._csp_extra_frame_src = extra_frame_src
     handler.send_header('X-Content-Type-Options', 'nosniff')
-    handler.send_header('X-Frame-Options', 'DENY')
+    handler.send_header('X-Frame-Options', 'SAMEORIGIN')
     handler.send_header('Referrer-Policy', 'same-origin')
     handler.send_header(_CSP_HEADER_NAME, _build_csp_enforced_policy(extra_connect_src, extra_frame_src))
     handler.send_header(
