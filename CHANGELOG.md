@@ -22,6 +22,9 @@
 
 ### Added
 
+- **Cold-start caches are pre-warmed in the background at server start.** The two dominant cold costs both lived in process-local caches, so the first user after a restart paid them interactively: the Claude Code transcript parse behind the sidebar projection (10-27s measured on a 2.2GB, 1.6k-file `~/.claude/projects` tree) and the live provider/model catalog rebuild (5-17s). A daemon thread now runs both once at startup, gated by the same settings as the request paths and disableable via `HERMES_WEBUI_PREWARM=0`. Measured after a restart: first `/api/sessions` 10-27s to ~640ms, first `/api/models` ~5.3s to ~110ms.
+
+
 - **Split view: run up to 8 chats side by side.** A new titlebar button opens a same-origin grid of chat panes (2, 3, 4, 6, or 8) so several conversations can run and stream at the same time. Each pane is the full app in a slim "pane mode" (`?pane=1`): reload/profile chrome hidden, sidebar collapsed but reachable through the hamburger, and per-pane global SSE disabled so eight panes cannot exhaust the browser's per-origin connection budget on HTTP/1.1. The layout and each pane's active session persist in localStorage and are restored on the next toggle, panes report session switches to the parent, and exiting the split drops all frames so background panes stop consuming resources. To allow the app to frame itself, `frame-ancestors` moves from `'none'` to `'self'` and `X-Frame-Options` from `DENY` to `SAMEORIGIN`: cross-origin embedding stays blocked.
 
 

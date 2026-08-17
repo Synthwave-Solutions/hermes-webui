@@ -679,6 +679,13 @@ def main() -> None:
         print(f'[!!] WARNING: Gateway watcher failed to start: {e}', flush=True)
 
     try:
+        from api.prewarm import start_prewarm_thread
+        if start_prewarm_thread():
+            print('[ok] cache pre-warm thread started (claude-code transcripts + model catalog)', flush=True)
+    except Exception as e:
+        print(f'[!!] WARNING: cache pre-warm failed to start: {e}', flush=True)
+
+    try:
         from api.background_process import start_drain_thread
         if start_drain_thread():
             print('[ok] bg_task_complete drain thread started', flush=True)
