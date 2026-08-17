@@ -254,6 +254,8 @@ function queueSessionMessage(sid, payload){
   const entry={...payload, _queued_at: Date.now()};
   q.push(entry);
   _persistSessionQueueStorage(sid,q);
+  // A queued message will change this conversation; drop any cached scene.
+  if(typeof _invalidateSessionSceneCache==='function') _invalidateSessionSceneCache(sid);
   return q.length;
 }
 function shiftQueuedSessionMessage(sid){

@@ -114,8 +114,11 @@ def test_immediate_empty_draft_flush_clears_locally_known_server_draft():
         "debounced non-empty draft saves must mark the session as having server-side draft payload"
     )
     assert "_rememberComposerDraftPayloadState(sid, normalizedText, normalizedFiles);" in save_body
-    assert "!_composerDraftKnownPayloadSessions.has(sid)" in now_body, (
-        "empty immediate switch-away saves may only be skipped when no local/server draft payload is known"
+    # The immediate save now compares payload signatures against the last known
+    # server draft (perf/scene-cache): an unchanged payload, including the
+    # empty-vs-empty case the old known-payload set covered, skips the POST.
+    assert "nextSignature === savedSignature" in now_body, (
+        "immediate switch-away saves may only be skipped when the payload matches the last known server draft"
     )
     assert "_rememberComposerDraftPayloadState(sid, normalizedText, normalizedFiles);" in now_body
 

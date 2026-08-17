@@ -7079,6 +7079,8 @@ async function switchToProfile(name) {
     if (_switchGen !== _profileSwitchGeneration) return false;
     S.activeProfile = data.active || name;
     S.activeProfileIsDefault = !!data.is_default;
+    // Scenes are per-profile state; never let one leak across a switch.
+    if (typeof _clearSessionSceneCache === 'function') _clearSessionSceneCache();
     if (typeof _resetCronUnreadForProfileSwitch === 'function') {
       _resetCronUnreadForProfileSwitch();
     }
