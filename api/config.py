@@ -609,6 +609,20 @@ _yaml_file_cache: dict[str, tuple] = {}
 _yaml_file_cache_lock = threading.Lock()
 
 
+def load_profile_yaml_cached(config_path) -> dict:
+    """Public mtime-memoized YAML read for PROFILE config.yaml files.
+
+    Thin wrapper around _load_yaml_config_file_raw so hot request paths that
+    read per-profile configs (routes.py `_read_profile_model_config` and
+    `_load_profile_config_dict`) share the same (path, mtime_ns, size) parse
+    cache as the app's own config. A profile config.yaml is ~300KB of YAML and
+    pure-Python safe_load costs ~340ms; the cached deep copy costs ~3ms, and
+    those helpers run on every /api/session and chat turn. Returns {} for a
+    missing/unparseable file (same contract as the raw helper).
+    """
+    return _load_yaml_config_file_raw(Path(config_path))
+
+
 def _load_yaml_config_file_raw(config_path: Path, *, _copy: bool = True) -> dict:
     """Return the RAW (un-env-expanded) parsed config dict, memoized on
     (resolved path, st_mtime_ns, st_size). Shared parse core for

@@ -199,7 +199,14 @@ class GatewayWatcher:
         watcher.stop()
     """
 
-    POLL_INTERVAL = 5  # seconds between polls
+    # Seconds between polls. The "cheap" fingerprint is a sessions scan plus a
+    # per-session messages aggregate; on a grown state.db (12k+ sessions) that
+    # is ~450ms of query per poll, so 5s burned a steady ~9% of a core and held
+    # read locks the chat path competes with (journal_mode=DELETE, no WAL).
+    # 15s keeps external CLI/gateway sessions reasonably fresh in the sidebar
+    # while cutting the standing cost 3x; WebUI-originated changes don't go
+    # through this poll at all. Overridable for constrained boxes.
+    POLL_INTERVAL = int(os.environ.get('HERMES_WEBUI_GATEWAY_POLL_INTERVAL', '15') or 15)
     SUBSCRIBER_TIMEOUT = 30  # seconds before sending keepalive comment
 
     def __init__(

@@ -6390,10 +6390,12 @@ def _read_profile_model_config(
         _profile_cfg_path = os.path.join(str(_profile_home), "config.yaml")
         if not os.path.isfile(_profile_cfg_path):
             return None, None, None
-        import yaml
+        # Memoized on (path, mtime_ns, size): this runs on every /api/session
+        # and chat turn, and an uncached safe_load of a ~300KB profile config
+        # costs ~340ms per call (the top frame in a live py-spy profile).
+        from api.config import load_profile_yaml_cached
 
-        with open(_profile_cfg_path, encoding="utf-8") as _f:
-            _pcfg = yaml.safe_load(_f) or {}
+        _pcfg = load_profile_yaml_cached(_profile_cfg_path) or {}
         if not isinstance(_pcfg, dict):
             return None, None, None
         _model_cfg = _pcfg.get("model") or {}
@@ -6431,10 +6433,10 @@ def _load_profile_config_dict(session) -> dict | None:
         )
         if not os.path.isfile(_profile_cfg_path):
             return None
-        import yaml
+        # Same memoized read as _read_profile_model_config: see that helper.
+        from api.config import load_profile_yaml_cached
 
-        with open(_profile_cfg_path, encoding="utf-8") as _f:
-            _pcfg = yaml.safe_load(_f) or {}
+        _pcfg = load_profile_yaml_cached(_profile_cfg_path) or {}
         return _pcfg if isinstance(_pcfg, dict) else None
     except Exception:
         logger.warning(
@@ -6446,30 +6448,35 @@ def _load_profile_config_dict(session) -> dict | None:
 
 
 def _ordered_custom_provider_model_ids(entry: dict) -> list[str]:
-    """Model ids from a custom_providers entry (default model + dict/list models)."""
+    """Model ids from a custom_providers entry (default model + dict/list models).
+
+    Dedup goes through a side `set`, not `x not in ordered`: a provider entry
+    can list thousands of models (an OmniRoute catalog sync writes 5k+), and
+    list-membership made this O(n^2), the single hottest frame in a live
+    py-spy profile of /api/session traffic before the fix.
+    """
     ordered: list[str] = []
-    _cp_model = str(entry.get("model") or "").strip()
-    if _cp_model:
-        ordered.append(_cp_model)
+    _seen: set[str] = set()
+
+    def _add(mid: str) -> None:
+        if mid and mid not in _seen:
+            _seen.add(mid)
+            ordered.append(mid)
+
+    _add(str(entry.get("model") or "").strip())
     _cp_models = entry.get("models")
     if isinstance(_cp_models, dict):
         for _key in _cp_models.keys():
             if isinstance(_key, str):
-                _kid = _key.strip()
-                if _kid and _kid not in ordered:
-                    ordered.append(_kid)
+                _add(_key.strip())
     elif isinstance(_cp_models, list):
         for _item in _cp_models:
             if isinstance(_item, str):
-                _mid = _item.strip()
-                if _mid and _mid not in ordered:
-                    ordered.append(_mid)
+                _add(_item.strip())
             elif isinstance(_item, dict):
-                _mid = str(
+                _add(str(
                     _item.get("id") or _item.get("model") or _item.get("name") or ""
-                ).strip()
-                if _mid and _mid not in ordered:
-                    ordered.append(_mid)
+                ).strip())
     return ordered
 
 
