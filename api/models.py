@@ -946,15 +946,32 @@ def _read_file_head(path: Path, max_prefix_bytes: int = 4096) -> str:
         return fp.read(max_prefix_bytes).decode('utf-8', errors='ignore')
 
 
-def _read_metadata_json_prefix(path, max_prefix_bytes=65536):
-    """Read only the metadata portion before the top-level messages array."""
+def _read_metadata_json_prefix(path, max_prefix_bytes=1048576):
+    """Read only the metadata portion before the top-level messages array.
+
+    The cap must cover the largest realistic pre-messages metadata block:
+    compression_anchor_summary near 200KB and anchor_activity_scenes above
+    700KB have both been observed in real sidecars. An overflow here
+    silently downgrades every metadata-only load of that session to a full
+    multi-MB JSON parse, and metadata-only loads are not cached, so the
+    penalty repeats on every poll.
+    """
     buf = ''
+    buf_bytes = 0
     with open(path, 'r', encoding='utf-8') as f:
-        while len(buf.encode('utf-8')) < max_prefix_bytes:
-            chunk = f.read(4096)
+        while buf_bytes < max_prefix_bytes:
+            chunk = f.read(65536)
             if not chunk:
                 return None
             buf += chunk
+            buf_bytes += len(chunk.encode('utf-8'))
+            # The char-by-char scanner below is O(len(buf)) per call, so
+            # rescanning after every chunk turns a large prefix into O(n^2).
+            # A raw '"messages"' substring cannot occur inside a JSON string
+            # value (interior quotes are escaped), so this C-speed check only
+            # passes once a real "messages" key (any depth) has been read.
+            if '"messages"' not in buf:
+                continue
             messages_pos = _find_top_level_json_key(buf, 'messages')
             if messages_pos is None:
                 continue

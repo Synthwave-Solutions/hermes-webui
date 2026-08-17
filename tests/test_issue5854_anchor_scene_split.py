@@ -155,7 +155,7 @@ def test_cached_lags_disk_detects_newer_scene_updated_at(session_store):
 
 def test_parity_cache_not_forced_reload_when_prefix_read_fails(session_store):
     """MUST-FIX regression (Opus round-1): when the cheap prefix read fails
-    (oversized metadata field > 64KB), the slow path must compare the CACHED
+    (oversized metadata field above the prefix cap), the slow path must compare the CACHED
     side against its REAL records, not a stale load-time fingerprint. A cache at
     exact parity with disk must NOT be judged as lagging (which would force a
     spurious full reload of the heavy session this PR optimizes).
@@ -169,7 +169,7 @@ def test_parity_cache_not_forced_reload_when_prefix_read_fails(session_store):
                   model="glm", messages=[{"role": "user", "content": "hi"},
                                          {"role": "assistant", "content": "yo"}])
     s.anchor_activity_scenes = scenes
-    s.compression_anchor_summary = "Z" * 80000  # push metadata prefix > 64KB
+    s.compression_anchor_summary = "Z" * 1100000  # push metadata prefix over the 1MB cap
     s.save()
     # Sanity: the cheap prefix genuinely fails for this file (slow path taken).
     assert M._read_metadata_json_prefix(session_store / "p1.json") is None
@@ -180,7 +180,7 @@ def test_parity_cache_not_forced_reload_when_prefix_read_fails(session_store):
                                                      {"role": "assistant", "content": "yo"}])
     cached_parity.anchor_activity_scenes = {"scene0": {"updated_at": 1000.0, "scene": {}}}
     cached_parity._anchor_scene_index = {}  # stale/empty load-time fingerprint
-    cached_parity.compression_anchor_summary = "Z" * 80000
+    cached_parity.compression_anchor_summary = "Z" * 1100000
     assert M._cached_session_lags_disk(cached_parity) is False
     # But a genuinely-behind cache (disk has a newer scene) still reloads.
     cached_behind = M.Session(session_id="p1", title="T", workspace=str(session_store.parent),

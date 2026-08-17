@@ -11868,6 +11868,24 @@ def handle_get(handler, parsed) -> bool:
         load_messages = query.get("messages", ["1"])[0] != "0"
         resolve_model_default = "1" if load_messages else "0"
         resolve_model = query.get("resolve_model", [resolve_model_default])[0] != "0"
+        # ?include=<tokens> opts a metadata-only (messages=0) request back into
+        # heavy payload parts that the slim default now omits. Comma-separated:
+        #   journal_snapshot - runtime_journal_snapshot for an active stream
+        #                      (multi-MB for a long agent turn; only the
+        #                      session-switch live-recovery path needs it)
+        #   full            - all pre-slimming metadata fields (escape hatch
+        #                      for external consumers of the old shape)
+        # Full loads (messages=1) always carry everything, so the flag is a
+        # no-op there.
+        _include_tokens = {
+            token.strip()
+            for token in query.get("include", [""])[0].split(",")
+            if token.strip()
+        }
+        include_full_metadata = load_messages or ("full" in _include_tokens)
+        include_journal_snapshot = (
+            include_full_metadata or "journal_snapshot" in _include_tokens
+        )
         # ?msg_limit=N returns a tail window containing the last N visible
         # transcript rows. Hidden tool-result rows do not consume the budget;
         # they are included only when they sit inside the selected window and
@@ -12132,7 +12150,11 @@ def handle_get(handler, parsed) -> bool:
                         journal,
                         active=journal_active,
                     )
-                    if journal_active:
+                    # Building the live snapshot replays the whole run journal
+                    # (multi-MB jsonl for a long turn) and serializes the full
+                    # in-flight assistant text. Metadata pollers never read it,
+                    # so only pay that cost when the caller opted in.
+                    if journal_active and include_journal_snapshot:
                         try:
                             snapshot = _run_journal_live_snapshot(original_stream_id, handler=handler)
                         except Exception:
@@ -12198,6 +12220,20 @@ def handle_get(handler, parsed) -> bool:
             ):
                 raw["is_cli_session"] = False
                 raw["read_only"] = True
+            if not include_full_metadata:
+                # Slim the metadata-only variant: these fields are unbounded
+                # (a compaction summary alone has been observed near 200KB raw)
+                # and no messages=0 consumer reads them. The transcript load
+                # (messages=1) still carries compression_anchor_summary and
+                # the frontend re-hydrates S.session from that response, so
+                # the compression banner keeps its summary text. Mirrors the
+                # _sidebar_session_response_item allowlist for /api/sessions.
+                for _heavy_key in (
+                    "compression_anchor_summary",
+                    "compression_anchor_details",
+                    "context_engine_state",
+                ):
+                    raw.pop(_heavy_key, None)
             redact = redact_session_data(raw)
             _t5 = _time.monotonic()
             resp = j(handler, {"session": redact})
