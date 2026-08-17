@@ -552,6 +552,12 @@ let _messageVirtualScrollActive=false;
 let _messageVirtualScrollSettleTimer=0;
 let _messageVirtualDeferredMeasurement=null;
 let _msgNodeRecycleEnabled=false;
+// Same-session recycle arm: set by renderMessages itself for in-session
+// re-renders (new message, tool completion, mid-stream refresh) so the #4346
+// recycle machinery also runs outside the virtual-scroll path, which keeps
+// owning _msgNodeRecycleEnabled. Recomputed at the top of every render and
+// cleared once the render loop has consumed the stash.
+let _msgNodeRecycleSameSession=false;
 const _recycleStash=new Map();
 const _recycleResetAttrs=[
   'data-transparent-turn-collapsed',
@@ -15834,8 +15840,20 @@ function renderMessages(options){
     S.session && typeof S.session.compression_anchor_summary==='string'
   ) ? S.session.compression_anchor_summary.trim() : '';
   const worklogDetailDisclosureState=_captureWorklogDetailDisclosureState(inner);
+  // Arm the #4346 node-recycle machinery for ANY same-session re-render (new
+  // message, tool completion, mid-stream refresh), not just the virtual-scroll
+  // path that owns _msgNodeRecycleEnabled around this call. Same-session only:
+  // rawIdx recycle keys are stable only within one session's transcript, and
+  // _sessionHtmlCacheSid tracks which session the current DOM belongs to, so a
+  // session switch always takes the fresh-build path (the recycle pool must
+  // never leak across sessions). Scrollbar drags keep the fresh-build path
+  // too, matching the #4793 drag hardening. (typeof guard keeps the standalone
+  // renderMessages() test harnesses that don't stub _scrollbarDragActive
+  // running.)
+  _msgNodeRecycleSameSession=!!sid&&sid===_sessionHtmlCacheSid
+    &&!(typeof _scrollbarDragActive!=='undefined'&&_scrollbarDragActive);
   _recycleStash.clear();
-  if(_msgNodeRecycleEnabled){
+  if(_msgNodeRecycleEnabled||_msgNodeRecycleSameSession){
     for(const child of Array.from(inner.children)){
       const key=child.dataset&&(child.dataset.recycleKey||child.dataset.msgIdx);
       if(!key) continue;
@@ -16203,7 +16221,7 @@ function renderMessages(options){
 
     if(isProcessWakeup){
       currentAssistantTurn=null;
-      let row=_msgNodeRecycleEnabled?_recycleStash.get(rawIdx):null;
+      let row=(_msgNodeRecycleEnabled||_msgNodeRecycleSameSession)?_recycleStash.get(rawIdx):null;
       if(row&&(!row.classList.contains('msg-row')||row.classList.contains('assistant-turn'))) row=null;
       const processText=String(rowDisplayContent||'').trim();
       const processFootHtml=`<div class="msg-foot">${timeHtml}<span class="msg-actions">${copyBtn}</span></div>`;
@@ -16268,7 +16286,7 @@ function renderMessages(options){
 
     if(isUser){
       currentAssistantTurn=null;
-      let row=_msgNodeRecycleEnabled?_recycleStash.get(rawIdx):null;
+      let row=(_msgNodeRecycleEnabled||_msgNodeRecycleSameSession)?_recycleStash.get(rawIdx):null;
       if(row&&(!row.classList.contains('msg-row')||row.classList.contains('assistant-turn'))) row=null;
       const newRawText=String(displayContent).trim();
       const nextRowHtml=`${filesHtml}<div class="msg-body">${bodyHtml}</div>${footHtml}`;
@@ -16309,7 +16327,9 @@ function renderMessages(options){
     }
 
     if(!currentAssistantTurn){
-      let recycled=_msgNodeRecycleEnabled?_recycleStash.get(rawIdx):null;
+      // typeof guard: this chunk is eval'd standalone by the #4793 harness,
+      // which stubs _msgNodeRecycleEnabled but not the same-session arm.
+      let recycled=(_msgNodeRecycleEnabled||(typeof _msgNodeRecycleSameSession!=='undefined'&&_msgNodeRecycleSameSession))?_recycleStash.get(rawIdx):null;
       if(recycled&&!recycled.classList.contains('assistant-turn')) recycled=null;
       if(recycled){
         const blocks=_assistantTurnBlocks(recycled);
@@ -16447,6 +16467,9 @@ function renderMessages(options){
     _assistantTurnBlocks(currentAssistantTurn).appendChild(seg);
     assistantSegments.set(rawIdx, seg);
   }
+  // Render-local: the same-session arm never outlives the loop that consumed
+  // the stash (the virtual-scroll caller still owns _msgNodeRecycleEnabled).
+  _msgNodeRecycleSameSession=false;
 
   function _insertCompressionLikeNode(node, anchorIndex){
     if(!node) return;
