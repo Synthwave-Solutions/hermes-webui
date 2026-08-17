@@ -14556,6 +14556,24 @@ def handle_post(handler, parsed) -> bool:
             return bad(handler, _sanitize_error(e), 502)
         return j(handler, result)
 
+    if parsed.path == "/api/integrations/disable":
+        # Admin-only: remove the Nango integration and its approval entry.
+        from api.integrations import disable_integration
+        from api.ownership import request_is_admin, request_owner_email
+
+        if not request_is_admin(handler):
+            return j(handler, {"error": "admin required"}, status=403)
+        provider_config_key = str(body.get("provider_config_key", "") or "").strip()
+        if not provider_config_key:
+            return bad(handler, "provider_config_key is required")
+        try:
+            result = disable_integration(request_owner_email(handler), provider_config_key)
+        except ValueError as e:
+            return bad(handler, str(e), 400)
+        except RuntimeError as e:
+            return bad(handler, _sanitize_error(e), 502)
+        return j(handler, result)
+
     if parsed.path == "/api/integrations/request":
         from api.integrations import CONNECT_STATUS_PENDING, request_provider_approval
         from api.ownership import request_owner_email

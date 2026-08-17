@@ -7404,6 +7404,17 @@ html,body{background:var(--bg)!important;color:var(--text);font-family:var(--fon
 .gov-table tbody tr.gov-approval-group:hover{background:none;}
 
 /* Chip box (multi-select input) */
+.gov-chipwrap{position:relative;flex:1;min-width:0;}
+.gov-chip-menu{position:absolute;left:0;right:0;top:100%;margin-top:4px;z-index:60;max-height:220px;overflow-y:auto;background:var(--panel-bg,var(--bg));border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:4px;display:flex;flex-direction:column;gap:1px;}
+.gov-chip-option{display:block;width:100%;text-align:left;border:none;background:transparent;color:var(--text);font-size:12px;padding:6px 9px;border-radius:6px;cursor:pointer;}
+.gov-chip-option:hover{background:var(--input-bg);color:var(--accent);}
+.gov-pill{display:inline-flex;align-items:center;border-radius:999px;padding:2px 9px;font-size:11px;font-weight:600;line-height:1.5;margin-right:4px;border:1px solid var(--border);color:var(--muted);}
+.gov-pill.on{background:rgba(63,185,80,.12);border-color:rgba(63,185,80,.3);color:#3fb950;}
+.gov-pill.warn{background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.3);color:#f59e0b;}
+.gov-pill.off{background:rgba(240,113,123,.12);border-color:rgba(240,113,123,.3);color:#f0717b;}
+.gov-intg-name{display:flex;align-items:center;gap:10px;}
+.gov-intg-logo{width:22px;height:22px;flex:0 0 22px;object-fit:contain;border-radius:5px;background:#fff;padding:2px;}
+.gov-mono{font-family:var(--mono,monospace);font-size:11px;}
 .gov-chipbox{display:flex;flex-wrap:wrap;align-items:center;gap:3px;background:var(--input-bg);border:1px solid var(--border);border-radius:8px;padding:6px 8px;cursor:text;min-height:36px;transition:border-color .15s ease;}
 .gov-chipbox:focus-within{border-color:var(--accent);}
 .gov-chipbox input{flex:1 1 120px;min-width:120px;border:none !important;background:transparent !important;outline:none;padding:3px 2px !important;font-size:13px;color:var(--text);}

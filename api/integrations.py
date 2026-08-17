@@ -699,6 +699,38 @@ def enable_integration(admin_email: str | None, provider_config_key: str) -> dic
     }
 
 
+def disable_integration(admin_email: str | None, provider_config_key: str) -> dict:
+    """Delete a Nango integration and drop its approval entry (admin path).
+
+    Refuses while connections exist: deleting the integration would take
+    their tokens with it, so the admin has to disconnect them first (a
+    deliberate, visible act). Removing the approval entry returns the
+    provider to the never-requested state.
+    """
+    key = str(provider_config_key or "").strip()
+    if not key:
+        raise ValueError("provider_config_key is required")
+    in_use = [
+        str(c.get("connection_id") or "")
+        for c in list_connections(None, is_admin=True)
+        if str(c.get("provider_config_key") or "") == key
+    ]
+    if in_use:
+        raise ValueError(
+            f"integration '{key}' still has {len(in_use)} connection(s); disconnect them first"
+        )
+    configured = {str(row.get("unique_key") or "") for row in _list_integrations()}
+    if key in configured:
+        _nango_request("DELETE", f"/integrations/{urllib.parse.quote(key, safe='')}")
+    try:
+        from api import approvals
+
+        approvals.remove(approvals.KIND_INTEGRATION, key)
+    except Exception:
+        logger.warning("Disabled %s but removing its approval entry failed", key, exc_info=True)
+    return {"status": "disabled", "provider_config_key": key, "display_name": _provider_label(key)}
+
+
 def create_connect_session(
     owner_email: str | None,
     provider_config_key: str,

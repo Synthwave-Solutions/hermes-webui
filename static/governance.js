@@ -65,7 +65,7 @@ async function loadGovernance() {
 
 async function _govSwitchTab(name) {
   _govEnsureWorkspacesTab();
-  const tab = ['overview', 'users', 'groups', 'workspaces', 'approvals', 'preview', 'audit'].includes(name) ? name : 'overview';
+  const tab = ['overview', 'users', 'groups', 'workspaces', 'approvals', 'integrations', 'preview', 'audit'].includes(name) ? name : 'overview';
   _govTab = tab;
   document.querySelectorAll('#mainGovernance .gov-tab').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.govTab === tab);
@@ -78,8 +78,10 @@ async function _govSwitchTab(name) {
   if (tab === 'groups') await _govLoadGroups();
   if (tab === 'workspaces') await _govLoadWorkspaces();
   if (tab === 'approvals') await _govLoadApprovals();
+  if (tab === 'integrations') await _govLoadIntegrations();
   if (tab === 'audit') await _govLoadAudit();
-  // preview tab is form-driven; nothing to preload
+  // preview tab is form-driven, but its email/groups pickers need the catalogs
+  if (tab === 'preview') _govEnsureCatalogs().then(_govFillCatalogDatalists).catch(() => {});
 }
 
 async function _govRefreshTab() {
@@ -224,10 +226,9 @@ async function _govLoadUsers() {
         '<div class="gov-form-title" id="govUserFormTitle">' + _govT('governance_user_add', 'Add user') + '</div>' +
         '<div class="gov-form-row"><label for="govUserEmail">' + _govT('governance_col_email', 'Email') + '</label>' +
           '<input id="govUserEmail" type="text" placeholder="name@example.com" autocomplete="off"></div>' +
-        '<div class="gov-form-row"><label for="govUserRoles">' + _govT('governance_roles_csv', 'Roles') + '</label>' +
-          '<input id="govUserRoles" type="text" placeholder="viewer, operator" autocomplete="off"></div>' +
-        '<div class="gov-form-row"><label for="govUserGroups">' + _govT('governance_groups_csv', 'Groups') + '</label>' +
-          '<input id="govUserGroups" type="text" placeholder="sw-engineering" autocomplete="off"></div>' +
+        _govChipFieldHtml('govUserRolesSel', _govT('governance_roles_csv', 'Roles'), 'govDlRolesUsr', _govT('governance_pick_role', 'pick a role')) +
+        _govChipFieldHtml('govUserGroupsSel', _govT('governance_groups_csv', 'Groups'), 'govDlGroupsUsr', _govT('governance_pick_group', 'pick a group')) +
+        '<datalist id="govDlRolesUsr"></datalist><datalist id="govDlGroupsUsr"></datalist>' +
       '</div>' +
       '<div class="gov-form-section">' +
         '<div class="gov-form-title">' + _govT('governance_grants_title', 'Capabilities & grants') + '</div>' +
@@ -279,11 +280,61 @@ function _govChipsSet(id, values) {
 }
 
 function _govChipFieldHtml(id, label, datalistId, placeholder) {
+  // Selection-first: focusing the input opens a clickable option menu fed by
+  // the same datalist; typing filters it and free text still works for
+  // values the catalog does not know yet.
   return '<div class="gov-form-row"><label for="' + id + 'Input">' + _govEsc(label) + '</label>' +
+    '<div class="gov-chipwrap">' +
     '<div class="gov-chipbox" id="' + id + 'Box" onclick="(function(i){if(i)i.focus();})($(\'' + id + 'Input\'))">' +
-      '<input id="' + id + 'Input" type="text" list="' + _govEsc(datalistId) + '" placeholder="' + _govEsc(placeholder || '') + '" autocomplete="off"' +
-      ' onkeydown="_govChipKey(event, \'' + id + '\')" onchange="_govChipCommit(\'' + id + '\')" onblur="_govChipCommit(\'' + id + '\')">' +
+      '<input id="' + id + 'Input" type="text" data-chip-dl="' + _govEsc(datalistId) + '" placeholder="' + _govEsc(placeholder || '') + '" autocomplete="off"' +
+      ' onkeydown="_govChipKey(event, \'' + id + '\')" onchange="_govChipCommit(\'' + id + '\')"' +
+      ' onfocus="_govChipMenuOpen(\'' + id + '\')" oninput="_govChipMenuOpen(\'' + id + '\')"' +
+      ' onblur="_govChipMenuBlur(\'' + id + '\')">' +
+    '</div>' +
+    '<div class="gov-chip-menu" id="' + id + 'Menu" style="display:none"></div>' +
     '</div></div>';
+}
+
+// ── Chip option menu (click-to-pick) ──────────────────────────────────────
+
+function _govChipMenuOptions(id) {
+  const input = $(id + 'Input');
+  if (!input) return [];
+  const dl = $(input.getAttribute('data-chip-dl') || '');
+  if (!dl) return [];
+  const chosen = new Set(_govChipsGet(id));
+  const q = String(input.value || '').trim().toLowerCase();
+  return Array.from(dl.querySelectorAll('option'))
+    .map(o => o.value)
+    .filter(v => v && !chosen.has(v) && (!q || v.toLowerCase().includes(q)))
+    .slice(0, 60);
+}
+
+function _govChipMenuOpen(id) {
+  const menu = $(id + 'Menu');
+  if (!menu) return;
+  const options = _govChipMenuOptions(id);
+  if (!options.length) { menu.style.display = 'none'; return; }
+  menu.innerHTML = options.map(v =>
+    '<button type="button" class="gov-chip-option" data-value="' + _govEsc(v) + '">' + _govEsc(v) + '</button>'
+  ).join('');
+  menu.querySelectorAll('.gov-chip-option').forEach(btn => {
+    // mousedown, not click: it fires before the input's blur closes the menu
+    btn.addEventListener('mousedown', ev => {
+      ev.preventDefault();
+      _govChipAdd(id, btn.getAttribute('data-value'));
+      const input = $(id + 'Input');
+      if (input) { input.value = ''; input.focus(); }
+      _govChipMenuOpen(id);
+    });
+  });
+  menu.style.display = '';
+}
+
+function _govChipMenuBlur(id) {
+  _govChipCommit(id);
+  const menu = $(id + 'Menu');
+  if (menu) setTimeout(() => { menu.style.display = 'none'; }, 150);
 }
 
 function _govRenderChipField(id) {
@@ -344,7 +395,7 @@ function _govChipKey(event, id) {
 
 async function _govEnsureCatalogs(force) {
   if (window.__GOV_CAT__ && !force) return window.__GOV_CAT__;
-  const cat = { skills: [], mcp: [], cli: [] };
+  const cat = { skills: [], mcp: [], cli: [], roles: [], groups: [], emails: [] };
   const opts = { redirect401: false, timeoutToast: false, timeoutMs: 15000 };
   await Promise.all([
     api('/api/skills', opts).then(d => {
@@ -367,6 +418,11 @@ async function _govEnsureCatalogs(force) {
       Object.values(policy.groups || {}).forEach(g => walk((g || {}).grants));
       Object.values(policy.users || {}).forEach(u => { walk((u || {}).grants); walk((u || {}).deny); });
       cat.cli = Array.from(seen).sort();
+      // Selection sources so admins pick instead of type: every role, group
+      // and user email already present in the policy.
+      cat.roles = Object.keys(policy.roles || {}).sort();
+      cat.groups = Object.keys(policy.groups || {}).sort();
+      cat.emails = Object.keys(policy.users || {}).sort();
       if (d.etag) _govEtag = d.etag;
     }).catch(() => {}),
   ]);
@@ -387,6 +443,11 @@ function _govFillCatalogDatalists(cat) {
   fill('govDlSkillsGrp', cat.skills);
   fill('govDlMcpGrp', cat.mcp);
   fill('govDlCliGrp', cat.cli);
+  fill('govDlRoles', cat.roles);
+  fill('govDlRolesUsr', cat.roles);
+  fill('govDlGroupsUsr', cat.groups);
+  fill('govDlEmails', cat.emails);
+  fill('govDlGroups', cat.groups);
 }
 
 function _govResetUserForm() {
@@ -396,10 +457,8 @@ function _govResetUserForm() {
   if (title) title.textContent = _govT('governance_user_add', 'Add user');
   const email = $('govUserEmail');
   if (email) { email.value = ''; email.disabled = false; }
-  const roles = $('govUserRoles');
-  if (roles) roles.value = '';
-  const groups = $('govUserGroups');
-  if (groups) groups.value = '';
+  _govChipsSet('govUserRolesSel', []);
+  _govChipsSet('govUserGroupsSel', []);
   _GOV_USER_GRANT_FIELDS.concat(_GOV_USER_DENY_FIELDS).forEach(id => _govChipsSet(id, []));
   _govRenderUserEffective();
 }
@@ -411,10 +470,8 @@ function _govEditUser(email) {
   if (title) title.textContent = _govT('governance_user_edit', 'Edit user');
   const emailEl = $('govUserEmail');
   if (emailEl) { emailEl.value = email; emailEl.disabled = true; }
-  const roles = $('govUserRoles');
-  if (roles) roles.value = (entry.roles || []).join(', ');
-  const groups = $('govUserGroups');
-  if (groups) groups.value = (entry.groups || []).join(', ');
+  _govChipsSet('govUserRolesSel', entry.roles || []);
+  _govChipsSet('govUserGroupsSel', entry.groups || []);
   const grants = (entry.grants && typeof entry.grants === 'object') ? entry.grants : {};
   const skills = (grants.skills && typeof grants.skills === 'object') ? grants.skills : {};
   const mcp = (grants.mcp && typeof grants.mcp === 'object') ? grants.mcp : {};
@@ -586,9 +643,11 @@ async function _govSaveUser() {
     if (typeof showToast === 'function') showToast(_govT('governance_invalid_email', 'Enter a valid email address'), 3000, 'error');
     return;
   }
+  _govChipCommit('govUserRolesSel');
+  _govChipCommit('govUserGroupsSel');
   const entry = {
-    roles: _govCsv(($('govUserRoles') || {}).value),
-    groups: _govCsv(($('govUserGroups') || {}).value),
+    roles: _govChipsGet('govUserRolesSel'),
+    groups: _govChipsGet('govUserGroupsSel'),
   };
   const grants = _govCollectUserGrants();
   if (grants) entry.grants = grants;
@@ -1299,6 +1358,126 @@ async function _govDecideApproval(kind, key, decision) {
   } catch (e) {
     if (!_govHandleConflict(e) && typeof showToast === 'function') showToast(e.message || 'decision failed', 4000, 'error');
   }
+}
+
+// ── Integrations tab ──────────────────────────────────────────────────────
+// Admin control plane for third-party access: every provider that is enabled
+// in Nango, has an approval entry, or has live connections. All actions are
+// buttons; nothing is typed. Enabling new providers happens from the
+// Integrations panel (Enable button on any catalog card).
+
+async function _govLoadIntegrations() {
+  const el = $('govPaneIntegrations');
+  if (!el) return;
+  el.innerHTML = '<div class="gov-muted">' + _govT('loading', 'Loading...') + '</div>';
+  let catalog, connections;
+  try {
+    const opts = { redirect401: false, timeoutToast: false, timeoutMs: 20000 };
+    [catalog, connections] = await Promise.all([
+      api('/api/integrations/catalog', opts),
+      api('/api/integrations/connections', opts).catch(() => ({ connections: [] })),
+    ]);
+  } catch (e) {
+    _govError(e, 'govPaneIntegrations');
+    return;
+  }
+  const conns = (connections && connections.connections) || [];
+  const connsByKey = new Map();
+  conns.forEach(c => {
+    const k = String((c && c.provider_config_key) || '');
+    if (!k) return;
+    if (!connsByKey.has(k)) connsByKey.set(k, []);
+    connsByKey.get(k).push(c);
+  });
+  const governed = ((catalog && catalog.providers) || []).filter(p => {
+    const approval = String(p.approval_status || '');
+    return p.configured
+      || (approval !== '' && approval !== 'none')
+      || connsByKey.has(String(p.unique_key || ''))
+      || connsByKey.has(String(p.key || ''));
+  });
+  const nangoDown = ((catalog && catalog.nango) || {}).available === false;
+  const banner = nangoDown
+    ? '<div class="gov-muted" style="margin-bottom:10px">' + _govT('governance_intg_nango_down',
+        'Nango is unreachable; showing the last known state, actions may fail.') + '</div>'
+    : '';
+  const rows = governed.map(p => {
+    const key = String(p.unique_key || p.key || '');
+    const rowConns = connsByKey.get(key) || [];
+    const owners = Array.from(new Set(rowConns.map(c => {
+      const eu = (c && c.end_user) || {};
+      return String(eu.email || eu.id || '').replace(/^u-/, '');
+    }).filter(Boolean)));
+    const approval = String(p.approval_status || '');
+    const badges =
+      (p.configured ? '<span class="gov-pill on">' + _govT('governance_intg_enabled', 'Enabled') + '</span>' : '') +
+      (approval === 'approved' ? '<span class="gov-pill on">' + _govT('governance_approved', 'Approved') + '</span>' : '') +
+      (approval === 'pending' ? '<span class="gov-pill warn">' + _govT('governance_pending', 'Pending') + '</span>' : '') +
+      (approval === 'rejected' ? '<span class="gov-pill off">' + _govT('governance_rejected', 'Rejected') + '</span>' : '');
+    const connCell = rowConns.length
+      ? String(rowConns.length) + (owners.length ? ' <span class="gov-muted">(' + _govEsc(owners.join(', ')) + ')</span>' : '')
+      : '<span class="gov-muted">0</span>';
+    const btn = (label, action, cls, disabled, title) =>
+      '<button type="button" class="gov-btn ' + (cls || '') + '"' + (disabled ? ' disabled' : '') +
+      (title ? ' title="' + _govEsc(title) + '"' : '') +
+      ' onclick="_govIntgAction(\'' + action + '\', \'' + _govEsc(key) + '\')">' + _govEsc(label) + '</button>';
+    let actions = '';
+    if (approval === 'pending') {
+      actions += btn(_govT('governance_approve', 'Approve'), 'approve', 'primary');
+      actions += btn(_govT('governance_reject', 'Reject'), 'reject', 'danger');
+    } else if (p.configured) {
+      actions += btn(_govT('governance_intg_disable', 'Disable'), 'disable', 'danger',
+        rowConns.length > 0, rowConns.length > 0 ? _govT('governance_intg_disable_blocked', 'Disconnect its connections first') : '');
+    } else {
+      if (approval === 'approved' || approval === 'rejected') {
+        actions += btn(_govT('governance_intg_enable', 'Enable'), 'enable', 'primary');
+        actions += btn(_govT('governance_intg_revoke', 'Revoke'), 'revoke', '');
+      }
+    }
+    const logo = p.logo ? '<img class="gov-intg-logo" src="' + _govEsc(p.logo) + '" alt="" loading="lazy" onerror="this.remove()">' : '';
+    return '<tr>' +
+      '<td class="gov-intg-name">' + logo + '<div><div>' + _govEsc(p.display_name || key) + '</div>' +
+        '<div class="gov-muted gov-mono">' + _govEsc(key) + '</div></div></td>' +
+      '<td>' + _govEsc(p.auth_mode || '') + '</td>' +
+      '<td>' + badges + '</td>' +
+      '<td>' + connCell + '</td>' +
+      '<td class="gov-row-actions">' + actions + '</td>' +
+    '</tr>';
+  }).join('');
+  el.innerHTML = banner +
+    '<table class="gov-table"><thead><tr>' +
+      '<th>' + _govT('governance_col_provider', 'Provider') + '</th>' +
+      '<th>' + _govT('governance_col_auth', 'Auth') + '</th>' +
+      '<th>' + _govT('governance_col_status', 'Status') + '</th>' +
+      '<th>' + _govT('governance_col_connections', 'Connections') + '</th><th></th>' +
+    '</tr></thead><tbody>' +
+    (rows || '<tr><td colspan="5" class="gov-muted">' + _govT('governance_intg_none',
+      'No governed integrations yet. Enable providers from the Integrations panel.') + '</td></tr>') +
+    '</tbody></table>' +
+    '<div class="gov-muted">' + _govT('governance_intg_note',
+      'Approve/Enable makes a provider connectable for everyone; Disable removes it from Nango (blocked while connections exist); Revoke returns it to the request flow.') +
+    ' <a href="#" onclick="switchPanel(\'integrations\');return false">' + _govT('governance_intg_open_panel', 'Open the Integrations panel') + '</a></div>';
+}
+
+async function _govIntgAction(action, key) {
+  try {
+    if (action === 'approve' || action === 'reject') {
+      await _govPost('/api/governance/approvals/decide', { kind: 'integration', key: key, decision: action });
+    } else if (action === 'revoke') {
+      await _govPost('/api/governance/approvals/revoke', { kind: 'integration', key: key });
+    } else if (action === 'enable') {
+      await _govPost('/api/integrations/enable', { provider_config_key: key });
+    } else if (action === 'disable') {
+      await _govPost('/api/integrations/disable', { provider_config_key: key });
+    } else {
+      return;
+    }
+    if (typeof showToast === 'function') showToast(_govT('governance_saved', 'Saved'), 2500);
+  } catch (e) {
+    if (!_govHandleConflict(e) && typeof showToast === 'function') showToast(e.message || 'action failed', 5000, 'error');
+  }
+  await _govLoadIntegrations();
+  _govRefreshApprovalsBadge();
 }
 
 // ── Preview access tab ────────────────────────────────────────────────────

@@ -926,6 +926,7 @@
           <button type="button" class="gov-tab" data-gov-tab="users" onclick="_govSwitchTab('users')" data-i18n="governance_users">Users</button>
           <button type="button" class="gov-tab" data-gov-tab="groups" onclick="_govSwitchTab('groups')" data-i18n="governance_groups">Groups</button>
           <button type="button" class="gov-tab" data-gov-tab="approvals" onclick="_govSwitchTab('approvals')"><span data-i18n="governance_approvals">Approvals</span><span class="gov-tab-badge" id="govApprovalsBadge" style="display:none"></span></button>
+          <button type="button" class="gov-tab" data-gov-tab="integrations" onclick="_govSwitchTab('integrations')" data-i18n="governance_integrations">Integrations</button>
           <button type="button" class="gov-tab" data-gov-tab="preview" onclick="_govSwitchTab('preview')" data-i18n="governance_preview">Preview access</button>
           <button type="button" class="gov-tab" data-gov-tab="audit" onclick="_govSwitchTab('audit')" data-i18n="governance_audit">Audit</button>
         </div>
@@ -934,13 +935,16 @@
           <div class="gov-tab-pane" id="govPaneUsers"></div>
           <div class="gov-tab-pane" id="govPaneGroups"></div>
           <div class="gov-tab-pane" id="govPaneApprovals"></div>
+          <div class="gov-tab-pane" id="govPaneIntegrations"></div>
           <div class="gov-tab-pane" id="govPanePreview">
             <div class="gov-form">
               <div class="gov-form-title" data-i18n="governance_preview_title">Preview effective access</div>
               <div class="gov-form-row"><label for="govPreviewEmail" data-i18n="governance_col_email">Email</label>
-                <input id="govPreviewEmail" type="text" placeholder="name@example.com"></div>
+                <input id="govPreviewEmail" type="text" list="govDlEmails" placeholder="name@example.com"></div>
               <div class="gov-form-row"><label for="govPreviewGroups" data-i18n="governance_groups_csv">Groups (comma separated)</label>
-                <input id="govPreviewGroups" type="text" placeholder="sw-engineering"></div>
+                <input id="govPreviewGroups" type="text" list="govDlGroups" placeholder="sw-engineering"></div>
+              <datalist id="govDlEmails"></datalist>
+              <datalist id="govDlGroups"></datalist>
               <div class="gov-form-actions">
                 <button type="button" class="gov-btn primary" onclick="_govRunPreview()" data-i18n="governance_preview_run">Preview</button>
               </div>

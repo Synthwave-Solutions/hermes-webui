@@ -948,6 +948,18 @@ def _handle_approvals_decide_generic(handler, parsed, policy, subject, body, kin
         else:
             mcp_requests.uninstall_quietly(key, decided_by, path=parsed.path)
 
+    if kind == approvals.KIND_INTEGRATION and decision == "approve":
+        # Same immediacy as MCP: approving a provider also creates the Nango
+        # integration, so the requester's card flips straight to Connect
+        # instead of parking on "an admin is setting it up". Best-effort:
+        # a Nango outage must not fail the (already persisted) decision.
+        try:
+            from api.integrations import enable_integration
+
+            enable_integration(decided_by, key)
+        except Exception:
+            logger.warning("Approved integration %s but enabling it in Nango failed", key, exc_info=True)
+
     op = "approvals.approve" if decision == "approve" else "approvals.reject"
     _audit_approval(subject, policy.mode, parsed, op=op, key=f"{kind}:{key}", owner=owner)
     j(
@@ -960,6 +972,46 @@ def _handle_approvals_decide_generic(handler, parsed, policy, subject, body, kin
             "entry": _approval_row(updated),
         },
     )
+    return True
+
+
+def _handle_approvals_revoke(handler, parsed, policy, subject, access) -> bool:
+    """Remove a decided (or pending) non-skill approval entry entirely.
+
+    The provider/server/command drops back to the never-requested state, so
+    the next user goes through the normal request flow again. Skills are
+    excluded: their lifecycle (delete-from-disk on reject) lives in the
+    decide handler and a silent registry removal would leave the skill
+    installed but unaccounted for.
+    """
+    if not _require_governance_admin(handler, access, subject, policy):
+        return True
+    body = _read_json(handler)
+    if body is None:
+        return True
+    from api import approvals
+
+    kind = str(body.get("kind") or "").strip().lower()
+    if kind not in approvals.KINDS or kind == approvals.KIND_SKILL:
+        j(
+            handler,
+            {"error": "invalid_payload", "message": "kind must be one of: "
+             + ", ".join(k for k in approvals.KINDS if k != approvals.KIND_SKILL)},
+            status=400,
+        )
+        return True
+    key = str(body.get("key") or "").strip()
+    if not key:
+        j(handler, {"error": "invalid_payload", "message": "key is required"}, status=400)
+        return True
+    entry = approvals.get(kind, key)
+    owner = str((entry or {}).get("owner_email") or "").strip().lower()
+    removed = approvals.remove(kind, key)
+    if not removed:
+        j(handler, {"error": "not_found", "message": f"unknown {kind} approval: {key}"}, status=404)
+        return True
+    _audit_approval(subject, policy.mode, parsed, op="approvals.revoke", key=f"{kind}:{key}", owner=owner)
+    j(handler, {"ok": True, "kind": kind, "key": key})
     return True
 
 
@@ -1085,6 +1137,7 @@ _POST_ROUTES = {
     "/api/governance/users/update": _handle_user_update,
     "/api/governance/users/delete": _handle_user_delete,
     "/api/governance/approvals/decide": _handle_approvals_decide,
+    "/api/governance/approvals/revoke": _handle_approvals_revoke,
 }
 
 
