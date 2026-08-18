@@ -863,6 +863,34 @@ def _stringify_env_value(value) -> str:
     return str(value)
 
 
+# A profile config.yaml can run to thousands of lines and is re-parsed at the
+# start of every agent turn just to extract the terminal block; cache the
+# parsed document keyed by (mtime, size) so only config edits pay the parse.
+_PROFILE_CFG_CACHE: dict = {}
+
+
+def _load_profile_config_cached(cfg_path: Path) -> dict:
+    try:
+        st = cfg_path.stat()
+        sig = (st.st_mtime_ns, st.st_size)
+    except OSError:
+        return {}
+    cached = _PROFILE_CFG_CACHE.get(str(cfg_path))
+    if cached is not None and cached[0] == sig:
+        return cached[1]
+    try:
+        import yaml as _yaml
+
+        loader = getattr(_yaml, 'CSafeLoader', _yaml.SafeLoader)
+        cfg = _yaml.load(cfg_path.read_text(encoding='utf-8'), Loader=loader)
+        if not isinstance(cfg, dict):
+            cfg = {}
+    except Exception:
+        cfg = {}
+    _PROFILE_CFG_CACHE[str(cfg_path)] = (sig, cfg)
+    return cfg
+
+
 def get_profile_runtime_env(home: Path) -> dict[str, str]:
     """Return env vars needed to run an agent turn for a profile home.
 
@@ -876,15 +904,8 @@ def get_profile_runtime_env(home: Path) -> dict[str, str]:
     home = Path(home).expanduser()
     env: dict[str, str] = {}
 
-    try:
-        import yaml as _yaml
-
-        cfg_path = home / 'config.yaml'
-        cfg = _yaml.safe_load(cfg_path.read_text(encoding='utf-8')) if cfg_path.exists() else {}
-        if not isinstance(cfg, dict):
-            cfg = {}
-    except Exception:
-        cfg = {}
+    cfg_path = home / 'config.yaml'
+    cfg = _load_profile_config_cached(cfg_path) if cfg_path.exists() else {}
 
     terminal_cfg = cfg.get('terminal', {}) if isinstance(cfg, dict) else {}
     if isinstance(terminal_cfg, dict):
