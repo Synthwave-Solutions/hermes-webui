@@ -7604,8 +7604,10 @@ function _startHiddenActiveStreamPoll(sid) {
   _sessionStreamHiddenPollSid = sid;
   const tick = () => {
     // Stop conditions: tab became visible (real SSE takes over), session
-    // switched, or we're already rendering a stream.
-    if (typeof document !== 'undefined' && !document.hidden) { _stopHiddenActiveStreamPoll(); return; }
+    // switched, or we're already rendering a stream. Split-view panes are the
+    // exception: they use this poll INSTEAD of the SSE even while visible, so
+    // eight panes don't hold eight of the six same-origin HTTP/1.1 sockets.
+    if (typeof document !== 'undefined' && !document.hidden && !window.__HERMES_PANE_MODE) { _stopHiddenActiveStreamPoll(); return; }
     if (_sessionStreamHiddenPollSid !== sid) { _stopHiddenActiveStreamPoll(); return; }
     if (S.activeStreamId) return; // already rendering; wait it out
     try {
@@ -7701,6 +7703,17 @@ function startSessionStream(sid) {
   // same-origin HTTP/1.1 sockets and can starve ordinary /api/session fetches.
   if (_chatStreamActiveForSession(sid)) {
     _sessionStreamHiddenSid = sid;
+    return;
+  }
+  // Split-view pane: never hold /api/session/stream open. Six panes' SSEs
+  // exhaust the six-connection budget and starve pane 7 and 8's boot fetches
+  // completely (they never even load their session). The ~6s status poll
+  // bridges server-initiated turns; the per-turn /api/chat/stream still
+  // attaches live when a turn is actually running.
+  if (window.__HERMES_PANE_MODE) {
+    stopSessionStream();
+    _sessionStreamSessionId = sid;
+    _startHiddenActiveStreamPoll(sid);
     return;
   }
   stopSessionStream();

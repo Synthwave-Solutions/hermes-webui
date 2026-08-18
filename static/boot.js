@@ -3716,7 +3716,9 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
       if(localStorage.getItem('hermes-webui-session')===_savedLocalBeforeProfileSwitch) localStorage.removeItem('hermes-webui-session');
     }catch(_){}
   }
-  const savedLocal=localStorage.getItem('hermes-webui-session');
+  // Split-view panes must not inherit the parent window's "last session":
+  // eight panes booting without a ?session= would all restore the same chat.
+  const savedLocal=window.__HERMES_PANE_MODE?null:localStorage.getItem('hermes-webui-session');
   const saved=urlSession||savedLocal;
   if(saved){
     try{

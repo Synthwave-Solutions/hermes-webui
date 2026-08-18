@@ -145,6 +145,7 @@ function _splitOnPaneMessage(ev) {
   const frames = document.querySelectorAll('#splitGrid iframe');
   for (let i = 0; i < frames.length; i++) {
     if (frames[i].contentWindow === ev.source) {
+      frames[i].dataset.splitSid = d.sid || '';
       if (_splitState.sessions[i] !== d.sid) {
         _splitState.sessions[i] = d.sid || null;
         _splitSaveState();
@@ -154,11 +155,46 @@ function _splitOnPaneMessage(ev) {
   }
 }
 
+// Most-recent-first non-archived session ids from the parent window's sidebar
+// cache (sessions.js `_allSessions`, loaded before this script), minus the ones
+// already claimed by a slot.
+function _splitRecentSessionIds(exclude, limit) {
+  try {
+    const rows = (typeof _allSessions !== 'undefined' && Array.isArray(_allSessions)) ? _allSessions : [];
+    const out = [];
+    for (const s of rows) {
+      if (!s || !s.session_id || s.archived) continue;
+      if (exclude.has(s.session_id)) continue;
+      out.push(s.session_id);
+      if (out.length >= limit) break;
+    }
+    return out;
+  } catch (_e) { return []; }
+}
+
+// Every pane should be a DIFFERENT chat: drop duplicate sids (first slot wins),
+// then fill the empty slots with the most recent sessions not yet on screen.
+function _splitFillDistinct() {
+  if (!_splitState) return;
+  const seen = new Set();
+  for (let i = 0; i < _splitState.sessions.length; i++) {
+    const sid = _splitState.sessions[i];
+    if (!sid) continue;
+    if (seen.has(sid)) _splitState.sessions[i] = null;
+    else seen.add(sid);
+  }
+  const fresh = _splitRecentSessionIds(seen, _splitState.count);
+  for (let i = 0; i < _splitState.count && fresh.length; i++) {
+    if (!_splitState.sessions[i]) _splitState.sessions[i] = fresh.shift();
+  }
+}
+
 function _splitSetCount(n) {
   if (!_SPLIT_ALLOWED_COUNTS.includes(n)) return;
   _splitState = _splitState || { count: n, sessions: [] };
   _splitState.count = n;
   while (_splitState.sessions.length < n) _splitState.sessions.push(null);
+  _splitFillDistinct();
   _splitSaveState();
   _splitRender();
 }
@@ -178,7 +214,18 @@ function _splitRender() {
   const existing = Array.from(grid.children);
   for (let i = existing.length - 1; i >= _splitState.count; i--) existing[i].remove();
   for (let i = 0; i < _splitState.count; i++) {
-    if (grid.children[i]) continue;
+    if (grid.children[i]) {
+      // Slot already on screen: retarget the frame only if the assigned
+      // session changed underneath it (e.g. the distinct-fill claimed a chat
+      // for a previously blank pane).
+      const fr = grid.children[i].querySelector('iframe');
+      const want = _splitState.sessions[i] || '';
+      if (fr && (fr.dataset.splitSid || '') !== want) {
+        fr.dataset.splitSid = want;
+        fr.src = _splitPaneUrl(_splitState.sessions[i]);
+      }
+      continue;
+    }
     const slot = document.createElement('div');
     slot.className = 'split-slot';
     const bar = document.createElement('div');
@@ -195,13 +242,14 @@ function _splitRender() {
       _splitState.sessions[i] = null;
       _splitSaveState();
       const fr = slot.querySelector('iframe');
-      if (fr) fr.src = _splitPaneUrl(null);
+      if (fr) { fr.dataset.splitSid = ''; fr.src = _splitPaneUrl(null); }
     };
     bar.appendChild(label);
     bar.appendChild(close);
     const frame = document.createElement('iframe');
     frame.className = 'split-frame';
     frame.setAttribute('title', t('split_view_panes', 1) + ' ' + (i + 1));
+    frame.dataset.splitSid = _splitState.sessions[i] || '';
     frame.src = _splitPaneUrl(_splitState.sessions[i]);
     slot.appendChild(bar);
     slot.appendChild(frame);
@@ -224,6 +272,7 @@ function toggleSplitView(force) {
       const free = _splitState.sessions.findIndex(s => !s);
       if (free >= 0) _splitState.sessions[free] = S.session.session_id;
     }
+    _splitFillDistinct();
     _splitSaveState();
     _splitEnsureOverlay().hidden = false;
     document.documentElement.setAttribute('data-split-open', '1');
