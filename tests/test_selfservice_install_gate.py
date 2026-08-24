@@ -549,7 +549,7 @@ def test_request_routes_are_self_routes():
 def test_install_and_connect_routes_keep_their_permission():
     assert route_permission("/api/mcp/servers/sync-approved", "POST") == "mcp:write"
     assert route_permission("/api/mcp/servers/context7", "PUT") == "mcp:write"
-    assert route_permission("/api/integrations/connect", "POST") == "config:write"
+    assert route_permission("/api/integrations/connect", "POST") == "integrations:connect"
 
 
 # ── Non-admin writes on an already configured server (adversarial) ──────────
