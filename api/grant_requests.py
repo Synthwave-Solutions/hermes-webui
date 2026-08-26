@@ -21,7 +21,15 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-SPOOL = Path(os.path.expanduser("~/.hermes/webui/governance-grant-requests.json"))
+_SPOOL_NAME = "governance-grant-requests.json"
+
+
+def _spool_path() -> Path:
+    """Resolve the spool lazily from config.STATE_DIR so a test override never
+    reads or writes the live admin queue."""
+    from api import config
+
+    return Path(config.STATE_DIR) / _SPOOL_NAME
 
 # gkind -> (top-level grants section, nested path) applied on approval.
 _GRANT_TARGETS = {
@@ -40,7 +48,7 @@ _GRANT_TARGETS = {
 
 def _load_spool() -> dict:
     try:
-        data = json.loads(SPOOL.read_text(encoding="utf-8"))
+        data = json.loads(_spool_path().read_text(encoding="utf-8"))
         return data if isinstance(data, dict) else {}
     except (FileNotFoundError, ValueError):
         return {}
@@ -121,9 +129,10 @@ def drop_from_spool(spool_key: str) -> None:
         spool = _load_spool()
         if spool_key in spool:
             spool.pop(spool_key)
-            tmp = SPOOL.with_suffix(".tmp")
+            spool_file = _spool_path()
+            tmp = spool_file.with_suffix(".tmp")
             tmp.write_text(json.dumps(spool, ensure_ascii=False, indent=1), encoding="utf-8")
-            os.replace(tmp, SPOOL)
+            os.replace(tmp, spool_file)
     except Exception as exc:
         logger.debug("grant request spool drop failed: %s", exc)
 
