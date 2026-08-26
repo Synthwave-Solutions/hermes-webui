@@ -413,15 +413,28 @@ class RailTooltipCascadeTests(unittest.TestCase):
                 "fire on rail buttons that carry no data-label.",
             )
 
-        # Affirmative: the scoped form must exist.
-        good_pattern = re.compile(
-            r"\.sidebar-nav\s+\.nav-tab:hover:{1,2}after\s*\{[^}]*content\s*:\s*attr\(data-label\)",
+        # left-nav-tooltips (Aug 2026): the legacy data-label rule is fully
+        # retired. It conflicted with the `has-tooltip--bottom` system the
+        # sidebar-nav tabs now carry (both anchored the same ::after in
+        # opposite vertical directions, over-constraining the box) while the
+        # base `.nav-tab` overflow:hidden clipped the pseudo-element outright.
+        # The custom tooltip system owns mobile too now; assert the legacy
+        # form stays gone and the clipping fix is in place.
+        legacy_pattern = re.compile(
+            r"\.nav-tab:hover:{1,2}after\s*\{[^}]*content\s*:\s*attr\(data-label\)",
             re.DOTALL,
         )
-        self.assertIsNotNone(
-            good_pattern.search(css_no_comments),
-            "Expected `.sidebar-nav .nav-tab:hover::after { content: attr(data-label); ... }` "
-            "rule (mobile sidebar fallback tooltip). It went missing.",
+        self.assertIsNone(
+            legacy_pattern.search(css_no_comments),
+            "Legacy data-label hover tooltip is back. It conflicts with the "
+            "has-tooltip system on the mobile sidebar-nav (see "
+            "tests/test_left_nav_tooltips_expand.py).",
+        )
+        self.assertRegex(
+            css_no_comments,
+            r"\.sidebar-nav\s+\.nav-tab\s*\{[^}]*overflow\s*:\s*visible",
+            "Missing `.sidebar-nav .nav-tab{overflow:visible}`; the base "
+            ".nav-tab overflow:hidden clips mobile nav tooltips.",
         )
 
     def test_all_rail_buttons_carry_has_tooltip(self):

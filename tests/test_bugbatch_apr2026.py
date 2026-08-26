@@ -77,11 +77,16 @@ def test_dark_user_bubbles_do_not_need_per_skin_text_hacks():
 
 
 def test_user_bubbles_define_selection_tokens_for_both_modes():
-    """User bubbles need dedicated selection colors so selected text remains readable."""
-    assert "--user-selection-bg: rgba(0,0,0,.22);" in STYLE_CSS, (
+    """User bubbles need dedicated selection colors so selected text remains readable.
+
+    Values strengthened by the text-selection-highlight ticket (Aug 2026): the
+    original .22/.18 alphas rendered a near-invisible highlight. The dedicated
+    minimum-alpha guard lives in tests/test_user_selection_visibility.py.
+    """
+    assert "--user-selection-bg: rgba(0,0,0,.34);" in STYLE_CSS, (
         "Light-mode user bubbles should define a darker selection fill for contrast"
     )
-    assert "--user-selection-bg: rgba(255,255,255,.18);" in STYLE_CSS, (
+    assert "--user-selection-bg: rgba(255,255,255,.30);" in STYLE_CSS, (
         "Dark-mode user bubbles should define a lighter selection fill for contrast"
     )
     assert "--user-selection-text: #fff;" in STYLE_CSS, (

@@ -144,10 +144,16 @@ def test_mode_off_is_a_passthrough(governance_env):
     assert _audit_events() == []
 
 
+# NOTE: these deny-path tests used to POST /api/settings, which was gated on
+# config:write. Since the appearance self-service change (26 Aug 2026 report)
+# that POST rides on config:read at the route level (the config:write gate for
+# non-cosmetic keys moved into the handler via api/settings_scope.py), so the
+# viewer identity here would now pass the hook. POST /api/model (model:write)
+# exercises the same deny mechanics.
 def test_report_only_deny_passes_through_and_audits_would_deny(governance_env):
     governance_env["set_policy"]({**POLICY, "mode": "report_only"})
     governance_env["identity"] = _identity("viewer@example.test")
-    handler = FakeHandler("/api/settings")
+    handler = FakeHandler("/api/model")
 
     assert enforce_request(handler, handler.parsed, "POST") is True
     assert handler.status is None  # zero behavior change for the client
@@ -158,9 +164,9 @@ def test_report_only_deny_passes_through_and_audits_would_deny(governance_env):
     assert event["event"] == "would_deny"
     assert event["reason"] == "permission_not_allowed"
     assert event["mode"] == "report_only"
-    assert event["path"] == "/api/settings"
+    assert event["path"] == "/api/model"
     assert event["method"] == "POST"
-    assert event["extra"]["resource"] == "config:write"
+    assert event["extra"]["resource"] == "model:write"
     # Identity is stored hashed, never raw
     raw = json.dumps(event)
     assert "viewer@example.test" not in raw
@@ -169,7 +175,7 @@ def test_report_only_deny_passes_through_and_audits_would_deny(governance_env):
 def test_enforce_deny_sends_403_json_and_audits_deny(governance_env):
     governance_env["set_policy"](POLICY)
     governance_env["identity"] = _identity("viewer@example.test")
-    handler = FakeHandler("/api/settings")
+    handler = FakeHandler("/api/model")
 
     assert enforce_request(handler, handler.parsed, "POST") is False
     assert handler.status == 403
@@ -178,7 +184,7 @@ def test_enforce_deny_sends_403_json_and_audits_deny(governance_env):
     payload = json.loads(handler.body)
     assert payload == {
         "error": "forbidden",
-        "resource": "config:write",
+        "resource": "model:write",
         "reason": "permission_not_allowed",
     }
 
@@ -207,7 +213,7 @@ def test_enforce_deny_get_navigation_gets_friendly_html(governance_env):
 def test_enforce_deny_post_ignores_html_accept(governance_env):
     governance_env["set_policy"](POLICY)
     governance_env["identity"] = _identity("viewer@example.test")
-    handler = FakeHandler("/api/settings", headers={"Accept": "text/html"})
+    handler = FakeHandler("/api/model", headers={"Accept": "text/html"})
 
     assert enforce_request(handler, handler.parsed, "POST") is False
     assert handler.sent_headers["Content-Type"] == "application/json"
@@ -274,7 +280,7 @@ def test_hook_never_reads_the_body(governance_env):
     governance_env["set_policy"](POLICY)
     governance_env["identity"] = _identity("viewer@example.test")
 
-    denied = FakeHandler("/api/settings")
+    denied = FakeHandler("/api/model")
     assert enforce_request(denied, denied.parsed, "POST") is False
 
     governance_env["identity"] = _identity("admin@example.test")
@@ -292,7 +298,7 @@ def test_audit_failure_never_changes_the_decision(governance_env, monkeypatch):
         raise OSError("audit sink unwritable")
 
     monkeypatch.setattr(enforce_mod, "append_audit_event", _broken_audit)
-    handler = FakeHandler("/api/settings")
+    handler = FakeHandler("/api/model")
 
     # Denial still happens in enforce mode even when auditing is down
     assert enforce_request(handler, handler.parsed, "POST") is False

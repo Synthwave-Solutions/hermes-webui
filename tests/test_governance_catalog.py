@@ -30,7 +30,10 @@ def test_route_catalog_maps_core_endpoint_families():
         ("/api/git/commit", "POST", "git:write"),
         ("/api/git/log", "GET", "git:read"),
         ("/api/settings", "GET", "config:read"),
-        ("/api/settings", "POST", "config:write"),
+        # POST /api/settings is config:read at the route level so appearance
+        # self-service works; api/settings_scope.py re-imposes config:write
+        # for non-cosmetic keys in the handler (26 Aug 2026 report).
+        ("/api/settings", "POST", "config:read"),
         ("/api/models", "GET", "model:read"),
         ("/api/model", "POST", "model:write"),
         ("/api/default-model", "POST", "model:write"),

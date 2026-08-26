@@ -145,7 +145,12 @@ ROUTE_CATALOG: tuple[RouteRule, ...] = (
     RouteRule("/api/git",                 "git:read", "git:write"),
 
     # config, settings, models, providers
-    RouteRule("/api/settings",            "config:read", "config:write", match="exact"),
+    # POST /api/settings deliberately rides on config:read: appearance-only
+    # payloads (theme/skin/font_size) are self-service for anyone who can open
+    # the settings panel, and this hook never reads the body. The handler's
+    # body-sink guard (api/settings_scope.py) re-imposes config:write for every
+    # non-cosmetic key, so full settings writes stay gated exactly as before.
+    RouteRule("/api/settings",            "config:read", "config:read", match="exact"),
     RouteRule("/api/reasoning",           "config:read", "config:write", match="exact"),
     RouteRule("/api/models",              "model:read", "model:read"),
     RouteRule("/api/model",               "model:read", "model:write"),

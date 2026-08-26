@@ -217,61 +217,367 @@ function _clearPersistedSessionQueue(sid){
   try{sessionStorage.removeItem(key);}catch(_){}
   try{localStorage.removeItem(key);}catch(_){}
 }
+// ── Cross-tab queue ownership (double-send D3) ─────────────────────────────
+// The persisted queue lives in localStorage, which is SHARED across tabs and
+// split panes. Each page life gets a tab id; a tab claims an entry at drain
+// time by writing _claimed_by/_claimed_at INTO THE PERSISTED ENTRY, so other
+// tabs skip it. localStorage has no compare-and-set, so the protocol is:
+// re-read storage immediately before claiming, write the claim, then re-read
+// in the drain's settle callback to detect a losing race; on an observed race
+// the LOWEST tab id wins deterministically and the loser backs off. A claim
+// whose tab died expires back to 'queued' after _QUEUE_CLAIM_TTL_MS.
+const _QUEUE_TAB_ID=(typeof window!=='undefined'&&window.__HERMES_QUEUE_TAB_ID)
+  ||(Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,10));
+const _QUEUE_CLAIM_TTL_MS=15000;
+// qids this tab removed (sent/cancelled/reconciled): the merge below must not
+// resurrect them from a storage copy written before our removal landed.
+const _queueTombstones={};
+function _tombstoneQueueEntry(sid,qid){
+  if(!sid||!qid) return;
+  (_queueTombstones[sid]=_queueTombstones[sid]||new Set()).add(qid);
+}
+function _queueClaimFresh(entry,now){
+  if(!entry||!entry._claimed_by) return false;
+  const at=Number(entry._claimed_at)||0;
+  return ((now||Date.now())-at)<_QUEUE_CLAIM_TTL_MS;
+}
+function _tabOwnsQueueEntry(entry){
+  return !!(entry&&entry._claimed_by===_QUEUE_TAB_ID&&_queueClaimFresh(entry));
+}
+function _foreignQueueClaim(entry){
+  return !!(entry&&entry._claimed_by&&entry._claimed_by!==_QUEUE_TAB_ID&&_queueClaimFresh(entry));
+}
+// Merge this tab's in-memory queue with the shared stored queue, by _qid.
+// Storage is the source of truth for entries this tab does not own:
+//  - in both: with preferStored (sync/restore reads) the stored copy wins for
+//    every entry this tab does not own; without it (write paths persisting a
+//    deliberate local mutation) the local copy wins unless another tab holds
+//    a live claim on the entry;
+//  - only in memory: kept only when this tab owns it or it never reached
+//    storage (fresh, or persist failed); a persisted unowned entry that is
+//    gone from storage was sent/removed by another tab and must NOT revive;
+//  - only in storage: queued by another tab, kept unless this tab tombstoned
+//    it (legacy entries without a _qid are dropped; restore re-mints them).
+function _mergeSessionQueueWithStorage(sid,mem,stored,preferStored){
+  const tomb=_queueTombstones[sid];
+  const storById=new Map();
+  for(const se of (stored||[])){ if(se&&se._qid) storById.set(se._qid,se); }
+  const memIds=new Set();
+  const merged=[];
+  for(const me of (mem||[])){
+    if(!me||!me._qid) continue;
+    memIds.add(me._qid);
+    const se=storById.get(me._qid);
+    if(se){
+      const storedWins=preferStored?!_tabOwnsQueueEntry(me):(_foreignQueueClaim(se)&&!_tabOwnsQueueEntry(me));
+      merged.push(storedWins?{...se,_persisted:true}:me);
+    } else if(_tabOwnsQueueEntry(me)||!me._persisted){
+      merged.push(me);
+    }
+  }
+  for(const se of (stored||[])){
+    if(!se||!se._qid||memIds.has(se._qid)) continue;
+    if(tomb&&tomb.has(se._qid)) continue;
+    merged.push({...se,_persisted:true});
+  }
+  return merged;
+}
+// Refresh this tab's in-memory queue from the shared store (merge in place)
+// and expire stale claims from dead tabs back to 'queued'.
+function _syncSessionQueueWithStorage(sid){
+  if(!sid) return [];
+  let stored=[];
+  try{stored=_readPersistedSessionQueue(sid);}catch(_){stored=[];}
+  const mem=_getSessionQueue(sid,false);
+  const merged=_mergeSessionQueueWithStorage(sid,mem,stored,true);
+  const now=Date.now();
+  let revived=false;
+  for(let i=0;i<merged.length;i++){
+    const e=merged[i];
+    if(!e||_queueEntryState(e)!=='running') continue;
+    if(_drainingQueueEntry&&_drainingQueueEntry.sid===sid&&_drainingQueueEntry.qid===e._qid) continue;
+    if(_queueClaimFresh(e,now)) continue;
+    const back={...e,_state:'queued'};
+    delete back._claimed_by;
+    delete back._claimed_at;
+    merged[i]=back;
+    revived=true;
+  }
+  if(!merged.length){
+    delete SESSION_QUEUES[sid];
+    delete _queueRenderKeys[sid];
+    return [];
+  }
+  const q=_getSessionQueue(sid,true);
+  q.length=0;
+  q.push(...merged);
+  if(revived) _persistSessionQueueStorage(sid,q);
+  delete _queueRenderKeys[sid];
+  return q;
+}
 function _persistSessionQueueStorage(sid, queue){
   if(!sid) return;
-  const q=Array.isArray(queue)?queue:[];
-  if(!q.length){_clearPersistedSessionQueue(sid);return;}
+  const mem=Array.isArray(queue)?queue:[];
+  // Re-read-before-write (D3): every write merges with the CURRENT stored
+  // state instead of mirroring this tab's possibly stale in-memory copy, so
+  // entries another tab queued survive and entries another tab already sent
+  // are never resurrected.
+  let stored=[];
+  try{stored=_readPersistedSessionQueue(sid);}catch(_){stored=[];}
+  const merged=_mergeSessionQueueWithStorage(sid,mem,stored);
+  if(!merged.length){_clearPersistedSessionQueue(sid);return;}
   const key=_queueStorageKey(sid);
   let payload='[]';
-  try{payload=JSON.stringify(q);}catch(_){return;}
+  try{payload=JSON.stringify(merged);}catch(_){return;}
   try{sessionStorage.setItem(key,payload);}catch(_){}
-  try{localStorage.setItem(key,payload);}catch(_){}
+  let ok=false;
+  try{localStorage.setItem(key,payload);ok=true;}catch(_){}
+  if(ok){for(const e of mem){if(e&&typeof e==='object')e._persisted=true;}}
 }
 function _readPersistedSessionQueue(sid){
   if(!sid) return [];
   const key=_queueStorageKey(sid);
-  const read=(store)=>{
+  const parse=(raw)=>{
+    if(!raw) return [];
     try{
-      const raw=store&&store.getItem?store.getItem(key):null;
-      if(!raw) return null;
       const parsed=JSON.parse(raw);
-      return Array.isArray(parsed)?parsed:null;
-    }catch(_){return null;}
+      return Array.isArray(parsed)?parsed:[];
+    }catch(_){return [];}
   };
-  const sessionValue=read(sessionStorage);
-  if(sessionValue&&sessionValue.length) return sessionValue;
-  const localValue=read(localStorage);
-  if(localValue&&localValue.length){
-    try{sessionStorage.setItem(key,JSON.stringify(localValue));}catch(_){}
-    return localValue;
-  }
-  return [];
+  // localStorage is the shared cross-tab source of truth. The per-tab
+  // sessionStorage mirror is only a fallback when localStorage is unusable;
+  // preferring it while localStorage is readable would let a stale tab-local
+  // copy shadow (and resurrect) entries another tab already sent (D3).
+  let raw=null;
+  let localOk=false;
+  try{raw=localStorage.getItem(key);localOk=true;}catch(_){}
+  if(localOk) return parse(raw);
+  try{return parse(sessionStorage.getItem(key));}catch(_){return [];}
+}
+// Queue-entry lifecycle (queued-messages-disappear P1 + no-progress-status P2):
+// every entry carries `_state` ('queued' | 'running' | 'failed'). 'completed'
+// entries are removed from the queue (the sent turn becomes the visible user
+// bubble in the chat, which IS the completion signal), and user removal of an
+// entry is the 'cancelled' terminal state. Failed entries stay visible with
+// their error until the user retries or dismisses them, never silently dropped.
+let _queueEntrySeq=0;
+function _queueEntryId(){
+  // Tab-id suffix keeps qids unique across tabs sharing the localStorage queue.
+  return Date.now()+'-'+(++_queueEntrySeq)+'-'+_QUEUE_TAB_ID;
+}
+function _queueEntryState(entry){
+  const st=entry&&entry._state;
+  return st==='running'||st==='failed'?st:'queued';
 }
 function queueSessionMessage(sid, payload){
   if(!sid||!payload) return 0;
   const q=_getSessionQueue(sid,true);
   // Stamp created_at so the restore path can detect stale entries (agent already responded)
-  const entry={...payload, _queued_at: Date.now()};
+  const entry={...payload, _queued_at: Date.now(), _qid: payload._qid||_queueEntryId(), _state:'queued'};
+  delete entry._error;
   q.push(entry);
   _persistSessionQueueStorage(sid,q);
   // A queued message will change this conversation; drop any cached scene.
   if(typeof _invalidateSessionSceneCache==='function') _invalidateSessionSceneCache(sid);
   return q.length;
 }
+// Peek the first drainable (still 'queued') entry WITHOUT removing it. The old
+// shift-before-send drain removed the entry from queue + storage before
+// /api/chat/start durably accepted the turn, so a refresh, disconnect, or start
+// failure inside that window silently lost the message (P1 ticket). Entries now
+// stay persisted as 'running' until the accepted callback removes them.
+function peekDrainableSessionMessage(sid){
+  const q=_getSessionQueue(sid,false);
+  for(const entry of q){
+    // An entry claimed live by another tab is that tab's to send (D3).
+    if(_queueEntryState(entry)==='queued'&&!_foreignQueueClaim(entry)) return entry;
+  }
+  return null;
+}
+function _setQueueEntryState(sid, qid, state, error){
+  const q=_getSessionQueue(sid,false);
+  const idx=q.findIndex(e=>e&&e._qid===qid);
+  if(idx===-1) return false;
+  const entry={...q[idx],_state:state};
+  // Cross-tab claim (D3): 'running' claims the entry for this tab in the
+  // persisted copy; any other state releases the claim.
+  if(state==='running'){
+    entry._claimed_by=_QUEUE_TAB_ID;
+    entry._claimed_at=Date.now();
+  } else {
+    delete entry._claimed_by;
+    delete entry._claimed_at;
+  }
+  if(state==='failed') entry._error=String(error||'Send failed');
+  else delete entry._error;
+  q[idx]=entry;
+  _persistSessionQueueStorage(sid,q);
+  delete _queueRenderKeys[sid];
+  return true;
+}
+function removeQueuedSessionMessage(sid, qid){
+  const q=_getSessionQueue(sid,false);
+  const idx=q.findIndex(e=>e&&e._qid===qid);
+  if(idx===-1) return false;
+  q.splice(idx,1);
+  // Tombstone before persisting so the storage merge (and any other open tab)
+  // cannot resurrect the removed entry from an older stored copy.
+  _tombstoneQueueEntry(sid,qid);
+  _persistSessionQueueStorage(sid,q);
+  if(!q.length) delete SESSION_QUEUES[sid];
+  delete _queueRenderKeys[sid];
+  return true;
+}
+// Removes and returns the FIRST queue entry regardless of state. The lifecycle
+// drain no longer shifts before sending (see drainQueuedSessionMessage); this
+// stays as the generic head-removal API for session-scoped queue consumers.
 function shiftQueuedSessionMessage(sid){
   const q=_getSessionQueue(sid,false);
   if(!q.length) return null;
   const next=q.shift();
-  if(!q.length){
-    delete SESSION_QUEUES[sid];
-    _clearPersistedSessionQueue(sid);
-  } else {
-    _persistSessionQueueStorage(sid,q);
-  }
+  if(next&&next._qid) _tombstoneQueueEntry(sid,next._qid);
+  _persistSessionQueueStorage(sid,q);
+  if(!q.length) delete SESSION_QUEUES[sid];
+  delete _queueRenderKeys[sid];
   return next;
 }
 function getQueuedSessionCount(sid){
   return _getSessionQueue(sid,false).length;
+}
+// ── Drain lifecycle callbacks (called from send() in messages.js) ──────────
+// _drainingQueueEntry tracks the single in-flight drained entry so send()'s
+// /api/chat/start outcome can settle it: accepted → remove (processed exactly
+// once), failed → keep visible as 'failed', busy-conflict → revert to 'queued'
+// IN PLACE (order preserved; the old path re-queued at the back).
+let _drainingQueueEntry=null;
+// One pending re-check timer while a foreign claim blocks this tab's drain
+// (D3 recovery: pick the entry up after the claiming tab dies).
+let _queueDrainRetryTimer=null;
+function _queueDrainEntryAccepted(sid){
+  const d=_drainingQueueEntry;
+  if(!d||d.sid!==sid) return false;
+  _drainingQueueEntry=null;
+  removeQueuedSessionMessage(sid,d.qid);
+  updateQueueBadge(sid);
+  return true;
+}
+function _queueDrainEntryFailed(sid, errMsg){
+  const d=_drainingQueueEntry;
+  if(!d||d.sid!==sid) return false;
+  _drainingQueueEntry=null;
+  _setQueueEntryState(sid,d.qid,'failed',errMsg);
+  updateQueueBadge(sid);
+  return true;
+}
+function _queueDrainEntryRequeue(sid){
+  const d=_drainingQueueEntry;
+  if(!d||d.sid!==sid) return false;
+  _drainingQueueEntry=null;
+  _setQueueEntryState(sid,d.qid,'queued');
+  updateQueueBadge(sid);
+  return true;
+}
+function _queueDrainSessionGone(sid){
+  const d=_drainingQueueEntry;
+  if(d&&d.sid===sid) _drainingQueueEntry=null;
+  delete SESSION_QUEUES[sid];
+  delete _queueTombstones[sid];
+  _clearPersistedSessionQueue(sid);
+  return true;
+}
+// ── Refresh / reconnect reconciliation ─────────────────────────────────────
+// An entry has been processed iff the transcript (or the server-side pending
+// turn) contains a user message with the SAME text sent AT/AFTER the entry's
+// queue time. The old restore filtered on "queued after the last assistant
+// reply", which silently dropped every message queued while the agent was
+// answering a PREVIOUS turn (the normal queueing scenario, P1 ticket).
+const _QUEUE_RECONCILE_SLACK_S=600; // browser vs server clock skew allowance
+function _queueEntryMatchesTranscript(entry, messages, session){
+  const text=String(entry&&entry.text||'').trim();
+  if(!text) return false;
+  const norm=s=>{
+    const v=String(s==null?'':s);
+    return (typeof _stripWorkspaceDisplayPrefix==='function'?_stripWorkspaceDisplayPrefix(v):v).trim();
+  };
+  if(session&&norm(session.pending_user_message)===text) return true;
+  const queuedS=(Number(entry._queued_at)||0)/1000;
+  const cutoff=queuedS>0?queuedS-_QUEUE_RECONCILE_SLACK_S:0;
+  const list=Array.isArray(messages)?messages:[];
+  for(let i=list.length-1;i>=0;i--){
+    const m=list[i];
+    if(!m||m.role!=='user') continue;
+    const ts=Number(m.timestamp||m._ts)||0;
+    if(cutoff&&ts&&ts<cutoff) break; // older than the entry, cannot be its send
+    if(norm(m.content)===text) return true;
+  }
+  return false;
+}
+function restoreSessionQueueFromStorage(sid, messages, session){
+  if(!sid) return 0;
+  const mem=_getSessionQueue(sid,false);
+  let entries=[];
+  try{entries=_readPersistedSessionQueue(sid);}catch(_){entries=[];}
+  if(mem.length){
+    // Same page-life switch-back: NEVER blind-mirror the in-memory copy over
+    // the shared store (D3): another tab may have sent, claimed, or removed
+    // entries since. Merge by _qid with storage as the source of truth for
+    // entries this tab does not own.
+    const merged=_mergeSessionQueueWithStorage(sid,mem,entries,true);
+    mem.length=0;
+    mem.push(...merged);
+    _persistSessionQueueStorage(sid,mem);
+    if(!mem.length) delete SESSION_QUEUES[sid];
+    delete _queueRenderKeys[sid];
+    updateQueueBadge(sid);
+    return mem.length;
+  }
+  if(!Array.isArray(entries)||!entries.length) return 0;
+  const restored=[];
+  for(const e of entries){
+    if(!e) continue;
+    const st=_queueEntryState(e);
+    if(st==='failed'){
+      const kept={...e,_qid:e._qid||_queueEntryId()};
+      if(e._qid) kept._persisted=true; else delete kept._persisted;
+      restored.push(kept);
+      continue;
+    }
+    // A live claim by ANOTHER tab: that tab is mid-send. Keep the entry
+    // visible and untouched; it is not drainable here and must not revert
+    // (the claim expires via _QUEUE_CLAIM_TTL_MS if that tab died).
+    if(st==='running'&&_foreignQueueClaim(e)){
+      restored.push({...e,_persisted:true});
+      continue;
+    }
+    // 'queued' and unclaimed/stale 'running' entries: drop only with positive
+    // evidence the turn reached the transcript; otherwise revert to 'queued'
+    // for re-drain. Dropped entries are tombstoned so the storage merge
+    // cannot resurrect the already-sent turn (D3).
+    if(_queueEntryMatchesTranscript(e,messages,session)){
+      if(e._qid) _tombstoneQueueEntry(sid,e._qid);
+      continue;
+    }
+    const revived={...e,_state:'queued',_qid:e._qid||_queueEntryId()};
+    delete revived._claimed_by;
+    delete revived._claimed_at;
+    if(e._qid) revived._persisted=true; else delete revived._persisted;
+    restored.push(revived);
+  }
+  if(!restored.length){
+    // Merge-write (not a blind clear): entries another tab queued meanwhile
+    // survive; everything this tab reconciled away is tombstoned above.
+    _persistSessionQueueStorage(sid,[]);
+    return 0;
+  }
+  SESSION_QUEUES[sid]=restored;
+  _persistSessionQueueStorage(sid,restored);
+  updateQueueBadge(sid);
+  if(typeof showToast==='function'){
+    showToast(restored.length>1
+      ? `${restored.length} queued messages restored, sending after the current response`
+      : 'Queued message restored, sending after the current response');
+  }
+  return restored.length;
 }
 function _compressionSessionLock(){
   return window._compressionLockSid||null;
@@ -7949,38 +8255,110 @@ function setBusy(v){
     updateQueueBadge(sid);
     // Drain one queued message for the finished session after UI settles
     const _isViewedSid=!S.session||sid===S.session.session_id;
-    const next=sid&&_isViewedSid?shiftQueuedSessionMessage(sid):null;
-    if(next){
-      updateQueueBadge(sid);
-      setTimeout(()=>{
-        // Guard: if the user switched away from the drain session during
-        // the 120ms settle window, the queued message must NOT go to the
-        // wrong chat.  Put it back into the original session's queue and
-        // skip sending — it will drain when the user returns to that session
-        // or when its next stream completes while it is the active view.
-        if(S.session&&S.session.session_id!==sid){
-          queueSessionMessage(sid,next);
-          updateQueueBadge(sid);
-          return;
-        }
-        $('msg').value=next.text||'';
-        S.pendingFiles=Array.isArray(next.files)?[...next.files]:[];
-        // Restore model from queued item (sent in /api/chat/start payload)
-        // Note: profile is NOT restored — full profile switch requires server interaction
-        if(next.model&&S.session&&next.model!==S.session.model){
-          S.session.model=next.model;
-        }
-        if(next.model_provider&&S.session) S.session.model_provider=next.model_provider;
-        if(next.model&&S.session){
-          if(typeof _applyModelToDropdown==='function'&&$('modelSelect')) _applyModelToDropdown(next.model,$('modelSelect'),S.session.model_provider||null);
-          if(typeof syncModelChip==='function') syncModelChip();
-        }
-        autoResize();
-        renderTray();
-        send();
-      },120);
-    }
+    if(sid&&_isViewedSid) drainQueuedSessionMessage(sid);
   }
+}
+
+// Drain the next 'queued' entry for `sid`. The entry stays in the queue (and in
+// its persisted mirror) marked 'running' until send()'s /api/chat/start outcome
+// settles it via _queueDrainEntryAccepted / _queueDrainEntryFailed. A refresh or
+// disconnect inside the drain window therefore keeps the message durable; the
+// loadSession restore reconciles the leftover 'running' entry against the
+// transcript (drop when the turn landed, revert to 'queued' when it did not).
+function drainQueuedSessionMessage(sid){
+  if(!sid||S.busy) return;
+  if(_drainingQueueEntry) return; // a drained send is still settling
+  // Cross-tab claim protocol (D3): re-read the SHARED persisted queue right
+  // before claiming (localStorage has no compare-and-set), so claims, sends,
+  // and removals from other tabs are visible; stale claims from dead tabs
+  // expire back to 'queued' inside the sync.
+  const q=_syncSessionQueueWithStorage(sid);
+  // A 'running' entry means a drain is already mid-flight, either in this tab
+  // (marked before its 120ms settle timeout fires) or in another tab holding
+  // a live claim; starting a second drain would send out of order and
+  // double-send the same entry.
+  if(q.some(e=>_queueEntryState(e)==='running')){
+    if(q.some(e=>_queueEntryState(e)==='running'&&_foreignQueueClaim(e))&&!_queueDrainRetryTimer){
+      // Re-check after the claim window: if the claiming tab died, its stale
+      // claim expires and this tab picks the entry up.
+      _queueDrainRetryTimer=setTimeout(()=>{
+        _queueDrainRetryTimer=null;
+        if(!S.busy&&S.session&&S.session.session_id===sid) drainQueuedSessionMessage(sid);
+      },_QUEUE_CLAIM_TTL_MS+250);
+    }
+    return;
+  }
+  const next=peekDrainableSessionMessage(sid);
+  if(!next) return;
+  // Claim: written into the PERSISTED entry so other tabs skip it (D3).
+  _setQueueEntryState(sid,next._qid,'running');
+  updateQueueBadge(sid);
+  setTimeout(async ()=>{
+    // Losing-race detection (CAS emulation, D3): re-read the persisted entry;
+    // if a competing tab claimed the same entry after our write, the LOWEST
+    // tab id wins deterministically and the loser backs off without sending.
+    let _casStored=[];
+    try{_casStored=_readPersistedSessionQueue(sid);}catch(_){_casStored=[];}
+    const _casEntry=_casStored.find(e=>e&&e._qid===next._qid);
+    const _lostRace=!!(_casEntry&&_foreignQueueClaim(_casEntry)&&String(_casEntry._claimed_by)<String(_QUEUE_TAB_ID));
+    if(!_casEntry||_lostRace){
+      // Entry already sent/removed by another tab, or a lower tab id won the
+      // claim race: back off; the winner's storage state is authoritative,
+      // so do NOT write (mirror it into memory instead).
+      const liveQ=_getSessionQueue(sid,false);
+      const idx=liveQ.findIndex(e=>e&&e._qid===next._qid);
+      if(idx!==-1){
+        if(!_casEntry) liveQ.splice(idx,1);
+        else liveQ[idx]={..._casEntry,_persisted:true};
+      }
+      if(!liveQ.length) delete SESSION_QUEUES[sid];
+      delete _queueRenderKeys[sid];
+      updateQueueBadge(sid);
+      return;
+    }
+    if(_foreignQueueClaim(_casEntry)){
+      // Race observed but this tab has the lowest id: re-assert the claim.
+      _setQueueEntryState(sid,next._qid,'running');
+    }
+    // Guard: if the user switched away from the drain session during
+    // the 120ms settle window, the queued message must NOT go to the
+    // wrong chat. Revert it to 'queued' IN PLACE (order preserved) and
+    // skip sending; it will drain when the user returns to that session
+    // or when its next stream completes while it is the active view.
+    if(S.session&&S.session.session_id!==sid){
+      _setQueueEntryState(sid,next._qid,'queued');
+      updateQueueBadge(sid);
+      return;
+    }
+    $('msg').value=next.text||'';
+    S.pendingFiles=Array.isArray(next.files)?[...next.files]:[];
+    // Restore model from queued item (sent in /api/chat/start payload)
+    // Note: profile is NOT restored, a full profile switch requires server interaction
+    if(next.model&&S.session&&next.model!==S.session.model){
+      S.session.model=next.model;
+    }
+    if(next.model_provider&&S.session) S.session.model_provider=next.model_provider;
+    if(next.model&&S.session){
+      if(typeof _applyModelToDropdown==='function'&&$('modelSelect')) _applyModelToDropdown(next.model,$('modelSelect'),S.session.model_provider||null);
+      if(typeof syncModelChip==='function') syncModelChip();
+    }
+    autoResize();
+    renderTray();
+    _drainingQueueEntry={sid,qid:next._qid};
+    try{
+      await send();
+    }finally{
+      // send() returned without touching /api/chat/start (local slash command,
+      // guard early-return, ...). The entry was consumed by that path, so
+      // remove it, mirroring the pre-lifecycle shift-before-send behavior,
+      // instead of leaving a stuck 'running' row that would re-drain forever.
+      if(_drainingQueueEntry&&_drainingQueueEntry.sid===sid&&_drainingQueueEntry.qid===next._qid){
+        _drainingQueueEntry=null;
+        removeQueuedSessionMessage(sid,next._qid);
+        updateQueueBadge(sid);
+      }
+    }
+  },120);
 }
 
 // ── Queue chip display (Codex Desktop pattern) ─────────────────────────────
@@ -8018,7 +8396,7 @@ function _renderQueueChips(sid){
   const inner=document.getElementById('queueChips');
   if(!card||!inner) return;
   const q=_getSessionQueue(sid,false);
-  const key=q.map(e=>{const t=e&&(e.text||e.message||e.content||'');return(e&&e._queued_at||0)+':'+t.length+':'+t.slice(0,20);}).join('|');
+  const key=q.map(e=>{const t=e&&(e.text||e.message||e.content||'');return(e&&e._queued_at||0)+':'+_queueEntryState(e)+':'+t.length+':'+t.slice(0,20);}).join('|');
   if(key===(_queueRenderKeys[sid]||'')&&key!='') return;
   // Skip re-render if user is actively editing inside the queue panel
   if(inner.contains(document.activeElement)&&document.activeElement!==inner) return;
@@ -8055,8 +8433,10 @@ function _renderQueueChips(sid){
 
   function _saveAndRefresh(){
     const liveQ=_getSessionQueue(sid,false);
-    if(!liveQ.length){delete SESSION_QUEUES[sid];_clearPersistedSessionQueue(sid);}
-    else{SESSION_QUEUES[sid]=[...liveQ];_persistSessionQueueStorage(sid,liveQ);}
+    // Merge-write (D3): never blind-clear or blind-mirror the shared store;
+    // removed entries are tombstoned by the callers below.
+    _persistSessionQueueStorage(sid,liveQ);
+    if(!liveQ.length) delete SESSION_QUEUES[sid];
     delete _queueRenderKeys[sid];
     updateQueueBadge(sid);
   }
@@ -8081,7 +8461,10 @@ function _renderQueueChips(sid){
         const liveQ=_getSessionQueue(sid,false);
         const first=snapshot.find(e=>e)||{};
         const firstFiles=(snapshot.find(e=>e&&Array.isArray(e.files)&&e.files.length)||{files:[]}).files;
-        liveQ.length=0;liveQ.push({text:combined,files:firstFiles,model:first.model||'',model_provider:first.model_provider||null,_queued_at:Date.now()});
+        // Tombstone the combined-away entries so the storage merge cannot
+        // resurrect them next to the new combined entry (D3).
+        snapshot.forEach(e=>{if(e&&e._qid)_tombstoneQueueEntry(sid,e._qid);});
+        liveQ.length=0;liveQ.push({text:combined,files:firstFiles,model:first.model||'',model_provider:first.model_provider||null,_queued_at:Date.now(),_qid:_queueEntryId(),_state:'queued'});
         SESSION_QUEUES[sid]=liveQ;
         _persistSessionQueueStorage(sid,liveQ);
         delete _queueRenderKeys[sid];
@@ -8098,7 +8481,11 @@ function _renderQueueChips(sid){
     clearBtn.title='Clear all queued messages';
     clearBtn.setAttribute('aria-label','Clear all queued messages');
     clearBtn.innerHTML=li('x',13);
-    clearBtn.onclick=()=>{q.length=0;_saveAndRefresh();};
+    clearBtn.onclick=()=>{
+      q.forEach(e=>{if(e&&e._qid)_tombstoneQueueEntry(sid,e._qid);});
+      q.length=0;
+      _saveAndRefresh();
+    };
     actions.appendChild(mergeBtn);
     actions.appendChild(clearBtn);
     // Hide button — collapses flyout entirely; queue pill re-shows it
@@ -8124,9 +8511,11 @@ function _renderQueueChips(sid){
     const _entryTs=entry&&entry._queued_at;
     const entryText=entry&&(entry.text||entry.message||entry.content||'');
     const _files=entry&&Array.isArray(entry.files)?entry.files.filter(Boolean):[];
+    const _state=_queueEntryState(entry);
     const row=document.createElement('div');
-    row.className='queue-card-row';
+    row.className='queue-card-row queue-state-'+_state;
     row.setAttribute('role','listitem');
+    row.setAttribute('data-queue-state',_state);
     row.setAttribute('draggable','true');
     row.ondragstart=(e)=>{if(_entryTs==null) return;_dragTs=_entryTs;row.style.opacity='.4';e.dataTransfer.effectAllowed='move';};
     row.ondragend=()=>{row.style.opacity='';};
@@ -8148,7 +8537,9 @@ function _renderQueueChips(sid){
     // Inline-editable text
     const msgSpan=document.createElement('span');
     msgSpan.className='queue-card-text';
-    msgSpan.setAttribute('contenteditable','true');
+    // A 'running' entry is already being sent; editing it can no longer change
+    // the outgoing turn, so lock it while the send settles.
+    msgSpan.setAttribute('contenteditable',_state==='running'?'false':'true');
     msgSpan.setAttribute('role','textbox');
     msgSpan.setAttribute('aria-label','Queued message — edit in place');
     msgSpan.textContent=entryText||(_files.length?'':'—');
@@ -8170,6 +8561,16 @@ function _renderQueueChips(sid){
       }
     };
     msgSpan.onkeydown=(e)=>{if(e.key==='Enter'){e.preventDefault();msgSpan.blur();}if(e.key==='Escape'){msgSpan.textContent=entryText||'—';msgSpan.blur();}};
+    // Lifecycle state badge (no-progress-status P2): queued rows carry no badge
+    // (the header already says "N queued"); running and failed rows announce
+    // their state so a message is never silently in limbo.
+    let _stateBadge=null;
+    if(_state!=='queued'){
+      _stateBadge=document.createElement('span');
+      _stateBadge.className='queue-card-state queue-card-state-'+_state;
+      _stateBadge.textContent=_state==='running'?'Sending':'Failed';
+      if(_state==='failed'&&entry&&entry._error) _stateBadge.title=String(entry._error);
+    }
     // Compact badges (files, model, profile)
     const badges=document.createElement('span');
     badges.className='queue-card-badges';
@@ -8201,15 +8602,37 @@ function _renderQueueChips(sid){
     delBtn.onclick=()=>{
       const liveQ=_getSessionQueue(sid,false);
       const idx=_entryTs!=null?liveQ.findIndex(e=>e&&e._queued_at===_entryTs):i;
-      if(idx!==-1) liveQ.splice(idx,1);
-      if(!liveQ.length){delete SESSION_QUEUES[sid];_clearPersistedSessionQueue(sid);}
-      else{SESSION_QUEUES[sid]=[...liveQ];_persistSessionQueueStorage(sid,liveQ);}
+      if(idx!==-1){
+        const removed=liveQ.splice(idx,1)[0];
+        if(removed&&removed._qid) _tombstoneQueueEntry(sid,removed._qid);
+      }
+      // Merge-write (D3): tombstone above keeps the storage merge from
+      // resurrecting the removed entry; never blind-clear the shared key.
+      _persistSessionQueueStorage(sid,liveQ);
+      if(!liveQ.length) delete SESSION_QUEUES[sid];
       delete _queueRenderKeys[sid];
       updateQueueBadge(sid);
     };
+    // Retry button for failed entries: back to 'queued' in place, then drain
+    // immediately when the session is idle.
+    let retryBtn=null;
+    if(_state==='failed'){
+      retryBtn=document.createElement('button');
+      retryBtn.className='queue-card-btn queue-card-retry';
+      retryBtn.title=entry&&entry._error?('Retry (failed with: '+entry._error+')'):'Retry this message';
+      retryBtn.setAttribute('draggable','false');
+      retryBtn.innerHTML=(typeof li==='function'?li('rotate-cw',11):'')+'Retry';
+      retryBtn.onclick=()=>{
+        if(entry&&entry._qid) _setQueueEntryState(sid,entry._qid,'queued');
+        updateQueueBadge(sid);
+        if(!S.busy&&S.session&&S.session.session_id===sid&&typeof drainQueuedSessionMessage==='function') drainQueuedSessionMessage(sid);
+      };
+    }
     row.appendChild(drag);
     row.appendChild(msgSpan);
+    if(_stateBadge) row.appendChild(_stateBadge);
     if(badges.childNodes.length) row.appendChild(badges);
+    if(retryBtn) row.appendChild(retryBtn);
     row.appendChild(delBtn);
     inner.appendChild(row);
   });

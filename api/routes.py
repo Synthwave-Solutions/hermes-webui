@@ -1454,7 +1454,7 @@ def _cron_output_content_window(text: str, limit: int = _CRON_OUTPUT_CONTENT_LIM
 
 
 
-def _cron_job_for_api(job: dict) -> dict:
+def _cron_job_for_api(job: dict, _delivery_ledger: dict | None = None) -> dict:
     """Return a cron job payload with optional UI settings normalized.
 
     Legacy jobs intentionally persist without ``profile`` so they keep the
@@ -1468,11 +1468,30 @@ def _cron_job_for_api(job: dict) -> dict:
     payload = dict(job or {})
     payload.setdefault("profile", None)
     payload["toast_notifications"] = payload.get("toast_notifications") is not False
+    # Delivery outcome tracked separately from run status (scheduler delivery
+    # ticket, 2026-08-26): the task record must show whether the last run's
+    # update actually reached its target, not just last_status.
+    try:
+        from api.cron_webui_delivery import delivery_state_for_job
+
+        delivery_status, delivery_error = delivery_state_for_job(payload, _delivery_ledger)
+        payload["delivery_status"] = delivery_status
+        if delivery_error and not payload.get("last_delivery_error"):
+            payload["last_delivery_error"] = delivery_error
+    except Exception:
+        logger.debug("cron delivery state unavailable for job %s", payload.get("id"))
     return payload
 
 
 def _cron_jobs_for_api(jobs) -> list[dict]:
-    return [_cron_job_for_api(job) for job in (jobs or [])]
+    # One ledger read serves the whole list; each job annotation reuses it.
+    try:
+        from api.cron_webui_delivery import load_ledger
+
+        ledger = load_ledger()
+    except Exception:
+        ledger = None
+    return [_cron_job_for_api(job, _delivery_ledger=ledger) for job in (jobs or [])]
 
 
 _AGENT_CRON_IMPORT_PATH_LOCK = threading.Lock()
@@ -12815,6 +12834,12 @@ def handle_get(handler, parsed) -> bool:
                 return j(handler, {"jobs": [], "cron_unavailable": True})
             raise
         all_profiles = _all_profiles_enabled(parsed) and _cron_admin_allowed(handler)
+        if not all_profiles:
+            # Governance scope filter (26 Aug 2026 report): non cron:admin
+            # callers only see rows from profiles inside their scope. Logic
+            # lives in api/cron_scope.py to keep this shared route minimal.
+            from api.cron_scope import scope_cron_rows_for_caller
+            active_jobs, other_jobs = scope_cron_rows_for_caller(handler, active_jobs, other_jobs)
         jobs = active_jobs + other_jobs if all_profiles else active_jobs
         hidden_other_count = 0 if all_profiles else len(other_jobs)
         return j(handler, {
@@ -12823,6 +12848,16 @@ def handle_get(handler, parsed) -> bool:
             "active_profile": active_profile,
             "other_profile_count": hidden_other_count,
         })
+
+    # The /api/crons/* GET detail routes below all serve the ACTIVE profile's
+    # cron store, so one shared scope check on the active profile stops
+    # direct-URL retrieval of jobs outside the caller's governance scope
+    # (26 Aug 2026 report; logic in api/cron_scope.py).
+    if parsed.path in ("/api/crons/output", "/api/crons/history", "/api/crons/run",
+                       "/api/crons/recent", "/api/crons/status", "/api/crons/delivery-options"):
+        from api.cron_scope import caller_sees_cron_profile
+        if not caller_sees_cron_profile(handler, _get_active_profile_name() or "default"):
+            return j(handler, {"error": "forbidden", "reason": "cron_scope"}, status=403)
 
     if parsed.path == "/api/crons/output":
         from api.profiles import cron_profile_context
@@ -14417,6 +14452,17 @@ def handle_post(handler, parsed) -> bool:
             _ensure_agent_cron_import_path()
             return _handle_cron_update(handler, body)
 
+    # The cron mutation routes below act on the ACTIVE profile's cron store,
+    # so they share the same governance scope guard as the GET detail routes:
+    # a caller outside the active profile's scope must not read, execute or
+    # delete its jobs via a known job_id (26 Aug 2026 report; logic in
+    # api/cron_scope.py, which allows + audits would_deny under report_only).
+    if parsed.path in ("/api/crons/delete", "/api/crons/run",
+                       "/api/crons/pause", "/api/crons/resume"):
+        from api.cron_scope import caller_sees_cron_profile
+        if not caller_sees_cron_profile(handler, _get_active_profile_name() or "default"):
+            return j(handler, {"error": "forbidden", "reason": "cron_scope"}, status=403)
+
     if parsed.path == "/api/crons/delete":
         from api.profiles import cron_profile_context
 
@@ -14793,6 +14839,17 @@ def handle_post(handler, parsed) -> bool:
 
     # ── Settings (POST) ──
     if parsed.path == "/api/settings":
+        # Appearance self-service (26 Aug 2026 report): the route catalog now
+        # admits this POST with config:read; this body-sink guard keeps every
+        # non-cosmetic settings write on config:write exactly as before while
+        # appearance-only payloads (theme, skin, and the other cosmetic keys
+        # the appearance autosave emits) pass without any admin approval.
+        # Denials are audited (deny under enforce, would_deny + allow under
+        # report_only). Logic lives in api/settings_scope.py.
+        from api.settings_scope import settings_write_denial_for
+        _settings_denial = settings_write_denial_for(handler, body)
+        if _settings_denial is not None:
+            return j(handler, _settings_denial, status=403)
         from api.auth import (
             create_session,
             get_password_hash,
@@ -19201,6 +19258,17 @@ def _handle_cron_recent(handler, parsed):
         from cron.jobs import list_jobs
 
         jobs = list_jobs(include_disabled=True)
+        # Delivery outcome is tracked SEPARATELY from run status (scheduler
+        # delivery ticket, 2026-08-26): a run whose last_status is ok but whose
+        # update never reached its target must not be reported as plain ok.
+        # One ledger read serves the whole completion list.
+        try:
+            from api.cron_webui_delivery import delivery_state_for_job, load_ledger
+
+            _delivery_ledger = load_ledger()
+        except Exception:
+            delivery_state_for_job = None
+            _delivery_ledger = None
         completions = []
         for job in jobs:
             job_id = str(job.get("id", "") or "")
@@ -19217,15 +19285,28 @@ def _handle_cron_recent(handler, parsed):
             else:
                 ts = float(last_run)
             if ts > since:
-                completions.append(
-                    {
-                        "job_id": job_id,
-                        "name": job.get("name", "Unknown"),
-                        "status": job.get("last_status", "unknown"),
-                        "completed_at": ts,
-                        "toast_notifications": job.get("toast_notifications") is not False,
-                    }
-                )
+                completion = {
+                    "job_id": job_id,
+                    "name": job.get("name", "Unknown"),
+                    "status": job.get("last_status", "unknown"),
+                    "completed_at": ts,
+                    "toast_notifications": job.get("toast_notifications") is not False,
+                }
+                if delivery_state_for_job is not None:
+                    try:
+                        delivery_status, delivery_error = delivery_state_for_job(
+                            job, _delivery_ledger
+                        )
+                    except Exception:
+                        delivery_status, delivery_error = None, job.get("last_delivery_error")
+                    completion["delivery_status"] = delivery_status
+                    completion["delivery_error"] = delivery_error
+                    # A successful run with a FAILED delivery must surface as a
+                    # failure, not as ok with the loss hidden in a side field.
+                    if completion["status"] == "ok" and delivery_status == "failed":
+                        completion["status"] = "error"
+                        completion["status_detail"] = "delivery_failed"
+                completions.append(completion)
         latest_session_info = _latest_cron_session_info_for_jobs(
             [job.get("id", "") for job in jobs],
             [c["job_id"] for c in completions],

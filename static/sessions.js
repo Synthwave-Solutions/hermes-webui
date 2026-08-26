@@ -2378,6 +2378,13 @@ async function loadSession(sid){
       const liveTurn=document.getElementById('liveAssistantTurn');
       if(!liveTurn||!liveTurn.querySelector('.tool-call-group[data-tool-worklog-group="1"]')) ensureLiveWorklogShell();
     }
+    // Restore queued messages for a BUSY session too (queued-messages-disappear
+    // P1): a refresh while a turn streams must not lose the queue. No drain is
+    // kicked here; setBusy(false) drains when the live stream completes.
+    if(typeof restoreSessionQueueFromStorage==='function'){
+      try{restoreSessionQueueFromStorage(sid,S.messages,S.session);}
+      catch(_){/* storage may be blocked (private browsing); keep the queue untouched */}
+    }
     _deferWorkspaceRefreshForSession(sid);
     setBusy(true);setComposerStatus('');
     startApprovalPolling(sid);
@@ -2412,29 +2419,19 @@ async function loadSession(sid){
     // Stale? A newer loadSession() call has already started (#1060).
     if (!_isCurrentLoad()) return;
 
-    // Restore any queued message that survived page refresh or tab restore.
-    if(typeof queueSessionMessage==='function'){
+    // Restore any queued messages that survived page refresh or tab restore.
+    // (queued-messages-disappear P1) The full ordered queue goes back into
+    // SESSION_QUEUES with reconciliation against the transcript; entries are
+    // only dropped with positive evidence the turn was already sent. The old
+    // path here kept just the first entry as a composer draft and cleared the
+    // persisted copy, silently losing every other queued message on refresh.
+    if(typeof restoreSessionQueueFromStorage==='function'){
       try{
-        const _entries=typeof _readPersistedSessionQueue==='function'
-          ? _readPersistedSessionQueue(sid)
-          : [];
-        if(Array.isArray(_entries)&&_entries.length){
-          const _lastMsg=S.messages.slice().reverse()
-            .find(m=>m&&m.role==='assistant');
-          const _lastAsst=_lastMsg?(_lastMsg.timestamp||_lastMsg._ts||0)*1000:0;
-          const _fresh=_entries.filter(e=>!e._queued_at||e._queued_at>_lastAsst);
-          if(_fresh.length){
-            const _first=_fresh[0];
-            const _msg=$&&$('msg');
-            if(_msg&&_first.text&&!_msg.value){
-              _msg.value=_first.text||'';
-              if(typeof autoResize==='function') autoResize();
-              if(typeof showToast==='function') showToast((_fresh.length>1?`${_fresh.length} queued messages restored (showing first)`:'Queued message restored')+' — review and send when ready');
-            }
-          }
-          if(typeof _clearPersistedSessionQueue==='function') _clearPersistedSessionQueue(sid);
-        }
-      }catch(_){if(typeof _clearPersistedSessionQueue==='function') _clearPersistedSessionQueue(sid);}
+        const _restoredCount=restoreSessionQueueFromStorage(sid,S.messages,S.session);
+        // Idle session: nothing will call setBusy(false) to drain, so kick the
+        // drain now (it no-ops when the session is busy or the queue is empty).
+        if(_restoredCount&&typeof drainQueuedSessionMessage==='function') drainQueuedSessionMessage(sid);
+      }catch(_){/* storage may be blocked (private browsing); keep the queue untouched */}
     }
 
     // Reconstruct tool calls from message metadata, or fall back to session-level summary.

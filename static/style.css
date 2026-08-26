@@ -139,7 +139,7 @@
     --topbar-bg:rgba(255,255,255,0.94);--main-bg:#FFFFFF;
     --error:#D44D4D;--success:#0F8F70;--warning:#B87916;--info:#55564F;
     --user-bubble-bg:#EFEFEF;--user-bubble-border:#DEDEDE;--user-bubble-text:#242424;--user-bubble-placeholder:#707070;
-    --user-selection-bg:rgba(0,0,0,0.16);--user-selection-text:#111111;
+    --user-selection-bg:rgba(0,0,0,0.30);--user-selection-text:#111111;
     --font-ui:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
     --font-mono:ui-monospace,"SFMono-Regular","SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
     font-family:var(--font-ui);
@@ -155,7 +155,7 @@
     --topbar-bg:rgba(21,22,20,0.92);--main-bg:#151614;
     --error:#FF6B6B;--success:#10A37F;--warning:#E6B15C;--info:#C9C8C0;
     --user-bubble-bg:#2E302D;--user-bubble-border:#454741;--user-bubble-text:#F4F3EC;--user-bubble-placeholder:#A7A79D;
-    --user-selection-bg:rgba(255,255,255,0.18);--user-selection-text:#FAF9F3;
+    --user-selection-bg:rgba(255,255,255,0.30);--user-selection-text:#FAF9F3;
   }
   :root[data-skin="graphite"],
   :root[data-skin="graphite"] body{font-family:var(--font-ui)!important;font-weight:430;letter-spacing:0;background:var(--bg);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;}
@@ -266,7 +266,7 @@
     --topbar-bg:rgba(255,255,255,0.96);--main-bg:#FFFFFF;
     --error:#D92D20;--success:#2E7A60;--warning:#B87916;--info:#4D8DFF;
     --user-bubble-bg:#EBEBEB;--user-bubble-border:#D9D9D9;--user-bubble-text:#252523;--user-bubble-placeholder:#6A6A68;
-    --user-selection-bg:rgba(46,122,96,0.20);--user-selection-text:#0D0D0D;
+    --user-selection-bg:rgba(46,122,96,0.35);--user-selection-text:#0D0D0D;
     --font-ui:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
     --font-mono:ui-monospace,"SFMono-Regular","SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
     font-family:var(--font-ui);
@@ -282,7 +282,7 @@
     --topbar-bg:rgba(21,22,20,0.92);--main-bg:#151614;
     --error:#FF6B6B;--success:#72B39A;--warning:#E6B15C;--info:#C9C8C0;
     --user-bubble-bg:#2E302D;--user-bubble-border:#454741;--user-bubble-text:#F4F3EC;--user-bubble-placeholder:#A7A79D;
-    --user-selection-bg:rgba(114,179,154,0.22);--user-selection-text:#FAF9F3;
+    --user-selection-bg:rgba(114,179,154,0.35);--user-selection-text:#FAF9F3;
   }
   :root[data-skin="codex"],
   :root[data-skin="codex"] body{font-family:var(--font-ui)!important;font-weight:430;letter-spacing:0;background:var(--bg);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;}
@@ -393,7 +393,7 @@
     --topbar-bg:rgba(250,249,245,0.96);--main-bg:#FAF9F5;
     --error:#C15F3C;--success:#6EA100;--warning:#B87916;--info:#6396D6;
     --user-bubble-bg:#F0EEE6;--user-bubble-border:#E2DED2;--user-bubble-text:#30302E;--user-bubble-placeholder:#87867F;
-    --user-selection-bg:rgba(217,119,87,0.24);--user-selection-text:#141413;
+    --user-selection-bg:rgba(217,119,87,0.38);--user-selection-text:#141413;
     --font-ui:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
     --font-mono:ui-monospace,"SFMono-Regular","SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
     font-family:var(--font-ui);
@@ -409,7 +409,7 @@
     --topbar-bg:rgba(20,20,19,0.94);--main-bg:#141413;
     --error:#F08A6F;--success:#9BCB5A;--warning:#E6B15C;--info:#7BA7DE;
     --user-bubble-bg:#282620;--user-bubble-border:#464238;--user-bubble-text:#FAF9F5;--user-bubble-placeholder:#B0AEA5;
-    --user-selection-bg:rgba(217,119,87,0.24);--user-selection-text:#FAF9F5;
+    --user-selection-bg:rgba(217,119,87,0.38);--user-selection-text:#FAF9F5;
   }
   :root[data-skin="terracotta"],
   :root[data-skin="terracotta"] body{font-family:var(--font-ui)!important;font-weight:430;letter-spacing:0;background:var(--bg);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;}
@@ -520,7 +520,7 @@
     --topbar-bg:rgba(255,255,255,0.94);--main-bg:#FFFFFF;
     --error:#D1242F;--success:#1A7F37;--warning:#9A6700;--info:#0969DA;
     --user-bubble-bg:#EFEFEF;--user-bubble-border:#DEDEDE;--user-bubble-text:#242424;--user-bubble-placeholder:#707070;
-    --user-selection-bg:rgba(0,0,0,0.16);--user-selection-text:#111111;
+    --user-selection-bg:rgba(0,0,0,0.30);--user-selection-text:#111111;
     --font-ui:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
     --font-mono:ui-monospace,"SFMono-Regular","SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
     font-family:var(--font-ui);
@@ -536,7 +536,7 @@
     --topbar-bg:rgba(21,22,20,0.92);--main-bg:#151614;
     --error:#FF7B72;--success:#3FB950;--warning:#D29922;--info:#58A6FF;
     --user-bubble-bg:#2E302D;--user-bubble-border:#454741;--user-bubble-text:#F4F3EC;--user-bubble-placeholder:#A7A79D;
-    --user-selection-bg:rgba(255,255,255,0.18);--user-selection-text:#FAF9F3;
+    --user-selection-bg:rgba(255,255,255,0.30);--user-selection-text:#FAF9F3;
   }
   :root[data-skin="github"],
   :root[data-skin="github"] body{font-family:var(--font-ui)!important;font-weight:430;letter-spacing:0;background:var(--bg);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;}
@@ -663,7 +663,7 @@
     --blue:#2E6F9E;--gold:#A55237;
     --user-bubble-bg:#ECE9DF;--user-bubble-border:#DED9CC;
     --user-bubble-text:#1F1E1C;--user-bubble-placeholder:#6B6A63;
-    --user-selection-bg:rgba(217,119,87,0.28);--user-selection-text:#1F1E1C;
+    --user-selection-bg:rgba(217,119,87,0.38);--user-selection-text:#1F1E1C;
   }
   :root.dark[data-skin="sienna"]{
     --bg:#1F1E1C;--sidebar:#262522;--surface:#2C2B28;
@@ -678,7 +678,7 @@
     --blue:#8BB8D6;--gold:#E6A88A;
     --user-bubble-bg:#34322E;--user-bubble-border:#42403B;
     --user-bubble-text:#EDEBE3;--user-bubble-placeholder:#A3A197;
-    --user-selection-bg:rgba(224,137,109,0.3);--user-selection-text:#F7F5ED;
+    --user-selection-bg:rgba(224,137,109,0.40);--user-selection-text:#F7F5ED;
   }
   /* Specificity boosted to beat the :root:not(.dark) .new-chat-btn rule that
      sets color:var(--accent-text) — without this, the solid-accent background
@@ -722,7 +722,7 @@
     --blue:#1E66F5;--gold:#DF8E1D;
     --user-bubble-bg:#E6E9EF;--user-bubble-border:#CCD0DA;
     --user-bubble-text:#4C4F69;--user-bubble-placeholder:#7C7F93;
-    --user-selection-bg:rgba(136,57,239,0.24);--user-selection-text:#1E1E2E;
+    --user-selection-bg:rgba(136,57,239,0.36);--user-selection-text:#1E1E2E;
   }
   :root.dark[data-skin="catppuccin"]{
     --bg:#1E1E2E;--sidebar:#181825;--surface:#313244;
@@ -737,7 +737,7 @@
     --blue:#89B4FA;--gold:#F9E2AF;
     --user-bubble-bg:#313244;--user-bubble-border:#45475A;
     --user-bubble-text:#CDD6F4;--user-bubble-placeholder:#A6ADC8;
-    --user-selection-bg:rgba(203,166,247,0.3);--user-selection-text:#1E1E2E;
+    --user-selection-bg:rgba(203,166,247,0.42);--user-selection-text:#1E1E2E;
   }
   :root[data-skin="catppuccin"]:not(.dark) .new-chat-btn,
   :root.dark[data-skin="catppuccin"] .new-chat-btn{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;box-shadow:0 1px 3px rgba(136,57,239,0.24);}
@@ -2037,6 +2037,13 @@
   .queue-card-text:focus{white-space:pre-wrap;overflow:auto;text-overflow:clip;}
   .queue-card-badges{display:flex;align-items:center;gap:5px;flex-shrink:0;font-size:10px;color:var(--muted);opacity:.6;}
   .queue-card-file-badge{display:flex;align-items:center;gap:2px;}
+  /* Queue entry lifecycle states (queued-messages-disappear P1 / no-progress-status P2) */
+  .queue-card-state{flex-shrink:0;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:1px 6px;border-radius:8px;border:1px solid var(--border);color:var(--muted);}
+  .queue-card-state-running{color:var(--accent,#4a9eff);border-color:currentColor;}
+  .queue-card-state-failed{color:var(--error,#e5534b);border-color:currentColor;}
+  .queue-card-row.queue-state-running .queue-card-text{opacity:.75;}
+  .queue-card-row.queue-state-failed{background:color-mix(in srgb,var(--error,#e5534b) 7%,transparent);}
+  .queue-card-retry{flex-shrink:0;}
   .approval-btn-icon{font-size:13px;line-height:1;}
   .approval-btn-label{line-height:1;}
   .approval-kbd{display:inline-flex;align-items:center;justify-content:center;padding:1px 5px;border-radius:4px;font-size:10px;font-family:inherit;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:var(--muted);line-height:1.4;margin-left:2px;}
@@ -2086,7 +2093,7 @@
   .clarify-card.collapsed .clarify-header{margin-bottom:0;}
   .clarify-card.collapsed .clarify-question,.clarify-card.collapsed .clarify-choices,.clarify-card.collapsed .clarify-response,.clarify-card.collapsed .clarify-hint{display:none;}
   /* Left rail (desktop primary navigation) */
-  .rail{display:none;width:48px;flex-shrink:0;flex-direction:column;align-items:center;gap:4px;padding:8px 0;background:var(--sidebar);border-right:1px solid var(--border);}
+  .rail{display:none;width:48px;flex-shrink:0;flex-direction:column;align-items:center;gap:4px;padding:8px 0;background:var(--sidebar);border-right:1px solid var(--border);transition:width .24s cubic-bezier(.22,1,.36,1);}
   .rail-btn{width:36px;height:36px;border-radius:8px;border:none;background:none;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative;transition:color .15s,background .15s;flex-shrink:0;padding:0;}
   .rail-btn:hover{color:var(--text);background:var(--hover-bg);}
   .rail-btn.active{color:var(--accent-text);background:var(--accent-bg);}
@@ -2134,18 +2141,32 @@
   .dashboard-external-badge{position:absolute;right:5px;top:5px;width:9px;height:9px;border-radius:2px;border:1px solid var(--accent);background:var(--sidebar);box-shadow:0 0 0 2px var(--sidebar);opacity:.95;}
   .dashboard-external-badge::after{content:'';position:absolute;right:-2px;top:-2px;width:5px;height:5px;border-top:1.5px solid var(--accent);border-right:1.5px solid var(--accent);}
   .sidebar-nav .dashboard-external-badge{right:8px;top:7px;width:8px;height:8px;}
+  /* left-nav-tooltips: rail pin-to-expand (persisted labels mode). With
+     html[data-rail-expanded="1"] the desktop rail widens and every icon shows
+     its label inline. The label reuses the i18n-synced data-tooltip text by
+     restyling the tooltip ::after into a static flex child, so the hover
+     tooltip and the expanded label can never drift apart. */
+  html[data-rail-expanded="1"] .rail{width:180px;align-items:stretch;padding:8px 6px;}
+  html[data-rail-expanded="1"] .rail .rail-btn{width:auto;justify-content:flex-start;gap:10px;padding:0 10px;}
+  html[data-rail-expanded="1"] .rail .rail-btn svg{flex:0 0 auto;}
+  html[data-rail-expanded="1"] .rail .rail-btn::after{content:attr(data-tooltip);position:static;transform:none;opacity:1;background:none;border:none;box-shadow:none;padding:0;margin:0;flex:1 1 auto;min-width:0;text-align:left;font-size:12.5px;font-weight:600;letter-spacing:.01em;color:inherit;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:none;pointer-events:none;}
+  .rail-expand-toggle svg{transition:transform .18s ease;}
+  html[data-rail-expanded="1"] .rail-expand-toggle svg{transform:rotate(180deg);}
+  @media(prefers-reduced-motion:reduce){.rail-expand-toggle svg{transition:none;}}
   @media(min-width:641px){.rail{display:flex;}.sidebar > .sidebar-nav{display:none;}}
   /* Sidebar navigation tabs */
   .sidebar-nav{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;padding:6px 8px 0;gap:2px;}
   .nav-tab{flex:1;padding:10px 4px 8px;font-size:20px;text-align:center;cursor:pointer;color:var(--muted);border:none;background:none;transition:color .15s;border-bottom:2px solid transparent;white-space:nowrap;overflow:hidden;position:relative;display:flex;align-items:center;justify-content:center;}
   .nav-tab:hover{color:var(--text);}
-  /* Legacy hover-tooltip — kept for the mobile `.sidebar-nav` only, where it
-     positions ABOVE the trigger (the bar is at the top of the sidebar so a
-     bottom-positioned tooltip would sink into the panel content). The desktop
-     `.rail` buttons opt out of this rule so the `.has-tooltip` system can run
-     unobstructed; rail buttons carry no `data-label`, so an unscoped rule
-     would render an empty styled box on hover. */
-  .sidebar-nav .nav-tab:hover::after{content:attr(data-label);position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--accent-bg-strong);color:var(--accent-text);font-size:12px;font-weight:700;letter-spacing:.02em;padding:6px 12px;border-radius:8px;white-space:nowrap;pointer-events:none;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,.3);}
+  /* left-nav-tooltips: the legacy data-label hover tooltip that used to serve
+     the mobile `.sidebar-nav` conflicted with the `.has-tooltip--bottom`
+     system these tabs now carry (both styled ::after with opposite vertical
+     anchoring, over-constraining the box), and the base `.nav-tab`
+     overflow:hidden clipped any tooltip pseudo-element outright, so mobile
+     nav tooltips never showed. The tabs all have data-tooltip and
+     has-tooltip--bottom now, so the custom tooltip system owns mobile too;
+     overflow:visible lets the tooltip render outside the button box. */
+  .sidebar-nav .nav-tab{overflow:visible;}
   .nav-tab.active{color:var(--accent-text);}
   .nav-tab.active::before{content:'';position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:20px;height:2px;background:var(--accent);border-radius:2px 2px 0 0;}
   /* Panel content areas (swapped by tab) */
@@ -5876,7 +5897,7 @@ main.main > #mainPlugin{display:none;}
   --user-bubble-border: var(--accent-hover);
   --user-bubble-text: #fff;
   --user-bubble-placeholder: rgba(255,255,255,.7);
-  --user-selection-bg: rgba(0,0,0,.22);
+  --user-selection-bg: rgba(0,0,0,.34);
   --user-selection-text: #fff;
 }
 /* Dark mode: keep user bubbles dark; skin remains a tint via border/fill. */
@@ -5885,7 +5906,7 @@ main.main > #mainPlugin{display:none;}
   --user-bubble-border: var(--accent-bg-strong);
   --user-bubble-text: var(--text);
   --user-bubble-placeholder: var(--muted);
-  --user-selection-bg: rgba(255,255,255,.18);
+  --user-selection-bg: rgba(255,255,255,.30);
   --user-selection-text: var(--text);
 }
 

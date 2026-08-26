@@ -564,6 +564,53 @@ function expandSidebar(){
   }catch(_){}
   _syncSidebarAria();
 })();
+
+// ── Desktop rail pin-to-expand (left-nav-tooltips) ─────────────────────────
+// The icon-only rail can be pinned into a labels view so every destination is
+// readable without hovering. State persists via localStorage; the inline
+// pre-paint script in index.html applies data-rail-expanded on <html> before
+// the stylesheet loads so there is no flash. Mobile is unaffected (the rail is
+// hidden below 641px) and split-view panes never restore or persist the state.
+const _RAIL_EXPANDED_KEY='hermes-webui-rail-expanded';
+
+function _isRailExpanded(){
+  return document.documentElement.dataset.railExpanded==='1';
+}
+
+function _syncRailExpandToggle(){
+  const btn=document.getElementById('railExpandToggle');
+  if(!btn)return;
+  const expanded=_isRailExpanded();
+  const key=expanded?'nav_collapse_labels':'nav_expand_labels';
+  let label=expanded?'Hide labels':'Show labels';
+  try{if(typeof t==='function'){const val=t(key);if(val&&val!==key)label=val;}}catch(_){}
+  btn.setAttribute('data-tooltip',label);
+  btn.setAttribute('aria-label',label);
+  btn.setAttribute('data-i18n-title',key);
+  btn.setAttribute('data-i18n-aria-label',key);
+  btn.setAttribute('aria-pressed',expanded?'true':'false');
+}
+
+function toggleRailExpanded(forceState){
+  const next=typeof forceState==='boolean'?forceState:!_isRailExpanded();
+  if(next)document.documentElement.dataset.railExpanded='1';
+  else delete document.documentElement.dataset.railExpanded;
+  if(!window.__HERMES_PANE_MODE){
+    try{localStorage.setItem(_RAIL_EXPANDED_KEY,next?'1':'0');}catch(_){}
+  }
+  _syncRailExpandToggle();
+}
+
+(function _restoreRailExpandedState(){
+  // The inline pre-paint script already set data-rail-expanded when persisted;
+  // this keeps the toggle button's label/aria state in sync after boot.
+  try{
+    if(!window.__HERMES_PANE_MODE&&localStorage.getItem(_RAIL_EXPANDED_KEY)==='1'){
+      document.documentElement.dataset.railExpanded='1';
+    }
+  }catch(_){}
+  _syncRailExpandToggle();
+})();
 // ── Boot-time tab visibility ────────────────────────────────────────────────
 // Apply hidden tabs from localStorage. The primary flash-prevention is an
 // inline <script> in index.html (after sidebar-nav) that runs synchronously

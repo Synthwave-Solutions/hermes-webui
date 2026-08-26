@@ -378,6 +378,11 @@ def test_cron_recent_does_not_cross_match_newer_long_prefix_session_when_only_sh
             "status": "success",
             "completed_at": 250.0,
             "toast_notifications": True,
+            # Delivery outcome is tracked separately from run status
+            # (cron WebUI delivery bridge); a job with no delivery target
+            # configured reports the local outcome with no error.
+            "delivery_status": "local",
+            "delivery_error": None,
             "session_id": "cron_backup_20260610_090000",
             "message_count": 4,
         }

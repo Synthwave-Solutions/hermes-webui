@@ -45,7 +45,7 @@ window.__HERMES_PANE_MODE = _splitIsPaneMode();
   // owns "last session" and the sidebar preference. Everything else persists
   // normally (theme, locale, drafts are server-side).
   try {
-    const _blocked = new Set(['hermes-webui-session', 'hermes-webui-sidebar-collapsed']);
+    const _blocked = new Set(['hermes-webui-session', 'hermes-webui-sidebar-collapsed', 'hermes-webui-rail-expanded']);
     const _origSet = window.localStorage.setItem.bind(window.localStorage);
     window.localStorage.setItem = function (k, v) {
       if (_blocked.has(String(k))) return;

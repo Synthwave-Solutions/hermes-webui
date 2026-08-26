@@ -1779,6 +1779,10 @@ async function send(){
       if(!_approvalSessionId || _approvalSessionId===activeSid) hideApprovalCard(true);
       if(!_clarifySessionId || _clarifySessionId===activeSid) hideClarifyCard(true, 'terminal');
       removeThinking();
+      // The session is gone server-side; its queue (including a mid-drain
+      // 'running' entry) has no destination anymore. Drop the persisted copy so
+      // it cannot leak into a future session with a recycled id.
+      if(typeof _queueDrainSessionGone==='function') _queueDrainSessionGone(activeSid);
       S.session=null;S.messages=[];
       setBusy(false);setComposerStatus('');
       if(typeof clearOptimisticSessionStreaming==='function') clearOptimisticSessionStreaming(activeSid);
@@ -1795,8 +1799,12 @@ async function send(){
       stopApprovalPolling();
       stopClarifyPolling();
       // Keep the user's attempted turn by queueing it for after the current run.
-      const _retryModelState=_chatPayloadModelState();
-      queueSessionMessage(activeSid,{text:msgText,files:[],model:_retryModelState.model,model_provider:_retryModelState.model_provider,profile:S.activeProfile||'default'});
+      // A drain-originated send reverts its own entry to 'queued' IN PLACE
+      // (order preserved, no duplicate); only a fresh composer send appends.
+      if(!(typeof _queueDrainEntryRequeue==='function'&&_queueDrainEntryRequeue(activeSid))){
+        const _retryModelState=_chatPayloadModelState();
+        queueSessionMessage(activeSid,{text:msgText,files:[],model:_retryModelState.model,model_provider:_retryModelState.model_provider,profile:S.activeProfile||'default'});
+      }
       updateQueueBadge(activeSid);
       showToast('Current session is still running. Reconnected and queued your message.',2600);
       try{
@@ -1815,12 +1823,20 @@ async function send(){
     if(!_approvalSessionId || _approvalSessionId===activeSid) hideApprovalCard(true);removeThinking();
     if(!_clarifySessionId || _clarifySessionId===activeSid) hideClarifyCard(true, 'terminal');
     S.messages.push({role:'assistant',content:`**Error:** ${errMsg}`});
+    // A drain-originated send keeps its queue entry, now marked 'failed' with
+    // the error, visible in the queue card (never silently dropped); mark it
+    // BEFORE setBusy(false) so the drain kicked there skips past it to the
+    // next 'queued' entry instead of stalling the rest of the queue.
+    const _drainSendFailed=typeof _queueDrainEntryFailed==='function'&&_queueDrainEntryFailed(activeSid,errMsg);
     _queueDrainSid=activeSid;renderMessages();setBusy(false);setComposerStatus(`Error: ${errMsg}`);
     // #5472: the send was rejected before the turn was durably started, so the
     // composer text + attachments (cleared at send time) would otherwise be
     // lost. Put back the ORIGINAL captured draft (not the mutated /moa/bundle
     // payload) and re-stage files so the user can re-send without retyping.
-    _restoreComposerDraftAfterFailedSend(_failedSendDraftText, _failedSendFilesSnapshot, activeSid, _composerDraftClearPromise);
+    // Skip for drain-originated sends: their text lives on as the visible
+    // 'failed' queue entry, and restoring it into the composer too would
+    // double-submit on the user's next send.
+    if(!_drainSendFailed) _restoreComposerDraftAfterFailedSend(_failedSendDraftText, _failedSendFilesSnapshot, activeSid, _composerDraftClearPromise);
     if(typeof clearOptimisticSessionStreaming==='function') clearOptimisticSessionStreaming(activeSid);
     // Reconcile with server truth after immediately clearing the optimistic spinner.
     if(typeof renderSessionList==='function') void renderSessionList();
@@ -1830,6 +1846,10 @@ async function send(){
   const startData = postStartData || {};
   streamId = postStartData ? postStartData.stream_id : null;
   S.activeStreamId = streamId;
+  // /api/chat/start durably accepted the turn: a drain-originated send can now
+  // remove its queue entry (this is the exactly-once handoff point; before it,
+  // the entry stays persisted as 'running' so a refresh cannot lose it).
+  if(typeof _queueDrainEntryAccepted==='function') _queueDrainEntryAccepted(activeSid);
   // setBusy(true) already ran with activeStreamId=null; refresh now that we
   // have a stream id so the primary button can switch to Stop (see
   // getComposerPrimaryAction).

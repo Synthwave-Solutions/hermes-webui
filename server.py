@@ -700,6 +700,13 @@ def main() -> None:
         print(f'[!!] WARNING: SessionChannel reaper failed to start: {e}', flush=True)
 
     try:
+        from api.cron_webui_delivery import start_cron_delivery_thread
+        if start_cron_delivery_thread():
+            print('[ok] cron WebUI delivery bridge started', flush=True)
+    except Exception as e:
+        print(f'[!!] WARNING: cron WebUI delivery bridge failed to start: {e}', flush=True)
+
+    try:
         from api.plugins import load_plugins
         load_plugins()
     except Exception as e:
@@ -752,6 +759,11 @@ def main() -> None:
             stop_session_channel_reaper()
         except Exception:
             logger.debug("Failed to stop SessionChannel reaper during shutdown", exc_info=True)
+        try:
+            from api.cron_webui_delivery import stop_cron_delivery_thread
+            stop_cron_delivery_thread()
+        except Exception:
+            logger.debug("Failed to stop cron WebUI delivery bridge during shutdown", exc_info=True)
 
 if __name__ == '__main__':
     main()
