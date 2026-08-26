@@ -581,7 +581,7 @@ window.__registerHermesLocale('zh', {
     tab_chat: '聊天',
     tab_memory: '记忆',
     tab_skills: '技能',
-    tab_tasks: '任务',
+    tab_tasks: '定时任务',
     tab_kanban: '看板',
     kanban_board: '看板',
     kanban_visible_tasks: '{0} 个可见任务',

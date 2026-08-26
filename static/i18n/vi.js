@@ -723,7 +723,7 @@ window.__registerHermesLocale('vi', {
     dialog_confirm_btn: 'Xác nhận',
     // Sidebar & Tabs
     tab_chat: 'Chat',
-    tab_tasks: 'Tác vụ',
+    tab_tasks: 'Công việc theo lịch',
     tab_skills: 'Kỹ năng',
     tab_memory: 'Bộ nhớ',
     tab_workspaces: 'Spaces',

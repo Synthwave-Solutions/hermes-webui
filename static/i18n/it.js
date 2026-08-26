@@ -880,7 +880,7 @@ window.__registerHermesLocale('it', {
     project_name_prompt: 'Nome progetto:',
     // Sidebar & Tabs
     tab_chat: 'Chat',
-    tab_tasks: 'Task',
+    tab_tasks: 'Job pianificati',
     tab_skills: 'Skill',
     tab_memory: 'Memoria',
     tab_workspaces: 'Spazi',

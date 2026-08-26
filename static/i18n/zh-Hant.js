@@ -874,7 +874,7 @@ window.__registerHermesLocale('zh-Hant', {
     project_name_prompt: '專案名稱：',
     // Sidebar & Tabs
     tab_chat: '聊天',
-    tab_tasks: '任務',
+    tab_tasks: '排程工作',
     tab_skills: '技能',
     tab_memory: '記憶',
     tab_workspaces: '工作區',

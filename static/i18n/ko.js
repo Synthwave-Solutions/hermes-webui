@@ -837,7 +837,7 @@ window.__registerHermesLocale('ko', {
     login_conn_failed: '연결 실패',
     // Sidebar & Tabs
     tab_chat: '채팅',
-    tab_tasks: '작업',
+    tab_tasks: '예약된 작업',
     tab_skills: '스킬',
     tab_memory: '메모리',
     tab_workspaces: '공간',

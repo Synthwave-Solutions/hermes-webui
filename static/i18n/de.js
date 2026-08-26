@@ -547,7 +547,7 @@ window.__registerHermesLocale('de', {
     project_name_prompt: 'Projektname:',
     // Sidebar & Tabs
     tab_chat: 'Chat',
-    tab_tasks: 'Aufgaben',
+    tab_tasks: 'Geplante Jobs',
     tab_skills: 'Skills',
     tab_memory: 'Gedächtnis',
     tab_workspaces: 'Spaces',

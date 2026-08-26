@@ -865,7 +865,7 @@ window.__registerHermesLocale('fr', {
     remove: 'Supprimer',
     project_name_prompt: 'Nom du projet :',
     tab_chat: 'Chat',
-    tab_tasks: 'Tâches',
+    tab_tasks: 'Tâches planifiées',
     tab_skills: 'Compétences',
     tab_memory: 'Mémoire',
     tab_workspaces: 'Espaces',

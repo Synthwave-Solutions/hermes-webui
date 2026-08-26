@@ -873,7 +873,7 @@ window.__registerHermesLocale('pl', {
     login_conn_failed: 'Połączenie nie powiodło się',
     // Sidebar & Tabs
     tab_chat: 'Czat',
-    tab_tasks: 'Zadania',
+    tab_tasks: 'Zaplanowane zadania',
     tab_skills: 'Umiejętności',
     tab_memory: 'Pamięć',
     tab_workspaces: 'Przestrzenie',

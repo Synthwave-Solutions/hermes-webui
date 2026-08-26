@@ -573,7 +573,7 @@ window.__registerHermesLocale('ru', {
     login_invalid_pw: 'Неверный пароль',
     login_conn_failed: 'Не удалось подключиться',
     tab_chat: 'Чат',
-    tab_tasks: 'Задачи',
+    tab_tasks: 'Запланированные задания',
     tab_skills: 'Навыки',
     tab_memory: 'Память',
     tab_workspaces: 'Рабочие пространства',

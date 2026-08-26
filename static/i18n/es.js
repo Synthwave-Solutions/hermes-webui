@@ -568,7 +568,7 @@ window.__registerHermesLocale('es', {
     project_name_prompt: 'Nombre del proyecto:',
     // Sidebar & Tabs
     tab_chat: 'Chat',
-    tab_tasks: 'Tareas',
+    tab_tasks: 'Trabajos programados',
     tab_skills: 'Habilidades',
     tab_memory: 'Memoria',
     tab_workspaces: 'Espacios',

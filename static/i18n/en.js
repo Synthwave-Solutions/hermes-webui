@@ -882,7 +882,7 @@ window.__registerHermesLocale('en', {
     tab_chat: 'Chat',
     nav_expand_labels: 'Show labels',
     nav_collapse_labels: 'Hide labels',
-    tab_tasks: 'Tasks',
+    tab_tasks: 'Scheduled jobs',
     tab_skills: 'Skills',
     tab_memory: 'Memory',
     tab_workspaces: 'Spaces',
@@ -1370,7 +1370,7 @@ window.__registerHermesLocale('en', {
     editing: 'Editing',
     // Empty state
     empty_title: 'What can I help with?',
-    empty_subtitle: 'Ask anything, run commands, explore files, or manage your scheduled tasks.',
+    empty_subtitle: 'Ask anything, run commands, explore files, or manage your scheduled jobs.',
     suggest_files: 'What files are in this workspace?',
     suggest_schedule: "What's on my schedule today?",
     suggest_plan: 'Help me plan a small project.',

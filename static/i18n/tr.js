@@ -853,7 +853,7 @@ window.__registerHermesLocale('tr', {
     login_conn_failed: 'Bağlantı başarısız oldu',
     // Sidebar & Tabs
     tab_chat: 'Sohbet',
-    tab_tasks: 'Görevler',
+    tab_tasks: 'Zamanlanmış işler',
     tab_skills: 'Yetenekler',
     tab_memory: 'Hafıza',
     tab_workspaces: 'Alanlar',

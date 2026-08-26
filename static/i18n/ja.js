@@ -880,7 +880,7 @@ window.__registerHermesLocale('ja', {
     project_name_prompt: 'プロジェクト名:',
     // Sidebar & Tabs
     tab_chat: 'チャット',
-    tab_tasks: 'タスク',
+    tab_tasks: 'スケジュール済みジョブ',
     tab_skills: 'スキル',
     tab_memory: 'メモリ',
     tab_workspaces: 'スペース',

@@ -759,7 +759,7 @@ window.__registerHermesLocale('pt', {
 
     // Sidebar & Tabs
     tab_chat: 'Chat',
-    tab_tasks: 'Tarefas',
+    tab_tasks: 'Trabalhos agendados',
     tab_skills: 'Skills',
     tab_memory: 'Memória',
     tab_workspaces: 'Spaces',
