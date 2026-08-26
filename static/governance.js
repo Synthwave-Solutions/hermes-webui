@@ -1209,7 +1209,7 @@ async function _govWsToggleMember(idx, add) {
 // the row's own kind instead of the hardcoded 'skill' this tab started with.
 
 // Display order of the kind groups; unknown kinds sort last, alphabetically.
-const _GOV_APPROVAL_KINDS = ['skill', 'integration', 'mcp', 'cli'];
+const _GOV_APPROVAL_KINDS = ['grant', 'skill', 'integration', 'mcp', 'cli'];
 
 function _govApprovalKind(item) {
   return String((item && item.kind) || 'skill').trim().toLowerCase() || 'skill';
@@ -1221,6 +1221,7 @@ function _govKindLabel(kind) {
     case 'integration': return _govT('governance_kind_integration', 'Integration');
     case 'mcp': return _govT('governance_kind_mcp', 'MCP');
     case 'cli': return _govT('governance_kind_cli', 'CLI');
+    case 'grant': return _govT('governance_kind_grant', 'Access');
     default: return kind;
   }
 }

@@ -844,8 +844,9 @@ def _handle_approvals_get(handler, parsed, policy, subject, access) -> bool:
     """
     if not _require_governance_admin(handler, access, subject, policy):
         return True
-    from api import approvals
+    from api import approvals, grant_requests
 
+    grant_requests.ingest_spool()
     kinds = _approval_kinds_param(parsed)
     pending = [_approval_row(entry) for entry in approvals.list_pending(kinds=kinds)]
     j(handler, {"pending": pending})
@@ -1015,6 +1016,75 @@ def _handle_approvals_revoke(handler, parsed, policy, subject, access) -> bool:
     return True
 
 
+def _handle_grant_request_decide(handler, parsed, policy, subject, body) -> bool:
+    """Decide a governance access request (kind "grant").
+
+    Approve applies the grant to the USER entry in the policy document (under
+    the policy mutation lock, audited as a policy_change) and then marks the
+    registry row approved; reject only marks the row, which keeps future
+    denials of the same item from re-nagging the queue. No If-Match here:
+    the approvals tab holds no policy etag and the mutation is additive.
+    """
+    from api import approvals, grant_requests
+
+    key = str(body.get("key") or "").strip()
+    decision = str(body.get("decision") or "").strip().lower()
+    if not key or decision not in ("approve", "reject"):
+        j(handler, {"error": "invalid_payload", "message": "key and decision (approve|reject) required"}, status=400)
+        return True
+    entry = approvals.get(approvals.KIND_GRANT, key)
+    if entry is None:
+        j(handler, {"error": "not_found", "message": f"unknown grant request: {key}"}, status=404)
+        return True
+    if str(entry.get("status") or "pending") != "pending":
+        j(handler, {"error": "invalid_payload", "message": "request already decided"}, status=409)
+        return True
+    decided_by = subject.normalized_email or str(subject.email or "").strip().lower()
+    payload = entry.get("payload") if isinstance(entry.get("payload"), dict) else {}
+
+    if decision == "approve":
+        with policy_mutation_lock():
+            try:
+                current_policy = get_policy()
+            except GovernancePolicyError as exc:
+                j(handler, {"error": "policy_error", "message": str(exc)}, status=500)
+                return True
+            raw = _policy_raw(current_policy)
+            old_etag = policy_etag(raw)
+            result = grant_requests.apply_grant_to_policy(raw, payload)
+            if result is None:
+                j(handler, {"error": "invalid_payload", "message": "request does not describe an applicable grant"}, status=400)
+                return True
+            before, after = result
+            try:
+                save_governance_policy(raw)
+            except GovernancePolicyError as exc:
+                j(handler, {"error": "invalid_policy", "message": str(exc)}, status=400)
+                return True
+            new_etag = policy_etag(raw)
+        _audit_policy_change(
+            subject,
+            current_policy.mode,
+            parsed,
+            op="grant_request_approve",
+            target=str(payload.get("email") or ""),
+            before=before,
+            after=after,
+            old_etag=old_etag,
+            new_etag=new_etag,
+        )
+        trigger_profile_sync(str(payload.get("email") or "") or None, reason="grant_request_approve")
+        grant_requests.drop_from_spool(key)
+
+    try:
+        updated = approvals.decide(approvals.KIND_GRANT, key, decision, decided_by, reason=str(body.get("reason") or "").strip() or None)
+    except (ValueError, KeyError) as exc:
+        j(handler, {"error": "invalid_payload", "message": str(exc)}, status=400)
+        return True
+    j(handler, {"ok": True, "kind": approvals.KIND_GRANT, "key": key, "status": str(updated.get("status") or decision)})
+    return True
+
+
 def _handle_approvals_decide(handler, parsed, policy, subject, access) -> bool:
     """Approve or reject a pending self-service request.
 
@@ -1043,6 +1113,8 @@ def _handle_approvals_decide(handler, parsed, policy, subject, access) -> bool:
             status=400,
         )
         return True
+    if kind == approvals.KIND_GRANT:
+        return _handle_grant_request_decide(handler, parsed, policy, subject, body)
     if kind != approvals.KIND_SKILL:
         return _handle_approvals_decide_generic(handler, parsed, policy, subject, body, kind)
 
