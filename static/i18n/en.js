@@ -1114,6 +1114,7 @@ window.__registerHermesLocale('en', {
     close_menu: 'Close menu',
     new_conversation: 'New conversation',
     split_view: 'Split view',
+    reload_page: 'Reload page',
     split_view_exit: 'Exit split view',
     split_view_panes: (n) => `${n} chats side by side`,
     split_view_close_pane: 'Clear this pane',

@@ -112,7 +112,7 @@
 <body>
 <header class="app-titlebar" role="banner">
   <div class="app-titlebar-left">
-    <button class="app-titlebar-profile" id="titlebarProfileBtn" type="button" onclick="toggleProfileDropdown(event)" aria-label="Switch profile" style="display:none">
+    <button class="app-titlebar-profile has-tooltip has-tooltip--bottom" data-tooltip="Switch profile" id="titlebarProfileBtn" type="button" onclick="toggleProfileDropdown(event)" aria-label="Switch profile" style="display:none">
       <span class="app-titlebar-profile-icon" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
       <span class="app-titlebar-profile-label" id="titlebarProfileLabel">default</span>
       <span class="app-titlebar-profile-chevron" aria-hidden="true"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
@@ -127,19 +127,19 @@
     <span class="app-titlebar-sub" id="appTitlebarSub" hidden></span>
   </div>
   <div class="app-titlebar-spacer" aria-hidden="true"></div>
-  <button class="app-titlebar-new-chat" id="btnTitlebarNewChat" onclick="$('btnNewChat') && $('btnNewChat').click()" type="button" aria-label="New conversation" data-i18n-title="new_conversation" data-i18n-aria-label="new_conversation" title="New conversation">
+  <button class="app-titlebar-new-chat has-tooltip has-tooltip--bottom" data-tooltip="New conversation" id="btnTitlebarNewChat" onclick="$('btnNewChat') && $('btnNewChat').click()" type="button" aria-label="New conversation" data-i18n-title="new_conversation" data-i18n-aria-label="new_conversation">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="16" height="16">
       <line x1="12" y1="5" x2="12" y2="19"/>
       <line x1="5" y1="12" x2="19" y2="12"/>
     </svg>
   </button>
-  <button class="app-titlebar-splitview" id="btnSplitView" onclick="toggleSplitView()" type="button" aria-label="Split view" data-i18n-title="split_view" data-i18n-aria-label="split_view" title="Split view">
+  <button class="app-titlebar-splitview has-tooltip has-tooltip--bottom" data-tooltip="Split view" id="btnSplitView" onclick="toggleSplitView()" type="button" aria-label="Split view" data-i18n-title="split_view" data-i18n-aria-label="split_view">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="16" height="16">
       <rect x="3" y="4" width="18" height="16" rx="2"/>
       <line x1="12" y1="4" x2="12" y2="20"/>
     </svg>
   </button>
-  <button class="app-titlebar-reload" id="btnReload" onclick="window.location.reload()" type="button" aria-label="Reload" title="Reload page">
+  <button class="app-titlebar-reload has-tooltip has-tooltip--bottom-right" data-tooltip="Reload page" id="btnReload" onclick="window.location.reload()" type="button" aria-label="Reload" data-i18n-title="reload_page">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="16" height="16">
       <polyline points="23 4 23 10 17 10"/>
       <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
