@@ -286,6 +286,17 @@ def enforce_request(handler, parsed, method: str) -> bool:
     if decision.allow:
         # Allowed requests are not audited (matches the reference).
         return True
+    if decision.reason == "route_not_allowed":
+        # File a grantable access request so an admin can approve this route in
+        # the governance Approvals tab. Best-effort, never blocks the deny.
+        try:
+            from api.grant_requests import record_route_denial
+
+            email = str((identity or {}).get("email") or "").strip().lower()
+            if email:
+                record_route_denial(email, parsed.path, method)
+        except Exception:
+            pass
     if decision.mode == "report_only":
         _audit_decision(identity, parsed, method, decision, report_only=True)
         return True

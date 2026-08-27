@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import time
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -43,6 +44,14 @@ _GRANT_TARGETS = {
     "toolset": ("tools", ("toolsets",)),
     "profile": ("profiles", ()),
     "workspace": ("workspaces", ()),
+    # An API route the caller was blocked from. Approving adds the path to the
+    # user's routes allowlist; the permission layer still applies, so a route
+    # grant alone never confers an admin capability.
+    "route": ("routes", ()),
+    # A secret-bearing path a governed user was blocked from by a denied glob.
+    # Approving adds the exact path to files.allow_globs, a per-person exception
+    # that overrides denied_globs for that one path (see the engine tool_policy).
+    "secret_glob": ("files", ("allow_globs",)),
 }
 
 
@@ -68,8 +77,71 @@ def _request_label(item: dict) -> str:
         "toolset": "Toolset",
         "profile": "Profile",
         "workspace": "Workspace",
+        "route": "API route",
+        "secret_glob": "Secret file access",
     }
     return f"{labels.get(gkind, gkind)}: {value}"
+
+
+def _route_is_requestable(path: str, method: str) -> bool:
+    """A route denial is one-click-grantable only when it is not an admin or
+    governance-mutation surface. Those stay hard-denied: a route grant adds the
+    path to the caller's allowlist, and while the permission layer still guards
+    the action, we do not even offer governance/admin routes in the queue."""
+    try:
+        from api.governance.catalog import route_permission
+    except Exception:
+        return False
+    for m in ("GET", method.upper()):
+        perm = route_permission(path, m) or ""
+        if perm.startswith("governance:") or perm.endswith(":admin"):
+            return False
+    return True
+
+
+def record_route_denial(email: str, path: str, method: str = "GET") -> bool:
+    """Spool a route_not_allowed denial as a grantable request (kind route).
+
+    Route denials happen at the HTTP layer, not the agent tool layer, so the
+    engine's tool-denial spool never sees them; this is the webui-side writer.
+    Writes the same spool the engine uses, so ingest_spool turns it into a
+    pending Access row. Best-effort, never raises, admin routes excluded."""
+    try:
+        email = str(email or "").strip().lower()
+        path = (str(path or "").split("?", 1)[0]).strip()
+        if not email or not path or not path.startswith("/api/"):
+            return False
+        if not _route_is_requestable(path, method):
+            return False
+        key = f"{email}|route|{path}"
+        now = time.time()
+        spool_file = _spool_path()
+        spool_file.parent.mkdir(parents=True, exist_ok=True)
+        lock_path = spool_file.with_suffix(".lock")
+        with open(lock_path, "w") as lock_fh:
+            try:
+                import fcntl
+                fcntl.flock(lock_fh, fcntl.LOCK_EX)
+            except Exception:
+                pass
+            spool = _load_spool()
+            entry = spool.get(key)
+            if isinstance(entry, dict):
+                entry["count"] = int(entry.get("count") or 0) + 1
+                entry["last_seen"] = now
+            else:
+                spool[key] = {
+                    "email": email, "gkind": "route", "value": path,
+                    "tool": "", "reason": "route_not_allowed", "detail": path,
+                    "count": 1, "first_seen": now, "last_seen": now,
+                }
+            tmp = spool_file.with_suffix(".tmp")
+            tmp.write_text(json.dumps(spool, ensure_ascii=False, indent=1), encoding="utf-8")
+            tmp.replace(spool_file)
+        return True
+    except Exception as exc:  # pragma: no cover
+        logger.debug("route denial spool failed: %s", exc)
+        return False
 
 
 def ingest_spool() -> int:

@@ -42,6 +42,7 @@ def _deep_merge_grants(base: "GrantSet", other: "GrantSet") -> "GrantSet":
         file_read_roots=base.file_read_roots | other.file_read_roots,
         file_write_roots=base.file_write_roots | other.file_write_roots,
         file_denied_globs=base.file_denied_globs | other.file_denied_globs,
+        file_allow_globs=base.file_allow_globs | other.file_allow_globs,
         cli_commands=base.cli_commands | other.cli_commands,
         cli_approval_commands=base.cli_approval_commands | other.cli_approval_commands,
         cli_denied_commands=base.cli_denied_commands | other.cli_denied_commands,
@@ -96,6 +97,7 @@ def _subtract_grants(base: "GrantSet", deny: "GrantSet") -> "GrantSet":
         # denied_globs is itself a denylist: a "deny" here would WIDEN access,
         # so it is never subtracted.
         file_denied_globs=base.file_denied_globs,
+        file_allow_globs=_subtract_set(base.file_allow_globs, deny.file_allow_globs),
         cli_commands=_subtract_set(base.cli_commands, deny.cli_commands),
         cli_approval_commands=base.cli_approval_commands,
         cli_denied_commands=base.cli_denied_commands | deny.cli_commands,
@@ -132,6 +134,7 @@ class GrantSet:
     file_read_roots: frozenset[str] = field(default_factory=frozenset)
     file_write_roots: frozenset[str] = field(default_factory=frozenset)
     file_denied_globs: frozenset[str] = field(default_factory=frozenset)
+    file_allow_globs: frozenset[str] = field(default_factory=frozenset)
     cli_commands: frozenset[str] = field(default_factory=frozenset)
     cli_approval_commands: frozenset[str] = field(default_factory=frozenset)
     cli_denied_commands: frozenset[str] = field(default_factory=frozenset)
@@ -186,6 +189,7 @@ class GrantSet:
             file_read_roots=_string_set(files.get("read_roots") if isinstance(files, Mapping) else None),
             file_write_roots=_string_set(files.get("write_roots") if isinstance(files, Mapping) else None),
             file_denied_globs=_string_set(files.get("denied_globs") if isinstance(files, Mapping) else None),
+            file_allow_globs=_string_set(files.get("allow_globs") if isinstance(files, Mapping) else None),
             cli_commands=frozenset(command_ids),
             cli_approval_commands=approval_command_ids,
             cli_workdir_roots=_string_set(cli.get("workdir_roots") if isinstance(cli, Mapping) else None),
@@ -206,7 +210,7 @@ class GrantSet:
             self.skills_load, self.skills_manage, self.mcp_servers,
             self.mcp_tools, self.model_providers, self.models,
             self.file_read_roots, self.file_write_roots,
-            self.file_denied_globs, self.cli_commands, self.cli_approval_commands,
+            self.file_denied_globs, self.file_allow_globs, self.cli_commands, self.cli_approval_commands,
             self.cli_denied_commands, self.cli_workdir_roots,
             self.usage_caps,
         ))
