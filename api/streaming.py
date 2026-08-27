@@ -1700,14 +1700,22 @@ def _extract_gateway_routing_metadata(agent, result, requested_model=None, reque
     return None
 
 
-def _build_agent_thread_env(profile_runtime_env: dict | None, workspace: str, session_id: str, profile_home: str) -> dict:
+def _build_agent_thread_env(profile_runtime_env: dict | None, workspace: str, session_id: str, profile_home: str, owner_email: str | None = None) -> dict:
     """Build thread-local agent env with per-run values overriding profile defaults.
 
     Profile runtime env may include TERMINAL_CWD from config.yaml. Passing it as
     **kwargs alongside an explicit TERMINAL_CWD raises TypeError before the
     agent starts, so merge into one dict first and let the active workspace win.
+
+    ``owner_email`` becomes HERMES_SESSION_USER_ID: for a WebUI session the
+    identity email IS the platform user id. The cronjob tool copies it into a
+    job's ``origin.user_id`` at creation, which is how the scheduled-jobs list
+    later recognises the job as the creator's own (api/cron_scope.py).
     """
     env = dict(profile_runtime_env or {})
+    owner = str(owner_email or "").strip().lower()
+    if owner:
+        env['HERMES_SESSION_USER_ID'] = owner
     env.update({
         'TERMINAL_CWD': str(workspace),
         'HERMES_EXEC_ASK': '1',
@@ -6865,6 +6873,7 @@ def _run_agent_streaming(
             str(s.workspace),
             session_id,
             _profile_home,
+            owner_email=getattr(s, 'owner_email', None),
         )
         _set_thread_env(**_thread_env)
         # process_complete agent-wakeup wiring (ours-original, Option B): bind

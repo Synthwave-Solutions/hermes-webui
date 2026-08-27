@@ -189,3 +189,120 @@ def settings_write_denial_for(handler, body):
             "resource": _WRITE_PERMISSION,
             "reason": "policy_error",
         }
+
+
+# ── Per-user appearance store ───────────────────────────────────────────────
+# Reported by Michael on 27 Aug 2026: skin colour and text size changes did
+# not stick. settings.json is ONE file for the whole instance, so the last
+# person to save decided everyone's server-side default, and another user's
+# next refresh could revert to it. The look-and-feel keys are now stored per
+# identity email under STATE_DIR/user-appearance/<sha1>.json and overlaid on
+# GET /api/settings for that identity. The instance-wide settings.json keeps
+# only the default for identity-less callers, so one person's choice never
+# alters anyone else's appearance.
+import hashlib
+import json
+from pathlib import Path
+
+USER_APPEARANCE_KEYS = frozenset({"theme", "skin", "font_size"})
+_THEMES = frozenset({"light", "dark", "system"})
+_FONT_SIZES = frozenset({"small", "default", "large", "xlarge"})
+
+
+def _user_appearance_dir() -> Path:
+    from api import config
+
+    return Path(config.STATE_DIR) / "user-appearance"
+
+
+def _user_appearance_path(email: str) -> Path:
+    digest = hashlib.sha1(email.encode("utf-8")).hexdigest()
+    return _user_appearance_dir() / f"{digest}.json"
+
+
+def _clean_appearance(body) -> dict:
+    """Keep only valid per-user appearance values (invalid ones are dropped)."""
+    out = {}
+    if not isinstance(body, dict):
+        return out
+    theme = str(body.get("theme") or "").strip().lower()
+    if theme in _THEMES:
+        out["theme"] = theme
+    skin = str(body.get("skin") or "").strip().lower()
+    if skin and len(skin) <= 64 and all(c.isalnum() or c in "-_" for c in skin):
+        out["skin"] = skin
+    font = str(body.get("font_size") or "").strip().lower()
+    if font in _FONT_SIZES:
+        out["font_size"] = font
+    return out
+
+
+def request_identity_email(handler) -> str:
+    """Lowercased identity email of the request, empty when there is none."""
+    try:
+        from api.ownership import request_owner_email
+
+        return str(request_owner_email(handler) or "").strip().lower()
+    except Exception:
+        logger.debug("identity email lookup failed", exc_info=True)
+        return ""
+
+
+def load_user_appearance(email: str) -> dict:
+    if not email:
+        return {}
+    try:
+        data = json.loads(_user_appearance_path(email).read_text(encoding="utf-8"))
+        return _clean_appearance(data)
+    except (FileNotFoundError, ValueError, OSError):
+        return {}
+
+
+def save_user_appearance(email: str, body) -> dict:
+    """Merge the appearance keys in ``body`` into the user's store. Returns
+    the stored appearance afterwards. Never raises."""
+    if not email:
+        return {}
+    incoming = _clean_appearance(body)
+    current = load_user_appearance(email)
+    if not incoming:
+        return current
+    current.update(incoming)
+    try:
+        path = _user_appearance_path(email)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(current, indent=1), encoding="utf-8")
+        tmp.replace(path)
+    except OSError:
+        logger.warning("user appearance store write failed", exc_info=True)
+    return current
+
+
+def overlay_user_appearance(handler, settings: dict) -> dict:
+    """GET /api/settings: the caller's own appearance wins over the instance
+    default. Mutates and returns ``settings``."""
+    email = request_identity_email(handler)
+    if email and isinstance(settings, dict):
+        stored = load_user_appearance(email)
+        if stored:
+            settings.update(stored)
+            settings["appearance_scope"] = "user"
+    return settings
+
+
+def split_user_appearance(handler, body: dict) -> tuple[dict, dict]:
+    """POST /api/settings: route the caller's appearance keys to their own
+    store. Returns ``(body_for_settings_json, stored_user_appearance)``; when
+    the request carries no identity everything stays in the instance file."""
+    if not isinstance(body, dict):
+        return body, {}
+    email = request_identity_email(handler)
+    if not email:
+        return body, {}
+    personal = {k: v for k, v in body.items() if k in USER_APPEARANCE_KEYS}
+    if not personal:
+        return body, {}
+    stored = save_user_appearance(email, personal)
+    rest = {k: v for k, v in body.items() if k not in USER_APPEARANCE_KEYS}
+    return rest, stored

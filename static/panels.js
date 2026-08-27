@@ -4775,7 +4775,12 @@ function _renderInsights(d, box, wikiStatus, skillUsage) {
       </div>
     </div>`;
 
+  // Scope label (27 Aug 2026 report): say whose data this is. The server
+  // already aggregated only the caller's sessions for a non-admin.
+  const scopeGlobal = d.scope === 'global';
+  const scopeHtml = `<div class="insights-scope${scopeGlobal ? ' global' : ''}">${esc(t(scopeGlobal ? 'insights_scope_global' : 'insights_scope_mine'))}</div>`;
   box.innerHTML = `
+    ${scopeHtml}
     ${_renderSystemHealthPanel()}
     ${_renderLlmWikiStatus(wikiStatus)}
     ${_renderSkillUsage(skillUsage)}
@@ -7978,7 +7983,7 @@ function switchSettingsSection(name,opts){
     _settingsSection = name;
     return;
   }
-  let section=(name==='appearance'||name==='preferences'||name==='providers'||name==='plugins'||name==='extensions'||name==='system'||name==='help')?name:'conversation';
+  let section=(name==='appearance'||name==='access'||name==='preferences'||name==='providers'||name==='plugins'||name==='extensions'||name==='system'||name==='help')?name:'conversation';
   // Deep-linking to the Plugins pane when the tab is hidden (no plugins
   // installed, #3457) falls back to Conversation. Resolve this BEFORE toggling
   // panes/sidebar/dropdown below so every downstream selection uses the
@@ -7990,13 +7995,13 @@ function switchSettingsSection(name,opts){
   }
   _settingsSection=section;
   _currentSettingsSection=section;
-  const map={conversation:'Conversation',appearance:'Appearance',preferences:'Preferences',providers:'Providers',plugins:'Plugins',extensions:'Extensions',system:'System',help:'Help'};
+  const map={conversation:'Conversation',appearance:'Appearance',access:'Access',preferences:'Preferences',providers:'Providers',plugins:'Plugins',extensions:'Extensions',system:'System',help:'Help'};
   // Sidebar menu items
   document.querySelectorAll('#settingsMenu .side-menu-item').forEach(it=>{
     it.classList.toggle('active', it.dataset.settingsSection===section);
   });
   // Panes in main
-  ['conversation','appearance','preferences','providers','plugins','extensions','system','help'].forEach(key=>{
+  ['conversation','appearance','access','preferences','providers','plugins','extensions','system','help'].forEach(key=>{
     const pane=$('settingsPane'+map[key]);
     if(pane) pane.classList.toggle('active', key===section);
   });
@@ -8010,6 +8015,7 @@ function switchSettingsSection(name,opts){
     if(section==='providers') loadProvidersPanel();
     if(section==='plugins') loadPluginsPanel();
     if(section==='extensions') loadExtensionsPanel();
+    if(section==='access'&&typeof loadMyAccessRequests==='function') loadMyAccessRequests();
   }
   if(opts&&opts.fromSidebarItem)_closeMobileSidebarAfterPanelSelection();
 }
@@ -13288,3 +13294,99 @@ function updateNotificationPermissionStatus(){
   }
   if(btnWrap) btnWrap.title=label;
 }
+
+// ── Files rail entry (27 Aug 2026 report: the workspace file browser was only
+// reachable through a small composer toggle). The browser is bound to the
+// active conversation's workspace, so the rail entry opens Chat and then the
+// workspace panel in browse mode; without a conversation it says what to do.
+function openFilesFromRail(){
+  try{
+    if(typeof switchPanel==='function') switchPanel('chat',{fromRailClick:true});
+    const hasSession=!!(window.S&&S.session);
+    const hasDefault=!!(window.S&&S._profileDefaultWorkspace);
+    if(!hasSession&&!hasDefault){
+      if(typeof showToast==='function') showToast(t('files_open_chat_first'),6000);
+      return;
+    }
+    if(typeof openWorkspacePanel==='function') openWorkspacePanel('browse');
+  }catch(e){
+    console.warn('openFilesFromRail failed',e);
+  }
+}
+
+// ── My access requests (Settings > Access requests) ─────────────────────────
+// Reads /api/governance/approvals/mine: the caller's OWN self-service and
+// governance access requests across every kind, scoped server-side to their
+// identity, so a non-admin can see whether what they asked for is still
+// pending, approved or rejected without touching the admin queue.
+function _accessKindLabel(kind){
+  if(typeof _govKindLabel==='function') return _govKindLabel(kind);
+  return kind||'';
+}
+function _accessStatusPill(status){
+  const s=String(status||'pending').toLowerCase();
+  const cls=s==='approved'?'on':(s==='rejected'?'off':'warn');
+  const key=s==='approved'?'access_status_approved':(s==='rejected'?'access_status_rejected':'access_status_pending');
+  return `<span class="gov-pill ${cls}">${esc(t(key))}</span>`;
+}
+function _accessNextAction(status){
+  const s=String(status||'pending').toLowerCase();
+  return t(s==='approved'?'access_next_approved':(s==='rejected'?'access_next_rejected':'access_next_pending'));
+}
+function _accessWhen(ts){
+  const n=Number(ts||0);
+  if(!n) return '';
+  try{ return new Date(n*1000).toLocaleString(); }catch(_){ return ''; }
+}
+async function loadMyAccessRequests(animate){
+  const box=$('accessRequestsList');
+  if(!box) return;
+  const btn=$('btnAccessRequestsRefresh');
+  if(animate&&btn) btn.disabled=true;
+  try{
+    const data=await api('/api/governance/approvals/mine');
+    const rows=Array.isArray(data&&data.requests)?data.requests.slice():[];
+    if(!rows.length){
+      box.innerHTML=`<div class="access-requests-empty">${esc(t('access_requests_empty'))}</div>`;
+      return;
+    }
+    const order={pending:0,approved:1,rejected:2};
+    rows.sort((a,b)=>{
+      const sa=order[String(a.status||'pending').toLowerCase()]??3, sb=order[String(b.status||'pending').toLowerCase()]??3;
+      if(sa!==sb) return sa-sb;
+      return Number(b.requested_at||0)-Number(a.requested_at||0);
+    });
+    const groups=new Map();
+    rows.forEach(r=>{const k=String(r.status||'pending').toLowerCase();if(!groups.has(k))groups.set(k,[]);groups.get(k).push(r);});
+    let html='';
+    groups.forEach((items,status)=>{
+      html+=`<div class="access-requests-group"><div class="access-requests-group-head">${_accessStatusPill(status)}<span class="access-requests-count">${items.length}</span></div>`;
+      html+=items.map(r=>{
+        const payload=r.payload&&typeof r.payload==='object'?r.payload:{};
+        const detail=payload.detail&&payload.detail!==r.label?`<div class="access-request-detail">${esc(String(payload.detail))}</div>`:'';
+        const decided=r.decided_by?`<span class="access-request-meta">${esc(t('access_decided_by'))}: ${esc(String(r.decided_by))}${r.decided_at?' · '+esc(_accessWhen(r.decided_at)):''}</span>`:'';
+        const reason=r.reason?`<div class="access-request-detail">${esc(String(r.reason))}</div>`:'';
+        return `<div class="access-request-row">
+          <div class="access-request-main">
+            <span class="access-request-kind">${esc(_accessKindLabel(r.kind))}</span>
+            <span class="access-request-label">${esc(String(r.label||r.name||r.key||''))}</span>
+          </div>
+          ${detail}${reason}
+          <div class="access-request-foot">
+            <span class="access-request-meta">${esc(t('access_requested_on'))}: ${esc(_accessWhen(r.requested_at))}</span>
+            ${decided}
+            <span class="access-request-next">${esc(_accessNextAction(r.status))}</span>
+          </div>
+        </div>`;
+      }).join('');
+      html+='</div>';
+    });
+    box.innerHTML=html;
+  }catch(e){
+    box.innerHTML=`<div class="access-requests-empty" style="color:var(--error)">${esc(t('access_requests_load_failed')+(e&&e.message?e.message:String(e)))}</div>`;
+  }finally{
+    if(btn) btn.disabled=false;
+  }
+}
+window.loadMyAccessRequests=loadMyAccessRequests;
+window.openFilesFromRail=openFilesFromRail;

@@ -100,31 +100,106 @@ def _identity_for(handler):
     return _request_identity(handler)
 
 
-def caller_sees_cron_profile(handler, profile) -> bool:
+def _identity_email(identity) -> str:
+    try:
+        return str((identity or {}).get("email") or "").strip().lower()
+    except Exception:
+        return ""
+
+
+def _session_owner_email(session_id: str) -> str:
+    """Owner email of a WebUI conversation, empty when unknown. Best effort."""
+    if not session_id:
+        return ""
+    try:
+        from api.models import get_session
+
+        session = get_session(str(session_id), metadata_only=True)
+        return str(getattr(session, "owner_email", "") or "").strip().lower()
+    except Exception:
+        return ""
+
+
+def row_owned_by_identity(identity, row, session_owner=None) -> bool:
+    """A job created from someone's WebUI conversation belongs to that person.
+
+    Reported by Michael on 27 Aug 2026: a governed user's own scheduled job was
+    absent from the list. Jobs the agent creates from a WebUI chat land in
+    whichever profile store was active at the time (usually ``default``), and
+    the creator's profile grants need not cover that store, so the profile
+    check alone hid their own work. Ownership is read from the job's origin:
+    ``origin.platform == webui`` and either ``origin.user_id`` (the identity
+    email the WebUI stamps at creation) matches the caller, or, for jobs made
+    before that stamp existed, the originating conversation is owned by them.
+    Non-WebUI origins (telegram, cli, ...) carry no comparable identity and
+    stay on the profile rule.
+    """
+    email = _identity_email(identity)
+    if not email or not isinstance(row, dict):
+        return False
+    origin = row.get("origin")
+    if not isinstance(origin, dict):
+        return False
+    if str(origin.get("platform") or "").strip().lower() != "webui":
+        return False
+    stamped = str(origin.get("user_id") or "").strip().lower()
+    if stamped:
+        return stamped == email
+    lookup = session_owner or _session_owner_email
+    return lookup(str(origin.get("chat_id") or "")) == email
+
+
+def _active_store_job(job_id: str):
+    """Load one job from the ACTIVE profile's store (the store the detail
+    routes serve). None when absent or the cron package is unavailable."""
+    if not job_id:
+        return None
+    try:
+        from api.profiles import cron_profile_context
+
+        with cron_profile_context():
+            from cron.jobs import get_job
+
+            return get_job(str(job_id))
+    except Exception:
+        logger.debug("cron scope job lookup failed for %s", job_id, exc_info=True)
+        return None
+
+
+def caller_sees_cron_profile(handler, profile, job_id: str | None = None) -> bool:
     """Route hook for the per-job detail endpoints (output/history/run/recent).
 
     Those endpoints serve the ACTIVE profile's cron store, so a single check on
     the active profile is enough to stop direct-URL retrieval of jobs outside
-    the caller's scope.
+    the caller's scope. A ``job_id`` lets a caller reach their OWN job in a
+    store their profile grants do not cover (see row_owned_by_identity).
     """
     try:
-        return identity_sees_cron_profile(_identity_for(handler), profile)
+        identity = _identity_for(handler)
+        if identity_sees_cron_profile(identity, profile):
+            return True
+        if job_id:
+            return row_owned_by_identity(identity, _active_store_job(job_id))
+        return False
     except Exception:
         logger.warning("cron scope governance check failed", exc_info=True)
         return False
 
 
-def scope_cron_rows(identity, active_jobs, other_jobs):
+def scope_cron_rows(identity, active_jobs, other_jobs, session_owner=None):
     """Filter listing rows by the identity's governance scope.
 
     Returns the ``(active_jobs, other_jobs)`` pair with out-of-scope rows
     removed entirely, so neither their metadata nor their count leaks into the
     ``/api/crons`` payload (``other_profile_count`` is derived from the
-    filtered ``other_jobs`` by the route).
+    filtered ``other_jobs`` by the route). A row the caller created from their
+    own WebUI conversation is always kept, whichever store it lives in.
     """
     decisions: dict[str, bool] = {}
 
     def _keep(row) -> bool:
+        if row_owned_by_identity(identity, row, session_owner):
+            return True
         profile = str((row.get("owner_profile") if isinstance(row, dict) else None) or "default")
         if profile not in decisions:
             decisions[profile] = identity_sees_cron_profile(identity, profile)

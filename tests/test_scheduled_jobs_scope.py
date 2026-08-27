@@ -500,7 +500,7 @@ def test_detail_routes_share_the_scope_guard():
         )
     # The guard sits before the first detail dispatch and denies with a 403.
     assert guard < ROUTES.index("return _handle_cron_output(handler, parsed)")
-    guard_block = ROUTES[guard:guard + 400]
+    guard_block = ROUTES[guard:guard + 800]
     assert "status=403" in guard_block
 
 
@@ -521,5 +521,60 @@ def test_post_mutation_routes_share_the_scope_guard():
                      "return _handle_cron_pause(handler, body)",
                      "return _handle_cron_resume(handler, body)"):
         assert guard < ROUTES.index(dispatch)
-    guard_block = ROUTES[guard:guard + 400]
+    guard_block = ROUTES[guard:guard + 800]
     assert "status=403" in guard_block
+
+
+# ── Own WebUI-created jobs are visible whichever store they live in ─────────
+# Reported by Michael on 27 Aug 2026: a governed user's own scheduled job was
+# absent from the list because the agent had created it in the default
+# profile store, which the user's profile grants do not cover.
+
+def _webui_job(job_id, owner_profile, chat_id, user_id=None):
+    row = _job(job_id, owner_profile)
+    row["origin"] = {"platform": "webui", "chat_id": chat_id, "user_id": user_id}
+    return row
+
+
+def test_own_webui_job_in_foreign_store_is_visible_via_stamped_identity(inject_policy):
+    inject_policy(POLICY)
+    rows = [_webui_job("w1", "default", "sess-1", user_id="alpha@example.test"),
+            _webui_job("w2", "default", "sess-2", user_id="beta@example.test")]
+    active, other = scope_cron_rows(_identity("alpha@example.test"), rows, [],
+                                    session_owner=lambda sid: "")
+    assert [r["id"] for r in active] == ["w1"]
+    assert other == []
+
+
+def test_own_webui_job_without_stamp_resolves_through_session_owner(inject_policy):
+    inject_policy(POLICY)
+    owners = {"sess-1": "alpha@example.test", "sess-2": "beta@example.test"}
+    rows = [_webui_job("w1", "default", "sess-1"), _webui_job("w2", "default", "sess-2")]
+    active, _ = scope_cron_rows(_identity("alpha@example.test"), rows, [],
+                                session_owner=lambda sid: owners.get(sid, ""))
+    assert [r["id"] for r in active] == ["w1"]
+    active_beta, _ = scope_cron_rows(_identity("beta@example.test"), rows, [],
+                                     session_owner=lambda sid: owners.get(sid, ""))
+    assert [r["id"] for r in active_beta] == ["w2"]
+
+
+def test_stamped_identity_beats_session_owner_lookup(inject_policy):
+    """A row stamped for someone else never falls back to the session lookup."""
+    inject_policy(POLICY)
+    rows = [_webui_job("w1", "default", "sess-1", user_id="beta@example.test")]
+    active, _ = scope_cron_rows(_identity("alpha@example.test"), rows, [],
+                                session_owner=lambda sid: "alpha@example.test")
+    assert active == []
+
+
+def test_non_webui_origin_stays_on_profile_rule(inject_policy):
+    inject_policy(POLICY)
+    row = _job("t1", "default")
+    row["origin"] = {"platform": "telegram", "chat_id": "123", "user_id": "alpha@example.test"}
+    active, _ = scope_cron_rows(_identity("alpha@example.test"), [row], [],
+                                session_owner=lambda sid: "alpha@example.test")
+    assert active == []
+
+
+def test_detail_routes_pass_job_id_to_scope_guard():
+    assert "caller_sees_cron_profile(handler, _get_active_profile_name() or \"default\", job_id=_scope_job_id)" in ROUTES

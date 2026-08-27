@@ -7305,8 +7305,11 @@ html[data-conversation-outline="enabled"] #outlineToggleBtn:not([hidden]){displa
 @keyframes settings-field-pulse { 0% { box-shadow: 0 0 0 0 var(--focus-ring); } 35% { box-shadow: 0 0 0 4px var(--focus-ring); } 100% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0); } }
 
 /* ── SynthPulse Control brand override (local deployment) ───────────────── */
-:root,
-:root:not(.dark)[data-skin]{
+/* The brand palette is the DEFAULT skin only. A chosen skin (data-skin set)
+   keeps its own :root[data-skin=...] palette; matching [data-skin] here
+   out-ranked every skin rule, which is why picking a skin changed nothing
+   (27 Aug 2026 report). */
+:root:not([data-skin]){
   color-scheme:light;
   --sp-chrome-bg:rgba(255,255,255,.92);
   --sp-page-grad:linear-gradient(180deg,#f6fbff 0%,#ffffff 100%);
@@ -7329,8 +7332,7 @@ html[data-conversation-outline="enabled"] #outlineToggleBtn:not([hidden]){displa
 /* SynthPulse Control brand override: dark. Same #009DFF accent on a deep navy
    ground. Without this block the light override above also matched
    :root.dark, so picking Dark flipped the class but changed no colour. */
-:root.dark,
-:root.dark[data-skin]{
+:root.dark:not([data-skin]){
   color-scheme:dark;
   --bg:#0b1220;--sidebar:#0f1826;--surface:#131f31;--surface-subtle:#16243a;--surface-subtle-hover:#1b2c46;
   --border:#233450;--border2:#2d4a70;--border-subtle:#1d2c44;--border-muted:#2a3e5e;
@@ -7602,3 +7604,20 @@ html,body{background:var(--bg)!important;color:var(--text);font-family:var(--fon
   html[data-pane="1"] .app-titlebar-hamburger{display:inline-flex !important;}
   .app-titlebar-splitview{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;flex-shrink:0;background:none;border:none;color:var(--muted);border-radius:8px;cursor:pointer;padding:0;-webkit-app-region:no-drag;transition:background-color .15s,color .15s;}
   .app-titlebar-splitview:hover{background:var(--hover-bg);color:var(--text);}
+
+/* ── Settings > Access requests (own governance requests) ────────────────── */
+.access-requests-list{display:flex;flex-direction:column;gap:14px;padding:4px 0;}
+.access-requests-empty{padding:14px;border:1px dashed var(--border2);border-radius:10px;color:var(--muted);font-size:12.5px;line-height:1.55;}
+.access-requests-group{display:flex;flex-direction:column;gap:8px;}
+.access-requests-group-head{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);}
+.access-requests-count{font-weight:600;color:var(--text);}
+.access-request-row{border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:var(--surface);display:flex;flex-direction:column;gap:6px;}
+.access-request-main{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.access-request-kind{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--accent-text);background:var(--accent-bg);border-radius:6px;padding:2px 7px;}
+.access-request-label{font-size:13px;font-weight:600;color:var(--text);word-break:break-word;}
+.access-request-detail{font-size:12px;color:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;word-break:break-all;}
+.access-request-foot{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:11.5px;color:var(--muted);align-items:center;}
+.access-request-next{color:var(--text);}
+/* Insights scope label (mine vs global) */
+.insights-scope{margin:0 0 10px;padding:8px 12px;border-radius:8px;font-size:12px;line-height:1.5;border:1px solid var(--border);background:var(--surface-subtle);color:var(--muted);}
+.insights-scope.global{border-color:rgba(245,158,11,.35);background:rgba(245,158,11,.08);color:var(--text);}

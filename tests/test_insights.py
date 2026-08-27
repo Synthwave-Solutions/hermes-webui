@@ -508,3 +508,53 @@ def test_insights_cache_hit_rate_is_none_without_cache_reads(monkeypatch, tmp_pa
     assert data["models"][0]["cache_hit_percent"] is None
     assert data["total_cache_hit_percent"] is None
 
+
+
+# ── Ownership scope (27 Aug 2026 report: Insights showed global data to a
+# non-administrator). Non-admins get their own sessions only; the response
+# says which view it is so the UI can label it.
+
+def _scoped_entries(now):
+    return [
+        {"session_id": "mine", "owner_email": "user@example.test", "created_at": now - 60,
+         "updated_at": now - 60, "input_tokens": 10, "output_tokens": 5, "message_count": 2,
+         "model": "m", "estimated_cost": 0.1},
+        {"session_id": "theirs", "owner_email": "other@example.test", "created_at": now - 60,
+         "updated_at": now - 60, "input_tokens": 1000, "output_tokens": 500, "message_count": 20,
+         "model": "m", "estimated_cost": 5.0},
+        {"session_id": "ownerless", "owner_email": None, "created_at": now - 60,
+         "updated_at": now - 60, "input_tokens": 100, "output_tokens": 50, "message_count": 4,
+         "model": "m", "estimated_cost": 1.0},
+    ]
+
+
+def test_insights_non_admin_sees_only_own_sessions(monkeypatch, tmp_path):
+    import api.ownership as ownership
+
+    now = time.time()
+    monkeypatch.setattr(ownership, "request_owner_scope", lambda handler: "user@example.test")
+    data = _call_insights(monkeypatch, tmp_path, _scoped_entries(now))
+    assert data["scope"] == "mine"
+    assert data["scope_owner"] == "user@example.test"
+    assert data["total_sessions"] == 1
+    assert data["total_messages"] == 2
+    assert data["total_input_tokens"] == 10
+    assert abs(data["total_cost"] - 0.1) < 1e-9
+
+
+def test_insights_admin_keeps_global_view_and_says_so(monkeypatch, tmp_path):
+    import api.ownership as ownership
+
+    now = time.time()
+    monkeypatch.setattr(ownership, "request_owner_scope", lambda handler: "all")
+    data = _call_insights(monkeypatch, tmp_path, _scoped_entries(now))
+    assert data["scope"] == "global"
+    assert data["scope_owner"] is None
+    assert data["total_sessions"] == 3
+    assert data["total_messages"] == 26
+
+
+def test_insights_ui_labels_scope():
+    assert "insights-scope" in PANELS_JS
+    assert "insights_scope_global" in PANELS_JS and "insights_scope_mine" in PANELS_JS
+    assert ".insights-scope" in STYLE_CSS

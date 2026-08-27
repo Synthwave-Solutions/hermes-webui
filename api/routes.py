@@ -10166,7 +10166,19 @@ def _handle_insights(handler, parsed) -> bool:
     else:
         idx = []
 
+    # Ownership scope (27 Aug 2026 report: Insights showed global data to a
+    # non-administrator). Non-admins get their OWN sessions only; the totals
+    # below are computed from that filtered set, so nothing global is merely
+    # hidden client-side. Admins (and installs without user isolation) keep the
+    # global view, labelled as such in the response.
+    from api.ownership import request_owner_scope
+
+    owner_scope = request_owner_scope(handler)
+    scoped = owner_scope not in (None, "", "all")
+
     for entry in idx:
+        if scoped and str(entry.get("owner_email") or "").strip().lower() != owner_scope:
+            continue
         created = entry.get("created_at", 0) or 0
         updated = entry.get("updated_at", 0) or 0
         # Session is relevant if it was created or updated within the calendar window.
@@ -10237,9 +10249,11 @@ def _handle_insights(handler, parsed) -> bool:
                 pass
 
     # ── Also include CLI sessions from Hermes state.db ─────────────────────
+    # CLI/gateway sessions carry no per-user owner, so under an owner scope
+    # they are admin-only (same rule as the session list) and skipped here.
     try:
         from api.models import _active_state_db_path
-        db_path = _active_state_db_path()
+        db_path = None if scoped else _active_state_db_path()
         if db_path and db_path.exists():
             with closing(sqlite3.connect(str(db_path))) as conn:
                 conn.row_factory = sqlite3.Row
@@ -10373,6 +10387,10 @@ def _handle_insights(handler, parsed) -> bool:
 
     return j(handler, {
         "period_days": days,
+        # "mine": only the caller's own sessions were aggregated; "global":
+        # every session (admins / no user isolation). The UI labels the view.
+        "scope": "mine" if scoped else "global",
+        "scope_owner": owner_scope if scoped else None,
         "total_sessions": total_sessions,
         "total_messages": total_messages,
         "total_input_tokens": total_input_tokens,
@@ -11761,6 +11779,10 @@ def handle_get(handler, parsed) -> bool:
 
     if parsed.path == "/api/settings":
         settings = load_settings()
+        # The caller's own theme/skin/font size beat the instance default
+        # (per-user appearance store, 27 Aug 2026; api/settings_scope.py).
+        from api.settings_scope import overlay_user_appearance
+        overlay_user_appearance(handler, settings)
         settings["persisted_speech_keys"] = persisted_speech_settings_keys()
         # Never expose the stored password hash to clients
         settings.pop("password_hash", None)
@@ -12856,7 +12878,10 @@ def handle_get(handler, parsed) -> bool:
     if parsed.path in ("/api/crons/output", "/api/crons/history", "/api/crons/run",
                        "/api/crons/recent", "/api/crons/status", "/api/crons/delivery-options"):
         from api.cron_scope import caller_sees_cron_profile
-        if not caller_sees_cron_profile(handler, _get_active_profile_name() or "default"):
+        # The job_id lets a caller reach their OWN job in a store their profile
+        # grants do not cover (27 Aug 2026 report; api/cron_scope.py).
+        _scope_job_id = parse_qs(parsed.query or "").get("job_id", [""])[0]
+        if not caller_sees_cron_profile(handler, _get_active_profile_name() or "default", job_id=_scope_job_id):
             return j(handler, {"error": "forbidden", "reason": "cron_scope"}, status=403)
 
     if parsed.path == "/api/crons/output":
@@ -14948,8 +14973,15 @@ def handle_post(handler, parsed) -> bool:
             body["auth_disabled_acknowledged"] = False
 
         from api.config import get_max_tokens_status, set_max_tokens
+        from api.settings_scope import split_user_appearance
 
-        saved = save_settings(body)
+        # An identified caller's theme/skin/font size go to THEIR store, not
+        # the instance file, so one person's choice never changes another's.
+        body, _user_appearance = split_user_appearance(handler, body)
+        saved = save_settings(body) if body else dict(load_settings())
+        if _user_appearance:
+            saved.update(_user_appearance)
+            saved["appearance_scope"] = "user"
         saved["persisted_speech_keys"] = persisted_speech_settings_keys()
         if max_tokens_provided:
             max_tokens_status = set_max_tokens(max_tokens_value)

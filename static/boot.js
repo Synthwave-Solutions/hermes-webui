@@ -3437,9 +3437,18 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
         api('/api/settings',{method:'POST',body:JSON.stringify({theme,skin})});
       }catch(_){}
     }
-    const fontSize=(s.font_size||localStorage.getItem('hermes-font-size')||'default');
+    // Same precedence as theme/skin: an explicit non-default choice in this
+    // browser wins over the server value, so a failed autosave (or a server
+    // default written by someone else) never reverts what the user picked
+    // (27 Aug 2026 report: text size reverted after refresh).
+    const _lsFont=(localStorage.getItem('hermes-font-size')||'').trim().toLowerCase();
+    const _lsHasExplicitFont=!!_lsFont&&_lsFont!=='default'&&['small','large','xlarge'].includes(_lsFont);
+    const fontSize=_lsHasExplicitFont?_lsFont:(s.font_size||_lsFont||'default');
     localStorage.setItem('hermes-font-size',fontSize);
     _applyFontSize(fontSize);
+    if(_lsHasExplicitFont&&s.font_size&&s.font_size!==fontSize){
+      try{api('/api/settings',{method:'POST',body:JSON.stringify({font_size:fontSize})});}catch(_){}
+    }
     if(typeof setLocale==='function'){
       const _lang=typeof resolvePreferredLocale==='function'
         ? resolvePreferredLocale(s.language, localStorage.getItem('hermes-lang'))
