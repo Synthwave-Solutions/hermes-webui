@@ -171,6 +171,10 @@ ROUTE_CATALOG: tuple[RouteRule, ...] = (
     RouteRule("/api/admin",               "config:write", "config:write"),
     RouteRule("/api/dashboard",           "dashboard:read", "dashboard:write"),
     RouteRule("/api/insights",            "analytics:read"),
+    # Upstream capacity alerts and their thresholds: administrator surface.
+    # Read is config:write on purpose (not config:read): the alert rows carry
+    # provider diagnostics, which is exactly what normal users must not see.
+    RouteRule("/api/capacity",            "config:write", "config:write"),
     RouteRule("/api/project-os",          "analytics:read"),
     RouteRule("/api/logs",                "logs:read", match="exact"),
     RouteRule("/api/client-events/log",   "status:read", "status:read", match="exact"),

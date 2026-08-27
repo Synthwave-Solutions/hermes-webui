@@ -1642,6 +1642,31 @@ def _cron_admin_allowed(handler) -> bool:
         return False
 
 
+def _body_profile_allowed(handler, profile: str) -> bool:
+    """Body-sink guard for a per-request ``profile`` field.
+
+    Closes the TODO on /api/profile/switch (27 Aug 2026 ticket, acceptance
+    criterion "elevated profiles cannot be selected by unauthorised users"):
+    the enforce hook only inspects the ``?profile=`` query target, so a profile
+    named in a POST body reached the agent unchecked. Every body sink that can
+    bind a turn, a session or a project to a profile now asks this first.
+
+    An empty profile means "no explicit target", which is always allowed: the
+    session's own profile applies. Failure to resolve governance denies (fails
+    closed), matching _cron_profile_target_allowed.
+    """
+    profile = str(profile or "").strip()
+    if not profile:
+        return True
+    try:
+        from api.governance.enforce import _request_identity, is_profile_allowed_for
+
+        return bool(is_profile_allowed_for(_request_identity(handler), profile))
+    except Exception:
+        logger.warning("body profile governance check failed for %s", profile, exc_info=True)
+        return False
+
+
 def _cron_profile_target_allowed(handler, profile: str) -> bool:
     """Body-sink guard for the cron ``profile`` target field.
 
@@ -11584,6 +11609,22 @@ def handle_get(handler, parsed) -> bool:
     # ── Insights / knowledge status ──
     if parsed.path == "/api/insights":
         return _handle_insights(handler, parsed)
+
+    if parsed.path == "/api/capacity/alerts":
+        # Administrator view of upstream capacity incidents (27 Aug 2026
+        # tickets). The route catalog gates this on config:write, so provider
+        # diagnostics never reach a normal user.
+        from api.capacity_alerts import effective_config, list_events
+
+        qs = parse_qs(parsed.query or "")
+        try:
+            limit = int(qs.get("limit", ["50"])[0])
+        except (TypeError, ValueError):
+            limit = 50
+        return j(handler, {
+            "alerts": list_events(limit=limit),
+            "config": effective_config(),
+        })
     if parsed.path == "/api/project-os/dashboard":
         return _handle_project_os_dashboard(handler, parsed)
 
@@ -14863,6 +14904,24 @@ def handle_post(handler, parsed) -> bool:
             return bad(handler, str(e), 409)
 
     # ── Settings (POST) ──
+    if parsed.path == "/api/capacity/config":
+        # Thresholds, polling cadence and alert destination. Values are
+        # validated in api/capacity_alerts.py; an invalid one is dropped rather
+        # than stored, so a typo can never silently disable alerting.
+        from api.capacity_alerts import effective_config, sanitize_config
+        from api.config import save_settings
+
+        clean = sanitize_config(body)
+        if not clean:
+            return bad(handler, "no valid capacity settings in payload")
+        save_settings(clean)
+        return j(handler, {"ok": True, "config": effective_config()})
+
+    if parsed.path == "/api/capacity/acknowledge":
+        from api.capacity_alerts import acknowledge
+
+        return j(handler, {"ok": acknowledge(body.get("id"))})
+
     if parsed.path == "/api/settings":
         # Appearance self-service (26 Aug 2026 report): the route catalog now
         # admits this POST with config:read; this body-sink guard keeps every
@@ -15365,6 +15424,8 @@ def handle_post(handler, parsed) -> bool:
             from api.profiles import _PROFILE_ID_RE
             if not _PROFILE_ID_RE.fullmatch(_requested_profile):
                 return bad(handler, "invalid profile")
+        if not _body_profile_allowed(handler, _requested_profile):
+            return bad(handler, "profile_not_allowed", 403)
         from api.ownership import request_owner_email as _request_owner_email
 
         proj = {
@@ -20559,6 +20620,8 @@ def _handle_goal_command(handler, body):
                 return bad(handler, "invalid profile", 400)
         except ImportError:
             requested_profile = ""
+    if not _body_profile_allowed(handler, requested_profile):
+        return bad(handler, "profile_not_allowed", 403)
     if requested_profile and not _profiles_match(getattr(s, "profile", None), requested_profile):
         has_persisted_turns = bool(
             getattr(s, "messages", None)
@@ -20771,6 +20834,8 @@ def _handle_chat_start(handler, body, diag=None):
                     return bad(handler, "invalid profile", 400)
             except ImportError:
                 requested_profile = ""
+        if not _body_profile_allowed(handler, requested_profile):
+            return bad(handler, "profile_not_allowed", 403)
         session_profile = getattr(s, "profile", None)
         has_persisted_turns = bool(
             getattr(s, "messages", None)

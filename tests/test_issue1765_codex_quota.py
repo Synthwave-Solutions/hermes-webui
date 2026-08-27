@@ -19,7 +19,12 @@ def test_codex_oauth_usage_exhaustion_is_classified_as_quota():
         classified = streaming._classify_provider_error(err, Exception(err))
         assert classified['type'] == 'quota_exhausted', err
         assert classified['label'] == 'Out of credits'
-        assert 'credits' in classified['hint'].lower() or 'usage' in classified['hint'].lower()
+        # 27 Aug 2026 ticket ("replace technical upstream errors with friendly
+        # guidance"): the hint a WebUI user sees is plain language now. Billing
+        # wording and the CLI instruction moved to the admin capacity alert.
+        _hint = classified['hint'].lower()
+        assert 'temporarily unavailable' in _hint and 'try again' in _hint
+        assert 'hermes model' not in _hint
 
 
 def test_silent_provider_failure_gets_specific_catch_all_error():
@@ -27,7 +32,11 @@ def test_silent_provider_failure_gets_specific_catch_all_error():
 
     assert classified['type'] == 'no_response'
     assert classified['label'] == 'No response from provider'
-    assert 'returned no content and no error' in classified['hint']
+    # Same ticket: the silent-failure hint no longer explains provider
+    # internals or points at a terminal the user does not have.
+    _hint = classified['hint'].lower()
+    assert 'returned nothing at all' in _hint and 'try again' in _hint
+    assert 'hermes model' not in _hint
 
 
 def test_provider_error_payload_includes_bounded_redacted_details(monkeypatch):

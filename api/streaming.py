@@ -1148,6 +1148,51 @@ def _provider_error_probe_text(value) -> tuple[str, int | None]:
     return ' '.join(t for t in _texts if t).strip(), _status_code
 
 
+def _capacity_hint(kind: str, notified: bool = False) -> str:
+    """Plain-language user copy for an upstream capacity failure.
+
+    Delegates to api/capacity_alerts.py so the wording lives in one place and
+    the "an administrator has been notified" sentence is only ever appended
+    when an alert really was recorded. Falls back to a safe sentence if the
+    module cannot be imported, never to a technical string.
+    """
+    try:
+        from api.capacity_alerts import user_facing_message
+
+        return user_facing_message(kind, notified=notified) or (
+            'The service is temporarily unavailable. Please try again later.'
+        )
+    except Exception:
+        return 'The service is temporarily unavailable. Please try again later.'
+
+
+def _report_capacity_incident(classification: dict, provider=None, model=None,
+                              detail: str = '', source: str = 'chat') -> dict:
+    """Alert admins about a capacity failure and re-word the hint accordingly.
+
+    Returns the classification (mutated in place) so a caller can simply pass
+    it on. Non-capacity classifications are returned untouched.
+    """
+    try:
+        if not isinstance(classification, dict):
+            return classification
+        if classification.get('category') != 'capacity':
+            return classification
+        from api.capacity_alerts import record_capacity_event
+
+        outcome = record_capacity_event(
+            classification.get('type'), provider=provider, model=model,
+            detail=detail, source=source,
+        )
+        classification['hint'] = _capacity_hint(
+            classification.get('type'), notified=bool(outcome.get('notified')),
+        )
+        classification['admin_notified'] = bool(outcome.get('notified'))
+    except Exception:
+        logger.debug('capacity incident reporting failed', exc_info=True)
+    return classification
+
+
 def _classify_provider_error(err_str: str, exc=None, *, silent_failure: bool = False) -> dict:
     """Classify provider/agent failure text for WebUI apperror UX.
 
@@ -1233,29 +1278,38 @@ def _classify_provider_error(err_str: str, exc=None, *, silent_failure: bool = F
         or ('context length exceeded' in _err_lower and 'cannot compress further' in _err_lower)
         or ('context compression' in _err_lower and 'max compression attempts' in _err_lower)
     )
+    # Capacity categories carry PLAIN-LANGUAGE hints (27 Aug 2026 ticket:
+    # normal users were shown HTTP statuses, provider diagnostics and terminal
+    # commands they cannot run). The technical detail is not lost: it is
+    # recorded on the capacity alert an administrator sees
+    # (api/capacity_alerts.py), which is also where the admin-only guidance
+    # ("top up the account", "add capacity") now lives. `category` lets the
+    # callers recognise these without repeating the type list.
     if _is_quota:
         return {
             'label': 'Out of credits',
             'type': 'quota_exhausted',
-            'hint': 'Your provider account is out of credits or usage. Top up, wait for the plan window to reset, or switch providers via `hermes model`.',
+            'category': 'capacity',
+            'hint': _capacity_hint('quota_exhausted'),
         }
     if _is_rate_limit:
         return {
             'label': 'Rate limit reached',
             'type': 'rate_limit',
-            'hint': 'Rate limit reached. The fallback model (if configured) was also exhausted. Try again in a moment.',
+            'category': 'capacity',
+            'hint': _capacity_hint('rate_limit'),
         }
     if _is_auth:
         return {
             'label': 'Authentication failed',
             'type': 'auth_mismatch',
-            'hint': 'The selected model may not be supported by your configured provider or your API key is invalid. Run `hermes model` in your terminal to update credentials, then restart the WebUI.',
+            'hint': 'This assistant could not sign in to the service it needs. An administrator has to check the account settings; nothing you can change yourself.',
         }
     if _is_not_found:
         return {
             'label': 'Model not found',
             'type': 'model_not_found',
-            'hint': 'The selected model was not found by the provider. Check the model ID in Settings or run `hermes model` to verify it exists for your provider.',
+            'hint': 'The selected model is not available. Pick another model in Settings, or ask an administrator to make this one available.',
         }
     if _is_compression_exhausted:
         return {
@@ -1269,7 +1323,7 @@ def _classify_provider_error(err_str: str, exc=None, *, silent_failure: bool = F
             # Preserve the existing no_response event type (#373) while making
             # the catch-all silent-failure message more specific for #1765.
             'type': 'no_response',
-            'hint': 'The provider returned no content and no error. This often means a usage/rate limit was hit silently. Check provider status, switch providers via `hermes model`, or try again in a moment.',
+            'hint': 'The service returned nothing at all, which usually means it was briefly out of capacity. Please try again in a moment; if it keeps happening, tell an administrator.',
         }
     return {'label': 'Error', 'type': 'error', 'hint': ''}
 
@@ -1700,7 +1754,7 @@ def _extract_gateway_routing_metadata(agent, result, requested_model=None, reque
     return None
 
 
-def _build_agent_thread_env(profile_runtime_env: dict | None, workspace: str, session_id: str, profile_home: str, owner_email: str | None = None) -> dict:
+def _build_agent_thread_env(profile_runtime_env: dict | None, workspace: str, session_id: str, profile_home: str, owner_email: str | None = None, user_message: str | None = None) -> dict:
     """Build thread-local agent env with per-run values overriding profile defaults.
 
     Profile runtime env may include TERMINAL_CWD from config.yaml. Passing it as
@@ -1716,6 +1770,14 @@ def _build_agent_thread_env(profile_runtime_env: dict | None, workspace: str, se
     owner = str(owner_email or "").strip().lower()
     if owner:
         env['HERMES_SESSION_USER_ID'] = owner
+    # The ask behind a governance access request (27 Aug 2026 ticket). The
+    # engine redacts and truncates this before it is stored on a request, so
+    # an admin reviewing the request sees what the person wanted, not just the
+    # derived capability. Passed raw here; redaction is the engine's job and
+    # must not be duplicated (two redactors drift).
+    trigger = str(user_message or '').strip()
+    if trigger:
+        env['HERMES_SESSION_LAST_USER_MESSAGE'] = trigger[:2000]
     env.update({
         'TERMINAL_CWD': str(workspace),
         'HERMES_EXEC_ASK': '1',
@@ -6874,6 +6936,7 @@ def _run_agent_streaming(
             session_id,
             _profile_home,
             owner_email=getattr(s, 'owner_email', None),
+            user_message=msg_text if isinstance(msg_text, str) else None,
         )
         _set_thread_env(**_thread_env)
         # process_complete agent-wakeup wiring (ours-original, Option B): bind
@@ -8444,6 +8507,13 @@ def _run_agent_streaming(
                     _last_err,
                     silent_failure=not bool(_last_err),
                 )
+                # Capacity failure: alert an administrator and replace the hint
+                # with plain language (27 Aug 2026 ticket).
+                _report_capacity_incident(
+                    _classification, provider=resolved_provider,
+                    model=resolved_model, detail=str(_last_err or '')[:500],
+                    source='chat',
+                )
                 _is_quota = _classification['type'] == 'quota_exhausted'
                 _is_auth = _classification['type'] == 'auth_mismatch'
                 _drop_replayed_assistant = (
@@ -9546,6 +9616,12 @@ def _run_agent_streaming(
                             logger.debug("Failed to append cancelled turn journal event", exc_info=True)
             put('cancel', _cancel_event_payload('Cancelled by user'))
             return
+        # Capacity failure on the exception path: same admin alert and same
+        # plain-language rewrite as the result path (27 Aug 2026 ticket).
+        _report_capacity_incident(
+            _classification, provider=resolved_provider, model=resolved_model,
+            detail=str(err_str or '')[:500], source='chat',
+        )
         _exc_is_quota = _classification['type'] == 'quota_exhausted'
         # Exception quota text still includes: 'more credits' in _exc_lower, 'can only afford' in _exc_lower, 'fewer max_tokens' in _exc_lower.
         # Rate-limit detection remains guarded as: (not _exc_is_quota).

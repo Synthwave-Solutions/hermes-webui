@@ -8145,6 +8145,16 @@ _SETTINGS_DEFAULTS = {
     "theme": "dark",  # light | dark | system
     "skin": "default",  # accent color skin: default | ares | mono | graphite | slate | poseidon | sisyphus | charizard | sienna | catppuccin | nous
     "font_size": "default",  # small | default | large | xlarge
+    # Upstream capacity alerting (27 Aug 2026 tickets). Administrator-only:
+    # these are NOT appearance keys, so writing them needs config:write.
+    "capacity_alert_cooldown_seconds": 900,
+    "capacity_alert_poll_seconds": 300,
+    "capacity_alert_thresholds": {},
+    "capacity_alert_destination": "",
+    # Where a NEW governance access request is announced out of band
+    # (platform:chat_id). Awareness only: decisions stay in the WebUI, where
+    # the administrator's identity is verified and the decision is audited.
+    "governance_alert_destination": "",
     "session_jump_buttons": False,  # show Start/End transcript jump pills
     "render_user_markdown": False,  # opt-in: render full markdown in user messages (#3870)
     "large_text_paste_as_attachment": True,  # convert very large composer text pastes into .md attachments by default

@@ -311,10 +311,75 @@ def _truncate_body(body: str) -> str:
     return body[:MAX_DELIVERY_CHARS].rstrip() + "\n\n(truncated: full output is in the Tasks panel)"
 
 
+def capacity_failure_text(job: dict, run_error: str | None) -> str | None:
+    """Plain-language update when a run failed because upstream capacity ran out.
+
+    Reported 27 Aug 2026 ("Telegram alerts do not work when all upstream
+    accounts are unavailable"): when every upstream account is spent, the run
+    that would have produced the alert cannot run either, and the user was left
+    with either silence or a raw provider error. The scheduled task now reports
+    the outage in its own words, an administrator is alerted, and the message
+    says an admin was notified only when that alert was actually recorded.
+    Returns None when the failure was not a capacity failure.
+    """
+    try:
+        from api.capacity_alerts import record_capacity_event, user_facing_message
+        from api.streaming import _classify_provider_error
+    except Exception:
+        return None
+    try:
+        classification = _classify_provider_error(str(run_error or ""), None,
+                                                  silent_failure=not bool(run_error))
+        if classification.get("category") != "capacity":
+            return None
+        outcome = record_capacity_event(
+            classification.get("type"),
+            provider=job.get("provider") or job.get("provider_snapshot"),
+            model=job.get("model") or job.get("model_snapshot"),
+            detail=str(run_error or "")[:500],
+            source="scheduled task",
+        )
+        name = str(job.get("name") or job.get("id") or "scheduled task")
+        message = user_facing_message(classification.get("type"),
+                                      notified=bool(outcome.get("notified")))
+        return (
+            f"Scheduled task \"{name}\" could not run. {message}\n"
+            f"The task stays scheduled and will run again on its next turn "
+            f"(job {job.get('id', '?')})."
+        )
+    except Exception:
+        logger.debug("capacity failure text unavailable", exc_info=True)
+        return None
+
+
+def deliver_external_notice(destination: str, text: str) -> tuple[bool, str | None]:
+    """Send one short notice to an external destination (platform:chat_id).
+
+    Used by api/capacity_alerts.py to reach an administrator outside the WebUI.
+    Returns (ok, error) and never claims a send it cannot confirm: an
+    unavailable backend is reported as an error, not as success.
+    """
+    destination = str(destination or "").strip()
+    if not destination:
+        return False, "no destination configured"
+    try:
+        from gateway.delivery import deliver_text  # type: ignore
+    except Exception:
+        return False, "external delivery backend unavailable"
+    try:
+        ok = deliver_text(destination, text)
+        return bool(ok), None if ok else "delivery not confirmed"
+    except Exception as exc:  # pragma: no cover
+        return False, str(exc)
+
+
 def build_update_text(job: dict, *, body: str | None, run_ok: bool, run_error: str | None) -> str:
     """One concise update for the originating conversation."""
     name = str(job.get("name") or job.get("id") or "scheduled task")
     if not run_ok:
+        capacity_text = capacity_failure_text(job, run_error)
+        if capacity_text is not None:
+            return capacity_text
         detail = (run_error or "no error detail recorded").strip()
         return (
             f"Scheduled task \"{name}\" failed on its last run: {detail}\n"
