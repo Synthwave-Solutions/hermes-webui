@@ -249,13 +249,19 @@ def _gateway_mirrored_pending_run_id(session_key: str, approval_id: str) -> str 
     return None
 
 
-def submit_gateway_pending_mirror(session_key: str, approval: dict) -> None:
-    """Mirror the live gateway head into WebUI polling state under a typed tag."""
+def submit_gateway_pending_mirror(session_key: str, approval: dict) -> tuple:
+    """Mirror the live gateway head into WebUI polling state under a typed tag.
+
+    Returns (head, total): the reconciled first pending item and the pending
+    count, so a caller (the SSE notify callback) can attach the count to the
+    event it emits and a poller and an SSE client agree on the same number.
+    """
     del approval  # mirror from the live gateway head under `_lock`, not from callback input
     with _lock:
         head, total, _changed = reconcile_gateway_pending_mirror_locked(session_key)
         _approval_sse_notify_locked(session_key, head, total)
     publish_session_list_changed("attention_pending")
+    return head, total
 
 
 def submit_pending(session_key: str, approval: dict) -> None:

@@ -6967,9 +6967,15 @@ def _run_agent_streaming(
                 unregister_gateway_notify as _unreg_notify,
             )
             def _approval_notify_cb(approval_data):
+                # Repopulate the WebUI polling state BEFORE the SSE push so a
+                # client that is polling (no live SSE) still sees this approval,
+                # and attach the reconciled pending count to the SSE event so
+                # both transports agree on the same number.
                 if _submit_pending_for_polling is not None:
                     try:
-                        _submit_pending_for_polling(session_id, approval_data)
+                        head, total = _submit_pending_for_polling(session_id, approval_data)
+                        if isinstance(approval_data, dict):
+                            approval_data.update({"pending_count": total})
                     except Exception:
                         logger.warning("Failed to mirror approval into WebUI polling state", exc_info=True)
                 put('approval', approval_data)
