@@ -8037,6 +8037,7 @@ function switchSettingsSection(name,opts){
     if(section==='plugins') loadPluginsPanel();
     if(section==='extensions') loadExtensionsPanel();
     if(section==='access'&&typeof loadMyAccessRequests==='function') loadMyAccessRequests();
+    if(section==='system'&&typeof loadCapacityAlerts==='function') loadCapacityAlerts();
   }
   if(opts&&opts.fromSidebarItem)_closeMobileSidebarAfterPanelSelection();
 }
@@ -13411,3 +13412,90 @@ async function loadMyAccessRequests(animate){
 }
 window.loadMyAccessRequests=loadMyAccessRequests;
 window.openFilesFromRail=openFilesFromRail;
+
+// ── Upstream capacity: administrator settings and alert list ────────────────
+// 27 Aug 2026 ticket. The pane appears only when the caller can actually read
+// the route (config:write); everyone else never sees the section, because the
+// alert rows carry provider diagnostics.
+function _capacityParseThresholds(raw){
+  const out={};
+  String(raw||'').split(',').forEach(part=>{
+    const m=part.split('=');
+    if(m.length!==2) return;
+    const name=m[0].trim().toLowerCase(), pct=parseFloat(m[1]);
+    if(name&&Number.isFinite(pct)&&pct>0&&pct<=100) out[name]=pct;
+  });
+  return out;
+}
+function _capacityFormatThresholds(obj){
+  if(!obj||typeof obj!=='object') return '';
+  return Object.keys(obj).sort().map(k=>k+'='+obj[k]).join(', ');
+}
+function _capacityAlertRow(a){
+  const when=Number(a.last_ts||0)?new Date(a.last_ts*1000).toLocaleString():'';
+  const kind={quota_exhausted:'capacity exhausted',rate_limit:'rate limited',overloaded:'overloaded'}[a.kind]||a.kind||'';
+  const repeat=Number(a.count||1)>1?` <span class="capacity-alert-count">×${Number(a.count)}</span>`:'';
+  const ack=a.acknowledged?'':`<button class="btn-tiny" onclick="acknowledgeCapacityAlert('${esc(String(a.id||''))}')" data-i18n="capacity_ack">Mark handled</button>`;
+  const detail=a.detail?`<div class="capacity-alert-detail">${esc(String(a.detail))}</div>`:'';
+  const dispatch=a.dispatch_error?`<div class="capacity-alert-detail">${esc(t('capacity_dispatch_failed'))}: ${esc(String(a.dispatch_error))}</div>`:'';
+  return `<div class="capacity-alert-row${a.acknowledged?' is-ack':''}">
+    <div class="capacity-alert-head"><strong>${esc(String(a.provider||'unknown'))}</strong> ${esc(kind)}${repeat}
+      <span class="capacity-alert-when">${esc(when)}</span></div>
+    ${a.model?`<div class="capacity-alert-detail">${esc(String(a.model))}</div>`:''}
+    ${detail}${dispatch}
+    <div>${ack}</div>
+  </div>`;
+}
+async function loadCapacityAlerts(animate){
+  const field=$('capacityAlertsField');
+  if(!field) return;
+  try{
+    const data=await api('/api/capacity/alerts?limit=25',{redirect401:false,timeoutToast:false});
+    field.style.display='';
+    const cfg=(data&&data.config)||{};
+    const set=(id,val)=>{const el=$(id); if(el&&document.activeElement!==el) el.value=val;};
+    set('capacityPollSeconds',cfg.capacity_alert_poll_seconds||'');
+    set('capacityCooldownSeconds',cfg.capacity_alert_cooldown_seconds||'');
+    set('capacityThresholds',_capacityFormatThresholds(cfg.capacity_alert_thresholds));
+    set('capacityDestination',cfg.capacity_alert_destination||'');
+    const list=$('capacityAlertsList');
+    const alerts=Array.isArray(data&&data.alerts)?data.alerts:[];
+    if(list) list.innerHTML=alerts.length
+      ? alerts.map(_capacityAlertRow).join('')
+      : `<div class="capacity-alerts-empty">${esc(t('capacity_no_alerts'))}</div>`;
+    if(animate&&typeof showToast==='function') showToast(t('capacity_refreshed'));
+  }catch(e){
+    // Not an administrator (403) or the route is unavailable: leave the whole
+    // section hidden rather than showing an empty admin panel.
+    field.style.display='none';
+  }
+}
+async function saveCapacityConfig(){
+  const status=$('capacityConfigStatus');
+  const payload={
+    capacity_alert_poll_seconds:parseInt(($('capacityPollSeconds')||{}).value,10),
+    capacity_alert_cooldown_seconds:parseInt(($('capacityCooldownSeconds')||{}).value,10),
+    capacity_alert_thresholds:_capacityParseThresholds(($('capacityThresholds')||{}).value),
+    capacity_alert_destination:String((($('capacityDestination')||{}).value)||'').trim(),
+  };
+  if(!Number.isFinite(payload.capacity_alert_poll_seconds)) delete payload.capacity_alert_poll_seconds;
+  if(!Number.isFinite(payload.capacity_alert_cooldown_seconds)) delete payload.capacity_alert_cooldown_seconds;
+  if(status) status.textContent=t('saving');
+  try{
+    const saved=await api('/api/capacity/config',{method:'POST',body:JSON.stringify(payload)});
+    if(status) status.textContent=t('capacity_saved');
+    // Re-render from the SERVER-validated values, so a dropped invalid entry
+    // is visible instead of lingering in the field as if it had been stored.
+    if(saved&&saved.config) await loadCapacityAlerts(false);
+  }catch(e){
+    if(status) status.textContent=(e&&e.message)?e.message:String(e);
+  }
+}
+async function acknowledgeCapacityAlert(id){
+  try{ await api('/api/capacity/acknowledge',{method:'POST',body:JSON.stringify({id:id})}); }
+  catch(_){ }
+  loadCapacityAlerts(false);
+}
+window.loadCapacityAlerts=loadCapacityAlerts;
+window.saveCapacityConfig=saveCapacityConfig;
+window.acknowledgeCapacityAlert=acknowledgeCapacityAlert;

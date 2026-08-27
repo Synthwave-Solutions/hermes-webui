@@ -7625,3 +7625,16 @@ html,body{background:var(--bg)!important;color:var(--text);font-family:var(--fon
 /* Governance approvals: the user request behind an access request */
 .gov-trigger{margin-top:5px;padding:5px 8px;border-left:2px solid var(--accent);background:var(--surface-subtle);border-radius:0 6px 6px 0;font-size:11.5px;line-height:1.5;color:var(--text);max-width:46ch;overflow:hidden;text-overflow:ellipsis;}
 .gov-trigger-label{color:var(--muted);font-weight:600;}
+
+/* Settings > System: upstream capacity alerts (administrators only) */
+.capacity-config-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;}
+.capacity-config-row{display:flex;flex-direction:column;gap:3px;font-size:11.5px;color:var(--muted);}
+.capacity-config-row input{padding:6px 8px;background:var(--input-bg);color:var(--text);border:1px solid var(--border2);border-radius:6px;font-size:12.5px;}
+.capacity-alerts-list{display:flex;flex-direction:column;gap:8px;margin-top:10px;}
+.capacity-alerts-empty{padding:10px 12px;border:1px dashed var(--border2);border-radius:8px;color:var(--muted);font-size:12px;}
+.capacity-alert-row{border:1px solid var(--border);border-left:3px solid var(--warning);border-radius:8px;padding:8px 10px;background:var(--surface);display:flex;flex-direction:column;gap:4px;}
+.capacity-alert-row.is-ack{border-left-color:var(--success);opacity:.65;}
+.capacity-alert-head{display:flex;flex-wrap:wrap;gap:6px;align-items:baseline;font-size:12.5px;color:var(--text);}
+.capacity-alert-count{color:var(--warning);font-weight:600;}
+.capacity-alert-when{margin-left:auto;font-size:11px;color:var(--muted);}
+.capacity-alert-detail{font-size:11.5px;color:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;word-break:break-word;}

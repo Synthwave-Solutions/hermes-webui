@@ -1634,6 +1634,26 @@
                 <span id="checkUpdatesStatus"></span>
               </div>
             </div>
+            <div class="settings-field" id="capacityAlertsField" style="display:none">
+              <label data-i18n="settings_label_capacity">Upstream capacity alerts</label>
+              <div style="font-size:11px;color:var(--muted);margin-bottom:6px" data-i18n="settings_desc_capacity">Warn before an upstream account runs empty. Users see a plain-language message; the diagnostics stay here.</div>
+              <div class="capacity-config-grid">
+                <label class="capacity-config-row"><span data-i18n="capacity_poll">Check every (seconds)</span>
+                  <input type="number" id="capacityPollSeconds" min="30" max="86400" step="30"></label>
+                <label class="capacity-config-row"><span data-i18n="capacity_cooldown">One alert per (seconds)</span>
+                  <input type="number" id="capacityCooldownSeconds" min="30" max="86400" step="30"></label>
+                <label class="capacity-config-row"><span data-i18n="capacity_thresholds">Warn at remaining %, per provider</span>
+                  <input type="text" id="capacityThresholds" placeholder="anthropic=20, openai=10"></label>
+                <label class="capacity-config-row"><span data-i18n="capacity_destination">Also send alerts to</span>
+                  <input type="text" id="capacityDestination" placeholder="telegram:123456789"></label>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+                <button class="btn-tiny" id="btnCapacitySave" onclick="saveCapacityConfig()" data-i18n="capacity_save">Save capacity settings</button>
+                <button class="btn-tiny" onclick="loadCapacityAlerts(true)" data-i18n="refresh">Refresh</button>
+                <span id="capacityConfigStatus" style="font-size:11px;color:var(--muted)" aria-live="polite"></span>
+              </div>
+              <div id="capacityAlertsList" class="capacity-alerts-list"></div>
+            </div>
             <div class="settings-field">
               <label for="settingsPassword" data-i18n="settings_label_password">Access Password</label>
               <div style="font-size:11px;color:var(--muted);margin-bottom:6px" data-i18n="settings_desc_password">Enter a new password to set or change it. Leave blank to keep current setting.</div>

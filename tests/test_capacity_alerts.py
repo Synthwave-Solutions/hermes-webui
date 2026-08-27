@@ -208,3 +208,56 @@ def test_non_capacity_failure_keeps_its_original_detail(ca):
     assert "bad config in step 3" in text
     assert job["id"] in text
     assert not ca.list_events(), "an ordinary bug is not a capacity incident"
+
+
+# ── Administrator settings pane ─────────────────────────────────────────────
+
+INDEX_HTML = (REPO / "static" / "index.html").read_text(encoding="utf-8")
+PANELS_JS = (REPO / "static" / "panels.js").read_text(encoding="utf-8")
+EN_JS = (REPO / "static" / "i18n" / "en.js").read_text(encoding="utf-8")
+
+
+def test_settings_pane_exposes_every_configurable_value():
+    for field in ("capacityPollSeconds", "capacityCooldownSeconds",
+                  "capacityThresholds", "capacityDestination"):
+        assert f'id="{field}"' in INDEX_HTML, field
+    assert 'id="capacityAlertsList"' in INDEX_HTML
+
+
+def test_pane_is_hidden_until_the_admin_route_answers():
+    assert 'id="capacityAlertsField" style="display:none"' in INDEX_HTML
+    block = PANELS_JS[PANELS_JS.index("async function loadCapacityAlerts"):][:1800]
+    assert "field.style.display='none'" in block, (
+        "a non-admin must not be shown an empty administrator panel"
+    )
+    assert "field.style.display=''" in block
+
+
+def test_pane_loads_when_the_system_section_opens():
+    assert "if(section==='system'&&typeof loadCapacityAlerts==='function')" in PANELS_JS
+
+
+def test_saving_re_renders_from_the_server_validated_config():
+    block = PANELS_JS[PANELS_JS.index("async function saveCapacityConfig"):][:1600]
+    assert "await loadCapacityAlerts(false)" in block, (
+        "a dropped invalid value must not linger in the field as if it were stored"
+    )
+
+
+def test_threshold_input_round_trips():
+    parse = PANELS_JS[PANELS_JS.index("function _capacityParseThresholds"):][:600]
+    assert "toLowerCase()" in parse and "pct>0&&pct<=100" in parse
+    assert "function _capacityFormatThresholds" in PANELS_JS
+
+
+def test_alert_rows_escape_provider_supplied_text():
+    row = PANELS_JS[PANELS_JS.index("function _capacityAlertRow"):][:1400]
+    for field in ("a.provider", "a.detail", "a.model", "a.dispatch_error"):
+        assert f"esc(String({field}" in row or f"esc(String({field}))" in row, field
+
+
+def test_every_pane_string_has_an_english_key():
+    for key in ("settings_label_capacity", "capacity_poll", "capacity_cooldown",
+                "capacity_thresholds", "capacity_destination", "capacity_save",
+                "capacity_no_alerts", "capacity_ack", "capacity_dispatch_failed"):
+        assert f"{key}:" in EN_JS, key
