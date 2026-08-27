@@ -1283,13 +1283,23 @@ function _govApprovalRow(item) {
     : '';
   const summary = _govPayloadSummary(item.payload);
   const detail = summary ? '<div class="gov-muted">' + _govEsc(summary) + '</div>' : '';
+  // The ask behind the request (27 Aug 2026 ticket): an approver needs to see
+  // what the person actually wanted, not only the derived capability. Already
+  // redacted and truncated server-side; rendered as escaped text, never HTML.
+  const trigger = (item.payload && typeof item.payload === 'object')
+    ? String(item.payload.trigger || '') : '';
+  const triggerHtml = trigger
+    ? '<div class="gov-trigger" title="' + _govEsc(trigger) + '">'
+      + '<span class="gov-trigger-label">' + _govEsc(_govT('governance_trigger', 'Asked for')) + ':</span> '
+      + _govEsc(trigger) + '</div>'
+    : '';
   const btn = (decision, cls, label2) => '<button type="button" class="gov-btn ' + cls + '"' +
     ' data-gov-approval="' + decision + '"' +
     ' data-kind="' + _govEsc(kind) + '"' +
     ' data-key="' + _govEsc(key) + '">' + label2 + '</button>';
   return '<tr>' +
     '<td class="gov-nowrap"><span class="gov-chip' + _govKindChipClass(kind) + '">' + _govEsc(_govKindLabel(kind)) + '</span></td>' +
-    '<td>' + _govEsc(primary) + secondary + detail + '</td>' +
+    '<td>' + _govEsc(primary) + secondary + detail + triggerHtml + '</td>' +
     '<td>' + _govEsc(item.owner_email || '') + '</td>' +
     '<td class="gov-nowrap">' + _govEsc(when) + '</td>' +
     '<td class="gov-row-actions">' +

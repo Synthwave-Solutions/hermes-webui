@@ -144,6 +144,53 @@ def record_route_denial(email: str, path: str, method: str = "GET") -> bool:
         return False
 
 
+def _notify_admins_of_request(entry: dict) -> bool:
+    """Tell administrators out of band that a new access request is waiting.
+
+    Reported 27 Aug 2026 ("Let administrators approve governance requests
+    through Chat or Telegram"): an admin had to be looking at the WebUI to
+    notice a request at all. This delivers the awareness half: a summary and
+    where to decide.
+
+    It deliberately does NOT carry an approve or deny action. A decision that
+    grants capability must be bound to a verified administrator identity, and
+    a chat message is forwardable, spoofable and replayable: acting on one
+    would let anybody holding the message grant access. Remote decisions need
+    a signed, single-use, identity-bound action token and an audited callback,
+    which is a security design decision rather than a wiring job. Until that
+    exists, the notification points at the Approvals tab, where the decision is
+    already authenticated and audited.
+
+    Never raises; a failed notification is logged and leaves the request
+    untouched in the queue.
+    """
+    try:
+        from api.config import load_settings
+
+        destination = str((load_settings() or {}).get("governance_alert_destination") or "").strip()
+        if not destination:
+            return False
+        payload = entry.get("payload") if isinstance(entry.get("payload"), dict) else {}
+        trigger = str(payload.get("trigger") or "").strip()
+        lines = [
+            "SynthPulse access request waiting for a decision.",
+            f"Requester: {entry.get('owner_email') or 'unknown'}",
+            f"Requested: {entry.get('label') or entry.get('key') or 'unknown'}",
+        ]
+        if trigger:
+            lines.append(f"Asked for: {trigger}")
+        lines.append("Decide in the SynthPulse WebUI: Governance > Approvals (kind: Access).")
+        from api.cron_webui_delivery import deliver_external_notice
+
+        ok, error = deliver_external_notice(destination, "\n".join(lines))
+        if not ok:
+            logger.info("governance request notification not delivered: %s", error)
+        return bool(ok)
+    except Exception as exc:  # pragma: no cover: never break ingest
+        logger.debug("governance request notification failed: %s", exc)
+        return False
+
+
 def ingest_spool() -> int:
     """Sync the denial spool into the approvals registry. Returns how many
     pending grant rows exist afterwards. Never raises."""
@@ -171,6 +218,11 @@ def ingest_spool() -> int:
                     "reason": str(item.get("reason") or ""),
                     "tool": str(item.get("tool") or ""),
                     "detail": str(item.get("detail") or ""),
+                    # What the person actually asked for, redacted and
+                    # truncated by the engine before it was ever stored
+                    # (27 Aug 2026 ticket). Empty when the surface could not
+                    # supply it: never a guess.
+                    "trigger": str(item.get("trigger") or ""),
                     "count": int(item.get("count") or 1),
                 }
                 if entry is None:
@@ -185,6 +237,12 @@ def ingest_spool() -> int:
                     }
                     approvals.save(registry)
                     pending += 1
+                    # A newly created request is the one moment an admin needs
+                    # to hear about it out of band (27 Aug 2026 ticket). Fires
+                    # once per request, outside the registry lock's purpose but
+                    # inside it by necessity: it is a best-effort, non-raising
+                    # call that never blocks the queue from rendering.
+                    _notify_admins_of_request(registry[rk])
                 elif str(entry.get("status") or "pending") == "pending":
                     entry["payload"] = payload
                     approvals.save(registry)

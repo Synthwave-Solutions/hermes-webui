@@ -7621,3 +7621,7 @@ html,body{background:var(--bg)!important;color:var(--text);font-family:var(--fon
 /* Insights scope label (mine vs global) */
 .insights-scope{margin:0 0 10px;padding:8px 12px;border-radius:8px;font-size:12px;line-height:1.5;border:1px solid var(--border);background:var(--surface-subtle);color:var(--muted);}
 .insights-scope.global{border-color:rgba(245,158,11,.35);background:rgba(245,158,11,.08);color:var(--text);}
+
+/* Governance approvals: the user request behind an access request */
+.gov-trigger{margin-top:5px;padding:5px 8px;border-left:2px solid var(--accent);background:var(--surface-subtle);border-radius:0 6px 6px 0;font-size:11.5px;line-height:1.5;color:var(--text);max-width:46ch;overflow:hidden;text-overflow:ellipsis;}
+.gov-trigger-label{color:var(--muted);font-weight:600;}
