@@ -378,9 +378,23 @@ def _handle_me(handler, parsed, policy, subject, access) -> bool:
             "groups": sorted(access.groups),
             "permissions": sorted(access.permissions),
             "profiles": sorted(access.profiles),
+            # Left-navigation items this caller must not see, derived from the
+            # same permissions that gate the panels' APIs (27 Aug 2026 ticket).
+            # The client hides these on top of the user's own hidden_tabs; the
+            # APIs stay the real enforcement.
+            "hidden_nav": _hidden_nav(access, policy),
         },
     )
     return True
+
+
+def _hidden_nav(access, policy) -> list:
+    try:
+        from api.governance.nav import hidden_panels
+
+        return hidden_panels(access, policy)
+    except Exception:
+        return []
 
 
 def _handle_policy_get(handler, parsed, policy, subject, access) -> bool:

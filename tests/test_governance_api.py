@@ -165,6 +165,9 @@ def test_me_shape_admin(policy_file, as_user):
     assert set(me) == {
         "email", "display_name", "method", "mode", "is_bootstrap_admin",
         "roles", "groups", "permissions", "profiles",
+        # Left-navigation items this caller may not see, derived from the same
+        # permissions that gate the panels' APIs (27 Aug 2026 ticket).
+        "hidden_nav",
     }
 
 

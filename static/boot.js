@@ -625,6 +625,10 @@ function toggleRailExpanded(forceState){
     if(typeof _applyTabVisibility==='function'&&typeof _getHiddenTabs==='function'){
       _applyTabVisibility(_getHiddenTabs());
     }
+    // Governance-derived navigation (27 Aug 2026 ticket): re-applies once the
+    // caller's effective permissions are known, so a panel they cannot use is
+    // hidden rather than shown as a dead end.
+    if(typeof loadGovernanceNavVisibility==='function') loadGovernanceNavVisibility();
     var active=document.querySelector('.rail .rail-btn.nav-tab.active[data-panel]')
                ||document.querySelector('.sidebar-nav .nav-tab.active[data-panel]');
     if(active&&active.classList.contains('nav-tab-hidden')){

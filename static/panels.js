@@ -7659,8 +7659,29 @@ function _applyTabOrder(order){
   });
 }
 
+// Panels governance says this user may not reach. Filled once from
+// /api/governance/me (27 Aug 2026 ticket) and merged into every visibility
+// pass, so a feature the person has no permission for is hidden instead of
+// being a dead end. The APIs behind each panel stay the real gate; this is
+// presentation only, and it can never REVEAL a panel, only hide one.
+window._govHiddenNav = window._govHiddenNav || [];
+
+async function loadGovernanceNavVisibility(){
+  try{
+    const me = window.__GOV_ME__ || await api('/api/governance/me',{redirect401:false,timeoutToast:false});
+    if(!me||!Array.isArray(me.hidden_nav)) return;
+    window._govHiddenNav = me.hidden_nav.filter(x=>typeof x==='string'&&x.trim());
+    if(typeof _applyTabVisibility==='function'&&typeof _getHiddenTabs==='function'){
+      _applyTabVisibility(_getHiddenTabs());
+    }
+  }catch(_){ /* not governed, or endpoint unavailable: show everything */ }
+}
+window.loadGovernanceNavVisibility=loadGovernanceNavVisibility;
+
 function _applyTabVisibility(hidden){
   hidden=_sanitizeTabPanelList(hidden);
+  const govHidden=Array.isArray(window._govHiddenNav)?window._govHiddenNav:[];
+  if(govHidden.length) hidden=hidden.concat(govHidden.filter(p=>hidden.indexOf(p)===-1));
   _applyTabOrder(_getTabOrder());
   // Hide/unhide all [data-panel] elements (sidebar-nav buttons + rail buttons)
   document.querySelectorAll('[data-panel]').forEach(function(el){
