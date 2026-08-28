@@ -2627,6 +2627,7 @@
   .composer-ws-wrap,
   .composer-reasoning-wrap,
   .composer-toolsets-wrap,
+  .composer-chat-mode-wrap,
   .composer-model-wrap{position:relative;flex:0 0 auto;}
   .composer-profile-chip{display:inline-flex;align-items:center;gap:8px;max-width:180px;padding:8px 10px 8px 12px;border-radius:999px;border:1px solid transparent;background-color:transparent;font-weight:500;cursor:pointer;transition:color .15s,background-color .15s,border-color .15s;}
   .composer-profile-chip:hover{background-color:var(--hover-bg);}
@@ -2663,6 +2664,16 @@
   .reasoning-option{padding:8px 14px;border-radius:6px;cursor:pointer;font-size:13px;color:var(--text);white-space:nowrap;transition:background-color .12s;}
   .reasoning-option:hover{background:rgba(255,255,255,.07);}
   .reasoning-option.selected{background:var(--accent-bg);}
+  /* Chat mode chip: per-conversation Normal chat vs Super agent.
+     Unlike the toolsets chip this wrap is visible by default and has NO
+     @container width gate below: the mode the conversation is running in has
+     to stay readable at every composer width. */
+  .composer-chat-mode-wrap{display:block;}
+  .composer-chat-mode-chip{display:inline-flex;align-items:center;gap:6px;max-width:180px;padding:8px 12px;border-radius:999px;border:1px solid transparent;background-color:transparent;color:var(--muted);font-weight:500;cursor:pointer;transition:color .15s,background-color .15s,border-color .15s;}
+  .composer-chat-mode-chip:hover{color:var(--text);background-color:var(--hover-bg);}
+  .composer-chat-mode-chip.mode-normal{color:var(--accent);background:var(--accent-bg);border-color:var(--accent-bg-strong);}
+  .composer-chat-mode-icon{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;line-height:1;}
+  .composer-chat-mode-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   /* Toolsets chip — session-level toolset override (#493) */
   .composer-toolsets-wrap{display:none;}
   .composer-toolsets-chip{display:inline-flex;align-items:center;gap:8px;max-width:180px;padding:8px 10px 8px 12px;border-radius:999px;border:1px solid transparent;background-color:transparent;color:var(--muted);font-weight:500;cursor:pointer;transition:color .15s,background-color .15s,border-color .15s;}
@@ -3032,6 +3043,9 @@
   .composer-footer.cf-icons .composer-model-label,
   .composer-footer.cf-icons #composerModelLabel{display:none;}
   .composer-footer.cf-icons .composer-model-chip{max-width:none;padding-left:10px;padding-right:8px;gap:4px;}
+  .composer-footer.cf-icons .composer-chat-mode-label,
+  .composer-footer.cf-icons #composerChatModeLabel{display:none;}
+  .composer-footer.cf-icons .composer-chat-mode-chip{box-sizing:border-box;width:44px;height:44px;max-width:44px;min-width:44px;min-height:44px;padding:0;justify-content:center;gap:0;}
   .composer-footer.cf-icons #btnSavedPrompts,
   .composer-footer.cf-icons .saved-prompts-popup{display:none!important;}
   .composer-footer.cf-icons .composer-divider{display:none;}
@@ -3044,6 +3058,9 @@
   .composer-footer.cf-burger .provider-quota-chip,
   .composer-footer.cf-burger .composer-left > .composer-reasoning-wrap,
   .composer-footer.cf-burger .composer-left > .composer-toolsets-wrap{display:none!important;}
+  .composer-footer.cf-burger .composer-chat-mode-label,
+  .composer-footer.cf-burger #composerChatModeLabel{display:none;}
+  .composer-footer.cf-burger .composer-chat-mode-chip{box-sizing:border-box;width:44px;height:44px;max-width:44px;min-width:44px;min-height:44px;padding:0;justify-content:center;gap:0;}
   .composer-footer.cf-burger .composer-mobile-config-btn{box-sizing:border-box;position:relative;display:inline-flex!important;width:44px;height:44px;min-width:44px;min-height:44px;flex-shrink:0;}
   .composer-footer.cf-burger .composer-mobile-config-panel.open{display:flex;}
   .composer-footer.cf-burger .composer-mobile-config-action{flex:1 1 0;min-height:44px;min-width:0;background:var(--input-bg);border-color:var(--border);}
@@ -3154,9 +3171,11 @@
     #composerProfileLabel,
     #composerWorkspaceLabel,
     #composerModelLabel,
-    #composerReasoningLabel{display:none;}
+    #composerReasoningLabel,
+    #composerChatModeLabel{display:none;}
     .composer-profile-chip,
     .composer-model-chip,
+    .composer-chat-mode-chip,
     .composer-reasoning-chip{box-sizing:border-box;width:44px;height:44px;max-width:44px;min-width:44px;min-height:44px;padding:0;justify-content:center;gap:0;font-size:11px;}
     .composer-workspace-group{box-sizing:border-box;flex:0 0 44px;width:44px;min-width:44px;max-width:44px;min-height:44px;overflow:hidden;border:none;background:transparent;border-radius:8px;}
     .composer-workspace-files-btn{box-sizing:border-box;width:44px;min-width:44px;max-width:44px;padding:0;border-radius:8px;}
@@ -4937,8 +4956,9 @@ main.main > #mainProfiles,
 main.main > #mainInsights,
 main.main > #mainLogs,
 main.main > #mainGovernance,
+main.main > #mainProjects,
 main.main > #mainIntegrations{display:none;}
-main.main:not(.showing-settings):not(.showing-skills):not(.showing-memory):not(.showing-tasks):not(.showing-kanban):not(.showing-workspaces):not(.showing-profiles):not(.showing-insights):not(.showing-logs):not(.showing-governance):not(.showing-integrations):not(.showing-plugin) > #mainChat{display:flex;}
+main.main:not(.showing-settings):not(.showing-skills):not(.showing-memory):not(.showing-tasks):not(.showing-kanban):not(.showing-workspaces):not(.showing-profiles):not(.showing-insights):not(.showing-logs):not(.showing-governance):not(.showing-integrations):not(.showing-projects):not(.showing-plugin) > #mainChat{display:flex;}
 main.main.showing-settings > #mainSettings{display:flex;overflow-y:auto;}
 main.main.showing-skills > #mainSkills{display:flex;}
 main.main.showing-memory > #mainMemory{display:flex;}
@@ -4949,6 +4969,7 @@ main.main.showing-profiles > #mainProfiles{display:flex;}
 main.main.showing-logs > #mainLogs{display:flex;}
 main.main.showing-governance > #mainGovernance{display:flex;}
 main.main.showing-integrations > #mainIntegrations{display:flex;}
+main.main.showing-projects > #mainProjects{display:flex;overflow-y:auto;}
 main.main.showing-plugin > #mainPlugin{display:flex;}
 main.main > #mainPlugin{display:none;}
 #mainPlugin .main-view-body{flex:1;display:flex;flex-direction:column;overflow:hidden;}
@@ -6646,6 +6667,30 @@ main.main > .main-view:not([id="mainChat"]):not([id="mainSettings"]) .main-view-
 .html-preview-fallback{padding:8px;font-size:13px;}
 .html-preview-spinner{animation:pulse 1.5s ease-in-out infinite;}
 
+/* ── Projects hub (ticket 12) ─────────────────────────────────────────────── */
+/* Every row carries a provenance chip and, when a source is empty, the
+   server's own reason for it: the panel must never look fuller than the
+   system actually is. */
+.proj-row{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);margin-bottom:6px;cursor:pointer;min-width:0;}
+.proj-row:hover{border-color:var(--accent);}
+.proj-row.active{border-color:var(--accent);background:var(--surface);}
+.proj-dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto;background:var(--muted);}
+.proj-row-main{flex:1;min-width:0;}
+.proj-row-name{font-size:12px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.proj-row-meta{font-size:11px;color:var(--muted);margin-top:2px;}
+.proj-card{background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:16px;}
+.proj-card-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.proj-item{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;color:var(--text);min-width:0;}
+.proj-item:last-child{border-bottom:none;}
+.proj-item-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.proj-chip{font-size:10px;color:var(--muted);border:1px solid var(--border);border-radius:999px;padding:1px 7px;white-space:nowrap;flex:0 0 auto;text-transform:uppercase;letter-spacing:.05em;}
+.proj-empty{font-size:12px;color:var(--muted);padding:8px 0;}
+.proj-state{font-size:11px;color:var(--muted);}
+.proj-integration{padding:10px 0;border-bottom:1px solid var(--border);}
+.proj-integration:last-child{border-bottom:none;}
+.proj-integration-head{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--text);}
+.proj-integration-seam{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;}
+
 /* ── Insights panel (#464) ────────────────────────────────────────────────── */
 main.main.showing-insights > #mainInsights{display:flex;overflow-y:auto;}
 .insights-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px;}
@@ -7625,6 +7670,34 @@ html,body{background:var(--bg)!important;color:var(--text);font-family:var(--fon
 /* Governance approvals: the user request behind an access request */
 .gov-trigger{margin-top:5px;padding:5px 8px;border-left:2px solid var(--accent);background:var(--surface-subtle);border-radius:0 6px 6px 0;font-size:11.5px;line-height:1.5;color:var(--text);max-width:46ch;overflow:hidden;text-overflow:ellipsis;}
 .gov-trigger-label{color:var(--muted);font-weight:600;}
+/* Governance approvals: the capability and risk detail behind a request */
+.gov-explain{margin-top:6px;}
+.gov-explain>summary{cursor:pointer;list-style:none;font-size:11.5px;color:var(--muted);display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+.gov-explain>summary::-webkit-details-marker{display:none;}
+.gov-explain[open]>summary{color:var(--text);}
+.gov-explain-toggle{font-weight:600;text-decoration:underline dotted;}
+.gov-explain-body{margin-top:6px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface-subtle);font-size:11.5px;line-height:1.55;max-width:64ch;}
+.gov-explain-row{display:flex;gap:8px;padding:2px 0;}
+.gov-explain-key{color:var(--muted);font-weight:600;min-width:13ch;flex:0 0 auto;}
+.gov-explain-val{color:var(--text);word-break:break-word;}
+.gov-risk{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;border-radius:5px;padding:1px 6px;border:1px solid var(--border2);color:var(--muted);}
+.gov-risk-external_comms,.gov-risk-financial{border-color:rgba(245,158,11,.45);color:var(--warning);}
+
+/* Governance > Approvals: related access for one request (ticket 10). Each
+   item is decided on its own, so every row carries its own actions and its own
+   status; the confirmed and the possible blocks stay visually separate. */
+.gov-sug-toggle{margin-top:6px;font-size:11.5px;}
+.gov-sug-cell{background:var(--surface-subtle);padding:10px 12px;}
+.gov-sug-note{font-size:11.5px;color:var(--muted);margin-bottom:8px;}
+.gov-sug-block{margin-bottom:10px;}
+.gov-sug-head{display:flex;gap:6px;align-items:center;font-size:11.5px;font-weight:600;color:var(--text);margin-bottom:6px;}
+.gov-sug-item{border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:6px;background:var(--surface);display:flex;flex-direction:column;gap:4px;}
+.gov-sug-item.is-decided{opacity:.62;}
+.gov-sug-label{font-size:12.5px;color:var(--text);font-weight:600;word-break:break-word;}
+.gov-sug-why{font-size:11.5px;line-height:1.55;color:var(--text);max-width:64ch;}
+.gov-sug-evidence{font-size:11px;line-height:1.5;color:var(--muted);}
+.gov-sug-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px;}
+.gov-sug-info{font-size:11px;color:var(--muted);font-style:italic;}
 
 /* Settings > System: upstream capacity alerts (administrators only) */
 .capacity-config-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;}

@@ -48,11 +48,54 @@ _GRANT_TARGETS = {
     # user's routes allowlist; the permission layer still applies, so a route
     # grant alone never confers an admin capability.
     "route": ("routes", ()),
+    # A governance permission the caller will be stopped by next. Only the
+    # names in GRANTABLE_PERMISSIONS are ever applied here; see that list for
+    # why this is an allowlist and not the route guard's denylist.
+    "permission": ("permissions", ()),
     # A secret-bearing path a governed user was blocked from by a denied glob.
     # Approving adds the exact path to files.allow_globs, a per-person exception
     # that overrides denied_globs for that one path (see the engine tool_policy).
     "secret_glob": ("files", ("allow_globs",)),
 }
+
+# The ONLY permissions a one-click decision may ever write into a policy.
+#
+# Added 28 Aug 2026 with the related-suggestion review detail (ticket 10). The
+# obvious guard was to reuse _route_is_requestable's shape below (refuse
+# governance:* and *:admin) but that predicate is safe only BECAUSE the
+# permission wall still stands behind a route grant. Handing out the permission
+# itself removes that wall, and two names slip straight through a denylist of
+# that shape: terminal:use is the RCE surface the catalog deliberately split off
+# chat:use, and config:write is a body-sink permission (api/settings_scope.py)
+# that /api/settings admits at config:read, so granting it opens every settings
+# write with no second wall left at all.
+#
+# So this is an allowlist, and it holds read-shaped permissions only. Anything
+# that writes, restarts, schedules or executes is reported to the administrator
+# as information ("this is also needed") and has to be granted by editing the
+# access rules, where the whole entry is in view.
+GRANTABLE_PERMISSIONS = frozenset({
+    "analytics:read",
+    "config:read",
+    "cron:read",
+    "dashboard:read",
+    "files:read",
+    "gateway:read",
+    "git:read",
+    "integrations:read",
+    "kanban:read",
+    "logs:read",
+    "mcp:read",
+    "memory:read",
+    "model:read",
+    "plugins:read",
+    "profiles:read",
+    "sessions:read",
+    "skills:read",
+    "status:read",
+    "system:read",
+    "todos:read",
+})
 
 
 def _load_spool() -> dict:
@@ -80,7 +123,34 @@ def _request_label(item: dict) -> str:
         "route": "API route",
         "secret_glob": "Secret file access",
     }
+    if gkind == "permission":
+        # The requester sees this label in Settings > Access requests, where a
+        # permission slug means nothing. Use the plain sentence the approvals
+        # screen already shows for that permission, and fall back to the bare
+        # kind rather than putting the slug in front of an end user.
+        try:
+            from api.capability_risk import PERMISSION_RISKS
+
+            capability = str((PERMISSION_RISKS.get(value) or {}).get("capability") or "").strip()
+        except Exception:
+            capability = ""
+        return f"Access: {capability}" if capability else "Access"
     return f"{labels.get(gkind, gkind)}: {value}"
+
+
+def _permission_is_grantable(permission: str) -> bool:
+    """Whether a permission may be written by a one-click approval at all.
+
+    Deliberately an allowlist (GRANTABLE_PERMISSIONS). Enforced HERE, not only
+    in the surface that offers the suggestion, so a hand-crafted POST naming
+    terminal:use or config:write cannot reach the policy through this path.
+    """
+    name = str(permission or "").strip()
+    if not name or name not in GRANTABLE_PERMISSIONS:
+        return False
+    # Belt and braces: the two shapes _route_is_requestable already refuses can
+    # never be in the allowlist, and must stay refused if one is ever added.
+    return not (name.startswith("governance:") or name.endswith(":admin"))
 
 
 def _route_is_requestable(path: str, method: str) -> bool:
@@ -191,6 +261,76 @@ def _notify_admins_of_request(entry: dict) -> bool:
         return False
 
 
+def materialise_suggested_grant(
+    email: str,
+    gkind: str,
+    value: str,
+    *,
+    origin_key: str = "",
+    confidence: str = "",
+    signal: str = "",
+) -> str | None:
+    """Turn an approved related suggestion into a real pending grant row.
+
+    Returns the spool-shaped key (``email|gkind|value``, WITHOUT the registry's
+    ``grant:`` prefix) so the caller can hand it straight to the ordinary grant
+    decision handler, which owns the policy write, the audit and the sync. None
+    means the same item was already decided and must not be applied twice.
+
+    Writes the registry directly under the registry lock, exactly as
+    ingest_spool does, instead of going through approvals.request(). That is on
+    purpose: request() enforces two anti-flood bounds (a per-owner pending cap
+    and a global entry cap) which exist to stop a user burying the admin queue
+    in self-service asks. Neither should be able to make an ADMINISTRATOR
+    unable to act on a review they already have open. Do not "simplify" this
+    back into request().
+    """
+    from api import approvals
+
+    email = str(email or "").strip().lower()
+    gkind = str(gkind or "").strip()
+    value = str(value or "").strip()
+    if not email or not value or gkind not in _GRANT_TARGETS:
+        return None
+    if gkind == "permission" and not _permission_is_grantable(value):
+        return None
+    skey = f"{email}|{gkind}|{value}"
+    rk = f"{approvals.KIND_GRANT}:{skey}"
+    with approvals._REGISTRY_LOCK:
+        registry = approvals.load()
+        entry = registry.get(rk)
+        if entry is not None:
+            return skey if str(entry.get("status") or "pending") == "pending" else None
+        registry[rk] = {
+            "kind": approvals.KIND_GRANT,
+            "key": skey,
+            "label": _request_label({"gkind": gkind, "value": value}),
+            "owner_email": email,
+            "status": "pending",
+            "requested_at": time.time(),
+            "payload": {
+                "email": email,
+                "gkind": gkind,
+                "value": value,
+                # Not a denial the person hit: an administrator added it while
+                # reviewing a request of theirs. The reason says so rather than
+                # borrowing a denial name the engine never wrote.
+                "reason": "suggested_dependency",
+                "tool": "",
+                "detail": "",
+                "trigger": "",
+                "count": 1,
+                "origin_key": str(origin_key or ""),
+                "confidence": str(confidence or ""),
+                "signal": str(signal or ""),
+            },
+        }
+        approvals.save(registry)
+    # No _notify_admins_of_request here: an administrator is looking at this
+    # queue right now, which is where the row came from.
+    return skey
+
+
 def ingest_spool() -> int:
     """Sync the denial spool into the approvals registry. Returns how many
     pending grant rows exist afterwards. Never raises."""
@@ -279,6 +419,10 @@ def apply_grant_to_policy(raw: dict, payload: dict) -> tuple[str, str] | None:
     value = str(payload.get("value") or "")
     target = _GRANT_TARGETS.get(gkind)
     if not email or not value or target is None:
+        return None
+    if gkind == "permission" and not _permission_is_grantable(value):
+        # The last gate before the policy document. A permission outside the
+        # allowlist is refused here even when something upstream offered it.
         return None
     section, subkeys = target
     users = raw.setdefault("users", {})

@@ -784,8 +784,22 @@ def _skill_key_parts(key) -> tuple | None:
     return category, name
 
 
-def _audit_approval(subject: GovernanceSubject, mode: str, parsed, *, op: str, key: str, owner: str) -> None:
-    """Audit an approval decision; a broken audit sink never undoes it."""
+def _audit_approval(
+    subject: GovernanceSubject, mode: str, parsed, *, op: str, key: str, owner: str,
+    digest: dict | None = None, origin: str = "", confidence: str = "", signal: str = "",
+) -> None:
+    """Audit an approval decision; a broken audit sink never undoes it.
+
+    ``digest`` is the risk summary the approvals screen showed for this row
+    (28 Aug 2026 ticket): recording it is what makes "we explained it" checkable
+    afterwards instead of a claim about a screen nobody kept.
+
+    ``origin``, ``confidence`` and ``signal`` describe a decision taken on a
+    RELATED suggestion (ticket 10): which request it was proposed next to,
+    whether it was a confirmed dependency or a guess, and which rule produced
+    it. Without them the trail cannot answer why a grant nobody asked for
+    exists.
+    """
     try:
         append_audit_event(
             "approval_decision",
@@ -795,19 +809,56 @@ def _audit_approval(subject: GovernanceSubject, mode: str, parsed, *, op: str, k
             method="POST",
             reason=op,
             mode=mode,
-            extra={"op": op, "target": key, "key": key, "owner": owner},
+            extra={
+                "op": op, "target": key, "key": key, "owner": owner,
+                **(digest or {}),
+                **({"origin": origin} if origin else {}),
+                **({"confidence": confidence} if confidence else {}),
+                **({"signal": signal} if signal else {}),
+            },
         )
     except Exception:
         return
 
 
-def _approval_row(entry: dict) -> dict:
+def _approval_digest(entry) -> dict:
+    """The risk digest for one registry row; {} when it cannot be composed.
+
+    The digest carries flags, scope and policy paths only, never quoted text,
+    so the skill description is not composed for it.
+    """
+    try:
+        from api import capability_risk
+
+        return capability_risk.risk_digest(
+            capability_risk.explain_entry(entry, skill_detail=False)
+        )
+    except Exception:
+        return {}
+
+
+def _may_read_skills(access) -> bool:
+    """Whether the caller holds skills:read, for the skill text in a detail view."""
+    try:
+        return bool(access is not None and access.has_permission("skills:read"))
+    except Exception:
+        return False
+
+
+def _approval_row(entry: dict, *, explain: bool = False, access=None) -> dict:
     """Serialize a registry entry for the approvals API.
 
     The four fields the skills UI already binds to (key, name, category,
     owner_email, added_at) keep their exact meaning and position; kind,
     label, status, requested_at and payload are added on top so a client can
     render the other install kinds without a second endpoint.
+
+    ``explain`` adds the reviewer-facing capability and risk detail (28 Aug
+    2026 ticket) and is passed by the admin queue only: the copy is written for
+    somebody deciding on another person's request, and /approvals/mine is
+    reachable by every authenticated caller. ``access`` is the caller's
+    effective access, used to keep the skill text in that detail behind the
+    same skills:read it needs anywhere else.
     """
     from api import approvals
 
@@ -819,7 +870,7 @@ def _approval_row(entry: dict) -> dict:
     else:
         category, name = None, str(entry.get("label") or "").strip() or key
     payload = entry.get("payload")
-    return {
+    row = {
         "kind": kind,
         "key": key,
         "name": name,
@@ -834,6 +885,18 @@ def _approval_row(entry: dict) -> dict:
         "reason": entry.get("reason"),
         "payload": payload if isinstance(payload, dict) else {},
     }
+    if explain:
+        # A gap in the metadata must never stop the queue rendering, so the
+        # row degrades to no detail block instead of no queue.
+        try:
+            from api import capability_risk
+
+            row["explanation"] = capability_risk.explain_entry(
+                entry, skill_detail=_may_read_skills(access)
+            )
+        except Exception:
+            row["explanation"] = {}
+    return row
 
 
 def _approval_kinds_param(parsed) -> tuple | None:
@@ -862,9 +925,167 @@ def _handle_approvals_get(handler, parsed, policy, subject, access) -> bool:
 
     grant_requests.ingest_spool()
     kinds = _approval_kinds_param(parsed)
-    pending = [_approval_row(entry) for entry in approvals.list_pending(kinds=kinds)]
+    pending = [
+        _approval_row(entry, explain=True, access=access)
+        for entry in approvals.list_pending(kinds=kinds)
+    ]
     j(handler, {"pending": pending})
     return True
+
+
+def _handle_approvals_suggestions(handler, parsed, policy, subject, access) -> bool:
+    """Related access proposals for one pending request (ticket 10).
+
+    Administrator-gated like the queue it expands: the list names capabilities
+    another person does not have, which is administrator information. Reading
+    it grants nothing and writes nothing to the policy.
+    """
+    if not _require_governance_admin(handler, access, subject, policy):
+        return True
+    from api import approvals
+    from api.governance import suggestions
+
+    key = str((parse_qs(parsed.query or "").get("key") or [""])[0]).strip()
+    if not key:
+        j(handler, {"error": "invalid_payload", "message": "key is required"}, status=400)
+        return True
+    entry = approvals.get(approvals.KIND_GRANT, key)
+    if entry is None:
+        j(handler, {"error": "not_found", "message": f"unknown grant request: {key}"}, status=404)
+        return True
+    rows = suggestions.apply_decisions(
+        suggestions.suggestions_for(entry, policy), suggestions.load_decisions()
+    )
+    j(
+        handler,
+        {
+            "key": key,
+            "request": _approval_row(entry, explain=True, access=access),
+            "suggestions": rows,
+            "confirmed": sum(1 for r in rows if r["confidence"] == suggestions.CONFIRMED),
+            "heuristic": sum(1 for r in rows if r["confidence"] == suggestions.HEURISTIC),
+        },
+    )
+    return True
+
+
+def _handle_suggestion_decide(handler, parsed, policy, subject, access) -> bool:
+    """Approve, deny or ignore ONE related suggestion (ticket 10).
+
+    Every decision stands alone: there is no approve-all and no chain
+    transaction, because a bundled decision is exactly what the review detail
+    is supposed to replace.
+
+    Approve delegates to the ordinary access-request handler, so the policy
+    write, its lock, the policy_change audit, the profile sync and the registry
+    row are the existing ones and not a second writer. Deny and ignore never
+    touch the policy: they are recorded in the suggestion decision store, which
+    keeps a guess from pre-empting a genuine request the person has not filed
+    yet.
+    """
+    if not _require_governance_admin(handler, access, subject, policy):
+        return True
+    body = _read_json(handler)
+    if body is None:
+        return True
+    from api import approvals, grant_requests
+    from api.governance import suggestions
+
+    origin_key = str(body.get("origin_key") or "").strip()
+    gkind = str(body.get("gkind") or "").strip()
+    value = str(body.get("value") or "").strip()
+    decision = str(body.get("decision") or "").strip().lower()
+    reason = str(body.get("reason") or "").strip()
+    if not origin_key or not gkind or not value or decision not in ("approve", "deny", "ignore"):
+        j(
+            handler,
+            {"error": "invalid_payload",
+             "message": "origin_key, gkind, value and decision (approve|deny|ignore) required"},
+            status=400,
+        )
+        return True
+
+    entry = approvals.get(approvals.KIND_GRANT, origin_key)
+    if entry is None:
+        j(handler, {"error": "not_found", "message": f"unknown grant request: {origin_key}"}, status=404)
+        return True
+    if decision == "approve" and str(entry.get("status") or "pending") != "pending":
+        # Dependencies of a request that was already refused must not be
+        # applied: that would widen access for an ask somebody said no to.
+        j(
+            handler,
+            {"error": "invalid_payload",
+             "message": "the request this came from was already decided"},
+            status=409,
+        )
+        return True
+
+    # Authorise against what the engine derives, never against the posted pair.
+    # The re-derivation also re-applies the visibility and allowlist rules, so a
+    # hand-crafted body cannot name a capability this surface never offers.
+    suggestion = suggestions.find_suggestion(entry, policy, gkind, value)
+    if suggestion is None:
+        j(
+            handler,
+            {"error": "not_found",
+             "message": "that is not a suggestion for this request"},
+            status=404,
+        )
+        return True
+
+    owner = str(entry.get("owner_email") or "").strip().lower()
+    if decision != "approve":
+        status = suggestions.STATUS_DENIED if decision == "deny" else suggestions.STATUS_IGNORED
+        suggestions.record_decision(
+            origin_key, gkind, value, status=status,
+            decided_by=subject.normalized_email or str(subject.email or "").strip().lower(),
+            reason=reason, confidence=suggestion["confidence"], signal=suggestion["signal"],
+        )
+        _audit_approval(
+            subject, policy.mode, parsed, op=f"suggestion.{decision}",
+            key=f"{gkind}:{value}", owner=owner, origin=origin_key,
+            confidence=suggestion["confidence"], signal=suggestion["signal"],
+        )
+        j(handler, {"ok": True, "gkind": gkind, "value": value, "status": status})
+        return True
+
+    if not suggestion["actionable"]:
+        # The security line of this feature: a suggestion an administrator may
+        # only be told about never becomes a button that grants it.
+        j(
+            handler,
+            {"error": "forbidden",
+             "message": "this one cannot be granted here; change it in the access rules"},
+            status=403,
+        )
+        return True
+
+    key = grant_requests.materialise_suggested_grant(
+        owner, gkind, value, origin_key=origin_key,
+        confidence=suggestion["confidence"], signal=suggestion["signal"],
+    )
+    if key is None:
+        j(handler, {"error": "invalid_payload", "message": "this access was already decided"}, status=409)
+        return True
+    suggestions.record_decision(
+        origin_key, gkind, value, status=suggestions.STATUS_APPROVED,
+        decided_by=subject.normalized_email or str(subject.email or "").strip().lower(),
+        reason=reason, confidence=suggestion["confidence"], signal=suggestion["signal"],
+    )
+    # Audited before the delegation, which writes its own policy_change and its
+    # own approvals.approve row. This event is the one that says WHICH request
+    # the grant was suggested next to and on what evidence; the delegation
+    # cannot carry it, and a failed delegation leaving the intent on record is
+    # the honest outcome.
+    _audit_approval(
+        subject, policy.mode, parsed, op="suggestion.approve",
+        key=f"{gkind}:{value}", owner=owner, origin=origin_key,
+        confidence=suggestion["confidence"], signal=suggestion["signal"],
+    )
+    return _handle_grant_request_decide(
+        handler, parsed, policy, subject,
+        {"key": key, "decision": "approve", "reason": reason or "approved with a related request"},
+    )
 
 
 def _handle_approvals_mine(handler, parsed, policy, subject, access) -> bool:
@@ -976,7 +1197,10 @@ def _handle_approvals_decide_generic(handler, parsed, policy, subject, body, kin
             logger.warning("Approved integration %s but enabling it in Nango failed", key, exc_info=True)
 
     op = "approvals.approve" if decision == "approve" else "approvals.reject"
-    _audit_approval(subject, policy.mode, parsed, op=op, key=f"{kind}:{key}", owner=owner)
+    _audit_approval(
+        subject, policy.mode, parsed, op=op, key=f"{kind}:{key}", owner=owner,
+        digest=_approval_digest(entry),
+    )
     j(
         handler,
         {
@@ -1055,6 +1279,8 @@ def _handle_grant_request_decide(handler, parsed, policy, subject, body) -> bool
         return True
     decided_by = subject.normalized_email or str(subject.email or "").strip().lower()
     payload = entry.get("payload") if isinstance(entry.get("payload"), dict) else {}
+    # Composed before the decision, from the row the approver was looking at.
+    digest = _approval_digest(entry)
 
     if decision == "approve":
         with policy_mutation_lock():
@@ -1095,6 +1321,18 @@ def _handle_grant_request_decide(handler, parsed, policy, subject, body) -> bool
     except (ValueError, KeyError) as exc:
         j(handler, {"error": "invalid_payload", "message": str(exc)}, status=400)
         return True
+    # Access requests are the bulk of this queue and used to leave no
+    # approval_decision behind at all: approving wrote a policy_change and
+    # rejecting wrote nothing, so the risk detail the approver was shown was
+    # recorded nowhere. Both decisions are audited here like every other kind
+    # (28 Aug 2026 ticket); the policy_change event on approve is unchanged.
+    _audit_approval(
+        subject, policy.mode, parsed,
+        op="approvals.approve" if decision == "approve" else "approvals.reject",
+        key=f"{approvals.KIND_GRANT}:{key}",
+        owner=str(payload.get("email") or entry.get("owner_email") or "").strip().lower(),
+        digest=digest,
+    )
     j(handler, {"ok": True, "kind": approvals.KIND_GRANT, "key": key, "status": str(updated.get("status") or decision)})
     return True
 
@@ -1152,10 +1390,16 @@ def _handle_approvals_decide(handler, parsed, policy, subject, access) -> bool:
         j(handler, {"error": "not_found", "message": f"unknown skill approval: {key}"}, status=404)
         return True
     owner = str(entry.get("owner_email") or "").strip().lower()
+    # Composed before the reject branch deletes the skill: the digest describes
+    # the row as it was shown, and the row is gone once the skill is.
+    digest = _approval_digest(approvals.get(approvals.KIND_SKILL, key))
 
     if decision == "approve":
         skill_ownership.set_status(key, skill_ownership.STATUS_APPROVED)
-        _audit_approval(subject, policy.mode, parsed, op="approvals.approve", key=key, owner=owner)
+        _audit_approval(
+            subject, policy.mode, parsed, op="approvals.approve", key=key, owner=owner,
+            digest=digest,
+        )
         j(handler, {"ok": True, "key": key, "status": skill_ownership.STATUS_APPROVED})
         return True
 
@@ -1194,7 +1438,10 @@ def _handle_approvals_decide(handler, parsed, policy, subject, access) -> bool:
         api_routes._SKILLS_STATS_CACHE.clear()
     except Exception:
         pass
-    _audit_approval(subject, policy.mode, parsed, op="approvals.reject", key=key, owner=owner)
+    _audit_approval(
+        subject, policy.mode, parsed, op="approvals.reject", key=key, owner=owner,
+        digest=digest,
+    )
     j(handler, {"ok": True, "key": key, "removed": removed})
     return True
 
@@ -1210,6 +1457,10 @@ _GET_ROUTES = {
     "/api/governance/usage": _handle_usage_get,
     "/api/governance/approvals": _handle_approvals_get,
     "/api/governance/approvals/mine": _handle_approvals_mine,
+    # No catalog entry needed: the /api/governance prefix rule already scores
+    # this GET as governance:read and the POST below as governance:write, and
+    # the handler re-checks governance:write itself.
+    "/api/governance/approvals/suggestions": _handle_approvals_suggestions,
 }
 
 _POST_ROUTES = {
@@ -1224,6 +1475,7 @@ _POST_ROUTES = {
     "/api/governance/users/delete": _handle_user_delete,
     "/api/governance/approvals/decide": _handle_approvals_decide,
     "/api/governance/approvals/revoke": _handle_approvals_revoke,
+    "/api/governance/approvals/suggestions/decide": _handle_suggestion_decide,
 }
 
 

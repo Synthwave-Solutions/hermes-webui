@@ -42,9 +42,9 @@ let _logsSeverityFilter = 'all';
 const APP_TITLEBAR_KEYS = {
   chat: 'tab_chat', tasks: 'tab_tasks', skills: 'tab_skills',
   memory: 'tab_memory', workspaces: 'tab_workspaces',
-  profiles: 'tab_profiles', todos: 'tab_todos', insights: 'tab_insights', logs: 'tab_logs', governance: 'tab_governance', integrations: 'tab_integrations', settings: 'tab_settings',
+  profiles: 'tab_profiles', todos: 'tab_todos', insights: 'tab_insights', logs: 'tab_logs', governance: 'tab_governance', integrations: 'tab_integrations', projects: 'tab_projects', settings: 'tab_settings',
 };
-const MAIN_VIEW_PANELS = ['settings','skills','memory','tasks','kanban','workspaces','profiles','insights','logs','governance','integrations','plugin'];
+const MAIN_VIEW_PANELS = ['settings','skills','memory','tasks','kanban','workspaces','profiles','insights','logs','governance','integrations','projects','plugin'];
 const MAIN_VIEW_SIDEBAR_PANEL_FALLBACKS = { plugin: 'settings' };
 
 /**
@@ -425,6 +425,7 @@ async function switchPanel(name, opts = {}) {
   // callers (server enforces regardless), so fall back to the chat panel.
   if (nextPanel === 'governance' && !(await loadGovernance())) return switchPanel('chat');
   if (nextPanel === 'integrations') await loadIntegrations();
+  if (nextPanel === 'projects') await loadProjectsHub();
   _syncLogsAutoRefresh();
   if (typeof _syncSystemHealthMonitorVisibility === 'function') _syncSystemHealthMonitorVisibility();
   if (nextPanel === 'settings') {
@@ -6377,7 +6378,7 @@ async function promptWorkspacePath(){
       // System-minted session (#6022): worktree:false is explicit so a config
       // worktree default can't leak a worktree from a workspace prompt.
       const r=await api('/api/session/new',{method:'POST',body:JSON.stringify({workspace:ws,worktree:false})});
-      if(r&&r.session){S._pendingSessionToolsets=null;S.session=r.session;S.messages=[];if(typeof syncTopbar==='function')syncTopbar();if(typeof renderMessages==='function')renderMessages();if(typeof renderSessionList==='function')await renderSessionList();}
+      if(r&&r.session){S._pendingSessionToolsets=null;S._pendingChatMode=null;S.session=r.session;S.messages=[];if(typeof syncTopbar==='function')syncTopbar();if(typeof renderMessages==='function')renderMessages();if(typeof renderSessionList==='function')await renderSessionList();}
     }catch(e){showToast(t('workspace_switch_failed')+e.message);return;}
     if(!S.session)return;
   }
@@ -6415,7 +6416,7 @@ async function switchToWorkspace(path,name){
       // System-minted session (#6022): explicit worktree:false — a workspace
       // switch from a blank page is not deliberate New Chat intent.
       const r=await api('/api/session/new',{method:'POST',body:JSON.stringify({workspace:ws,worktree:false})});
-      if(r&&r.session){S._pendingSessionToolsets=null;S.session=r.session;S.messages=[];if(typeof syncTopbar==='function')syncTopbar();if(typeof renderMessages==='function')renderMessages();if(typeof renderSessionList==='function')await renderSessionList();}
+      if(r&&r.session){S._pendingSessionToolsets=null;S._pendingChatMode=null;S.session=r.session;S.messages=[];if(typeof syncTopbar==='function')syncTopbar();if(typeof renderMessages==='function')renderMessages();if(typeof renderSessionList==='function')await renderSessionList();}
     }catch(e){if(typeof setStatus==='function')setStatus(t('switch_failed')+e.message);return;}
     if(!S.session)return;
   }
@@ -6483,6 +6484,7 @@ async function switchToWorkspace(path,name){
     // Clear the one-shot flag so a subsequent newSession() inherits this choice instead.
     S._profileSwitchWorkspace=null;
     S._pendingSessionToolsets=null;
+    S._pendingChatMode=null;
     syncTopbar();
     if(
       restoreComposerFocusTarget&&
@@ -7002,6 +7004,7 @@ async function switchToProfile(name) {
   // nothing. (#4662 Opus gate)
   if (name && name === S.activeProfile) return true;
   S._pendingSessionToolsets=null;
+  S._pendingChatMode=null;
   // Profile switches are per-client cookie/TLS scoped, so a running stream in
   // the current session can safely continue while this tab moves to another
   // profile. The in-flight session stays attached to its original profile.

@@ -6,6 +6,7 @@ branching a session, preventing data loss scenarios like:
   - context_messages not carried → agent sees different context
   - gateway_routing not carried → routing customization lost
   - enabled_toolsets not carried → toolset override lost
+  - chat_mode not carried → the conversation silently reverts to super agent
   - context_engine_state not carried → context engine state lost
 
 These are static-analysis tests (source inspection) matching the
@@ -130,6 +131,14 @@ def test_duplicate_copies_enabled_toolsets():
     ctor = _find_session_ctor(block)
     assert _has_field(ctor, 'enabled_toolsets'), \
         "Duplicate must copy enabled_toolsets"
+
+
+def test_duplicate_copies_chat_mode():
+    """Per-conversation chat mode must survive duplication."""
+    block, _ = _extract_duplicate_block()
+    ctor = _find_session_ctor(block)
+    assert _has_field(ctor, 'chat_mode'), \
+        "Duplicate must copy chat_mode"
 
 
 def test_duplicate_copies_llm_title_generated():
@@ -359,6 +368,14 @@ def test_branch_copies_enabled_toolsets():
     ctor = _find_session_ctor(block, 'branch')
     assert _has_field(ctor, 'enabled_toolsets'), \
         "Branch must copy enabled_toolsets"
+
+
+def test_branch_copies_chat_mode():
+    """Branch must inherit the conversation's chat mode from source."""
+    block, _ = _extract_branch_block()
+    ctor = _find_session_ctor(block, 'branch')
+    assert _has_field(ctor, 'chat_mode'), \
+        "Branch must copy chat_mode"
 
 
 def test_branch_copies_context_messages():

@@ -20,6 +20,7 @@ from api.config import (
     SESSION_DIR, SESSION_INDEX_FILE, SESSIONS, SESSIONS_MAX,
     LOCK, STREAMS, STREAMS_LOCK, DEFAULT_WORKSPACE, DEFAULT_MODEL, PROJECTS_FILE, HOME,
     get_effective_default_model, _get_session_agent_lock,
+    normalize_chat_mode,
 )
 from api.workspace import get_last_workspace
 from api.usage import prompt_cache_hit_percent
@@ -1079,6 +1080,7 @@ class Session:
                  worktree_repo_root=None,
                  worktree_created_at=None,
                  enabled_toolsets=None,
+                 chat_mode=None,
                  composer_draft=None,
                  anchor_activity_scenes=None,
                  **kwargs):
@@ -1140,6 +1142,11 @@ class Session:
         self.source_label = kwargs.get('source_label')
         self.read_only = bool(kwargs.get('read_only', False))
         self.enabled_toolsets = enabled_toolsets  # List[str] or None — per-session toolset override
+        # Conversation chat mode (Michael Ramirez, 28 Aug 2026): 'super' (today's
+        # full surface, the default) or 'normal' (narrowed for speed). Stored
+        # normalized, never None, so every row answers the question and a reload
+        # never has to guess what the user picked.
+        self.chat_mode = normalize_chat_mode(chat_mode)
         self.composer_draft = composer_draft if isinstance(composer_draft, dict) else {}
         self.anchor_activity_scenes = anchor_activity_scenes if isinstance(anchor_activity_scenes, dict) else {}
         raw_message_count = kwargs.get('message_count')
@@ -1211,7 +1218,7 @@ class Session:
             'parent_session_id',
             'worktree_path', 'worktree_branch', 'worktree_repo_root', 'worktree_created_at',
             'is_cli_session', 'source_tag', 'raw_source', 'session_source', 'source_label', 'read_only',
-            'enabled_toolsets', 'composer_draft', 'anchor_activity_scenes',
+            'enabled_toolsets', 'chat_mode', 'composer_draft', 'anchor_activity_scenes',
         ]
         meta = {k: getattr(self, k, None) for k in METADATA_FIELDS}
         meta['message_count'] = len(self.messages or [])
@@ -1483,6 +1490,7 @@ class Session:
             'source_label': self.source_label,
             'read_only': self.read_only,
             'enabled_toolsets': self.enabled_toolsets,
+            'chat_mode': self.chat_mode,
             'composer_draft': self.composer_draft if isinstance(self.composer_draft, dict) else {},
             'is_streaming': _is_streaming_session(
                 self.active_stream_id, active_stream_ids
@@ -3353,7 +3361,7 @@ def _profile_default_model_state(profile=None):
     return default_model or get_effective_default_model(), default_provider
 
 
-def new_session(workspace=None, model=None, profile=None, model_provider=None, project_id=None, worktree_info=None, enabled_toolsets=None):
+def new_session(workspace=None, model=None, profile=None, model_provider=None, project_id=None, worktree_info=None, enabled_toolsets=None, chat_mode=None):
     """Create a new in-memory session.
 
     The session lives in the SESSIONS dict only — no disk write happens until
@@ -3407,6 +3415,7 @@ def new_session(workspace=None, model=None, profile=None, model_provider=None, p
         worktree_repo_root=wt.get('repo_root') if wt else None,
         worktree_created_at=wt.get('created_at') if wt else None,
         enabled_toolsets=enabled_toolsets,
+        chat_mode=chat_mode,
     )
     try:
         from api.ownership import resolve_new_owner

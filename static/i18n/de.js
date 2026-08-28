@@ -1048,6 +1048,7 @@ window.__registerHermesLocale('de', {
     composer_control_mobile_config: 'Mobile config',
     composer_control_quota_chip: 'Quota chip',
     composer_control_toolsets: 'Toolsets',
+    composer_control_chat_mode: 'Chat-Modus',
     composer_control_status: 'Status',
 
     workspace_drag_hint: 'Ziehen zum Neuordnen',
@@ -1175,6 +1176,14 @@ window.__registerHermesLocale('de', {
     session_toolsets_clear: 'Use defaults', // TODO: translate
     session_toolsets_applied: 'Toolsets updated', // TODO: translate
     session_toolsets_cleared: 'Using active profile defaults', // TODO: translate
+    // Conversation chat mode (Normal chat vs Super agent)
+    chat_mode: 'Chat-Modus',
+    chat_mode_super: 'Super-Agent',
+    chat_mode_normal: 'Normaler Chat',
+    chat_mode_super_title: 'Voller Zugriff auf Werkzeuge und Skills',
+    chat_mode_normal_title: 'Weniger Werkzeuge, schnellere Antworten',
+    chat_mode_switched: 'Chat-Modus gesetzt',
+    chat_mode_failed: 'Chat-Modus konnte nicht geändert werden: ',
     session_toolsets_failed: 'Failed to update toolsets: ', // TODO: translate
     session_time_unknown: 'Unbekannt',
     session_time_minutes_ago: (n) => `Vor ${n} Minuten`,

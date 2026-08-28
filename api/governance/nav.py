@@ -29,6 +29,11 @@ logger = logging.getLogger(__name__)
 PANEL_PERMISSIONS = {
     "tasks": "cron:read",
     "kanban": "kanban:read",
+    # Projects hub (ticket 12): every aggregated section inside the payload
+    # is re-gated by the permission its own route requires, so the panel
+    # itself deliberately carries the widest of the set, which is also what
+    # /api/projects and the hub route already need.
+    "projects": "sessions:read",
     "skills": "skills:read",
     "memory": "memory:read",
     "workspaces": "files:read",

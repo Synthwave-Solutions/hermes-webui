@@ -1234,21 +1234,103 @@ function _govKindChipClass(kind) {
   return '';
 }
 
-/** Compact one-line rendering of an approval payload (mcp command, provider, ...). */
-function _govPayloadSummary(payload) {
+// Denial reasons the engine spools (hermes_cli.dashboard_governance
+// .grant_requests._map_denial). The list exists so an unrecognised reason
+// renders as nothing at all rather than putting an internal slug on screen.
+const _GOV_DENIAL_REASONS = [
+  'cli_command_not_allowed', 'skill_not_allowed', 'cli_workdir_not_allowed',
+  'file_read_root_not_allowed', 'file_write_root_not_allowed', 'mcp_server_not_allowed',
+  'profile_not_allowed', 'workspace_not_allowed', 'tool_not_allowed',
+  'file_denied_glob', 'route_not_allowed',
+];
+
+function _govDenialReasonLabel(reason) {
+  return _GOV_DENIAL_REASONS.indexOf(String(reason || '')) === -1
+    ? '' : _govT('governance_reason_blocked', 'Stopped by the access rules');
+}
+
+/** Compact one-line rendering of an approval payload (address, provider, ...).
+ *
+ * Allowlisted per kind (28 Aug 2026 ticket). The previous version walked
+ * Object.keys(payload), so every field any producer ever added rendered itself
+ * on the approver's screen unreviewed: the MCP row showed the header name it
+ * needs and the profile it was requested under, neither of which helps a
+ * decision. Only fields written for a person to read are shown now. The MCP
+ * address is kept in full on purpose: two endpoints on one host are different
+ * services, and that is exactly what the approver is deciding about.
+ */
+function _govPayloadSummary(payload, kind) {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return '';
+  const trim = (v) => {
+    const text = String(v === null || v === undefined ? '' : v).trim();
+    return text.length > 120 ? text.slice(0, 117) + '...' : text;
+  };
   const parts = [];
-  Object.keys(payload).forEach(k => {
-    const v = payload[k];
-    if (v === null || v === undefined || v === '') return;
-    let text;
-    if (Array.isArray(v)) text = v.join(' ');
-    else if (typeof v === 'object') text = JSON.stringify(v);
-    else text = String(v);
-    if (text.length > 120) text = text.slice(0, 117) + '...';
-    parts.push(k + ': ' + text);
-  });
-  return parts.slice(0, 4).join(' | ');
+  if (kind === 'grant') {
+    parts.push(_govDenialReasonLabel(payload.reason));
+    const count = Number(payload.count);
+    if (Number.isFinite(count) && count > 1) {
+      const label = (typeof t === 'function') ? t('governance_blocked_times', count) : '';
+      parts.push(label && label !== 'governance_blocked_times' ? label : ('Blocked ' + count + ' times'));
+    }
+  } else if (kind === 'mcp') {
+    parts.push(trim(payload.url));
+    parts.push(trim(payload.description));
+  } else {
+    parts.push(trim(payload.description));
+  }
+  return parts.filter(Boolean).slice(0, 4).join(' | ');
+}
+
+function _govRiskLabel(id) {
+  switch (id) {
+    case 'external_comms': return _govT('governance_risk_external_comms', 'Sends messages outside this workstation');
+    case 'data_access': return _govT('governance_risk_data_access', 'Reads data belonging to people');
+    case 'file_write': return _govT('governance_risk_file_write', 'Creates or changes files');
+    case 'scheduling': return _govT('governance_risk_scheduling', 'Runs work on a schedule');
+    case 'financial': return _govT('governance_risk_financial', 'Can cause spend');
+    default: return '';
+  }
+}
+
+/** The capability and risk detail behind one approval (28 Aug 2026 ticket).
+ *
+ * Everything here comes from the server's permission metadata; nothing is
+ * derived in the browser. Every value is escaped, including inside the title
+ * attributes: a skill's description is written by whoever wrote the skill, and
+ * a skill author must never be able to put markup on an approver's screen.
+ */
+function _govExplainHtml(ex) {
+  const risks = Array.isArray(ex.risks) ? ex.risks : [];
+  const chips = risks.map(id => {
+    const label = _govRiskLabel(id);
+    if (!label) return '';
+    return '<span class="gov-risk gov-risk-' + _govEsc(id) + '" title="' + _govEsc(label) + '">'
+      + _govEsc(label) + '</span>';
+  }).join('');
+  const row = (label, value, sep) => {
+    const text = Array.isArray(value) ? value.filter(Boolean).join(sep || ' | ') : String(value || '');
+    if (!text) return '';
+    return '<div class="gov-explain-row"><span class="gov-explain-key">' + _govEsc(label)
+      + '</span><span class="gov-explain-val">' + _govEsc(text) + '</span></div>';
+  };
+  const body =
+    row(_govT('governance_explain_capability', 'Capability'), ex.capability)
+    + row(_govT('governance_explain_data', 'Data it can reach'), ex.data)
+    + row(_govT('governance_explain_tools', 'Tools'), ex.tools, ', ')
+    + row(_govT('governance_explain_systems', 'External systems'), ex.external_systems, ', ')
+    + row(_govT('governance_explain_permission', 'Permission still required'), ex.permissions, ', ')
+    + row(_govT('governance_explain_permission_notes', 'What that permission covers'), ex.permission_notes, ' ')
+    + row(_govT('governance_explain_scope', 'Applies to'), ex.scope_text)
+    + row(_govT('governance_explain_duration', 'Duration'), ex.duration)
+    + row(_govT('governance_explain_mitigations', 'Recommended mitigations'), ex.mitigations, ' ')
+    + row(_govT('governance_explain_alternatives', 'Narrower alternative'), ex.alternatives, ' ')
+    + row(_govT('governance_explain_dependencies', 'Also needed'), ex.dependencies, ' ')
+    + row(_govT('governance_explain_target', 'Policy entry changed'), ex.policy_target, ', ');
+  if (!body) return '';
+  return '<details class="gov-explain"><summary class="gov-explain-summary">'
+    + '<span class="gov-explain-toggle">' + _govEsc(_govT('governance_explain_toggle', 'What this grants')) + '</span>'
+    + chips + '</summary><div class="gov-explain-body">' + body + '</div></details>';
 }
 
 function _govUpdateApprovalsBadge(count) {
@@ -1281,7 +1363,7 @@ function _govApprovalRow(item) {
   const secondary = (primary !== key && key)
     ? '<div class="gov-path gov-muted">' + _govEsc(key) + '</div>'
     : '';
-  const summary = _govPayloadSummary(item.payload);
+  const summary = _govPayloadSummary(item.payload, kind);
   const detail = summary ? '<div class="gov-muted">' + _govEsc(summary) + '</div>' : '';
   // The ask behind the request (27 Aug 2026 ticket): an approver needs to see
   // what the person actually wanted, not only the derived capability. Already
@@ -1293,19 +1375,182 @@ function _govApprovalRow(item) {
       + '<span class="gov-trigger-label">' + _govEsc(_govT('governance_trigger', 'Asked for')) + ':</span> '
       + _govEsc(trigger) + '</div>'
     : '';
+  const ex = (item.explanation && typeof item.explanation === 'object') ? item.explanation : null;
+  const explainHtml = ex ? _govExplainHtml(ex) : '';
+  // Related access (ticket 10) hangs off access requests only: the chain it
+  // walks is the route/permission one, which the other kinds do not have.
+  const sugHtml = kind === 'grant'
+    ? '<button type="button" class="gov-btn gov-sug-toggle" data-gov-suggest-toggle="1"'
+      + ' data-key="' + _govEsc(key) + '">'
+      + _govEsc(_govT('governance_sug_toggle', 'Related access')) + '</button>'
+    : '';
+  const sugRow = kind === 'grant'
+    ? '<tr class="gov-sug-row" style="display:none"><td colspan="5" class="gov-sug-cell"></td></tr>'
+    : '';
   const btn = (decision, cls, label2) => '<button type="button" class="gov-btn ' + cls + '"' +
     ' data-gov-approval="' + decision + '"' +
     ' data-kind="' + _govEsc(kind) + '"' +
     ' data-key="' + _govEsc(key) + '">' + label2 + '</button>';
   return '<tr>' +
     '<td class="gov-nowrap"><span class="gov-chip' + _govKindChipClass(kind) + '">' + _govEsc(_govKindLabel(kind)) + '</span></td>' +
-    '<td>' + _govEsc(primary) + secondary + detail + triggerHtml + '</td>' +
+    '<td>' + _govEsc(primary) + secondary + detail + triggerHtml + explainHtml + sugHtml + '</td>' +
     '<td>' + _govEsc(item.owner_email || '') + '</td>' +
     '<td class="gov-nowrap">' + _govEsc(when) + '</td>' +
     '<td class="gov-row-actions">' +
       btn('approve', 'primary', _govT('governance_approve', 'Approve')) +
       btn('reject', 'danger', _govT('governance_reject', 'Reject')) +
-    '</td></tr>';
+    '</td></tr>' + sugRow;
+}
+
+function _govSugRiskPill(risk) {
+  const r = String(risk || 'medium');
+  const cls = r === 'high' ? 'off' : (r === 'low' ? 'on' : 'warn');
+  const label = r === 'high'
+    ? _govT('governance_sug_risk_high', 'High risk')
+    : (r === 'low' ? _govT('governance_sug_risk_low', 'Low risk')
+                   : _govT('governance_sug_risk_medium', 'Medium risk'));
+  return '<span class="gov-pill ' + cls + '">' + _govEsc(label) + '</span>';
+}
+
+function _govSugStatusLabel(status) {
+  switch (String(status || '')) {
+    case 'approved': return _govT('governance_sug_approved', 'Approved');
+    case 'denied': return _govT('governance_sug_denied', 'Denied');
+    case 'ignored': return _govT('governance_sug_ignored', 'Set aside');
+    default: return '';
+  }
+}
+
+/** One related suggestion. Decided on its own, never bundled with a sibling.
+ *
+ * A suggestion the server marked non-actionable renders WITHOUT an approve
+ * button and says so: the point of this screen is to tell an administrator
+ * about the rest of the chain, never to turn a shell or settings-write
+ * capability into one click. The server refuses those as well.
+ */
+function _govSuggestionHtml(item, originKey) {
+  const gkind = String(item.gkind || '');
+  const value = String(item.value || '');
+  const status = String(item.status || 'open');
+  const decided = status !== 'open';
+  const evidence = (Array.isArray(item.evidence) ? item.evidence : [])
+    .map(line => '<div class="gov-sug-evidence">' + _govEsc(String(line)) + '</div>').join('');
+  const abtn = (decision, cls, label) => '<button type="button" class="gov-btn ' + cls + '"' +
+    ' data-gov-suggestion="' + decision + '"' +
+    ' data-origin="' + _govEsc(originKey) + '"' +
+    ' data-gkind="' + _govEsc(gkind) + '"' +
+    ' data-value="' + _govEsc(value) + '">' + _govEsc(label) + '</button>';
+  let actions;
+  if (decided) {
+    actions = '<div class="gov-sug-info">' + _govEsc(_govSugStatusLabel(status))
+      + (item.decided_by ? ' \u00b7 ' + _govEsc(_govT('governance_sug_decided_by', 'Decided by'))
+        + ': ' + _govEsc(String(item.decided_by)) : '') + '</div>';
+  } else {
+    actions = '<div class="gov-sug-actions">'
+      + (item.actionable ? abtn('approve', 'primary', _govT('governance_sug_approve', 'Approve')) : '')
+      + abtn('deny', 'danger', _govT('governance_sug_deny', 'Deny'))
+      + abtn('ignore', '', _govT('governance_sug_ignore', 'Ignore'))
+      + (item.actionable ? '' : '<span class="gov-sug-info">'
+        + _govEsc(_govT('governance_sug_manual',
+          'Not grantable from here. Change it in the access rules.')) + '</span>')
+      + '</div>';
+  }
+  return '<div class="gov-sug-item' + (decided ? ' is-decided' : '') + '">'
+    + '<div class="gov-sug-label">' + _govSugRiskPill(item.risk) + _govEsc(String(item.label || value)) + '</div>'
+    + '<div class="gov-sug-why">' + _govEsc(String(item.why || '')) + '</div>'
+    + (item.risk_note ? '<div class="gov-sug-evidence">' + _govEsc(String(item.risk_note)) + '</div>' : '')
+    + evidence + actions + '</div>';
+}
+
+/** Load and render the related access for one request into its detail row.
+ *
+ * The two confidence levels are rendered as two labelled blocks and are never
+ * merged: a dependency read out of the rules that do the blocking and a guess
+ * from a pattern must not look the same to whoever is deciding.
+ */
+async function _govLoadSuggestions(key, host) {
+  if (!host) return;
+  host.innerHTML = '<div class="gov-muted">' + _govT('loading', 'Loading...') + '</div>';
+  let data;
+  try {
+    data = await api('/api/governance/approvals/suggestions?key=' + encodeURIComponent(key),
+      { redirect401: false });
+  } catch (e) {
+    host.innerHTML = '<div class="gov-muted">' + _govEsc(e.message || 'failed') + '</div>';
+    return;
+  }
+  const rows = Array.isArray(data && data.suggestions) ? data.suggestions : [];
+  if (!rows.length) {
+    host.innerHTML = '<div class="gov-muted">'
+      + _govEsc(_govT('governance_sug_none', 'Nothing else is standing in this person\u2019s way.'))
+      + '</div>';
+    return;
+  }
+  const block = (confidence, title, pill) => {
+    const items = rows.filter(r => String(r.confidence || '') === confidence);
+    if (!items.length) return '';
+    return '<div class="gov-sug-block"><div class="gov-sug-head">'
+      + '<span class="gov-pill ' + pill + '">' + _govEsc(title) + '</span></div>'
+      + items.map(item => _govSuggestionHtml(item, key)).join('') + '</div>';
+  };
+  host.innerHTML =
+    '<div class="gov-sug-note">' + _govEsc(_govT('governance_sug_note',
+      'Each item is decided on its own. Nothing here is granted unless you approve it.')) + '</div>'
+    + block('confirmed', _govT('governance_sug_confirmed', 'Needed for this to work'), 'on')
+    + block('heuristic', _govT('governance_sug_heuristic', 'Possibly related'), 'warn');
+}
+
+/** Related-access clicks inside the approvals pane. True when handled.
+ *
+ * Lives beside the decide-button delegation rather than in a listener of its
+ * own, and the two probe disjoint attributes, so a click on one can never
+ * decide the other. The detail row is always the sibling right after its
+ * request row, which is why no generated id is needed for a key that carries
+ * '|', '@' and '/'.
+ */
+function _govSuggestionClick(closest) {
+  const toggle = closest('[data-gov-suggest-toggle]');
+  if (toggle) {
+    if (toggle.disabled) return true;
+    const row = toggle.closest('tr');
+    const host = row && row.nextElementSibling;
+    if (!host || !host.classList.contains('gov-sug-row')) return true;
+    const open = host.style.display !== 'none';
+    host.style.display = open ? 'none' : '';
+    if (!open) _govLoadSuggestions(toggle.getAttribute('data-key') || '', host.querySelector('td'));
+    return true;
+  }
+  const sug = closest('[data-gov-suggestion]');
+  if (!sug) return false;
+  if (!sug.disabled) {
+    _govDecideSuggestion(
+      sug.getAttribute('data-origin') || '',
+      sug.getAttribute('data-gkind') || '',
+      sug.getAttribute('data-value') || '',
+      sug.getAttribute('data-gov-suggestion') || '',
+      sug.closest('.gov-sug-cell'),
+    );
+  }
+  return true;
+}
+
+async function _govDecideSuggestion(origin, gkind, value, decision, host) {
+  try {
+    await _govPost('/api/governance/approvals/suggestions/decide', {
+      origin_key: origin, gkind: gkind, value: value, decision: decision,
+    });
+    if (typeof showToast === 'function') {
+      showToast(_govSugStatusLabel(
+        decision === 'approve' ? 'approved' : (decision === 'deny' ? 'denied' : 'ignored')
+      ), 2500);
+    }
+    // Only this block is re-rendered: reloading the whole queue would collapse
+    // the detail the administrator is working in and lose their place.
+    await _govLoadSuggestions(origin, host);
+    _govRefreshApprovalsBadge();
+  } catch (e) {
+    if (!_govHandleConflict(e) && typeof showToast === 'function') showToast(e.message || 'decision failed', 4000, 'error');
+  }
 }
 
 async function _govLoadApprovals() {
@@ -1589,7 +1834,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const approvals = document.getElementById('govPaneApprovals');
   if (approvals) {
     approvals.addEventListener('click', (ev) => {
-      const btn = ev.target && ev.target.closest ? ev.target.closest('[data-gov-approval]') : null;
+      const closest = (sel) => (ev.target && ev.target.closest ? ev.target.closest(sel) : null);
+      if (_govSuggestionClick(closest)) return;
+      const btn = closest('[data-gov-approval]');
       if (!btn || btn.disabled) return;
       _govDecideApproval(
         btn.getAttribute('data-kind') || 'skill',

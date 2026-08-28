@@ -137,6 +137,7 @@ EXPECTED_APPEARANCE_PAYLOAD_KEYS = frozenset({
     "hide_composer_mobile_config",
     "hide_composer_quota_chip",
     "hide_composer_toolsets",
+    "hide_composer_chat_mode",
     "hide_composer_status",
 })
 

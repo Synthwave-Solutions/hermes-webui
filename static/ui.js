@@ -5,7 +5,7 @@
 // legacy reverse-scan over S.messages — that keeps new clients working
 // against old servers (Phase 1 may not yet be deployed everywhere).
 // See api/todo_state.py for the wire contract.
-const S={session:null,messages:[],entries:[],busy:false,pendingFiles:[],toolCalls:[],activeStreamId:null,currentDir:'.',activeProfile:'default',activeProfileIsDefault:true,showHiddenWorkspaceFiles:false,todos:[],todoStateMeta:null,_pendingSessionToolsets:null};
+const S={session:null,messages:[],entries:[],busy:false,pendingFiles:[],toolCalls:[],activeStreamId:null,currentDir:'.',activeProfile:'default',activeProfileIsDefault:true,showHiddenWorkspaceFiles:false,todos:[],todoStateMeta:null,_pendingSessionToolsets:null,_pendingChatMode:null};
 
 function assistantDisplayName(){
   if(S.activeProfile&&S.activeProfile!=='default') return S.activeProfile.charAt(0).toUpperCase()+S.activeProfile.slice(1);
@@ -5553,6 +5553,70 @@ document.addEventListener('click',function(e){
   }
 });
 
+// ── Conversation chat mode (Normal chat vs Super agent) ───────────────────
+// Two-state chip, no dropdown. Before a conversation exists the pick is staged
+// on S._pendingChatMode and forwarded to /api/session/new; afterwards it is a
+// POST to /api/session/mode. Every new conversation starts in "super", so the
+// chip changes nothing until a user clicks it.
+let _currentChatMode = 'super';
+
+function _applyChatModeChip(mode) {
+  _currentChatMode = (mode === 'normal') ? 'normal' : 'super';
+  const wrap = $('composerChatModeWrap');
+  const label = $('composerChatModeLabel');
+  const chip = $('composerChatModeChip');
+  if (!wrap || !label || !chip) return;
+  // Visibility belongs to the responsive CSS: unlike the toolsets chip the mode
+  // is never width-gated away, it only degrades to an icon on narrow composers.
+  wrap.style.display = '';
+  const isNormal = _currentChatMode === 'normal';
+  label.textContent = isNormal ? t('chat_mode_normal') : t('chat_mode_super');
+  chip.classList.toggle('mode-normal', isNormal);
+  chip.setAttribute('aria-pressed', isNormal ? 'true' : 'false');
+  chip.title = t('chat_mode') + ': ' + (isNormal ? t('chat_mode_normal_title') : t('chat_mode_super_title'));
+}
+
+function _syncChatModeChip() {
+  if (typeof S === 'undefined' || !S || !S.session) {
+    _applyChatModeChip((typeof S !== 'undefined' && S && S._pendingChatMode) || 'super');
+    return;
+  }
+  _applyChatModeChip(S.session.chat_mode || 'super');
+}
+
+function syncChatModeChip() {
+  _syncChatModeChip();
+}
+
+function toggleChatMode() {
+  if (typeof S === 'undefined' || !S) return;
+  const next = (_currentChatMode === 'normal') ? 'super' : 'normal';
+  if (!S.session) {
+    S._pendingChatMode = next;
+    _applyChatModeChip(next);
+    showToast('⚡ ' + t('chat_mode_switched') + ': ' + (next === 'normal' ? t('chat_mode_normal') : t('chat_mode_super')));
+    return;
+  }
+  const sid = S.session.session_id;
+  api('/api/session/mode', {
+    method: 'POST',
+    body: JSON.stringify({ session_id: sid, mode: next })
+  })
+    .then(function(r) {
+      if (r && r.ok) {
+        S.session.chat_mode = r.chat_mode || 'super';
+        _applyChatModeChip(S.session.chat_mode);
+        showToast('⚡ ' + t('chat_mode_switched') + ': ' + (S.session.chat_mode === 'normal' ? t('chat_mode_normal') : t('chat_mode_super')));
+      } else {
+        showToast(t('chat_mode_failed') + (r && r.error ? r.error : 'Unknown error'), 3000, 'error');
+      }
+    })
+    .catch(function(err) {
+      showToast(t('chat_mode_failed') + (err.message || err), 3000, 'error');
+    });
+}
+if (typeof window !== 'undefined') window.toggleChatMode = toggleChatMode;
+
 // ── Session toolsets chip (#493) ───────────────────────────────────────────
 let _currentSessionToolsets = null; // null = active profile defaults, array = custom list
 let _toolsetsCatalog = null;
@@ -10838,6 +10902,7 @@ function syncTopbar(){
     if(typeof syncWorkspaceDisplays==='function') syncWorkspaceDisplays();
     if(typeof _syncWorkspaceHeadingState==='function') _syncWorkspaceHeadingState();
     if(typeof syncModelChip==='function') syncModelChip();
+    if(typeof syncChatModeChip==='function') syncChatModeChip();
     if(typeof syncTerminalButton==='function') syncTerminalButton();
     if(typeof _syncHermesPanelSessionActions==='function') _syncHermesPanelSessionActions();
     else {
@@ -10957,6 +11022,7 @@ function syncTopbar(){
   if(typeof syncModelChip==='function') syncModelChip();
   if(typeof syncReasoningChip==='function') syncReasoningChip();
   if(typeof syncToolsetsChip==='function') syncToolsetsChip();
+  if(typeof syncChatModeChip==='function') syncChatModeChip();
   // Show Clear button only when session has messages
   const clearBtn=$('btnClearConv');
   if(clearBtn) clearBtn.style.display=(S.messages&&S.messages.filter(msg=>msg.role!=='tool').length>0)?'':'none';
@@ -20884,7 +20950,7 @@ async function promptNewFile(targetDir = S.currentDir || '.'){
       // System-minted session (#6022): explicit worktree:false — creating a
       // file from a blank page must not inherit the config worktree default.
       const r=await api('/api/session/new',{method:'POST',body:JSON.stringify({workspace:ws,worktree:false})});
-      if(r&&r.session){S._pendingSessionToolsets=null;S.session=r.session;S.messages=[];syncTopbar();renderMessages();await renderSessionList();}
+      if(r&&r.session){S._pendingSessionToolsets=null;S._pendingChatMode=null;S.session=r.session;S.messages=[];syncTopbar();renderMessages();await renderSessionList();}
     }catch(e){setStatus(t('create_failed')+e.message);return;}
   }
   if(!S.session)return;
@@ -20917,7 +20983,7 @@ async function promptNewFolder(targetDir = S.currentDir || '.'){
       // System-minted session (#6022): explicit worktree:false — creating a
       // folder from a blank page must not inherit the config worktree default.
       const r=await api('/api/session/new',{method:'POST',body:JSON.stringify({workspace:ws,worktree:false})});
-      if(r&&r.session){S._pendingSessionToolsets=null;S.session=r.session;S.messages=[];syncTopbar();renderMessages();await renderSessionList();}
+      if(r&&r.session){S._pendingSessionToolsets=null;S._pendingChatMode=null;S.session=r.session;S.messages=[];syncTopbar();renderMessages();await renderSessionList();}
     }catch(e){setStatus(t('folder_create_failed')+e.message);return;}
   }
   if(!S.session)return;

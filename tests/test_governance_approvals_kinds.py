@@ -356,3 +356,58 @@ def test_request_flood_is_capped_per_owner(isolated_home):
     # Deciding frees the budget.
     approvals.decide("integration", "p0", "reject", "admin@example.test")
     assert approvals.request("integration", "one-more", "spammer@example.test")["key"] == "one-more"
+
+
+# ── Row shape after the capability/risk detail was added (28 Aug 2026) ───────
+
+def test_legacy_skill_fields_survive_the_added_explanation(as_user):
+    """The five fields the skills UI binds to keep their meaning and value; the
+    reviewer detail is added alongside them, never in place of one."""
+    approvals.request("skill", "ops/deploy", "u@example.test")
+    as_user("admin@example.test")
+    _, handler = _call("/api/governance/approvals")
+    skill = handler.body["pending"][0]
+    assert skill["key"] == "ops/deploy"
+    assert skill["name"] == "deploy"
+    assert skill["category"] == "ops"
+    assert skill["owner_email"] == "u@example.test"
+    assert skill["added_at"] == skill["requested_at"]
+    assert isinstance(skill["explanation"], dict) and skill["explanation"]["capability"]
+
+
+def test_mine_row_shape_is_unchanged(as_user):
+    """static/panels.js loadMyAccessRequests and static/integrations.js read
+    this row; it must keep exactly the keys it had before the admin queue grew
+    an explanation."""
+    approvals.request("mcp", "context7", "u@example.test", label="Context7")
+    as_user("u@example.test")
+    _, handler = _call("/api/governance/approvals/mine")
+    assert set(handler.body["requests"][0]) == {
+        "kind", "key", "name", "category", "label", "owner_email", "added_at",
+        "requested_at", "status", "decided_by", "decided_at", "reason", "payload",
+    }
+
+
+# ── The permission grant kind (ticket 10, 28 Aug 2026) ──────────────────────
+
+def test_permission_grants_are_held_to_an_allowlist(isolated_home):
+    """A route grant was safe to offer one-click BECAUSE the permission wall
+    stayed up behind it. Handing out the permission removes that wall, so the
+    guard here is an allowlist and not the route guard's denylist: a denylist
+    of governance:*/*:admin lets terminal:use and config:write straight
+    through, and config:write is a body-sink permission the route layer admits
+    at config:read."""
+    from api import grant_requests
+
+    raw = {"users": {"u@example.test": {"grants": {}}}}
+    assert grant_requests.apply_grant_to_policy(
+        raw, {"email": "u@example.test", "gkind": "permission", "value": "sessions:read"}
+    ) is not None
+    assert raw["users"]["u@example.test"]["grants"]["permissions"] == ["sessions:read"]
+
+    for refused in ("terminal:use", "config:write", "governance:write", "profiles:admin"):
+        raw = {"users": {"u@example.test": {"grants": {}}}}
+        assert grant_requests.apply_grant_to_policy(
+            raw, {"email": "u@example.test", "gkind": "permission", "value": refused}
+        ) is None, refused
+        assert raw["users"]["u@example.test"]["grants"] == {}

@@ -202,6 +202,14 @@ window.__registerHermesLocale('es', {
     session_toolsets_clear: 'Use defaults', // TODO: translate
     session_toolsets_applied: 'Toolsets updated', // TODO: translate
     session_toolsets_cleared: 'Using active profile defaults', // TODO: translate
+    // Conversation chat mode (Normal chat vs Super agent)
+    chat_mode: 'Modo de chat',
+    chat_mode_super: 'Súper agente',
+    chat_mode_normal: 'Chat normal',
+    chat_mode_super_title: 'Acceso completo a herramientas y skills',
+    chat_mode_normal_title: 'Menos herramientas, respuestas más rápidas',
+    chat_mode_switched: 'Modo de chat actualizado',
+    chat_mode_failed: 'No se pudo cambiar el modo de chat: ',
     session_toolsets_failed: 'Failed to update toolsets: ', // TODO: translate
     model_scope_advisory: 'Se aplica a esta conversación desde tu próximo mensaje.',
     model_scope_toast: 'Se aplica a esta conversación desde tu próximo mensaje.',
@@ -1378,6 +1386,7 @@ window.__registerHermesLocale('es', {
     composer_control_mobile_config: 'Mobile config',
     composer_control_quota_chip: 'Quota chip',
     composer_control_toolsets: 'Toolsets',
+    composer_control_chat_mode: 'Modo de chat',
     composer_control_status: 'Status',
     open_in_browser: 'Abrir en el navegador',
     settings_section_system_title: 'System',

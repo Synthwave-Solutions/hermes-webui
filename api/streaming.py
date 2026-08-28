@@ -41,6 +41,7 @@ from api.config import (
     parse_reasoning_effort,
     coerce_reasoning_effort_for_model,
     _main_model_request_overrides,
+    normalize_chat_mode,
 )
 from api.helpers import redact_session_data, _redact_text
 from api.governance.agent_context import (
@@ -6794,6 +6795,10 @@ def _run_agent_streaming(
     _turn_session_identity_tokens = None
     _governance_turn_token = None
     _streaming_cron_profile_home_token = None
+    # Widest mode until the session is read below, so an early failure can never
+    # leave the turn narrower than the user asked for. Declared above the
+    # Issue #765 group so `_checkpoint_stop = None` keeps its adjacency to `try:`.
+    _chat_mode = 'super'
     # Initialised here (before any code that may raise) so the outer `finally`
     # block can safely check `if _checkpoint_stop is not None` even when an
     # exception fires before the checkpoint thread is created (Issue #765).
@@ -6827,6 +6832,12 @@ def _run_agent_streaming(
             session_id=session_id,
             request_id=stream_id,
         )
+        # Conversation chat mode (Michael Ramirez, 28 Aug 2026), read once per
+        # turn from the live session object rather than from the sidecar: a
+        # brand-new conversation has no sidecar on disk yet (no write until the
+        # first message), so a mode staged on the empty composer would be
+        # invisible to Session.load_metadata_only on the very first turn.
+        _chat_mode = normalize_chat_mode(getattr(s, 'chat_mode', None))
         update_active_run(stream_id, phase="running", session_id=session_id)
         s.workspace = str(Path(workspace).expanduser().resolve())
         _last_persisted_model = None
@@ -7004,11 +7015,21 @@ def _run_agent_streaming(
         # `_servers` by `(profile_home, name)` upstream in hermes-agent; that
         # lives outside this WebUI repo.  This change fixes the headline bug
         # for users who run a single non-default profile per WebUI process.
-        try:
-            from tools.mcp_tool import discover_mcp_tools
-            discover_mcp_tools()
-        except Exception:
-            pass  # MCP not available or not configured — non-fatal
+        #
+        # Normal-mode turns skip discovery entirely: the mode's toolset list
+        # keeps none of the enabled MCP server toolsets (bare names such as
+        # notion, composio or playwright), so discovery cannot contribute a
+        # single schema to the turn, while discover_mcp_tools() takes a
+        # cross-process advisory file lock whose bounded wait is 240 x 0.5s.
+        # This is a latency saving only, never a security boundary: the
+        # registry is process-global, so the real boundary stays the toolset
+        # intersection below plus agent-side governance filtering.
+        if _chat_mode != 'normal':
+            try:
+                from tools.mcp_tool import discover_mcp_tools
+                discover_mcp_tools()
+            except Exception:
+                pass  # MCP not available or not configured: non-fatal
 
         # Register a gateway-style notify callback so the approval system can
         # push the `approval` SSE event the moment a dangerous command is
@@ -7677,7 +7698,7 @@ def _run_agent_streaming(
 
             # Per-profile toolsets — use _resolve_cli_toolsets() so MCP
             # server toolsets are included, matching native CLI behaviour.
-            from api.config import _resolve_cli_toolsets
+            from api.config import _resolve_cli_toolsets, chat_mode_toolsets
             _toolsets = _resolve_cli_toolsets(_cfg)
 
             # Per-session toolset override (#493): if the session has
@@ -7698,6 +7719,13 @@ def _run_agent_streaming(
                         _toolsets = _override
             except Exception as _ts_err:
                 print(f"[webui] WARNING: failed to read per-session toolsets for {session_id}: {_ts_err}", flush=True)
+
+            # Chat mode narrowing runs LAST, over whatever list the profile and
+            # the per-session override already produced. It is a pure
+            # intersection, so a mode can only ever remove toolsets from this
+            # turn, never add one the user was not already entitled to, and it
+            # can never re-widen a session that pinned a narrow custom list.
+            _toolsets = chat_mode_toolsets(_toolsets, _chat_mode)
 
             # Fallback model chain from profile config (e.g. for rate-limit or
             # provider recovery). Match Hermes CLI/gateway semantics:
@@ -7893,6 +7921,7 @@ def _run_agent_streaming(
                     _max_tokens_cfg or '',
                     _fallback_resolved or {},
                     sorted(_toolsets) if _toolsets else [],
+                    _chat_mode,
                     _reasoning_config or {},
                     _main_request_overrides or {},
                     _public_prefill_context_status(_prefill_context),

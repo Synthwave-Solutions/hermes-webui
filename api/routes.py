@@ -2985,6 +2985,7 @@ from api.config import (
     STREAM_LAST_EVENT_ID,
     SERVER_START_TIME,
     _resolve_cli_toolsets,
+    CHAT_MODES,
     _INDEX_HTML_PATH,
     get_available_models,
     get_available_models_for_session_visit,
@@ -11366,6 +11367,175 @@ def _render_index_shell_base() -> str:
     return base
 
 
+# ── Projects hub (ticket 12) ────────────────────────────────────────────────
+# A permission-filtered, READ-ONLY roll-up of what this system actually holds
+# per project. Both branches ride on the existing
+# RouteRule("/api/projects", "sessions:read", "sessions:write") prefix rule, so
+# no catalog entry is added; because that permission is WIDER than the ones
+# guarding some of the aggregated data, each section is re-gated here with the
+# permission its own route already requires (api/projects_hub.py names them).
+
+
+def _projects_hub_context(handler):
+    """Resolve profile, ownership scope and section entitlements once."""
+    from api import projects_hub
+    from api.governance.enforce import _request_identity
+    from api.ownership import request_owner_scope
+
+    active_profile = get_active_profile_name()
+    owner_scope = request_owner_scope(handler)
+    capabilities = projects_hub.caller_capabilities(_request_identity(handler))
+    return active_profile, owner_scope, capabilities
+
+
+def _projects_hub_workspace_root(workspace_entries, name):
+    """The filesystem root behind a workspace NAME the caller may already see."""
+    for entry in workspace_entries or []:
+        if not isinstance(entry, dict):
+            continue
+        if str(entry.get("name") or "") != str(name):
+            continue
+        raw = str(entry.get("path") or "").strip()
+        if raw:
+            return Path(raw).expanduser()
+    return None
+
+
+def _projects_hub_list_dir_reader(workspace_entries):
+    """Shallow, workspace-confined listing keyed by workspace name.
+
+    list_dir() takes a Path and raises on anything that is not a directory;
+    the registry stores paths as strings, so convert and pre-check here rather
+    than letting safe_resolve_ws take a str.
+    """
+    def _read(name):
+        root = _projects_hub_workspace_root(workspace_entries, name)
+        if root is None or not root.is_dir():
+            return []
+        return list_dir(root, ".")
+
+    return _read
+
+
+def _projects_hub_status_reader(workspace_entries):
+    """Project OS status for a workspace, or None when the repo has none.
+
+    _project_os_goal_summary always answers with something (it falls back to a
+    board name), so absence is decided by whether any Project OS document was
+    actually found: an invented summary would be exactly the fake status this
+    hub is meant to avoid.
+    """
+    def _read(name):
+        root = _projects_hub_workspace_root(workspace_entries, name)
+        if root is None or not root.is_dir():
+            return None
+        handoff = _project_os_workspace_json(root, ".ax/handoff/current.json")
+        project_md = _project_os_workspace_read(root, "docs/project-os/PROJECT.md")
+        status_md = _project_os_workspace_read(root, "docs/project-os/STATUS.md")
+        if not (handoff or project_md or status_md):
+            return None
+        return {
+            "summary": _project_os_goal_summary(project_md, handoff, status_md),
+            "updated_at": (handoff or {}).get("updated_at") or 0,
+        }
+
+    return _read
+
+
+def _projects_hub_integrations(capabilities):
+    """Locally derived status of the sources this hub cannot read yet.
+
+    Gated on mcp:read because the MCP server inventory is what it is derived
+    from, and that inventory is mcp:read on /api/mcp. The notes drawer flag is
+    files:read on /api/notes, so it is only consulted when the caller holds
+    that too; otherwise the notes row reports the server state alone.
+    """
+    from api import projects_hub
+
+    try:
+        notes_drawer = None
+        if capabilities.get("notes_drawer"):
+            notes_drawer = _external_notes_sources_enabled()
+        cfg = get_config()
+        servers = cfg.get("mcp_servers") if isinstance(cfg, dict) else None
+        return projects_hub.integration_status(
+            servers or {}, _mcp_runtime_status_by_name(), notes_drawer)
+    except Exception:
+        logger.debug("projects hub integration status failed", exc_info=True)
+        return projects_hub.integration_status({}, {}, None)
+
+
+def _handle_projects_hub(handler) -> bool:
+    """GET /api/projects/hub: one summary row per project the caller may see."""
+    from api import projects_hub
+
+    active_profile, owner_scope, capabilities = _projects_hub_context(handler)
+    payload = {
+        "projects": projects_hub.project_rollups(
+            load_projects(), all_sessions(), owner_scope, active_profile),
+        "active_profile": active_profile,
+        "sections": sorted(name for name, ok in capabilities.items() if ok),
+    }
+    if capabilities.get("integrations"):
+        payload["integrations"] = _projects_hub_integrations(capabilities)
+    return j(handler, payload)
+
+
+def _handle_projects_hub_detail(handler, parsed) -> bool:
+    """GET /api/projects/hub/detail?project_id=...: one project, section-gated."""
+    from api import projects_hub
+
+    active_profile, owner_scope, capabilities = _projects_hub_context(handler)
+    project_id = str((parse_qs(parsed.query).get("project_id") or [""])[0] or "").strip()
+    visible = projects_hub.visible_projects(load_projects(), owner_scope, active_profile)
+    project = next(
+        (p for p in visible if str(p.get("project_id") or "") == project_id), None)
+    if project is None:
+        # A project that is not yours answers exactly like one that does not
+        # exist, matching the /api/projects/rename precedent.
+        return bad(handler, "Project not found", 404)
+
+    workspace_entries = []
+    if capabilities.get("workspaces") or capabilities.get("files") or capabilities.get("status"):
+        try:
+            workspace_entries = _workspaces_response_list(load_workspaces(), handler)
+        except Exception:
+            logger.debug("projects hub workspace read failed", exc_info=True)
+
+    cron_rows = []
+    if capabilities.get("jobs"):
+        try:
+            from api.cron_scope import scope_cron_rows_for_caller
+
+            active_jobs, other_jobs = _cron_jobs_cross_profile(active_profile)
+            active_jobs, other_jobs = scope_cron_rows_for_caller(
+                handler, active_jobs, other_jobs)
+            cron_rows = list(active_jobs) + list(other_jobs)
+        except Exception:
+            logger.debug("projects hub job read failed", exc_info=True)
+
+    detail = projects_hub.project_detail(
+        project,
+        all_sessions(),
+        owner_scope,
+        active_profile,
+        capabilities,
+        workspace_entries=workspace_entries,
+        cron_rows=cron_rows,
+        list_dir_reader=(
+            _projects_hub_list_dir_reader(workspace_entries)
+            if capabilities.get("files") else None
+        ),
+        project_os_reader=(
+            _projects_hub_status_reader(workspace_entries)
+            if capabilities.get("status") else None
+        ),
+    )
+    detail["active_profile"] = active_profile
+    detail["sections"] = sorted(name for name, ok in capabilities.items() if ok)
+    return j(handler, detail)
+
+
 def handle_get(handler, parsed) -> bool:
     """Handle all GET routes. Returns True if handled, False for 404."""
     proxy_result = _handle_extension_sidecar_proxy(handler, parsed, "GET")
@@ -12545,6 +12715,12 @@ def handle_get(handler, parsed) -> bool:
         finally:
             diag.finish()
 
+    if parsed.path == "/api/projects/hub":
+        return _handle_projects_hub(handler)
+
+    if parsed.path == "/api/projects/hub/detail":
+        return _handle_projects_hub_detail(handler, parsed)
+
     if parsed.path == "/api/projects":
         # ── Profile scoping (#1614) ────────────────────────────────────────
         # Default: filter to the active profile. ?all_profiles=1 returns the
@@ -12559,13 +12735,11 @@ def handle_get(handler, parsed) -> bool:
         from api.ownership import request_owner_scope
 
         owner_scope = request_owner_scope(handler)
-        if owner_scope != "all":
-            all_projects = [
-                p for p in all_projects
-                if isinstance(p, dict)
-                and str(p.get("owner_email") or "").strip().lower()
-                and str(p.get("owner_email") or "").strip().lower() == owner_scope
-            ]
+        # One rule, one place: the Projects hub (ticket 12) applies the very
+        # same ownership filter, and two copies would drift.
+        from api import projects_hub
+
+        all_projects = projects_hub.visible_projects_by_owner(all_projects, owner_scope)
         isolated_profile_mode = _is_isolated_profile_mode()
         all_profiles = _all_profiles_enabled(parsed)
         if all_profiles:
@@ -13329,6 +13503,17 @@ def _validate_session_toolsets_shape(toolsets):
         raise ValueError("each toolset must be a non-empty string")
     return toolsets
 
+def _validate_chat_mode(value):
+    """Validate the per-conversation chat mode posted by a client.
+
+    Strict on the wire (unlike api.config.normalize_chat_mode, which coerces a
+    stored value): a typo must surface as a 400 rather than silently landing the
+    conversation in a mode the user did not ask for.
+    """
+    if not isinstance(value, str) or value.strip().lower() not in CHAT_MODES:
+        raise ValueError('mode must be "normal" or "super"')
+    return value.strip().lower()
+
 def handle_post(handler, parsed) -> bool:
     """Handle all POST routes. Returns True if handled, False for 404."""
     diag = RequestDiagnostics.maybe_start("POST", parsed.path, logger=logger)
@@ -13584,6 +13769,15 @@ def handle_post(handler, parsed) -> bool:
             enabled_toolsets = _validate_session_toolsets_shape(body.get("enabled_toolsets"))
         except ValueError as e:
             return bad(handler, str(e), status=400)
+        # A conversation can be created already in a mode when the user picked it
+        # on the empty composer; absent the key it starts in "super" (today's
+        # behaviour) like every other new conversation.
+        chat_mode = None
+        if body.get("chat_mode") is not None:
+            try:
+                chat_mode = _validate_chat_mode(body.get("chat_mode"))
+            except ValueError as e:
+                return bad(handler, str(e), status=400)
         # Use the profile sent by the client tab (if any) so that two tabs on
         # different profiles never clobber each other via the process-level global.
         # ── Memory lifecycle: commit the previous session before starting a new one ──
@@ -13620,6 +13814,7 @@ def handle_post(handler, parsed) -> bool:
             project_id=body.get("project_id") or None,
             worktree_info=worktree_info,
             enabled_toolsets=enabled_toolsets,
+            chat_mode=chat_mode,
         )
         # Stamp the creating identity so the placeholder stays visible to its
         # creator under user isolation (persisted on the first save).
@@ -13681,6 +13876,7 @@ def handle_post(handler, parsed) -> bool:
                 # re-derive on the next turn.
                 personality=session.personality,
                 enabled_toolsets=getattr(session, "enabled_toolsets", None),
+                chat_mode=getattr(session, "chat_mode", None),
                 context_length=getattr(session, "context_length", None),
                 threshold_tokens=getattr(session, "threshold_tokens", None),
                 truncation_watermark=getattr(session, "truncation_watermark", None),
@@ -13980,6 +14176,39 @@ def handle_post(handler, parsed) -> bool:
             s.enabled_toolsets = toolsets
             s.save()
         return j(handler, {"ok": True, "enabled_toolsets": s.enabled_toolsets})
+
+    if parsed.path == "/api/session/mode":
+        """Set the per-conversation chat mode (Michael Ramirez, 28 Aug 2026).
+
+        POST body: { session_id, mode: "normal" | "super" }
+        - "super" is today's full surface and the default for every new
+          conversation; "normal" narrows the turn's toolsets for speed.
+
+        Ownership and profile scoping already ran in
+        _guard_request_session_visibility() above (the body names session_id at
+        the top level), and the /api/session prefix rule in
+        api/governance/catalog.py classifies this POST as sessions:write, so
+        neither is re-implemented here.
+        """
+        try:
+            require(body, "session_id")
+        except ValueError as e:
+            return bad(handler, str(e))
+        sid = body["session_id"]
+        if _session_is_subagent_view_only(sid):
+            return bad(handler, "Subagent sessions are view-only and cannot be modified from WebUI", 400)
+        try:
+            mode = _validate_chat_mode(body.get("mode"))
+        except ValueError as e:
+            return bad(handler, str(e), status=400)
+        try:
+            s = get_session(sid)
+        except KeyError:
+            return bad(handler, "Session not found", 404)
+        with _get_session_agent_lock(sid):
+            s.chat_mode = mode
+            s.save()
+        return j(handler, {"ok": True, "chat_mode": s.chat_mode})
 
     if parsed.path == "/api/session/draft":
         # GET ?session_id=X  → return current draft
@@ -14373,6 +14602,7 @@ def handle_post(handler, parsed) -> bool:
             project_id=getattr(source, "project_id", None),
             personality=getattr(source, "personality", None),
             enabled_toolsets=getattr(source, "enabled_toolsets", None),
+            chat_mode=getattr(source, "chat_mode", None),
             context_length=getattr(source, "context_length", None),
             threshold_tokens=getattr(source, "threshold_tokens", None),
             # context_messages — truncated to fork prefix (not full parent copy)

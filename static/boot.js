@@ -3062,6 +3062,7 @@ const _COMPOSER_CONTROL_TOGGLE_DEFS=[
   {key:'hide_composer_workspace',label:'Workspace',labelKey:'composer_control_workspace',selectors:['.composer-ws-wrap','#composerMobileWorkspaceAction'],orderSelector:'.composer-ws-wrap',orderGroup:'left'},
   {key:'hide_composer_model',label:'Model',labelKey:'composer_control_model',selectors:['.composer-model-wrap','#composerMobileModelAction'],orderSelector:'.composer-model-wrap',orderGroup:'left'},
   {key:'hide_composer_reasoning',label:'Reasoning',labelKey:'composer_control_reasoning',selectors:['#composerReasoningWrap','#composerMobileReasoningAction'],orderSelector:'#composerReasoningWrap',orderGroup:'left'},
+  {key:'hide_composer_chat_mode',label:'Chat mode',labelKey:'composer_control_chat_mode',selectors:['#composerChatModeWrap'],orderSelector:'#composerChatModeWrap',orderGroup:'left'},
   {key:'hide_composer_context',label:'Context',labelKey:'composer_control_context',selectors:['#ctxIndicatorWrap','#composerMobileContextAction'],orderSelector:'#ctxIndicatorWrap',orderGroup:'right'},
 ];
 window._COMPOSER_CONTROL_TOGGLE_DEFS=_COMPOSER_CONTROL_TOGGLE_DEFS;

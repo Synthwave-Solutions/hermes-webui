@@ -319,6 +319,14 @@ window.__registerHermesLocale('ru', {
     session_toolsets_clear: 'Use defaults', // TODO: translate
     session_toolsets_applied: 'Toolsets updated', // TODO: translate
     session_toolsets_cleared: 'Using active profile defaults', // TODO: translate
+    // Conversation chat mode (Normal chat vs Super agent)
+    chat_mode: 'Режим чата',
+    chat_mode_super: 'Супер-агент',
+    chat_mode_normal: 'Обычный чат',
+    chat_mode_super_title: 'Полный доступ к инструментам и навыкам',
+    chat_mode_normal_title: 'Меньше инструментов, быстрее ответы',
+    chat_mode_switched: 'Режим чата изменён',
+    chat_mode_failed: 'Не удалось изменить режим чата: ',
     session_toolsets_failed: 'Failed to update toolsets: ', // TODO: translate
     model_scope_toast: 'Применяется к этой беседе со следующего сообщения.',
     reference_only_label: 'Только справка',
@@ -1395,6 +1403,7 @@ window.__registerHermesLocale('ru', {
     composer_control_mobile_config: 'Mobile config',
     composer_control_quota_chip: 'Quota chip',
     composer_control_toolsets: 'Toolsets',
+    composer_control_chat_mode: 'Режим чата',
     composer_control_status: 'Status',
     open_in_browser: 'Открыть в браузере',
     settings_section_system_title: 'System',

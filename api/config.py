@@ -1089,6 +1089,60 @@ def _resolve_cli_toolsets(cfg=None):
 
 CLI_TOOLSETS = _resolve_cli_toolsets()
 
+# ── Conversation chat mode (Michael Ramirez, 28 Aug 2026) ─────────────────
+# A conversation runs in one of two modes. "super" is today's full surface and
+# stays the default for every new conversation, so nothing changes until a user
+# flips the chip. "normal" trades reach for speed by narrowing the turn to a
+# handful of everyday toolsets.
+#
+# The narrowing is a pure INTERSECTION over the already-resolved toolset list.
+# That is deliberate and load-bearing: a mode is a presentation choice, so it
+# must never be able to hand a user a toolset their profile (or the per-session
+# override at api/streaming.py) did not already grant. Agent-side governance in
+# hermes_cli.dashboard_governance still runs downstream and can only subtract
+# further.
+CHAT_MODES = ("super", "normal")
+DEFAULT_CHAT_MODE = "super"
+
+# The five everyday toolsets normal mode keeps: clarify preserves the
+# ask-the-user path, file + web keep ordinary lookups useful, todo + memory keep
+# continuity across turns. Everything else is dropped, most importantly
+# "skills" - its absence also removes the whole skills index from the system
+# prompt (agent/system_prompt.py gates that block on the skills TOOLS being
+# present), which is the single biggest saving of the mode.
+NORMAL_CHAT_TOOLSETS = frozenset({"clarify", "file", "web", "todo", "memory"})
+
+
+def normalize_chat_mode(value):
+    """Coerce any stored/posted value onto the two-value mode vocabulary.
+
+    Anything unreadable resolves to DEFAULT_CHAT_MODE ("super"): an unknown
+    value must never silently hand a user a narrower surface than the one they
+    picked.
+    """
+    if isinstance(value, str):
+        candidate = value.strip().lower()
+        if candidate in CHAT_MODES:
+            return candidate
+    return DEFAULT_CHAT_MODE
+
+
+def chat_mode_toolsets(toolsets, mode):
+    """Narrow an already-resolved toolset list to what *mode* allows.
+
+    Pure filter over its input: it reads no config and never appends a name, so
+    ``set(result) <= set(toolsets)`` holds for every mode. That property is what
+    makes the mode incapable of widening a user's entitlement.
+
+    A profile that grants none of NORMAL_CHAT_TOOLSETS falls back to the input
+    unchanged rather than shipping a zero-tool turn.
+    """
+    names = list(toolsets or [])
+    if normalize_chat_mode(mode) != "normal":
+        return names
+    narrowed = [t for t in names if t in NORMAL_CHAT_TOOLSETS]
+    return narrowed or names
+
 # ── Model / provider discovery ───────────────────────────────────────────────
 
 # Hardcoded fallback models (used when no config.yaml or agent is available)
@@ -8178,6 +8232,7 @@ _SETTINGS_DEFAULTS = {
     "hide_composer_quota_chip": False,  # hide provider quota chip in composer footer
     "hide_composer_reasoning": False,  # hide reasoning chip in composer footer/mobile config panel
     "hide_composer_toolsets": False,  # hide toolsets chip in composer footer
+    "hide_composer_chat_mode": False,  # hide chat mode chip in composer footer
     "hide_composer_status": False,  # hide status text in composer footer
     "hide_composer_context": False,  # hide context indicator in composer footer/mobile config panel
     "hide_composer_bg_badge": False,  # hide background-jobs badge in composer footer
@@ -8494,6 +8549,7 @@ _SETTINGS_BOOL_KEYS = {
     "hide_composer_quota_chip",
     "hide_composer_reasoning",
     "hide_composer_toolsets",
+    "hide_composer_chat_mode",
     "hide_composer_status",
     "hide_composer_context",
     "hide_composer_bg_badge",

@@ -193,6 +193,14 @@ window.__registerHermesLocale('ko', {
     session_toolsets_clear: 'Use defaults', // TODO: translate
     session_toolsets_applied: 'Toolsets updated', // TODO: translate
     session_toolsets_cleared: 'Using active profile defaults', // TODO: translate
+    // Conversation chat mode (Normal chat vs Super agent)
+    chat_mode: '채팅 모드',
+    chat_mode_super: '슈퍼 에이전트',
+    chat_mode_normal: '일반 채팅',
+    chat_mode_super_title: '도구와 스킬 전체 사용',
+    chat_mode_normal_title: '도구를 줄여 더 빠른 응답',
+    chat_mode_switched: '채팅 모드를 변경했습니다',
+    chat_mode_failed: '채팅 모드를 변경하지 못했습니다: ',
     session_toolsets_failed: 'Failed to update toolsets: ', // TODO: translate
     model_search_no_results: 'No models found',
     model_group_configured: '구성됨',
@@ -626,6 +634,7 @@ window.__registerHermesLocale('ko', {
     composer_control_mobile_config: 'Mobile config',
     composer_control_quota_chip: 'Quota chip',
     composer_control_toolsets: 'Toolsets',
+    composer_control_chat_mode: '채팅 모드',
     composer_control_status: 'Status',
     open_in_browser: '브라우저에서 열기',
     settings_dropdown_conversation: '대화',
