@@ -1654,10 +1654,26 @@ def _body_profile_allowed(handler, profile: str) -> bool:
     An empty profile means "no explicit target", which is always allowed: the
     session's own profile applies. Failure to resolve governance denies (fails
     closed), matching _cron_profile_target_allowed.
+
+    The profile the request ALREADY runs under is allowed without a grant of its
+    own. The WebUI echoes the active profile back in every send, so gating that
+    echo locked every scoped user out of chat: a user granted only their own
+    profile sits in the ambient "default" one until they switch, and each send
+    carried "default" (Stephen Edwick, 27 Aug 2026, "any profile i select, any
+    message i send" -> profile_not_allowed on /api/chat/start). Echoing the
+    current profile is not a selection and cannot escalate: that binding comes
+    from the signed hermes_profile cookie, which only the already-gated
+    /api/profile/switch can mint. Naming a DIFFERENT profile is a selection and
+    still needs the grant.
     """
     profile = str(profile or "").strip()
     if not profile:
         return True
+    try:
+        if _profiles_match(profile, _get_active_profile_name()):
+            return True
+    except Exception:
+        logger.warning("active-profile resolution failed for %s", profile, exc_info=True)
     try:
         from api.governance.enforce import _request_identity, is_profile_allowed_for
 

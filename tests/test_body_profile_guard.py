@@ -66,3 +66,46 @@ def test_the_guard_runs_before_the_profile_binds_anything():
         sink = ROUTES.index(anchor)
         window = ROUTES[max(0, sink - 400):sink]
         assert "_body_profile_allowed(handler, requested_profile)" in window, anchor
+
+
+# ── The echo of the current profile is not a selection ───────────────────────
+#
+# Follow-up of 28 Aug 2026. The guard above locked every scoped user out of
+# chat: the WebUI sends `S.activeProfile||'default'` with every message, and a
+# user granted only their own profile sits in the ambient "default" one until
+# they switch, so each send named a profile they hold no grant for and
+# /api/chat/start answered 403 profile_not_allowed.
+
+def _guard_with_active(monkeypatch, allowed, active):
+    import api.routes as routes
+
+    guard = _guard(monkeypatch, allowed)
+    monkeypatch.setattr(routes, "_get_active_profile_name", lambda: active)
+    return guard
+
+
+def test_echoing_the_profile_the_request_already_runs_under_is_allowed(monkeypatch):
+    guard = _guard_with_active(monkeypatch, {"steve"}, "default")
+    assert guard(SimpleNamespace(), "default") is True, (
+        "a user scoped to their own profile must still be able to chat in the "
+        "ambient profile the deployment put them in"
+    )
+
+
+def test_naming_a_different_profile_still_needs_the_grant(monkeypatch):
+    guard = _guard_with_active(monkeypatch, {"steve"}, "default")
+    assert guard(SimpleNamespace(), "financial-ops") is False
+    assert guard(SimpleNamespace(), "steve") is True
+
+
+def test_a_broken_active_profile_lookup_falls_through_to_governance(monkeypatch):
+    import api.routes as routes
+
+    guard = _guard(monkeypatch, {"steve"})
+
+    def _boom():
+        raise RuntimeError("profile store unreadable")
+
+    monkeypatch.setattr(routes, "_get_active_profile_name", _boom)
+    assert guard(SimpleNamespace(), "steve") is True
+    assert guard(SimpleNamespace(), "financial-ops") is False
