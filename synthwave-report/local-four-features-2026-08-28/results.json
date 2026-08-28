@@ -7,7 +7,7 @@
       "id": "TC-CHATMODE-001",
       "title": "TC-CHATMODE-001 @critical new chats default to Super agent and can switch to Normal",
       "status": "passed",
-      "duration": 2162,
+      "duration": 2348,
       "screenshot": "assets/TC-CHATMODE-001.png",
       "video": "assets/TC-CHATMODE-001.webm"
     },
@@ -15,7 +15,7 @@
       "id": "TC-CHATMODE-002",
       "title": "TC-CHATMODE-002 @high session mode persists and rejects unknown modes",
       "status": "passed",
-      "duration": 1360,
+      "duration": 1384,
       "screenshot": "assets/TC-CHATMODE-002.png",
       "video": "assets/TC-CHATMODE-002.webm"
     },
@@ -23,7 +23,7 @@
       "id": "TC-PROJHUB-001",
       "title": "TC-PROJHUB-001 @critical Projects hub loads and safely renders project names",
       "status": "passed",
-      "duration": 1853,
+      "duration": 1878,
       "screenshot": "assets/TC-PROJHUB-001.png",
       "video": "assets/TC-PROJHUB-001.webm"
     },
@@ -31,7 +31,7 @@
       "id": "TC-PROJHUB-002",
       "title": "TC-PROJHUB-002 @high Projects API labels unconnected sources honestly",
       "status": "passed",
-      "duration": 1388,
+      "duration": 1485,
       "screenshot": "assets/TC-PROJHUB-002.png",
       "video": "assets/TC-PROJHUB-002.webm"
     },
@@ -39,7 +39,7 @@
       "id": "TC-APPROVAL-001",
       "title": "TC-APPROVAL-001 @critical approval explanation renderer escapes untrusted values",
       "status": "passed",
-      "duration": 1409,
+      "duration": 1525,
       "screenshot": "assets/TC-APPROVAL-001.png",
       "video": "assets/TC-APPROVAL-001.webm"
     },
@@ -47,7 +47,7 @@
       "id": "TC-CHAIN-001",
       "title": "TC-CHAIN-001 @critical related approvals keep route and permission walls separate",
       "status": "passed",
-      "duration": 1385,
+      "duration": 1389,
       "screenshot": "assets/TC-CHAIN-001.png",
       "video": "assets/TC-CHAIN-001.webm"
     }

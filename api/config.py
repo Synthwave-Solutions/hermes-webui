@@ -1140,8 +1140,12 @@ def chat_mode_toolsets(toolsets, mode):
     names = list(toolsets or [])
     if normalize_chat_mode(mode) != "normal":
         return names
-    narrowed = [t for t in names if t in NORMAL_CHAT_TOOLSETS]
-    return narrowed or names
+    # Fail narrow. A session-level override may contain only wide toolsets such
+    # as terminal/browser or bare MCP server names. Falling back to ``names``
+    # in that case silently turns Normal chat back into the wide surface the
+    # user explicitly opted out of. A zero-tool turn is safer and still a valid
+    # text-only chat turn.
+    return [t for t in names if t in NORMAL_CHAT_TOOLSETS]
 
 # ── Model / provider discovery ───────────────────────────────────────────────
 

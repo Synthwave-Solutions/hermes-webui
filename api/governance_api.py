@@ -14,6 +14,8 @@ dispatch; the in-module _require* gates are the defense that also holds
 under report_only and off.
 """
 
+import io
+import json
 import logging
 from urllib.parse import parse_qs
 
@@ -1067,25 +1069,54 @@ def _handle_suggestion_decide(handler, parsed, policy, subject, access) -> bool:
     if key is None:
         j(handler, {"error": "invalid_payload", "message": "this access was already decided"}, status=409)
         return True
+    # Delegate through the ordinary grant path first. It persists the policy and
+    # only then marks the materialised approval row approved. Do not record the
+    # suggestion itself as approved until that whole path has returned success,
+    # otherwise a policy-save failure makes the suggestion disappear while the
+    # requested capability was never granted.
+    class _CaptureHandler:
+        def __init__(self):
+            self.status = None
+            self.headers = {}
+            self.wfile = io.BytesIO()
+
+        def send_response(self, status):
+            self.status = status
+
+        def send_header(self, key, value):
+            self.headers[key] = value
+
+        def end_headers(self):
+            return None
+
+    captured = _CaptureHandler()
+    _handle_grant_request_decide(
+        captured, parsed, policy, subject,
+        {"key": key, "decision": "approve", "reason": reason or "approved with a related request"},
+    )
+    raw_response = captured.wfile.getvalue()
+    response_payload = {}
+    if raw_response:
+        try:
+            response_payload = json.loads(raw_response.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            response_payload = {}
+    if captured.status != 200 or not response_payload.get("ok"):
+        j(handler, response_payload or {"error": "grant_failed", "message": "the related access could not be granted"}, status=captured.status or 500)
+        return True
+
     suggestions.record_decision(
         origin_key, gkind, value, status=suggestions.STATUS_APPROVED,
         decided_by=subject.normalized_email or str(subject.email or "").strip().lower(),
         reason=reason, confidence=suggestion["confidence"], signal=suggestion["signal"],
     )
-    # Audited before the delegation, which writes its own policy_change and its
-    # own approvals.approve row. This event is the one that says WHICH request
-    # the grant was suggested next to and on what evidence; the delegation
-    # cannot carry it, and a failed delegation leaving the intent on record is
-    # the honest outcome.
     _audit_approval(
         subject, policy.mode, parsed, op="suggestion.approve",
         key=f"{gkind}:{value}", owner=owner, origin=origin_key,
         confidence=suggestion["confidence"], signal=suggestion["signal"],
     )
-    return _handle_grant_request_decide(
-        handler, parsed, policy, subject,
-        {"key": key, "decision": "approve", "reason": reason or "approved with a related request"},
-    )
+    j(handler, response_payload, status=200)
+    return True
 
 
 def _handle_approvals_mine(handler, parsed, policy, subject, access) -> bool:

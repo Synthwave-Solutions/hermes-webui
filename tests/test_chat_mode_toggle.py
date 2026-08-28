@@ -187,9 +187,9 @@ def test_normal_mode_drops_every_enabled_mcp_server_name():
     assert result & servers == set()
 
 
-def test_normal_mode_falls_back_rather_than_shipping_a_zero_tool_turn():
+def test_normal_mode_allows_zero_tools_instead_of_restoring_wide_toolsets():
     pinned = ["terminal", "browser"]
-    assert chat_mode_toolsets(pinned, "normal") == pinned
+    assert chat_mode_toolsets(pinned, "normal") == []
 
 
 # ── Persistence ─────────────────────────────────────────────────────────────

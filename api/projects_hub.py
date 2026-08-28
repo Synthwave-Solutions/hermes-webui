@@ -241,6 +241,11 @@ def _workspaces_section(sessions, workspace_entries) -> dict:
             continue
         items.append({
             "name": str(entry.get("name") or ""),
+            # Internal-only identity used by injected readers. project_detail
+            # strips this field before returning JSON, so duplicate display
+            # names cannot redirect reads to another ACL-visible root and no
+            # absolute path leaks to the browser.
+            "_path": str(entry.get("path") or "").strip(),
             "source": "workspaces",
         })
     return _section(
@@ -261,8 +266,9 @@ def _files_section(sessions, workspace_entries, list_dir_reader) -> dict:
     truncated = len(linked) > MAX_FILE_ROOTS
     for entry in linked[:MAX_FILE_ROOTS]:
         name = entry.get("name") or ""
+        workspace_ref = entry.get("_path") or name
         try:
-            listing = list_dir_reader(name) or []
+            listing = list_dir_reader(workspace_ref) or []
         except Exception:
             logger.debug("hub file listing failed for a space", exc_info=True)
             continue
@@ -332,8 +338,9 @@ def _status_section(sessions, workspace_entries, project_os_reader) -> dict:
     items = []
     for entry in _workspaces_section(sessions, workspace_entries)["items"][:MAX_FILE_ROOTS]:
         name = entry.get("name") or ""
+        workspace_ref = entry.get("_path") or name
         try:
-            status = project_os_reader(name)
+            status = project_os_reader(workspace_ref)
         except Exception:
             logger.debug("hub project status read failed", exc_info=True)
             continue
@@ -396,6 +403,8 @@ def project_detail(
 
     if capabilities.get("workspaces"):
         detail["workspaces"] = _workspaces_section(sessions, workspace_entries)
+        for row in detail["workspaces"]["items"]:
+            row.pop("_path", None)
     if capabilities.get("files"):
         detail["files"] = _files_section(sessions, workspace_entries, list_dir_reader)
     if capabilities.get("jobs"):

@@ -11388,12 +11388,21 @@ def _projects_hub_context(handler):
     return active_profile, owner_scope, capabilities
 
 
-def _projects_hub_workspace_root(workspace_entries, name):
-    """The filesystem root behind a workspace NAME the caller may already see."""
+def _projects_hub_workspace_root(workspace_entries, workspace_ref):
+    """Resolve an ACL-filtered workspace by exact path, with legacy name fallback."""
+    wanted = str(workspace_ref or "").strip()
+    # Internal project-hub readers receive the exact path from projects_hub.py.
+    # Keep accepting a name for older direct callers and focused tests.
     for entry in workspace_entries or []:
         if not isinstance(entry, dict):
             continue
-        if str(entry.get("name") or "") != str(name):
+        raw = str(entry.get("path") or "").strip()
+        if raw and raw == wanted:
+            return Path(raw).expanduser()
+    for entry in workspace_entries or []:
+        if not isinstance(entry, dict):
+            continue
+        if str(entry.get("name") or "") != wanted:
             continue
         raw = str(entry.get("path") or "").strip()
         if raw:

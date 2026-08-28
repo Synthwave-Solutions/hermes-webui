@@ -16,8 +16,13 @@ for: the integration inventory shipping mcp:read data on a sessions:read
 route, and a "read-only" helper (ensure_cron_project) that writes.
 """
 import ast
+import json
 import pathlib
+import shutil
+import subprocess
 import sys
+
+import pytest
 
 from unittest.mock import patch
 
@@ -288,6 +293,31 @@ def test_a_capability_check_that_raises_closes_the_section():
 
     caps = projects_hub.caller_capabilities({"email": STEVE}, permission_check=_boom)
     assert not any(caps.values()), "governance is deny by default"
+
+
+def test_duplicate_workspace_names_keep_readers_bound_to_the_exact_path():
+    from api import projects_hub
+
+    sessions = [{"workspace": "/allowed/second"}]
+    entries = [
+        {"name": "Shared", "path": "/allowed/first"},
+        {"name": "Shared", "path": "/allowed/second"},
+    ]
+    seen = []
+
+    detail = projects_hub.project_detail(
+        {"project_id": "p1", "name": "Alpha"},
+        [{"project_id": "p1", "workspace": "/allowed/second"}],
+        "all", "default",
+        {"workspaces": True, "files": True, "status": True},
+        workspace_entries=entries,
+        list_dir_reader=lambda ref: seen.append(("files", ref)) or [],
+        project_os_reader=lambda ref: seen.append(("status", ref)) or None,
+    )
+
+    assert seen == [("files", "/allowed/second"), ("status", "/allowed/second")]
+    assert detail["workspaces"]["items"] == [{"name": "Shared", "source": "workspaces"}]
+    assert "/allowed/second" not in repr(detail)
 
 
 def test_the_hub_omits_the_integration_inventory_without_mcp_read():
@@ -620,6 +650,49 @@ def test_a_refused_request_renders_a_neutral_state_without_a_toast():
     assert "_projUnavailable()" in block
     assert "showToast" not in PROJECTS_JS and "alert(" not in PROJECTS_JS
     assert "projects_unavailable" in PROJECTS_JS
+
+
+def test_a_stale_project_selection_does_not_hide_a_valid_hub():
+    """A disappeared project must not trigger a detail 404 after hub refresh."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is required for the frontend projects regression")
+    script = f"""
+const vm = require('vm');
+const context = {{
+  console,
+  document: {{ getElementById: () => null }},
+  $: () => null,
+  api: async path => {{
+    context.calls.push(path);
+    if (path === '/api/projects/hub') return {{ projects: [{{ project_id: 'visible' }}] }};
+    throw new Error('404');
+  }},
+  calls: [],
+  t: key => key,
+  _escHtml: String,
+}};
+vm.createContext(context);
+vm.runInContext({json.dumps(PROJECTS_JS)} + `
+  _projSelectedId = 'stale';
+  _projRenderList = () => {{}};
+  _projRenderIntegrations = () => {{}};
+  _projUnavailable = () => {{ globalThis.unavailable = true; }};
+  globalThis.run = async () => {{
+    const result = await loadProjectsHub();
+    return {{ result, calls: globalThis.calls, selected: _projSelectedId, unavailable: !!globalThis.unavailable }};
+  }};
+`, context);
+context.run().then(result => process.stdout.write(JSON.stringify(result)));
+"""
+    result = subprocess.run([node, "-e", script], text=True, capture_output=True)
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {
+        "result": True,
+        "calls": ["/api/projects/hub"],
+        "selected": "",
+        "unavailable": False,
+    }
 
 
 def test_the_client_never_re_adds_a_section_the_server_withheld():

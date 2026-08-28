@@ -75,6 +75,14 @@ async function loadProjectsHub() {
   }
   _projRenderList();
   _projRenderIntegrations();
+  // A project can disappear or leave the caller's visibility scope between
+  // refreshes. Never let a stale local selection turn a successfully loaded
+  // hub into the generic unavailable state via a follow-up detail 404.
+  const visibleIds = new Set((_projHub.projects || []).map(p => String(p.project_id || '')));
+  if (_projSelectedId && !visibleIds.has(_projSelectedId)) {
+    _projSelectedId = '';
+    _projDetail = null;
+  }
   if (_projSelectedId) await _projOpen(_projSelectedId);
   return true;
 }

@@ -482,6 +482,29 @@ def test_approving_one_leaves_every_sibling_open_and_writes_only_that_value(isol
     assert _by(handler.body["suggestions"], "permission", "cron:write") is not None
 
 
+def test_policy_save_failure_leaves_related_suggestion_retryable(isolated_home, as_user, monkeypatch):
+    key = _request(USER, "route", "/api/crons")
+    as_user("admin@example.test")
+
+    def _fail_save(_raw):
+        raise governance_api.GovernancePolicyError("disk unavailable")
+
+    monkeypatch.setattr(governance_api, "save_governance_policy", _fail_save)
+    _, handler = _call(
+        "/api/governance/approvals/suggestions/decide", method="POST",
+        body={"origin_key": key, "gkind": "permission", "value": "cron:read", "decision": "approve"},
+    )
+    assert handler.status == 400
+    decision = suggestions.load_decisions().get(
+        suggestions.decision_key(key, "permission", "cron:read")
+    )
+    assert decision is None or decision.get("status") != suggestions.STATUS_APPROVED
+
+    _, detail = _call("/api/governance/approvals/suggestions", query=f"key={key}")
+    row = _by(detail.body["suggestions"], "permission", "cron:read")
+    assert row is not None and row["status"] == suggestions.STATUS_OPEN
+
+
 def test_approve_lands_in_the_audit_trail_with_the_chain(isolated_home, as_user):
     key = _request(USER, "route", "/api/crons")
     as_user("admin@example.test")
