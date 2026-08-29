@@ -13986,6 +13986,9 @@ def handle_post(handler, parsed) -> bool:
                 requested_participants, owner_email=s.owner_email
             )
             _audit_group_participants(handler, s, [], s.participants, "session_new")
+            # Same reason as the participants route: the conversation belongs
+            # in the sidebars of everyone named in it, from the start.
+            _on_session_list_changed(getattr(s, "profile", None))
         if worktree_info:
             publish_session_list_changed(
                 "session_new",
@@ -14360,6 +14363,10 @@ def handle_post(handler, parsed) -> bool:
             s.participants = requested
             s.save()
         _audit_group_participants(handler, s, before, requested, "participants_set")
+        # Membership decides whose sidebar this conversation appears in, so the
+        # cached session list must be rebuilt: without this, somebody added to
+        # a conversation would not see it until the cache aged out.
+        _on_session_list_changed(getattr(s, "profile", None))
         publish_session_list_changed(
             "session_participants",
             profile=getattr(s, "profile", None),
