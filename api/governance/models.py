@@ -48,6 +48,7 @@ def _deep_merge_grants(base: "GrantSet", other: "GrantSet") -> "GrantSet":
         cli_denied_commands=base.cli_denied_commands | other.cli_denied_commands,
         cli_workdir_roots=base.cli_workdir_roots | other.cli_workdir_roots,
         workspaces=base.workspaces | other.workspaces,
+        env_vars=base.env_vars | other.env_vars,
         usage_caps={**base.usage_caps, **other.usage_caps},
     )
 
@@ -103,6 +104,7 @@ def _subtract_grants(base: "GrantSet", deny: "GrantSet") -> "GrantSet":
         cli_denied_commands=base.cli_denied_commands | deny.cli_commands,
         cli_workdir_roots=_subtract_set(base.cli_workdir_roots, deny.cli_workdir_roots),
         workspaces=_subtract_set(base.workspaces, deny.workspaces),
+        env_vars=_subtract_set(base.env_vars, deny.env_vars),
         usage_caps=dict(base.usage_caps),
     )
 
@@ -142,6 +144,11 @@ class GrantSet:
     # Zie hermes-agent: workspaces horen in de governance, niet in een los
     # bestand naast de rechten.
     workspaces: frozenset[str] = field(default_factory=frozenset)
+    # Environment variables a caller's shell may receive; see the hermes-agent
+    # GrantSet. The terminal can no longer read the Hermes .env, so a person
+    # who needs one platform key gets that name granted here and the agent
+    # fills the value in for their child processes only.
+    env_vars: frozenset[str] = field(default_factory=frozenset)
     usage_caps: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
@@ -155,6 +162,7 @@ class GrantSet:
         models = data.get("models") if isinstance(data.get("models"), Mapping) else {}
         files = data.get("files") if isinstance(data.get("files"), Mapping) else {}
         cli = data.get("cli") if isinstance(data.get("cli"), Mapping) else {}
+        env = data.get("env") if isinstance(data.get("env"), Mapping) else {}
         mcp_tools: dict[str, frozenset[str]] = {}
         raw_mcp_tools = mcp.get("tools") if isinstance(mcp, Mapping) else None
         if isinstance(raw_mcp_tools, Mapping):
@@ -194,6 +202,7 @@ class GrantSet:
             cli_approval_commands=approval_command_ids,
             cli_workdir_roots=_string_set(cli.get("workdir_roots") if isinstance(cli, Mapping) else None),
             workspaces=_string_set(data.get("workspaces")),
+            env_vars=_string_set(env.get("vars") if isinstance(env, Mapping) else None),
             usage_caps=dict(data.get("usage_caps") or {}),
         )
 
@@ -211,7 +220,7 @@ class GrantSet:
             self.mcp_tools, self.model_providers, self.models,
             self.file_read_roots, self.file_write_roots,
             self.file_denied_globs, self.file_allow_globs, self.cli_commands, self.cli_approval_commands,
-            self.cli_denied_commands, self.cli_workdir_roots,
+            self.cli_denied_commands, self.cli_workdir_roots, self.env_vars,
             self.usage_caps,
         ))
 

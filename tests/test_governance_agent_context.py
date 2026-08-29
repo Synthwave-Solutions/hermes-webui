@@ -335,3 +335,30 @@ def test_serialized_grant_payload_covers_every_grant_field():
         f"grant serializer drift: missing={sorted(grant_fields - payload_keys)}, "
         f"extra={sorted(payload_keys - grant_fields)}"
     )
+
+
+class TestEnvVarGrantCrossesToTheAgent:
+    """The webui resolves the grants and the agent enforces them, so a new
+    dimension must exist on both sides or the bridge drops it silently. The
+    env grant names the environment variables a person's shell may receive,
+    which is what replaced reading the Hermes .env from the terminal."""
+
+    def test_the_policy_parses_the_env_grant(self):
+        from api.governance.models import GrantSet
+        grants = GrantSet.from_mapping({"env": {"vars": ["OMNIROUTE_API_KEY", "NOTION_API_KEY"]}})
+        assert grants.env_vars == frozenset({"OMNIROUTE_API_KEY", "NOTION_API_KEY"})
+
+    def test_an_env_only_grant_is_not_treated_as_empty(self):
+        from api.governance.models import GrantSet
+        assert not GrantSet.from_mapping({"env": {"vars": ["A"]}}).is_empty()
+
+    def test_roles_and_users_merge_their_env_grants(self):
+        from api.governance.models import GrantSet
+        role = GrantSet.from_mapping({"env": {"vars": ["A"]}})
+        user = GrantSet.from_mapping({"env": {"vars": ["B"]}})
+        assert role.merge(user).env_vars == frozenset({"A", "B"})
+
+    def test_a_deny_takes_one_variable_back(self):
+        from api.governance.models import GrantSet
+        granted = GrantSet.from_mapping({"env": {"vars": ["A", "B"]}})
+        assert granted.subtract(GrantSet.from_mapping({"env": {"vars": ["A"]}})).env_vars == frozenset({"B"})
