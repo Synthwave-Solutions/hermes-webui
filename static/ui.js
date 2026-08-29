@@ -18124,10 +18124,34 @@ function _toolPathBasename(value){
   const parts=normalized.split(/[\\/]+/);
   return parts.pop()||normalized;
 }
+// Work handed to a separate worker CLI looks like any other shell command in
+// the activity stream, so a delegation that takes minutes reads as "Running a
+// command" and the conversation appears stalled. Recognise the workers we
+// actually use and say who is doing the work (29 Aug 2026).
+const _DELEGATION_WORKERS=[
+  {re:/(?:^|[\s;&|(])opencode(?:\s|$)/i, label:'OpenCode'},
+  {re:/(?:^|[\s;&|(])dsh(?:\s|$)/i, label:'DeepSeek Harness'},
+  {re:/(?:^|[\s;&|(])deepseek-harness(?:\s|$)/i, label:'DeepSeek Harness'},
+  {re:/(?:^|[\s;&|(])claude(?:\s|$)/i, label:'Claude Code'},
+  {re:/(?:^|[\s;&|(])codex(?:\s|$)/i, label:'Codex'},
+];
+function _delegatedWorkerName(tc){
+  try{
+    const a=(tc&&tc.args)||{};
+    const cmd=String(a.command||a.cmd||a.script||'');
+    if(!cmd) return '';
+    for(const w of _DELEGATION_WORKERS){ if(w.re.test(cmd)) return w.label; }
+  }catch(e){}
+  return '';
+}
+if(typeof window!=='undefined') window._delegatedWorkerName=_delegatedWorkerName;
+
 function _toolActionKind(tc){
   const n=String(tc&&tc.name||'').toLowerCase().replace(/[^a-z0-9]+/g,'_');
   if(!n) return 'unknown';
   if(n==='subagent_progress'||n==='delegate_task') return 'delegate';
+  // A shell call that starts a worker CLI is a delegation, not a command.
+  if((n.includes('terminal')||n.includes('shell')||n.includes('command'))&&_delegatedWorkerName(tc)) return 'delegate';
   if(n.includes('skill')) return 'skill';
   if(n.includes('memory')) return 'memory';
   if(n.includes('terminal')||n.includes('shell')||n.includes('command')||n.includes('process')||n==='execute_code') return 'shell';
@@ -18199,6 +18223,10 @@ function _toolVisibleTargetLabel(tc, opts){
     if(range) text=opts.rangeFirst?`${range} · ${text}`:`${text} · ${range}`;
     return _shortToolLabel(text, opts.limit||112);
   }
+  if(kind==='delegate'){
+    const worker=_delegatedWorkerName(tc);
+    if(worker) return _shortToolLabel(`${worker}: ${target}`, opts.limit||112);
+  }
   if(kind==='skill'){
     const suffix=_toolI18n('tool_target_skill_suffix', 'skill');
     const text=target.toLowerCase().endsWith(String(suffix).toLowerCase())?target:`${target} ${suffix}`;
@@ -18242,7 +18270,7 @@ function _toolActionLabelText(tc, opts){
       write:{running:'Updating',done:'Updated',fallback:'a file'},
       skill:{running:'Loading',done:'Loaded',fallback:'a skill'},
       memory:{running:'Saving',done:'Saved',fallback:'memory'},
-      delegate:{running:'Delegating',done:'Delegated',fallback:'a task'},
+      delegate:{running:'Handing work to',done:'Got work back from',fallback:'a subagent'},
       unknown:{running:'Running',done:'Ran',fallback:disp||'a tool'},
     };
     const v=verbs[k]||verbs.unknown;
@@ -18268,7 +18296,7 @@ function _toolWorklogSummaryLine(kind, state, count){
       write:{running:['Updating a file','Updating {n} files'],done:['Updated a file','Updated {n} files']},
       skill:{running:['Loading a skill','Loading {n} skills'],done:['Loaded a skill','Loaded {n} skills']},
       memory:{running:['Saving memory','Saving {n} memory updates'],done:['Saved memory','Saved {n} memory updates']},
-      delegate:{running:['Delegating a task','Delegating {n} tasks'],done:['Delegated a task','Delegated {n} tasks']},
+      delegate:{running:['Handing work over','Handing over {n} tasks'],done:['Work came back','{n} tasks came back']},
       unknown:{running:['Running a tool','Running {n} tools'],done:['Ran a tool','Ran {n} tools']},
     };
     const pair=((forms[k]||forms.unknown)[s]||forms.unknown.running);
