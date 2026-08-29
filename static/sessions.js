@@ -1565,6 +1565,11 @@ async function newSession(flash, options={}){
     if(!S.session && Array.isArray(S._pendingSessionToolsets)) reqBody.enabled_toolsets=S._pendingSessionToolsets;
     // Same empty-composer gate for the staged chat mode (Michael Ramirez, 28 Aug 2026).
     if(!S.session && S._pendingChatMode) reqBody.chat_mode=S._pendingChatMode;
+    // And for the people staged on the empty composer, so a group conversation
+    // is a group from its very first message (Michael Ramirez, 29 Aug 2026).
+    if(!S.session && Array.isArray(S._pendingParticipants) && S._pendingParticipants.length){
+      reqBody.participants=S._pendingParticipants;
+    }
     const modelSelForNew=$('modelSelect');
     const explicitModelOverride=(typeof _readEmptyComposerModelOverride==='function')
       ? _readEmptyComposerModelOverride()
@@ -1637,7 +1642,7 @@ async function newSession(flash, options={}){
     }
     S.session=data.session;S.messages=data.session.messages||[];
     S._pendingSessionToolsets=null;
-    S._pendingChatMode=null;
+    S._pendingChatMode=null;S._pendingParticipants=null;
     if(_sessionSourceFilter==='cli') _sessionSourceFilter='webui';
     if(typeof _hydrateTodosFromSession==='function') _hydrateTodosFromSession(S.session);
     S.lastUsage={...(data.session.last_usage||{})};
@@ -2146,7 +2151,7 @@ async function loadSession(sid){
   // Loading a real existing session abandons any pre-session toolset override
   // staged on the empty composer before any deferred refresh work runs.
   S._pendingSessionToolsets=null;
-  S._pendingChatMode=null;
+  S._pendingChatMode=null;S._pendingParticipants=null;
   if(typeof populateModelDropdown==='function'){
     const modelRefreshSid=sid;
     const isActiveModelRefreshSession=()=>!!(S.session&&S.session.session_id===modelRefreshSid);

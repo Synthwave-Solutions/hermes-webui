@@ -98,5 +98,6 @@ function applyLocaleToDOM(){
   // Chip labels that JS owns (their text depends on state, not on a fixed
   // data-i18n key) have to be re-rendered after a locale switch.
   if(typeof syncChatModeChip==='function')syncChatModeChip();
+  if(typeof syncGroupPeopleChip==='function')syncGroupPeopleChip();
 }
 window.i18nReady=loadLocale().catch(err=>{console.warn('[i18n] using English metadata fallback',err);_locale=LOCALES.en;});

@@ -406,6 +406,7 @@
           <button type="button" class="side-menu-item" data-settings-section="access" onclick="switchSettingsSection('access',{fromSidebarItem:true})">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
             <span data-i18n="settings_tab_access">Access requests</span>
+            <span class="access-pending-badge" id="accessPendingBadge" hidden aria-live="polite"></span>
           </button>
           <button type="button" class="side-menu-item" data-settings-section="preferences" onclick="switchSettingsSection('preferences',{fromSidebarItem:true})">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
@@ -708,6 +709,12 @@
               <button class="composer-chat-mode-chip" id="composerChatModeChip" type="button" onclick="toggleChatMode()" aria-pressed="false" title="Chat mode">
                 <span class="composer-chat-mode-icon" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></span>
                 <span class="composer-chat-mode-label" id="composerChatModeLabel">Super agent</span>
+              </button>
+            </div>
+            <div class="composer-people-wrap" id="composerPeopleWrap">
+              <button class="composer-people-chip" id="composerPeopleChip" type="button" onclick="openGroupPeoplePicker()" title="Who is in this conversation" data-i18n-title="group_people" aria-label="Who is in this conversation">
+                <span class="composer-people-icon" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+                <span class="composer-people-label" id="composerPeopleLabel" data-i18n="group_just_me">Just me</span>
               </button>
             </div>
             <div class="composer-toolsets-wrap" id="composerToolsetsWrap">
@@ -1926,6 +1933,25 @@
 <script src="static/outline.js?v=__WEBUI_VERSION__" defer></script>
 
 <!-- Kanban: create/rename board modal — used for both flows. -->
+<!-- Group conversations: pick who else is in this chat. Same overlay shell as
+     the kanban modals so there is one modal look in the app. -->
+<div class="kanban-modal-overlay" id="groupPeopleModal" hidden onclick="if(event.target===this)closeGroupPeoplePicker()">
+  <div class="kanban-modal" role="dialog" aria-modal="true" aria-labelledby="groupPeopleModalTitle">
+    <h3 id="groupPeopleModalTitle" data-i18n="group_people_title">Who is in this conversation</h3>
+    <div class="kanban-modal-row">
+      <div class="panel-head-sub" data-i18n="group_people_desc">Everyone you pick can open this conversation and write in it. Each person's messages run under their own access, never yours.</div>
+    </div>
+    <div class="kanban-modal-row">
+      <input type="text" id="groupPeopleFilter" placeholder="Search colleagues" data-i18n-placeholder="group_people_search" autocomplete="off" oninput="renderGroupPeopleList()">
+    </div>
+    <div class="kanban-modal-row" id="groupPeopleList" style="max-height:280px;overflow-y:auto"></div>
+    <div class="kanban-modal-error" id="groupPeopleModalError" aria-live="polite"></div>
+    <div class="kanban-modal-actions">
+      <button type="button" class="btn secondary" onclick="closeGroupPeoplePicker()" data-i18n="cancel">Cancel</button>
+      <button type="button" class="btn primary" id="groupPeopleModalSubmit" onclick="submitGroupPeoplePicker()" data-i18n="save">Save</button>
+    </div>
+  </div>
+</div>
 <div class="kanban-modal-overlay" id="kanbanBoardModal" hidden onclick="if(event.target===this)closeKanbanBoardModal()">
   <div class="kanban-modal" role="dialog" aria-modal="true" aria-labelledby="kanbanBoardModalTitle">
     <h3 id="kanbanBoardModalTitle" data-i18n="kanban_new_board">New board</h3>

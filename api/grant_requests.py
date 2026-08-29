@@ -261,6 +261,64 @@ def _notify_admins_of_request(entry: dict) -> bool:
         return False
 
 
+def notify_requester_of_decision(entry: dict, decision: str, decided_by: str, reason: str = "") -> bool:
+    """Tell the person who asked that their request was decided.
+
+    Reported 27 Aug 2026 ("Notify users when a governance approval is granted
+    or denied"): a requester had to keep reopening the Access requests screen
+    to find out. This closes the loop out of band.
+
+    The destination is per person, configured by an admin under the settings
+    key ``governance_user_alert_destinations`` as ``{email: "platform:chat_id"}``.
+    Somebody without one simply does not get an out-of-band message; the
+    decision is still visible in their own Access requests list, which stays
+    the authoritative place. Nothing here grants or changes anything: it is a
+    message about a decision that has already been persisted.
+
+    Never raises; a failed notification leaves the decision untouched.
+    """
+    try:
+        requester = str(entry.get("owner_email") or "").strip().lower()
+        if not requester:
+            return False
+        from api.config import load_settings
+
+        settings = load_settings() or {}
+        destinations = settings.get("governance_user_alert_destinations")
+        if not isinstance(destinations, dict):
+            return False
+        destination = ""
+        for email, value in destinations.items():
+            if str(email or "").strip().lower() == requester:
+                destination = str(value or "").strip()
+                break
+        if not destination:
+            return False
+        granted = str(decision or "").strip().lower() == "approve"
+        what = str(entry.get("label") or entry.get("key") or "your request")
+        lines = [
+            f"Your SynthPulse access request was {'approved' if granted else 'declined'}.",
+            f"Requested: {what}",
+            f"Decided by: {decided_by or 'an administrator'}",
+        ]
+        if str(reason or "").strip():
+            lines.append(f"Note: {str(reason).strip()}")
+        lines.append(
+            "It is active now, no need to ask again."
+            if granted
+            else "Reply to your administrator if you still need this."
+        )
+        from api.cron_webui_delivery import deliver_external_notice
+
+        ok, error = deliver_external_notice(destination, "\n".join(lines))
+        if not ok:
+            logger.info("governance decision notice not delivered: %s", error)
+        return bool(ok)
+    except Exception as exc:  # pragma: no cover: never break a decision
+        logger.debug("governance decision notification failed: %s", exc)
+        return False
+
+
 def materialise_suggested_grant(
     email: str,
     gkind: str,

@@ -6378,7 +6378,7 @@ async function promptWorkspacePath(){
       // System-minted session (#6022): worktree:false is explicit so a config
       // worktree default can't leak a worktree from a workspace prompt.
       const r=await api('/api/session/new',{method:'POST',body:JSON.stringify({workspace:ws,worktree:false})});
-      if(r&&r.session){S._pendingSessionToolsets=null;S._pendingChatMode=null;S.session=r.session;S.messages=[];if(typeof syncTopbar==='function')syncTopbar();if(typeof renderMessages==='function')renderMessages();if(typeof renderSessionList==='function')await renderSessionList();}
+      if(r&&r.session){S._pendingSessionToolsets=null;S._pendingChatMode=null;S._pendingParticipants=null;S.session=r.session;S.messages=[];if(typeof syncTopbar==='function')syncTopbar();if(typeof renderMessages==='function')renderMessages();if(typeof renderSessionList==='function')await renderSessionList();}
     }catch(e){showToast(t('workspace_switch_failed')+e.message);return;}
     if(!S.session)return;
   }
@@ -6416,7 +6416,7 @@ async function switchToWorkspace(path,name){
       // System-minted session (#6022): explicit worktree:false — a workspace
       // switch from a blank page is not deliberate New Chat intent.
       const r=await api('/api/session/new',{method:'POST',body:JSON.stringify({workspace:ws,worktree:false})});
-      if(r&&r.session){S._pendingSessionToolsets=null;S._pendingChatMode=null;S.session=r.session;S.messages=[];if(typeof syncTopbar==='function')syncTopbar();if(typeof renderMessages==='function')renderMessages();if(typeof renderSessionList==='function')await renderSessionList();}
+      if(r&&r.session){S._pendingSessionToolsets=null;S._pendingChatMode=null;S._pendingParticipants=null;S.session=r.session;S.messages=[];if(typeof syncTopbar==='function')syncTopbar();if(typeof renderMessages==='function')renderMessages();if(typeof renderSessionList==='function')await renderSessionList();}
     }catch(e){if(typeof setStatus==='function')setStatus(t('switch_failed')+e.message);return;}
     if(!S.session)return;
   }
@@ -6484,7 +6484,7 @@ async function switchToWorkspace(path,name){
     // Clear the one-shot flag so a subsequent newSession() inherits this choice instead.
     S._profileSwitchWorkspace=null;
     S._pendingSessionToolsets=null;
-    S._pendingChatMode=null;
+    S._pendingChatMode=null;S._pendingParticipants=null;
     syncTopbar();
     if(
       restoreComposerFocusTarget&&
@@ -7004,7 +7004,7 @@ async function switchToProfile(name) {
   // nothing. (#4662 Opus gate)
   if (name && name === S.activeProfile) return true;
   S._pendingSessionToolsets=null;
-  S._pendingChatMode=null;
+  S._pendingChatMode=null;S._pendingParticipants=null;
   // Profile switches are per-client cookie/TLS scoped, so a running stream in
   // the current session can safely continue while this tab moves to another
   // profile. The in-flight session stays attached to its original profile.
@@ -13414,6 +13414,53 @@ async function loadMyAccessRequests(animate){
   }
 }
 window.loadMyAccessRequests=loadMyAccessRequests;
+// Your own access requests, surfaced without opening the screen: a count of
+// what is still waiting, and a one-time notice for anything decided since you
+// last looked. The watermark is per browser on purpose: this is a nudge, and
+// the Access requests screen stays the authoritative record of every decision.
+const _ACCESS_SEEN_LS_KEY='hermes-webui-access-decisions-seen';
+
+function _accessSeenWatermark(){
+  try{ return Number(localStorage.getItem(_ACCESS_SEEN_LS_KEY)||0)||0; }catch(e){ return 0; }
+}
+function _setAccessSeenWatermark(ts){
+  try{ localStorage.setItem(_ACCESS_SEEN_LS_KEY,String(Number(ts||0)||0)); }catch(e){}
+}
+
+async function refreshAccessRequestNotices(){
+  const badge=$('accessPendingBadge');
+  let rows=[];
+  try{
+    const data=await api('/api/governance/approvals/mine',{redirect401:false,timeoutToast:false});
+    rows=Array.isArray(data&&data.requests)?data.requests:[];
+  }catch(e){ return; }
+  const pending=rows.filter(r=>String(r&&r.status||'').toLowerCase()==='pending');
+  if(badge){
+    badge.textContent=String(pending.length);
+    badge.hidden=pending.length===0;
+    badge.title=pending.length===1?t('access_pending_one'):t('access_pending_many').replace('{n}',String(pending.length));
+  }
+  const seen=_accessSeenWatermark();
+  const decided=rows.filter(r=>{
+    const status=String(r&&r.status||'').toLowerCase();
+    if(status!=='approved'&&status!=='rejected') return false;
+    return Number(r.decided_at||0)>seen;
+  });
+  if(!decided.length) return;
+  const newest=decided.reduce((max,r)=>Math.max(max,Number(r.decided_at||0)),0);
+  // First run on a fresh browser: adopt the watermark silently rather than
+  // announcing every decision ever made.
+  if(!seen){ _setAccessSeenWatermark(newest); return; }
+  _setAccessSeenWatermark(newest);
+  decided.slice(0,3).forEach(r=>{
+    const approved=String(r.status||'').toLowerCase()==='approved';
+    const label=String(r.label||r.name||r.key||'');
+    const key=approved?'access_notice_approved':'access_notice_rejected';
+    if(typeof showToast==='function') showToast(t(key).replace('{what}',label),6000,approved?'':'error');
+  });
+}
+window.refreshAccessRequestNotices=refreshAccessRequestNotices;
+
 window.openFilesFromRail=openFilesFromRail;
 
 // ── Upstream capacity: administrator settings and alert list ────────────────

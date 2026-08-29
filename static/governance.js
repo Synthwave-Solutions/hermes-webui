@@ -1300,6 +1300,68 @@ function _govRiskLabel(id) {
  * attributes: a skill's description is written by whoever wrote the skill, and
  * a skill author must never be able to put markup on an approver's screen.
  */
+/** The advisory block: why they asked, the worst case, and a recommendation.
+ *
+ * Rendered above the catalogue detail because it is what an approver reads
+ * first. Every value is escaped: the requester's own words and a model's
+ * output are both untrusted text, never markup. The source line is never
+ * dropped, so advice written from the fixed catalogue can never be mistaken
+ * for a considered opinion about this particular person.
+ */
+function _govRecommendationLabel(value) {
+  switch (String(value || '')) {
+    case 'grant': return _govT('advice_rec_grant', 'Grant it');
+    case 'grant_narrower': return _govT('advice_rec_grant_narrower', 'Grant something narrower');
+    case 'decline': return _govT('advice_rec_decline', 'Do not grant');
+    case 'needs_more_information': return _govT('advice_rec_needs_more_information', 'Ask them first');
+    default: return '';
+  }
+}
+
+function _govRecommendationClass(value) {
+  switch (String(value || '')) {
+    case 'grant': return 'on';
+    case 'decline': return 'off';
+    default: return 'warn';
+  }
+}
+
+function _govAdviceHtml(advice) {
+  if (!advice || typeof advice !== 'object') return '';
+  const recommendation = String(advice.recommendation || '');
+  const label = _govRecommendationLabel(recommendation);
+  const row = (key, value) => {
+    const text = String(value || '').trim();
+    if (!text) return '';
+    return '<div class="gov-explain-row"><span class="gov-explain-key">' + _govEsc(key)
+      + '</span><span class="gov-explain-val">' + _govEsc(text) + '</span></div>';
+  };
+  let body = '';
+  body += row(_govT('advice_their_words', 'In their own words'), advice.requester_ask);
+  body += row(_govT('advice_why', 'Why they asked'), advice.why);
+  body += row(_govT('advice_risk', 'Worst case'), advice.risk);
+  if (label) {
+    body += '<div class="gov-explain-row"><span class="gov-explain-key">'
+      + _govEsc(_govT('advice_recommendation', 'Advice')) + '</span><span class="gov-explain-val">'
+      + '<span class="gov-pill ' + _govRecommendationClass(recommendation) + '">' + _govEsc(label) + '</span> '
+      + _govEsc(String(advice.recommendation_reason || '')) + '</span></div>';
+  }
+  body += row(_govT('governance_explain_alternatives', 'Narrower alternative'), advice.narrower_alternative);
+  if (!body) return '';
+  const source = String(advice.source || '') === 'model'
+    ? _govT('advice_from_model', 'Written by the assistant')
+    : _govT('advice_from_rules', 'From the risk catalogue');
+  const note = String(advice.note || '').trim();
+  body += '<div class="gov-explain-row gov-muted"><span class="gov-explain-key"></span>'
+    + '<span class="gov-explain-val">' + _govEsc(source + (note ? '. ' + note : '')) + '</span></div>';
+  const pill = label
+    ? '<span class="gov-pill ' + _govRecommendationClass(recommendation) + '">' + _govEsc(label) + '</span>'
+    : '';
+  return '<details class="gov-explain" open><summary class="gov-explain-summary">'
+    + '<span class="gov-explain-toggle">' + _govEsc(_govT('advice_title', 'What this is and what we advise'))
+    + '</span>' + pill + '</summary><div class="gov-explain-body">' + body + '</div></details>';
+}
+
 function _govExplainHtml(ex) {
   const risks = Array.isArray(ex.risks) ? ex.risks : [];
   const chips = risks.map(id => {
@@ -1377,6 +1439,7 @@ function _govApprovalRow(item) {
     : '';
   const ex = (item.explanation && typeof item.explanation === 'object') ? item.explanation : null;
   const explainHtml = ex ? _govExplainHtml(ex) : '';
+  const adviceHtml = _govAdviceHtml(item.advice);
   // Related access (ticket 10) hangs off access requests only: the chain it
   // walks is the route/permission one, which the other kinds do not have.
   const sugHtml = kind === 'grant'
@@ -1393,7 +1456,7 @@ function _govApprovalRow(item) {
     ' data-key="' + _govEsc(key) + '">' + label2 + '</button>';
   return '<tr>' +
     '<td class="gov-nowrap"><span class="gov-chip' + _govKindChipClass(kind) + '">' + _govEsc(_govKindLabel(kind)) + '</span></td>' +
-    '<td>' + _govEsc(primary) + secondary + detail + triggerHtml + explainHtml + sugHtml + '</td>' +
+    '<td>' + _govEsc(primary) + secondary + detail + triggerHtml + adviceHtml + explainHtml + sugHtml + '</td>' +
     '<td>' + _govEsc(item.owner_email || '') + '</td>' +
     '<td class="gov-nowrap">' + _govEsc(when) + '</td>' +
     '<td class="gov-row-actions">' +

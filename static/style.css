@@ -2628,6 +2628,7 @@
   .composer-reasoning-wrap,
   .composer-toolsets-wrap,
   .composer-chat-mode-wrap,
+  .composer-people-wrap,
   .composer-model-wrap{position:relative;flex:0 0 auto;}
   .composer-profile-chip{display:inline-flex;align-items:center;gap:8px;max-width:180px;padding:8px 10px 8px 12px;border-radius:999px;border:1px solid transparent;background-color:transparent;font-weight:500;cursor:pointer;transition:color .15s,background-color .15s,border-color .15s;}
   .composer-profile-chip:hover{background-color:var(--hover-bg);}
@@ -2674,6 +2675,20 @@
   .composer-chat-mode-chip.mode-normal{color:var(--accent);background:var(--accent-bg);border-color:var(--accent-bg-strong);}
   .composer-chat-mode-icon{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;line-height:1;}
   .composer-chat-mode-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  /* People chip: who else is in this conversation (group chats, 29 Aug 2026).
+     Visible at every composer width like the mode chip, because who can read
+     a conversation must never be hidden behind a narrow layout. */
+  .composer-people-wrap{display:block;}
+  .composer-people-chip{display:inline-flex;align-items:center;gap:6px;max-width:200px;padding:8px 12px;border-radius:999px;border:1px solid transparent;background-color:transparent;color:var(--muted);font-weight:500;cursor:pointer;transition:color .15s,background-color .15s,border-color .15s;}
+  .composer-people-chip:hover{color:var(--text);background-color:var(--hover-bg);}
+  .composer-people-chip.is-group{color:var(--accent);background:var(--accent-bg);border-color:var(--accent-bg-strong);}
+  .composer-people-icon{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;line-height:1;}
+  .composer-people-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  /* Count of your own access requests still waiting for a decision. Sits in
+     the settings menu so it is visible without opening the screen. */
+  .access-pending-badge{margin-left:auto;min-width:18px;padding:1px 6px;border-radius:999px;background:var(--accent-bg);color:var(--accent);font-size:11px;font-weight:700;text-align:center;}
+  /* Author line above a message in a group conversation. */
+  .msg-author{font-size:11px;font-weight:600;color:var(--muted);margin-bottom:2px;letter-spacing:.01em;}
   /* Toolsets chip — session-level toolset override (#493) */
   .composer-toolsets-wrap{display:none;}
   .composer-toolsets-chip{display:inline-flex;align-items:center;gap:8px;max-width:180px;padding:8px 10px 8px 12px;border-radius:999px;border:1px solid transparent;background-color:transparent;color:var(--muted);font-weight:500;cursor:pointer;transition:color .15s,background-color .15s,border-color .15s;}
@@ -3046,6 +3061,9 @@
   .composer-footer.cf-icons .composer-chat-mode-label,
   .composer-footer.cf-icons #composerChatModeLabel{display:none;}
   .composer-footer.cf-icons .composer-chat-mode-chip{box-sizing:border-box;width:44px;height:44px;max-width:44px;min-width:44px;min-height:44px;padding:0;justify-content:center;gap:0;}
+  .composer-footer.cf-icons .composer-people-label,
+  .composer-footer.cf-icons #composerPeopleLabel{display:none;}
+  .composer-footer.cf-icons .composer-people-chip{box-sizing:border-box;width:44px;height:44px;max-width:44px;min-width:44px;min-height:44px;padding:0;justify-content:center;gap:0;}
   .composer-footer.cf-icons #btnSavedPrompts,
   .composer-footer.cf-icons .saved-prompts-popup{display:none!important;}
   .composer-footer.cf-icons .composer-divider{display:none;}

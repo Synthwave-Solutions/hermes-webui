@@ -898,6 +898,18 @@ def _approval_row(entry: dict, *, explain: bool = False, access=None) -> dict:
             )
         except Exception:
             row["explanation"] = {}
+        # The advisory block: why this person most likely asked, the realistic
+        # worst case, and a recommendation. Written by a model where one is
+        # reachable, from the risk catalogue otherwise; the block says which.
+        # Pending rows only: advice on a decided request would be noise, and
+        # asking a model about a settled row costs money for nothing.
+        if str(entry.get("status") or "").strip().lower() == "pending":
+            try:
+                from api import approval_advice
+
+                row["advice"] = approval_advice.advise(entry, row.get("explanation"))
+            except Exception:
+                row["advice"] = {}
     return row
 
 
@@ -1232,6 +1244,15 @@ def _handle_approvals_decide_generic(handler, parsed, policy, subject, body, kin
         subject, policy.mode, parsed, op=op, key=f"{kind}:{key}", owner=owner,
         digest=_approval_digest(entry),
     )
+    # Close the loop with the person who asked. Best effort and after the
+    # decision is already persisted and audited, so a delivery problem can
+    # never undo or delay a decision.
+    try:
+        from api import grant_requests
+
+        grant_requests.notify_requester_of_decision(entry, decision, decided_by, reason or "")
+    except Exception:
+        logger.debug("could not notify the requester of the decision", exc_info=True)
     j(
         handler,
         {
@@ -1364,6 +1385,16 @@ def _handle_grant_request_decide(handler, parsed, policy, subject, body) -> bool
         owner=str(payload.get("email") or entry.get("owner_email") or "").strip().lower(),
         digest=digest,
     )
+    # Close the loop with the requester, after the decision is persisted and
+    # audited so a delivery problem can never undo or delay it.
+    try:
+        from api import grant_requests
+
+        grant_requests.notify_requester_of_decision(
+            entry, decision, decided_by, str(body.get("reason") or "").strip()
+        )
+    except Exception:
+        logger.debug("could not notify the requester of the decision", exc_info=True)
     j(handler, {"ok": True, "kind": approvals.KIND_GRANT, "key": key, "status": str(updated.get("status") or decision)})
     return True
 

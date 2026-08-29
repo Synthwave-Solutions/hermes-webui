@@ -1081,6 +1081,7 @@ class Session:
                  worktree_created_at=None,
                  enabled_toolsets=None,
                  chat_mode=None,
+                 participants=None,
                  composer_draft=None,
                  anchor_activity_scenes=None,
                  **kwargs):
@@ -1147,6 +1148,12 @@ class Session:
         # normalized, never None, so every row answers the question and a reload
         # never has to guess what the user picked.
         self.chat_mode = normalize_chat_mode(chat_mode)
+        # Group conversations (Michael Ramirez, 29 Aug 2026): other people in the
+        # organisation who may open this chat and write in it. The owner is not
+        # listed here, they are in it by owning it. Empty for every ordinary
+        # one-person conversation, which is why nothing else had to change.
+        from api.group_chat import normalize as _normalize_participants
+        self.participants = _normalize_participants(participants, owner_email=self.owner_email)
         self.composer_draft = composer_draft if isinstance(composer_draft, dict) else {}
         self.anchor_activity_scenes = anchor_activity_scenes if isinstance(anchor_activity_scenes, dict) else {}
         raw_message_count = kwargs.get('message_count')
@@ -1218,7 +1225,7 @@ class Session:
             'parent_session_id',
             'worktree_path', 'worktree_branch', 'worktree_repo_root', 'worktree_created_at',
             'is_cli_session', 'source_tag', 'raw_source', 'session_source', 'source_label', 'read_only',
-            'enabled_toolsets', 'chat_mode', 'composer_draft', 'anchor_activity_scenes',
+            'enabled_toolsets', 'chat_mode', 'participants', 'composer_draft', 'anchor_activity_scenes',
         ]
         meta = {k: getattr(self, k, None) for k in METADATA_FIELDS}
         meta['message_count'] = len(self.messages or [])
@@ -1491,6 +1498,7 @@ class Session:
             'read_only': self.read_only,
             'enabled_toolsets': self.enabled_toolsets,
             'chat_mode': self.chat_mode,
+            'participants': list(self.participants or []),
             'composer_draft': self.composer_draft if isinstance(self.composer_draft, dict) else {},
             'is_streaming': _is_streaming_session(
                 self.active_stream_id, active_stream_ids

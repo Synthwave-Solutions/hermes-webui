@@ -536,10 +536,85 @@ def _session_owner_visible_to_request(owner_email, handler=None) -> bool:
 
 
 def _session_visible_to_request(session, handler=None) -> bool:
-    """Combined profile AND ownership visibility for a loaded session object."""
+    """Combined profile AND ownership visibility for a loaded session object.
+
+    A group conversation is also visible to the people named in it, which is
+    what makes them able to open it at all. The profile boundary still applies
+    first: being named in a chat never reaches across profiles.
+    """
     if not _session_visible_to_active_profile(getattr(session, "profile", None) or None, handler):
         return False
-    return _session_owner_visible_to_request(getattr(session, "owner_email", None), handler)
+    if _session_owner_visible_to_request(getattr(session, "owner_email", None), handler):
+        return True
+    if handler is None:
+        return True
+    from api.group_chat import visible_to_scope as _group_visible_to_scope
+    from api.ownership import request_owner_scope
+
+    return _group_visible_to_scope(
+        getattr(session, "owner_email", None),
+        getattr(session, "participants", None),
+        request_owner_scope(handler),
+    )
+
+
+def _request_owner_email_for_new_session(handler):
+    """The creating identity, used to keep the owner out of the participant list."""
+    from api.ownership import request_owner_email
+
+    try:
+        return request_owner_email(handler)
+    except Exception:
+        logger.debug("group chat: could not resolve the creating identity", exc_info=True)
+        return None
+
+
+def _audit_group_participants(handler, session, before, after, action: str) -> None:
+    """Record who changed the membership of a group conversation.
+
+    Membership decides who can read a conversation, so a change belongs in the
+    same audit trail as a governance decision rather than only in the file.
+    """
+    try:
+        from api.governance.audit import append_audit_event
+        from api.ownership import request_owner_email
+
+        actor = request_owner_email(handler) or ""
+        added = [p for p in (after or []) if p not in (before or [])]
+        removed = [p for p in (before or []) if p not in (after or [])]
+        if not added and not removed and action != "session_new":
+            return
+        append_audit_event(
+            "group_participants_changed",
+            subject_email=str(actor),
+            path="/api/session/participants",
+            method="POST",
+            reason=action,
+            extra={
+                "session_id": str(getattr(session, "session_id", "") or ""),
+                "owner_email": str(getattr(session, "owner_email", "") or ""),
+                "added": added,
+                "removed": removed,
+                "count": len(after or []),
+            },
+        )
+    except Exception:
+        logger.debug("group chat: participant audit failed", exc_info=True)
+
+
+def _group_participants_may_be_managed_by(session, handler) -> bool:
+    """Only the conversation's owner, or an admin, may change who is in it.
+
+    A participant can read and write but cannot pull other people in: that is
+    what keeps the owner in control of who sees the conversation.
+    """
+    from api.ownership import request_is_admin, request_owner_email
+
+    if request_is_admin(handler):
+        return True
+    owner = str(getattr(session, "owner_email", "") or "").strip().lower()
+    caller = str(request_owner_email(handler) or "").strip().lower()
+    return bool(owner) and bool(caller) and owner == caller
 
 
 def _request_session_visibility_exempt(method: str, path: str | None) -> bool:
@@ -2572,11 +2647,16 @@ def _build_session_list_cache_payload(
     if owner_scope is not None and str(owner_scope) != "all":
         diag_stage("ownership_scope")
         normalized_owner_scope = str(owner_scope).strip().lower()
+        # Group conversations (29 Aug 2026): a row is also kept when this
+        # person was named in it. Ownership itself is unchanged, so a chat
+        # nobody was named in behaves exactly as before.
+        from api.group_chat import visible_to_scope as _group_visible_to_scope
         merged = [
             s for s in merged
             if isinstance(s, dict)
-            and str(s.get("owner_email") or "").strip().lower()
-            and str(s.get("owner_email") or "").strip().lower() == normalized_owner_scope
+            and _group_visible_to_scope(
+                s.get("owner_email"), s.get("participants"), normalized_owner_scope
+            )
         ]
     # ── Profile scoping (#1611) ────────────────────────────────────────
     # Default: filter to the active profile. ?all_profiles=1 opts into
@@ -11474,6 +11554,62 @@ def _projects_hub_integrations(capabilities):
         return projects_hub.integration_status({}, {}, None)
 
 
+def _people_display_name(user, email: str) -> str:
+    """A readable name for the picker.
+
+    The governance policy stores addresses, not names, so the local part is
+    title-cased as a fallback. It is only a label: every write and every check
+    still keys on the address.
+    """
+    stored = str(getattr(user, "display_name", "") or "").strip() if user is not None else ""
+    if stored:
+        return stored
+    local = str(email or "").split("@", 1)[0]
+    parts = [p for p in local.replace("_", ".").replace("-", ".").split(".") if p]
+    return " ".join(p[:1].upper() + p[1:] for p in parts) if parts else str(email or "")
+
+
+def _handle_people_directory(handler) -> bool:
+    """GET /api/people: the colleagues you can put in a group conversation.
+
+    Names and addresses only. It deliberately carries no roles, grants or
+    activity: this list exists so a picker can show real colleagues instead of
+    asking people to type addresses, and a directory that leaks who has which
+    rights would be a governance surface rather than a contact list.
+    """
+    from api.governance.loader import load_governance_policy
+    from api.ownership import request_owner_email
+
+    people = []
+    try:
+        policy = load_governance_policy()
+    except Exception:
+        logger.debug("people directory: governance policy unavailable", exc_info=True)
+        policy = None
+    seen = set()
+    if policy is not None:
+        entries = list((getattr(policy, "users", None) or {}).items())
+        for email, user in entries:
+            address = str(email or "").strip().lower()
+            if not address or address in seen:
+                continue
+            seen.add(address)
+            people.append({
+                "email": address,
+                "display_name": _people_display_name(user, address),
+            })
+        for email in (getattr(policy, "bootstrap_admins", None) or ()):
+            address = str(email or "").strip().lower()
+            if address and address not in seen:
+                seen.add(address)
+                people.append({"email": address, "display_name": _people_display_name(None, address)})
+    people.sort(key=lambda p: (p.get("display_name") or p.get("email") or ""))
+    return j(handler, {
+        "people": people,
+        "me": str(request_owner_email(handler) or "").strip().lower() or None,
+    })
+
+
 def _handle_projects_hub(handler) -> bool:
     """GET /api/projects/hub: one summary row per project the caller may see."""
     from api import projects_hub
@@ -12724,6 +12860,9 @@ def handle_get(handler, parsed) -> bool:
         finally:
             diag.finish()
 
+    if parsed.path == "/api/people":
+        return _handle_people_directory(handler)
+
     if parsed.path == "/api/projects/hub":
         return _handle_projects_hub(handler)
 
@@ -13787,6 +13926,16 @@ def handle_post(handler, parsed) -> bool:
                 chat_mode = _validate_chat_mode(body.get("chat_mode"))
             except ValueError as e:
                 return bad(handler, str(e), status=400)
+        # A conversation can be created as a group chat straight away, so the
+        # people picked on the empty composer are in it from the first message
+        # instead of being added after the fact.
+        from api.group_chat import validate as _validate_participants
+        requested_participants, participants_error = _validate_participants(
+            body.get("participants"),
+            owner_email=_request_owner_email_for_new_session(handler),
+        )
+        if participants_error:
+            return bad(handler, participants_error, status=400)
         # Use the profile sent by the client tab (if any) so that two tabs on
         # different profiles never clobber each other via the process-level global.
         # ── Memory lifecycle: commit the previous session before starting a new one ──
@@ -13830,6 +13979,13 @@ def handle_post(handler, parsed) -> bool:
         from api.ownership import request_owner_email as _request_owner_email
 
         s.owner_email = _request_owner_email(handler)
+        if requested_participants:
+            from api.group_chat import normalize as _normalize_participants
+
+            s.participants = _normalize_participants(
+                requested_participants, owner_email=s.owner_email
+            )
+            _audit_group_participants(handler, s, [], s.participants, "session_new")
         if worktree_info:
             publish_session_list_changed(
                 "session_new",
@@ -14158,6 +14314,58 @@ def handle_post(handler, parsed) -> bool:
             s.personality = name if name else None
             s.save()
         return j(handler, {"ok": True, "personality": s.personality, "prompt": prompt})
+
+    if parsed.path == "/api/session/participants":
+        """Set who else is in this conversation (group chat).
+
+        POST body: { session_id, participants: [email, ...] }
+
+        An empty list turns a group conversation back into a private one. Only
+        the owner or an admin may change the list, and every address must
+        already be known to the governance policy, so a conversation can never
+        be opened to somebody this workstation does not know.
+        """
+        try:
+            require(body, "session_id")
+        except ValueError as e:
+            return bad(handler, str(e))
+        sid = body["session_id"]
+        if _session_is_subagent_view_only(sid):
+            return bad(handler, "Subagent sessions are view-only and cannot be modified from WebUI", 400)
+        try:
+            s = get_session(sid)
+        except KeyError:
+            return bad(handler, "Session not found", 404)
+        if not _session_visible_to_request(s, handler):
+            return bad(handler, "Session not found", 404)
+        if not _group_participants_may_be_managed_by(s, handler):
+            return bad(
+                handler,
+                "Only the person who started this conversation can change who is in it.",
+                status=403,
+            )
+        from api.group_chat import normalize as _normalize_participants
+        from api.group_chat import validate as _validate_participants
+
+        requested, error = _validate_participants(
+            body.get("participants") or [],
+            owner_email=getattr(s, "owner_email", None),
+        )
+        if error:
+            return bad(handler, error, status=400)
+        with _get_session_agent_lock(sid):
+            before = _normalize_participants(
+                getattr(s, "participants", None), owner_email=getattr(s, "owner_email", None)
+            )
+            s.participants = requested
+            s.save()
+        _audit_group_participants(handler, s, before, requested, "participants_set")
+        publish_session_list_changed(
+            "session_participants",
+            profile=getattr(s, "profile", None),
+            session_id=sid,
+        )
+        return j(handler, {"ok": True, "participants": list(s.participants or [])})
 
     if parsed.path == "/api/session/toolsets":
         """Set or clear per-session toolset override (#493).
@@ -20391,9 +20599,29 @@ def _start_chat_stream_for_session(
     goal_related: bool = False,
     source: str = "webui",
     moa_config=None,
+    sender_email=None,
 ):
-    """Persist pending state, register an SSE channel, and start an agent turn."""
+    """Persist pending state, register an SSE channel, and start an agent turn.
+
+    ``sender_email`` is who typed this message. In an ordinary one-person chat
+    that is the owner and nothing changes. In a group conversation it is the
+    participant who wrote, and the turn runs under THEIR governance: being in
+    somebody else's conversation must never lend you their rights.
+    """
     attachments = attachments or []
+    if getattr(s, "participants", None) and webui_gateway_chat_enabled(get_config()):
+        # The gateway worker binds no governance principal, so a turn there
+        # would run unbound. Refusing is the honest answer: a group chat must
+        # not be the one place where a participant's own limits stop applying.
+        # Checked before any stream or pending state is created so a refusal
+        # leaves the conversation exactly as it was.
+        return {
+            "error": (
+                "Group conversations are not available on the gateway chat backend yet, "
+                "because a turn there cannot run under the sender's own access."
+            ),
+            "_status": 409,
+        }
     # Prevent duplicate runs in the same session while a stream is still active.
     # This commonly happens after page refresh/reconnect races and can produce
     # duplicated clarify cards for what appears to be a single user request.
@@ -20514,6 +20742,9 @@ def _start_chat_stream_for_session(
     backend_is_gateway = webui_gateway_chat_enabled(get_config())
     worker_target = _run_gateway_chat_streaming if backend_is_gateway else _run_agent_streaming
     worker_kwargs = {"model_provider": model_provider, "goal_related": goal_related}
+    _sender = str(sender_email or "").strip().lower()
+    if _sender and _sender != str(getattr(s, "owner_email", "") or "").strip().lower():
+        worker_kwargs["sender_email"] = _sender
     if moa_config and not backend_is_gateway:
         worker_kwargs["moa_config"] = moa_config
     thr = threading.Thread(
@@ -20602,6 +20833,7 @@ def _start_run(
     route: str,
     diag=None,
     moa_config=None,
+    sender_email=None,
 ):
     """Shared start-run helper for /api/chat/start and start_session_turn.
 
@@ -20642,6 +20874,7 @@ def _start_run(
                 diag=diag,
                 source=request.source or source,
                 moa_config=moa_config,
+                sender_email=sender_email,
             )
 
         def _legacy_adapter_factory():
@@ -20682,6 +20915,7 @@ def _start_run(
         diag=diag,
         source=source,
         moa_config=moa_config,
+        sender_email=sender_email,
     )
 
 
@@ -21184,6 +21418,9 @@ def _handle_chat_start(handler, body, diag=None):
             "source": "webui",
             "route": "/api/chat/start",
             "diag": diag,
+            # Who typed this. Only differs from the owner in a group chat, and
+            # there it decides whose governance the turn runs under.
+            "sender_email": _request_owner_email_for_new_session(handler),
         }
         if not gateway_chat_enabled and moa_config is not None:
             start_run_kwargs["moa_config"] = moa_config

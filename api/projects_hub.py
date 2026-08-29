@@ -106,15 +106,22 @@ def is_system_project(project) -> bool:
 
 
 def visible_sessions(session_rows, owner_scope, active_profile) -> list:
-    """Session index rows this caller may see, same rule as /api/sessions."""
+    """Session index rows this caller may see, same rule as /api/sessions.
+
+    Group conversations count for the people named in them, so a project's
+    conversation count matches what its participants actually see in the
+    sidebar rather than only what they own.
+    """
+    from api.group_chat import visible_to_scope
+
     out = []
     for row in session_rows or []:
         if not isinstance(row, dict):
             continue
-        if owner_scope != "all":
-            row_owner = str(row.get("owner_email") or "").strip().lower()
-            if not row_owner or row_owner != owner_scope:
-                continue
+        if owner_scope != "all" and not visible_to_scope(
+            row.get("owner_email"), row.get("participants"), owner_scope
+        ):
+            continue
         if not _profiles_match(row.get("profile"), active_profile):
             continue
         out.append(row)

@@ -4603,6 +4603,30 @@ def _compression_summary_from_messages(messages):
     return None
 
 
+def _stamp_group_message_author(session, msg_text, sender_email) -> None:
+    """Record who wrote the current user turn in a group conversation.
+
+    Only stamped when a conversation actually has other people in it, so an
+    ordinary one-person chat keeps writing exactly the same message shape it
+    always did and no transcript grows a field for no reason. The stamp is
+    written once: a turn already carrying an author is left alone, so a replay
+    or a self-heal cannot reattribute somebody else's message.
+    """
+    author = str(sender_email or "").strip().lower()
+    if not author or not getattr(session, "participants", None):
+        return
+    try:
+        messages = getattr(session, "messages", None) or []
+        idx = _find_current_user_turn(messages, msg_text)
+        if idx is None:
+            return
+        message = messages[idx]
+        if isinstance(message, dict) and not message.get("author_email"):
+            message["author_email"] = author
+    except Exception:
+        logger.debug("group chat: could not stamp the message author", exc_info=True)
+
+
 def _find_current_user_turn(messages, msg_text):
     needle = " ".join(str(msg_text or '').split())
     last_strong_match = None  # _looks_like_current_user_turn (high confidence)
@@ -6377,11 +6401,18 @@ def _run_agent_streaming(
     model_provider=None,
     goal_related=False,
     moa_config=None,
+    sender_email=None,
 ):
     """Run agent in background thread, writing SSE events to STREAMS[stream_id].
 
-    When ephemeral=True, session mutations are skipped — used by /btw to get
+    When ephemeral=True, session mutations are skipped: used by /btw to get
     a streaming answer without persisting to the parent session.
+
+    ``sender_email`` is who wrote this message. It is None for every ordinary
+    conversation, where the owner is the only writer. In a group conversation
+    it is the participant who typed, and the whole turn (governance principal
+    and the session user id handed to the agent) runs as that person, so being
+    in someone else's chat grants nothing beyond your own access.
     """
     q = STREAMS.get(stream_id)
     if q is None:
@@ -6826,8 +6857,11 @@ def _run_agent_streaming(
         # mode enforce raises GovernanceBindingError (fail closed) which the
         # generic error path below surfaces to the user. Reset lives in the
         # outer finally next to _reset_turn_session_identity.
+        # Group conversations: the principal is whoever sent this message, not
+        # the person who happens to own the conversation.
+        _turn_principal = str(sender_email or '').strip().lower() or getattr(s, 'owner_email', None)
         _governance_turn_token = bind_governed_agent_turn(
-            getattr(s, 'owner_email', None),
+            _turn_principal,
             active_profile=str(getattr(s, 'profile', None) or 'default'),
             session_id=session_id,
             request_id=stream_id,
@@ -6946,7 +6980,7 @@ def _run_agent_streaming(
             str(s.workspace),
             session_id,
             _profile_home,
-            owner_email=getattr(s, 'owner_email', None),
+            owner_email=_turn_principal,
             user_message=msg_text if isinstance(msg_text, str) else None,
         )
         _set_thread_env(**_thread_env)
@@ -8366,6 +8400,7 @@ def _run_agent_streaming(
                         msg_text,
                         source=getattr(s, 'pending_user_source', None) or 'webui',
                     )
+                    _stamp_group_message_author(s, msg_text, sender_email)
                     _advance_truncation_watermark_after_commit(s)  # #3831
                 # Strip XML tool-call blocks from assistant message content.
                 # DeepSeek and some other providers emit <function_calls>...</function_calls>
@@ -8696,6 +8731,7 @@ def _run_agent_streaming(
                                     msg_text,
                                     source=getattr(s, 'pending_user_source', None) or 'webui',
                                 )
+                                _stamp_group_message_author(s, msg_text, sender_email)
                                 _advance_truncation_watermark_after_commit(s)  # #3831
                                 # Skip the error block — jump directly to the
                                 # normal post-result persistence path by
@@ -9767,6 +9803,7 @@ def _run_agent_streaming(
                                     msg_text,
                                     source=getattr(s, 'pending_user_source', None) or 'webui',
                                 )
+                                _stamp_group_message_author(s, msg_text, sender_email)
                                 _advance_truncation_watermark_after_commit(s)  # #3831
                                 s.save()
                         logger.info('[webui] self-heal (except path): retry succeeded')

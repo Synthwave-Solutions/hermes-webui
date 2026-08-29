@@ -629,6 +629,12 @@ function toggleRailExpanded(forceState){
     // caller's effective permissions are known, so a panel they cannot use is
     // hidden rather than shown as a dead end.
     if(typeof loadGovernanceNavVisibility==='function') loadGovernanceNavVisibility();
+    // Your own access requests: the waiting count and any decision made since
+    // you last looked (29 Aug 2026 ticket). Never blocks boot.
+    if(typeof refreshAccessRequestNotices==='function'){
+      setTimeout(function(){ try{ refreshAccessRequestNotices(); }catch(_){} }, 1500);
+      setInterval(function(){ try{ refreshAccessRequestNotices(); }catch(_){} }, 180000);
+    }
     var active=document.querySelector('.rail .rail-btn.nav-tab.active[data-panel]')
                ||document.querySelector('.sidebar-nav .nav-tab.active[data-panel]');
     if(active&&active.classList.contains('nav-tab-hidden')){

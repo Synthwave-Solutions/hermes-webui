@@ -107,6 +107,9 @@ ROUTE_CATALOG: tuple[RouteRule, ...] = (
     RouteRule("/api/session",             "sessions:read", "sessions:write"),
     RouteRule("/api/sessions",            "sessions:read", "sessions:write"),
     RouteRule("/api/projects",            "sessions:read", "sessions:write"),
+    # The colleague directory behind the group-chat picker: names and addresses
+    # only, and only for people who may already start a conversation.
+    RouteRule("/api/people",              "sessions:read", match="exact"),
     RouteRule("/api/background",          "sessions:read", "sessions:write"),
     RouteRule("/api/bg-task-complete-ack", "sessions:write", "sessions:write", match="exact"),
     RouteRule("/api/process-complete-ack", "sessions:write", "sessions:write", match="exact"),

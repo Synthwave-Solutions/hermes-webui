@@ -5,7 +5,7 @@
 // legacy reverse-scan over S.messages — that keeps new clients working
 // against old servers (Phase 1 may not yet be deployed everywhere).
 // See api/todo_state.py for the wire contract.
-const S={session:null,messages:[],entries:[],busy:false,pendingFiles:[],toolCalls:[],activeStreamId:null,currentDir:'.',activeProfile:'default',activeProfileIsDefault:true,showHiddenWorkspaceFiles:false,todos:[],todoStateMeta:null,_pendingSessionToolsets:null,_pendingChatMode:null};
+const S={session:null,messages:[],entries:[],busy:false,pendingFiles:[],toolCalls:[],activeStreamId:null,currentDir:'.',activeProfile:'default',activeProfileIsDefault:true,showHiddenWorkspaceFiles:false,todos:[],todoStateMeta:null,_pendingSessionToolsets:null,_pendingChatMode:null,_pendingParticipants:null};
 
 function assistantDisplayName(){
   if(S.activeProfile&&S.activeProfile!=='default') return S.activeProfile.charAt(0).toUpperCase()+S.activeProfile.slice(1);
@@ -5617,6 +5617,177 @@ function toggleChatMode() {
 }
 if (typeof window !== 'undefined') window.toggleChatMode = toggleChatMode;
 
+// ── Group conversations: who else is in this chat ──────────────────────────
+// Before a conversation exists the pick is staged on S._pendingParticipants and
+// sent with /api/session/new; afterwards it is a POST to
+// /api/session/participants. Empty means a private, one-person chat: exactly
+// how every conversation behaved before this existed.
+let _groupPeopleDirectory = null;
+let _groupPeopleDraft = [];
+
+function _currentParticipants() {
+  if (typeof S === 'undefined' || !S) return [];
+  if (!S.session) return Array.isArray(S._pendingParticipants) ? S._pendingParticipants.slice() : [];
+  const list = S.session.participants;
+  return Array.isArray(list) ? list.slice() : [];
+}
+
+function _groupPersonLabel(email) {
+  const found = (_groupPeopleDirectory || []).find(p => p && p.email === email);
+  if (found && found.display_name) return found.display_name;
+  return String(email || '');
+}
+
+function syncGroupPeopleChip() {
+  const wrap = $('composerPeopleWrap');
+  const chip = $('composerPeopleChip');
+  const label = $('composerPeopleLabel');
+  if (!wrap || !chip || !label) return;
+  wrap.style.display = '';
+  const people = _currentParticipants();
+  const isGroup = people.length > 0;
+  chip.classList.toggle('is-group', isGroup);
+  if (!isGroup) {
+    label.textContent = t('group_just_me');
+    chip.title = t('group_people');
+    return;
+  }
+  label.textContent = people.length === 1
+    ? _groupPersonLabel(people[0])
+    : t('group_people_count').replace('{n}', String(people.length));
+  chip.title = t('group_people') + ': ' + people.map(_groupPersonLabel).join(', ');
+}
+if (typeof window !== 'undefined') window.syncGroupPeopleChip = syncGroupPeopleChip;
+
+function _groupPeopleCanManage() {
+  if (typeof S === 'undefined' || !S || !S.session) return true;  // not created yet
+  const me = String((window.__GOV_ME__ && window.__GOV_ME__.email) || '').toLowerCase();
+  const owner = String(S.session.owner_email || '').toLowerCase();
+  const isAdmin = !!(window.__GOV_ME__ && Array.isArray(window.__GOV_ME__.roles)
+    && (window.__GOV_ME__.roles.indexOf('admin') !== -1 || window.__GOV_ME__.roles.indexOf('owner') !== -1));
+  if (isAdmin) return true;
+  if (!owner) return true;
+  return !!me && me === owner;
+}
+
+async function openGroupPeoplePicker() {
+  const overlay = $('groupPeopleModal');
+  if (!overlay) return;
+  const err = $('groupPeopleModalError');
+  if (err) err.textContent = '';
+  _groupPeopleDraft = _currentParticipants();
+  if (!_groupPeopleDirectory) {
+    try {
+      const data = await api('/api/people', { timeoutToast: false });
+      _groupPeopleDirectory = Array.isArray(data && data.people) ? data.people : [];
+      if (data && data.me) _groupPeopleDirectory = _groupPeopleDirectory.filter(p => p.email !== data.me);
+    } catch (e) {
+      _groupPeopleDirectory = [];
+      if (err) err.textContent = t('group_people_load_failed');
+    }
+  }
+  const submit = $('groupPeopleModalSubmit');
+  const canManage = _groupPeopleCanManage();
+  if (submit) submit.disabled = !canManage;
+  if (!canManage && err) err.textContent = t('group_people_owner_only');
+  const filter = $('groupPeopleFilter');
+  if (filter) filter.value = '';
+  renderGroupPeopleList();
+  overlay.hidden = false;
+  if (filter) setTimeout(() => filter.focus(), 0);
+}
+if (typeof window !== 'undefined') window.openGroupPeoplePicker = openGroupPeoplePicker;
+
+function closeGroupPeoplePicker() {
+  const overlay = $('groupPeopleModal');
+  if (overlay) overlay.hidden = true;
+}
+if (typeof window !== 'undefined') window.closeGroupPeoplePicker = closeGroupPeoplePicker;
+
+function toggleGroupPerson(email) {
+  const at = _groupPeopleDraft.indexOf(email);
+  if (at === -1) _groupPeopleDraft.push(email);
+  else _groupPeopleDraft.splice(at, 1);
+  renderGroupPeopleList();
+}
+if (typeof window !== 'undefined') window.toggleGroupPerson = toggleGroupPerson;
+
+function renderGroupPeopleList() {
+  const list = $('groupPeopleList');
+  if (!list) return;
+  const needle = String(($('groupPeopleFilter') || {}).value || '').trim().toLowerCase();
+  const people = (_groupPeopleDirectory || []).filter(p => {
+    if (!needle) return true;
+    return String(p.email || '').toLowerCase().includes(needle)
+      || String(p.display_name || '').toLowerCase().includes(needle);
+  });
+  list.innerHTML = '';
+  if (!people.length) {
+    const empty = document.createElement('div');
+    empty.className = 'panel-head-sub';
+    empty.textContent = t('group_people_none');
+    list.appendChild(empty);
+    return;
+  }
+  const canManage = _groupPeopleCanManage();
+  people.forEach(person => {
+    const row = document.createElement('label');
+    row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 6px;border-radius:8px;cursor:pointer';
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.checked = _groupPeopleDraft.indexOf(person.email) !== -1;
+    box.disabled = !canManage;
+    box.addEventListener('change', () => toggleGroupPerson(person.email));
+    const text = document.createElement('span');
+    text.style.cssText = 'display:flex;flex-direction:column;min-width:0';
+    const name = document.createElement('span');
+    // textContent, never innerHTML: a display name is data from the policy file.
+    name.textContent = person.display_name || person.email;
+    const mail = document.createElement('span');
+    mail.className = 'panel-head-sub';
+    mail.textContent = person.email;
+    text.appendChild(name);
+    text.appendChild(mail);
+    row.appendChild(box);
+    row.appendChild(text);
+    list.appendChild(row);
+  });
+}
+if (typeof window !== 'undefined') window.renderGroupPeopleList = renderGroupPeopleList;
+
+async function submitGroupPeoplePicker() {
+  const err = $('groupPeopleModalError');
+  if (err) err.textContent = '';
+  const picked = _groupPeopleDraft.slice();
+  if (typeof S === 'undefined' || !S) return;
+  if (!S.session) {
+    // Staged: the people travel with /api/session/new on the first message.
+    S._pendingParticipants = picked;
+    syncGroupPeopleChip();
+    closeGroupPeoplePicker();
+    showToast(picked.length ? t('group_people_staged') : t('group_people_cleared'));
+    return;
+  }
+  try {
+    const r = await api('/api/session/participants', {
+      method: 'POST',
+      body: JSON.stringify({ session_id: S.session.session_id, participants: picked }),
+    });
+    if (r && r.ok) {
+      S.session.participants = Array.isArray(r.participants) ? r.participants : [];
+      syncGroupPeopleChip();
+      closeGroupPeoplePicker();
+      showToast(S.session.participants.length ? t('group_people_saved') : t('group_people_cleared'));
+      if (typeof renderMessages === 'function') renderMessages();
+    } else if (err) {
+      err.textContent = (r && r.error) || t('group_people_failed');
+    }
+  } catch (e) {
+    if (err) err.textContent = (e && e.message) || t('group_people_failed');
+  }
+}
+if (typeof window !== 'undefined') window.submitGroupPeoplePicker = submitGroupPeoplePicker;
+
 // ── Session toolsets chip (#493) ───────────────────────────────────────────
 let _currentSessionToolsets = null; // null = active profile defaults, array = custom list
 let _toolsetsCatalog = null;
@@ -10903,6 +11074,7 @@ function syncTopbar(){
     if(typeof _syncWorkspaceHeadingState==='function') _syncWorkspaceHeadingState();
     if(typeof syncModelChip==='function') syncModelChip();
     if(typeof syncChatModeChip==='function') syncChatModeChip();
+    if(typeof syncGroupPeopleChip==='function') syncGroupPeopleChip();
     if(typeof syncTerminalButton==='function') syncTerminalButton();
     if(typeof _syncHermesPanelSessionActions==='function') _syncHermesPanelSessionActions();
     else {
@@ -11023,6 +11195,7 @@ function syncTopbar(){
   if(typeof syncReasoningChip==='function') syncReasoningChip();
   if(typeof syncToolsetsChip==='function') syncToolsetsChip();
   if(typeof syncChatModeChip==='function') syncChatModeChip();
+  if(typeof syncGroupPeopleChip==='function') syncGroupPeopleChip();
   // Show Clear button only when session has messages
   const clearBtn=$('btnClearConv');
   if(clearBtn) clearBtn.style.display=(S.messages&&S.messages.filter(msg=>msg.role!=='tool').length>0)?'':'none';
@@ -16198,6 +16371,24 @@ function _processWakeupCardHtml(info, rawText, extras){
   return `<details class="process-wakeup-card"><summary class="process-wakeup-summary"><span class="process-wakeup-toggle">${li('chevron-right',12)}</span><span class="process-wakeup-label">${li('terminal',13)}<span>${esc(t('process_wakeup_label'))}</span></span>${cmdHtml}${chip}${extras.timeHtml||''}</summary><div class="process-wakeup-detail">${extras.filesHtml||''}${patternRow}${cmdRow}<div class="msg-body process-wakeup-body">${outHtml}</div>${extras.footHtml||''}</div></details>`;
 }
 
+// Group conversations: name the writer above their message. Only rendered when
+// a conversation actually has other people in it, so an ordinary chat looks
+// exactly as it did. esc() because a display name comes from the policy file.
+function _groupAuthorLineHtml(message){
+  try{
+    if(typeof S==='undefined'||!S||!S.session) return '';
+    const people=S.session.participants;
+    if(!Array.isArray(people)||!people.length) return '';
+    if(!message||message.role!=='user') return '';
+    const author=String(message.author_email||'').trim().toLowerCase()
+      ||String(S.session.owner_email||'').trim().toLowerCase();
+    if(!author) return '';
+    const label=(typeof _groupPersonLabel==='function')?_groupPersonLabel(author):author;
+    return `<div class="msg-author" title="${esc(author)}">${esc(String(label))}</div>`;
+  }catch(e){ return ''; }
+}
+if(typeof window!=='undefined') window._groupAuthorLineHtml=_groupAuthorLineHtml;
+
 function renderMessages(options){
   _lastMessageRenderAt=performance.now();
   const preserveScroll=!!(options&&options.preserveScroll);
@@ -16780,7 +16971,7 @@ function renderMessages(options){
       let row=(_msgNodeRecycleEnabled||_msgNodeRecycleSameSession)?_recycleStash.get(rawIdx):null;
       if(row&&(!row.classList.contains('msg-row')||row.classList.contains('assistant-turn'))) row=null;
       const newRawText=String(displayContent).trim();
-      const nextRowHtml=`${filesHtml}<div class="msg-body">${bodyHtml}</div>${footHtml}`;
+      const nextRowHtml=`${_groupAuthorLineHtml(m)}${filesHtml}<div class="msg-body">${bodyHtml}</div>${footHtml}`;
       if(row){
         row.className='msg-row';
         row.id=_userMessageDomId(rawIdx);
