@@ -15173,8 +15173,15 @@ def handle_post(handler, parsed) -> bool:
         provider_config_key = str(body.get("provider_config_key", "") or "").strip()
         if not provider_config_key:
             return bad(handler, "provider_config_key is required")
+        # An OAuth-family provider carries its own app credentials here: Nango
+        # refuses to create the integration without them, so there is nowhere
+        # later to put them.
+        raw_credentials = body.get("credentials")
+        credentials = raw_credentials if isinstance(raw_credentials, dict) else None
         try:
-            result = enable_integration(request_owner_email(handler), provider_config_key)
+            result = enable_integration(
+                request_owner_email(handler), provider_config_key, credentials
+            )
         except ValueError as e:
             return bad(handler, str(e), 400)
         except RuntimeError as e:

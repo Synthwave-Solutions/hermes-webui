@@ -667,16 +667,78 @@ def list_connections(owner_email: str | None, *, is_admin: bool = False) -> list
     return out
 
 
-def enable_integration(admin_email: str | None, provider_config_key: str) -> dict:
+# Client credentials an OAuth-family provider needs before Nango will even
+# create the integration. Nango 0.71 refuses POST /integrations with 400
+# "Missing credentials" for these auth modes, so the credentials belong in the
+# enable call: creating first and adding them later is not a path that exists.
+# MCP_OAUTH2 is deliberately absent; those providers register a client
+# dynamically at connect time and take no credentials here.
+_OAUTH_CREDENTIAL_FIELDS: dict[str, tuple[str, ...]] = {
+    "OAUTH1": ("client_id", "client_secret"),
+    "OAUTH2": ("client_id", "client_secret"),
+    "TBA": ("client_id", "client_secret"),
+    "APP": ("app_id", "app_link", "private_key"),
+    "CUSTOM": ("client_id", "client_secret", "app_id", "app_link", "private_key"),
+}
+# Optional alongside the required ones, passed through when present.
+_OAUTH_OPTIONAL_FIELDS: dict[str, tuple[str, ...]] = {
+    "OAUTH1": ("scopes", "webhook_secret"),
+    "OAUTH2": ("scopes", "webhook_secret"),
+    "TBA": ("scopes", "webhook_secret"),
+}
+
+
+def _credentials_payload(auth_mode: str, entry: dict, credentials: dict | None) -> dict | None:
+    """Build the Nango ``credentials`` object, or explain what is missing.
+
+    Raises ValueError naming the exact fields and the provider's own setup
+    guide, so the person reading it knows what to fetch and where. The
+    alternative is the raw upstream text "Nango API error (400): Missing
+    credentials", which says nothing about which provider or which field.
+    """
+    required = _OAUTH_CREDENTIAL_FIELDS.get(auth_mode)
+    if not required:
+        return None
+    supplied = {
+        key: str(value).strip()
+        for key, value in (credentials or {}).items()
+        if str(value or "").strip()
+    }
+    missing = [name for name in required if not supplied.get(name)]
+    if missing:
+        guide = str(entry.get("setup_guide_url") or entry.get("docs") or "").strip()
+        where = f" Register the app first: {guide}" if guide else ""
+        raise ValueError(
+            f"{_provider_label(str(entry.get('_key') or ''))} signs in with {auth_mode} and needs "
+            f"its own app credentials before it can be enabled. Missing: "
+            f"{', '.join(missing)}.{where}"
+        )
+    payload = {"type": auth_mode}
+    for name in required:
+        payload[name] = supplied[name]
+    for name in _OAUTH_OPTIONAL_FIELDS.get(auth_mode, ()):
+        if supplied.get(name):
+            payload[name] = supplied[name]
+    return payload
+
+
+def enable_integration(
+    admin_email: str | None,
+    provider_config_key: str,
+    credentials: dict | None = None,
+) -> dict:
     """Create the Nango integration for a catalog provider (admin path).
 
     The unique_key mirrors the provider key, matching how the pre-seeded
     integrations were made. Recording the implicit admin approval means
     non-admins get one-click connect afterwards instead of a queue entry.
     Idempotent: enabling an already-configured provider only (re)records the
-    approval. OAuth/APP providers are created without client credentials;
-    those still have to be added in the Nango dashboard before a connect can
-    succeed, which the returned ``needs_credentials`` flag surfaces.
+    approval. OAuth-family providers (OAUTH1/OAUTH2/TBA/APP/CUSTOM) carry
+    their client credentials in ``credentials`` and are refused without them,
+    naming the fields and the provider's setup guide. Nango will not create
+    such an integration credential-less, so there is no "add them later in the
+    dashboard" path: without this the enable itself came back as the opaque
+    "Nango API error (400): Missing credentials" (reported 01-09-2026).
     """
     key = str(provider_config_key or "").strip()
     if not key:
@@ -684,11 +746,15 @@ def enable_integration(admin_email: str | None, provider_config_key: str) -> dic
     entry = load_provider_entries().get(key)
     if entry is None:
         raise ValueError(f"unknown provider: {key}")
+    auth_mode = str(entry.get("auth_mode") or "").upper()
     configured = {str(row.get("unique_key") or "") for row in _list_integrations()}
     if key not in configured:
-        _nango_request("POST", "/integrations", payload={"provider": key, "unique_key": key})
+        payload: dict[str, Any] = {"provider": key, "unique_key": key}
+        creds = _credentials_payload(auth_mode, {**entry, "_key": key}, credentials)
+        if creds:
+            payload["credentials"] = creds
+        _nango_request("POST", "/integrations", payload=payload)
     _record_admin_approval(key, admin_email, _approval_entries().get(key))
-    auth_mode = str(entry.get("auth_mode") or "").upper()
     return {
         "status": "enabled",
         "provider_config_key": key,
