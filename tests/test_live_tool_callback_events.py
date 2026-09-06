@@ -66,8 +66,11 @@ def test_tool_callback_events_keep_existing_frontend_event_contract():
     messages = _read("static/messages.js")
     ui = _read("static/ui.js")
 
-    assert "source.addEventListener('tool',e=>{" in messages
-    assert "source.addEventListener('tool_complete',e=>{" in messages
+    for event, handler in (("tool", "handleLiveToolEvent"), ("tool_complete", "handleLiveToolCompleteEvent")):
+        inline = f"source.addEventListener('{event}',e=>{{" in messages
+        named = (f"source.addEventListener('{event}',{handler});" in messages
+                 and f"function {handler}(e)" in messages)
+        assert inline or named, f"frontend must subscribe to {event} with a defined handler"
     assert "String(d&&d.tid" in messages or "explicitTid=String(d&&d.tid" in messages, (
         "frontend tool handlers must still consume explicit server tid when present"
     )
