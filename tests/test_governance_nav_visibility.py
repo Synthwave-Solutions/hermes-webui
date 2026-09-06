@@ -68,8 +68,8 @@ def test_wildcard_and_area_admin_grants_open_the_panel():
 
 
 @pytest.mark.parametrize("policy", [_Policy(enabled=False), _Policy(mode="report_only")])
-def test_governance_off_or_report_only_never_hides(policy):
-    assert hidden_panels(_Access(set()), policy) == []
+def test_policy_mode_does_not_promote_a_member_to_administrator(policy):
+    assert set(visible_panels(_Access(set()), policy)) == set(ESSENTIAL_PANELS)
 
 
 def test_visible_is_the_complement_and_always_includes_the_essentials():

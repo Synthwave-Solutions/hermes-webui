@@ -644,8 +644,9 @@ def suggestions_for(entry, policy) -> list:
         if email in {str(a).strip().lower() for a in (policy.bootstrap_admins or ())}:
             return []
         access = resolve_effective_access(policy, GovernanceSubject(email=email))
-        if "*" in access.permissions or "*" in access.routes:
-            # Nothing to complete: this person is not walled in anywhere.
+        from api.governance.nav import administrative_access
+        if administrative_access(access):
+            # Route wildcards do not satisfy feature permissions or their dependencies.
             return []
 
         confirmed = _rule_route_needs_permission(origin_key, gkind, value, access)

@@ -73,8 +73,8 @@ def identity_is_admin(identity) -> bool:
     """Return whether the identity resolves to an admin, independent of mode.
 
     True when the resolved EffectiveAccess carries the bootstrap-admin grant
-    source, an owner/admin role, wildcard routes, or the governance:write
-    permission. The auth-disabled synthetic identity always counts as admin
+    source, an owner/admin role, or an administrative permission.
+    Route allowlists never grant administrative access. The auth-disabled synthetic identity always counts as admin
     (trusted local single-user mode). Fails closed (non-admin) when the
     policy cannot be read for a real identity.
     """
@@ -104,13 +104,8 @@ def identity_is_admin(identity) -> bool:
             result = True
         else:
             access = resolve_effective_access(policy, subject)
-            result = (
-                "bootstrap_admin" in access.grant_sources
-                or "owner" in access.roles
-                or "admin" in access.roles
-                or "*" in access.routes
-                or access.has_permission("governance:write")
-            )
+            from api.governance.nav import administrative_access
+            result = administrative_access(access)
         with _ADMIN_CACHE_LOCK:
             if len(_ADMIN_CACHE) >= _ADMIN_CACHE_MAX_ENTRIES:
                 _ADMIN_CACHE.clear()

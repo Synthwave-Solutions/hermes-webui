@@ -708,3 +708,12 @@ def test_approve_reuses_the_existing_grant_decision_path():
     assert "_handle_grant_request_decide(" in block
     assert "save_governance_policy" not in block
     assert "policy_mutation_lock" not in block
+
+
+def test_global_route_allowlist_does_not_hide_missing_feature_permissions(isolated_home):
+    raw = yaml.safe_load(_policy_file(isolated_home).read_text(encoding='utf-8'))
+    raw['users'][USER]['grants']['routes'] = ['*']
+    _policy_file(isolated_home).write_text(yaml.safe_dump(raw), encoding='utf-8')
+    loader.set_policy_loader(None)
+    _key, rows = _suggest(USER, 'route', '/api/crons')
+    assert _by(rows, 'permission', 'cron:read') is not None

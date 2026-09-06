@@ -66,17 +66,25 @@ def _has(permissions: frozenset, permission: str) -> bool:
     return f"{permission.split(':', 1)[0]}:admin" in permissions
 
 
-def navigation_audience(access, policy=None) -> str:
-    """Presentation audience from effective administrative grants, never role names.
+def administrative_access(access) -> bool:
+    """Administrative identity is independent of route allowlists and mode.
 
-    The ungoverned local-owner interface retains its complete navigation.
-    Read-only governance access is not administrative access.
+    Explicit owner/admin roles retain the ownership policy's existing contract.
+    A wildcard route only allows addressing endpoints; it grants no privilege.
     """
-    if policy is not None and (not getattr(policy, "enabled", True)
-                               or getattr(policy, "mode", "") == "report_only"):
-        return "admin"
     permissions = _permissions(access) or frozenset()
-    return "admin" if permissions.intersection({"*", "governance:write", "governance:admin"}) else "member"
+    roles = set(getattr(access, "roles", ()) or ())
+    sources = set(getattr(access, "grant_sources", ()) or ())
+    subject = getattr(access, "subject", None)
+    return (getattr(subject, "provider", "") == "auth_disabled"
+            or "bootstrap_admin" in sources
+            or bool(roles.intersection({"owner", "admin"}))
+            or bool(permissions.intersection({"*", "governance:write", "governance:admin"})))
+
+
+def navigation_audience(access, policy=None) -> str:
+    """Use the same administrative identity as ownership, in every policy mode."""
+    return "admin" if administrative_access(access) else "member"
 
 
 def hidden_panels(access, policy=None) -> list:

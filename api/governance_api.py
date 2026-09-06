@@ -133,6 +133,8 @@ def _serialize_access(access) -> dict:
     Never includes claims or token scopes (port of the reference
     serialize_effective_access).
     """
+    from api.governance.nav import administrative_access
+
     subject = access.subject
     return {
         "mode": access.mode,
@@ -149,7 +151,7 @@ def _serialize_access(access) -> dict:
         "profiles": sorted(access.profiles),
         "routes": sorted(access.routes),
         "grant_sources": list(access.grant_sources),
-        "is_admin": access.has_permission("governance:read") or access.has_permission("governance:write"),
+        "is_admin": administrative_access(access),
     }
 
 

@@ -5,12 +5,14 @@ Scheduled tasks, Skills library, Connections and My approvals. A destination
 is omitted when its feature permission is absent. Settings remains a utility
 for personal preferences and request history.
 
-Navigation is derived from the caller's effective permissions returned by
+Navigation is derived from the caller's effective access returned by
 `/api/governance/me`. Wildcard, `governance:write` or `governance:admin` grants
-select the complete administrator navigation. A role called admin without an
-administrative grant does not. Read-only governance access does not select
-the administrator interface. Local ungoverned and report-only deployments keep
-the complete interface. Backend authorization is unchanged.
+select the complete administrator navigation. Explicit owner/admin roles and
+bootstrap administrators follow the same administrative identity as ownership.
+Read-only governance access and wildcard route allowlists do not select the
+administrator interface. Policy mode alone never promotes a signed-in member;
+auth-disabled local single-user mode keeps the complete interface. Backend
+feature permission checks remain independent.
 
 This intentionally replaces permission-only navigation: ordinary members no
 longer see every technical panel for which they happen to hold read access.

@@ -20,11 +20,11 @@ def test_member_with_broad_feature_reads_gets_daily_work_navigation():
     }
 
 
-def test_administrative_grant_opens_full_navigation_without_role_name_magic():
+def test_administrative_grants_and_explicit_admin_roles_open_full_navigation():
     assert hidden_panels(access('governance:write'), POLICY) == []
     caller = access('sessions:read')
     caller.roles = frozenset({'admin'})
-    assert 'governance' in hidden_panels(caller, POLICY)
+    assert hidden_panels(caller, POLICY) == []
 
 
 def test_member_missing_feature_grant_keeps_own_approvals_but_no_dead_ends():
