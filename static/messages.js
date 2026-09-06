@@ -5638,6 +5638,7 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
         : _stripXmlToolCalls(assistantText.slice(segmentStart));
       if(String(pendingDisplayTextBeforeTool||'').trim()) _upsertAnchorProcessProse(pendingDisplayTextBeforeTool,{sealed:true});
       _applyToAnchor('tool',{...d,...tc},e);
+      window.dispatchEvent(new CustomEvent('synpulse:voice-activity',{detail:{sid:activeSid}}));
 
       if(S.session&&S.session.session_id===activeSid&&typeof scheduleRenderSessionArtifacts==='function') scheduleRenderSessionArtifacts();
       if(!S.session||S.session.session_id!==activeSid) return;
@@ -6159,6 +6160,9 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
         }
         if(!lastAsst&&d.session&&Array.isArray(d.session.messages)){
           lastAsst=[...d.session.messages].reverse().find(m=>m&&m.role==='assistant')||null;
+        }
+        if(lastAsst&&isActiveSession){
+          window.dispatchEvent(new CustomEvent('synpulse:voice-answer',{detail:{sid:d.session?.session_id||S.session?.session_id,text:typeof lastAsst.content==='string'?lastAsst.content:''}}));
         }
         if(isActiveSession&&_pendingGoalContinuation&&typeof queueSessionMessage==='function'){
           const _goalNext=_pendingGoalContinuation;
