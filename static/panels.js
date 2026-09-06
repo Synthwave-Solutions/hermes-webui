@@ -899,7 +899,7 @@ function _appendCronProfileToggle(parent){
 async function loadCronProfiles(){
   if (_cronProfilesCache) return _cronProfilesCache;
   try {
-    const data = await api('/api/profiles');
+    const data = await api('/api/profiles?fast=1');
     _cronProfilesCache = Array.isArray(data.profiles) ? data.profiles : [];
   } catch(e) {
     _cronProfilesCache = [];
@@ -3192,7 +3192,7 @@ async function _kanbanLoadProfileNames(){
   );
   if (hasFreshCache) return _kanbanProfileNamesCache;
   try {
-    const data = await api('/api/profiles');
+    const data = await api('/api/profiles?fast=1');
     const profiles = Array.isArray(data && data.profiles) ? data.profiles : [];
     const names = profiles.map(p => p && p.name).filter(Boolean);
     // Stable order: default first, then alphabetical.
@@ -6564,7 +6564,7 @@ function _profileDropdownBestCachedData(){
 
 function _profileDropdownFetchFresh(){
   if(_profileDropdownFetchPromise) return _profileDropdownFetchPromise;
-  _profileDropdownFetchPromise = api('/api/profiles', {timeoutToast:false}).then(data=>{
+  _profileDropdownFetchPromise = api('/api/profiles?fast=1', {timeoutToast:false}).then(data=>{
     if(_profileDropdownDataCacheUsable(data)) _profilesCache = data;
     _profileDropdownWriteStoredCache(data);
     return data;
@@ -6692,7 +6692,7 @@ async function loadProfilesPanel() {
   const panel = $('profilesPanel');
   if (!panel) return;
   try {
-    const data = await api('/api/profiles');
+    const data = await api('/api/profiles?fast=1');
     _profilesCache = data;
     _profileDropdownWriteStoredCache(data);
     panel.innerHTML = '';
@@ -6740,7 +6740,7 @@ async function loadProfilesPanel() {
       if (typeof p.model === 'string' && p.model) meta.push(p.model.split('/').pop());
       if (p.provider&&window._navAudience==='admin') meta.push(p.provider);
       if(p.bot&&p.bot.description)meta.unshift(p.bot.description);
-      if (p.total_skills && p.total_skills > 0) meta.push(t('profile_skill_count', p.total_skills).replace(String(p.total_skills), `${p.enabled_skills} / ${p.total_skills}`));
+      if (!p.skill_counts_pending && p.total_skills && p.total_skills > 0) meta.push(t('profile_skill_count', p.total_skills).replace(String(p.total_skills), `${p.enabled_skills} / ${p.total_skills}`));
       const gwDot = window._navAudience==='member'?'':p.gateway_running
         ? `<span class="profile-opt-badge running" title="${esc(t('profile_gateway_running'))}"></span>`
         : `<span class="profile-opt-badge stopped" title="${esc(t('profile_gateway_stopped'))}"></span>`;
@@ -6820,7 +6820,7 @@ function _renderProfileDetail(p, activeName){
   if (p.provider) rows.push(`<div class="detail-row"><div class="detail-row-label">Provider</div><div class="detail-row-value">${esc(p.provider)}</div></div>`);
   if (p.base_url) rows.push(`<div class="detail-row"><div class="detail-row-label">Base URL</div><div class="detail-row-value"><code>${esc(p.base_url)}</code></div></div>`);
   rows.push(`<div class="detail-row"><div class="detail-row-label">API key</div><div class="detail-row-value">${p.has_env ? esc(t('profile_api_keys_configured')) : '<span style="color:var(--muted)">Not configured</span>'}</div></div>`);
-  if (p.total_skills && p.total_skills > 0) rows.push(`<div class="detail-row"><div class="detail-row-label">Skills</div><div class="detail-row-value">${esc(t('profile_skill_count', p.total_skills).replace(String(p.total_skills), `${p.enabled_skills} / ${p.total_skills}`))}</div></div>`);
+  if (!p.skill_counts_pending && p.total_skills && p.total_skills > 0) rows.push(`<div class="detail-row"><div class="detail-row-label">Skills</div><div class="detail-row-value">${esc(t('profile_skill_count', p.total_skills).replace(String(p.total_skills), `${p.enabled_skills} / ${p.total_skills}`))}</div></div>`);
   if (p.default_workspace) rows.push(`<div class="detail-row"><div class="detail-row-label">Default space</div><div class="detail-row-value"><code>${esc(p.default_workspace)}</code></div></div>`);
   const editable=_canUseFeature('profiles:admin');
   body.innerHTML = `
@@ -6945,7 +6945,7 @@ function renderProfileDropdown(data) {
     opt.className = 'profile-opt' + (p.name === active ? ' active' : '');
     const meta = [];
     if (typeof p.model === 'string' && p.model) meta.push(p.model.split('/').pop());
-    if (p.total_skills && p.total_skills > 0) meta.push(t('profile_skill_count', p.total_skills).replace(String(p.total_skills), `${p.enabled_skills} / ${p.total_skills}`));
+    if (!p.skill_counts_pending && p.total_skills && p.total_skills > 0) meta.push(t('profile_skill_count', p.total_skills).replace(String(p.total_skills), `${p.enabled_skills} / ${p.total_skills}`));
     const gwDot = `<span class="profile-opt-badge ${p.gateway_running ? 'running' : 'stopped'}"></span>`;
     const checkmark = p.name === active ? ' <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--link)" stroke-width="3" style="vertical-align:-1px"><polyline points="20 6 9 17 4 12"/></svg>' : '';
     const defaultBadge = p.is_default ? ` <span style="opacity:.5;font-weight:400">${esc(t('profile_default_label'))}</span>` : '';

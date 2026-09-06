@@ -5687,7 +5687,7 @@ async function openGroupPeoplePicker() {
       _groupPeopleDirectory = Array.isArray(data && data.people) ? data.people : [];
       if (data && data.me) _groupPeopleDirectory = _groupPeopleDirectory.filter(p => String(p.email || '').trim().toLowerCase() !== String(data.me).trim().toLowerCase());
       try {
-        const bots = await api('/api/profiles', {timeoutToast:false});
+        const bots = await api('/api/profiles?fast=1', {timeoutToast:false});
         _groupPeopleDirectory = _groupPeopleDirectory.concat((bots.profiles || bots || []).map(bot => ({
           email:'bot:' + bot.name,
           display_name:(bot.bot && bot.bot.title) || bot.name,

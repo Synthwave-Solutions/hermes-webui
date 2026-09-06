@@ -53,3 +53,5 @@ WebUI conversation list, with the same server-side ownership filtering. A stale
 CLI-only preference from another account is reset when member navigation loads.
 Navigation labels are always visible for members, so the redundant Show labels
 toggle is hidden.
+
+Bot lists and pickers request /api/profiles?fast=1: cold skill counts are omitted while the server computes them in its bounded background worker. Pending counts are never rendered as zero; reopening the list refreshes counts without polling.
