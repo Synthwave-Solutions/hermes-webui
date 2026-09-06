@@ -9,7 +9,9 @@ SHAPES = ('circle','squircle','hexagon')
 
 def _path(name):
     from api import profiles
-    profiles._validate_profile_name(name)
+    # Existing built-in bot is editable; the creation validator reserves its ID.
+    if name != "default":
+        profiles._validate_profile_name(name)
     home=profiles.get_hermes_home_for_profile(name)
     if not home.is_dir(): raise FileNotFoundError('Bot not found')
     path=home/'profile.yaml'
