@@ -5,6 +5,7 @@ const assert=require('node:assert/strict'),{chromium}=require(process.env.PLAYWR
  const p=await b.newPage();
  await p.setContent('<div id="composerWrap"><textarea id="msg"></textarea></div>');
  await p.evaluate(()=>{
+ window.__GOV_ME__={email:'alice@example.test'};
  window.S={session:null,activeProfile:'default',_bootReady:false};
  window.t=k=>k; window.botAvatarHtml=()=>''; window.botDisplayName=p=>p.name;
  window.calls=[]; window.api=url=>new Promise((resolve,reject)=>calls.push({url,resolve,reject}));
@@ -51,6 +52,21 @@ const assert=require('node:assert/strict'),{chromium}=require(process.env.PLAYWR
  assert.equal(await p.locator('[data-bot="research"]').isDisabled(),false);
  await resolve(11,{people:[]});
  assert.equal(await p.locator('.chat-bot-roster-state').count(),0);
+ await p.evaluate(()=>{window.__GOV_ME__={};refreshChatBots();});
+ assert.equal(await p.evaluate(()=>calls.length),13);
+ assert.equal(await p.evaluate(()=>calls[12].url),'/api/profiles?fast=1');
+ await resolve(12,profiles(['research']));
+ await p.locator('[data-bot="research"]').waitFor();
+ // Exercise the actual identity-settle hook, not a manual roster refresh.
+ const govSource=require('fs').readFileSync('static/governance.js','utf8');
+ const govFetch=govSource.slice(govSource.indexOf('async function _govFetchMe()'),govSource.indexOf('/**',govSource.indexOf('async function _govFetchMe()')));
+ await p.addScriptTag({content:govFetch});
+ await p.evaluate(()=>{window.identityPromise=_govFetchMe();});
+ assert.equal(await p.evaluate(()=>calls[13].url),'/api/governance/me');
+ await resolve(13,{email:'bob@example.test'});
+ await p.evaluate(()=>identityPromise);
+ assert.deepEqual(await p.evaluate(()=>calls.slice(14).map(c=>c.url)),['/api/profiles?fast=1','/api/people']);
+ await resolve(14,profiles(['research'])); await resolve(15,{people:[]});
  console.log('PASS early loading, slow people, no boot switch, retry retains people, stale context exclusion');
  }finally{await b.close();}
 })().catch(e=>{console.error(e);process.exit(1)});

@@ -144,6 +144,7 @@
       if (!fresh()) return;
       loading = false; paint(); paintMenu();
     });
+    if (!actor()) { people = []; peopleLoading = false; return; }
     Promise.resolve(api('/api/people', {timeoutToast:false})).then(result => {
       if (!fresh()) return;
       if (!Array.isArray(result.people)) throw new Error('Invalid people catalog');

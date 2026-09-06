@@ -29,3 +29,5 @@ Browser inference uses a deterministic local provider fixture. This proves appli
 ![After laptop](mentions-after-laptop.png)
 ![Before mobile](mentions-before-mobile.png)
 ![After mobile](mentions-after-mobile.png)
+
+The release browser smoke also covers identity-less startup: people discovery waits for an authenticated identity, and late identity resolution refreshes the picker automatically without navigation. All three smoke pages and the actual delayed-identity boot regression pass.
