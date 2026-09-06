@@ -140,6 +140,9 @@ def _config(identity, name):
         result["allowed_users"] = [email for email in policy.users
                                    if is_profile_allowed_for({"email": email}, name)]
         result["allowed_groups"] = []
+    if data and data.get("skills_inherit"):
+        disabled = set((cfg.get("skills") or {}).get("disabled", [])) if isinstance(cfg.get("skills"), dict) else set()
+        result["skills"] = [item["name"] for item in catalog(identity)["skills"] if item["name"] not in disabled]
     result.update(name=name, title=meta.get("bot", {}).get("title", name),
                   description=meta.get("bot", {}).get("description", ""),
                   system_prompt=(home / "SOUL.md").read_text() if (home / "SOUL.md").is_file() and not (home / "SOUL.md").is_symlink() else "",
@@ -148,6 +151,7 @@ def _config(identity, name):
     for key in ("skills", "mcp_servers", "cli_tools", "allowed_users", "allowed_groups"):
         result.setdefault(key, [])
     result.pop("owner_email", None)
+    result.pop("skills_inherit", None)
     return result
 
 
@@ -187,7 +191,11 @@ def _validate(identity, body):
     clean = {key: body.get(key, "") for key in ("title", "description", "system_prompt", "default_model", "model_provider")}
     for key in ("skills", "mcp_servers", "cli_tools", "allowed_users", "allowed_groups"):
         values = body.get(key, [])
-        if not isinstance(values, list) or len(values) > 100 or any(not isinstance(v, str) for v in values):
+        if not isinstance(values, list) or len(values) > 10000 or any(not isinstance(v, str) for v in values):
+            raise ValueError("Invalid " + key)
+        preserve_large_skills = (key == "skills" and target.exists() and
+                                 set(values) == set(_config(identity, name)["skills"]))
+        if len(values) > 100 and not preserve_large_skills:
             raise ValueError("Invalid " + key)
         known = {entry.get("email", entry.get("name")) for entry in choices[{"allowed_users":"users", "allowed_groups":"groups"}.get(key, key)]}
         if set(values) - known:
@@ -219,8 +227,11 @@ def save(identity, body):
             raise RuntimeError("Bot changed or already exists. Reload before saving.")
         if not exists and "revision" in body:
             raise RuntimeError("Bot no longer exists. Reload before saving.")
+        unchanged_skills = exists and set(clean["skills"]) == set(_config(identity, name)["skills"])
         owner = (previous or {}).get("owner_email") or _identity(identity)
         data = {**clean, "owner_email": owner, "revision": actual_revision + 1}
+        if unchanged_skills and (previous is None or previous.get("skills_inherit")):
+            data["skills_inherit"] = True
         data["allowed_users"] = sorted(set(data["allowed_users"]) | {owner})
         parent = target.parent
         parent.mkdir(parents=True, exist_ok=True)
@@ -272,9 +283,10 @@ def save(identity, body):
             metadata.setdefault("ui_meta", {}).setdefault("hermes-bots", {}).update(
                 title=clean["title"], description=clean["description"], custom=True)
             atomic_yaml_write(stage / "profile.yaml", metadata, sort_keys=False)
-            (stage / "skills").mkdir(exist_ok=True)
+            if not unchanged_skills:
+                (stage / "skills").mkdir(exist_ok=True)
             skills_root = profiles._DEFAULT_HERMES_HOME / "skills"
-            for skill in clean["skills"]:
+            for skill in ([] if unchanged_skills else clean["skills"]):
                 source = skills_root / skill
                 if not source.resolve().is_relative_to(skills_root.resolve()) or source.is_symlink():
                     raise PermissionError("Invalid skill source")
@@ -300,10 +312,11 @@ def save(identity, body):
                     for filename in ("config.yaml", "SOUL.md"):
                         os.replace(stage / filename, target / filename)
                     old = target / "skills"
-                    if old.exists():
-                        backup = target / (".skills-before-" + next(tempfile._get_candidate_names()))
-                        os.replace(old, backup)
-                    os.replace(stage / "skills", old)
+                    if (stage / "skills").exists():
+                        if old.exists():
+                            backup = target / (".skills-before-" + next(tempfile._get_candidate_names()))
+                            os.replace(old, backup)
+                        os.replace(stage / "skills", old)
                     if (stage / "assets/avatar.png").exists():
                         (target / "assets").mkdir(exist_ok=True)
                         os.replace(stage / "assets/avatar.png", target / "assets/avatar.png")
@@ -387,8 +400,8 @@ def access_ceiling(identity, name, rights):
     from api.governance.resolver import _wildcard_grants
     return replace(rights, mode="enforce", permissions=frozenset({"*"}),
                    profiles=frozenset({name}), grants=replace(
-        _wildcard_grants(), skills_load=frozenset(data["skills"]),
-        skills_view=frozenset(data["skills"]), skills_manage=frozenset(),
+        _wildcard_grants(), skills_load=frozenset({"*"}) if data.get("skills_inherit") else frozenset(data["skills"]),
+        skills_view=frozenset({"*"}) if data.get("skills_inherit") else frozenset(data["skills"]), skills_manage=frozenset(),
         mcp_servers=frozenset(data["mcp_servers"]),
         cli_commands=frozenset(data["cli_tools"])))
 
@@ -398,17 +411,28 @@ def guard_profile_request(handler, parsed, method):
     path = parsed.path
     prefixes = ("/api/config", "/api/skills", "/api/skill/", "/api/mcp",
                 "/api/models", "/api/model/", "/api/providers", "/api/personalities",
+                "/api/personality/", "/api/reasoning", "/api/commands",
                 "/api/plugins", "/api/toolsets", "/api/tools",
                 "/api/profile/active", "/api/profile/bot", "/api/profile/avatar")
-    if not path.startswith(prefixes):
+    # Default-deny a revoked active scope, including future profile-bound
+    # APIs. Recovery and independently session/actor-scoped APIs are explicit.
+    recovery = ("/api/auth/", "/api/governance/", "/api/chat", "/api/sessions", "/api/session/",
+                "/api/projects", "/api/stream", "/api/events", "/api/health")
+    if (not path.startswith("/api/") or path.startswith(recovery)
+            or path in ("/api/profiles", "/api/profile/switch", "/api/memory",
+                        "/api/memory/write", "/api/bots/builder", "/api/version")):
         return True
     from urllib.parse import parse_qs
     from api.profiles import get_active_profile_name
     from api.governance.enforce import _request_identity
     from api.helpers import bad
-    name = (parse_qs(parsed.query).get("profile") or [get_active_profile_name()])[0]
-    if not name or name == "active":
-        name = get_active_profile_name()
+    # Most sinks resolve their path from the signed active cookie, not
+    # ?profile=. A harmless query target must never mask a revoked active bot.
+    name = get_active_profile_name()
+    if path == "/api/profile/avatar" and method in ("GET", "HEAD"):
+        name = (parse_qs(parsed.query).get("profile") or [name])[0]
+    if path in ("/api/profile/bot", "/api/profile/avatar") and method == "POST":
+        return True  # Exact body target receives its own owner guard in routes.
     try:
         data = managed(name)
         if data is None:
@@ -416,7 +440,7 @@ def guard_profile_request(handler, parsed, method):
         identity = _request_identity(handler)
         if allowed(identity, name) is not True:
             raise PermissionError("This bot is no longer available. Select another bot.")
-        if method not in ("GET", "HEAD"):
+        if method not in ("GET", "HEAD") and path.startswith(prefixes) and path != "/api/personality/set":
             require_edit(identity, name)
         return True
     except (PermissionError, ValueError, OSError):

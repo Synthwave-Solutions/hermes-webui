@@ -177,7 +177,9 @@ def test_legacy_body_dispatch_cannot_delete_or_clone_private_bot(setup, monkeypa
 
 @pytest.mark.parametrize("path,method", [
     ("/api/profile/active","GET"), ("/api/skills/content","GET"),
+    ("/api/future-profile-api","GET"),
     ("/api/config","GET"), ("/api/skills/toggle","POST"),
+    ("/api/reasoning","POST"), ("/api/commands/exec","POST"), ("/api/personality/set","POST"),
     ("/api/model/set","POST"), ("/api/providers","POST"),
     ("/api/mcp/servers/test","PATCH"), ("/api/mcp/servers/test","DELETE"),
 ])
@@ -188,7 +190,7 @@ def test_revoked_active_cookie_cannot_read_or_mutate_profile(setup, monkeypatch,
     monkeypatch.setattr("api.governance.enforce._request_identity", lambda h:BOB)
     statuses = []
     monkeypatch.setattr("api.helpers.bad", lambda h, message, status:statuses.append(status))
-    assert builder.guard_profile_request(object(), urlparse(path), method) is False
+    assert builder.guard_profile_request(object(), urlparse(path + "?profile=default"), method) is False
     assert statuses == [403]
 
 
@@ -202,3 +204,40 @@ def test_shared_viewer_cannot_mutate_bot_but_can_switch_and_use_personal_memory(
     assert not builder.guard_profile_request(object(), urlparse("/api/skills/toggle"), "POST")
     assert builder.guard_profile_request(object(), urlparse("/api/profile/switch"), "POST")
     assert builder.guard_profile_request(object(), urlparse("/api/memory"), "GET")
+
+
+def test_revoked_bot_is_rejected_before_chat_enqueue(setup):
+    from api import routes
+    from types import SimpleNamespace
+    builder.save(ADMIN, payload())
+    session = SimpleNamespace(profile="research-bot", owner_email=BOB["email"],
+                              participants=[], bot_participants=[])
+    result = routes._start_chat_stream_for_session(session, msg="hello", workspace=str(setup),
+        model="codex/gpt-6-astra", sender_identity=BOB)
+    assert result["_status"] == 403
+
+
+def test_legacy_large_skills_unchanged_preserve_tree_and_wildcard(setup):
+    for i in range(102):
+        path = setup / "skills" / ("skill" + str(i))
+        path.mkdir()
+        (path / "SKILL.md").write_text("# skill")
+    (setup / "SOUL.md").write_text("Legacy bot")
+    existing = builder.get(ADMIN, "default")["config"]
+    assert len(existing["skills"]) > 100
+    existing.pop("avatar_url")
+    existing["system_prompt"] = "Updated instructions"
+    before = (setup / "skills/research/SKILL.md").stat().st_ino
+    result = builder.save(ADMIN, existing)
+    assert result["config"]["system_prompt"] == "Updated instructions"
+    assert (setup / "skills/research/SKILL.md").stat().st_ino == before
+    _, rights = builder.access(ADMIN)
+    assert builder.access_ceiling(ADMIN, "default", rights).grants.skills_load == frozenset({"*"})
+
+
+def test_recovery_session_routes_remain_available_with_revoked_cookie(setup, monkeypatch):
+    from urllib.parse import urlparse
+    builder.save(ADMIN, payload())
+    monkeypatch.setattr("api.profiles.get_active_profile_name", lambda:"research-bot")
+    monkeypatch.setattr("api.governance.enforce._request_identity", lambda h:BOB)
+    assert builder.guard_profile_request(object(), urlparse("/api/session/load?session_id=own"), "GET")

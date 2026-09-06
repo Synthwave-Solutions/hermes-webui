@@ -20857,6 +20857,13 @@ def _start_chat_stream_for_session(
         execution_profile = selected_bot(s, msg, sender_identity or sender_email or getattr(s, 'owner_email', None))
     except ValueError as exc:
         return {'error': str(exc), '_status': 403}
+    from api.bot_builder import allowed as _managed_bot_allowed
+    _bot_actor = sender_identity if isinstance(sender_identity, dict) else {"email": sender_email or getattr(s, "owner_email", None)}
+    try:
+        if _managed_bot_allowed(_bot_actor, execution_profile or getattr(s, "profile", None) or "default") is False:
+            return {"error": "Bot access was revoked. Select an available bot.", "_status": 403}
+    except (PermissionError, ValueError, OSError):
+        return {"error": "Bot access is unavailable. Select an available bot.", "_status": 403}
     if execution_profile:
         from types import SimpleNamespace
         bot_provider, bot_model, _ = _read_profile_model_config(SimpleNamespace(profile=execution_profile), None)
