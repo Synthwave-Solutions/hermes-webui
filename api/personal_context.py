@@ -107,12 +107,12 @@ def prompt_overlay(identity, session):
     )
 
 
-def shared_project_context(identity, session):
+def shared_project_context(identity, session, bot=None):
     empty = {"content": "", "path": "", "name": "", "scope": ""}
     if session is None or not getattr(session, "project_shared", False):
         return empty
     from api.project_collaboration import runtime_file_scope
-    workspace, allowed = runtime_file_scope(session, identity, getattr(session, "profile", None))
+    workspace, allowed = runtime_file_scope(session, identity, bot or getattr(session, "profile", None))
     if not workspace or not allowed:
         return empty
     from api.routes import _project_context_candidates, _strip_project_context_frontmatter

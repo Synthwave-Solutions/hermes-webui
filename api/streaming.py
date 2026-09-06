@@ -6938,7 +6938,7 @@ def _run_agent_streaming(
         from tools.memory_tool import bind_personal_memory_dir, reset_personal_memory_dir
         _personal_memory_token = bind_personal_memory_dir(_personal_root / "memories", enabled=not _personal_shared)
         _personal_overlay = "" if _personal_shared else personal_context.prompt_overlay(_turn_identity, s)
-        _shared_context = personal_context.shared_project_context(_turn_identity, s)
+        _shared_context = personal_context.shared_project_context(_turn_identity, s, execution_profile)
         if _shared_context["content"]:
             _personal_overlay += "\n\nShared project instructions:\n" + _shared_context["content"]
         from api import approval_resume
