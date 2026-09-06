@@ -73,7 +73,7 @@ def test_pwa_new_chat_launch_does_not_block_first_paint_on_model_catalog():
     boot_js = Path("static/boot.js").read_text(encoding="utf-8")
     launch_marker = "if(_shouldStartFreshPwaChat(pwaLaunchAction,urlSession)){"
     assert launch_marker in boot_js
-    launch_branch = boot_js[boot_js.index(launch_marker) : boot_js.index("const savedLocal=localStorage.getItem", boot_js.index(launch_marker))]
+    launch_branch = boot_js[boot_js.index(launch_marker) : boot_js.index("const savedLocal=", boot_js.index(launch_marker))]
     assert "await newSession(true);" in launch_branch
     assert "await _startBootModelDropdown();" not in launch_branch
     assert "Promise.resolve(_startBootModelDropdown()).catch(()=>{})" in launch_branch
@@ -153,7 +153,7 @@ def test_new_chat_prefers_explicit_empty_composer_override_before_configured_def
     assert "consumedExplicitModelOverride" in fn
     assert "usingConfiguredDefault" in fn
     assert "_clearEmptyComposerModelOverride" in fn
-    assert "newModelState={model:window._defaultModel,model_provider:null};" in fn
+    assert "newModelState={model:window._defaultModel,model_provider:window._activeProvider||null};" in fn
     assert fn.index("explicitModelOverride") < fn.index("}else if(window._defaultModel){") < fn.index("_modelStateForSelect"), (
         "newSession() must prefer the empty-composer override first, then the configured default, then legacy picker state"
     )
@@ -191,3 +191,21 @@ def test_changelog_mentions_new_chat_default_model_provider_sync():
     unreleased = CHANGELOG.split("## [v0.51.103]", 1)[0]
     assert "New conversations now resync" in unreleased
     assert "default model provider" in unreleased
+
+
+def test_configured_named_router_default_keeps_its_provider_on_new_chat():
+    import subprocess
+    fn=_new_session_function()
+    start=fn.index("    let newModelState=") if "    let newModelState=" in fn else fn.index("    let newModelState;")
+    end=fn.index("    const data=await api('/api/session/new'",start)
+    script="""
+const assert=require('node:assert/strict');
+const window={_defaultModel:'codex/gpt-6-astra',_activeProvider:'custom:omniroute'};
+const S={session:{model:'gpt-6-astra',model_provider:'openai-codex'}};
+const reqBody={},explicitModelOverride=null,hasLoadedSession=true,modelSelForNew=null;
+"""+fn[start:end]+"""
+assert.equal(reqBody.model,'codex/gpt-6-astra');
+assert.equal(reqBody.model_provider,'custom:omniroute');
+"""
+    result=subprocess.run(['node','-'],input=script,text=True,capture_output=True)
+    assert result.returncode==0,result.stderr
