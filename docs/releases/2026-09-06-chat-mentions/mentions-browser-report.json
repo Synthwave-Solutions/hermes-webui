@@ -1,0 +1,34 @@
+{
+  "passed": true,
+  "results": [
+    "collapse persists reload",
+    "human keyboard selection",
+    "fresh group excludes private history and actual Research response",
+    "persisted bot attribution and rendered Research after reload",
+    "Bob can read new group and list it",
+    "mobile dropdown and Escape",
+    "private attachment and busy preflight keep draft without prepare",
+    "unauthorized recipients rejected"
+  ],
+  "errors": [],
+  "private_sid": "20a21dcbe6b6",
+  "group_sid": "f22199a80f39",
+  "assistant_metadata": [
+    {
+      "keys": [
+        "role",
+        "content",
+        "reasoning",
+        "finish_reason",
+        "timestamp",
+        "_db_persisted",
+        "_row_id",
+        "_turnDuration",
+        "_turnTps",
+        "bot_profile",
+        "bot_name",
+        "_turnUsage"
+      ]
+    }
+  ]
+}

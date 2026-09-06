@@ -158,7 +158,19 @@ def _session_visible_to_active_profile(session) -> bool:
 
 
 def _reject_invisible_session(handler, session) -> bool:
-    if _session_visible_to_active_profile(session):
+    # Use the same request identity and profile boundary as opening the chat.
+    # The process-global active profile is not the viewer's signed profile.
+    from api.routes import _session_visible_to_request
+    from api.governance.enforce import _request_identity
+    from api.group_chat import require_turn_membership
+
+    allowed = _session_visible_to_request(session, handler)
+    if allowed and (getattr(session, "participants", None) or getattr(session, "project_id", None)):
+        try:
+            require_turn_membership(session, _request_identity(handler))
+        except PermissionError:
+            allowed = False
+    if allowed:
         return False
     j(handler, {'error': 'Session not found'}, status=404)
     return True

@@ -46,6 +46,7 @@ async function _govFetchMe() {
   } catch (e) {
     window.__GOV_ME__ = null;
   }
+  if (typeof refreshChatBots === 'function') refreshChatBots();
   return window.__GOV_ME__;
 }
 
