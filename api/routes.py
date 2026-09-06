@@ -543,7 +543,10 @@ def _session_visible_to_request(session, handler=None) -> bool:
     first: being named in a chat never reaches across profiles.
     """
     if not _session_visible_to_active_profile(getattr(session, "profile", None) or None, handler):
-        return False
+        from api.group_chat import shared_profile_visible
+        from api.ownership import request_owner_email
+        return bool(handler is not None and not _is_isolated_profile_mode()
+                    and shared_profile_visible(session, request_owner_email(handler)))
     if _session_owner_visible_to_request(getattr(session, "owner_email", None), handler):
         return True
     if handler is None:
@@ -2677,7 +2680,10 @@ def _build_session_list_cache_payload(
         scoped = merged
         other_profile_count = 0
     else:
-        scoped = [s for s in merged if _profiles_match(s.get("profile"), active_profile)]
+        from api.group_chat import shared_profile_visible
+        scoped = [s for s in merged if _profiles_match(s.get("profile"), active_profile)
+                  or (not _is_isolated_profile_mode() and owner_scope not in (None, 'all')
+                      and shared_profile_visible(s, owner_scope))]
         other_profile_count = 0 if _is_isolated_profile_mode() else len(merged) - len(scoped)
     diag_stage("messaging_dedupe")
     archived_scoped = _keep_latest_messaging_session_per_source(
@@ -11585,7 +11591,7 @@ def _handle_people_directory(handler) -> bool:
         policy = load_governance_policy()
     except Exception:
         logger.debug("people directory: governance policy unavailable", exc_info=True)
-        policy = None
+        return bad(handler, "People directory is unavailable. Please try again.", 503)
     seen = set()
     if policy is not None:
         entries = list((getattr(policy, "users", None) or {}).items())
@@ -11603,6 +11609,8 @@ def _handle_people_directory(handler) -> bool:
             if address and address not in seen:
                 seen.add(address)
                 people.append({"email": address, "display_name": _people_display_name(None, address)})
+    if not people:
+        return bad(handler, "People directory is unavailable. Please try again.", 503)
     people.sort(key=lambda p: (p.get("display_name") or p.get("email") or ""))
     return j(handler, {
         "people": people,
@@ -20624,19 +20632,8 @@ def _start_chat_stream_for_session(
     somebody else's conversation must never lend you their rights.
     """
     attachments = attachments or []
-    if getattr(s, "participants", None) and webui_gateway_chat_enabled(get_config()):
-        # The gateway worker binds no governance principal, so a turn there
-        # would run unbound. Refusing is the honest answer: a group chat must
-        # not be the one place where a participant's own limits stop applying.
-        # Checked before any stream or pending state is created so a refusal
-        # leaves the conversation exactly as it was.
-        return {
-            "error": (
-                "Group conversations are not available on the gateway chat backend yet, "
-                "because a turn there cannot run under the sender's own access."
-            ),
-            "_status": 409,
-        }
+    # Groups always use the local worker below, where each turn is bound to
+    # its human sender. Personal gateway chats keep their configured backend.
     # Prevent duplicate runs in the same session while a stream is still active.
     # This commonly happens after page refresh/reconnect races and can produce
     # duplicated clarify cards for what appears to be a single user request.
@@ -20754,7 +20751,7 @@ def _start_chat_stream_for_session(
     if goal_related:
         STREAM_GOAL_RELATED[stream_id] = True
     diag.stage("worker_thread_start") if diag else None
-    backend_is_gateway = webui_gateway_chat_enabled(get_config())
+    backend_is_gateway = webui_gateway_chat_enabled(get_config()) and not bool(getattr(s, 'participants', None))
     worker_target = _run_gateway_chat_streaming if backend_is_gateway else _run_agent_streaming
     worker_kwargs = {"model_provider": model_provider, "goal_related": goal_related}
     _sender = str(sender_email or "").strip().lower()
@@ -21346,7 +21343,7 @@ def _handle_chat_start(handler, body, diag=None):
             or getattr(s, "context_messages", None)
             or getattr(s, "pending_user_message", None)
         )
-        if not _session_visible_to_active_profile(session_profile, handler):
+        if not _session_visible_to_active_profile(session_profile, handler) and not _session_visible_to_request(s, handler):
             if (
                 requested_profile
                 and _profiles_match(requested_profile, active_profile)
@@ -21360,7 +21357,7 @@ def _handle_chat_start(handler, body, diag=None):
         # Per-user ownership visibility (user isolation). An unowned empty
         # placeholder is claimable by the requester; anything else that fails
         # the ownership check is indistinguishable from a missing session.
-        if not _session_owner_visible_to_request(getattr(s, "owner_email", None), handler):
+        if not _session_visible_to_request(s, handler):
             if has_persisted_turns or getattr(s, "owner_email", None):
                 return bad(handler, "Session not found", 404)
         if getattr(s, "owner_email", None) is None and (

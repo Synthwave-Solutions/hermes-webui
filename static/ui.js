@@ -5676,13 +5676,13 @@ async function openGroupPeoplePicker() {
   const err = $('groupPeopleModalError');
   if (err) err.textContent = '';
   _groupPeopleDraft = _currentParticipants();
-  if (!_groupPeopleDirectory) {
+  {
     try {
       const data = await api('/api/people', { timeoutToast: false });
       _groupPeopleDirectory = Array.isArray(data && data.people) ? data.people : [];
-      if (data && data.me) _groupPeopleDirectory = _groupPeopleDirectory.filter(p => p.email !== data.me);
+      if (data && data.me) _groupPeopleDirectory = _groupPeopleDirectory.filter(p => String(p.email || '').trim().toLowerCase() !== String(data.me).trim().toLowerCase());
     } catch (e) {
-      _groupPeopleDirectory = [];
+      _groupPeopleDirectory = null;
       if (err) err.textContent = t('group_people_load_failed');
     }
   }
@@ -5712,14 +5712,18 @@ function toggleGroupPerson(email) {
 }
 if (typeof window !== 'undefined') window.toggleGroupPerson = toggleGroupPerson;
 
+function _groupSearchText(value) {
+  return String(value || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+}
+
 function renderGroupPeopleList() {
   const list = $('groupPeopleList');
   if (!list) return;
-  const needle = String(($('groupPeopleFilter') || {}).value || '').trim().toLowerCase();
+  const needle = _groupSearchText(($('groupPeopleFilter') || {}).value);
   const people = (_groupPeopleDirectory || []).filter(p => {
     if (!needle) return true;
-    return String(p.email || '').toLowerCase().includes(needle)
-      || String(p.display_name || '').toLowerCase().includes(needle);
+    return _groupSearchText(p.email).includes(needle)
+      || _groupSearchText(p.display_name).includes(needle);
   });
   list.innerHTML = '';
   if (!people.length) {

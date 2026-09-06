@@ -106,13 +106,31 @@ def visible_to_scope(owner_email, participants, owner_scope) -> bool:
     return scope in normalize(participants, owner_email=owner)
 
 
+def shared_profile_visible(session_or_row, email) -> bool:
+    """Explicit group membership intersects existing bot/profile permission."""
+    who = _clean(email)
+    row = session_or_row if isinstance(session_or_row, dict) else vars(session_or_row)
+    participants = participants_of(row)
+    if not participants or not is_member(row.get('owner_email'), participants, who):
+        return False
+    try:
+        from api.governance.loader import get_policy
+        from api.governance.enforce import subject_from_identity
+        from api.governance.resolver import resolve_effective_access
+        policy = get_policy()
+        if not policy.enabled:
+            return who in known_emails()
+        access = resolve_effective_access(policy, subject_from_identity({'email': who}))
+        return access.is_profile_allowed(str(row.get('profile') or 'default'))
+    except Exception:
+        return False
+
+
 def known_emails() -> set:
     """Every address the governance policy knows, for validating a pick.
 
-    Returns an empty set when the policy cannot be read, and callers treat that
-    as "cannot validate" rather than "nobody exists": failing open on a typo is
-    better than blocking every group chat because a policy file is briefly
-    unreadable, and a typo grants nothing on its own.
+    Returns an empty set when the policy cannot be read. Adding a participant
+    grants transcript visibility, so an unavailable directory must fail closed.
     """
     try:
         from api.governance.loader import load_governance_policy
@@ -148,7 +166,11 @@ def validate(values, *, owner_email=None) -> tuple:
         if not isinstance(raw, str) or not _EMAIL_RE.match(_clean(raw)):
             return [], f"not an e-mail address: {str(raw)[:80]}"
     participants = normalize(values, owner_email=owner_email)
+    if not participants:
+        return [], None
     known = known_emails()
+    if not known:
+        return [], "People directory is unavailable. Please try again."
     if known:
         unknown = [p for p in participants if p not in known]
         if unknown:

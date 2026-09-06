@@ -20,6 +20,51 @@ DEV = "hrishikesh@synthwave.solutions"
 STRANGER = "someone@example.com"
 
 
+def test_shared_bot_profile_requires_membership_and_existing_grant(monkeypatch):
+    from api.governance import loader
+    from api.governance.loader import parse_governance_policy
+    policy = parse_governance_policy({'mode':'enforce','roles':{'member':{'profiles':['team']}},
+        'users':{STEVE:{'roles':['member']},DEV:{'roles':[]}}})
+    monkeypatch.setattr(loader,'get_policy',lambda:policy)
+    row={'owner_email':OWNER,'participants':[STEVE,DEV],'profile':'team'}
+    assert group_chat.shared_profile_visible(row,STEVE)
+    assert not group_chat.shared_profile_visible(row,DEV)
+    assert not group_chat.shared_profile_visible(row,STRANGER)
+    assert not group_chat.shared_profile_visible({**row,'participants':[]},OWNER)
+
+
+def test_cross_profile_group_detail_preserves_isolated_boundary(monkeypatch):
+    from types import SimpleNamespace
+    from api import routes, ownership
+    monkeypatch.setattr(routes,'_session_visible_to_active_profile',lambda *a:False)
+    monkeypatch.setattr(ownership,'request_owner_email',lambda h:STEVE)
+    monkeypatch.setattr(group_chat,'shared_profile_visible',lambda s,e:e==STEVE)
+    session=SimpleNamespace(profile='team',owner_email=OWNER,participants=[STEVE])
+    monkeypatch.setattr(routes,'_is_isolated_profile_mode',lambda:False)
+    assert routes._session_visible_to_request(session,object())
+    monkeypatch.setattr(routes,'_is_isolated_profile_mode',lambda:True)
+    assert not routes._session_visible_to_request(session,object())
+
+
+def test_member_can_reach_chat_dispatch_without_owner_rights(monkeypatch):
+    from types import SimpleNamespace
+    from api import routes, ownership
+    session=SimpleNamespace(session_id='s',profile='team',owner_email=OWNER,participants=[STEVE],messages=[{'role':'user','content':'prior'}],context_messages=[],pending_user_message=None)
+    monkeypatch.setattr(routes,'get_session',lambda sid:session)
+    monkeypatch.setattr(routes,'_session_is_subagent_view_only',lambda sid:False)
+    monkeypatch.setattr(routes,'_get_active_profile_name',lambda:'personal')
+    monkeypatch.setattr(routes,'_body_profile_allowed',lambda *args:True)
+    monkeypatch.setattr(routes,'_session_visible_to_active_profile',lambda *args:False)
+    monkeypatch.setattr(routes,'_session_owner_visible_to_request',lambda *args:False)
+    monkeypatch.setattr(routes,'_is_isolated_profile_mode',lambda:False)
+    monkeypatch.setattr(ownership,'request_owner_email',lambda h:STEVE)
+    monkeypatch.setattr(group_chat,'shared_profile_visible',lambda s,e:e==STEVE)
+    monkeypatch.setattr(routes,'bad',lambda h,msg,*a,**kw:msg)
+    def reached(*args): raise ValueError('passed membership checks')
+    monkeypatch.setattr(routes,'_resolve_chat_workspace_with_recovery',reached)
+    assert routes._handle_chat_start(object(),{'session_id':'s','message':'hello'})=='passed membership checks'
+
+
 @pytest.fixture
 def known(monkeypatch):
     monkeypatch.setattr(group_chat, "known_emails", lambda: {OWNER, STEVE, DEV})
@@ -121,12 +166,10 @@ class TestValidate:
         participants, error = group_chat.validate([], owner_email=OWNER)
         assert participants == [] and error is None
 
-    def test_an_unreadable_policy_does_not_block_the_pick(self, monkeypatch):
-        # Failing open on validation is safe: naming somebody grants nothing on
-        # its own, and each turn still runs under that person's own access.
+    def test_an_unreadable_policy_cannot_grant_transcript_access(self, monkeypatch):
         monkeypatch.setattr(group_chat, "known_emails", lambda: set())
         participants, error = group_chat.validate([STRANGER], owner_email=OWNER)
-        assert error is None and participants == [STRANGER]
+        assert error and participants == []
 
 
 class TestParticipantsOf:
