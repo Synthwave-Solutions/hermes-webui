@@ -1375,7 +1375,7 @@ def test_all_profiles_cli_contexts_normalizes_default_profile_name(tmp_path, mon
     monkeypatch.setattr(
         profiles,
         "list_profiles_api",
-        lambda: [{"name": None}, {"name": "research"}],
+        lambda **kwargs: [{"name": None}, {"name": "research"}],
     )
 
     contexts, _cache_key = models._all_profiles_cli_contexts()

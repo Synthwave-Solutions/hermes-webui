@@ -5732,7 +5732,7 @@ def _all_profiles_cli_contexts() -> tuple[list[tuple[Path, Path, str | None]], t
     except Exception:
         pass
     try:
-        for row in list_profiles_api():
+        for row in list_profiles_api(fast=True, include_skill_counts=False):
             if not isinstance(row, dict):
                 continue
             _add_context(row.get('name'))

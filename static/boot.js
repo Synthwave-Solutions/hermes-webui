@@ -3780,7 +3780,7 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
       if(S.session){
         try{Promise.resolve(_startBootModelDropdown()).catch(()=>{});}catch(_){}
       }
-      S._bootReady=true;
+      S._bootReady=true;window.dispatchEvent(new Event("synpulse:boot-ready"));
       syncTopbar();syncWorkspacePanelState();await renderSessionList();await _finalizeComposerPrefillOnBoot(prefillIntent);if(typeof startGatewaySSE==='function')startGatewaySSE();return;
     }catch(e){console.warn('[pwa] new-chat launch action failed', e);}
   }
@@ -3804,7 +3804,7 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
           try{localStorage.removeItem('hermes-webui-session');}catch(_){}
         }
         S.session=null; S.messages=[]; S.activeStreamId=null; S.busy=false;
-        S._bootReady=true;
+        S._bootReady=true;window.dispatchEvent(new Event("synpulse:boot-ready"));
         syncTopbar();syncWorkspacePanelState();
         $('emptyState').style.display='';
         await renderSessionList();await _finalizeComposerPrefillOnBoot(prefillIntent);if(typeof startGatewaySSE==='function')startGatewaySSE();
@@ -3812,7 +3812,7 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
       }
       if(_rootPrefillNeedsFreshComposer(urlSession, savedLocal, prefillIntent)){
         S.session=null; S.messages=[]; S.activeStreamId=null; S.busy=false;
-        S._bootReady=true;
+        S._bootReady=true;window.dispatchEvent(new Event("synpulse:boot-ready"));
         const _ephPanelPref=localStorage.getItem('hermes-webui-workspace-panel-pref')==='open'
           || localStorage.getItem('hermes-webui-workspace-panel')==='open';
         if(_ephPanelPref&&!_isCompactWorkspaceViewport()) _workspacePanelMode='browse';
@@ -3848,7 +3848,7 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
       const _restoredHasDraft = !!(_restoredDraftText || _restoredDraftFiles.length);
       if(_isRestoredPersonalScratchSession(S.session, urlSession) && (S.session.message_count||0) === 0 && !_restoredInFlight && !_restoredHasDraft){
         S.session=null; S.messages=[];
-        S._bootReady=true;
+        S._bootReady=true;window.dispatchEvent(new Event("synpulse:boot-ready"));
         // Restore panel pref before syncing so the workspace panel stays visible
         // even though there is no active session (#workspace-persist).
         const _ephPanelPref=localStorage.getItem('hermes-webui-workspace-panel-pref')==='open'
@@ -3868,12 +3868,12 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
       if(S.session&&S.session.workspace&&panelPref&&!_isCompactWorkspaceViewport()){
         _workspacePanelMode='browse';
       }
-      S._bootReady=true;
+      S._bootReady=true;window.dispatchEvent(new Event("synpulse:boot-ready"));
       syncTopbar();syncWorkspacePanelState();await renderSessionList();if(typeof startGatewaySSE==='function')startGatewaySSE();await checkInflightOnBoot(saved);await _finalizeComposerPrefillOnBoot(prefillIntent);return;}
     catch(e){localStorage.removeItem('hermes-webui-session');}
   }
   // no saved session - show empty state, wait for user to hit +
-  S._bootReady=true;
+  S._bootReady=true;window.dispatchEvent(new Event("synpulse:boot-ready"));
   syncTopbar();
   // Restore panel pref so the workspace panel stays visible on a fresh load if the
   // user had it open during their last session (#workspace-persist).
@@ -3888,7 +3888,7 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
   if(typeof startGatewaySSE==='function') startGatewaySSE();
 })().catch(e=>{
   console.error('[synthpulse] boot failed', e);
-  try{S._bootReady=true;}catch(_){}
+  try{S._bootReady=true;window.dispatchEvent(new Event("synpulse:boot-ready"));}catch(_){}
   try{syncTopbar();}catch(_){}
   try{syncWorkspacePanelState();}catch(_){}
   try{$('emptyState').style.display='';}catch(_){}
