@@ -5249,6 +5249,11 @@ async function deleteCurrentSkill() {
 
 // ── Memory (main view) ──
 let _memoryData = null;
+let _memoryRequestEpoch = 0;
+let _memoryLoadedContext = null;
+function _memoryContext() {
+  return JSON.stringify([S.session && S.session.session_id || '', S.activeProfile || 'default']);
+}
 let _notesSourcesData = null;
 let _notesSearchResults = [];
 let _notesSelectedSource = 'joplin';
@@ -5261,8 +5266,9 @@ let _memoryMode = 'empty'; // 'empty' | 'read' | 'edit'
 const MEMORY_SECTIONS = [
   { key: 'memory', labelKey: 'my_notes', emptyKey: 'no_notes_yet', iconKey: 'brain' },
   { key: 'user',   labelKey: 'user_profile', emptyKey: 'no_profile_yet', iconKey: 'user' },
-  { key: 'soul',   labelKey: 'agent_soul', emptyKey: 'no_soul_yet', iconKey: 'sparkles' },
-  { key: 'project_context', label: 'Project Context', empty: 'No project context file found for this workspace.', iconKey: 'file-text', readOnly: true },
+  { key: 'soul', label: 'Personal agent preferences', empty: 'How should agents work with you? This does not change a shared bot persona.', iconKey: 'sparkles' },
+  { key: 'project_context', label: 'My project notes', empty: 'Your private notes for this project. Without a project, these are your general project notes.', iconKey: 'file-text' },
+  { key: 'shared_project_context', label: 'Shared project instructions', empty: 'No shared instructions.', iconKey: 'file-text', readOnly: true },
   { key: 'external_notes', labelKey: 'external_notes_sources', emptyKey: 'external_notes_empty', iconKey: 'book-open' },
 ];
 
@@ -5285,6 +5291,7 @@ function _memorySectionContent(key) {
   if (key === 'user') return _memoryData.user || '';
   if (key === 'soul') return _memoryData.soul || '';
   if (key === 'project_context') return _memoryData.project_context || '';
+  if (key === 'shared_project_context') return _memoryData.shared_project_context || '';
   return _memoryData.memory || '';
 }
 
@@ -5408,17 +5415,8 @@ function _renderMemoryDetail(section) {
   const mtime = _memorySectionMtime(section);
   const mtimeStr = mtime ? new Date(mtime * 1000).toLocaleString() : '';
   const mtimeHtml = mtimeStr ? `<div class="memory-detail-mtime">${esc(mtimeStr)}</div>` : '';
-  const path = _memorySectionPath(section);
-  const fileName = section === 'project_context' && _memoryData
-    ? (_memoryData.project_context_name || (path.split(/[\\/]/).pop() || ''))
-    : (path.split(/[\\/]/).pop() || '');
-  const pathHtml = path ? `<div class="memory-detail-mtime">${esc(fileName)} · ${esc(path)}</div>` : '';
-  const shadowed = section === 'project_context' && _memoryData && Array.isArray(_memoryData.project_context_shadowed)
-    ? _memoryData.project_context_shadowed
-    : [];
-  const shadowedHtml = shadowed.length
-    ? `<div class="memory-detail-mtime">${esc(shadowed.map(item => `${item.name || 'Context file'} present, shadowed by ${item.shadowed_by || fileName || 'active context'}`).join('; '))}</div>`
-    : '';
+  const pathHtml = `<div class="memory-detail-mtime">${section === 'shared_project_context' ? 'Shared with project members · Read only' : 'Only you'}</div>`;
+  const shadowedHtml = '';
   const inner = content
     ? `<div class="memory-content preview-md">${renderMd(content)}</div>`
     : `<div class="memory-empty">${esc(_memorySectionEmpty(meta))}</div>`;
@@ -5515,6 +5513,7 @@ async function previewExternalNote(source, id) {
 }
 
 async function openMemorySection(section, el) {
+  if (!_memoryData || _memoryLoadedContext !== _memoryContext()) { await loadMemory(true); if (!_memoryData) return; }
   if (section === 'external_notes' && _memoryData && !_memoryData.external_notes_enabled) return;
   _currentMemorySection = section;
   document.querySelectorAll('#memoryPanel .side-menu-item').forEach(e => e.classList.remove('active'));
@@ -5543,13 +5542,14 @@ function closeMemoryEdit() { cancelMemoryEdit(); }
 
 async function submitMemorySave() {
   if (!_currentMemorySection) return;
+  if (_memoryLoadedContext !== _memoryContext()) { await loadMemory(true); showToast('Your chat context changed. Open the notes again before editing.'); return; }
   if (_memorySectionMeta(_currentMemorySection).readOnly) return;
   const ta = $('memEditContent');
   const errEl = $('memEditError');
   if (!ta) return;
   if (errEl) errEl.style.display = 'none';
   try {
-    await api('/api/memory/write', {method:'POST', body: JSON.stringify({section: _currentMemorySection, content: ta.value})});
+    await api('/api/memory/write', {method:'POST', body: JSON.stringify({section: _currentMemorySection, content: ta.value, session_id: S.session && S.session.session_id || null})});
     showToast(t('memory_saved'));
     await loadMemory(true);
     _renderMemoryDetail(_currentMemorySection);
@@ -7524,12 +7524,24 @@ async function deleteProfile(name) {
 // ── Memory panel ──
 async function loadMemory(force) {
   const panel = $('memoryPanel');
+  const epoch = ++_memoryRequestEpoch;
+  const context = _memoryContext();
+  _memoryData = null;
+  _memoryLoadedContext = null;
+  _memoryMode = 'empty';
+  if (panel) panel.innerHTML = '';
+  const detail = $('memoryDetailBody');
+  if (detail) detail.innerHTML = '';
+  _setMemoryHeaderButtons('empty');
   try {
     const memoryUrl = S.session && S.session.session_id
       ? `/api/memory?session_id=${encodeURIComponent(S.session.session_id)}`
       : '/api/memory';
     const data = await api(memoryUrl);
+    if (epoch !== _memoryRequestEpoch || context !== _memoryContext()) return;
     _memoryData = data;
+    _memoryLoadedContext = context;
+    if (_currentMemorySection === 'shared_project_context' && !data.shared_project_context) _currentMemorySection = null;
     if (_currentMemorySection === 'external_notes' && !data.external_notes_enabled) {
       _currentMemorySection = null;
     }
@@ -7539,14 +7551,14 @@ async function loadMemory(force) {
     if (panel) {
       panel.innerHTML = '';
       for (const s of MEMORY_SECTIONS) {
+        if (s.key === 'shared_project_context' && !data.shared_project_context) continue;
         if (s.key === 'external_notes' && !_memoryData.external_notes_enabled) continue;
         const el = document.createElement('button');
         el.type = 'button';
         el.className = 'side-menu-item';
         if (_currentMemorySection === s.key) el.classList.add('active');
         el.innerHTML = `${li(s.iconKey,16)}<span>${esc(_memorySectionLabel(s))}</span>`;
-        const sectionPath = _memorySectionPath(s.key);
-        if (sectionPath) el.title = sectionPath;
+        el.title = s.key === 'shared_project_context' ? 'Shared with project members · Read only' : s.key === 'external_notes' ? 'Connected notes sources' : 'Only you';
         el.onclick = () => openMemorySection(s.key, el);
         panel.appendChild(el);
       }
@@ -7555,6 +7567,7 @@ async function loadMemory(force) {
       _renderMemoryDetail(_currentMemorySection);
     }
   } catch(e) {
+    if (epoch !== _memoryRequestEpoch || context !== _memoryContext()) return;
     if (panel) panel.innerHTML = `<div style="padding:12px;color:var(--accent);font-size:12px">${esc(t('error_prefix'))}${esc(e.message)}</div>`;
   }
 }
