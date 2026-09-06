@@ -1585,7 +1585,8 @@ async function newSession(flash, options={}){
     }else if(window._defaultModel){
       // Configured default wins over stale picker/persisted state even with no
       // loaded session (deleting the last session left S.session null + stale picker) (#4728).
-      newModelState={model:window._defaultModel,model_provider:null};
+      // Model and provider are one configured route, including named routers.
+      newModelState={model:window._defaultModel,model_provider:window._activeProvider||null};
       usingConfiguredDefault=true;
     }else if(modelSelForNew&&modelSelForNew.value&&typeof _modelStateForSelect==='function'){
       newModelState=_modelStateForSelect(modelSelForNew,modelSelForNew.value);
