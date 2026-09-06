@@ -6654,6 +6654,39 @@ function _refreshProfileSwitchBackground(gen){
   }).catch(function(){});
 }
 
+function botDisplayName(p){ return (p.bot&&p.bot.title)||p.name; }
+function botAvatarHtml(p){
+  const avatar=String(p.bot_avatar_url||'');
+  if(avatar.startsWith('/api/profile/avatar?')) return `<img src="${esc(avatar)}" width="32" height="32" alt="" style="border-radius:8px;object-fit:cover;vertical-align:middle;margin-right:8px">`;
+  const meta=p.bot||{};let hash=0;for(const ch of p.name||'bot') hash=(hash*31+ch.charCodeAt(0))>>>0;
+  const color=/^#[0-9a-f]{6}$/i.test(meta.color||'')?meta.color:['#6688aa','#8866aa','#668877','#aa8866'][hash%4];
+  const face=meta.shape==='hexagon'?'<polygon points="16,2 29,9 29,23 16,30 3,23 3,9"/>':meta.shape==='squircle'?'<rect x="2" y="2" width="28" height="28" rx="7"/>':'<circle cx="16" cy="16" r="14"/>';
+  return `<svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true" style="vertical-align:middle;margin-right:8px"><g fill="${color}">${face}</g><g fill="white"><circle cx="11" cy="14" r="2"/><circle cx="21" cy="14" r="2"/></g><path d="M11 21 Q16 25 21 21" fill="none" stroke="white" stroke-width="2"/></svg>`;
+}
+async function saveBotAppearance(){
+  const p=_currentProfileDetail;if(!p)return;
+  try{
+    await api('/api/profile/appearance',{method:'POST',body:JSON.stringify({name:p.name,revision:p.bot_revision||0,bot:{title:$('botTitle').value,description:$('botDescription').value,shape:$('botShape').value,color:$('botColor').value,knowledge_sources:$('botKnowledge').value.split('\n').map(x=>x.trim()).filter(Boolean)}})});
+    await loadProfilesPanel();showToast(t('bot_saved'));
+  }catch(e){showToast(e.message);}
+}
+async function uploadBotAvatar(input){
+  const p=_currentProfileDetail,file=input.files&&input.files[0];if(!p||!file)return;
+  if(file.size>2000000||!['image/png','image/jpeg','image/webp'].includes(file.type)){showToast(t('bot_avatar_limit'));return;}
+  try{
+    const data=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(file);});
+    await api('/api/profile/avatar',{method:'POST',body:JSON.stringify({name:p.name,avatar:data})});
+    await loadProfilesPanel();showToast(t('bot_saved'));
+  }catch(e){showToast(e.message||t('bot_avatar_limit'));}
+}
+async function openBotConfiguration(section){
+  const p=_currentProfileDetail;if(!p)return;
+  if(S.activeProfile!==p.name)await switchToProfile(p.name);
+  if(S.activeProfile!==p.name)return;
+  switchPanel(section==='soul'?'memory':section);
+  if(section==='soul'){await loadMemory(true);await openMemorySection('soul');}
+}
+
 async function loadProfilesPanel() {
   const panel = $('profilesPanel');
   if (!panel) return;
@@ -6713,7 +6746,7 @@ async function loadProfilesPanel() {
       card.innerHTML = `
         <div class="profile-card-header">
           <div style="min-width:0;flex:1">
-            <div class="profile-card-name${isActive ? ' is-active' : ''}">${gwDot}${esc(p.name)}${defaultBadge}${activeBadge}${hiddenBadge}</div>
+            <div class="profile-card-name${isActive ? ' is-active' : ''}">${botAvatarHtml(p)}${gwDot}${esc(botDisplayName(p))}${defaultBadge}${activeBadge}${hiddenBadge}</div>
             ${meta.length ? `<div class="profile-card-meta">${esc(meta.join(' \u00b7 '))}</div>` : `<div class="profile-card-meta">${esc(t('profile_no_configuration'))}</div>`}
           </div>
         </div>`;
@@ -6761,7 +6794,7 @@ function _renderProfileDetail(p, activeName){
   const body = $('profileDetailBody');
   const empty = $('profileDetailEmpty');
   if (!title || !body) return;
-  title.textContent = p.name;
+  title.textContent = botDisplayName(p);
   const isActive = p.name === activeName;
   const isDefault = !!p.is_default;
   const statusBadge = isActive
@@ -6772,6 +6805,10 @@ function _renderProfileDetail(p, activeName){
     ? `<span class="detail-badge ok">${esc(t('profile_gateway_running'))}</span>`
     : `<span class="detail-badge">${esc(t('profile_gateway_stopped'))}</span>`;
   const rows = [];
+  const bindings=p.bot_configuration||{};
+  for(const [label,value] of [['Prompt',bindings.prompt],['Toolsets',(bindings.toolsets||[]).join(', ')||'Default / inherited'],['MCP servers',(bindings.mcp_servers||[]).join(', ')||'None explicitly configured'],['Memory',bindings.memory],['Skills folder',bindings.skills]]){
+    if(value)rows.push(`<div class="detail-row"><div class="detail-row-label">${esc(label)}</div><div class="detail-row-value">${esc(value)}</div></div>`);
+  }
   rows.push(`<div class="detail-row"><div class="detail-row-label">Status</div><div class="detail-row-value">${statusBadge}${defaultBadge}</div></div>`);
   rows.push(`<div class="detail-row"><div class="detail-row-label">Gateway</div><div class="detail-row-value">${gwBadge}</div></div>`);
   if (p.model) rows.push(`<div class="detail-row"><div class="detail-row-label">Model</div><div class="detail-row-value"><code>${esc(p.model)}</code></div></div>`);
@@ -6783,7 +6820,22 @@ function _renderProfileDetail(p, activeName){
   body.innerHTML = `
     <div class="main-view-content">
       <div class="detail-card">
-        <div class="detail-card-title">Profile</div>
+        <div class="detail-card-title">${botAvatarHtml(p)}${esc(t('bot_identity'))}</div>
+        <label>${esc(t('bot_name'))}<input id="botTitle" value="${esc((p.bot&&p.bot.title)||p.name)}" maxlength="80" style="width:100%"></label>
+        <label>${esc(t('bot_description'))}<textarea id="botDescription" maxlength="400" style="width:100%">${esc((p.bot&&p.bot.description)||'')}</textarea></label>
+        <label>${esc(t('bot_avatar'))} <select id="botShape">${['circle','squircle','hexagon'].map(shape=>`<option value="${shape}" ${(p.bot&&p.bot.shape)===shape?'selected':''}>${shape}</option>`).join('')}</select> <input type="color" id="botColor" value="${/^#[0-9a-f]{6}$/i.test((p.bot&&p.bot.color)||'')?p.bot.color:'#6688aa'}"></label>
+        <label>Knowledge source files (relative to this bot's chat workspace)<textarea id="botKnowledge" style="width:100%" placeholder="docs/product.md">${esc((p.bot_knowledge_sources||[]).join('\n'))}</textarea></label>
+        <p>One file per line. Files are read only when relevant and allowed for the human sender. Missing files are skipped. Upload documents into the chat workspace first.</p>
+        <button type="button" onclick="saveBotAppearance()">${esc(t('save'))}</button>
+        <label>${esc(t('bot_upload'))}<input type="file" accept="image/png,image/jpeg,image/webp" onchange="uploadBotAvatar(this)"></label>
+        <p>${esc(t('bot_avatar_limit'))}</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button onclick="openBotConfiguration('soul')">${esc(t('bot_prompt'))}</button>
+          <button onclick="openBotConfiguration('memory')">${esc(t('bot_knowledge'))}</button>
+          <button onclick="openBotConfiguration('skills')">${esc(t('tab_skills'))}</button>
+          <button onclick="openBotConfiguration('settings')">${esc(t('bot_tools'))}</button>
+          <button onclick="openBotConfiguration('workspaces')">${esc(t('tab_workspaces'))}</button>
+        </div>
         ${rows.join('')}
       </div>
     </div>`;
@@ -6885,7 +6937,7 @@ function renderProfileDropdown(data) {
     const gwDot = `<span class="profile-opt-badge ${p.gateway_running ? 'running' : 'stopped'}"></span>`;
     const checkmark = p.name === active ? ' <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--link)" stroke-width="3" style="vertical-align:-1px"><polyline points="20 6 9 17 4 12"/></svg>' : '';
     const defaultBadge = p.is_default ? ` <span style="opacity:.5;font-weight:400">${esc(t('profile_default_label'))}</span>` : '';
-    opt.innerHTML = `<div class="profile-opt-name">${gwDot}${esc(p.name)}${defaultBadge}${checkmark}</div>` +
+    opt.innerHTML = `<div class="profile-opt-name">${botAvatarHtml(p)}${gwDot}${esc(botDisplayName(p))}${defaultBadge}${checkmark}</div>` +
       (meta.length ? `<div class="profile-opt-meta">${esc(meta.join(' \u00b7 '))}</div>` : '');
     opt.onclick = async () => {
       closeProfileDropdown();

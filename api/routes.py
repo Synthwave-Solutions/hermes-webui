@@ -13409,16 +13409,34 @@ def handle_get(handler, parsed) -> bool:
 
     # ── Profile API (GET) ──
     if parsed.path == "/api/profiles":
-        from api import profiles as profiles_api
+        from api import profiles as profiles_api, bot_metadata
 
         return j(
             handler,
             {
-                "profiles": profiles_api.list_profiles_api(),
+                "profiles": [{**p, **bot_metadata.read_profile(p["name"])} for p in profiles_api.list_profiles_api()],
                 "active": profiles_api.get_active_profile_name(),
                 "single_profile_mode": _is_isolated_profile_mode(),
             },
         )
+
+    if parsed.path == "/api/profile/avatar":
+        name = (parse_qs(parsed.query).get("profile") or [""])[0]
+        if not name or not _chat_profile_target_allowed(handler, name):
+            return bad(handler, "Bot not found", 404)
+        try:
+            from api.bot_metadata import avatar_bytes
+            blob=avatar_bytes(name)
+        except (ValueError, OSError):
+            return bad(handler, "Avatar not found", 404)
+        handler.send_response(200)
+        handler.send_header("Content-Type", "image/png")
+        handler.send_header("Content-Length", str(len(blob)))
+        handler.send_header("Cache-Control", "private, max-age=60")
+        handler.send_header("X-Content-Type-Options", "nosniff")
+        handler.end_headers()
+        handler.wfile.write(blob)
+        return
 
     if parsed.path == "/api/profile/active":
         from api import profiles as profiles_api
@@ -15330,6 +15348,25 @@ def handle_post(handler, parsed) -> bool:
             return bad(handler, _sanitize_error(e), 404)
         except RuntimeError as e:
             return bad(handler, str(e), 409)
+
+    if parsed.path in ("/api/profile/appearance", "/api/profile/avatar"):
+        from api import governance_api, bot_metadata
+        from api.governance.enforce import subject_from_identity
+        policy = governance_api.get_policy()
+        subject = subject_from_identity(governance_api._caller_identity(handler))
+        access = governance_api.resolve_effective_access(policy, subject)
+        if not governance_api._require(handler, access, subject, policy, "profiles:admin"):
+            return
+        name=str(body.get("name") or "").strip()
+        if not name or not _chat_profile_target_allowed(handler,name):
+            return bad(handler,"Bot not found",404)
+        try:
+            result = bot_metadata.save_avatar(name,body.get("avatar")) if parsed.path.endswith("/avatar") else bot_metadata.save_profile(name,body.get("bot"),body.get("revision"))
+            return j(handler,{"ok":True, **result})
+        except RuntimeError as exc:
+            return bad(handler,str(exc),409)
+        except (ValueError,OSError) as exc:
+            return bad(handler,str(exc),400)
 
     if parsed.path == "/api/profile/create":
         name = body.get("name", "").strip()

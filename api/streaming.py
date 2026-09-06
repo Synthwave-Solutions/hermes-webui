@@ -691,6 +691,10 @@ def _webui_ephemeral_system_prompt(
     surface_prompt = _webui_surface_context_prompt(surface_context)
     if surface_prompt:
         parts.append(surface_prompt)
+    if isinstance(surface_context, dict):
+        from api.bot_metadata import knowledge_prompt
+        knowledge = knowledge_prompt(surface_context.get('profile'), surface_context.get('workspace'))
+        if knowledge: parts.append(knowledge)
     parts.append(_WEBUI_PROGRESS_PROMPT)
     delivery_prompt = _webui_delivery_context_prompt(config_data)
     if delivery_prompt:
