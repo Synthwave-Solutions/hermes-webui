@@ -15373,7 +15373,7 @@ def handle_post(handler, parsed) -> bool:
             return bad(handler, str(e), 409)
 
     if parsed.path in ("/api/profile/appearance", "/api/profile/avatar"):
-        from api import governance_api, bot_metadata
+        from api import bot_metadata
         from api.governance.enforce import subject_from_identity
         policy = governance_api.get_policy()
         subject = subject_from_identity(governance_api._caller_identity(handler))
