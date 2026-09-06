@@ -422,7 +422,8 @@ function _intgRenderGrid() {
       : '';
     return '<div class="intg-card' + (p.configured ? ' configured' : '') + '">'
       + '<div class="intg-card-head">' + logo
-      + '<div class="intg-card-name">' + _intgEsc(p.display_name || p.key) + '</div></div>'
+      + '<div class="intg-card-name">' + _intgEsc(p.display_name || p.key)
+      + (p.unique_key && p.unique_key !== p.key ? ' · ' + _intgEsc(p.unique_key) : '') + '</div></div>'
       + '<div class="intg-card-key">' + _intgEsc(p.key) + '</div>'
       + '<div class="intg-card-badges">' + badges + '</div>'
       + '<div class="intg-card-actions">' + action + docs + '</div>'
@@ -470,12 +471,81 @@ function _intgMarkPending(providerConfigKey) {
 
 // Admin path: create the Nango integration for a provider so it becomes
 // connectable for everyone (POST /api/integrations/enable, admin-gated).
+async function _intgEnablePayload(providerKey) {
+  const catalog = await api('/api/integrations/catalog', { redirect401: false });
+  const provider = (catalog.providers || []).find(p => p.key === providerKey);
+  if (!provider) throw new Error('Provider is no longer available. Refresh the catalog.');
+  const payload = { provider_config_key: providerKey };
+  const fields = provider.configured && provider.unique_key === providerKey ? [] : (provider.credential_fields || []);
+  if (!fields.length) return payload;
+  const credentials = await _intgCredentialDialog(provider, fields);
+  if (credentials === null) return null;
+  payload.credentials = credentials;
+  return payload;
+}
+
+function _intgCredentialDialog(provider, fields) {
+  return new Promise(resolve => {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'app-dialog';
+    dialog.style.cssText = 'max-width:480px;width:calc(100% - 32px);max-height:90vh;overflow:auto';
+    const form = document.createElement('form');
+    const title = document.createElement('h3');
+    title.textContent = provider.display_name;
+    form.appendChild(title);
+    const explanation = document.createElement('p');
+    explanation.textContent = _intgT('integrations_credentials_prompt', 'Enter the app credentials from this provider to enable sign-in.');
+    form.appendChild(explanation);
+    const inputs = {};
+    for (const field of fields) {
+      const label = document.createElement('label');
+      label.textContent = field.replace(/_/g, ' ');
+      label.style.cssText = 'display:block;margin:12px 0';
+      const input = document.createElement(field === 'private_key' ? 'textarea' : 'input');
+      if (field !== 'private_key') input.type = field.includes('secret') ? 'password' : 'text';
+      else input.rows = 6;
+      input.required = true;
+      input.autocomplete = 'off';
+      input.spellcheck = false;
+      input.style.cssText = 'display:block;width:100%;box-sizing:border-box';
+      label.appendChild(input);
+      form.appendChild(label);
+      inputs[field] = input;
+    }
+    const finish = result => {
+      Object.values(inputs).forEach(input => { input.value = ''; });
+      dialog.close();
+      dialog.remove();
+      resolve(result);
+    };
+    const cancel = document.createElement('button');
+    cancel.type = 'button'; cancel.className = 'intg-btn';
+    cancel.textContent = _intgT('cancel', 'Cancel');
+    cancel.onclick = () => finish(null);
+    const submit = document.createElement('button');
+    submit.type = 'submit'; submit.className = 'intg-btn primary';
+    submit.textContent = _intgT('integrations_enable', 'Enable');
+    form.append(cancel, submit);
+    form.onsubmit = event => {
+      event.preventDefault();
+      const values = Object.fromEntries(fields.map(field => [field, inputs[field].value.trim()]));
+      if (Object.values(values).some(value => !value)) return;
+      finish(values);
+    };
+    dialog.addEventListener('cancel', event => { event.preventDefault(); finish(null); });
+    dialog.appendChild(form); document.body.appendChild(dialog); dialog.showModal();
+    inputs[fields[0]].focus();
+  });
+}
+
 async function _intgEnable(providerKey) {
   let data;
   try {
+    const payload = await _intgEnablePayload(providerKey);
+    if (payload === null) return;
     data = await api('/api/integrations/enable', {
       method: 'POST',
-      body: JSON.stringify({ provider_config_key: providerKey }),
+      body: JSON.stringify(payload),
       redirect401: false,
     });
   } catch (e) {

@@ -515,6 +515,7 @@ def _catalog_item(key: str, entry: dict) -> dict:
         "key": key,
         "display_name": str(entry.get("display_name") or key),
         "auth_mode": str(entry.get("auth_mode") or ""),
+        "credential_fields": list(_OAUTH_CREDENTIAL_FIELDS.get(str(entry.get("auth_mode") or "").upper(), ())),
         "categories": [str(c) for c in categories] if isinstance(categories, list) else [],
         "docs": str(entry.get("docs") or ""),
         "configured": False,
@@ -592,6 +593,8 @@ def get_catalog(owner_email: str | None = None, *, is_admin: bool = False) -> di
         for key, entry in load_provider_entries().items()
     }
     nango: dict[str, Any] = {"available": True, "error": None}
+    configured_items = []
+    configured_providers = set()
     try:
         for row in _list_integrations():
             provider = str(row.get("provider") or "")
@@ -604,9 +607,11 @@ def get_catalog(owner_email: str | None = None, *, is_admin: bool = False) -> di
                 # (custom/renamed provider): still surface it as connectable.
                 item = _catalog_item(provider, {"display_name": row.get("display_name")})
                 items[provider] = item
+            item = dict(item)
             item["configured"] = True
-            if not item["unique_key"]:
-                item["unique_key"] = unique_key
+            item["unique_key"] = unique_key
+            configured_items.append(item)
+            configured_providers.add(provider)
     except NangoError as exc:
         logger.warning("Nango integrations fetch failed: %s", exc)
         nango = {"available": False, "error": str(exc)}
@@ -614,10 +619,11 @@ def get_catalog(owner_email: str | None = None, *, is_admin: bool = False) -> di
     # not one per provider). The lookup prefers the Nango unique_key, since
     # that is the provider_config_key the connect endpoint is called with.
     entries = _approval_entries()
-    for item in items.values():
+    visible_items = [item for key, item in items.items() if key not in configured_providers] + configured_items
+    for item in visible_items:
         entry = entries.get(str(item.get("unique_key") or "")) or entries.get(item["key"])
         item.update(_approval_view(entry, owner_email, is_admin=is_admin))
-    providers = sorted(items.values(), key=lambda p: str(p["display_name"]).lower())
+    providers = sorted(visible_items, key=lambda p: (str(p["display_name"]).lower(), str(p["unique_key"] or "")))
     return {"providers": providers, "nango": nango}
 
 
@@ -761,7 +767,7 @@ def enable_integration(
         "display_name": _provider_label(key),
         "auth_mode": auth_mode,
         # OAuth-family integrations need a client id/secret before connects work.
-        "needs_credentials": auth_mode.startswith("OAUTH") or auth_mode == "APP",
+        "needs_credentials": False,
     }
 
 

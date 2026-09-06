@@ -363,12 +363,14 @@ def deliver_external_notice(destination: str, text: str) -> tuple[bool, str | No
     if not destination:
         return False, "no destination configured"
     try:
-        from gateway.delivery import deliver_text  # type: ignore
+        from tools.send_message_tool import send_message_tool  # type: ignore
     except Exception:
         return False, "external delivery backend unavailable"
     try:
-        ok = deliver_text(destination, text)
-        return bool(ok), None if ok else "delivery not confirmed"
+        response = send_message_tool({"action": "send", "target": destination, "message": text})
+        result = json.loads(response) if isinstance(response, str) else response
+        ok = isinstance(result, dict) and result.get("success") is True
+        return ok, None if ok else "external delivery not confirmed"
     except Exception as exc:  # pragma: no cover
         return False, str(exc)
 

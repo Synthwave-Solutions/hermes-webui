@@ -1231,6 +1231,7 @@ window.__registerHermesLocale('en', {
     integrations_errors: 'error(s)',
     integrations_connect: 'Connect',
     integrations_connected: 'Connected',
+    integrations_credentials_prompt: 'Enter the app credentials from this provider to enable sign-in.',
     integrations_connect_failed: 'Connect session could not be created.',
     integrations_popup_blocked: 'Popup blocked - allow popups for this site and try again.',
     integrations_not_configured: 'Not configured',

@@ -1785,7 +1785,9 @@ async function _govIntgAction(action, key) {
     } else if (action === 'revoke') {
       await _govPost('/api/governance/approvals/revoke', { kind: 'integration', key: key });
     } else if (action === 'enable') {
-      await _govPost('/api/integrations/enable', { provider_config_key: key });
+      const payload = await _intgEnablePayload(key);
+      if (payload === null) return;
+      await _govPost('/api/integrations/enable', payload);
     } else if (action === 'disable') {
       await _govPost('/api/integrations/disable', { provider_config_key: key });
     } else {
