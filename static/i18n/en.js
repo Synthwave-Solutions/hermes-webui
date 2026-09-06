@@ -860,6 +860,11 @@ window.__registerHermesLocale('en', {
     settings_section_access_title: 'Access requests',
     settings_section_access_meta: 'Everything you asked for that needs an admin decision, with its current status. Only your own requests are shown.',
     access_requests_empty: 'No outstanding requests. When a governance rule blocks something you ask the agent to do, the request lands here automatically and an admin decides on it.',
+    approval_resume_optin: 'Complete after approval in this conversation',
+    approval_resume_limits: 'For the next hour, new blocked operations may wait up to five minutes for approval. Only the original running operation continues. Cancellation, a restart or expired wait requires your input; nothing is replayed.',
+    approval_resume_label: 'Continuation',
+    approval_resume_cancel: 'Cancel continuation',
+
     access_requests_load_failed: 'Could not load your requests: ',
     access_status_pending: 'Pending',
     access_status_approved: 'Approved',

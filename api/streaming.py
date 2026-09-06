@@ -6875,11 +6875,30 @@ def _run_agent_streaming(
         # Group conversations: the principal is whoever sent this message, not
         # the person who happens to own the conversation.
         _turn_principal = str(sender_email or '').strip().lower() or getattr(s, 'owner_email', None)
+        from api import approval_resume
+        import hashlib
+        _approval_prompt_hash = hashlib.sha256(str(msg_text or "").encode("utf-8")).hexdigest()
+        _approval_workspace = str(Path(workspace).expanduser().resolve())
+        def _approval_input_is_fresh():
+            if str(getattr(s, 'workspace', '') or '') != _approval_workspace:
+                return False
+            for message in reversed(getattr(s, 'messages', []) or []):
+                if isinstance(message, dict) and message.get('role') == 'user':
+                    content = message.get('content')
+                    return isinstance(content, str) and hashlib.sha256(content.encode('utf-8')).hexdigest() == _approval_prompt_hash
+            return False
+        _approval_waiter = approval_resume.make_waiter(
+            str(_turn_principal or '').strip().lower(), session_id, stream_id,
+            _approval_prompt_hash, cancel_event,
+            fresh=_approval_input_is_fresh,
+        )
         _governance_turn_token = bind_governed_agent_turn(
             _turn_principal,
             active_profile=str(getattr(s, 'profile', None) or 'default'),
             session_id=session_id,
             request_id=stream_id,
+            user_message_sha256=_approval_prompt_hash,
+            approval_waiter=_approval_waiter,
         )
         # Conversation chat mode (Michael Ramirez, 28 Aug 2026), read once per
         # turn from the live session object rather than from the sidecar: a
@@ -7629,6 +7648,10 @@ def _run_agent_streaming(
                     logger.debug('Failed to update live prompt estimate on tool start', exc_info=True)
 
             def on_tool_complete(tool_call_id, name, args, function_result):
+                try:
+                    approval_resume.finish_call(stream_id, tool_call_id, function_result)
+                except Exception:
+                    logger.exception("Could not settle approval continuation")
                 try:
                     _record_live_tool_complete(tool_call_id, name, function_result)
                     if tool_call_id and tool_call_id not in _live_tool_event_complete_ids:
@@ -9934,6 +9957,11 @@ def _run_agent_streaming(
         # turn on this thread leaks no grants. Same lifecycle slot as the
         # session-identity restore above.
         reset_governed_agent_turn(_governance_turn_token)
+        try:
+            from api import approval_resume as _resume_cleanup
+            _resume_cleanup.close_run(stream_id)
+        except Exception:
+            logger.exception("Could not settle ended approval continuation")
         with STREAMS_LOCK:
             STREAMS.pop(stream_id, None)
             CANCEL_FLAGS.pop(stream_id, None)

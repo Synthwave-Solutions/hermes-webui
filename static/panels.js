@@ -13363,16 +13363,38 @@ function _accessWhen(ts){
   if(!n) return '';
   try{ return new Date(n*1000).toLocaleString(); }catch(_){ return ''; }
 }
+async function setApprovalResumeConsent(enabled){
+  const sid=S.session&&S.session.session_id;
+  if(!sid) return;
+  try{ await api('/api/governance/approvals/resume',{method:'POST',body:JSON.stringify({session_id:sid,enabled})}); }
+  finally{ await loadMyAccessRequests(false); }
+}
+async function cancelApprovalResume(id){
+  await api('/api/governance/approvals/resume',{method:'POST',body:JSON.stringify({action:'cancel',operation_id:id})});
+  await loadMyAccessRequests(false);
+}
+async function approvalResumeHtml(){
+  const sid=S.session&&S.session.session_id;
+  const data=await api('/api/governance/approvals/resume?session_id='+encodeURIComponent(sid||''));
+  let html=sid?`<label><input type="checkbox" ${data.enabled?'checked':''} onchange="setApprovalResumeConsent(this.checked)"> ${esc(t('approval_resume_optin'))}</label><p>${esc(t('approval_resume_limits'))}</p>`:'';
+  for(const row of data.records||[]){
+    html+=`<div class="access-request-row"><span>${esc(t('approval_resume_label'))}: ${esc(String(row.status))}</span> <span>${esc(String(row.reason||''))}</span>`;
+    if(['waiting','queued'].includes(row.status)) html+=` <button data-operation-id="${esc(String(row.id))}" onclick="cancelApprovalResume(this.dataset.operationId)">${esc(t('approval_resume_cancel'))}</button>`;
+    html+='</div>';
+  }
+  return html;
+}
 async function loadMyAccessRequests(animate){
   const box=$('accessRequestsList');
   if(!box) return;
   const btn=$('btnAccessRequestsRefresh');
   if(animate&&btn) btn.disabled=true;
   try{
+    const resumeHtml=await approvalResumeHtml();
     const data=await api('/api/governance/approvals/mine');
     const rows=Array.isArray(data&&data.requests)?data.requests.slice():[];
     if(!rows.length){
-      box.innerHTML=`<div class="access-requests-empty">${esc(t('access_requests_empty'))}</div>`;
+      box.innerHTML=resumeHtml+`<div class="access-requests-empty">${esc(t('access_requests_empty'))}</div>`;
       return;
     }
     const order={pending:0,approved:1,rejected:2};
@@ -13383,7 +13405,7 @@ async function loadMyAccessRequests(animate){
     });
     const groups=new Map();
     rows.forEach(r=>{const k=String(r.status||'pending').toLowerCase();if(!groups.has(k))groups.set(k,[]);groups.get(k).push(r);});
-    let html='';
+    let html=resumeHtml;
     groups.forEach((items,status)=>{
       html+=`<div class="access-requests-group"><div class="access-requests-group-head">${_accessStatusPill(status)}<span class="access-requests-count">${items.length}</span></div>`;
       html+=items.map(r=>{

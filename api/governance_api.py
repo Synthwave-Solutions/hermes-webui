@@ -1157,6 +1157,40 @@ def _handle_approvals_mine(handler, parsed, policy, subject, access) -> bool:
     return True
 
 
+def _handle_approval_resume(handler, parsed, policy, subject, access):
+    from api import approval_resume
+    from urllib.parse import parse_qs
+    owner = subject.normalized_email
+    if not owner:
+        j(handler, {"error": "Authentication required"}, status=401)
+        return True
+    if getattr(handler, "command", "GET").upper() == "GET":
+        sid = (parse_qs(parsed.query).get("session_id") or [""])[0]
+        j(handler, {"records": approval_resume.records(owner),
+                    "enabled": approval_resume.consent_enabled(owner, sid)})
+        return True
+    body = _read_json(handler)
+    if body is None: return True
+    try:
+        if body.get("action") == "cancel":
+            approval_resume.cancel(owner, str(body.get("operation_id") or ""))
+        else:
+            sid = str(body.get("session_id") or "")
+            # Exact ownership. Group-session consent is deliberately unsupported.
+            from api.routes import get_session
+            session = get_session(sid)
+            if str(getattr(session, "owner_email", "") or "").lower() != owner:
+                j(handler, {"error": "Conversation not found"}, status=404)
+                return True
+            enabled = body.get("enabled")
+            if not isinstance(enabled, bool): raise ValueError("enabled must be boolean")
+            approval_resume.set_consent(owner, sid, enabled)
+        j(handler, {"ok": True})
+    except (KeyError, ValueError) as exc:
+        j(handler, {"error": str(exc)}, status=400)
+    return True
+
+
 def _handle_approvals_decide_generic(handler, parsed, policy, subject, body, kind) -> bool:
     """Approve or reject a non-skill request through api/approvals.
 
@@ -1385,6 +1419,11 @@ def _handle_grant_request_decide(handler, parsed, policy, subject, body) -> bool
         owner=str(payload.get("email") or entry.get("owner_email") or "").strip().lower(),
         digest=digest,
     )
+    from api import approval_resume
+    try:
+        approval_resume.decide(entry, decision)
+    except Exception:
+        logger.exception("Approval saved but continuation could not be signalled")
     # Close the loop with the requester, after the decision is persisted and
     # audited so a delivery problem can never undo or delay it.
     try:
@@ -1519,6 +1558,7 @@ _GET_ROUTES = {
     "/api/governance/usage": _handle_usage_get,
     "/api/governance/approvals": _handle_approvals_get,
     "/api/governance/approvals/mine": _handle_approvals_mine,
+    "/api/governance/approvals/resume": _handle_approval_resume,
     # No catalog entry needed: the /api/governance prefix rule already scores
     # this GET as governance:read and the POST below as governance:write, and
     # the handler re-checks governance:write itself.
@@ -1526,6 +1566,7 @@ _GET_ROUTES = {
 }
 
 _POST_ROUTES = {
+    "/api/governance/approvals/resume": _handle_approval_resume,
     "/api/governance/policy": _handle_policy_replace,
     "/api/governance/validate": _handle_validate,
     "/api/governance/preview": _handle_preview,

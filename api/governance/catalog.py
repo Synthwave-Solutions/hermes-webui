@@ -51,6 +51,8 @@ _SELF_ROUTES: frozenset[str] = frozenset({
     # is still pending. The admin queue (/api/governance/approvals) stays
     # governance:write.
     "/api/governance/approvals/mine",
+    # Owner-scoped consent/cancellation only; cannot grant permissions.
+    "/api/governance/approvals/resume",
     # Asking for something is not the same as getting it. These three write
     # nothing but a pending row in the approvals registry (or, for an
     # already-approved item, install what an admin already decided), so they
