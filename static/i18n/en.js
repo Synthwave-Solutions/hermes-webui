@@ -1,5 +1,9 @@
 // Locale bundle; loaded on demand by static/i18n.js.
 window.__registerHermesLocale('en', {
+    chat_bots_address: 'Send to',
+    chat_bots_choose: 'Your bots',
+    chat_bots_loading: 'Loading bots…',
+    chat_bots_unavailable: 'No available bots',
     subagent_status_last_seen: 'Working at last update',
     subagent_status_queued: 'Queued',
     subagent_status_running: 'Working',

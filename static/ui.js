@@ -16488,6 +16488,7 @@ function _scheduleSessionProgress() {
 }
 
 function renderMessages(options){
+  if(typeof refreshChatBots==='function') refreshChatBots();
   _scheduleSessionProgress();
   _lastMessageRenderAt=performance.now();
   const preserveScroll=!!(options&&options.preserveScroll);
