@@ -58,7 +58,9 @@ jobs:
       - name: Check recipient behavior
         run: node tests/chat_bot_roster_behavior.cjs
       - name: Install Chromium
-        run: python -m playwright install --with-deps chromium
+        run: |
+          python -m playwright install --with-deps chromium
+          npx playwright install --with-deps chromium
       - name: Verify full application loads without browser errors
         run: python tests/browser_smoke.py
       - name: Verify guided bot configuration and navigation races
