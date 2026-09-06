@@ -18361,6 +18361,10 @@ function _toolQueryTitle(query){
 }
 function _toolActionLabelText(tc, opts){
   opts=opts||{};
+  if(tc&&tc.name==='subagent_progress'&&window.SynPulseSubagentProgress){
+    const label=window.SynPulseSubagentProgress.label(tc,typeof t==='function'?t:null);
+    if(label) return label;
+  }
   const kind=_toolActionKind(tc);
   const done=tc&&tc.done!==false;
   const isErr=tc&&tc.is_error;

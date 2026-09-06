@@ -5607,7 +5607,7 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
       }
     });
 
-    source.addEventListener('tool',e=>{
+    function handleLiveToolEvent(e){
       if(_terminalStateReached||_streamFinalized) return;
       if(!S.session||S.session.session_id!==activeSid||S.activeStreamId!==streamId) return;
       const d=JSON.parse(e.data);
@@ -5641,9 +5641,10 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
       _smdEndParser();
       _resetAssistantSegment();
       scrollIfPinned();
-    });
+    }
+    source.addEventListener('tool',handleLiveToolEvent);
 
-    source.addEventListener('tool_complete',e=>{
+    function handleLiveToolCompleteEvent(e){
       if(_terminalStateReached||_streamFinalized) return;
       if(!S.session||S.session.session_id!==activeSid||S.activeStreamId!==streamId) return;
       const d=JSON.parse(e.data);
@@ -5679,6 +5680,23 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
       }
       snapshotLiveTurn();
       scrollIfPinned();
+    }
+    source.addEventListener('tool_complete',handleLiveToolCompleteEvent);
+
+    // Project worker lifecycle through the same durable Anchor/tool rendering.
+    // One projector belongs to this EventSource: replay is idempotent, and a
+    // late event cannot regress a worker or escape into another conversation.
+    const projectSubagent=window.SynPulseSubagentProgress?.createProjector();
+    source.addEventListener('subagent',e=>{
+      if(_terminalStateReached||_streamFinalized||!projectSubagent) return;
+      if(!S.session||S.session.session_id!==activeSid||S.activeStreamId!==streamId) return;
+      let data;
+      try{data=JSON.parse(e.data||'{}');}catch(_){return;}
+      const projected=projectSubagent(data);
+      if(!projected) return;
+      const event={data:JSON.stringify(projected.data),lastEventId:e.lastEventId};
+      if(projected.event==='tool_complete') handleLiveToolCompleteEvent(event);
+      else handleLiveToolEvent(event);
     });
 
     // Phase 2: dedicated `todo_state` event carries a full snapshot of

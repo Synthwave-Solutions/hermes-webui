@@ -1,5 +1,10 @@
 // Locale bundle; loaded on demand by static/i18n.js.
 window.__registerHermesLocale('en', {
+    subagent_status_queued: 'Queued',
+    subagent_status_running: 'Working',
+    subagent_status_completed: 'Completed',
+    subagent_status_failed: 'Failed',
+    subagent_status_cancelled: 'Stopped',
     offline_title: 'Connection lost',
     offline_browser_detail: 'Your browser reports that this device is offline.',
     offline_network_detail: 'SynthPulse is unreachable from this browser right now.',
