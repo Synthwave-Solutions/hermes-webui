@@ -48,6 +48,7 @@ jobs:
           tests/test_group_bots.py
           tests/test_chat_worker_identity_dispatch.py
           tests/test_bot_metadata.py
+          tests/test_profile_metadata_only.py
           tests/test_bot_builder.py
           tests/test_governance_agent_context.py
           tests/test_synpulse_role_navigation.py
@@ -66,6 +67,8 @@ jobs:
         run: python tests/browser_smoke.py
       - name: Verify guided bot configuration and navigation races
         run: node tests/bot_builder_browser.cjs
+      - name: Verify bots are visible while chat history loads
+        run: node tests/chat_bots_boot_browser.cjs
       - name: Verify gateway conversation settlement and reload
         run: python tests/browser_conversation_lifecycle.py
       - name: Verify gateway terminal errors and reload

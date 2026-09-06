@@ -30,5 +30,5 @@ def test_fast_list_keeps_isolation_and_does_not_use_full_cache(monkeypatch,tmp_p
         return [{"name":"one","skill_count":None,"enabled_skills":None,"total_skills":None,"skill_counts_pending":True}]
     monkeypatch.setattr(p,"_build_profile_rows_fast",rows)
     result=p.list_profiles_api(fast=True)
-    assert seen==[{"deferred_counts":True,"isolated":(tmp_path,"one")}]
+    assert seen==[{"deferred_counts":True,"isolated":(tmp_path,"one"),"include_skill_counts":True}]
     assert result[0]["is_active"] and result[0]["skill_count"] is None

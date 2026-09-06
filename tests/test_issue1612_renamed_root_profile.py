@@ -39,7 +39,7 @@ def test_is_root_profile_renamed_root_via_list_profiles_api(monkeypatch):
     """A profile name reported by list_profiles_api with is_default=True is treated as root."""
     import api.profiles as p
 
-    monkeypatch.setattr(p, 'list_profiles_api', lambda: [
+    monkeypatch.setattr(p, 'list_profiles_api', lambda **kwargs: [
         {'name': 'kinni', 'is_default': True, 'path': str(p._DEFAULT_HERMES_HOME)},
         {'name': 'haku', 'is_default': False, 'path': '/tmp/profiles/haku'},
     ])
@@ -55,7 +55,7 @@ def test_is_root_profile_caches_results(monkeypatch):
     import api.profiles as p
 
     calls = {'n': 0}
-    def fake_list():
+    def fake_list(**kwargs):
         calls['n'] += 1
         return [{'name': 'kinni', 'is_default': True, 'path': '/tmp/.hermes'}]
     monkeypatch.setattr(p, 'list_profiles_api', fake_list)
@@ -75,7 +75,7 @@ def test_is_root_profile_invalidation_drops_stale(monkeypatch):
         [{'name': 'kinni', 'is_default': True, 'path': '/tmp/.hermes'}],
         [{'name': 'noblepro', 'is_default': True, 'path': '/tmp/.hermes'}],
     ]
-    monkeypatch.setattr(p, 'list_profiles_api', lambda: seq[0] if seq else [])
+    monkeypatch.setattr(p, 'list_profiles_api', lambda **kwargs: seq[0] if seq else [])
 
     p._invalidate_root_profile_cache()
     assert p._is_root_profile('kinni') is True
@@ -112,7 +112,7 @@ def test_get_active_hermes_home_returns_default_for_renamed_root(tmp_path, monke
     import api.profiles as p
 
     monkeypatch.setattr(p, '_DEFAULT_HERMES_HOME', tmp_path)
-    monkeypatch.setattr(p, 'list_profiles_api', lambda: [
+    monkeypatch.setattr(p, 'list_profiles_api', lambda **kwargs: [
         {'name': 'kinni', 'is_default': True, 'path': str(tmp_path)},
     ])
     p._invalidate_root_profile_cache()
@@ -129,7 +129,7 @@ def test_get_active_hermes_home_returns_named_for_real_named_profile(tmp_path, m
     profile_dir = tmp_path / 'profiles' / 'haku'
     profile_dir.mkdir(parents=True)
     monkeypatch.setattr(p, '_DEFAULT_HERMES_HOME', tmp_path)
-    monkeypatch.setattr(p, 'list_profiles_api', lambda: [
+    monkeypatch.setattr(p, 'list_profiles_api', lambda **kwargs: [
         {'name': 'kinni', 'is_default': True, 'path': str(tmp_path)},
         {'name': 'haku', 'is_default': False, 'path': str(profile_dir)},
     ])
@@ -154,7 +154,7 @@ def test_switch_profile_resolution_renamed_root_picks_default_home(tmp_path, mon
     import api.profiles as p
 
     monkeypatch.setattr(p, '_DEFAULT_HERMES_HOME', tmp_path)
-    monkeypatch.setattr(p, 'list_profiles_api', lambda: [
+    monkeypatch.setattr(p, 'list_profiles_api', lambda **kwargs: [
         {'name': 'kinni', 'is_default': True, 'path': str(tmp_path)},
     ])
     p._invalidate_root_profile_cache()
@@ -189,7 +189,7 @@ def test_switch_profile_sticky_marker_renamed_root(tmp_path, monkeypatch):
     import api.profiles as p
 
     monkeypatch.setattr(p, '_DEFAULT_HERMES_HOME', tmp_path)
-    monkeypatch.setattr(p, 'list_profiles_api', lambda: [
+    monkeypatch.setattr(p, 'list_profiles_api', lambda **kwargs: [
         {'name': 'kinni', 'is_default': True, 'path': str(tmp_path)},
     ])
     p._invalidate_root_profile_cache()
@@ -207,7 +207,7 @@ def test_delete_profile_blocks_renamed_root(tmp_path, monkeypatch):
     import api.profiles as p
 
     monkeypatch.setattr(p, '_DEFAULT_HERMES_HOME', tmp_path)
-    monkeypatch.setattr(p, 'list_profiles_api', lambda: [
+    monkeypatch.setattr(p, 'list_profiles_api', lambda **kwargs: [
         {'name': 'kinni', 'is_default': True, 'path': str(tmp_path)},
     ])
     p._invalidate_root_profile_cache()

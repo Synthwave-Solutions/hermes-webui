@@ -24,9 +24,9 @@ Date: 6 September 2026. This report uses synthetic QA identities and data. Produ
 
 ## Automated results
 
-Final focused WebUI result: **282 passed in 18.45 seconds**, on code commit `f93bac36`, with the paired engine selected explicitly through `HERMES_WEBUI_AGENT_DIR`. The isolated browser suite passed all **13 checks**, with no page errors, at 1440 × 950, 1024 × 768 and 390 × 844.
+Final focused WebUI result: **285 passed in 18.78 seconds**, on code commit `5e4d60b8`, with the paired engine selected explicitly through `HERMES_WEBUI_AGENT_DIR`. The isolated browser suite passed all **13 checks**, with no page errors, at 1440 × 950, 1024 × 768 and 390 × 844.
 
-The focused GitHub workflow runs these 282 tests, recipient rules, full-page browser smoke, the guided-builder browser regression and both normal and terminal-error Gateway lifecycle checks. Both actual lifecycle checks passed locally on the final patch, including preserved activity and hard-reload parity. Six Gateway regressions cover session identity, stale-run refusal, durable error state and redaction before storage, journal and live delivery.
+The focused GitHub workflow runs these 285 tests, recipient rules, full-page browser smoke, the guided-builder browser regression and both normal and terminal-error Gateway lifecycle checks. Both actual lifecycle checks passed locally on the final patch, including preserved activity and hard-reload parity. Six Gateway regressions cover session identity, stale-run refusal, durable error state and redaction before storage, journal and live delivery.
 
 The neighboring session/profile authorization tests are included in this total. Two older session doubles were corrected to implement the existing `save()` lifecycle method, without changing runtime behavior.
 
@@ -37,6 +37,14 @@ Engine: **101 passed, 2 skipped** in the combined memory, file-tool, bot-ceiling
 Independent review additionally reran the builder/personal-context regressions and the actual approval-ceiling tests. These overlap the combined suites and must not be added to the totals.
 
 The initial focused GitHub run exposed a test dependency on the VPS's installed skill library. It now uses a real synthetic skill in a temporary directory, so normal-mode exclusion is checked identically on a clean CI host and the VPS.
+
+## Startup followup
+
+The first production-browser load after restart exposed a 35.03-second session-list request (34.32 seconds in CLI-session enumeration) and a 10.33-second fast-profile request. Both indirectly entered skill-tree counting. Root-profile lookup and CLI enumeration now request profile metadata without skill counts; existing identity and ownership filtering is unchanged. Three new regressions fail on the previous source and pass with this change.
+
+The bot roster now displays a loading status before conversation history settles. Bot selection stays disabled until boot completes; a profile change during boot invalidates the old request. A real Chromium test covers loading, errors, early clicks, readiness and late responses without relying on a message render.
+
+Neighboring startup tests passed 85 cases with one pre-existing `test_gateway_sessions_excluded_when_disabled` failure reproduced on exact base `3c8a4f77`. The separate first group passed 19 tests; those overlap and are not added to the focused total. Production timing after this followup is recorded in the linked release note rather than inferred from synthetic benchmarks.
 
 ## Known baseline and evidence boundaries
 
