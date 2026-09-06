@@ -33,3 +33,7 @@ Responses show the selected bot's identity. The authenticated person who sent th
 Approval cards show the capability and scope without requiring generated advice to load. New requests originating from a supported WebUI turn retain a redacted copy of the original human ask, capped at 400 characters. The first recorded ask is preserved when a capability request is repeated. Credential-shaped text is masked; this is a bounded summary, not a complete transcript.
 
 Historical requests without this context are explicitly labelled as unavailable. Their original messages are not reconstructed or invented. Approving a request still requires reviewing its precise scope and current policy.
+
+## Large capability selections
+
+All catalog-backed options can be selected, up to the existing 10,000-entry request bound per capability list. Each entry must still be available under the editor's current grants. The former 100-entry sublimit blocked unchanged legacy bots with 154 CLI tools; it has been removed for existing and new bots. Narrowing a selection and later restoring permitted options works without a shrinking legacy quota.
