@@ -10,7 +10,7 @@ class SynPulseVoice {
     try {
       const media=await this.d.media();
       media.getTracks().forEach(t=>{t.enabled=false;});
-      if(epoch!==this.epoch) {media.getTracks().forEach(t=>t.stop());return;}
+      if(epoch!==this.epoch||this.d.current()!==sid) {media.getTracks().forEach(t=>t.stop());if(epoch===this.epoch)this.stop();return;}
       this.media=media;
       const pc=this.d.peer();this.pc=pc;
       this.media.getTracks().forEach(t=>this.pc.addTrack(t,this.media));
@@ -34,6 +34,7 @@ class SynPulseVoice {
     } catch(e) { if(epoch===this.epoch){this.stop();this.d.error(e.message||'Voice connection failed');} }
   }
   mic(on) {
+    if(this.sid&&this.d.current()!==this.sid){this.stop();return;}
     if(!this.pc||this.dc?.readyState!=='open')return;
     this.muted=!on;
     this.media?.getTracks().forEach(t=>{t.enabled=on;});
