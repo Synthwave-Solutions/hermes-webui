@@ -3571,6 +3571,17 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
     }
     return undefined;
   }
+  function _mergeSubagentActivityRow(existing,incoming){
+    if(existing?.tool?.name!=='subagent_progress'||incoming?.tool?.name!=='subagent_progress') return existing;
+    if(!existing.tool.id||existing.tool.id!==incoming.tool.id) return existing;
+    const ranks={queued:0,running:1,completed:2,failed:2,cancelled:2};
+    const before=ranks[existing.tool.args?.status],after=ranks[incoming.tool.args?.status];
+    if(before===undefined||after===undefined||after<before||before===2) return existing;
+    // Keep chronology/row identity, update only the same worker's observed state.
+    return {...existing,status:incoming.status,kind:incoming.kind,
+      tool:{...existing.tool,...incoming.tool},
+      payload:{...existing.payload,...incoming.payload,args:incoming.tool.args}};
+  }
   function _completeSettledAnchorSceneForTurn(messages, lastAsstIndex, projectedScene){
     if(!Array.isArray(messages)||lastAsstIndex<0) return projectedScene;
     const lastAsst=messages[lastAsstIndex];
@@ -3633,7 +3644,13 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
       if(isTextual&&_anchorSceneRowLooksLikeFinalAnswer(textKey,finalKey)) return;
       if(isTextual&&_anchorSceneRowTextOverlapsExisting(textKey,seenTextKeys)) return;
       const key=_anchorSceneExistingRowKey(row);
-      if(key&&seen.has(key)) return;
+      if(key&&seen.has(key)){
+        if(row.tool?.name==='subagent_progress'){
+          const index=rows.findIndex(existing=>_anchorSceneExistingRowKey(existing)===key);
+          if(index>=0) rows[index]=_mergeSubagentActivityRow(rows[index],row);
+        }
+        return;
+      }
       if(key) seen.add(key);
       if(isTextual&&textKey) seenTextKeys.push(textKey);
       rows.push({
