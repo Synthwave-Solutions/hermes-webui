@@ -488,12 +488,14 @@ function _intgCredentialDialog(provider, fields) {
   return new Promise(resolve => {
     const dialog = document.createElement('dialog');
     dialog.className = 'app-dialog';
-    dialog.style.cssText = 'max-width:480px;width:calc(100% - 32px);max-height:90vh;overflow:auto';
+    dialog.style.cssText = 'max-width:480px;width:calc(100% - 32px);max-height:90vh;overflow:auto;margin:auto';
     const form = document.createElement('form');
     const title = document.createElement('h3');
+    title.className = 'app-dialog-title';
     title.textContent = provider.display_name;
     form.appendChild(title);
     const explanation = document.createElement('p');
+    explanation.className = 'app-dialog-desc';
     explanation.textContent = _intgT('integrations_credentials_prompt', 'Enter the app credentials from this provider to enable sign-in.');
     form.appendChild(explanation);
     const inputs = {};
@@ -504,6 +506,7 @@ function _intgCredentialDialog(provider, fields) {
       const input = document.createElement(field === 'private_key' ? 'textarea' : 'input');
       if (field !== 'private_key') input.type = field.includes('secret') ? 'password' : 'text';
       else input.rows = 6;
+      input.className = 'app-dialog-input';
       input.required = true;
       input.autocomplete = 'off';
       input.spellcheck = false;
@@ -519,13 +522,16 @@ function _intgCredentialDialog(provider, fields) {
       resolve(result);
     };
     const cancel = document.createElement('button');
-    cancel.type = 'button'; cancel.className = 'intg-btn';
+    cancel.type = 'button'; cancel.className = 'app-dialog-btn';
     cancel.textContent = _intgT('cancel', 'Cancel');
     cancel.onclick = () => finish(null);
     const submit = document.createElement('button');
-    submit.type = 'submit'; submit.className = 'intg-btn primary';
+    submit.type = 'submit'; submit.className = 'app-dialog-btn confirm';
     submit.textContent = _intgT('integrations_enable', 'Enable');
-    form.append(cancel, submit);
+    const actions = document.createElement('div');
+    actions.className = 'app-dialog-actions';
+    actions.append(cancel, submit);
+    form.appendChild(actions);
     form.onsubmit = event => {
       event.preventDefault();
       const values = Object.fromEntries(fields.map(field => [field, inputs[field].value.trim()]));
