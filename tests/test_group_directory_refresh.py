@@ -40,3 +40,22 @@ const api=async(url)=>{if(url==='/api/profiles')return [];calls++;if(fail)throw 
 '''
     result=subprocess.run(['node','-e',script],capture_output=True,text=True)
     assert result.returncode==0,result.stderr
+
+
+def test_friendly_bot_button_inserts_stable_mention_without_sending():
+    source=(Path(__file__).resolve().parents[1]/'static/ui.js').read_text()
+    start=source.index('function selectGroupBot(')
+    end=source.index("if (typeof window !== 'undefined') window.selectGroupBot",start)
+    script=r"""
+const assert=require('assert');let events=0,closed=0,focused=0;
+const input={value:'@old Keep my draft',dispatchEvent(){events++},focus(){focused++}};
+const $=()=>input;const _currentParticipants=()=>['bot:stable-writer'];
+const closeGroupPeoplePicker=()=>closed++;
+"""+source[start:end]+r"""
+selectGroupBot('stable-writer');assert.equal(input.value,'@stable-writer Keep my draft');
+assert.equal(events,1);assert.equal(closed,1);assert.equal(focused,1);
+selectGroupBot('not-a-member');assert.equal(events,1);
+input.disabled=true;selectGroupBot('stable-writer');assert.equal(events,1);
+"""
+    result=subprocess.run(['node','-e',script],capture_output=True,text=True)
+    assert result.returncode==0,result.stderr

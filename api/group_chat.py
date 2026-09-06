@@ -219,3 +219,9 @@ def validate(values, *, owner_email=None) -> tuple:
                 "not a known account on this workstation: " + ", ".join(unknown[:5])
             )
     return participants, None
+
+
+def require_turn_membership(session, actor) -> None:
+    """Recheck the original human at worker entry after queue/dispatch races."""
+    if not is_member(getattr(session, 'owner_email', None), getattr(session, 'participants', None), actor):
+        raise PermissionError('You are no longer a member of this conversation')

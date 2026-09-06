@@ -6903,6 +6903,9 @@ def _run_agent_streaming(
         # Group conversations: the principal is whoever sent this message, not
         # the person who happens to own the conversation.
         _turn_principal = str(sender_email or '').strip().lower() or getattr(s, 'owner_email', None)
+        if sender_email or execution_profile:
+            from api.group_chat import require_turn_membership
+            require_turn_membership(s, _turn_principal)
         if execution_profile:
             from api.group_chat import bot_allowed, normalize_bots
             if execution_profile not in normalize_bots(getattr(s, 'bot_participants', None)) or not bot_allowed(_turn_principal, execution_profile):

@@ -94,3 +94,12 @@ def test_dispatch_two_bots_keeps_conversation_and_actor(monkeypatch):
     assert [x['kwargs']['execution_profile'] for x in launched]==['writer','reviewer']
     assert all(x['kwargs']['sender_email']=='alice@example.test' and x['target']==routes._run_agent_streaming for x in launched)
     assert session.profile=='conversation'
+
+
+def test_worker_membership_recheck_refuses_removed_sender():
+    session=SimpleNamespace(owner_email='owner@example.test',participants=['alice@example.test'])
+    group_chat.require_turn_membership(session,'alice@example.test')
+    session.participants=[]
+    with pytest.raises(PermissionError):group_chat.require_turn_membership(session,'alice@example.test')
+    group_chat.require_turn_membership(session,'owner@example.test')
+    with pytest.raises(PermissionError):group_chat.require_turn_membership(session,None)

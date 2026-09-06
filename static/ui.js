@@ -5721,6 +5721,18 @@ function toggleGroupPerson(email) {
 }
 if (typeof window !== 'undefined') window.toggleGroupPerson = toggleGroupPerson;
 
+function selectGroupBot(profile) {
+  const key = 'bot:' + String(profile || '');
+  if (!_currentParticipants().includes(key)) return;
+  const input = $('msg');
+  if (!input || input.disabled || input.readOnly) return;
+  input.value = '@' + profile + ' ' + String(input.value || '').replace(/^\s*@[A-Za-z0-9][A-Za-z0-9_-]{0,63}(?=\s|$)\s*/, '');
+  input.dispatchEvent(new Event('input', {bubbles:true}));
+  closeGroupPeoplePicker();
+  input.focus();
+}
+if (typeof window !== 'undefined') window.selectGroupBot = selectGroupBot;
+
 function _groupSearchText(value) {
   return String(value || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
 }
@@ -5771,6 +5783,16 @@ function renderGroupPeopleList() {
       }
     }
     row.appendChild(text);
+    if (person.kind === 'bot' && _currentParticipants().includes(person.email)) {
+      const use = document.createElement('button');
+      use.type = 'button'; use.className = 'app-dialog-btn';
+      use.textContent = 'Talk to ' + (person.display_name || person.email.slice(4));
+      use.addEventListener('click', event => {
+        event.preventDefault(); event.stopPropagation();
+        selectGroupBot(person.email.slice(4));
+      });
+      row.appendChild(use);
+    }
     list.appendChild(row);
   });
   if ((_groupPeopleDirectory || []).some(person => person.kind === 'bot')) {
