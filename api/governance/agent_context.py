@@ -130,7 +130,8 @@ def _audit_bind_failure(email: str, session_id: str, request_id: str,
 
 
 def bind_governed_agent_turn(identity: Any, *, active_profile: str = "default",
-                             session_id: str = "", request_id: str = ""):
+                             session_id: str = "", request_id: str = "",
+                             user_message_sha256: str = "", approval_waiter=None):
     """Bind the caller's governance principal to the CURRENT thread's context.
 
     Returns an opaque token for reset_governed_agent_turn, or None when the
@@ -169,6 +170,19 @@ def bind_governed_agent_turn(identity: Any, *, active_profile: str = "default",
             agent_mod, policy, email, _identity_groups(identity),
             active_profile, session_id, request_id,
         )
+        # The waiter is a trusted in-process capability, never an env payload.
+        # Older engine versions remain compatible and simply cannot park calls.
+        from dataclasses import replace
+        from .loader import resolve_policy_path
+        fields = getattr(ctx, "__dataclass_fields__", {})
+        updates = {}
+        if "user_message_sha256" in fields:
+            updates["user_message_sha256"] = str(user_message_sha256 or "")
+        if "approval_waiter" in fields and "approval_policy_path" in fields:
+            updates["approval_waiter"] = approval_waiter
+            updates["approval_policy_path"] = str(resolve_policy_path())
+        if updates:
+            ctx = replace(ctx, **updates)
         token = agent_mod.bind_governance_context(ctx)
         return (agent_mod, token)
     except Exception as exc:

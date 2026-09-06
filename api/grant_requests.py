@@ -389,6 +389,28 @@ def materialise_suggested_grant(
     return skey
 
 
+def _operation_payloads(item: dict, email: str, gkind: str, value: str) -> dict:
+    """Carry only explicit operation provenance, never arbitrary spool fields.
+
+    An operation is evidence, not permission to execute. Resume consumers must
+    revalidate identity, freshness, policy, opt-in and the canonical run state.
+    """
+    operations = item.get("operations")
+    if not isinstance(operations, dict):
+        return {}
+    fields = ("version", "operation_id", "actor_email", "gkind", "value", "tool", "reason",
+              "session_id", "request_id", "tool_call_id", "binding_status", "prompt_sha256",
+              "freshness_status", "trigger_redacted", "created_at")
+    result = {}
+    for op_id, op in list(operations.items())[:128]:
+        if not isinstance(op, dict) or op.get("version") != 1 or op.get("operation_id") != op_id:
+            continue
+        if (op.get("actor_email"), op.get("gkind"), op.get("value")) != (email, gkind, value):
+            continue
+        result[op_id] = {name: op[name] for name in fields if name in op}
+    return result
+
+
 def ingest_spool() -> int:
     """Sync the denial spool into the approvals registry. Returns how many
     pending grant rows exist afterwards. Never raises."""
@@ -423,6 +445,8 @@ def ingest_spool() -> int:
                     # supply it: never a guess.
                     "trigger": str(item.get("trigger") or ""),
                     "count": int(item.get("count") or 1),
+                    "operations": _operation_payloads(item, email, gkind, value),
+                    "operations_overflow": item.get("operations_overflow") is True,
                 }
                 if entry is None:
                     registry[rk] = {
