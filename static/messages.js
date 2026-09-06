@@ -6045,7 +6045,7 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
               const prevCost=_prevCost;
               const curIn=d.usage.input_tokens||0;
               const curOut=d.usage.output_tokens||0;
-              const curCost=d.usage.estimated_cost||0;
+              const curCost=d.usage.estimated_cost;
               const curCacheRead=d.usage.cache_read_tokens||0;
               const curCacheWrite=d.usage.cache_write_tokens||0;
               // Only set delta if values actually increased (skip no-op turns)
@@ -6053,7 +6053,9 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
                 lastAsst._turnUsage={
                   input_tokens:Math.max(0,curIn-prevIn),
                   output_tokens:Math.max(0,curOut-prevOut),
-                  estimated_cost:Math.max(0,curCost-prevCost),
+                  estimated_cost:d.usage.cost_status==='unknown'||curCost==null?null:Math.max(0,curCost-prevCost),
+                  cost_status:d.usage.cost_status,
+                  cost_source:d.usage.cost_source,
                   cache_read_tokens:Math.max(0,curCacheRead-_prevCacheRead),
                   cache_write_tokens:Math.max(0,curCacheWrite-_prevCacheWrite),
                   cache_hit_percent:d.usage.turn_cache_hit_percent,

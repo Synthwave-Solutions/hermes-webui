@@ -2,6 +2,8 @@
 Hermes Web UI -- SSE streaming engine and agent thread runner.
 Includes Sprint 10 cancel support via CANCEL_FLAGS.
 """
+from api.usage_cost import agent_cost_usage
+
 import base64
 import contextlib
 import contextvars
@@ -6584,7 +6586,9 @@ def _run_agent_streaming(
         _usage = {
             'input_tokens': 0,
             'output_tokens': 0,
-            'estimated_cost': 0,
+            'estimated_cost': None,
+            'cost_status': 'unknown',
+            'cost_source': 'none',
             'cache_read_tokens': 0,
             'cache_write_tokens': 0,
             'cache_hit_percent': None,
@@ -6599,7 +6603,7 @@ def _run_agent_streaming(
             try:
                 _usage['input_tokens'] = getattr(_agent, 'session_prompt_tokens', 0) or 0
                 _usage['output_tokens'] = getattr(_agent, 'session_completion_tokens', 0) or 0
-                _usage['estimated_cost'] = getattr(_agent, 'session_estimated_cost_usd', 0) or 0
+                _usage.update(agent_cost_usage(_agent))
                 _usage['cache_read_tokens'] = getattr(_agent, 'session_cache_read_tokens', 0) or 0
                 _usage['cache_write_tokens'] = getattr(_agent, 'session_cache_write_tokens', 0) or 0
             except Exception:
@@ -6757,7 +6761,10 @@ def _run_agent_streaming(
                 pass
 
         if _session_obj is not None:
-            for _field in ('input_tokens', 'output_tokens', 'estimated_cost', 'cache_read_tokens', 'cache_write_tokens', 'context_length', 'threshold_tokens', 'last_prompt_tokens'):
+            if _agent is None:
+                for _field in ('estimated_cost', 'cost_status', 'cost_source'):
+                    _usage[_field] = getattr(_session_obj, _field, None)
+            for _field in ('input_tokens', 'output_tokens', 'cache_read_tokens', 'cache_write_tokens', 'context_length', 'threshold_tokens', 'last_prompt_tokens'):
                 if not _usage.get(_field):
                     try:
                         _usage[_field] = getattr(_session_obj, _field, 0) or 0
@@ -9023,7 +9030,8 @@ def _run_agent_streaming(
                 # on stage-320: prevents restart-induced regression of session usage data.
                 input_tokens = getattr(agent, 'session_prompt_tokens', 0) or 0
                 output_tokens = getattr(agent, 'session_completion_tokens', 0) or 0
-                estimated_cost = getattr(agent, 'session_estimated_cost_usd', None)
+                cost_usage = agent_cost_usage(agent)
+                estimated_cost = cost_usage['estimated_cost']
                 cache_read_tokens = getattr(agent, 'session_cache_read_tokens', 0) or 0
                 cache_write_tokens = getattr(agent, 'session_cache_write_tokens', 0) or 0
                 prev_input_tokens = getattr(s, 'input_tokens', 0) or 0
@@ -9039,8 +9047,9 @@ def _run_agent_streaming(
                     s.input_tokens = input_tokens
                 if output_tokens > 0:
                     s.output_tokens = output_tokens
-                if estimated_cost is not None:
-                    s.estimated_cost = estimated_cost
+                s.estimated_cost = estimated_cost
+                s.cost_status = cost_usage['cost_status']
+                s.cost_source = cost_usage['cost_source']
                 if cache_read_tokens > 0:
                     s.cache_read_tokens = cache_read_tokens
                 if cache_write_tokens > 0:
@@ -9428,7 +9437,7 @@ def _run_agent_streaming(
             usage = {
                 'input_tokens': input_tokens,
                 'output_tokens': output_tokens,
-                'estimated_cost': estimated_cost,
+                **cost_usage,
                 'cache_read_tokens': cache_read_tokens,
                 'cache_write_tokens': cache_write_tokens,
                 'cache_hit_percent': cache_hit_percent,
