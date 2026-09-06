@@ -10751,6 +10751,7 @@ function _partitionPluginsActiveFirst(plugins){
 }
 
 async function loadPluginsPanel(){
+  if(!_canUseFeature('plugins:read')) return;
   const list=$('pluginsList');
   const empty=$('pluginsEmpty');
   if(!list) return;
