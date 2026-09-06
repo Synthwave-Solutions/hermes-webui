@@ -1980,7 +1980,52 @@ def _invalidate_list_profiles_cache() -> None:
         _LIST_PROFILES_CACHE = None
 
 
-def _build_profile_rows_fast() -> list | None:
+_FAST_SKILL_QUEUE: list[Path] = []
+_FAST_SKILL_PENDING: set[Path] = set()
+_FAST_SKILL_LOCK = threading.Lock()
+_FAST_SKILL_WORKER_RUNNING = False
+
+
+def _warm_queued_skill_stats():
+    global _FAST_SKILL_WORKER_RUNNING
+    while True:
+        with _FAST_SKILL_LOCK:
+            if not _FAST_SKILL_QUEUE:
+                _FAST_SKILL_WORKER_RUNNING = False
+                return
+            path = _FAST_SKILL_QUEUE.pop(0)
+        try:
+            _get_profile_skills_stats(path)
+        except Exception:
+            logger.debug("Deferred profile skill count failed", exc_info=True)
+        finally:
+            with _FAST_SKILL_LOCK:
+                _FAST_SKILL_PENDING.discard(path)
+
+
+def _list_skill_stats(path):
+    """Fresh cached counts or explicit unknown; never parse skills inline."""
+    global _FAST_SKILL_WORKER_RUNNING
+    import time
+    path = Path(path).resolve()
+    cached = _SKILLS_STATS_CACHE.get(path)
+    if cached is not None and time.time() < cached[3]:
+        if _skill_tree_max_mtime_ns(path / "skills", path / "config.yaml") == cached[2]:
+            return cached[0], cached[1]
+    with _FAST_SKILL_LOCK:
+        if path not in _FAST_SKILL_PENDING and len(_FAST_SKILL_PENDING) < 256:
+            _FAST_SKILL_PENDING.add(path)
+            _FAST_SKILL_QUEUE.append(path)
+        if _FAST_SKILL_QUEUE and not _FAST_SKILL_WORKER_RUNNING:
+            _FAST_SKILL_WORKER_RUNNING = True
+            try:
+                threading.Thread(target=_warm_queued_skill_stats, name="profile-skill-counts", daemon=True).start()
+            except Exception:
+                _FAST_SKILL_WORKER_RUNNING = False
+    return None, None
+
+
+def _build_profile_rows_fast(*, deferred_counts=False, isolated=None) -> list | None:
     """Build the profile list WITHOUT the upstream alias scan.
 
     ``hermes_cli.profiles.list_profiles()`` calls ``find_alias_for_profile()``
@@ -2020,7 +2065,7 @@ def _build_profile_rows_fast() -> list | None:
             gateway_running = _check_gateway_running(home)
         except Exception:
             gateway_running = False
-        enabled_count, total_count = _get_profile_skills_stats(home)
+        enabled_count, total_count = (_list_skill_stats(home) if deferred_counts else _get_profile_skills_stats(home))
         return {
             'name': name,
             'path': str(home),
@@ -2034,7 +2079,12 @@ def _build_profile_rows_fast() -> list | None:
             'skill_count': enabled_count,
             'enabled_skills': enabled_count,
             'total_skills': total_count,
+            **({'skill_counts_pending': enabled_count is None} if deferred_counts else {}),
         }
+
+    if isolated is not None:
+        home, name = isolated
+        return [_row(Path(home), name, name == 'default')]
 
     rows: list = []
     default_home = _get_default_hermes_home()
@@ -2055,7 +2105,7 @@ def _build_profile_rows_fast() -> list | None:
     return rows
 
 
-def list_profiles_api() -> list:
+def list_profiles_api(*, fast=False) -> list:
     """List all profiles with metadata, serialized for JSON response.
 
     In isolated profile mode (HERMES_HOME points to ~/.hermes/profiles/<name>),
@@ -2070,6 +2120,15 @@ def list_profiles_api() -> list:
     """
     import time
     global _LIST_PROFILES_CACHE
+
+    if fast:
+        isolated = ((Path(_INITIAL_HERMES_HOME).expanduser(), _isolated_profile_name())
+                    if _is_isolated_profile_mode() else None)
+        rows = _build_profile_rows_fast(deferred_counts=True, isolated=isolated)
+        if rows is not None:
+            active = _isolated_profile_name() if isolated else get_active_profile_name()
+            return [{**p, 'is_active': p['name'] == active} for p in rows]
+        # Optional engine helpers unavailable: retain the compatible default API.
 
     # In isolated profile mode, return only the active (isolated) profile
     if _is_isolated_profile_mode():
