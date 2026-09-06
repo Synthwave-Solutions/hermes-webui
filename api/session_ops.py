@@ -529,6 +529,13 @@ def session_progress(session, *, attention=None) -> dict | None:
     if not live and pending and float(pending) > float((summary or {}).get('started_at') or 0):
         return {'status': 'queued', 'run_id': None, 'reason': 'pending_start'}
     if live and not (summary or {}).get('terminal'):
+        if not attention:
+            try:
+                from api.approval_resume import waiting_for_session
+                if waiting_for_session(str(getattr(session, 'owner_email', '') or '').strip().lower(), session.session_id):
+                    attention = {'kind': 'approval'}
+            except ImportError:
+                pass  # Optional completion-on-approval consumer is not installed.
         return {'status': 'waiting' if attention else 'running', 'run_id': live,
                 'reason': (attention or {}).get('kind')}
     if summary:

@@ -68,3 +68,18 @@ let api=()=>Promise.resolve(response);
 '''
     result=subprocess.run(['node','-e',script],capture_output=True,text=True)
     assert result.returncode==0,result.stderr
+
+
+def test_live_governance_wait_is_owner_scoped(tmp_path, monkeypatch):
+    import sys
+    monkeypatch.setattr(run_journal, '_default_session_dir', lambda: tmp_path)
+    monkeypatch.setattr(session_ops, '_live_active_stream_id', lambda s: 'r')
+    calls=[]
+    def waiting(owner,sid):
+        calls.append((owner,sid)); return owner=='owner@example.test'
+    monkeypatch.setitem(sys.modules,'api.approval_resume',SimpleNamespace(waiting_for_session=waiting))
+    s=SimpleNamespace(session_id='s',owner_email='owner@example.test',pending_started_at=None)
+    assert session_ops.session_progress(s)['status']=='waiting'
+    s.owner_email='other@example.test'
+    assert session_ops.session_progress(s)['status']=='running'
+    assert calls==[('owner@example.test','s'),('other@example.test','s')]
