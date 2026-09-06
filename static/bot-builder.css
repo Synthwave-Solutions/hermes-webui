@@ -18,3 +18,10 @@
 #builderError { color:var(--error,#d44); }
 .bot-current-photo { margin:12px 0; }
 .bot-current-photo img,.bot-current-photo svg { width:72px; height:72px; }
+
+.bot-builder-tabs { display:flex; flex-wrap:wrap; gap:6px; margin:0 0 20px; }
+.bot-builder-tabs button { border:1px solid var(--border); background:var(--bg); color:var(--muted); border-radius:8px; padding:10px 12px; min-height:44px; font:inherit; cursor:pointer; }
+.bot-builder-tabs button[aria-selected=true] { border-color:var(--link); color:var(--text); background:var(--bg-secondary,var(--bg)); }
+.bot-builder-tabs button:focus-visible { outline:2px solid var(--link); outline-offset:2px; }
+.bot-builder-actions button[hidden] { display:none; }
+.bot-builder:has(.bot-builder-tabs) .bot-builder-actions { justify-content:flex-end; }
