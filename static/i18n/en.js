@@ -1076,7 +1076,7 @@ window.__registerHermesLocale('en', {
     bot_description: 'Role and description',
     bot_avatar: 'Avatar',
     bot_upload: 'Upload your own image',
-    bot_avatar_limit: 'PNG, JPEG or WebP, at most 2 MB. Images are stored with this bot.',
+    bot_avatar_limit: 'PNG, JPEG or WebP, up to 10 MB. Photos are resized and stored with this bot.',
     bot_saved: 'Bot saved',
     bot_prompt: 'Prompt and instructions',
     bot_knowledge: 'Bot memory',

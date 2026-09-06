@@ -6669,24 +6669,34 @@ async function saveBotAppearance(){
   const p=_currentProfileDetail;if(!p)return;
   try{
     await api('/api/profile/appearance',{method:'POST',body:JSON.stringify({name:p.name,revision:p.bot_revision||0,bot:{title:$('botTitle').value,description:$('botDescription').value,shape:$('botShape').value,color:$('botColor').value,knowledge_sources:$('botKnowledge').value.split('\n').map(x=>x.trim()).filter(Boolean)}})});
+    _profileDropdownClearStoredCache();
+    window.dispatchEvent(new CustomEvent('synpulse:bot-updated'));
     await loadProfilesPanel();showToast(t('bot_saved'));
   }catch(e){showToast(e.message);}
 }
 async function uploadBotAvatar(input){
   const p=_currentProfileDetail,file=input.files&&input.files[0];if(!p||!file)return;
-  if(file.size>2000000||!['image/png','image/jpeg','image/webp'].includes(file.type)){showToast(t('bot_avatar_limit'));return;}
+  const name=p.name,hint=$('botAvatarHint');input.disabled=true;
+  if(hint){hint.textContent='Uploading photo…';hint.setAttribute('role','status');}
   try{
-    const data=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(file);});
-    await api('/api/profile/avatar',{method:'POST',body:JSON.stringify({name:p.name,avatar:data})});
+    const data=await readBotAvatarFile(file);
+    const result=await api('/api/profile/avatar',{method:'POST',body:JSON.stringify({name,avatar:data})});
+    if(_currentProfileDetail&&_currentProfileDetail.name===name){
+      _currentProfileDetail={..._currentProfileDetail,...result};
+      _renderProfileDetail(_currentProfileDetail,S.activeProfile);
+    }
+    _profileDropdownClearStoredCache();
+    window.dispatchEvent(new CustomEvent('synpulse:bot-updated',{detail:{name}}));
     await loadProfilesPanel();showToast(t('bot_saved'));
-  }catch(e){showToast(e.message||t('bot_avatar_limit'));}
+  }catch(e){
+    if(hint&&hint.isConnected){hint.textContent=e.message||t('bot_avatar_limit');hint.setAttribute('role','alert');}
+    showToast(e.message||t('bot_avatar_limit'));
+  }finally{input.disabled=false;input.value='';}
 }
 async function openBotConfiguration(section){
   const p=_currentProfileDetail;if(!p)return;
-  if(S.activeProfile!==p.name)await switchToProfile(p.name);
-  if(S.activeProfile!==p.name)return;
-  switchPanel(section==='soul'?'memory':section);
-  if(section==='soul'){await loadMemory(true);await openMemorySection('soul');}
+  if(window.BotBuilder){await window.BotBuilder.open(p.name);return;}
+  showToast("Bot configuration is unavailable. Reload the page.");
 }
 
 async function loadProfilesPanel() {
@@ -6836,6 +6846,7 @@ function _renderProfileDetail(p, activeName){
       <form class="bot-editor" onsubmit="event.preventDefault();saveBotAppearance()">
         <fieldset ${editable?'':'disabled'}>
           <legend>${esc(t('bot_identity'))}</legend>
+          <div class="bot-current-photo" aria-label="Current bot photo">${botAvatarHtml(p)}</div>
           <div class="bot-editor-grid">
             <label for="botTitle">${esc(t('bot_name'))}<input id="botTitle" value="${esc((p.bot&&p.bot.title)||p.name)}" maxlength="80" required></label>
             <label for="botDescription" class="bot-editor-wide">${esc(t('bot_description'))}<textarea id="botDescription" maxlength="400" rows="3">${esc((p.bot&&p.bot.description)||'')}</textarea></label>
@@ -6889,6 +6900,7 @@ function _setProfileHeaderButtons(mode, p, activeName){
 }
 
 function openProfileDetail(name, el){
+  if(window.BotBuilder)window.BotBuilder.invalidate();
   if (!_profilesCache || !_profilesCache.profiles) return;
   const p = _profilesCache.profiles.find(x => x.name === name);
   if (!p) return;
@@ -7384,46 +7396,8 @@ function openProfileCreate(){
 }
 
 function _renderProfileForm(){
-  const title = $('profileDetailTitle');
-  const body = $('profileDetailBody');
-  const empty = $('profileDetailEmpty');
-  if (!title || !body) return;
-  title.textContent = t('new_profile');
-  body.innerHTML = `
-    <div class="main-view-content">
-      <form class="detail-form" onsubmit="event.preventDefault(); saveProfileForm();">
-        <div class="detail-form-row">
-          <label for="profileFormName">${esc(t('profile_name_label') || 'Name')}</label>
-          <input type="text" id="profileFormName" placeholder="${esc(t('profile_name_placeholder') || 'lowercase, a-z 0-9 hyphens')}" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" required>
-          <div class="detail-form-hint">${esc(t('profile_name_rule') || 'Lowercase letters, numbers, hyphens, underscores only.')}</div>
-        </div>
-        <div class="detail-form-row">
-          <label class="detail-form-check" for="profileFormClone">
-            <input type="checkbox" id="profileFormClone"> <span>${esc(t('profile_clone_label') || 'Clone config from active profile')}</span>
-          </label>
-        </div>
-        <div class="detail-form-row">
-          <label for="profileFormModel">${esc(t('profile_model_label') || 'Model / provider')}</label>
-          <select id="profileFormModel"></select>
-          <div class="detail-form-hint">${esc(t('profile_model_hint') || 'Choose from configured providers and models for this new profile.')}</div>
-        </div>
-        <div class="detail-form-row">
-          <label for="profileFormBaseUrl">${esc(t('profile_base_url_label') || 'Base URL')}</label>
-          <input type="text" id="profileFormBaseUrl" placeholder="${esc(t('profile_base_url_placeholder') || 'Optional, e.g. http://localhost:11434')}" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">
-        </div>
-        <div class="detail-form-row">
-          <label for="profileFormApiKey">${esc(t('profile_api_key_label') || 'API key')}</label>
-          <input type="password" id="profileFormApiKey" placeholder="${esc(t('profile_api_key_placeholder') || 'Optional')}" autocomplete="off">
-        </div>
-        <div id="profileFormError" class="detail-form-error" style="display:none"></div>
-      </form>
-    </div>`;
-  body.style.display = '';
-  if (empty) empty.style.display = 'none';
-  _setProfileHeaderButtons('create');
-  const n = $('profileFormName');
-  if (n) n.focus();
-  _populateProfileFormModelSelect();
+  if(window.BotBuilder){window.BotBuilder.open();return;}
+  showToast("Bot configuration is unavailable. Reload the page.");
 }
 
 async function _populateProfileFormModelSelect(){
@@ -7455,6 +7429,7 @@ async function _populateProfileFormModelSelect(){
 }
 
 function cancelProfileForm(){
+  if(window.BotBuilder)window.BotBuilder.invalidate();
   if (_profilePreFormDetail) {
     const snap = _profilePreFormDetail;
     _profilePreFormDetail = null;

@@ -74,7 +74,7 @@
       profiles = Array.isArray(data.profiles) ? data.profiles : [];
     }).catch(() => {
       // No cached roster from a different context, and no privileged fallback.
-      if (generation === current) profiles = [];
+      if (generation === current) { profiles = []; key = ''; }
     }).finally(() => {
       if (generation !== current || contextKey() !== next) return;
       loading = false; paint();
@@ -82,6 +82,9 @@
   };
   document.addEventListener('input', event => {
     if (event.target && event.target.id === 'msg') paint();
+  });
+  window.addEventListener('synpulse:bot-updated', () => {
+    key = ''; window.refreshChatBots();
   });
   // Export the pure recipient rules for behavior tests without a browser framework.
   window.chatBotRecipientRules = {available, address};
