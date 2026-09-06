@@ -149,6 +149,8 @@ def bind_governed_agent_turn(identity: Any, *, active_profile: str = "default",
     GovernanceBindingError when a non-admin context cannot be built under
     mode enforce (fail closed; callers surface the message to the user).
     """
+    from api.bot_builder import managed as _managed_bot
+    _has_bot_policy = _managed_bot(active_profile) is not None
     try:
         policy = loader.get_policy()
     except Exception:
@@ -156,24 +158,24 @@ def bind_governed_agent_turn(identity: Any, *, active_profile: str = "default",
         # policy_error for every /api request, so a turn that still reaches
         # this point (auth off, legacy path) keeps current unrestricted
         # behavior rather than double-bricking.
-        if project_workspace:
-            raise GovernanceBindingError("Project governance policy unavailable") from None
+        if project_workspace or _has_bot_policy:
+            raise GovernanceBindingError("Scoped governance policy unavailable") from None
         logger.debug("governed agent turn: policy unreadable, running unbound", exc_info=True)
         return None
     if not getattr(policy, "enabled", False):
-        if project_workspace:
-            raise GovernanceBindingError("Project turns require governance")
+        if project_workspace or _has_bot_policy:
+            raise GovernanceBindingError("Scoped turns require governance")
         return None
 
     email = _identity_email(identity)
-    from api.bot_builder import managed as _managed_bot
-    _has_bot_policy = _managed_bot(active_profile) is not None
     if email and email in {str(a).strip().lower() for a in policy.bootstrap_admins} and not project_workspace and not _has_bot_policy:
         # Never-deny principals: run unbound. The resolver would grant
         # wildcard anyway; skipping the bind keeps admin turns byte-identical
         # to today's behavior (and immune to translation bugs).
         return None
     if not email:
+        if _has_bot_policy:
+            raise GovernanceBindingError("Managed bots require an authenticated actor")
         # Ownerless sessions (legacy rows, cron/CLI-claimed, gateway imports)
         # have no principal to scope; deny-by-default would brick them, so run
         # unbound: exactly the dormant status quo for non-webui-owned turns.
@@ -215,7 +217,7 @@ def bind_governed_agent_turn(identity: Any, *, active_profile: str = "default",
         token = agent_mod.bind_governance_context(ctx)
         return (agent_mod, token)
     except Exception as exc:
-        if policy.mode == "enforce" or project_workspace:
+        if policy.mode == "enforce" or project_workspace or _has_bot_policy:
             _audit_bind_failure(email, session_id, request_id, exc,
                                 mode=policy.mode, report_only=False)
             logger.warning("governed agent turn: bind failed under enforce, refusing turn (%s)",

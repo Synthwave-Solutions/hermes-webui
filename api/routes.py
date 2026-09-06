@@ -11729,6 +11729,9 @@ def _handle_projects_hub_detail(handler, parsed) -> bool:
 
 def handle_get(handler, parsed) -> bool:
     """Handle all GET routes. Returns True if handled, False for 404."""
+    from api.bot_builder import guard_profile_request
+    if not guard_profile_request(handler, parsed, "GET"):
+        return True
     proxy_result = _handle_extension_sidecar_proxy(handler, parsed, "GET")
     if proxy_result is not False:
         return proxy_result
@@ -13762,6 +13765,9 @@ from api.project_collaboration import transaction as _project_transaction
 @_project_transaction
 def handle_post(handler, parsed) -> bool:
     """Handle all POST routes. Returns True if handled, False for 404."""
+    from api.bot_builder import guard_profile_request
+    if not guard_profile_request(handler, parsed, "POST"):
+        return True
     diag = RequestDiagnostics.maybe_start("POST", parsed.path, logger=logger)
     if parsed.path == "/api/csp-report":
         if diag:
@@ -15480,8 +15486,14 @@ def handle_post(handler, parsed) -> bool:
         if not name or not _chat_profile_target_allowed(handler,name):
             return bad(handler,"Bot not found",404)
         try:
+            from api import bot_builder
+            from api.governance.enforce import _request_identity
+            if bot_builder.managed(name) is not None:
+                bot_builder.require_edit(_request_identity(handler), name)
             result = bot_metadata.save_avatar(name,body.get("avatar")) if parsed.path.endswith("/avatar") else bot_metadata.save_profile(name,body.get("bot"),body.get("revision"))
             return j(handler,{"ok":True, **result})
+        except PermissionError as exc:
+            return bad(handler, str(exc), 403)
         except RuntimeError as exc:
             return bad(handler,str(exc),409)
         except (ValueError,OSError) as exc:
@@ -15511,6 +15523,13 @@ def handle_post(handler, parsed) -> bool:
                 "Invalid profile name: lowercase letters, numbers, hyphens, underscores only",
             )
         clone_from = body.get("clone_from")
+        if clone_from:
+            from api import bot_builder
+            try:
+                if bot_builder.managed(str(clone_from)) is not None:
+                    return bad(handler, "Use the guided builder to copy a private bot with explicit access", 403)
+            except (ValueError, PermissionError):
+                return bad(handler, "Clone source is not available", 403)
         if clone_from is not None:
             clone_from = str(clone_from).strip()
             if not _re.match(r"^[a-z0-9][a-z0-9_-]{0,63}$", clone_from):
@@ -15544,6 +15563,10 @@ def handle_post(handler, parsed) -> bool:
         if not name:
             return bad(handler, "name is required")
         try:
+            from api import bot_builder
+            from api.governance.enforce import _request_identity
+            if bot_builder.managed(name) is not None:
+                bot_builder.require_edit(_request_identity(handler), name)
             from api.profiles import delete_profile_api, _validate_profile_name
 
             _validate_profile_name(name)
@@ -16585,6 +16608,9 @@ def handle_post(handler, parsed) -> bool:
 
 def handle_patch(handler, parsed) -> bool:
     """Handle all PATCH routes. Returns True if handled, False for 404."""
+    from api.bot_builder import guard_profile_request
+    if not guard_profile_request(handler, parsed, "PATCH"):
+        return True
     if not _check_csrf(handler):
         return j(handler, {"error": _csrf_rejection_error(handler)}, status=403)
     proxy_result = _handle_extension_sidecar_proxy(
@@ -16613,6 +16639,9 @@ def handle_patch(handler, parsed) -> bool:
 
 def handle_delete(handler, parsed) -> bool:
     """Handle all DELETE routes. Returns True if handled, False for 404."""
+    from api.bot_builder import guard_profile_request
+    if not guard_profile_request(handler, parsed, "DELETE"):
+        return True
     if not _check_csrf(handler):
         return j(handler, {"error": _csrf_rejection_error(handler)}, status=403)
     proxy_result = _handle_extension_sidecar_proxy(
@@ -16678,6 +16707,9 @@ def handle_delete(handler, parsed) -> bool:
 
 def handle_put(handler, parsed) -> bool:
     """Handle all PUT routes. Returns True if handled, False for 404."""
+    from api.bot_builder import guard_profile_request
+    if not guard_profile_request(handler, parsed, "PUT"):
+        return True
     if not _check_csrf(handler):
         return j(handler, {"error": "Cross-origin request rejected"}, status=403)
     proxy_result = _handle_extension_sidecar_proxy(

@@ -21,7 +21,7 @@ def setup(tmp_path, monkeypatch):
     (skill / "SKILL.md").write_text("# Research")
     policy = parse_governance_policy({"version":1,"mode":"enforce",
         "bootstrap_admins":["alice@example.test"],
-        "roles":{"worker":{"grants":{"permissions":["chat:use"], "profiles":["default"],
+        "roles":{"worker":{"grants":{"permissions":["chat:use", "profiles:admin"], "profiles":["default"],
             "cli":{"commands":["git"]}, "skills":{"load":["research"],"view":["research"]},
             "mcp":{"servers":["allowed"]}}}},
         "groups":{"team":{"roles":["worker"]}},
@@ -125,3 +125,80 @@ def test_real_engine_binding_preserves_actor_and_bot_ceiling(setup):
         assert not tool_arguments_allowed_for_context(ctx, "terminal", {"command":"git status"}).allowed
     finally:
         reset_governed_agent_turn(token)
+
+
+def test_failed_edit_rolls_back_content_and_acl_revision(setup, monkeypatch):
+    import os
+    builder.save(ADMIN, {**payload(), "allowed_users":[BOB["email"]]})
+    original_replace = os.replace
+    failed = False
+    def fail_final_publish(source, destination):
+        nonlocal failed
+        from pathlib import Path
+        source, destination = Path(source), Path(destination)
+        if not failed and source.name == "profile.yaml" and source.parent.name.startswith(".bot-stage-"):
+            failed = True
+            with pytest.raises(PermissionError):
+                builder.allowed(BOB, "research-bot")
+            raise OSError("simulated publish failure")
+        return original_replace(source, destination)
+    monkeypatch.setattr(os, "replace", fail_final_publish)
+    with pytest.raises(OSError):
+        builder.save(ADMIN, {**payload(), "revision":1, "system_prompt":"NEW_PRIVATE"})
+    restored = builder.get(ADMIN, "research-bot")["config"]
+    assert restored["revision"] == 1
+    assert restored["system_prompt"] == payload()["system_prompt"]
+    assert builder.allowed(BOB, "research-bot")
+
+
+@pytest.mark.parametrize("route,body", [
+    ("/api/profile/delete", {"name":"research-bot"}),
+    ("/api/profile/create", {"name":"copied-bot", "clone_from":"research-bot", "clone_config":True}),
+])
+def test_legacy_body_dispatch_cannot_delete_or_clone_private_bot(setup, monkeypatch, route, body):
+    from api import routes, profiles
+    from types import SimpleNamespace
+    from urllib.parse import urlparse
+    builder.save(ADMIN, payload())
+    monkeypatch.setattr(routes, "_check_csrf", lambda h: True)
+    monkeypatch.setattr(routes.governance_api, "handle_governance_api", lambda *a: False)
+    monkeypatch.setattr(routes, "_handle_extension_sidecar_proxy", lambda *a, **k: False)
+    monkeypatch.setattr(routes, "read_body", lambda h: body)
+    monkeypatch.setattr(routes, "_guard_request_session_visibility", lambda *a, **k: True)
+    monkeypatch.setattr("api.governance.enforce._request_identity", lambda h: BOB)
+    response = {}
+    monkeypatch.setattr(routes, "bad", lambda h, message, status=400: response.update(status=status))
+    monkeypatch.setattr(profiles, "delete_profile_api", lambda *a: pytest.fail("delete reached"))
+    monkeypatch.setattr(profiles, "create_profile_api", lambda *a, **k: pytest.fail("clone reached"))
+    routes.handle_post(SimpleNamespace(headers={}), urlparse(route))
+    assert response["status"] == 403
+    assert builder.allowed(ADMIN, "research-bot")
+
+
+@pytest.mark.parametrize("path,method", [
+    ("/api/profile/active","GET"), ("/api/skills/content","GET"),
+    ("/api/config","GET"), ("/api/skills/toggle","POST"),
+    ("/api/model/set","POST"), ("/api/providers","POST"),
+    ("/api/mcp/servers/test","PATCH"), ("/api/mcp/servers/test","DELETE"),
+])
+def test_revoked_active_cookie_cannot_read_or_mutate_profile(setup, monkeypatch, path, method):
+    from urllib.parse import urlparse
+    builder.save(ADMIN, payload())
+    monkeypatch.setattr("api.profiles.get_active_profile_name", lambda:"research-bot")
+    monkeypatch.setattr("api.governance.enforce._request_identity", lambda h:BOB)
+    statuses = []
+    monkeypatch.setattr("api.helpers.bad", lambda h, message, status:statuses.append(status))
+    assert builder.guard_profile_request(object(), urlparse(path), method) is False
+    assert statuses == [403]
+
+
+def test_shared_viewer_cannot_mutate_bot_but_can_switch_and_use_personal_memory(setup, monkeypatch):
+    from urllib.parse import urlparse
+    builder.save(ADMIN, {**payload(), "allowed_users":[BOB["email"]]})
+    monkeypatch.setattr("api.profiles.get_active_profile_name", lambda:"research-bot")
+    monkeypatch.setattr("api.governance.enforce._request_identity", lambda h:BOB)
+    monkeypatch.setattr("api.helpers.bad", lambda *a:None)
+    assert builder.guard_profile_request(object(), urlparse("/api/profile/active"), "GET")
+    assert not builder.guard_profile_request(object(), urlparse("/api/skills/toggle"), "POST")
+    assert builder.guard_profile_request(object(), urlparse("/api/profile/switch"), "POST")
+    assert builder.guard_profile_request(object(), urlparse("/api/memory"), "GET")

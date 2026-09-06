@@ -43,6 +43,8 @@ def managed(name):
     data = _yaml(_home(name) / "profile.yaml").get(_KEY)
     if data is None:
         return None
+    if isinstance(data, dict) and data.get("updating"):
+        raise PermissionError("Bot update in progress; retry shortly")
     if not isinstance(data, dict) or not data.get("owner_email"):
         raise PermissionError("Invalid bot access configuration")
     return data
@@ -210,6 +212,8 @@ def save(identity, body):
         exists = target.exists()
         require_edit(identity, name if exists else None)
         previous = managed(name) if exists else None
+        if exists and any((target / child).is_symlink() for child in ("skills", "assets")):
+            raise PermissionError("Bot assets or skills cannot use symlinks")
         actual_revision = int((previous or {}).get("revision", 0))
         if exists and ("revision" not in body or body["revision"] != actual_revision):
             raise RuntimeError("Bot changed or already exists. Reload before saving.")
@@ -249,8 +253,18 @@ def save(identity, body):
             for value in cfg["mcp_servers"].values():
                 if isinstance(value, dict):
                     value["enabled"] = True
-            cfg["platform_toolsets"] = {"webui": ["file", "web", "memory", "delegation", "skills"] + ["mcp-" + n for n in clean["mcp_servers"]] + (["terminal"] if clean["cli_tools"] else []),
-                                        "cli": ["file", "web", "memory", "delegation", "skills"] + ["mcp-" + n for n in clean["mcp_servers"]] + (["terminal"] if clean["cli_tools"] else [])}
+            platforms = copy.deepcopy(cfg.get("platform_toolsets") or global_cfg.get("platform_toolsets") or {})
+            if not isinstance(platforms, dict):
+                platforms = {}
+            for surface in ("webui", "cli"):
+                baseline = platforms.get(surface, platforms.get("cli", ["file", "web", "memory", "delegation", "skills"]))
+                baseline = baseline if isinstance(baseline, list) else []
+                selected = [tool for tool in baseline if isinstance(tool, str) and not tool.startswith("mcp-") and tool != "terminal"]
+                selected += ["skills"] + ["mcp-" + n for n in clean["mcp_servers"]]
+                if clean["cli_tools"]:
+                    selected.append("terminal")
+                platforms[surface] = list(dict.fromkeys(selected))
+            cfg["platform_toolsets"] = platforms
             atomic_yaml_write(stage / "config.yaml", cfg, sort_keys=False)
             (stage / "SOUL.md").write_text(clean["system_prompt"])
             metadata = _yaml(stage / "profile.yaml")
@@ -272,20 +286,49 @@ def save(identity, body):
                 (stage / "assets").mkdir(exist_ok=True)
                 (stage / "assets/avatar.png").write_bytes(blob)
             if exists:
-                # Keep nonconfiguration files in-place on edit. Readers use
-                # revision/ACL from profile.yaml, published last.
-                for filename in ("config.yaml", "SOUL.md"):
-                    os.replace(stage / filename, target / filename)
-                if (stage / "skills").exists():
+                # Publish a deny-all transaction marker before new private
+                # instructions/config can be observed under the old ACL.
+                names = ("config.yaml", "SOUL.md", "assets/avatar.png", "profile.yaml")
+                had_skills = (target / "skills").exists()
+                originals = {filename: ((target / filename).read_bytes() if (target / filename).is_file() else None)
+                             for filename in names}
+                old_metadata = _yaml(target / "profile.yaml")
+                marker = copy.deepcopy(old_metadata)
+                marker[_KEY] = {"owner_email": owner, "updating": True}
+                atomic_yaml_write(target / "profile.yaml", marker, sort_keys=False)
+                try:
+                    for filename in ("config.yaml", "SOUL.md"):
+                        os.replace(stage / filename, target / filename)
                     old = target / "skills"
                     if old.exists():
                         backup = target / (".skills-before-" + next(tempfile._get_candidate_names()))
                         os.replace(old, backup)
                     os.replace(stage / "skills", old)
-                if (stage / "assets/avatar.png").exists():
-                    (target / "assets").mkdir(exist_ok=True)
-                    os.replace(stage / "assets/avatar.png", target / "assets/avatar.png")
-                os.replace(stage / "profile.yaml", target / "profile.yaml")
+                    if (stage / "assets/avatar.png").exists():
+                        (target / "assets").mkdir(exist_ok=True)
+                        os.replace(stage / "assets/avatar.png", target / "assets/avatar.png")
+                    os.replace(stage / "profile.yaml", target / "profile.yaml")
+                except BaseException:
+                    # Restore content before restoring access/revision.
+                    if backup and backup.exists():
+                        if (target / "skills").exists():
+                            shutil.rmtree(target / "skills")
+                        os.replace(backup, target / "skills")
+                        backup = None
+                    if not had_skills and (target / "skills").exists():
+                        shutil.rmtree(target / "skills")
+                    for filename in names:
+                        destination = target / filename
+                        original = originals[filename]
+                        if original is None:
+                            destination.unlink(missing_ok=True)
+                        else:
+                            destination.parent.mkdir(exist_ok=True)
+                            fd, temporary = tempfile.mkstemp(dir=destination.parent)
+                            with os.fdopen(fd, "wb") as stream:
+                                stream.write(original)
+                            os.replace(temporary, destination)
+                    raise
             else:
                 os.replace(stage, target)
             profiles._invalidate_list_profiles_cache()
@@ -348,3 +391,41 @@ def access_ceiling(identity, name, rights):
         skills_view=frozenset(data["skills"]), skills_manage=frozenset(),
         mcp_servers=frozenset(data["mcp_servers"]),
         cli_commands=frozenset(data["cli_tools"])))
+
+
+def guard_profile_request(handler, parsed, method):
+    """Revalidate managed signed-cookie scopes at profile-dependent sinks."""
+    path = parsed.path
+    prefixes = ("/api/config", "/api/skills", "/api/skill/", "/api/mcp",
+                "/api/models", "/api/model/", "/api/providers", "/api/personalities",
+                "/api/plugins", "/api/toolsets", "/api/tools",
+                "/api/profile/active", "/api/profile/bot", "/api/profile/avatar")
+    if not path.startswith(prefixes):
+        return True
+    from urllib.parse import parse_qs
+    from api.profiles import get_active_profile_name
+    from api.governance.enforce import _request_identity
+    from api.helpers import bad
+    name = (parse_qs(parsed.query).get("profile") or [get_active_profile_name()])[0]
+    if not name or name == "active":
+        name = get_active_profile_name()
+    try:
+        data = managed(name)
+        if data is None:
+            return True
+        identity = _request_identity(handler)
+        if allowed(identity, name) is not True:
+            raise PermissionError("This bot is no longer available. Select another bot.")
+        if method not in ("GET", "HEAD"):
+            require_edit(identity, name)
+        return True
+    except (PermissionError, ValueError, OSError):
+        if method not in ("GET", "HEAD"):
+            # The route may reject before consuming the request body.
+            # Do not parse leftover JSON as a subsequent keep-alive request.
+            try:
+                handler.close_connection = True
+            except AttributeError:
+                pass
+        bad(handler, "Bot access is restricted. Select an available bot.", 403)
+        return False
