@@ -1,7 +1,7 @@
 /* Chat recipients use the existing profile ACL and group @bot dispatch contract. */
 (function () {
   'use strict';
-  let key = '', generation = 0, profiles = [], loading = false;
+  let key = '', generation = 0, profiles = [], loading = true;
   function contextKey() {
     const s = S.session || {};
     return JSON.stringify([s.session_id || '', S.activeProfile || '', s.bot_participants || []]);
@@ -38,12 +38,13 @@
       const selected = group ? (mention ? mention[1] === p.name : rows.length === 1) : S.activeProfile === p.name;
       button.setAttribute('aria-pressed', String(selected));
       button.title = '@' + p.name;
-      button.disabled = loading || (!group && !!S.busy);
+      button.disabled = loading || !S._bootReady || (!group && !!S.busy);
       button.innerHTML = botAvatarHtml(p);
       const name = document.createElement('span'); name.textContent = botDisplayName(p);
       button.appendChild(name);
       button.onclick = async () => {
         // The roster can outlive an asynchronous navigation; never address its old chat.
+        if (!S._bootReady) return;
         if (contextKey() !== key) { window.refreshChatBots(); return; }
         if (group) {
           if (!input) return;
@@ -61,6 +62,7 @@
     }
     if (!rows.length) {
       const state = document.createElement('span'); state.className = 'chat-bot-roster-state';
+      state.setAttribute('role', 'status');
       state.textContent = t(loading ? 'chat_bots_loading' : 'chat_bots_unavailable');
       bar.appendChild(state);
     }
@@ -86,6 +88,18 @@
   window.addEventListener('synpulse:bot-updated', () => {
     key = ''; window.refreshChatBots();
   });
+  window.addEventListener('synpulse:boot-ready', () => {
+    if (contextKey() !== key) window.refreshChatBots();
+    else paint();
+  });
+  // Paint before the main boot awaits profile/session hydration. The catalog is
+  // authenticated and never restored from another context's browser cache.
+  paint();
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => window.refreshChatBots(), {once:true});
+  } else {
+    window.refreshChatBots();
+  }
   // Export the pure recipient rules for behavior tests without a browser framework.
   window.chatBotRecipientRules = {available, address};
 })();
