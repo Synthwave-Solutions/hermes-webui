@@ -697,6 +697,13 @@ def _webui_ephemeral_system_prompt(
         from api.bot_metadata import knowledge_prompt
         knowledge = knowledge_prompt(surface_context.get('profile'), surface_context.get('workspace'))
         if knowledge: parts.append(knowledge)
+        from api import bot_knowledge, bot_builder
+        shared_knowledge = bot_knowledge.prompt(surface_context.get("profile"), actor_email)
+        if shared_knowledge:
+            parts.append(shared_knowledge)
+        shared_memory = bot_builder.memory_prompt(surface_context.get("profile"), actor_email)
+        if shared_memory:
+            parts.append(shared_memory)
     parts.append(_WEBUI_PROGRESS_PROMPT)
     delivery_prompt = _webui_delivery_context_prompt(config_data)
     if delivery_prompt:

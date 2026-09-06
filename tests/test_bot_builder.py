@@ -260,3 +260,119 @@ def test_bootstrap_only_owner_can_create_and_resave_without_unknown_users(setup)
     with pytest.raises(PermissionError):
         builder.save(ADMIN, edited)
     assert builder.get(ADMIN, "research-bot")["config"]["revision"] == 2
+
+
+def test_bot_memory_is_dedicated_and_preserves_legacy_personal_data(setup):
+    legacy = setup / 'memories'
+    legacy.mkdir()
+    (legacy / 'MEMORY.md').write_text('PRIVATE legacy person notes')
+    (setup / 'SOUL.md').write_text('Shared bot instructions')
+    initial = builder.get(ADMIN, 'default')['config']
+    assert initial['bot_memory'] == ''
+    initial.pop('avatar_url')
+    initial['bot_memory'] = 'Shared product glossary'
+    builder.save(ADMIN, initial)
+    assert builder.get(ADMIN, 'default')['config']['bot_memory'] == 'Shared product glossary'
+    assert (legacy / 'MEMORY.md').read_text() == 'PRIVATE legacy person notes'
+    assert (setup / 'BOT_MEMORY.md').read_text() == 'Shared product glossary'
+
+
+def test_bot_memory_runtime_obeys_actor_acl_and_revocation(setup):
+    body = {**payload(), 'bot_memory': 'Shared reference', 'allowed_users': [BOB['email']]}
+    builder.save(ADMIN, body)
+    assert 'Shared reference' in builder.memory_prompt('research-bot', BOB['email'])
+    assert builder.memory_prompt('research-bot', OUT['email']) == ''
+    assert builder.memory_prompt('research-bot', None) == ''
+    builder.save(ADMIN, {**body, 'revision': 1, 'allowed_users': []})
+    assert builder.memory_prompt('research-bot', BOB['email']) == ''
+
+
+def test_bot_memory_omitted_preserved_and_explicit_empty_clears(setup):
+    builder.save(ADMIN, {**payload(), 'bot_memory': 'Keep this'})
+    builder.save(ADMIN, {**payload(), 'revision': 1})
+    assert builder.get(ADMIN, 'research-bot')['config']['bot_memory'] == 'Keep this'
+    builder.save(ADMIN, {**payload(), 'revision': 2, 'bot_memory': ''})
+    assert builder.get(ADMIN, 'research-bot')['config']['bot_memory'] == ''
+
+
+def test_bot_memory_failed_publish_rolls_back(setup, monkeypatch):
+    import os
+    from pathlib import Path
+    builder.save(ADMIN, {**payload(), 'bot_memory': 'Old shared note'})
+    replace = os.replace
+    def fail_publish(source, destination):
+        source = Path(source)
+        if source.name == 'profile.yaml' and source.parent.name.startswith('.bot-stage-'):
+            raise OSError('publication failed')
+        return replace(source, destination)
+    monkeypatch.setattr(os, 'replace', fail_publish)
+    with pytest.raises(OSError):
+        builder.save(ADMIN, {**payload(), 'revision': 1, 'bot_memory': 'New shared note'})
+    restored = builder.get(ADMIN, 'research-bot')['config']
+    assert restored['revision'] == 1
+    assert restored['bot_memory'] == 'Old shared note'
+
+
+def test_bot_memory_symlink_read_and_save_fail_closed(setup):
+    builder.save(ADMIN, payload())
+    memory = setup / 'profiles/research-bot/BOT_MEMORY.md'
+    memory.unlink()
+    secret = setup / 'private.txt'
+    secret.write_text('Do not expose')
+    memory.symlink_to(secret)
+    with pytest.raises((OSError, PermissionError)):
+        builder.get(ADMIN, 'research-bot')
+    assert builder.memory_prompt('research-bot', ADMIN['email']) == ''
+    with pytest.raises((OSError, PermissionError)):
+        builder.save(ADMIN, {**payload(), 'revision': 1, 'bot_memory': 'Bad write'})
+    assert secret.read_text() == 'Do not expose'
+
+
+@pytest.mark.parametrize('value', [None, ['not text'], 'x' * 32769])
+def test_bot_memory_invalid_input_never_publishes(setup, value):
+    with pytest.raises(ValueError):
+        builder.save(ADMIN, {**payload(), 'bot_memory': value})
+    assert not (setup / 'profiles/research-bot').exists()
+
+
+def test_appearance_cannot_publish_stale_acl_during_bot_edit(setup, monkeypatch):
+    import os
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+    from pathlib import Path
+    from api import bot_metadata
+    builder.save(ADMIN, {**payload(), 'allowed_users': [BOB['email']]})
+    entered = threading.Event()
+    continue_publish = threading.Event()
+    appearance_started = threading.Event()
+    replace = os.replace
+    def pause_content_publish(source, destination):
+        source = Path(source)
+        if source.name == 'SOUL.md' and source.parent.name.startswith('.bot-stage-'):
+            entered.set()
+            assert continue_publish.wait(5)
+        return replace(source, destination)
+    monkeypatch.setattr(os, 'replace', pause_content_publish)
+    def appearance():
+        appearance_started.set()
+        return bot_metadata.save_profile('research-bot', {'color': '#123456'}, 0)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        editor = pool.submit(builder.save, ADMIN, {**payload(), 'revision': 1,
+                                                   'bot_memory': 'New shared notes'})
+        try:
+            assert entered.wait(5)
+            photo = pool.submit(appearance)
+            assert appearance_started.wait(5)
+            # Appearance must wait; otherwise it reads the deny-marker and
+            # races the builder's final ACL/revision publication.
+            with pytest.raises(TimeoutError):
+                photo.result(timeout=.1)
+        finally:
+            continue_publish.set()
+        editor.result(timeout=5)
+        photo.result(timeout=5)
+    result = builder.get(ADMIN, 'research-bot')['config']
+    assert result['revision'] == 2
+    assert result['bot_memory'] == 'New shared notes'
+    assert builder.allowed(BOB, 'research-bot') is False
+    assert bot_metadata.read_profile('research-bot')['bot']['color'] == '#123456'

@@ -6669,7 +6669,7 @@ function botAvatarHtml(p){
 async function saveBotAppearance(){
   const p=_currentProfileDetail;if(!p)return;
   try{
-    await api('/api/profile/appearance',{method:'POST',body:JSON.stringify({name:p.name,revision:p.bot_revision||0,bot:{title:$('botTitle').value,description:$('botDescription').value,shape:$('botShape').value,color:$('botColor').value,knowledge_sources:$('botKnowledge').value.split('\n').map(x=>x.trim()).filter(Boolean)}})});
+    await api('/api/profile/appearance',{method:'POST',body:JSON.stringify({name:p.name,revision:p.bot_revision||0,bot:{title:$('botTitle').value,description:$('botDescription').value,shape:$('botShape').value,color:$('botColor').value,knowledge_sources:p.bot_knowledge_sources||[]}})});
     _profileDropdownClearStoredCache();
     window.dispatchEvent(new CustomEvent('synpulse:bot-updated'));
     await loadProfilesPanel();showToast(t('bot_saved'));
@@ -6696,7 +6696,7 @@ async function uploadBotAvatar(input){
 }
 async function openBotConfiguration(section){
   const p=_currentProfileDetail;if(!p)return;
-  if(window.BotBuilder){await window.BotBuilder.open(p.name);return;}
+  if(window.BotBuilder){await window.BotBuilder.open(p.name,section);return;}
   showToast("Bot configuration is unavailable. Reload the page.");
 }
 
@@ -6840,6 +6840,7 @@ function _renderProfileDetail(p, activeName){
     <div class="main-view-content bot-detail-content">
       <section class="bot-overview"><div class="bot-overview-avatar">${botAvatarHtml(p)}</div><div><h2>${esc(botDisplayName(p))}</h2><p>${esc((p.bot&&p.bot.description)||t('bot_description_empty'))}</p></div></section>
       <div class="bot-configuration-links">
+        ${editable?`<button type="button" class="sm-btn" onclick="openBotConfiguration('identity')">${esc(t('bot_editor_edit'))}</button>`:''}
         <button type="button" class="sm-btn" onclick="openBotConfiguration('soul')">${esc(t('bot_prompt'))}</button>
         <button type="button" class="sm-btn" onclick="openBotConfiguration('memory')">${esc(t('bot_knowledge'))}</button>
         <button type="button" class="sm-btn" onclick="openBotConfiguration('skills')">${esc(t('tab_skills'))}</button>
@@ -6857,8 +6858,7 @@ function _renderProfileDetail(p, activeName){
             <label class="bot-editor-wide" for="botAvatarFile">${esc(t('bot_upload'))}<input id="botAvatarFile" type="file" accept="image/png,image/jpeg,image/webp" onchange="uploadBotAvatar(this)" aria-describedby="botAvatarHint"></label>
           </div>
           <p class="bot-field-hint" id="botAvatarHint">${esc(t('bot_avatar_limit'))}</p>
-          <label for="botKnowledge">${esc(t('bot_knowledge_files'))}<textarea id="botKnowledge" rows="4" placeholder="docs/product.md" aria-describedby="botKnowledgeHint">${esc((p.bot_knowledge_sources||[]).join('\n'))}</textarea></label>
-          <p class="bot-field-hint" id="botKnowledgeHint">${esc(t('bot_knowledge_files_hint'))}</p>
+          <div class="bot-editor-wide"><h3>${esc(t('bot_knowledge_files'))}</h3><p class="bot-field-hint">${esc(t('bot_editor_choose_hint'))}</p><button type="button" class="sm-btn" onclick="openBotConfiguration('knowledge')">${esc(t('bot_editor_choose_knowledge'))}</button></div>
           ${editable?`<button type="submit" class="sm-btn primary">${esc(t('save'))}</button>`:''}
         </fieldset>
         ${editable?'':`<p class="bot-field-hint">${esc(t('bot_read_only'))}</p>`}
