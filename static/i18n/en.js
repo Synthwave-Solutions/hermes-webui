@@ -1,5 +1,6 @@
 // Locale bundle; loaded on demand by static/i18n.js.
 window.__registerHermesLocale('en', {
+    subagent_status_last_seen: 'Working at last update',
     subagent_status_queued: 'Queued',
     subagent_status_running: 'Working',
     subagent_status_completed: 'Completed',

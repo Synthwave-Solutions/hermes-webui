@@ -45,9 +45,10 @@
     const a=tc&&tc.args||{};
     const names={queued:'Queued',running:'Working',completed:'Completed',failed:'Failed',cancelled:'Stopped'};
     if(!Object.hasOwn(names,a.status)) return '';
-    const key='subagent_status_'+a.status;
+    const lastSeen=tc.done===true&&(a.status==='queued'||a.status==='running');
+    const key=lastSeen?'subagent_status_last_seen':'subagent_status_'+a.status;
     const translated=typeof translate==='function'?translate(key):key;
-    const state=translated&&translated!==key?translated:names[a.status];
+    const state=translated&&translated!==key?translated:(lastSeen?'Working at last update':names[a.status]);
     const index=Number(a.task_index)||0;
     const count=Number(a.task_count)||0;
     const worker=count>1?`Sub-agent ${index+1}/${count}`:'Sub-agent';
