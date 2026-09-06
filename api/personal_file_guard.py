@@ -22,6 +22,18 @@ def guard_request(handler, route, values):
         session = None  # Existing route returns its normal missing-session error.
     workspace = getattr(session, 'workspace', None)
     candidates = []
+    if route.startswith('/api/escape/') and workspace and values.get('token'):
+        from api.workspace import resolve_authorized_escape_request
+        try:
+            resolved = resolve_authorized_escape_request(Path(workspace), sid, values['token'], values.get('path') or '.')
+        except (ValueError, FileNotFoundError):
+            raise PermissionError('Invalid private file authorization') from None
+        personal_context.ensure_actor_path(identity, resolved['target'], session)
+    if route == '/api/file/raw' and session:
+        from api.routes import _file_raw_target
+        resolved = _file_raw_target(session, sid, values.get('path') or '')
+        if resolved:
+            personal_context.ensure_actor_path(identity, resolved[1], session)
     for key in ('path', 'dest_dir', 'new_path'):
         raw = values.get(key)
         if raw is None:
