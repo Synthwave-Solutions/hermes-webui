@@ -113,7 +113,7 @@ def catalog(identity):
                 commands.add(command)
     return {"skills": skills, "mcp_servers": [{"name": n} for n in sorted(mcp_names)],
             "cli_tools": [{"name": n} for n in sorted(commands)],
-            "users": [{"email": n} for n in sorted(policy.users)],
+            "users": [{"email": n} for n in sorted(set(policy.users) | set(policy.bootstrap_admins) | {_identity(identity)})],
             "groups": [{"name": n} for n in sorted(policy.groups)]}
 
 
