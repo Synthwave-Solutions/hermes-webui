@@ -682,6 +682,7 @@ def _webui_ephemeral_system_prompt(
     personality_prompt: Optional[str],
     surface_context: Optional[dict] = None,
     config_data: Optional[dict] = None,
+    actor_email: Optional[str] = None,
 ) -> str:
     """Build WebUI-only runtime instructions that are not persisted to history."""
     parts = []
@@ -694,6 +695,20 @@ def _webui_ephemeral_system_prompt(
     delivery_prompt = _webui_delivery_context_prompt(config_data)
     if delivery_prompt:
         parts.append(delivery_prompt)
+    # Identity comes from the authenticated turn sender, never personality,
+    # recalled memory or the selected (possibly shared) execution profile.
+    actor = str(actor_email or "").strip().lower()
+    if re.fullmatch(r"[^\s@<>]+@[^\s@<>]+", actor):
+        parts.append(
+            "Active user identity for this turn (authoritative):\n"
+            f"Active user: {actor}\n"
+            "This is the human sender, not the assistant or the shared profile owner. "
+            "Use this identity over names in shared instructions, examples and recalled memory. "
+            "For Gmail and Google Workspace, resolve this user's connected account explicitly "
+            "and verify its account identity before use. Never fall back to the profile owner's "
+            "mailbox. This identity does not grant access: existing authorization and approval "
+            "rules still apply. If the matching connection is absent, explain what is missing."
+        )
     return "\n\n".join(part for part in parts if part)
 
 
@@ -8176,6 +8191,7 @@ def _run_agent_streaming(
                     'workspace': s.workspace,
                 },
                 config_data=_cfg,
+                actor_email=_turn_principal,
             )
             _pending_started_at = getattr(s, 'pending_started_at', None)
             # Normal chat-start sets pending_started_at before spawning this thread;

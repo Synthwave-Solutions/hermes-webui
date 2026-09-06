@@ -93,3 +93,7 @@ locally and want browser-originated chat to use the same runtime/tool path as
 messaging surfaces. Attachments, cancellation, approvals, and clarify prompts
 still follow WebUI's current compatibility path and may not match every messaging
 surface until the runtime-adapter migration is complete.
+
+### Active sender identity
+
+Browser turns attach the authenticated sender's email to ephemeral runtime instructions, separately from the selected execution profile. Both in-process and gateway chat use the same guidance. Shared profile instructions and recalled owner context must not redefine the human sender. Gmail/Workspace account selection must verify the corresponding connection; this identity does not expand permissions or provide missing credentials. Legacy background turns without a current sender use their recorded owner when available.

@@ -517,6 +517,7 @@ def _run_gateway_chat_streaming(
     *,
     model_provider=None,
     goal_related=False,
+    sender_email=None,
 ):
     """Bridge a WebUI chat turn through Hermes Gateway's API server.
 
@@ -614,6 +615,7 @@ def _run_gateway_chat_streaming(
                     "workspace": s.workspace if s is not None else str(workspace),
                 },
                 config_data=cfg,
+                actor_email=sender_email or getattr(s, "owner_email", None),
             )
             prefill_messages = _prefill_messages_with_webui_context(prefill_context, cfg)
             prefill_messages = _normalize_prefill_messages_before_user_turn(prefill_messages)
