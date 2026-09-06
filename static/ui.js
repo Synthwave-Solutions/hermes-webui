@@ -16389,7 +16389,46 @@ function _groupAuthorLineHtml(message){
 }
 if(typeof window!=='undefined') window._groupAuthorLineHtml=_groupAuthorLineHtml;
 
+let _progressPollTimer = null;
+let _progressPollPending = false;
+let _progressPollSid = null;
+function _refreshSessionProgress() {
+  const sid = S.session && S.session.session_id;
+  const inner = $('msgInner');
+  if (!inner || !inner.parentNode) return;
+  let row = $('sessionProgress');
+  if (!row) {
+    row = document.createElement('div');
+    row.id = 'sessionProgress';
+    row.className = 'intg-muted';
+    row.setAttribute('role', 'status');
+    row.style.cssText = 'padding:6px 16px;font-size:12px';
+    inner.parentNode.insertBefore(row, inner);
+  }
+  if (_progressPollSid !== sid) { row.textContent = ''; _progressPollSid = sid; }
+  if (!sid || _progressPollPending) return;
+  _progressPollPending = true;
+  api('/api/session/status?session_id=' + encodeURIComponent(sid), {redirect401:false, timeoutToast:false})
+    .then(data => {
+      if (!S.session || S.session.session_id !== sid) return;
+      const progress = data && data.progress;
+      const labels = {queued:'Queued',running:'Working',waiting:'Waiting for input',completed:'Completed',failed:'Failed',canceled:'Canceled'};
+      const state = progress && progress.status;
+      if (!labels[state]) { row.textContent = ''; row.removeAttribute('data-progress-state'); return; }
+      row.dataset.progressState = state;
+      row.textContent = t('session_progress_' + state) || labels[state];
+    })
+    .catch(() => { if (S.session && S.session.session_id === sid) row.textContent = t('session_progress_unavailable') || 'Status unavailable'; })
+    .finally(() => { _progressPollPending = false; });
+}
+function _scheduleSessionProgress() {
+  if (_progressPollTimer !== null) return;
+  _refreshSessionProgress();
+  _progressPollTimer = setTimeout(() => { _progressPollTimer = null; _scheduleSessionProgress(); }, 5000);
+}
+
 function renderMessages(options){
+  _scheduleSessionProgress();
   _lastMessageRenderAt=performance.now();
   const preserveScroll=!!(options&&options.preserveScroll);
   const virtualFallback=!!(options&&options._virtualFallback);

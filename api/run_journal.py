@@ -520,7 +520,9 @@ def _summary_from_events(session_id: str, run_id: str, events: Iterable[dict]) -
         "last_event_id": (last or {}).get("event_id"),
         "terminal": bool(terminal),
         "terminal_state": status,
+        "terminal_event": (terminal or {}).get("event"),
         "last_event": (last or {}).get("event"),
+        "started_at": (ordered[0] if ordered else {}).get("created_at"),
     }
 
 
@@ -534,6 +536,26 @@ def latest_run_summary(session_id: str, run_id: str, *, session_dir: Path | None
     summary = _summary_from_events(session_id, run_id, events)
     _cache_summary(path, summary, expected_signature=pre_read_signature)
     return summary
+
+
+def latest_session_run_summary(session_id: str) -> dict | None:
+    """Select by the durable first-event timestamp, not a late title write's mtime."""
+    sid = _validate_id(session_id, "session_id")
+    root = _default_session_dir() / RUN_JOURNAL_DIR_NAME / sid
+    latest = None
+    for path in root.glob("*.jsonl"):
+        try:
+            _validate_id(path.stem, "run_id")
+            with path.open(encoding="utf-8") as handle:
+                first = json.loads(handle.readline(65536))
+            if first.get("session_id") != sid or first.get("run_id") != path.stem:
+                continue
+            candidate = (float(first["created_at"]), path.stem)
+            if latest is None or candidate > latest:
+                latest = candidate
+        except (OSError, ValueError, KeyError, TypeError):
+            continue
+    return latest_run_summary(sid, latest[1]) if latest else None
 
 
 def session_journal_fingerprint(session_id: str, *, session_dir: Path | None = None) -> tuple[int, float, int]:

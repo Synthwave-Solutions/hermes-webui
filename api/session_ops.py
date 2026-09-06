@@ -520,6 +520,30 @@ def undo_last(session_id: str) -> dict[str, Any]:
     }
 
 
+def session_progress(session, *, attention=None) -> dict | None:
+    """Project existing journal and worker state; never infer success from prose."""
+    from api.run_journal import latest_session_run_summary, latest_run_summary
+    live = _live_active_stream_id(session)
+    summary = latest_run_summary(session.session_id, live) if live else latest_session_run_summary(session.session_id)
+    pending = getattr(session, 'pending_started_at', None)
+    if not live and pending and float(pending) > float((summary or {}).get('started_at') or 0):
+        return {'status': 'queued', 'run_id': None, 'reason': 'pending_start'}
+    if live and not (summary or {}).get('terminal'):
+        return {'status': 'waiting' if attention else 'running', 'run_id': live,
+                'reason': (attention or {}).get('kind')}
+    if summary:
+        state = summary.get('terminal_state')
+        status = {'completed': 'completed', 'interrupted-by-user': 'canceled',
+                  'tool_limit_reached': 'waiting'}.get(state, 'failed')
+        if status == 'completed' and summary.get('terminal_event') != 'done':
+            status = 'failed'
+        return {'status': status, 'run_id': summary.get('run_id'),
+                'reason': state if summary.get('terminal') else 'worker_unavailable'}
+    if getattr(session, 'pending_started_at', None):
+        return {'status': 'queued', 'run_id': None, 'reason': 'pending_start'}
+    return None
+
+
 def session_status(session_id: str) -> dict[str, Any]:
     """Return a snapshot of session state for /status.
 
@@ -529,6 +553,8 @@ def session_status(session_id: str) -> dict[str, Any]:
     (active_stream_id is set).
     """
     s = get_session(session_id)
+    from api.routes import _session_attention_summary
+    progress = session_progress(s, attention=_session_attention_summary(session_id))
     inp = int(s.input_tokens or 0)
     out = int(s.output_tokens or 0)
     profile = getattr(s, 'profile', None) or 'default'
@@ -539,6 +565,7 @@ def session_status(session_id: str) -> dict[str, Any]:
         hermes_home = ''
     return {
         'session_id': s.session_id,
+        'progress': progress,
         'title': s.title,
         'model': s.model,
         'profile': profile,
