@@ -13375,7 +13375,9 @@ async function cancelApprovalResume(id){
 }
 async function approvalResumeHtml(){
   const sid=S.session&&S.session.session_id;
-  const data=await api('/api/governance/approvals/resume?session_id='+encodeURIComponent(sid||''));
+  let data;
+  try{ data=await api('/api/governance/approvals/resume?session_id='+encodeURIComponent(sid||'')); }
+  catch(_){ return `<p>${esc(t('approval_resume_unavailable'))}</p>`; }
   let html=sid?`<label><input type="checkbox" ${data.enabled?'checked':''} onchange="setApprovalResumeConsent(this.checked)"> ${esc(t('approval_resume_optin'))}</label><p>${esc(t('approval_resume_limits'))}</p>`:'';
   for(const row of data.records||[]){
     html+=`<div class="access-request-row"><span>${esc(t('approval_resume_label'))}: ${esc(String(row.status))}</span> <span>${esc(String(row.reason||''))}</span>`;
