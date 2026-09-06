@@ -15417,6 +15417,7 @@ def handle_post(handler, parsed) -> bool:
                 return bad(handler, "profile_not_allowed", 403)
         except Exception:
             logger.warning("profile switch governance check failed for %s", name, exc_info=True)
+            return bad(handler, "profile_access_unavailable", 403)
         try:
             from api.profiles import switch_profile, _validate_profile_name
             from api.helpers import build_profile_cookie

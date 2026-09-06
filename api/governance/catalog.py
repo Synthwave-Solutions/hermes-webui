@@ -102,6 +102,8 @@ ROUTE_CATALOG: tuple[RouteRule, ...] = (
     # profiles
     RouteRule("/api/profiles",            "profiles:read"),
     RouteRule("/api/profile/active",      "profiles:read", match="exact"),
+    # Selecting a permitted bot is chat use, not profile administration.
+    RouteRule("/api/profile/switch",      "profiles:read", "chat:use", match="exact"),
     RouteRule("/api/profile",             "profiles:read", "profiles:admin"),
 
     # sessions, projects, background
