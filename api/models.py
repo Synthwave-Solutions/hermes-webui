@@ -3963,7 +3963,7 @@ class _ExternalSessionView:
         self.workspace = workspace
 
 
-def get_session_for_file_ops(sid: str):
+def get_session_for_file_ops(sid: str, handler=None):
     """Return a profile-authorized session-like object for file-manager handlers.
 
     Tries ``get_session`` first (preserves all existing behavior for WebUI
@@ -3979,6 +3979,20 @@ def get_session_for_file_ops(sid: str):
         if state_db_has_session(sid):
             return _ExternalSessionView(str(sid), str(get_last_workspace()))
         raise
+
+    if handler is not None:
+        from api.routes import _session_visible_to_request
+        from api.governance.enforce import _request_identity
+        from api.group_chat import require_turn_membership
+
+        if not _session_visible_to_request(session, handler):
+            raise KeyError(sid)
+        if getattr(session, "participants", None) or getattr(session, "project_id", None):
+            try:
+                require_turn_membership(session, _request_identity(handler))
+            except PermissionError:
+                raise KeyError(sid) from None
+        return session
 
     from api.profiles import _profiles_match, get_active_profile_name
 
@@ -6606,6 +6620,8 @@ def _session_messages_have_prefix(messages, prefix) -> bool:
 
 
 _SESSION_MESSAGE_DISPLAY_METADATA_KEYS = (
+    "bot_profile",
+    "bot_name",
     "_turnDuration",
     "_turnTps",
     "_turnUsage",
