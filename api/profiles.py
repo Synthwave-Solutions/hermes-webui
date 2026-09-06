@@ -420,7 +420,7 @@ def _is_root_profile(name: str) -> bool:
     # Cache miss — populate from list_profiles_api(). Done outside the lock to
     # avoid holding it across a hermes_cli subprocess call.
     try:
-        infos = list_profiles_api()
+        infos = list_profiles_api(fast=True, include_skill_counts=False)
     except Exception:
         logger.debug("Failed to list profiles for root-profile lookup", exc_info=True)
         return False
@@ -2025,7 +2025,7 @@ def _list_skill_stats(path):
     return None, None
 
 
-def _build_profile_rows_fast(*, deferred_counts=False, isolated=None) -> list | None:
+def _build_profile_rows_fast(*, deferred_counts=False, isolated=None, include_skill_counts=True) -> list | None:
     """Build the profile list WITHOUT the upstream alias scan.
 
     ``hermes_cli.profiles.list_profiles()`` calls ``find_alias_for_profile()``
@@ -2065,7 +2065,8 @@ def _build_profile_rows_fast(*, deferred_counts=False, isolated=None) -> list | 
             gateway_running = _check_gateway_running(home)
         except Exception:
             gateway_running = False
-        enabled_count, total_count = (_list_skill_stats(home) if deferred_counts else _get_profile_skills_stats(home))
+        enabled_count, total_count = ((None, None) if not include_skill_counts else
+                                      (_list_skill_stats(home) if deferred_counts else _get_profile_skills_stats(home)))
         return {
             'name': name,
             'path': str(home),
@@ -2105,7 +2106,7 @@ def _build_profile_rows_fast(*, deferred_counts=False, isolated=None) -> list | 
     return rows
 
 
-def list_profiles_api(*, fast=False) -> list:
+def list_profiles_api(*, fast=False, include_skill_counts=True) -> list:
     """List all profiles with metadata, serialized for JSON response.
 
     In isolated profile mode (HERMES_HOME points to ~/.hermes/profiles/<name>),
@@ -2121,10 +2122,12 @@ def list_profiles_api(*, fast=False) -> list:
     import time
     global _LIST_PROFILES_CACHE
 
-    if fast:
+    # Identity/path callers do not need counts or background skill scans.
+    if fast or not include_skill_counts:
         isolated = ((Path(_INITIAL_HERMES_HOME).expanduser(), _isolated_profile_name())
                     if _is_isolated_profile_mode() else None)
-        rows = _build_profile_rows_fast(deferred_counts=True, isolated=isolated)
+        rows = _build_profile_rows_fast(deferred_counts=True, isolated=isolated,
+                                        include_skill_counts=include_skill_counts)
         if rows is not None:
             active = _isolated_profile_name() if isolated else get_active_profile_name()
             return [{**p, 'is_active': p['name'] == active} for p in rows]
