@@ -542,6 +542,11 @@ def _session_visible_to_request(session, handler=None) -> bool:
     what makes them able to open it at all. The profile boundary still applies
     first: being named in a chat never reaches across profiles.
     """
+    from api.project_collaboration import session_access as _project_session_access
+    from api.governance.enforce import _request_identity as _project_actor
+    _project_access = _project_session_access(session, _project_actor(handler)) if handler else None
+    if _project_access is not None:
+        return _project_access and (not _is_isolated_profile_mode() or _session_visible_to_active_profile(getattr(session, 'profile', None), handler))
     if not _session_visible_to_active_profile(getattr(session, "profile", None) or None, handler):
         from api.group_chat import shared_profile_visible
         from api.ownership import request_owner_email
@@ -2662,13 +2667,11 @@ def _build_session_list_cache_payload(
         # Group conversations (29 Aug 2026): a row is also kept when this
         # person was named in it. Ownership itself is unchanged, so a chat
         # nobody was named in behaves exactly as before.
-        from api.group_chat import visible_to_scope as _group_visible_to_scope
+        from api.project_collaboration import session_visible as _project_row_visible
         merged = [
             s for s in merged
             if isinstance(s, dict)
-            and _group_visible_to_scope(
-                s.get("owner_email"), s.get("participants"), normalized_owner_scope
-            )
+            and _project_row_visible(s, normalized_owner_scope)
         ]
     # ── Profile scoping (#1611) ────────────────────────────────────────
     # Default: filter to the active profile. ?all_profiles=1 opts into
@@ -2690,9 +2693,10 @@ def _build_session_list_cache_payload(
         other_profile_count = 0
     else:
         from api.group_chat import shared_profile_visible
+        from api.project_collaboration import session_access as _project_row_access
         scoped = [s for s in merged if _profiles_match(s.get("profile"), active_profile)
                   or (not _is_isolated_profile_mode() and owner_scope not in (None, 'all')
-                      and shared_profile_visible(s, owner_scope))]
+                      and (shared_profile_visible(s, owner_scope) or _project_row_access(s, owner_scope) is True))]
         other_profile_count = 0 if _is_isolated_profile_mode() else len(merged) - len(scoped)
     diag_stage("messaging_dedupe")
     archived_scoped = _keep_latest_messaging_session_per_source(
@@ -11627,6 +11631,22 @@ def _handle_people_directory(handler) -> bool:
     })
 
 
+def _handle_project_collaboration(handler, parsed, body=None):
+    from api.project_collaboration import handle
+    try:
+        return j(handler, handle(handler, parsed.path, body, parse_qs(parsed.query)))
+    except FileNotFoundError:
+        return bad(handler, "Project or file not found", 404)
+    except FileExistsError:
+        return bad(handler, "A file with this name already exists", 409)
+    except PermissionError as exc:
+        return bad(handler, str(exc), 403)
+    except RuntimeError as exc:
+        return bad(handler, str(exc), 409)
+    except (ValueError, OSError) as exc:
+        return bad(handler, str(exc), 400)
+
+
 def _handle_projects_hub(handler) -> bool:
     """GET /api/projects/hub: one summary row per project the caller may see."""
     from api import projects_hub
@@ -11693,6 +11713,15 @@ def _handle_projects_hub_detail(handler, parsed) -> bool:
             if capabilities.get("status") else None
         ),
     )
+    if project.get('owner_email'):
+        from api.project_collaboration import _identity as _project_identity, public_project as _public_project
+        try:
+            _project_actor, _project_permissions = _project_identity(handler)
+        except PermissionError:
+            pass  # Legacy local/read-only hub remains available without team controls.
+        else:
+            from api.governance.enforce import _request_identity as _project_detail_identity
+            detail['project'] = _public_project(project, _project_detail_identity(handler), _project_permissions)
     detail["active_profile"] = active_profile
     detail["sections"] = sorted(name for name, ok in capabilities.items() if ok)
     return j(handler, detail)
@@ -12873,12 +12902,22 @@ def handle_get(handler, parsed) -> bool:
                 diag=diag,
             )
             diag.stage("response_write")
-            return j(handler, _session_list_payload_to_response(payload), pretty=False)
+            from api.project_collaboration import session_access as _cached_project_access
+            from api.governance.enforce import _request_identity as _cached_project_actor
+            _safe_project_response = _session_list_payload_to_response(payload)
+            for _project_rows_key in ('sessions', 'sidebar_reference_sessions'):
+                if _project_rows_key in _safe_project_response:
+                    _safe_project_response[_project_rows_key] = [row for row in _safe_project_response[_project_rows_key]
+                        if _cached_project_access(row, _cached_project_actor(handler)) is not False]
+            return j(handler, _safe_project_response, pretty=False)
         finally:
             diag.finish()
 
     if parsed.path == "/api/people":
         return _handle_people_directory(handler)
+
+    if parsed.path == "/api/projects/files":
+        return _handle_project_collaboration(handler, parsed)
 
     if parsed.path == "/api/projects/hub":
         return _handle_projects_hub(handler)
@@ -12912,7 +12951,7 @@ def handle_get(handler, parsed) -> bool:
             other_profile_count = 0
         else:
             scoped = [p for p in all_projects
-                      if _profiles_match(p.get("profile"), active_profile)]
+                      if _profiles_match(p.get("profile"), active_profile) or p.get("collaboration")]
             other_profile_count = 0 if isolated_profile_mode else len(all_projects) - len(scoped)
         return j(handler, {
             "projects": scoped,
@@ -13697,6 +13736,10 @@ def _validate_chat_mode(value):
         raise ValueError('mode must be "normal" or "super"')
     return value.strip().lower()
 
+from api.project_collaboration import transaction as _project_transaction
+
+
+@_project_transaction
 def handle_post(handler, parsed) -> bool:
     """Handle all POST routes. Returns True if handled, False for 404."""
     diag = RequestDiagnostics.maybe_start("POST", parsed.path, logger=logger)
@@ -13806,6 +13849,9 @@ def handle_post(handler, parsed) -> bool:
         if diag:
             diag.finish()
         return True
+
+    if parsed.path in ("/api/projects/team", "/api/projects/files", "/api/projects/chat"):
+        return _handle_project_collaboration(handler, parsed, body)
 
     if parsed.path == "/api/escape/authorize":
         return _handle_escape_authorize(handler, parsed, body)
@@ -13922,6 +13968,15 @@ def handle_post(handler, parsed) -> bool:
         return j(handler, {"ok": True, "prompt": new_prompt})
 
     if parsed.path == "/api/session/new":
+        if body.get('project_id'):
+            from api.project_collaboration import project_for as _project_for_new, member as _project_member_new
+            _new_project = _project_for_new(body['project_id'])
+            from api.ownership import row_visible_to as _legacy_new_project_visible
+            if not _new_project or not _legacy_new_project_visible(_new_project.get('owner_email'), handler):
+                return bad(handler, "Project not found", 404)
+            if _new_project.get('collaboration'):
+                return bad(handler, "Start this conversation from its project", 400)
+
         try:
             workspace = str(resolve_trusted_workspace(body.get("workspace"))) if body.get("workspace") else None
         except (TypeError, ValueError) as e:
@@ -14036,6 +14091,8 @@ def handle_post(handler, parsed) -> bool:
                 profile=getattr(s, "profile", None),
                 session_id=getattr(s, "session_id", None),
             )
+        # Persist authoritative identity/roster before the first turn or reload.
+        s.save()
         return j(handler, {"session": s.compact() | {"messages": s.messages}})
 
     if parsed.path == "/api/session/duplicate":
@@ -14360,6 +14417,14 @@ def handle_post(handler, parsed) -> bool:
         return j(handler, {"ok": True, "personality": s.personality, "prompt": prompt})
 
     if parsed.path == "/api/session/participants":
+        from api.project_collaboration import project_for as _participants_project
+        try:
+            _participants_session = get_session(body.get('session_id'))
+        except KeyError:
+            return bad(handler, "Session not found", 404)
+        if (_participants_project(getattr(_participants_session, 'project_id', None)) or {}).get('collaboration'):
+            return bad(handler, "Manage people and bots in the project", 400)
+
         """Set who else is in this conversation (group chat).
 
         POST body: { session_id, participants: [email, ...] }
@@ -15901,6 +15966,10 @@ def handle_post(handler, parsed) -> bool:
         except PermissionError:
             return bad(handler, "Read-only imported sessions cannot be moved from WebUI", 403)
         # #1614: refuse moves into a project owned by another profile.
+        from api.project_collaboration import project_for as _move_project
+        from api.ownership import row_visible_to as _legacy_move_project_visible
+        if getattr(s, 'project_shared', False) or (_move_project(getattr(s, 'project_id', None)) or {}).get('collaboration'):
+            return bad(handler, "Project conversations stay in their project", 400)
         target_pid = body.get("project_id") or None
         if target_pid:
             # Use the session's own profile for authorization, not the global
@@ -15916,6 +15985,9 @@ def handle_post(handler, parsed) -> bool:
             )
             if not target:
                 return bad(handler, "Project not found", 404)
+            if target.get('collaboration') or not _legacy_move_project_visible(target.get('owner_email'), handler):
+                return bad(handler, "Use the project to create a shared conversation", 403)
+
             if not _profiles_match(target.get("profile"), _session_profile):
                 return bad(handler, "Project not found", 404)
         # #3746: acquire the per-session agent lock with a bounded timeout
@@ -15947,6 +16019,12 @@ def handle_post(handler, parsed) -> bool:
 
     # ── Project CRUD (POST) ──
     if parsed.path == "/api/projects/create":
+        if _request_owner_email_for_new_session(handler):
+            if not _body_profile_allowed(handler, str(body.get('profile') or '')):
+                return bad(handler, 'profile_not_allowed', 403)
+            from types import SimpleNamespace as _ProjectCreatePath
+            return _handle_project_collaboration(handler, _ProjectCreatePath(path='/api/projects/team', query=''), body)
+
         try:
             require(body, "name")
         except ValueError as e:
@@ -15986,6 +16064,10 @@ def handle_post(handler, parsed) -> bool:
         return j(handler, {"ok": True, "project": proj})
 
     if parsed.path == "/api/projects/rename":
+        from api.project_collaboration import project_for as _legacy_project_operation
+        if (_legacy_project_operation(body.get('project_id')) or {}).get('collaboration'):
+            return bad(handler, 'Manage shared projects in the Projects hub', 400)
+
         try:
             require(body, "project_id", "name")
         except ValueError as e:
@@ -16017,6 +16099,10 @@ def handle_post(handler, parsed) -> bool:
         return j(handler, {"ok": True, "project": proj})
 
     if parsed.path == "/api/projects/delete":
+        from api.project_collaboration import project_for as _legacy_project_operation
+        if (_legacy_project_operation(body.get('project_id')) or {}).get('collaboration'):
+            return bad(handler, 'Manage shared projects in the Projects hub', 400)
+
         try:
             require(body, "project_id")
         except ValueError as e:
@@ -17075,6 +17161,8 @@ def _replay_run_journal(
         max_seq=max_seq,
     )
     for entry in journal.get("events") or []:
+        if not _stream_id_visible_to_request_profile(handler, stream_id, emit_error=False):
+            return False
         _sse_with_id(
             handler,
             entry.get("event") or entry.get("type") or "message",
@@ -17154,6 +17242,8 @@ def _stream_runner_run_events(handler, run_id: str, cursor: str | None = None) -
     cursor_value = cursor
     try:
         while True:
+            if not _stream_id_visible_to_request_profile(handler, run_id, emit_error=False):
+                break
             try:
                 event_stream = adapter.observe_run(run_id, cursor=cursor_value)
             except Exception as exc:
@@ -17162,6 +17252,8 @@ def _stream_runner_run_events(handler, run_id: str, cursor: str | None = None) -
             emitted = False
             terminal = False
             for entry in list(getattr(event_stream, "events", []) or []):
+                if not _stream_id_visible_to_request_profile(handler, run_id, emit_error=False):
+                    return True
                 if not isinstance(entry, dict):
                     continue
                 event = _runner_event_name(entry)
@@ -17252,12 +17344,16 @@ def _handle_sse_stream(handler, parsed):
             logger.debug("Failed to replay active run journal for stream %s", stream_id, exc_info=True)
     try:
         while True:
+            if not _stream_id_visible_to_request_profile(handler, stream_id, emit_error=False):
+                break
             try:
                 item = subscriber.get(timeout=_SSE_HEARTBEAT_INTERVAL_SECONDS)
             except queue.Empty:
                 handler.wfile.write(b": heartbeat\n\n")
                 handler.wfile.flush()
                 continue
+            if not _stream_id_visible_to_request_profile(handler, stream_id, emit_error=False):
+                break
             if len(item) >= 3:
                 event, data, queued_event_id = item[0], item[1], item[2]
             else:
@@ -20683,6 +20779,7 @@ def _start_chat_stream_for_session(
     source: str = "webui",
     moa_config=None,
     sender_email=None,
+    sender_identity=None,
 ):
     """Persist pending state, register an SSE channel, and start an agent turn.
 
@@ -20696,7 +20793,7 @@ def _start_chat_stream_for_session(
     # its human sender. Personal gateway chats keep their configured backend.
     from api.group_chat import selected_bot
     try:
-        execution_profile = selected_bot(s, msg, sender_email or getattr(s, 'owner_email', None))
+        execution_profile = selected_bot(s, msg, sender_identity or sender_email or getattr(s, 'owner_email', None))
     except ValueError as exc:
         return {'error': str(exc), '_status': 403}
     if execution_profile:
@@ -20827,6 +20924,8 @@ def _start_chat_stream_for_session(
     backend_is_gateway = webui_gateway_chat_enabled(get_config()) and not bool(getattr(s, 'participants', None) or getattr(s, 'bot_participants', None))
     worker_target = _run_gateway_chat_streaming if backend_is_gateway else _run_agent_streaming
     worker_kwargs = {"model_provider": model_provider, "goal_related": goal_related}
+    if sender_identity:
+        worker_kwargs['sender_identity'] = sender_identity
     if execution_profile:
         worker_kwargs['execution_profile'] = execution_profile
     _sender = str(sender_email or "").strip().lower()
@@ -20921,6 +21020,7 @@ def _start_run(
     diag=None,
     moa_config=None,
     sender_email=None,
+    sender_identity=None,
 ):
     """Shared start-run helper for /api/chat/start and start_session_turn.
 
@@ -20962,6 +21062,7 @@ def _start_run(
                 source=request.source or source,
                 moa_config=moa_config,
                 sender_email=sender_email,
+                sender_identity=sender_identity,
             )
 
         def _legacy_adapter_factory():
@@ -21003,6 +21104,7 @@ def _start_run(
         source=source,
         moa_config=moa_config,
         sender_email=sender_email,
+        sender_identity=sender_identity,
     )
 
 
@@ -21495,6 +21597,7 @@ def _handle_chat_start(handler, body, diag=None):
         # with start_session_turn so both entry points behave identically
         # under runtime_adapter_enabled() / runtime_adapter_runner_enabled()
         # — Q-2979-A2 / Copilot discussion_r3305864087/r3305864173).
+        from api.governance.enforce import _request_identity as _chat_sender_identity
         start_run_kwargs = {
             "msg": msg,
             "attachments": attachments,
@@ -21508,6 +21611,7 @@ def _handle_chat_start(handler, body, diag=None):
             # Who typed this. Only differs from the owner in a group chat, and
             # there it decides whose governance the turn runs under.
             "sender_email": _request_owner_email_for_new_session(handler),
+            "sender_identity": _chat_sender_identity(handler),
         }
         if not gateway_chat_enabled and moa_config is not None:
             start_run_kwargs["moa_config"] = moa_config
@@ -21531,6 +21635,15 @@ def _handle_chat_start(handler, body, diag=None):
 
 def _resolve_chat_workspace_with_recovery(s, requested_workspace) -> str:
     """Recover stale implicit session workspaces without hiding explicit errors."""
+    if getattr(s, 'project_shared', False):
+        from api.project_collaboration import project_for as _workspace_project_for
+        _workspace_project = _workspace_project_for(getattr(s, 'project_id', None))
+        if not _workspace_project or _workspace_project.get('deleted'):
+            raise ValueError('Project is no longer available')
+        _project_root = str(_workspace_project['workspace'])
+        if requested_workspace not in (None, '') and Path(requested_workspace).resolve() != Path(_project_root).resolve():
+            raise ValueError('Project conversations use their own workspace')
+        return str(resolve_trusted_workspace(_project_root))
     explicit = requested_workspace not in (None, "")
     candidate = requested_workspace if explicit else getattr(s, "workspace", None)
     try:

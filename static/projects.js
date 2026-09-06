@@ -91,13 +91,14 @@ function _projRenderList() {
   const list = $('projectsPanelList');
   if (!list) return;
   const rows = (_projHub && Array.isArray(_projHub.projects)) ? _projHub.projects : [];
+  const create='<div class="proj-card"><input id="projNewName" placeholder="Project name" aria-label="Project name"><button class="app-dialog-btn" onclick="_projCreateShared()">New project</button></div>';
   if (!rows.length) {
-    list.innerHTML = '<div class="proj-empty">'
+    list.innerHTML = create + '<div class="proj-empty">'
       + _projEsc(_projT('projects_none_yet', 'You do not have any projects on this workstation yet.'))
       + '</div>';
     return;
   }
-  list.innerHTML = rows.map(p => {
+  list.innerHTML = create + rows.map(p => {
     const meta = [];
     meta.push(String(p.conversation_count || 0) + ' '
       + _projT('projects_section_conversations', 'Conversations').toLowerCase());
@@ -185,10 +186,10 @@ function _projRenderDetail() {
       + '</div></div>';
   }
 
-  let html = '';
+  let html = (p.collaboration || p.can_manage) ? '<div id="projTeamControls"></div>' : '';
   html += _projSectionCard(
     'projects_section_conversations', 'Conversations', _projDetail.conversations,
-    s => '<div class="proj-item"><span class="proj-item-name">'
+    s => '<div class="proj-item" data-project-session="'+_projEsc(s.session_id)+'"><span class="proj-item-name">'
       + _projEsc(String(s.title)) + '</span><span class="proj-state">'
       + _projEsc(_projWhen(s.last_activity_at)) + '</span></div>');
   html += _projSectionCard(
@@ -223,7 +224,13 @@ function _projRenderDetail() {
       + '</span><span class="proj-chip">'
       + _projEsc(_projT('projects_shared_board_note', 'Shared')) + '</span></div></div>';
   }
-  if (sections) sections.innerHTML = html;
+  if (sections) {
+    sections.innerHTML = html;
+    sections.querySelectorAll('[data-project-session]').forEach(row=>row.addEventListener('click',()=>{
+      loadSession(row.dataset.projectSession);switchPanel('chat');
+    }));
+  }
+  if(p.collaboration || p.can_manage) _projLoadTeamControls(p);
 }
 
 function _projRenderIntegrations() {
@@ -250,4 +257,100 @@ function _projRenderIntegrations() {
       + '</span></div><div class="proj-integration-seam">'
       + _projEsc(String(r.seam)) + '</div></div>').join('')
     + '</div>';
+}
+
+async function _projCreateShared() {
+  const name = ($('projNewName') || {}).value || '';
+  try {
+    const result = await api('/api/projects/team', {method:'POST', body:JSON.stringify({name, members:[], bot_participants:[], profile:'default'})});
+    _projSelectedId = result.project.project_id;
+    await loadProjectsHub();
+  } catch (error) { showToast(String(error.message || error)); }
+}
+
+async function _projLoadTeamControls(project) {
+  const host = $('projTeamControls');
+  if (!host) return;
+  try {
+    const [people, bots, files] = await Promise.all([
+      api('/api/people'), api('/api/profiles?fast=1').catch(()=>({profiles:[]})), api('/api/projects/files?project_id='+encodeURIComponent(project.project_id)).catch(()=>null)
+    ]);
+    if (!_projDetail || _projDetail.project.project_id !== project.project_id) return;
+    const humans = (people.people || []).slice();
+    if(people.me && !humans.some(p=>p.email===people.me)) humans.push({email:people.me,display_name:people.me});
+    const profiles = bots.profiles || [];
+    host.innerHTML = '<div class="proj-card"><div class="proj-card-title">People and bots</div>'
+      + '<input id="projPeopleSearch" placeholder="Find people" aria-label="Find people">'
+      + '<div id="projHumanChoices"></div><div id="projBotChoices"></div>'
+      + (project.can_manage ? '<button class="app-dialog-btn" id="projSaveTeam">Save members and bots</button><button class="app-dialog-btn" id="projArchiveTeam">Archive project</button>' : '')
+      + '<p class="proj-state">Project membership does not change your bot or tool permissions.</p>'
+      + '<button class="app-dialog-btn" id="projStartChat">New group conversation</button></div>'
+      + (files ? '<div class="proj-card"><div class="proj-card-title">Project files</div><input type="file" id="projUpload"><div id="projFileList"></div></div>' : '');
+    const humanHost=$('projHumanChoices');
+    const ownerRow=document.createElement('div');ownerRow.textContent='Owner: '+project.owner_email;humanHost.appendChild(ownerRow);
+    humans.filter(p=>p.email!==project.owner_email).forEach(person=>{
+      const label=document.createElement('label');label.style.cssText='display:block;padding:5px';
+      label.dataset.search=(person.display_name+' '+person.email).normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+      const box=document.createElement('input');box.type='checkbox';box.value=person.email;
+      box.checked=(project.members||[]).includes(person.email);box.disabled=!project.can_manage;
+      label.append(box,document.createTextNode(' '+(person.display_name||person.email)));humanHost.appendChild(label);
+    });
+    $('projPeopleSearch').oninput=event=>{
+      const q=event.target.value.normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+      humanHost.querySelectorAll('label').forEach(row=>row.style.display=row.dataset.search.includes(q)?'block':'none');
+    };
+    const botHost=$('projBotChoices');
+    const ids=[...new Set(profiles.map(p=>p.name).concat(project.bot_participants||[]))];
+    ids.forEach(id=>{
+      const p=profiles.find(p=>p.name===id);const label=document.createElement('label');label.style.display='block';
+      const box=document.createElement('input');box.type='checkbox';box.value=id;box.checked=(project.bot_participants||[]).includes(id);
+      box.disabled=!project.can_manage || !p;
+      label.appendChild(box);
+      if(p && typeof botAvatarHtml==='function'){const avatar=document.createElement('span');avatar.innerHTML=botAvatarHtml(p);label.appendChild(avatar);}
+      label.appendChild(document.createTextNode(' '+(p && typeof botDisplayName==='function'?botDisplayName(p):id)+(!p?' — ask an administrator for bot access':'')));botHost.appendChild(label);
+    });
+    if ($('projSaveTeam')) $('projSaveTeam').onclick=async()=>{
+      try {
+        await api('/api/projects/team',{method:'POST',body:JSON.stringify({project_id:project.project_id,revision:project.revision||0,
+          members:Array.from(humanHost.querySelectorAll('input:checked')).map(x=>x.value),
+          bot_participants:Array.from(botHost.querySelectorAll('input:checked')).map(x=>x.value)})});
+        await _projOpen(project.project_id);
+      } catch(error){showToast(String(error.message||error));}
+    };
+    if($('projArchiveTeam')) $('projArchiveTeam').onclick=async()=>{
+      try {await api('/api/projects/team',{method:'POST',body:JSON.stringify({project_id:project.project_id,revision:project.revision||0,deleted:true})});_projSelectedId='';_projDetail=null;await loadProjectsHub();_projRenderDetail();}
+      catch(error){showToast(String(error.message||error));}
+    };
+    $('projStartChat').onclick=async()=>{
+      try {
+        const usable=(project.bot_participants||[]).filter(id=>!(project.unavailable_bots||[]).includes(id));
+        if(!usable.length){showToast('No project bot is available to your account. Ask the project owner or administrator.');return;}
+        const result=await api('/api/projects/chat',{method:'POST',body:JSON.stringify({project_id:project.project_id,bot_participants:usable})});
+        await loadSession(result.session.session_id);switchPanel('chat');
+      } catch(error){showToast(String(error.message||error));}
+    };
+    if(files){
+      const fileHost=$('projFileList');
+      (files.files||[]).forEach(file=>{
+        const button=document.createElement('button');button.className='app-dialog-btn';button.textContent=file.name;
+        button.onclick=async()=>{
+          try {
+            const data=await api('/api/projects/files?project_id='+encodeURIComponent(project.project_id)+'&name='+encodeURIComponent(file.name));
+            const blob=new Blob([Uint8Array.from(atob(data.content_base64),c=>c.charCodeAt(0))]);
+            const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=file.name;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+          } catch(error){showToast(String(error.message||error));}
+        };fileHost.appendChild(button);
+      });
+      $('projUpload').onchange=async event=>{
+        const file=event.target.files[0];if(!file)return;
+        if(file.size>5000000){event.target.value='';showToast('File limit is 5 MB');return;}
+        const input=event.target;input.disabled=true;
+        const reader=new FileReader();reader.onload=async()=>{
+          try {await api('/api/projects/files',{method:'POST',body:JSON.stringify({project_id:project.project_id,name:file.name,content_base64:String(reader.result).split(',')[1]})});await _projOpen(project.project_id);}
+          catch(error){showToast(String(error.message||error));}
+          finally{input.disabled=false;input.value='';}
+        };reader.onerror=()=>{input.disabled=false;input.value='';showToast('The file could not be read. Please try again.');};reader.readAsDataURL(file);
+      };
+    }
+  } catch(error){host.textContent=String(error.message||error);}
 }

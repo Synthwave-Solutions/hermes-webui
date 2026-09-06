@@ -1049,7 +1049,7 @@ class Session:
                  model_provider=None,
                  messages=None, created_at=None, updated_at=None,
                  tool_calls=None, pinned: bool=False, archived: bool=False,
-                 project_id: str=None, profile=None, owner_email=None,
+                 project_id: str=None, profile=None, owner_email=None, project_shared=False,
                  input_tokens: int=0, output_tokens: int=0, estimated_cost=None,
                  cache_read_tokens: int=0, cache_write_tokens: int=0,
                  personality=None,
@@ -1099,6 +1099,7 @@ class Session:
         self.pinned = bool(pinned)
         self.archived = bool(archived)
         self.project_id = project_id or None
+        self.project_shared = bool(project_shared)
         self.profile = profile
         # Per-user ownership (docs/user-isolation-design.md): lowercased email
         # of the creating identity, or None for legacy/cron/CLI rows (admin-only).
@@ -1229,7 +1230,7 @@ class Session:
             'parent_session_id',
             'worktree_path', 'worktree_branch', 'worktree_repo_root', 'worktree_created_at',
             'is_cli_session', 'source_tag', 'raw_source', 'session_source', 'source_label', 'read_only',
-            'enabled_toolsets', 'chat_mode', 'participants', 'bot_participants', 'composer_draft', 'anchor_activity_scenes',
+            'enabled_toolsets', 'chat_mode', 'participants', 'bot_participants', 'project_shared', 'composer_draft', 'anchor_activity_scenes',
         ]
         meta = {k: getattr(self, k, None) for k in METADATA_FIELDS}
         meta['message_count'] = len(self.messages or [])
@@ -1504,6 +1505,7 @@ class Session:
             'chat_mode': self.chat_mode,
             'participants': list(self.participants or []),
             'bot_participants': list(self.bot_participants or []),
+            'project_shared': self.project_shared,
             'composer_draft': self.composer_draft if isinstance(self.composer_draft, dict) else {},
             'is_streaming': _is_streaming_session(
                 self.active_stream_id, active_stream_ids
@@ -4669,6 +4671,7 @@ def title_from(messages, fallback: str='Untitled'):
 
 # ── Project helpers ──────────────────────────────────────────────────────────
 
+PROJECTS_LOCK = threading.RLock()
 _PROJECTS_MIGRATION_LOCK = threading.Lock()
 _projects_migrated = False
 
@@ -4714,6 +4717,16 @@ def _backfill_project_profiles_if_needed(projects: list) -> bool:
     return mutated
 
 
+def _project_store_transaction(function):
+    from functools import wraps
+    @wraps(function)
+    def wrapped(*args, **kwargs):
+        with PROJECTS_LOCK:
+            return function(*args, **kwargs)
+    return wrapped
+
+
+@_project_store_transaction
 def load_projects(*, _migrate: bool = True) -> list:
     """Load project list from disk. Returns list of project dicts.
 
@@ -4729,7 +4742,7 @@ def load_projects(*, _migrate: bool = True) -> list:
     except Exception:
         return []
     if _migrate and not _projects_migrated:
-        with _PROJECTS_MIGRATION_LOCK:
+        with PROJECTS_LOCK, _PROJECTS_MIGRATION_LOCK:
             # Re-check inside the lock — another thread may have raced.
             if _projects_migrated:
                 # Per Opus advisor on stage-293: another thread completed
@@ -4756,7 +4769,17 @@ def load_projects(*, _migrate: bool = True) -> list:
 
 def save_projects(projects) -> None:
     """Write project list to disk."""
-    PROJECTS_FILE.write_text(json.dumps(projects, ensure_ascii=False, indent=2), encoding='utf-8')
+    with PROJECTS_LOCK:
+        import tempfile
+        PROJECTS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        fd, temporary = tempfile.mkstemp(dir=PROJECTS_FILE.parent, prefix='.projects-')
+        try:
+            with os.fdopen(fd, 'w', encoding='utf-8') as stream:
+                json.dump(projects, stream, ensure_ascii=False, indent=2)
+                stream.flush(); os.fsync(stream.fileno())
+            os.replace(temporary, PROJECTS_FILE)
+        finally:
+            if os.path.exists(temporary): os.unlink(temporary)
 
 
 CRON_PROJECT_NAME = 'Cron Jobs'
@@ -4786,7 +4809,7 @@ def ensure_cron_project(create: bool = True) -> str | None:
     from api.profiles import get_active_profile_name, _is_root_profile
 
     active = get_active_profile_name() or 'default'
-    with _CRON_PROJECT_LOCK:
+    with PROJECTS_LOCK, _CRON_PROJECT_LOCK:
         projects = load_projects()
         # Look for an existing per-profile cron project. Match either an exact
         # profile tag or the renamed-root alias (a 'default'-tagged project
@@ -4830,7 +4853,7 @@ def ensure_webhook_project() -> str:
     from api.profiles import get_active_profile_name, _is_root_profile
 
     active = get_active_profile_name() or 'default'
-    with _WEBHOOK_PROJECT_LOCK:
+    with PROJECTS_LOCK, _WEBHOOK_PROJECT_LOCK:
         projects = load_projects()
         for p in projects:
             if p.get('name') != WEBHOOK_PROJECT_NAME:

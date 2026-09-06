@@ -34,7 +34,7 @@ _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 def _clean(value) -> str:
-    return str(value or "").strip().lower()
+    return str((value.get("email") if isinstance(value, dict) else value) or "").strip().lower()
 
 
 def normalize(values, *, owner_email=None) -> list:
@@ -128,7 +128,7 @@ def bot_allowed(email, profile) -> bool:
         policy = get_policy()
         if not policy.enabled:
             return who in known_emails()
-        access = resolve_effective_access(policy, subject_from_identity({'email': who}))
+        access = resolve_effective_access(policy, subject_from_identity(email if isinstance(email, dict) else {'email': who}))
         return access.is_profile_allowed(profile or 'default')
     except Exception:
         return False
@@ -156,6 +156,15 @@ def validate_bots(values, actor) -> list[str]:
 
 def selected_bot(session, message, actor) -> str | None:
     bots = normalize_bots(getattr(session, 'bot_participants', None))
+    from api.project_collaboration import project_for, session_access
+    project_access = session_access(session, actor)
+    if project_access is False:
+        raise ValueError('You are no longer a member of this project')
+    if project_access is True:
+        project = project_for(getattr(session, 'project_id', None))
+        bots = [b for b in bots if b in project.get('bot_participants', [])]
+        if not bots:
+            raise ValueError('No assigned bot is available for this project conversation')
     if not bots:
         return None
     match = re.match(r'^\s*@([A-Za-z0-9][A-Za-z0-9_-]{0,63})(?=\s|$)', str(message or ''))
@@ -223,5 +232,11 @@ def validate(values, *, owner_email=None) -> tuple:
 
 def require_turn_membership(session, actor) -> None:
     """Recheck the original human at worker entry after queue/dispatch races."""
+    from api.project_collaboration import session_access
+    project_access = session_access(session, actor)
+    if project_access is not None:
+        if not project_access:
+            raise PermissionError('You are no longer a member of this project')
+        return
     if not is_member(getattr(session, 'owner_email', None), getattr(session, 'participants', None), actor):
         raise PermissionError('You are no longer a member of this conversation')

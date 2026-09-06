@@ -83,12 +83,13 @@ def visible_projects_by_owner(projects, owner_scope) -> list:
     would zero that counter and change the ?all_profiles=1 response.
     """
     if owner_scope == "all":
-        return list(projects or [])
+        return [p for p in (projects or []) if not p.get("deleted")]
     return [
         p for p in (projects or [])
         if isinstance(p, dict)
         and str(p.get("owner_email") or "").strip().lower()
-        and str(p.get("owner_email") or "").strip().lower() == owner_scope
+        and not p.get("deleted")
+        and (str(p.get("owner_email") or "").strip().lower() == owner_scope or owner_scope in p.get("members", []))
     ]
 
 
@@ -96,7 +97,7 @@ def visible_projects(projects, owner_scope, active_profile) -> list:
     """Projects this caller may see in this profile: ownership, then profile."""
     return [
         p for p in visible_projects_by_owner(projects, owner_scope)
-        if isinstance(p, dict) and _profiles_match(p.get("profile"), active_profile)
+        if isinstance(p, dict) and (_profiles_match(p.get("profile"), active_profile) or p.get("collaboration"))
     ]
 
 
@@ -112,17 +113,15 @@ def visible_sessions(session_rows, owner_scope, active_profile) -> list:
     conversation count matches what its participants actually see in the
     sidebar rather than only what they own.
     """
-    from api.group_chat import visible_to_scope
+    from api.project_collaboration import session_visible
 
     out = []
     for row in session_rows or []:
         if not isinstance(row, dict):
             continue
-        if owner_scope != "all" and not visible_to_scope(
-            row.get("owner_email"), row.get("participants"), owner_scope
-        ):
+        if owner_scope != "all" and not session_visible(row, owner_scope):
             continue
-        if not _profiles_match(row.get("profile"), active_profile):
+        if not _profiles_match(row.get("profile"), active_profile) and not row.get("project_shared"):
             continue
         out.append(row)
     return out

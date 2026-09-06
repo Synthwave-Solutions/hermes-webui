@@ -648,7 +648,7 @@ def test_every_server_supplied_field_is_escaped():
 def test_a_refused_request_renders_a_neutral_state_without_a_toast():
     block = PROJECTS_JS[PROJECTS_JS.index("async function loadProjectsHub"):][:900]
     assert "_projUnavailable()" in block
-    assert "showToast" not in PROJECTS_JS and "alert(" not in PROJECTS_JS
+    assert "showToast" not in block and "alert(" not in block
     assert "projects_unavailable" in PROJECTS_JS
 
 

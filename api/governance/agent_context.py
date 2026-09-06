@@ -131,7 +131,8 @@ def _audit_bind_failure(email: str, session_id: str, request_id: str,
 
 def bind_governed_agent_turn(identity: Any, *, active_profile: str = "default",
                              session_id: str = "", request_id: str = "",
-                             user_message_sha256: str = "", user_message: str = "", approval_waiter=None):
+                             user_message_sha256: str = "", user_message: str = "", approval_waiter=None,
+                             project_workspace: str = "", project_access_check=None):
     """Bind the caller's governance principal to the CURRENT thread's context.
 
     Returns an opaque token for reset_governed_agent_turn, or None when the
@@ -147,13 +148,17 @@ def bind_governed_agent_turn(identity: Any, *, active_profile: str = "default",
         # policy_error for every /api request, so a turn that still reaches
         # this point (auth off, legacy path) keeps current unrestricted
         # behavior rather than double-bricking.
+        if project_workspace:
+            raise GovernanceBindingError("Project governance policy unavailable")
         logger.debug("governed agent turn: policy unreadable, running unbound", exc_info=True)
         return None
     if not getattr(policy, "enabled", False):
+        if project_workspace:
+            raise GovernanceBindingError("Project turns require governance")
         return None
 
     email = _identity_email(identity)
-    if email and email in {str(a).strip().lower() for a in policy.bootstrap_admins}:
+    if email and email in {str(a).strip().lower() for a in policy.bootstrap_admins} and not project_workspace:
         # Never-deny principals: run unbound. The resolver would grant
         # wildcard anyway; skipping the bind keeps admin turns byte-identical
         # to today's behavior (and immune to translation bugs).
@@ -176,6 +181,11 @@ def bind_governed_agent_turn(identity: Any, *, active_profile: str = "default",
         from .loader import resolve_policy_path
         fields = getattr(ctx, "__dataclass_fields__", {})
         updates = {}
+        if project_workspace:
+            if not {'project_workspace', 'project_access_check'} <= set(fields) or not callable(project_access_check):
+                raise GovernanceBindingError('This engine does not support scoped project file access')
+            updates['project_workspace'] = str(project_workspace)
+            updates['project_access_check'] = project_access_check
         if "user_message_redacted" in fields:
             from hermes_cli.dashboard_governance.grant_requests import redact_trigger
             updates["user_message_redacted"] = redact_trigger(user_message)
@@ -189,7 +199,7 @@ def bind_governed_agent_turn(identity: Any, *, active_profile: str = "default",
         token = agent_mod.bind_governance_context(ctx)
         return (agent_mod, token)
     except Exception as exc:
-        if policy.mode == "enforce":
+        if policy.mode == "enforce" or project_workspace:
             _audit_bind_failure(email, session_id, request_id, exc,
                                 mode=policy.mode, report_only=False)
             logger.warning("governed agent turn: bind failed under enforce, refusing turn (%s)",
