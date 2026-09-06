@@ -241,3 +241,22 @@ def test_recovery_session_routes_remain_available_with_revoked_cookie(setup, mon
     monkeypatch.setattr("api.profiles.get_active_profile_name", lambda:"research-bot")
     monkeypatch.setattr("api.governance.enforce._request_identity", lambda h:BOB)
     assert builder.guard_profile_request(object(), urlparse("/api/session/load?session_id=own"), "GET")
+
+def test_bootstrap_only_owner_can_create_and_resave_without_unknown_users(setup):
+    from api.governance.loader import get_policy
+    policy = get_policy()
+    policy.users.pop(ADMIN["email"])
+    assert ADMIN["email"] not in policy.users
+    created = builder.save(ADMIN, payload())
+    edited = dict(created["config"])
+    edited.pop("avatar_url", None)
+    edited["description"] = "Updated"
+    saved = builder.save(ADMIN, edited)
+    assert saved["config"]["revision"] == 2
+    assert saved["config"]["allowed_users"] == [ADMIN["email"]]
+    edited = dict(saved["config"])
+    edited.pop("avatar_url", None)
+    edited["allowed_users"].append("unregistered@example.test")
+    with pytest.raises(PermissionError):
+        builder.save(ADMIN, edited)
+    assert builder.get(ADMIN, "research-bot")["config"]["revision"] == 2

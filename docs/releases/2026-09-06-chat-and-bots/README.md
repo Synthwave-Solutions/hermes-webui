@@ -19,7 +19,11 @@ Personal context is keyed by a hash of the authenticated identity, never an iden
 
 Existing shared memory files are preserved and are not copied into every user's private memory. Administrators should review historic bot instructions for personal information before using those bots in shared chats. This is application-level isolation; it is not an operating-system sandbox against a host administrator or an independently privileged terminal tool.
 
-The bot builder uses one revision-checked configuration endpoint for creation and editing. The final save validates instructions, selected skills, MCP connections, CLI tools and allowed people/groups together. New managed bots are private to their creator unless explicitly shared. A bot's selected capabilities remain a ceiling on the human sender's current permissions, including after approval and when delegating work.
+The bot builder uses one revision-checked configuration endpoint for creation and editing. The final save validates instructions, selected skills, MCP connections, CLI tools and allowed people/groups together. New managed bots are private to their creator unless explicitly shared. Bootstrap administrators can edit their own bots through the same ownership checks; bootstrap status does not grant access to another person's private context. The legacy Gateway route remains available when authentication is explicitly disabled.
+
+A bot's selected capabilities remain a ceiling on the human sender's current permissions, including after approval and when delegating work.
+
+Terminal errors are persisted as authoritative run outcomes and remain visible after reload. Late events from an older run cannot overwrite the current run's state.
 
 ## Interaction reference
 
