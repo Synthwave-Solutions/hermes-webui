@@ -13969,7 +13969,7 @@ def handle_post(handler, parsed) -> bool:
 
     if parsed.path == "/api/session/new":
         if body.get('project_id'):
-            from api.project_collaboration import project_for as _project_for_new, member as _project_member_new
+            from api.project_collaboration import project_for as _project_for_new
             _new_project = _project_for_new(body['project_id'])
             from api.ownership import row_visible_to as _legacy_new_project_visible
             if not _new_project or not _legacy_new_project_visible(_new_project.get('owner_email'), handler):
@@ -19134,6 +19134,8 @@ def _handle_approval_sse_stream(handler, parsed):
 
     try:
         while True:
+            if not _session_id_visible_to_request_profile(handler, sid, emit_error=False):
+                break
             try:
                 payload = q.get(timeout=_SSE_HEARTBEAT_INTERVAL_SECONDS)
             except queue.Empty:
@@ -19328,6 +19330,8 @@ def _handle_session_sse_stream(handler, parsed):
         # live (mirrors approval/clarify which send an 'initial' frame). No
         # snapshot data is needed — this channel only carries forward-looking
         # events, not pending state.
+        if not _session_id_visible_to_request_profile(handler, sid, emit_error=False):
+            return True
         _sse(handler, 'initial', {"session_id": sid})
 
         # ── Open-tab live-view self-heal (root cause: lost server_turn_started) ──
@@ -19361,6 +19365,8 @@ def _handle_session_sse_stream(handler, parsed):
                         sid,
                         exc_info=True,
                     )
+                if not _session_id_visible_to_request_profile(handler, sid, emit_error=False):
+                    return True
                 _sse(handler, 'server_turn_started', {
                     "session_id": sid,
                     "stream_id": recover_stream_id,
@@ -19391,6 +19397,8 @@ def _handle_session_sse_stream(handler, parsed):
                 if subscriber_known_count is not None:
                     persisted_count = persisted_message_count_for_session(sid)
                     if should_emit_session_updated(subscriber_known_count, persisted_count):
+                        if not _session_id_visible_to_request_profile(handler, sid, emit_error=False):
+                            return True
                         _sse(handler, 'session-updated', {
                             "session_id": sid,
                             "message_count": persisted_count,
@@ -19415,6 +19423,8 @@ def _handle_session_sse_stream(handler, parsed):
                 handler.wfile.flush()
                 continue
             if payload is None:
+                break
+            if not _session_id_visible_to_request_profile(handler, sid, emit_error=False):
                 break
             event_name, data = payload
             _sse(handler, event_name, data)
@@ -20924,7 +20934,7 @@ def _start_chat_stream_for_session(
     backend_is_gateway = webui_gateway_chat_enabled(get_config()) and not bool(getattr(s, 'participants', None) or getattr(s, 'bot_participants', None))
     worker_target = _run_gateway_chat_streaming if backend_is_gateway else _run_agent_streaming
     worker_kwargs = {"model_provider": model_provider, "goal_related": goal_related}
-    if sender_identity:
+    if sender_identity and not backend_is_gateway:
         worker_kwargs['sender_identity'] = sender_identity
     if execution_profile:
         worker_kwargs['execution_profile'] = execution_profile

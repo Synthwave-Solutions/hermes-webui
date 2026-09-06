@@ -149,7 +149,7 @@ def bind_governed_agent_turn(identity: Any, *, active_profile: str = "default",
         # this point (auth off, legacy path) keeps current unrestricted
         # behavior rather than double-bricking.
         if project_workspace:
-            raise GovernanceBindingError("Project governance policy unavailable")
+            raise GovernanceBindingError("Project governance policy unavailable") from None
         logger.debug("governed agent turn: policy unreadable, running unbound", exc_info=True)
         return None
     if not getattr(policy, "enabled", False):

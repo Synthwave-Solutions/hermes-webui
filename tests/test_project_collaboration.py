@@ -51,7 +51,7 @@ def create(client):
 
 
 def test_full_dispatch_project_files_roster_chat_and_revocation(client):
-    from api import routes,models
+    from api import models
     from api.project_collaboration import session_access
     p=create(client);pid=p['project_id']
     assert client(MEMBER,'/api/projects/files?project_id='+pid)==(200,{'files':[]})
@@ -240,7 +240,7 @@ def test_replay_stops_when_project_membership_changes(client, monkeypatch):
 
 
 def test_runtime_file_scope_keeps_authenticated_group_claims(client, monkeypatch):
-    from api import auth, models
+    from api import models
     from api.governance import loader
     from api.project_collaboration import runtime_file_scope
     p=create(client)
@@ -254,3 +254,25 @@ def test_runtime_file_scope_keeps_authenticated_group_claims(client, monkeypatch
     assert not check(root+'/plan.txt',True)
     _,without=runtime_file_scope(session,{'email':MEMBER},'writer')
     assert not without(root+'/plan.txt')
+
+
+def test_connected_session_channel_stops_before_revoked_event(client,monkeypatch):
+    from api import routes,streaming,background_process
+    p=create(client)
+    _,result=client(MEMBER,'/api/projects/chat',{'project_id':p['project_id'],'bot_participants':['writer']})
+    sid=result['session']['session_id']
+    emitted=[];closed=[]
+    class Subscriber:
+        def get(self,timeout):
+            assert client(OWNER,'/api/projects/team',{'project_id':p['project_id'],'revision':p['revision'],'members':[]})[0]==200
+            return ('bg_task_complete',{'secret':'private completion'})
+    subscriber=Subscriber()
+    monkeypatch.setattr(background_process,'subscribe_to_session_channel',lambda *a,**kw:(SimpleNamespace(unsubscribe=lambda q:closed.append(q)),subscriber))
+    monkeypatch.setattr(background_process,'active_stream_id_for_session',lambda sid:None)
+    monkeypatch.setattr(routes,'end_sse_headers',lambda handler:None)
+    monkeypatch.setattr(routes,'_sse_set_write_deadline',lambda handler:None)
+    monkeypatch.setattr(streaming,'_sse',lambda handler,event,payload:emitted.append(event))
+    handler=SimpleNamespace(headers={'Cookie':MEMBER},send_response=lambda *a:None,send_header=lambda *a:None)
+    routes._handle_session_sse_stream(handler,urlparse('/api/session/stream?session_id='+sid))
+    assert emitted==['initial']
+    assert closed==[subscriber]

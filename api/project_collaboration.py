@@ -9,7 +9,6 @@ import os
 from pathlib import Path
 import re
 import tempfile
-import threading
 import time
 import uuid
 

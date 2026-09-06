@@ -3,7 +3,6 @@ import json
 import math
 import os
 import tempfile
-from pathlib import Path
 
 VERSION = 1
 MAX_BYTES = 2 * 1024 * 1024
