@@ -99,19 +99,22 @@
       body.querySelectorAll('[data-choice="'+el.dataset.filter+'"]').forEach(row=>row.hidden=!row.textContent.toLowerCase().includes(el.value.toLowerCase()));
     });
     if(input('builderPhoto'))input('builderPhoto').onchange=async event=>{
+      if(!event.target.files.length)return;
       const current=state,button=input('builderNext');button.disabled=true;
       try{const avatar=await readAvatar(event.target.files[0]);if(state!==current)return;collect();state.avatar=avatar;render();}
       catch(err){if(state===current)error(err.message);}
       finally{event.target.value='';if(state===current&&input('builderNext'))input('builderNext').disabled=false;}
     };
-    input('builderBack').onclick=()=>{collect();state.step--;render();};
+    input('builderBack').onclick=()=>{if(!state||state.saving)return;collect();state.step--;render();};
     input('builderNext').onclick=async()=>{
-      try{validate();if(state.step<3){state.step++;render();}else await save();}catch(err){error(err.message);}
+      try{if(!state||state.saving)return;validate();if(state.step<3){state.step++;render();}else await save();}catch(err){error(err.message);}
     };
   }
   async function open(name){
     const intent=++epoch;state=null;
-    if(typeof switchPanel==='function')switchPanel('profiles');
+    _profileMode='create';
+    if(typeof switchPanel==='function' && await switchPanel('profiles')===false)return;
+    if(epoch!==intent || (typeof _currentPanel!=='undefined' && _currentPanel!=='profiles'))return;
     const body=input('profileDetailBody');if(!body)return;
     body.style.display='';body.textContent='Loading bot configuration…';
     const data=await api('/api/bots/builder'+(name?'?profile='+encodeURIComponent(name):''),{timeoutToast:false}).catch(err=>{
@@ -124,9 +127,10 @@
     render();
   }
   async function save(){
-    if(!state||state.step!==3)return;
+    if(!state||state.step!==3||state.saving)return;
     collect();const current=state,button=input('builderNext');
-    button.disabled=true;button.textContent='Saving…';
+    state.saving=true;button.disabled=true;button.textContent='Saving…';
+    input('builderBack').disabled=true;
     const payload={...state.config};
     delete payload.avatar_url;
     if(state.avatar)payload.avatar=state.avatar;
@@ -138,7 +142,7 @@
       window.dispatchEvent(new CustomEvent('synpulse:bot-updated',{detail:{name:payload.name}}));
       await loadProfilesPanel();openProfileDetail(payload.name);
       showToast('Bot saved');
-    }catch(err){if(state===current){error(err.message);button.disabled=false;button.textContent=current.edit?'Save bot':'Create bot';}}
+    }catch(err){if(state===current){current.saving=false;error(err.message);button.disabled=false;input('builderBack').disabled=false;button.textContent=current.edit?'Save bot':'Create bot';}}
   }
   function invalidate(){epoch++;state=null;}
   window.BotBuilder={readAvatar,open,save,invalidate};

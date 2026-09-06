@@ -34,4 +34,29 @@ await p.locator('#builderNext').click();await p.locator('#builderNext').click();
 const edited=await p.evaluate(()=>sent.at(-1));
 assert.equal(edited.revision,7);assert.equal(edited.system_prompt,'Updated bot instructions.');
 assert.equal('avatar_url' in edited,false);
+
+// A slow catalog response cannot reclaim the view after accepted navigation.
+await p.evaluate(()=>{
+ window.previousApi=api;
+ window.api=()=>new Promise(resolve=>window.resolveCatalog=resolve);
+ BotBuilder.open();
+});
+await p.waitForFunction(()=>typeof resolveCatalog==='function');
+await p.evaluate(()=>{BotBuilder.invalidate();document.getElementById('profileDetailBody').textContent='Other view';resolveCatalog({can_edit:true,catalog:{},config:{}});});
+await p.waitForTimeout(30);
+assert.equal(await p.locator('#profileDetailBody').textContent(),'Other view');
+await p.evaluate(()=>{window.api=previousApi;});
+await p.evaluate(()=>BotBuilder.open('review-bot'));
+await p.locator('#builderPhoto').setInputFiles([]);
+assert.equal(await p.locator('#builderError').isVisible(),false);
+await p.locator('#builderNext').click();await p.locator('#builderNext').click();await p.locator('#builderNext').click();
+await p.evaluate(()=>{window.postCount=0;window.api=()=>{postCount++;return new Promise(resolve=>window.resolveSave=resolve);};});
+await p.locator('#builderNext').click();
+assert.equal(await p.locator('#builderBack').isDisabled(),true);
+assert.equal(await p.locator('#builderNext').isDisabled(),true);
+await p.evaluate(()=>{document.getElementById('builderBack').onclick();BotBuilder.save();});
+assert.equal(await p.evaluate(()=>postCount),1);
+await p.evaluate(()=>{BotBuilder.invalidate();document.getElementById('profileDetailBody').textContent='Other view';resolveSave({ok:true});});
+await p.waitForTimeout(30);
+assert.equal(await p.locator('#profileDetailBody').textContent(),'Other view');
 await b.close();console.log('PASS: four-step payload, no early create, selected tools/access, resized photo, 390px no overflow');})().catch(e=>{console.error(e);process.exit(1)});

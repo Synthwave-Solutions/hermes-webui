@@ -388,6 +388,7 @@ async function switchPanel(name, opts = {}) {
     }
   }
   if (!opts.bypassSettingsGuard && !_beforePanelSwitch(nextPanel)) return false;
+  if (prevPanel === 'profiles' && nextPanel !== 'profiles' && window.BotBuilder) window.BotBuilder.invalidate();
   if (prevPanel !== 'settings' && nextPanel === 'settings') _beginSettingsPanelSession();
   // Close any long-lived Kanban SSE stream when leaving the kanban panel
   // so we don't keep a stale connection open in the background.
@@ -6782,6 +6783,7 @@ async function loadProfilesPanel() {
 }
 
 function _renderProfileConceptHelp(activeName){
+  if(window.BotBuilder)window.BotBuilder.invalidate();
   const title = $('profileDetailTitle');
   const body = $('profileDetailBody');
   const empty = $('profileDetailEmpty');
