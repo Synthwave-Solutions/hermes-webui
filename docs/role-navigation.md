@@ -39,3 +39,17 @@ tests/test_governance_nav_visibility.py tests/test_synpulse_own_approvals_ui.py`
 Browser checks should use distinct signed-in member and administrator accounts,
 at desktop and mobile widths. Verify that a member cannot see another person's
 approval requests, and that refreshing retains the correct navigation.
+
+## Conversation controls
+
+Members start with the bot, files, workspace and conversation members in reach.
+Model, reasoning, mode, toolsets and provider quota controls are disclosed through
+Settings > Appearance > Show advanced chat controls. This preference is stored
+per signed-in email in the browser and does not change backend permissions or
+the selected model. Administrators retain all composer controls.
+
+The CLI/WebUI source filter remains an administrative control. Members use the
+WebUI conversation list, with the same server-side ownership filtering. A stale
+CLI-only preference from another account is reset when member navigation loads.
+Navigation labels are always visible for members, so the redundant Show labels
+toggle is hidden.

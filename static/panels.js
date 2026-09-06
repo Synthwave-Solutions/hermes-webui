@@ -7737,14 +7737,32 @@ const _MEMBER_NAV_ORDER = ['profiles','projects','tasks','skills','integrations'
 function _canUseFeature(permission){
   const me=window.__GOV_ME__;
   if(!me)return false;
-  if(me.mode==='off'||me.mode==='report_only')return true;
+  if(me.method==='auth_disabled')return true;
   const permissions=Array.isArray(me.permissions)?me.permissions:[];
   return permissions.includes('*')||permissions.includes(permission)||permissions.includes(permission.split(':')[0]+':admin');
+}
+function _advancedChatPreferenceKey(){
+  return 'synpulse-advanced-chat-controls:'+String((window.__GOV_ME__||{}).email||'local');
+}
+function setAdvancedChatControls(enabled){
+  document.documentElement.dataset.advancedChatControls=enabled?'1':'0';
+  const checkbox=$('settingsAdvancedChatControls');
+  if(checkbox)checkbox.checked=!!enabled;
+  try{localStorage.setItem(_advancedChatPreferenceKey(),enabled?'1':'0');}catch(_){}
+}
+function restoreAdvancedChatControls(){
+  let enabled=false;
+  try{enabled=localStorage.getItem(_advancedChatPreferenceKey())==='1';}catch(_){}
+  document.documentElement.dataset.advancedChatControls=enabled?'1':'0';
+  const checkbox=$('settingsAdvancedChatControls');
+  if(checkbox)checkbox.checked=enabled;
 }
 function _applyNavigationAudience(me){
   window._navAudience=me&&me.nav_audience==='admin'?'admin':'member';
   document.documentElement.dataset.navAudience=window._navAudience;
+  restoreAdvancedChatControls();
   if(window._navAudience==='member'){
+    if(typeof _sessionSourceFilter!=='undefined'&&_sessionSourceFilter==='cli'&&typeof _setSessionSourceFilter==='function')_setSessionSourceFilter('webui');
     document.querySelectorAll('[data-dashboard-link]').forEach(el=>el.classList.remove('dashboard-link-visible'));
   }
 }

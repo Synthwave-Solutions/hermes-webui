@@ -6,6 +6,8 @@ window.__registerHermesLocale('en', {
     subagent_status_completed: 'Completed',
     subagent_status_failed: 'Failed',
     subagent_status_cancelled: 'Stopped',
+    advanced_chat_controls: 'Show advanced chat controls',
+    advanced_chat_controls_hint: 'Show model, reasoning, mode and tool controls in the composer. Your bot and conversation members always stay within reach.',
     tab_approvals: 'My approvals',
     my_approvals_description: 'Track requests waiting for approval. Only your requests appear here.',
     my_approvals_empty: 'You have no requests waiting for approval.',

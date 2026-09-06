@@ -7753,7 +7753,7 @@ main.main.showing-approvals > #mainApprovals{display:flex;}
 .bot-technical-details{margin-top:24px;border-top:1px solid var(--border);padding-top:16px;}
 .bot-technical-details summary{cursor:pointer;color:var(--muted);font-size:13px;padding:8px 0;}
 html[data-nav-audience="member"] [data-dashboard-link]{display:none!important;}
-@media(min-width:1000px){
+@media(min-width:641px){
   html[data-nav-audience="member"] .rail{width:180px;align-items:stretch;padding:8px 6px;}
   html[data-nav-audience="member"] .rail .rail-btn{width:auto;justify-content:flex-start;gap:10px;padding:0 10px;}
   html[data-nav-audience="member"] .rail .rail-btn svg{flex:0 0 auto;}
@@ -7787,3 +7787,17 @@ html[data-nav-audience="member"] .sidebar .panel-view{margin-left:76px;}
 html[data-nav-audience="member"] .sidebar-nav .nav-tab{width:68px;min-height:62px;flex-basis:62px;display:flex;flex-direction:column;gap:4px;justify-content:center;}
 html[data-nav-audience="member"] .sidebar-nav .nav-tab::after{content:attr(data-tooltip);position:static;transform:none;opacity:1;background:none;border:0;box-shadow:none;padding:0;font-size:10px;line-height:1.15;white-space:normal;color:inherit;text-align:center;max-width:66px;}
 }
+
+/* Members start with conversation essentials. Advanced controls are an explicit
+   personal display preference under Settings > Appearance; no policy changes. */
+html[data-nav-audience="member"] .session-source-tabs,
+html[data-nav-audience="member"] #railExpandToggle{display:none!important;}
+html[data-nav-audience="admin"] .member-advanced-chat-setting{display:none!important;}
+html[data-nav-audience="member"]:not([data-advanced-chat-controls="1"]) .composer-model-wrap,
+html[data-nav-audience="member"]:not([data-advanced-chat-controls="1"]) #composerReasoningWrap,
+html[data-nav-audience="member"]:not([data-advanced-chat-controls="1"]) #composerChatModeWrap,
+html[data-nav-audience="member"]:not([data-advanced-chat-controls="1"]) #composerToolsetsWrap,
+html[data-nav-audience="member"]:not([data-advanced-chat-controls="1"]) #providerQuotaChip,
+html[data-nav-audience="member"]:not([data-advanced-chat-controls="1"]) #composerMobileModelAction,
+html[data-nav-audience="member"]:not([data-advanced-chat-controls="1"]) #composerMobileReasoningAction,
+html[data-nav-audience="member"]:not([data-advanced-chat-controls="1"]) #composerMobileQuotaAction{display:none!important;}
