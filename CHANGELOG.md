@@ -5,6 +5,10 @@
 
 ### Changed
 
+- **Bots now have friendly names, uploaded photos and profile-specific configuration entry points.** Group conversations can include people and up to six bots, with explicit Talk to targeting and original-sender governance. Saved knowledge references are read through governed tools in the conversation workspace; they are not vector RAG. See [the Bots guide](docs/bots.md).
+
+- **Approval explanations are visible even when generated advice is unavailable.** New supported WebUI requests preserve the first original ask as a redacted summary of at most 400 characters. Historical missing context remains explicitly unknown.
+
 - **Switching back to a recently viewed chat now paints instantly.** A bounded in-memory scene cache (15 scenes, 32MB LRU) restores the transcript synchronously on switch-back and revalidates in the background against revision, message count, live-turn state, and composer-draft signature; any mismatch reloads in place. Only idle conversations are cached, and every mutation path invalidates: sends, stream attaches, queued messages, background-task completions, session SSE updates, force reloads, deletes, and profile switches (full clear).
 
 - **Metadata-only session polls dropped from up to 458KB gzip and 0.9-3s to under 1KB and ~45ms.** Two causes fixed: an active stream made the handler replay the entire multi-MB run journal into `runtime_journal_snapshot` even though metadata pollers never read it (now built only for `?include=journal_snapshot`, which the session-switch live-recovery path requests), and sidecars whose pre-messages metadata outgrew the 64KB prefix cap silently degraded every poll to a full uncached parse (cap now 1MB with a linear scanner). `?include=full` restores the old shape; `messages=1` responses are byte-for-byte unchanged.
