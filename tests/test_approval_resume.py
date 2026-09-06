@@ -108,3 +108,29 @@ def test_run_teardown_releases_unknown_outcome():
     r.close_run('run')
     assert r.records(OWNER)[0]['status']=='input-needed'
     assert not r._RUNNING
+
+
+@pytest.mark.parametrize('result,status', [({'isError':True},'failed'),(None,'input-needed'),('unstructured','input-needed'),({'skipped':True},'failed')])
+def test_unverified_or_error_tool_outcome_is_not_completed(result,status):
+    worker,out=start();r.decide(ENTRY,'approve');worker.join(2)
+    r.finish_call('run','call',result)
+    assert r.records(OWNER)[0]['status']==status
+
+
+def test_consent_rechecked_when_denial_arrives():
+    r.set_consent(OWNER,'session',True)
+    fn=r.make_waiter(OWNER,'session','run','a'*64,threading.Event())
+    r.set_consent(OWNER,'session',False)
+    assert fn(dict(OP)) is False
+    assert not r.records(OWNER)
+
+
+def test_original_input_hash_matches_session_and_rejects_newer_user_message():
+    import hashlib
+    from types import SimpleNamespace
+    digest=hashlib.sha256('original ask'.encode()).hexdigest()
+    session=SimpleNamespace(workspace='/workspace',messages=[{'role':'user','content':'original ask'},{'role':'assistant','content':'working'}])
+    assert r.input_is_fresh(session,'/workspace',digest)
+    session.messages.append({'role':'user','content':'changed ask'})
+    assert not r.input_is_fresh(session,'/workspace',digest)
+    assert not r.input_is_fresh(session,'/different',digest)

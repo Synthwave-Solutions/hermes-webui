@@ -6879,18 +6879,10 @@ def _run_agent_streaming(
         import hashlib
         _approval_prompt_hash = hashlib.sha256(str(msg_text or "").encode("utf-8")).hexdigest()
         _approval_workspace = str(Path(workspace).expanduser().resolve())
-        def _approval_input_is_fresh():
-            if str(getattr(s, 'workspace', '') or '') != _approval_workspace:
-                return False
-            for message in reversed(getattr(s, 'messages', []) or []):
-                if isinstance(message, dict) and message.get('role') == 'user':
-                    content = message.get('content')
-                    return isinstance(content, str) and hashlib.sha256(content.encode('utf-8')).hexdigest() == _approval_prompt_hash
-            return False
         _approval_waiter = approval_resume.make_waiter(
             str(_turn_principal or '').strip().lower(), session_id, stream_id,
             _approval_prompt_hash, cancel_event,
-            fresh=_approval_input_is_fresh,
+            fresh=lambda: approval_resume.input_is_fresh(s, _approval_workspace, _approval_prompt_hash),
         )
         _governance_turn_token = bind_governed_agent_turn(
             _turn_principal,

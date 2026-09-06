@@ -95,6 +95,7 @@ def make_waiter(owner, session, request, prompt_sha256, cancel_event, *, fresh=l
     """Bound by the authenticated run, never from a browser-supplied identity."""
     if not consent_enabled(owner,session): return None
     def wait(operation):
+        if not consent_enabled(owner,session): return False
         expected={'actor_email':owner,'session_id':session,'request_id':request,'prompt_sha256':prompt_sha256}
         if not prompt_sha256 or operation.get('binding_status')!='bound' or operation.get('freshness_status')!='bound' or any(operation.get(k)!=v for k,v in expected.items()): return False
         op=operation.get('operation_id'); call=operation.get('tool_call_id')
@@ -120,6 +121,10 @@ def make_waiter(owner, session, request, prompt_sha256, cancel_event, *, fresh=l
                     if time.time()>=deadline: _transition(db,op,'expired','Approval wait expired'); return False
                     if not fresh(): _transition(db,op,'input-needed','Conversation or workspace changed'); return False
                     if row['status']=='queued':
+                        consent=db.execute('SELECT expires FROM consent WHERE owner=? AND session=?',(owner,session)).fetchone()
+                        if not consent or consent['expires']<=time.time():
+                            _transition(db,op,'expired','Continuation consent expired')
+                            return False
                         _RUNNING.add(op)
                         _transition(db,op,'resumed','Original invocation released for policy revalidation')
                         return True
@@ -131,7 +136,7 @@ def make_waiter(owner, session, request, prompt_sha256, cancel_event, *, fresh=l
 
 def finish(operation_id: str, success: bool):
     """Called by the original gate after revalidation/execution, never a replay."""
-    with _db() as db:
+    with _LOCK, _db() as db:
         row=db.execute('SELECT status FROM intents WHERE id=?',(operation_id,)).fetchone()
         if row and row['status']=='resumed':
             _transition(db,operation_id,'completed' if success else 'failed','Original invocation finished' if success else 'Revalidation or invocation failed')
@@ -144,12 +149,13 @@ def finish_call(request_id, tool_call_id, result):
         value = json.loads(result) if isinstance(result, str) else result
     except (TypeError, ValueError):
         value = None
-    success = not (isinstance(value, dict) and (value.get('error') or value.get('is_error') or value.get('success') is False))
-    with _db() as db:
+    unknown = value is None or not isinstance(value, (dict, list))
+    success = not (isinstance(value, dict) and (value.get('error') or value.get('is_error') or value.get('isError') or value.get('success') is False or value.get('skipped') or value.get('status') in ('skipped', 'not-executed', 'cancelled')))
+    with _LOCK, _db() as db:
         for row in db.execute("SELECT id,binding FROM intents WHERE status='resumed'").fetchall():
             binding = json.loads(row['binding'])
             if binding.get('request_id') == request_id and binding.get('tool_call_id') == tool_call_id:
-                _transition(db,row['id'],'completed' if success else 'failed','Original tool invocation returned')
+                _transition(db,row['id'],'input-needed' if unknown else ('completed' if success else 'failed'),'Tool returned an unknown outcome' if unknown else 'Original tool invocation returned')
                 _RUNNING.discard(row['id'])
 
 
@@ -161,3 +167,21 @@ def close_run(request_id):
                 _RUNNING.discard(row['id'])
                 event=_WAITERS.get(row['id'])
                 if event: event.set()
+
+
+def waiting_for_session(owner, session):
+    with _LOCK, _db() as db:
+        return any(row['id'] in _WAITERS for row in db.execute(
+            "SELECT id FROM intents WHERE owner=? AND session=? AND status IN ('waiting','queued') AND expires>?",
+            (owner,session,time.time())))
+
+
+def input_is_fresh(session, workspace, prompt_sha256):
+    import hashlib
+    if str(getattr(session, 'workspace', '') or '') != workspace:
+        return False
+    for message in reversed(getattr(session, 'messages', []) or []):
+        if isinstance(message, dict) and message.get('role') == 'user':
+            content = message.get('content')
+            return isinstance(content, str) and hashlib.sha256(content.encode('utf-8')).hexdigest() == prompt_sha256
+    return False
