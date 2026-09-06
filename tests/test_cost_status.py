@@ -57,7 +57,7 @@ def test_actual_done_usage_dict_forwards_cost_contract():
 
 @pytest.mark.parametrize("status,cost,expected", [
     ("unknown", None, "Cost unavailable"), ("included", 0, "$0.0000"),
-    ("estimated", 1.2, "$1.20"),
+    ("estimated", 1.2, "$1.20"), (None, 0, ""),
 ])
 def test_real_context_cost_rendering(status, cost, expected):
     node = shutil.which("node")
@@ -72,6 +72,8 @@ def test_real_context_cost_rendering(status, cost, expected):
               ";console.log(costLine.textContent)")
     result = subprocess.run([node, "-e", script], check=True, capture_output=True, text=True)
     assert expected in result.stdout
+    if status is None and cost == 0:
+        assert "$" not in result.stdout
 
 def test_unknown_cost_does_not_resurrect_stale_price():
     node = shutil.which("node")
@@ -89,3 +91,17 @@ console.log(JSON.stringify(_mergeUsageForCtxIndicator(
     actual = json.loads(result.stdout)
     assert actual["estimated_cost"] is None
     assert actual["cost_status"] == "unknown"
+
+@pytest.mark.parametrize("status,shown", [(None, False), ("included", True), ("actual", True)])
+def test_legacy_zero_footer_is_not_presented_as_known_free(status, shown):
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node required for frontend behavior")
+    source = (ROOT / "static/ui.js").read_text()
+    start = source.index("        const cost=msg._turnUsage.estimated_cost;")
+    end = source.index("        const cacheHitPct=", start)
+    script = ("const msg=" + json.dumps({"_turnUsage":{"estimated_cost":0,"cost_status":status}}) +
+              ";const inTok=1,outTok=1;const _fmtTokens=String;" + source[start:end] +
+              ";console.log(text)")
+    result = subprocess.run([node, "-e", script], check=True, capture_output=True, text=True)
+    assert ("$0.0000" in result.stdout) is shown
