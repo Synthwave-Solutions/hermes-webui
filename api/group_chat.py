@@ -111,7 +111,15 @@ def shared_profile_visible(session_or_row, email) -> bool:
     who = _clean(email)
     row = session_or_row if isinstance(session_or_row, dict) else vars(session_or_row)
     participants = participants_of(row)
-    if not participants or not is_member(row.get('owner_email'), participants, who):
+    if not (participants or row.get('bot_participants')) or not is_member(row.get('owner_email'), participants, who):
+        return False
+    bots = normalize_bots(row.get('bot_participants'))
+    return any(bot_allowed(who, bot) for bot in bots) if bots else bot_allowed(who, str(row.get('profile') or 'default'))
+
+
+def bot_allowed(email, profile) -> bool:
+    who = _clean(email)
+    if not who:
         return False
     try:
         from api.governance.loader import get_policy
@@ -121,9 +129,42 @@ def shared_profile_visible(session_or_row, email) -> bool:
         if not policy.enabled:
             return who in known_emails()
         access = resolve_effective_access(policy, subject_from_identity({'email': who}))
-        return access.is_profile_allowed(str(row.get('profile') or 'default'))
+        return access.is_profile_allowed(profile or 'default')
     except Exception:
         return False
+
+
+def normalize_bots(values) -> list[str]:
+    if not isinstance(values, (list, tuple)):
+        return []
+    return list(dict.fromkeys(str(v).strip() for v in values if isinstance(v, str)
+                             and re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]{0,63}', v.strip())))[:6]
+
+
+def validate_bots(values, actor) -> list[str]:
+    if values is None:
+        return []
+    bots = normalize_bots(values)
+    if not isinstance(values, list) or any(not isinstance(v, str) for v in values) or len(values) > 6 or len(bots) != len(set(values)):
+        raise ValueError('Select up to six valid bots')
+    from api.profiles import get_hermes_home_for_profile
+    for bot in bots:
+        if not bot_allowed(actor, bot) or not (get_hermes_home_for_profile(bot) / 'config.yaml').is_file():
+            raise ValueError('Bot is unavailable or not allowed: ' + bot)
+    return bots
+
+
+def selected_bot(session, message, actor) -> str | None:
+    bots = normalize_bots(getattr(session, 'bot_participants', None))
+    if not bots:
+        return None
+    match = re.match(r'^\s*@([A-Za-z0-9][A-Za-z0-9_-]{0,63})(?=\s|$)', str(message or ''))
+    selected = match.group(1) if match else (bots[0] if len(bots) == 1 else None)
+    if selected not in bots:
+        raise ValueError('Choose one group bot by starting the message with @bot-id')
+    if not bot_allowed(actor, selected):
+        raise ValueError('The selected bot is not allowed for your account')
+    return selected
 
 
 def known_emails() -> set:

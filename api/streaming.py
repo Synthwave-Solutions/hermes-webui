@@ -4622,6 +4622,29 @@ def _compression_summary_from_messages(messages):
     return None
 
 
+def _stamp_group_bot_author(session, msg_text, profile) -> None:
+    """Persist server-selected bot identity only on this turn's assistant rows."""
+    if not profile:
+        return
+    messages = getattr(session, 'messages', None) or []
+    # Exact user boundary, never infer bot identity from response content.
+    boundary = next((i for i in range(len(messages)-1, -1, -1)
+                     if isinstance(messages[i], dict) and messages[i].get('role') == 'user'
+                     and _message_text(messages[i].get('content')).strip() == str(msg_text).strip()), None)
+    if boundary is None:
+        return
+    label = profile
+    try:
+        from api.bot_metadata import read_profile
+        label = read_profile(profile).get('bot', {}).get('title') or profile
+    except Exception:
+        pass
+    for message in messages[boundary+1:]:
+        if isinstance(message, dict) and message.get('role') == 'assistant' and not message.get('bot_profile'):
+            message['bot_profile'] = profile
+            message['bot_name'] = label
+
+
 def _stamp_group_message_author(session, msg_text, sender_email) -> None:
     """Record who wrote the current user turn in a group conversation.
 
@@ -6421,6 +6444,7 @@ def _run_agent_streaming(
     goal_related=False,
     moa_config=None,
     sender_email=None,
+    execution_profile=None,
 ):
     """Run agent in background thread, writing SSE events to STREAMS[stream_id].
 
@@ -6879,6 +6903,10 @@ def _run_agent_streaming(
         # Group conversations: the principal is whoever sent this message, not
         # the person who happens to own the conversation.
         _turn_principal = str(sender_email or '').strip().lower() or getattr(s, 'owner_email', None)
+        if execution_profile:
+            from api.group_chat import bot_allowed, normalize_bots
+            if execution_profile not in normalize_bots(getattr(s, 'bot_participants', None)) or not bot_allowed(_turn_principal, execution_profile):
+                raise PermissionError('Selected group bot is no longer allowed')
         from api import approval_resume
         import hashlib
         _approval_prompt_hash = hashlib.sha256(str(msg_text or "").encode("utf-8")).hexdigest()
@@ -6890,7 +6918,7 @@ def _run_agent_streaming(
         )
         _governance_turn_token = bind_governed_agent_turn(
             _turn_principal,
-            active_profile=str(getattr(s, 'profile', None) or 'default'),
+            active_profile=str(execution_profile or getattr(s, 'profile', None) or 'default'),
             session_id=session_id,
             request_id=stream_id,
             user_message_sha256=_approval_prompt_hash,
@@ -6952,7 +6980,7 @@ def _run_agent_streaming(
                 get_hermes_home_for_profile,
                 get_profile_runtime_env,
             )
-            _profile_home_path = get_hermes_home_for_profile(getattr(s, 'profile', None))
+            _profile_home_path = get_hermes_home_for_profile(execution_profile or getattr(s, 'profile', None))
             _profile_home = str(_profile_home_path)
             _streaming_cron_profile_home_token = _STREAMING_CRON_PROFILE_HOME.set(_profile_home)
             _profile_runtime_env = get_profile_runtime_env(_profile_home_path)
@@ -6970,7 +6998,7 @@ def _run_agent_streaming(
             model=model,
             provider_context=provider_context,
             profile_home=_profile_home,
-            has_profile=bool(getattr(s, "profile", None)),
+            has_profile=bool(execution_profile or getattr(s, "profile", None)),
         )
         # #4251: only apply the profile-repair persistence if this turn still
         # owns the session model/provider pair it last wrote.
@@ -8206,7 +8234,7 @@ def _run_agent_streaming(
                 surface_context={
                     'source': 'webui',
                     'session_id': session_id,
-                    'profile': getattr(s, 'profile', None),
+                    'profile': execution_profile or getattr(s, 'profile', None),
                     'workspace': s.workspace,
                 },
                 config_data=_cfg,
@@ -8273,6 +8301,7 @@ def _run_agent_streaming(
             # Persist the user message BEFORE streaming starts so it's durable even if
             # the server crashes before the first checkpoint fires (every 15s).
             with _agent_lock:
+                _stamp_group_bot_author(s, msg_text, execution_profile)
                 s.save(touch_updated_at=True, skip_index=False)
 
             _ckpt_thread = threading.Thread(
@@ -8842,6 +8871,7 @@ def _run_agent_streaming(
                             _error_message['provider_details_label'] = 'Terminal state details'
                         s.messages.append(_error_message)
                         try:
+                            _stamp_group_bot_author(s, msg_text, execution_profile)
                             s.save()
                         except Exception:
                             pass
@@ -9275,6 +9305,7 @@ def _run_agent_streaming(
                     put('cancel', _cancel_event_payload('Cancelled by user'))
                     return
                 with _stream_writeback_stage(_writeback_timings, "session_save"):
+                    _stamp_group_bot_author(s, msg_text, execution_profile)
                     s.save()
                 if cancel_event.is_set():
                     _finalize_cancelled_turn(s, ephemeral=False)
@@ -9840,6 +9871,7 @@ def _run_agent_streaming(
                                 )
                                 _stamp_group_message_author(s, msg_text, sender_email)
                                 _advance_truncation_watermark_after_commit(s)  # #3831
+                                _stamp_group_bot_author(s, msg_text, execution_profile)
                                 s.save()
                         logger.info('[webui] self-heal (except path): retry succeeded')
                         return  # skip error emission
@@ -9907,6 +9939,7 @@ def _run_agent_streaming(
                     _error_message['provider_details_label'] = 'Interruption details'
                 s.messages.append(_error_message)
                 try:
+                    _stamp_group_bot_author(s, msg_text, execution_profile)
                     s.save()
                 except Exception:
                     pass

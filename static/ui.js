@@ -5629,7 +5629,7 @@ function _currentParticipants() {
   if (typeof S === 'undefined' || !S) return [];
   if (!S.session) return Array.isArray(S._pendingParticipants) ? S._pendingParticipants.slice() : [];
   const list = S.session.participants;
-  return Array.isArray(list) ? list.slice() : [];
+  return (Array.isArray(list) ? list.slice() : []).concat((S.session.bot_participants || []).map(name => 'bot:' + name));
 }
 
 function _groupPersonLabel(email) {
@@ -5681,6 +5681,15 @@ async function openGroupPeoplePicker() {
       const data = await api('/api/people', { timeoutToast: false });
       _groupPeopleDirectory = Array.isArray(data && data.people) ? data.people : [];
       if (data && data.me) _groupPeopleDirectory = _groupPeopleDirectory.filter(p => String(p.email || '').trim().toLowerCase() !== String(data.me).trim().toLowerCase());
+      try {
+        const bots = await api('/api/profiles', {timeoutToast:false});
+        _groupPeopleDirectory = _groupPeopleDirectory.concat((bots.profiles || bots || []).map(bot => ({
+          email:'bot:' + bot.name,
+          display_name:(bot.bot && bot.bot.title) || bot.name,
+          kind:'bot',
+          avatar:bot.bot_avatar_url || '',
+        })));
+      } catch (_) { /* People remain usable when bot discovery is not permitted. */ }
     } catch (e) {
       _groupPeopleDirectory = null;
       if (err) err.textContent = t('group_people_load_failed');
@@ -5749,13 +5758,27 @@ function renderGroupPeopleList() {
     name.textContent = person.display_name || person.email;
     const mail = document.createElement('span');
     mail.className = 'panel-head-sub';
-    mail.textContent = person.email;
+    mail.textContent = person.kind === 'bot' ? '@' + person.email.slice(4) + ' · Bot' : person.email;
     text.appendChild(name);
     text.appendChild(mail);
     row.appendChild(box);
+    if (person.kind === 'bot' && person.avatar) {
+      const avatarUrl = new URL(person.avatar, window.location.href);
+      if (avatarUrl.origin === window.location.origin) {
+        const avatar = document.createElement('img');
+        avatar.src = avatarUrl.href; avatar.alt = ''; avatar.width = 28; avatar.height = 28;
+        avatar.style.borderRadius = '50%'; row.appendChild(avatar);
+      }
+    }
     row.appendChild(text);
     list.appendChild(row);
   });
+  if ((_groupPeopleDirectory || []).some(person => person.kind === 'bot')) {
+    const hint = document.createElement('p');
+    hint.className = 'panel-head-sub';
+    hint.textContent = 'Select up to six bots. Start a message with @bot-id to choose one; only that bot responds.';
+    list.appendChild(hint);
+  }
 }
 if (typeof window !== 'undefined') window.renderGroupPeopleList = renderGroupPeopleList;
 
@@ -5775,13 +5798,16 @@ async function submitGroupPeoplePicker() {
   try {
     const r = await api('/api/session/participants', {
       method: 'POST',
-      body: JSON.stringify({ session_id: S.session.session_id, participants: picked }),
+      body: JSON.stringify({ session_id: S.session.session_id,
+        participants: picked.filter(value => !value.startsWith('bot:')),
+        bot_participants: picked.filter(value => value.startsWith('bot:')).map(value => value.slice(4)) }),
     });
     if (r && r.ok) {
       S.session.participants = Array.isArray(r.participants) ? r.participants : [];
+      S.session.bot_participants = Array.isArray(r.bot_participants) ? r.bot_participants : [];
       syncGroupPeopleChip();
       closeGroupPeoplePicker();
-      showToast(S.session.participants.length ? t('group_people_saved') : t('group_people_cleared'));
+      showToast(_currentParticipants().length ? t('group_people_saved') : t('group_people_cleared'));
       if (typeof renderMessages === 'function') renderMessages();
     } else if (err) {
       err.textContent = (r && r.error) || t('group_people_failed');
@@ -17070,6 +17096,23 @@ function renderMessages(options){
       if(S.session) currentAssistantTurn.dataset.sessionId=S.session.session_id;
       currentAssistantTurn.dataset.recycleKey=rawIdx;
       inner.appendChild(currentAssistantTurn);
+    }
+    if(m.bot_profile){
+      const role=currentAssistantTurn.querySelector('.msg-role.assistant');
+      if(role){
+        const label=role.querySelector('.msg-role-name');
+        if(label) label.textContent=String(m.bot_name||m.bot_profile);
+        const icon=role.querySelector('.role-icon');
+        if(icon){
+          icon.textContent=String(m.bot_name||m.bot_profile).charAt(0).toUpperCase();
+          const avatar=document.createElement('img');
+          avatar.src='/api/profile/avatar?profile='+encodeURIComponent(String(m.bot_profile));
+          avatar.alt=''; avatar.style.cssText='width:100%;height:100%;object-fit:cover;border-radius:inherit';
+          avatar.onerror=()=>avatar.remove();
+          icon.appendChild(avatar);
+        }
+        role.title='@'+String(m.bot_profile);
+      }
     }
     _setLatestAssistantTurnLandmark(currentAssistantTurn, !m._live&&rawIdx===latestRenderedAssistantRawIdx);
     const seg=document.createElement('div');

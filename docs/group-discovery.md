@@ -28,3 +28,12 @@ retry, accented search, a non-owner member sending, an unauthorized bot profile,
 and an isolated-profile deployment. Real cross-user delivery requires a
 separate authorized browser session; a creator's self-exclusion is not evidence
 that colleagues cannot find them.
+
+
+## Explicit bot participants
+
+Persist `bot_participants` as up to six stable profile IDs independently of human email membership. The picker lists permitted profiles using bot presentation metadata; staged and saved groups preserve both kinds. With two or more bots, start the turn with `@profile-id`; one bot is an unambiguous default. Dispatch starts exactly one local governed worker. The conversation profile stays stable while the worker resolves the selected profile's model, SOUL/tools/MCP and profile-aware cache. Both request and worker recheck the original human sender's existing profile permission; group membership grants no tool permission. Runtime adapters and gateway backends cannot bypass this sender-bound path.
+
+Each committed assistant turn receives server-selected `bot_profile` and `bot_name` metadata. Rendering uses this per-message identity and the guarded same-origin profile avatar endpoint after reload. Existing prior-turn authors are not overwritten. Autonomous bot fanout is intentionally not enabled; each human turn chooses one bot.
+
+Validation: synthetic two-bot dispatch captures distinct execution profiles and original sender; serialization reload preserves both bot IDs; attribution preserves two sequential different authors. Directory tests include a non-Michael requester finding Michael and recovering from a failed initial directory response. The pre-existing cron-branch fixture returns403 on both clean71fbd228 and this change; it is not a group regression. No real colleagues were invited or messaged by these tests.

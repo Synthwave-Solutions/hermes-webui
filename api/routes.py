@@ -13962,6 +13962,11 @@ def handle_post(handler, parsed) -> bool:
         )
         if participants_error:
             return bad(handler, participants_error, status=400)
+        from api.group_chat import validate_bots
+        try:
+            requested_bots = validate_bots(body.get('bot_participants'), _request_owner_email_for_new_session(handler))
+        except ValueError as exc:
+            return bad(handler, str(exc), status=400)
         # Use the profile sent by the client tab (if any) so that two tabs on
         # different profiles never clobber each other via the process-level global.
         # ── Memory lifecycle: commit the previous session before starting a new one ──
@@ -14005,6 +14010,7 @@ def handle_post(handler, parsed) -> bool:
         from api.ownership import request_owner_email as _request_owner_email
 
         s.owner_email = _request_owner_email(handler)
+        s.bot_participants = requested_bots
         if requested_participants:
             from api.group_chat import normalize as _normalize_participants
 
@@ -14382,13 +14388,21 @@ def handle_post(handler, parsed) -> bool:
         )
         if error:
             return bad(handler, error, status=400)
+        from api.group_chat import validate_bots
+        try:
+            requested_bots = validate_bots(body.get('bot_participants', getattr(s, 'bot_participants', [])), _request_owner_email_for_new_session(handler))
+        except ValueError as exc:
+            return bad(handler, str(exc), status=400)
         with _get_session_agent_lock(sid):
             before = _normalize_participants(
                 getattr(s, "participants", None), owner_email=getattr(s, "owner_email", None)
             )
+            before_bots = list(getattr(s, 'bot_participants', []) or [])
             s.participants = requested
+            s.bot_participants = requested_bots
             s.save()
         _audit_group_participants(handler, s, before, requested, "participants_set")
+        _audit_group_participants(handler, s, ["bot:"+b for b in before_bots], ["bot:"+b for b in requested_bots], "bots_set")
         # Membership decides whose sidebar this conversation appears in, so the
         # cached session list must be rebuilt: without this, somebody added to
         # a conversation would not see it until the cache aged out.
@@ -14398,7 +14412,7 @@ def handle_post(handler, parsed) -> bool:
             profile=getattr(s, "profile", None),
             session_id=sid,
         )
-        return j(handler, {"ok": True, "participants": list(s.participants or [])})
+        return j(handler, {"ok": True, "participants": list(s.participants or []), "bot_participants": list(s.bot_participants or [])})
 
     if parsed.path == "/api/session/toolsets":
         """Set or clear per-session toolset override (#493).
@@ -20671,6 +20685,16 @@ def _start_chat_stream_for_session(
     attachments = attachments or []
     # Groups always use the local worker below, where each turn is bound to
     # its human sender. Personal gateway chats keep their configured backend.
+    from api.group_chat import selected_bot
+    try:
+        execution_profile = selected_bot(s, msg, sender_email or getattr(s, 'owner_email', None))
+    except ValueError as exc:
+        return {'error': str(exc), '_status': 403}
+    if execution_profile:
+        from types import SimpleNamespace
+        bot_provider, bot_model, _ = _read_profile_model_config(SimpleNamespace(profile=execution_profile), None)
+        if bot_model:
+            model, model_provider, normalized_model = bot_model, bot_provider, bot_model
     # Prevent duplicate runs in the same session while a stream is still active.
     # This commonly happens after page refresh/reconnect races and can produce
     # duplicated clarify cards for what appears to be a single user request.
@@ -20788,9 +20812,11 @@ def _start_chat_stream_for_session(
     if goal_related:
         STREAM_GOAL_RELATED[stream_id] = True
     diag.stage("worker_thread_start") if diag else None
-    backend_is_gateway = webui_gateway_chat_enabled(get_config()) and not bool(getattr(s, 'participants', None))
+    backend_is_gateway = webui_gateway_chat_enabled(get_config()) and not bool(getattr(s, 'participants', None) or getattr(s, 'bot_participants', None))
     worker_target = _run_gateway_chat_streaming if backend_is_gateway else _run_agent_streaming
     worker_kwargs = {"model_provider": model_provider, "goal_related": goal_related}
+    if execution_profile:
+        worker_kwargs['execution_profile'] = execution_profile
     _sender = str(sender_email or "").strip().lower()
     if _sender and _sender != str(getattr(s, "owner_email", "") or "").strip().lower():
         worker_kwargs["sender_email"] = _sender
@@ -20910,7 +20936,7 @@ def _start_run(
         runtime_adapter_runner_enabled,
     )
 
-    if runtime_adapter_enabled() or runtime_adapter_runner_enabled():
+    if (runtime_adapter_enabled() or runtime_adapter_runner_enabled()) and not (getattr(s, 'participants', None) or getattr(s, 'bot_participants', None)):
         def _legacy_start_run(request: StartRunRequest) -> dict:
             return _start_chat_stream_for_session(
                 s,

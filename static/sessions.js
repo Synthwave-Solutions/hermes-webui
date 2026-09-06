@@ -1568,7 +1568,8 @@ async function newSession(flash, options={}){
     // And for the people staged on the empty composer, so a group conversation
     // is a group from its very first message (Michael Ramirez, 29 Aug 2026).
     if(!S.session && Array.isArray(S._pendingParticipants) && S._pendingParticipants.length){
-      reqBody.participants=S._pendingParticipants;
+      reqBody.participants=S._pendingParticipants.filter(value=>!value.startsWith('bot:'));
+      reqBody.bot_participants=S._pendingParticipants.filter(value=>value.startsWith('bot:')).map(value=>value.slice(4));
     }
     const modelSelForNew=$('modelSelect');
     const explicitModelOverride=(typeof _readEmptyComposerModelOverride==='function')
