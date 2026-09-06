@@ -5259,7 +5259,8 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
         allowDone:isComplete,
       });
     }
-    if(index<0){
+    // Worker identity is authoritative; parallel workers share the tool name.
+    if(index<0 && !(explicitTid && name==='subagent_progress')){
       index=_findPendingLiveToolCallIndex(inflight.toolCalls,{
         signature,
         name,
