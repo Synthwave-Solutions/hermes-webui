@@ -114,7 +114,7 @@ def test_no_mcp_server_tool_survives_normal_mode(surfaces):
         assert toolset not in servers, f"{tool_name} came from MCP server {toolset}"
 
 
-def test_the_skills_index_disappears_in_normal_mode(surfaces):
+def test_the_skills_index_disappears_in_normal_mode(surfaces, tmp_path):
     """agent/system_prompt.py gates the whole skills index on these tool names.
 
     Dropping the skills toolset therefore removes the index from the prompt for
@@ -128,6 +128,15 @@ def test_the_skills_index_disappears_in_normal_mode(surfaces):
     import model_tools
 
     registry = model_tools.registry
+    # Use a real synthetic skill so a clean CI host and an installed VPS prove
+    # the same contract without depending on the operator's private library.
+    skills = tmp_path / 'skills'
+    skill = skills / 'qa-mode-review'
+    skill.mkdir(parents=True)
+    (skill / 'SKILL.md').write_text(
+        '---\nname: qa-mode-review\ndescription: Review supplied QA evidence\n---\n'
+        'Only use the supplied evidence.\n'
+    )
 
     def _emitted_index(defs):
         """Reproduce the has_skills_tools gate from agent/system_prompt.py."""
@@ -138,12 +147,11 @@ def test_the_skills_index_disappears_in_normal_mode(surfaces):
         return build_skills_system_prompt(
             available_tools=names,
             available_toolsets={t for t in toolsets if t},
+            skills_dir_override=skills,
         )
 
     assert _emitted_index(normal_defs) == ""
-    # Sanity floor on what normal mode is dropping: the index this profile emits
-    # in super mode is tens of thousands of characters of prompt.
-    assert len(_emitted_index(super_defs)) > 50_000
+    assert 'qa-mode-review' in _emitted_index(super_defs)
 
 
 def test_the_tool_search_bridge_is_absent_in_normal_mode(surfaces):

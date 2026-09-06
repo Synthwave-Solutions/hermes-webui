@@ -788,6 +788,7 @@ def main() -> int:
         playwright = sync_playwright().start()
         browser = playwright.chromium.launch(
             headless=True,
+            executable_path=os.environ.get("CHROMIUM_PATH") or None,
             args=["--no-sandbox", "--disable-dev-shm-usage"],
         )
         context = browser.new_context(base_url=base_url)

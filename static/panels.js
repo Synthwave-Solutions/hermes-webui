@@ -388,6 +388,7 @@ async function switchPanel(name, opts = {}) {
     }
   }
   if (!opts.bypassSettingsGuard && !_beforePanelSwitch(nextPanel)) return false;
+  if (prevPanel === 'profiles' && nextPanel !== 'profiles' && window.BotBuilder) window.BotBuilder.invalidate();
   if (prevPanel !== 'settings' && nextPanel === 'settings') _beginSettingsPanelSession();
   // Close any long-lived Kanban SSE stream when leaving the kanban panel
   // so we don't keep a stale connection open in the background.
@@ -5249,6 +5250,11 @@ async function deleteCurrentSkill() {
 
 // ── Memory (main view) ──
 let _memoryData = null;
+let _memoryRequestEpoch = 0;
+let _memoryLoadedContext = null;
+function _memoryContext() {
+  return JSON.stringify([S.session && S.session.session_id || '', S.activeProfile || 'default']);
+}
 let _notesSourcesData = null;
 let _notesSearchResults = [];
 let _notesSelectedSource = 'joplin';
@@ -5261,8 +5267,9 @@ let _memoryMode = 'empty'; // 'empty' | 'read' | 'edit'
 const MEMORY_SECTIONS = [
   { key: 'memory', labelKey: 'my_notes', emptyKey: 'no_notes_yet', iconKey: 'brain' },
   { key: 'user',   labelKey: 'user_profile', emptyKey: 'no_profile_yet', iconKey: 'user' },
-  { key: 'soul',   labelKey: 'agent_soul', emptyKey: 'no_soul_yet', iconKey: 'sparkles' },
-  { key: 'project_context', label: 'Project Context', empty: 'No project context file found for this workspace.', iconKey: 'file-text', readOnly: true },
+  { key: 'soul', label: 'Personal agent preferences', empty: 'How should agents work with you? This does not change a shared bot persona.', iconKey: 'sparkles' },
+  { key: 'project_context', label: 'My project notes', empty: 'Your private notes for this project. Without a project, these are your general project notes.', iconKey: 'file-text' },
+  { key: 'shared_project_context', label: 'Shared project instructions', empty: 'No shared instructions.', iconKey: 'file-text', readOnly: true },
   { key: 'external_notes', labelKey: 'external_notes_sources', emptyKey: 'external_notes_empty', iconKey: 'book-open' },
 ];
 
@@ -5285,6 +5292,7 @@ function _memorySectionContent(key) {
   if (key === 'user') return _memoryData.user || '';
   if (key === 'soul') return _memoryData.soul || '';
   if (key === 'project_context') return _memoryData.project_context || '';
+  if (key === 'shared_project_context') return _memoryData.shared_project_context || '';
   return _memoryData.memory || '';
 }
 
@@ -5408,17 +5416,8 @@ function _renderMemoryDetail(section) {
   const mtime = _memorySectionMtime(section);
   const mtimeStr = mtime ? new Date(mtime * 1000).toLocaleString() : '';
   const mtimeHtml = mtimeStr ? `<div class="memory-detail-mtime">${esc(mtimeStr)}</div>` : '';
-  const path = _memorySectionPath(section);
-  const fileName = section === 'project_context' && _memoryData
-    ? (_memoryData.project_context_name || (path.split(/[\\/]/).pop() || ''))
-    : (path.split(/[\\/]/).pop() || '');
-  const pathHtml = path ? `<div class="memory-detail-mtime">${esc(fileName)} · ${esc(path)}</div>` : '';
-  const shadowed = section === 'project_context' && _memoryData && Array.isArray(_memoryData.project_context_shadowed)
-    ? _memoryData.project_context_shadowed
-    : [];
-  const shadowedHtml = shadowed.length
-    ? `<div class="memory-detail-mtime">${esc(shadowed.map(item => `${item.name || 'Context file'} present, shadowed by ${item.shadowed_by || fileName || 'active context'}`).join('; '))}</div>`
-    : '';
+  const pathHtml = `<div class="memory-detail-mtime">${section === 'shared_project_context' ? 'Shared with project members · Read only' : 'Only you'}</div>`;
+  const shadowedHtml = '';
   const inner = content
     ? `<div class="memory-content preview-md">${renderMd(content)}</div>`
     : `<div class="memory-empty">${esc(_memorySectionEmpty(meta))}</div>`;
@@ -5515,6 +5514,7 @@ async function previewExternalNote(source, id) {
 }
 
 async function openMemorySection(section, el) {
+  if (!_memoryData || _memoryLoadedContext !== _memoryContext()) { await loadMemory(true); if (!_memoryData) return; }
   if (section === 'external_notes' && _memoryData && !_memoryData.external_notes_enabled) return;
   _currentMemorySection = section;
   document.querySelectorAll('#memoryPanel .side-menu-item').forEach(e => e.classList.remove('active'));
@@ -5543,13 +5543,14 @@ function closeMemoryEdit() { cancelMemoryEdit(); }
 
 async function submitMemorySave() {
   if (!_currentMemorySection) return;
+  if (_memoryLoadedContext !== _memoryContext()) { await loadMemory(true); showToast('Your chat context changed. Open the notes again before editing.'); return; }
   if (_memorySectionMeta(_currentMemorySection).readOnly) return;
   const ta = $('memEditContent');
   const errEl = $('memEditError');
   if (!ta) return;
   if (errEl) errEl.style.display = 'none';
   try {
-    await api('/api/memory/write', {method:'POST', body: JSON.stringify({section: _currentMemorySection, content: ta.value})});
+    await api('/api/memory/write', {method:'POST', body: JSON.stringify({section: _currentMemorySection, content: ta.value, session_id: S.session && S.session.session_id || null})});
     showToast(t('memory_saved'));
     await loadMemory(true);
     _renderMemoryDetail(_currentMemorySection);
@@ -6669,24 +6670,34 @@ async function saveBotAppearance(){
   const p=_currentProfileDetail;if(!p)return;
   try{
     await api('/api/profile/appearance',{method:'POST',body:JSON.stringify({name:p.name,revision:p.bot_revision||0,bot:{title:$('botTitle').value,description:$('botDescription').value,shape:$('botShape').value,color:$('botColor').value,knowledge_sources:$('botKnowledge').value.split('\n').map(x=>x.trim()).filter(Boolean)}})});
+    _profileDropdownClearStoredCache();
+    window.dispatchEvent(new CustomEvent('synpulse:bot-updated'));
     await loadProfilesPanel();showToast(t('bot_saved'));
   }catch(e){showToast(e.message);}
 }
 async function uploadBotAvatar(input){
   const p=_currentProfileDetail,file=input.files&&input.files[0];if(!p||!file)return;
-  if(file.size>2000000||!['image/png','image/jpeg','image/webp'].includes(file.type)){showToast(t('bot_avatar_limit'));return;}
+  const name=p.name,hint=$('botAvatarHint');input.disabled=true;
+  if(hint){hint.textContent='Uploading photo…';hint.setAttribute('role','status');}
   try{
-    const data=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=reject;reader.readAsDataURL(file);});
-    await api('/api/profile/avatar',{method:'POST',body:JSON.stringify({name:p.name,avatar:data})});
+    const data=await readBotAvatarFile(file);
+    const result=await api('/api/profile/avatar',{method:'POST',body:JSON.stringify({name,avatar:data})});
+    if(_currentProfileDetail&&_currentProfileDetail.name===name){
+      _currentProfileDetail={..._currentProfileDetail,...result};
+      _renderProfileDetail(_currentProfileDetail,S.activeProfile);
+    }
+    _profileDropdownClearStoredCache();
+    window.dispatchEvent(new CustomEvent('synpulse:bot-updated',{detail:{name}}));
     await loadProfilesPanel();showToast(t('bot_saved'));
-  }catch(e){showToast(e.message||t('bot_avatar_limit'));}
+  }catch(e){
+    if(hint&&hint.isConnected){hint.textContent=e.message||t('bot_avatar_limit');hint.setAttribute('role','alert');}
+    showToast(e.message||t('bot_avatar_limit'));
+  }finally{input.disabled=false;input.value='';}
 }
 async function openBotConfiguration(section){
   const p=_currentProfileDetail;if(!p)return;
-  if(S.activeProfile!==p.name)await switchToProfile(p.name);
-  if(S.activeProfile!==p.name)return;
-  switchPanel(section==='soul'?'memory':section);
-  if(section==='soul'){await loadMemory(true);await openMemorySection('soul');}
+  if(window.BotBuilder){await window.BotBuilder.open(p.name);return;}
+  showToast("Bot configuration is unavailable. Reload the page.");
 }
 
 async function loadProfilesPanel() {
@@ -6772,6 +6783,7 @@ async function loadProfilesPanel() {
 }
 
 function _renderProfileConceptHelp(activeName){
+  if(window.BotBuilder)window.BotBuilder.invalidate();
   const title = $('profileDetailTitle');
   const body = $('profileDetailBody');
   const empty = $('profileDetailEmpty');
@@ -6836,6 +6848,7 @@ function _renderProfileDetail(p, activeName){
       <form class="bot-editor" onsubmit="event.preventDefault();saveBotAppearance()">
         <fieldset ${editable?'':'disabled'}>
           <legend>${esc(t('bot_identity'))}</legend>
+          <div class="bot-current-photo" aria-label="Current bot photo">${botAvatarHtml(p)}</div>
           <div class="bot-editor-grid">
             <label for="botTitle">${esc(t('bot_name'))}<input id="botTitle" value="${esc((p.bot&&p.bot.title)||p.name)}" maxlength="80" required></label>
             <label for="botDescription" class="bot-editor-wide">${esc(t('bot_description'))}<textarea id="botDescription" maxlength="400" rows="3">${esc((p.bot&&p.bot.description)||'')}</textarea></label>
@@ -6889,6 +6902,7 @@ function _setProfileHeaderButtons(mode, p, activeName){
 }
 
 function openProfileDetail(name, el){
+  if(window.BotBuilder)window.BotBuilder.invalidate();
   if (!_profilesCache || !_profilesCache.profiles) return;
   const p = _profilesCache.profiles.find(x => x.name === name);
   if (!p) return;
@@ -7384,46 +7398,8 @@ function openProfileCreate(){
 }
 
 function _renderProfileForm(){
-  const title = $('profileDetailTitle');
-  const body = $('profileDetailBody');
-  const empty = $('profileDetailEmpty');
-  if (!title || !body) return;
-  title.textContent = t('new_profile');
-  body.innerHTML = `
-    <div class="main-view-content">
-      <form class="detail-form" onsubmit="event.preventDefault(); saveProfileForm();">
-        <div class="detail-form-row">
-          <label for="profileFormName">${esc(t('profile_name_label') || 'Name')}</label>
-          <input type="text" id="profileFormName" placeholder="${esc(t('profile_name_placeholder') || 'lowercase, a-z 0-9 hyphens')}" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" required>
-          <div class="detail-form-hint">${esc(t('profile_name_rule') || 'Lowercase letters, numbers, hyphens, underscores only.')}</div>
-        </div>
-        <div class="detail-form-row">
-          <label class="detail-form-check" for="profileFormClone">
-            <input type="checkbox" id="profileFormClone"> <span>${esc(t('profile_clone_label') || 'Clone config from active profile')}</span>
-          </label>
-        </div>
-        <div class="detail-form-row">
-          <label for="profileFormModel">${esc(t('profile_model_label') || 'Model / provider')}</label>
-          <select id="profileFormModel"></select>
-          <div class="detail-form-hint">${esc(t('profile_model_hint') || 'Choose from configured providers and models for this new profile.')}</div>
-        </div>
-        <div class="detail-form-row">
-          <label for="profileFormBaseUrl">${esc(t('profile_base_url_label') || 'Base URL')}</label>
-          <input type="text" id="profileFormBaseUrl" placeholder="${esc(t('profile_base_url_placeholder') || 'Optional, e.g. http://localhost:11434')}" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">
-        </div>
-        <div class="detail-form-row">
-          <label for="profileFormApiKey">${esc(t('profile_api_key_label') || 'API key')}</label>
-          <input type="password" id="profileFormApiKey" placeholder="${esc(t('profile_api_key_placeholder') || 'Optional')}" autocomplete="off">
-        </div>
-        <div id="profileFormError" class="detail-form-error" style="display:none"></div>
-      </form>
-    </div>`;
-  body.style.display = '';
-  if (empty) empty.style.display = 'none';
-  _setProfileHeaderButtons('create');
-  const n = $('profileFormName');
-  if (n) n.focus();
-  _populateProfileFormModelSelect();
+  if(window.BotBuilder){window.BotBuilder.open();return;}
+  showToast("Bot configuration is unavailable. Reload the page.");
 }
 
 async function _populateProfileFormModelSelect(){
@@ -7455,6 +7431,7 @@ async function _populateProfileFormModelSelect(){
 }
 
 function cancelProfileForm(){
+  if(window.BotBuilder)window.BotBuilder.invalidate();
   if (_profilePreFormDetail) {
     const snap = _profilePreFormDetail;
     _profilePreFormDetail = null;
@@ -7524,12 +7501,24 @@ async function deleteProfile(name) {
 // ── Memory panel ──
 async function loadMemory(force) {
   const panel = $('memoryPanel');
+  const epoch = ++_memoryRequestEpoch;
+  const context = _memoryContext();
+  _memoryData = null;
+  _memoryLoadedContext = null;
+  _memoryMode = 'empty';
+  if (panel) panel.innerHTML = '';
+  const detail = $('memoryDetailBody');
+  if (detail) detail.innerHTML = '';
+  _setMemoryHeaderButtons('empty');
   try {
     const memoryUrl = S.session && S.session.session_id
       ? `/api/memory?session_id=${encodeURIComponent(S.session.session_id)}`
       : '/api/memory';
     const data = await api(memoryUrl);
+    if (epoch !== _memoryRequestEpoch || context !== _memoryContext()) return;
     _memoryData = data;
+    _memoryLoadedContext = context;
+    if (_currentMemorySection === 'shared_project_context' && !data.shared_project_context) _currentMemorySection = null;
     if (_currentMemorySection === 'external_notes' && !data.external_notes_enabled) {
       _currentMemorySection = null;
     }
@@ -7539,14 +7528,14 @@ async function loadMemory(force) {
     if (panel) {
       panel.innerHTML = '';
       for (const s of MEMORY_SECTIONS) {
+        if (s.key === 'shared_project_context' && !data.shared_project_context) continue;
         if (s.key === 'external_notes' && !_memoryData.external_notes_enabled) continue;
         const el = document.createElement('button');
         el.type = 'button';
         el.className = 'side-menu-item';
         if (_currentMemorySection === s.key) el.classList.add('active');
         el.innerHTML = `${li(s.iconKey,16)}<span>${esc(_memorySectionLabel(s))}</span>`;
-        const sectionPath = _memorySectionPath(s.key);
-        if (sectionPath) el.title = sectionPath;
+        el.title = s.key === 'shared_project_context' ? 'Shared with project members · Read only' : s.key === 'external_notes' ? 'Connected notes sources' : 'Only you';
         el.onclick = () => openMemorySection(s.key, el);
         panel.appendChild(el);
       }
@@ -7555,6 +7544,7 @@ async function loadMemory(force) {
       _renderMemoryDetail(_currentMemorySection);
     }
   } catch(e) {
+    if (epoch !== _memoryRequestEpoch || context !== _memoryContext()) return;
     if (panel) panel.innerHTML = `<div style="padding:12px;color:var(--accent);font-size:12px">${esc(t('error_prefix'))}${esc(e.message)}</div>`;
   }
 }
@@ -7734,7 +7724,7 @@ function _applyTabOrder(order){
 // presentation only, and it can never REVEAL a panel, only hide one.
 window._govHiddenNav = window._govHiddenNav || [];
 window._navAudience = 'member';
-const _MEMBER_NAV_ORDER = ['profiles','projects','tasks','skills','integrations','approvals'];
+const _MEMBER_NAV_ORDER = ['profiles','projects','tasks','skills','integrations','approvals','memory'];
 function _canUseFeature(permission){
   const me=window.__GOV_ME__;
   if(!me)return false;

@@ -1,0 +1,12 @@
+const fs=require('fs'),vm=require('vm'),assert=require('node:assert/strict');
+const context={window:{addEventListener(){}},document:{addEventListener(){}},S:{}};
+vm.runInNewContext(fs.readFileSync('static/chat-bots.js','utf8'),context);
+const {available,address}=context.window.chatBotRecipientRules;
+const rows=[{name:'writer'},{name:'reviewer'},{name:'private',visible:false}];
+assert.equal(available(rows,{bot_participants:['reviewer','unknown']}).map(x=>x.name).join(','),'reviewer');
+assert.equal(available(rows,{}).map(x=>x.name).join(','),'writer,reviewer');
+assert.equal(address('Review invoice','reviewer'),'@reviewer Review invoice');
+assert.equal(address('@writer Review invoice','reviewer'),'@reviewer Review invoice');
+assert.equal(address('Email a@b.test unchanged','reviewer'),'@reviewer Email a@b.test unchanged');
+assert.equal(address('','reviewer'),'@reviewer ');
+console.log('Recipient filtering and literal dispatch addressing passed');

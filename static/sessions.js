@@ -2497,6 +2497,9 @@ async function loadSession(sid){
       setStatus('');
       setComposerStatus('');
       updateQueueBadge(sid);
+      // Idle hydration is complete, including an empty transcript. Clear the
+      // loading guard before rendering so the placeholder can be removed.
+      if (_isCurrentLoad()) _loadingSessionId = null;
       syncTopbar();renderMessages(sameSessionForceReload?{preserveScroll:true}:undefined);
       startApprovalPolling(sid);
       if(typeof resumeManualCompressionForSession==='function') resumeManualCompressionForSession(sid);

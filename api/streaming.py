@@ -297,14 +297,14 @@ def _file_signature(path: Path) -> tuple[int, int] | None:
         return None
 
 
-def _persistent_state_snapshot(profile_home: str | None) -> dict:
+def _persistent_state_snapshot(profile_home: str | None, memory_home: str | None = None) -> dict:
     """Capture lightweight memory/skill file signatures for save toasts."""
     if not profile_home:
         return {"memory": {}, "skills": {}}
     root = Path(profile_home)
     memory = {}
     for key, parts in _PERSISTENT_MEMORY_FILES:
-        sig = _file_signature(root.joinpath(*parts))
+        sig = _file_signature(Path(memory_home or profile_home).joinpath(*parts))
         if sig is not None:
             memory[key] = sig
     skills = {}
@@ -6492,6 +6492,10 @@ def _run_agent_streaming(
         except Exception:
             logger.debug("Failed to append worker_started turn journal event", exc_info=True)
     s = None
+    # Access checks can refuse the turn before provider resolution. Keep the
+    # error path safe and report that refusal instead of crashing the worker.
+    resolved_model = model
+    resolved_provider = model_provider
     _rt = {}
     old_cwd = None
     old_exec_ask = None
@@ -6877,6 +6881,7 @@ def _run_agent_streaming(
     _turn_session_identity_tokens = None
     _governance_turn_token = None
     _streaming_cron_profile_home_token = None
+    _personal_memory_token = None
     # Widest mode until the session is read below, so an early failure can never
     # leave the turn narrower than the user asked for. Declared above the
     # Issue #765 group so `_checkpoint_stop = None` keeps its adjacency to `try:`.
@@ -6925,6 +6930,21 @@ def _run_agent_streaming(
                 raise PermissionError('Selected bot was removed from the project')
             if execution_profile not in normalize_bots(getattr(s, 'bot_participants', None)) or not bot_allowed(_turn_identity, execution_profile):
                 raise PermissionError('Selected group bot is no longer allowed')
+        from api import personal_context
+        # Identity is captured by the authenticated dispatcher, never from
+        # a selected bot or a request body user/profile override.
+        if not _turn_principal:
+            from api import auth as _personal_auth
+            if not _personal_auth.is_auth_enabled():
+                _turn_identity = {"method": "auth_disabled", "email": ""}
+        _personal_root = personal_context.ensure_home(_turn_identity)
+        _personal_shared = personal_context.shared_conversation(s)
+        from tools.memory_tool import bind_personal_memory_dir, reset_personal_memory_dir
+        _personal_memory_token = bind_personal_memory_dir(_personal_root / "memories", enabled=not _personal_shared)
+        _personal_overlay = "" if _personal_shared else personal_context.prompt_overlay(_turn_identity, s)
+        _shared_context = personal_context.shared_project_context(_turn_identity, s, execution_profile)
+        if _shared_context["content"]:
+            _personal_overlay += "\n\nShared project instructions:\n" + _shared_context["content"]
         from api import approval_resume
         import hashlib
         _approval_prompt_hash = hashlib.sha256(str(msg_text or "").encode("utf-8")).hexdigest()
@@ -7973,6 +7993,9 @@ def _run_agent_streaming(
                 # Identify browser-originated sessions as WebUI so Hermes Agent
                 # does not inject CLI-specific terminal/output guidance.
                 platform='webui',
+                user_id=_turn_principal,
+                skip_context_files=True,
+                load_soul_identity=True,
                 quiet_mode=True,
                 enabled_toolsets=_toolsets,
                 fallback_model=_fallback_resolved,
@@ -8059,6 +8082,10 @@ def _run_agent_streaming(
                     # field the cached agent silently retains the previous
                     # profile's SOUL.md (and any other profile-scoped context).
                     _profile_home or '',
+                    str(_personal_root),
+                    _personal_shared,
+                    [_file_signature(path) for key, path in personal_context.paths(_turn_identity, s).items()
+                     if key in ("memory", "user")],
                 ], sort_keys=True)
                 _agent_sig = _hashlib.sha256(_sig_blob.encode()).hexdigest()[:16]
 
@@ -8261,7 +8288,7 @@ def _run_agent_streaming(
             # while making long tool runs emit real user-visible interim text
             # through interim_assistant_callback instead of frontend guesses.
             agent.ephemeral_system_prompt = _webui_ephemeral_system_prompt(
-                _personality_prompt,
+                '\n\n'.join(p for p in (_personality_prompt, _personal_overlay) if p),
                 surface_context={
                     'source': 'webui',
                     'session_id': session_id,
@@ -8346,7 +8373,7 @@ def _run_agent_streaming(
             if _process_notifications:
                 _agent_msg_text = "\n\n".join([*_process_notifications, msg_text]).strip()
             user_message = _build_native_multimodal_message(workspace_ctx, _agent_msg_text, attachments, workspace, cfg=_cfg)
-            _persistent_state_before = _persistent_state_snapshot(_profile_home)
+            _persistent_state_before = _persistent_state_snapshot(_profile_home, str(_personal_root))
             _run_conversation_kwargs = dict(
                 user_message=user_message,
                 system_message=workspace_system_msg,
@@ -9394,7 +9421,7 @@ def _run_agent_streaming(
                     try:
                         _persistent_changes = _persistent_state_changes(
                             _persistent_state_before,
-                            _persistent_state_snapshot(_profile_home),
+                            _persistent_state_snapshot(_profile_home, str(_personal_root)),
                         )
                         if _persistent_changes.get("memory_saved"):
                             put("state_saved", {
@@ -9796,7 +9823,7 @@ def _run_agent_streaming(
         _exc_is_interrupted = _classification['type'] == 'interrupted'
 
         # The user hint still points to Settings / `hermes model` from _classify_provider_error().
-        if isinstance(e, GovernanceBindingError):
+        if isinstance(e, (GovernanceBindingError, PermissionError)):
             # Track A fail-closed refusal (non-admin under mode enforce whose
             # governance context could not be built/bound): surface the safe
             # message verbatim instead of running the provider-error
@@ -9993,6 +10020,8 @@ def _run_agent_streaming(
             _error_payload['old_session_id'] = session_id
         put('apperror', _error_payload)
     finally:
+        if _personal_memory_token is not None:
+            reset_personal_memory_dir(_personal_memory_token)
         # Stop the periodic checkpoint thread before the final recovery path.
         # The checkpoint thread also uses the per-session lock; joining it first
         # avoids contending with checkpoint writes during stale-pending repair.

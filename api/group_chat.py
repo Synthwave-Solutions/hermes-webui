@@ -118,6 +118,13 @@ def shared_profile_visible(session_or_row, email) -> bool:
 
 
 def bot_allowed(email, profile) -> bool:
+    from api.bot_builder import allowed as _managed_allowed
+    try:
+        result = _managed_allowed(email if isinstance(email, dict) else {"email": email}, profile)
+        if result is not None:
+            return result
+    except Exception:
+        return False
     who = _clean(email)
     if not who:
         return False
