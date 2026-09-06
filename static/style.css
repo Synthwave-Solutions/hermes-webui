@@ -7816,3 +7816,12 @@ html[data-nav-audience="member"]:not([data-advanced-chat-controls="1"]) #compose
 .proj-actions{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}.proj-actions button{max-width:100%;overflow-wrap:anywhere}
 .proj-create .app-dialog-btn{width:100%}
 @media(max-width:640px){.proj-team-grid{grid-template-columns:minmax(0,1fr);gap:16px}}
+
+/* Speech controls use the composer surface; reduced motion remains quiet. */
+#realtimeVoiceBar { flex-wrap:wrap; gap:8px; padding:8px; }
+#realtimeVoiceBar[hidden] { display:none; }
+#realtimeVoiceBar button { color:var(--text); background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px; padding:6px 10px; }
+#realtimeVoiceBar[data-state="listening"] #realtimeVoiceStatus,
+#realtimeVoiceBar[data-state="speaking"] #realtimeVoiceStatus { animation:voicePulse 1.2s ease-in-out infinite alternate; }
+@keyframes voicePulse { to { opacity:.5; } }
+@media(prefers-reduced-motion:reduce) { #realtimeVoiceStatus { animation:none !important; } }

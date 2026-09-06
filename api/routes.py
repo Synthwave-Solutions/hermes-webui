@@ -12246,6 +12246,10 @@ def handle_get(handler, parsed) -> bool:
             pass
         return j(handler, settings)
 
+    if parsed.path == "/api/voice/realtime/capability":
+        from api.realtime_voice import handle as handle_realtime_voice
+        return handle_realtime_voice(handler, capability=True)
+
     if parsed.path == "/api/transcribe/capability":
         return handle_transcribe_capability(handler)
 
@@ -13820,6 +13824,10 @@ def handle_post(handler, parsed) -> bool:
         return handle_upload_extract(handler)
     if parsed.path == "/api/workspace/upload":
         return handle_workspace_upload(handler)
+
+    if parsed.path == "/api/voice/realtime/call":
+        from api.realtime_voice import handle as handle_realtime_voice
+        return handle_realtime_voice(handler)
 
     if parsed.path == "/api/transcribe":
         return handle_transcribe(handler)
