@@ -327,3 +327,31 @@ class TestProbeStillRunsEveryCall:
                 "expensive compute must be skipped within TTL when unchanged"
             assert mock_probe.call_count > probe_after_first, \
                 "cheap mtime probe MUST still run on every call (#4783 contract)"
+
+
+def test_slow_profile_build_gets_full_ttl_after_completion(mod):
+    clock = [100.0]
+    builds = []
+    rows = [{"name": "default"}]
+    def build():
+        builds.append(1)
+        clock[0] += 10.0  # cold scan exceeds the four-second TTL
+        return rows
+    with (
+        patch("time.time", side_effect=lambda: clock[0]),
+        patch.object(mod, "_is_isolated_profile_mode", return_value=False),
+        patch.object(mod, "get_active_profile_name", return_value="default"),
+        patch.object(mod, "_build_profile_rows_fast", side_effect=build),
+    ):
+        assert mod.list_profiles_api()[0]["is_active"]
+        threads = [threading.Thread(target=mod.list_profiles_api) for _ in range(8)]
+        for thread in threads: thread.start()
+        for thread in threads: thread.join(timeout=2)
+        assert all(not thread.is_alive() for thread in threads)
+        assert len(builds) == 1, "completed cold build must remain fresh for queued readers"
+        clock[0] += mod._LIST_PROFILES_CACHE_TTL - 0.1
+        mod.list_profiles_api()
+        assert len(builds) == 1
+        clock[0] += 0.2
+        mod.list_profiles_api()
+        assert len(builds) == 2, "profile changes still become visible after the existing TTL"

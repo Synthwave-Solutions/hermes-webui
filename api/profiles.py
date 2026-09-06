@@ -2070,7 +2070,6 @@ def list_profiles_api() -> list:
     """
     import time
     global _LIST_PROFILES_CACHE
-    now = time.time()
 
     # In isolated profile mode, return only the active (isolated) profile
     if _is_isolated_profile_mode():
@@ -2130,12 +2129,14 @@ def list_profiles_api() -> list:
     # acquired AFTER this lock (never the reverse), so there is no deadlock.
     with _LIST_PROFILES_CACHE_LOCK:
         cached = _LIST_PROFILES_CACHE
-        if cached is not None and now - cached[1] < _LIST_PROFILES_CACHE_TTL:
+        if cached is not None and time.time() - cached[1] < _LIST_PROFILES_CACHE_TTL:
             rows = cached[0]
         else:
             rows = _build_profile_rows_fast()
             if rows is not None:
-                _LIST_PROFILES_CACHE = (rows, now)
+                # A cold skill scan can take longer than the TTL. Start the
+                # freshness window when the completed rows become available.
+                _LIST_PROFILES_CACHE = (rows, time.time())
 
     if rows is None:
         # Fallback: cheap helpers unavailable — use the original (slow) path,
