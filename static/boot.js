@@ -307,6 +307,14 @@ function handleWorkspaceClose(){
   closeWorkspacePanel();
 }
 
+function _isRestoredPersonalScratchSession(session, urlSession){
+  // Explicit links and configured collaboration have durable identity even
+  // before their first message. Never replace them with a private composer.
+  return !!session && !urlSession && !session.project_id && !session.project_shared
+    && !(Array.isArray(session.participants) && session.participants.length)
+    && !(Array.isArray(session.bot_participants) && session.bot_participants.length);
+}
+
 async function _maybeBindFreshDefaultWorkspaceSession(prefillIntent=null){
   if(_prefillHasDraftText(prefillIntent)) return false;
   if(S.session) return false;
@@ -3839,7 +3847,7 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
         ? _restoredDraft.files.filter(Boolean)
         : [];
       const _restoredHasDraft = !!(_restoredDraftText || _restoredDraftFiles.length);
-      if(S.session && (S.session.message_count||0) === 0 && !_restoredInFlight && !_restoredHasDraft){
+      if(_isRestoredPersonalScratchSession(S.session, urlSession) && (S.session.message_count||0) === 0 && !_restoredInFlight && !_restoredHasDraft){
         S.session=null; S.messages=[];
         S._bootReady=true;
         // Restore panel pref before syncing so the workspace panel stays visible
