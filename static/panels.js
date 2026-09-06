@@ -989,6 +989,7 @@ function _cronGatewayNoticeHtml(status) {
 }
 
 async function loadCronGatewayNotice() {
+  if(!_canUseFeature('gateway:read')) return;
   const box = $('cronGatewayNotice');
   if (!box) return;
   try {
@@ -10357,6 +10358,7 @@ function handleExtensionStorageClear(btn){
 }
 
 async function loadExtensionsPanel(opts){
+  if(!_canUseFeature('plugins:read')) return;
   const target=$('extensionsDiagnostics');
   const copyBtn=$('extensionsCopyDiagnosticsBtn');
   if(!target) return;
@@ -10552,6 +10554,7 @@ function _extensionPostInstallNote(entry,isInstalled){
 }
 
 async function loadExtensionsGallery(){
+  if(!_canUseFeature('plugins:read')) return;
   _extensionsGalleryLoaded=true;
   const galleryEl=$('extensionsGallery');
   const installedEl=$('extensionsInstalled');
@@ -10926,6 +10929,7 @@ const _SELF_HOSTED_DEFAULT_BASE_URLS = Object.freeze({
 });
 
 async function _fetchProviderQuotaStatus(force=false){
+  if(!_canUseFeature('analytics:read')) return;
   const endpoint=force?`/api/provider/quota?refresh=1&ts=${Date.now()}`:'/api/provider/quota';
   const status=await api(endpoint,{cache:'no-store'});
   if(status&&typeof status==='object') status.client_fetched_at=new Date().toISOString();
@@ -11213,6 +11217,7 @@ function _buildProviderQuotaCard(status){
 }
 
 async function renderProviderCostChart(card){
+  if(!_canUseFeature('analytics:read')) return;
   let history;
   try{
     history=await api('/api/provider/cost-history?provider=openrouter');

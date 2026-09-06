@@ -3103,6 +3103,7 @@ function renderProviderQuotaIndicator(status){
   if(mobileLabel) mobileLabel.textContent=text.label;
 }
 async function refreshProviderQuotaIndicator(){
+  if(typeof _canUseFeature==='function'&&!_canUseFeature('analytics:read')) return;
   // Short-circuit before the fetch when the chip is disabled — no point asking
   // the server for quota data the UI will throw away.
   if(window._showQuotaChip!==true){
