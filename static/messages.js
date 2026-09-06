@@ -3571,6 +3571,17 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
     }
     return undefined;
   }
+  function _mergeSubagentActivityRow(existing,incoming){
+    if(existing?.tool?.name!=='subagent_progress'||incoming?.tool?.name!=='subagent_progress') return existing;
+    if(!existing.tool.id||existing.tool.id!==incoming.tool.id) return existing;
+    const ranks={queued:0,running:1,completed:2,failed:2,cancelled:2};
+    const before=ranks[existing.tool.args?.status],after=ranks[incoming.tool.args?.status];
+    if(before===undefined||after===undefined||after<before||before===2) return existing;
+    // Keep chronology/row identity, update only the same worker's observed state.
+    return {...existing,status:incoming.status,kind:incoming.kind,
+      tool:{...existing.tool,...incoming.tool},
+      payload:{...existing.payload,...incoming.payload,args:incoming.tool.args}};
+  }
   function _completeSettledAnchorSceneForTurn(messages, lastAsstIndex, projectedScene){
     if(!Array.isArray(messages)||lastAsstIndex<0) return projectedScene;
     const lastAsst=messages[lastAsstIndex];
@@ -3633,7 +3644,13 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
       if(isTextual&&_anchorSceneRowLooksLikeFinalAnswer(textKey,finalKey)) return;
       if(isTextual&&_anchorSceneRowTextOverlapsExisting(textKey,seenTextKeys)) return;
       const key=_anchorSceneExistingRowKey(row);
-      if(key&&seen.has(key)) return;
+      if(key&&seen.has(key)){
+        if(row.tool?.name==='subagent_progress'){
+          const index=rows.findIndex(existing=>_anchorSceneExistingRowKey(existing)===key);
+          if(index>=0) rows[index]=_mergeSubagentActivityRow(rows[index],row);
+        }
+        return;
+      }
       if(key) seen.add(key);
       if(isTextual&&textKey) seenTextKeys.push(textKey);
       rows.push({
@@ -4900,7 +4917,7 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
     _streamFadeLastTickMs=now;
 
     // OpenWebUI fades the actual arriving tokens, so long/fast responses naturally
-    // appear to accelerate. Hermes has a playout buffer, so track incoming word
+    // appear to accelerate. SynPulse has a playout buffer, so track incoming word
     // velocity and play out faster than it instead of using a metronomic cadence.
     // LLM telemetry is usually tokens/sec, but the UI reveals words. A fixed word
     // cadence can look stuck even when token throughput is high, so combine:
@@ -5259,7 +5276,8 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
         allowDone:isComplete,
       });
     }
-    if(index<0){
+    // Worker identity is authoritative; parallel workers share the tool name.
+    if(index<0 && !(explicitTid && name==='subagent_progress')){
       index=_findPendingLiveToolCallIndex(inflight.toolCalls,{
         signature,
         name,
@@ -5607,7 +5625,7 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
       }
     });
 
-    source.addEventListener('tool',e=>{
+    function handleLiveToolEvent(e){
       if(_terminalStateReached||_streamFinalized) return;
       if(!S.session||S.session.session_id!==activeSid||S.activeStreamId!==streamId) return;
       const d=JSON.parse(e.data);
@@ -5641,9 +5659,10 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
       _smdEndParser();
       _resetAssistantSegment();
       scrollIfPinned();
-    });
+    }
+    source.addEventListener('tool',handleLiveToolEvent);
 
-    source.addEventListener('tool_complete',e=>{
+    function handleLiveToolCompleteEvent(e){
       if(_terminalStateReached||_streamFinalized) return;
       if(!S.session||S.session.session_id!==activeSid||S.activeStreamId!==streamId) return;
       const d=JSON.parse(e.data);
@@ -5679,6 +5698,30 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
       }
       snapshotLiveTurn();
       scrollIfPinned();
+    }
+    source.addEventListener('tool_complete',handleLiveToolCompleteEvent);
+
+    // Project worker lifecycle through the same durable Anchor/tool rendering.
+    // One projector belongs to this EventSource: replay is idempotent, and a
+    // late event cannot regress a worker or escape into another conversation.
+    const projectSubagent=window.SynPulseSubagentProgress?.createProjector(INFLIGHT[activeSid]?.toolCalls);
+    source.addEventListener('subagent',e=>{
+      if(_terminalStateReached||_streamFinalized||!projectSubagent) return;
+      if(!S.session||S.session.session_id!==activeSid||S.activeStreamId!==streamId) return;
+      let data;
+      try{data=JSON.parse(e.data||'{}');}catch(_){return;}
+      const projected=projectSubagent(data);
+      if(!projected) return;
+      const event={data:JSON.stringify(projected.data),lastEventId:e.lastEventId};
+      if(projected.event==='tool_complete') handleLiveToolCompleteEvent(event);
+      else if((INFLIGHT[activeSid]?.toolCalls||[]).some(tc=>tc.tid===projected.data.tid)){
+        // Updating a worker is not a new parent-assistant prose boundary.
+        const tc=upsertLiveToolCall(projected.data,'start');
+        if(!tc) return;
+        _applyToAnchor('tool',{...projected.data,...tc},event);
+        appendLiveToolCard(tc,{sessionId:activeSid,streamId});
+        snapshotLiveTurn();
+      }else handleLiveToolEvent(event);
     });
 
     // Phase 2: dedicated `todo_state` event carries a full snapshot of
@@ -6631,7 +6674,7 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
                 ? _isMessageReaderUnpinned()
                 : (typeof _messageUserUnpinned!=='undefined' && _messageUserUnpinned));
             clearLiveToolCards();if(!assistantText)removeThinking();
-            const cancelAgentName=(assistantDisplayName()+'').trim()||'SynthPulse';
+            const cancelAgentName=(assistantDisplayName()+'').trim()||'SynPulse';
             S.messages.push({role:'assistant',content:`**Task cancelled:** Task cancelled.\n\n*The run was cancelled by the user before ${cancelAgentName} finished. No provider failure occurred.*`,provider_details:'Task cancelled.',provider_details_label:'Cancellation details',_error:true});
             _attachProjectedAnchorSceneToLastAssistant(S.messages);
             renderMessages({preserveScroll:true});
@@ -6916,7 +6959,7 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
 }
 
 function transcript(){
-  const lines=[`# SynthPulse session ${S.session?.session_id||''}`,``,
+  const lines=[`# SynPulse session ${S.session?.session_id||''}`,``,
     `Workspace: ${S.session?.workspace||''}`,`Model: ${S.session?.model||''}`,``];
   for(const m of S.messages){
     if(!m||m.role==='tool')continue;

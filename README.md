@@ -45,6 +45,12 @@ This gives you nearly **1:1 parity with Hermes CLI from a convenient web UI** wh
 
 ---
 
+## SynPulse team navigation
+
+Members use Chats, Bots, Projects, Scheduled tasks, Skills library, Connections
+and My approvals. Effective feature grants and administrative grants determine
+which navigation is shown. See [daily work navigation](docs/role-navigation.md).
+
 ## Contents
 
 [<img width="750" alt="image" src="https://github.com/user-attachments/assets/7e9544a7-ba47-4fc7-8142-1d9d16b17065" />

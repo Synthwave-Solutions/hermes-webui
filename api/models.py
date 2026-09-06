@@ -72,6 +72,7 @@ _CLI_SESSIONS_CACHE_STALE_WAIT_SECONDS = 0.10
 _CLAUDE_CODE_PARSE_CACHE_LOCK = threading.Lock()
 _CLAUDE_CODE_PARSE_CACHE: "collections.OrderedDict[tuple, tuple]" = collections.OrderedDict()
 _CLAUDE_CODE_PARSE_CACHE_MAX = 1000
+_CLAUDE_CODE_SIDEBAR_LOCK = threading.Lock()
 
 # Per-file cache for the UI-owned sidecar metadata (title + archived) that the
 # state.db sidebar projection overlays onto each CLI/cron row (#4842). The
@@ -1048,7 +1049,7 @@ class Session:
                  model_provider=None,
                  messages=None, created_at=None, updated_at=None,
                  tool_calls=None, pinned: bool=False, archived: bool=False,
-                 project_id: str=None, profile=None, owner_email=None,
+                 project_id: str=None, profile=None, owner_email=None, project_shared=False,
                  input_tokens: int=0, output_tokens: int=0, estimated_cost=None,
                  cache_read_tokens: int=0, cache_write_tokens: int=0,
                  personality=None,
@@ -1098,6 +1099,7 @@ class Session:
         self.pinned = bool(pinned)
         self.archived = bool(archived)
         self.project_id = project_id or None
+        self.project_shared = bool(project_shared)
         self.profile = profile
         # Per-user ownership (docs/user-isolation-design.md): lowercased email
         # of the creating identity, or None for legacy/cron/CLI rows (admin-only).
@@ -1228,7 +1230,7 @@ class Session:
             'parent_session_id',
             'worktree_path', 'worktree_branch', 'worktree_repo_root', 'worktree_created_at',
             'is_cli_session', 'source_tag', 'raw_source', 'session_source', 'source_label', 'read_only',
-            'enabled_toolsets', 'chat_mode', 'participants', 'bot_participants', 'composer_draft', 'anchor_activity_scenes',
+            'enabled_toolsets', 'chat_mode', 'participants', 'bot_participants', 'project_shared', 'composer_draft', 'anchor_activity_scenes',
         ]
         meta = {k: getattr(self, k, None) for k in METADATA_FIELDS}
         meta['message_count'] = len(self.messages or [])
@@ -1503,6 +1505,7 @@ class Session:
             'chat_mode': self.chat_mode,
             'participants': list(self.participants or []),
             'bot_participants': list(self.bot_participants or []),
+            'project_shared': self.project_shared,
             'composer_draft': self.composer_draft if isinstance(self.composer_draft, dict) else {},
             'is_streaming': _is_streaming_session(
                 self.active_stream_id, active_stream_ids
@@ -4668,6 +4671,7 @@ def title_from(messages, fallback: str='Untitled'):
 
 # ── Project helpers ──────────────────────────────────────────────────────────
 
+PROJECTS_LOCK = threading.RLock()
 _PROJECTS_MIGRATION_LOCK = threading.Lock()
 _projects_migrated = False
 
@@ -4713,6 +4717,16 @@ def _backfill_project_profiles_if_needed(projects: list) -> bool:
     return mutated
 
 
+def _project_store_transaction(function):
+    from functools import wraps
+    @wraps(function)
+    def wrapped(*args, **kwargs):
+        with PROJECTS_LOCK:
+            return function(*args, **kwargs)
+    return wrapped
+
+
+@_project_store_transaction
 def load_projects(*, _migrate: bool = True) -> list:
     """Load project list from disk. Returns list of project dicts.
 
@@ -4728,7 +4742,7 @@ def load_projects(*, _migrate: bool = True) -> list:
     except Exception:
         return []
     if _migrate and not _projects_migrated:
-        with _PROJECTS_MIGRATION_LOCK:
+        with PROJECTS_LOCK, _PROJECTS_MIGRATION_LOCK:
             # Re-check inside the lock — another thread may have raced.
             if _projects_migrated:
                 # Per Opus advisor on stage-293: another thread completed
@@ -4755,7 +4769,17 @@ def load_projects(*, _migrate: bool = True) -> list:
 
 def save_projects(projects) -> None:
     """Write project list to disk."""
-    PROJECTS_FILE.write_text(json.dumps(projects, ensure_ascii=False, indent=2), encoding='utf-8')
+    with PROJECTS_LOCK:
+        import tempfile
+        PROJECTS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        fd, temporary = tempfile.mkstemp(dir=PROJECTS_FILE.parent, prefix='.projects-')
+        try:
+            with os.fdopen(fd, 'w', encoding='utf-8') as stream:
+                json.dump(projects, stream, ensure_ascii=False, indent=2)
+                stream.flush(); os.fsync(stream.fileno())
+            os.replace(temporary, PROJECTS_FILE)
+        finally:
+            if os.path.exists(temporary): os.unlink(temporary)
 
 
 CRON_PROJECT_NAME = 'Cron Jobs'
@@ -4785,7 +4809,7 @@ def ensure_cron_project(create: bool = True) -> str | None:
     from api.profiles import get_active_profile_name, _is_root_profile
 
     active = get_active_profile_name() or 'default'
-    with _CRON_PROJECT_LOCK:
+    with PROJECTS_LOCK, _CRON_PROJECT_LOCK:
         projects = load_projects()
         # Look for an existing per-profile cron project. Match either an exact
         # profile tag or the renamed-root alias (a 'default'-tagged project
@@ -4829,7 +4853,7 @@ def ensure_webhook_project() -> str:
     from api.profiles import get_active_profile_name, _is_root_profile
 
     active = get_active_profile_name() or 'default'
-    with _WEBHOOK_PROJECT_LOCK:
+    with PROJECTS_LOCK, _WEBHOOK_PROJECT_LOCK:
         projects = load_projects()
         for p in projects:
             if p.get('name') != WEBHOOK_PROJECT_NAME:
@@ -5194,6 +5218,12 @@ def _claude_code_title(messages: list[dict], summary_title: str | None) -> str:
 
 
 def get_claude_code_sessions(projects_dir: Path | str | None = None, *, max_files: int = CLAUDE_CODE_MAX_FILES, max_file_bytes: int = CLAUDE_CODE_MAX_FILE_BYTES) -> list:
+    # Collapse the startup warmer and concurrent sidebar reads into one scan.
+    with _CLAUDE_CODE_SIDEBAR_LOCK:
+        return _get_claude_code_sessions(projects_dir, max_files=max_files, max_file_bytes=max_file_bytes)
+
+
+def _get_claude_code_sessions(projects_dir, *, max_files, max_file_bytes) -> list:
     """Read Claude Code JSONL sessions as read-only external-agent rows.
 
     The bridge is additive and defensive: it skips symlinks, oversized files,
@@ -5201,6 +5231,10 @@ def get_claude_code_sessions(projects_dir: Path | str | None = None, *, max_file
     listing. Tests pass ``projects_dir`` fixtures so Michael's real ~/.claude is
     never read during test runs.
     """
+    from api import claude_sidebar_cache as sidebar_cache
+    cache_path = _cfg.STATE_DIR / "claude-sidebar-index.json"
+    cached = sidebar_cache.load(cache_path)
+    fresh = {}
     sessions = []
     # ``get_last_workspace()`` is loop-invariant (the same active workspace for
     # every Claude Code row) but internally stats config.yaml + probes terminal
@@ -5208,9 +5242,15 @@ def get_claude_code_sessions(projects_dir: Path | str | None = None, *, max_file
     # sidebar build (#4718). Resolve it a single time.
     cc_workspace = str(get_last_workspace())
     for path in _iter_claude_code_jsonl_files(projects_dir, max_files=max_files, max_file_bytes=max_file_bytes) or []:
-        messages, summary_title, first_ts, last_ts = _parse_claude_code_jsonl_cached(path)
-        if not messages:
+        metadata, cache_entry = sidebar_cache.metadata(
+            path, cached, parse=_parse_claude_code_jsonl, title=_claude_code_title,
+            max_messages=CLAUDE_CODE_MAX_MESSAGES_PER_FILE,
+        )
+        if cache_entry is not None:
+            fresh[str(path.resolve())] = cache_entry
+        if not metadata or not metadata["message_count"]:
             continue
+        first_ts, last_ts = metadata["first_ts"], metadata["last_ts"]
         sid = _claude_code_session_id(path)
         # Match the truthiness fallback used in the assignments below: the old
         # inline code was ``first_ts or last_ts or path.stat().st_mtime``, which
@@ -5229,10 +5269,10 @@ def get_claude_code_sessions(projects_dir: Path | str | None = None, *, max_file
         updated_at = last_ts or first_ts or _mtime
         sessions.append({
             'session_id': sid,
-            'title': _claude_code_title(messages, summary_title),
+            'title': metadata['title'],
             'workspace': cc_workspace,
             'model': 'claude-code',
-            'message_count': len(messages),
+            'message_count': metadata['message_count'],
             'created_at': created_at,
             'updated_at': updated_at,
             'last_message_at': updated_at,
@@ -5247,6 +5287,9 @@ def get_claude_code_sessions(projects_dir: Path | str | None = None, *, max_file
             'is_cli_session': True,
             'read_only': True,
         })
+    # Persist only the current bounded source set, never transcript contents.
+    if fresh != cached:
+        sidebar_cache.save(cache_path, fresh)
     sessions.sort(key=lambda s: s.get('last_message_at') or s.get('updated_at') or 0, reverse=True)
     return sessions
 

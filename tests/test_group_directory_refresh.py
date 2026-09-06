@@ -27,7 +27,7 @@ let _groupPeopleDirectory=[],_groupPeopleDraft=[];
 const _currentParticipants=()=>[];
 const _groupPeopleCanManage=()=>true;
 const renderGroupPeopleList=()=>{};
-const api=async(url)=>{if(url==='/api/profiles')return [];calls++;if(fail)throw Error('offline');return {me:' OTHER@example.test ',people:[{email:'other@example.test'},{email:'michael@example.test'}]};};
+const api=async(url)=>{if(url==='/api/profiles?fast=1')return [];calls++;if(fail)throw Error('offline');return {me:' OTHER@example.test ',people:[{email:'other@example.test'},{email:'michael@example.test'}]};};
 ''' + source[start:end] + search + r'''
 (async()=>{
  await openGroupPeoplePicker();assert.equal(calls,1);

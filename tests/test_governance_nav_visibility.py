@@ -48,7 +48,8 @@ class _Policy:
 def test_a_panel_is_hidden_exactly_when_its_permission_is_missing():
     access = _Access({"cron:read", "files:read"})
     hidden = hidden_panels(access, _Policy())
-    assert "tasks" not in hidden and "workspaces" not in hidden and "files" not in hidden
+    assert "tasks" not in hidden
+    assert "workspaces" in hidden and "files" in hidden
     assert "insights" in hidden and "governance" in hidden and "logs" in hidden
 
 
@@ -67,14 +68,14 @@ def test_wildcard_and_area_admin_grants_open_the_panel():
 
 
 @pytest.mark.parametrize("policy", [_Policy(enabled=False), _Policy(mode="report_only")])
-def test_governance_off_or_report_only_never_hides(policy):
-    assert hidden_panels(_Access(set()), policy) == []
+def test_policy_mode_does_not_promote_a_member_to_administrator(policy):
+    assert set(visible_panels(_Access(set()), policy)) == set(ESSENTIAL_PANELS)
 
 
 def test_visible_is_the_complement_and_always_includes_the_essentials():
     access = _Access({"analytics:read"})
     visible = visible_panels(access, _Policy())
-    assert "insights" in visible
+    assert "insights" not in visible
     assert set(ESSENTIAL_PANELS) <= set(visible)
     assert not set(visible) & set(hidden_panels(access, _Policy()))
 
@@ -103,10 +104,10 @@ def test_client_can_only_hide_never_reveal():
     assert "hidden.splice(" not in block
 
 
-def test_resolution_failure_shows_everything_rather_than_locking_a_user_out():
+def test_resolution_failure_keeps_only_self_service_navigation():
     class _Broken:
         @property
         def grants(self):
             raise RuntimeError("policy unreadable")
 
-    assert hidden_panels(_Broken(), _Policy()) == []
+    assert set(visible_panels(_Broken(), _Policy())) == set(ESSENTIAL_PANELS)

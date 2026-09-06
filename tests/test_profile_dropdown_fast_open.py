@@ -57,7 +57,7 @@ def test_profile_dropdown_uses_shared_fetch_promise_and_validated_local_storage_
 
     fetch_body = _function_body(PANELS_JS, "function _profileDropdownFetchFresh(){")
     assert "if(_profileDropdownFetchPromise) return _profileDropdownFetchPromise;" in fetch_body
-    assert "api('/api/profiles', {timeoutToast:false})" in fetch_body
+    assert "api('/api/profiles?fast=1', {timeoutToast:false})" in fetch_body
     assert "if(_profileDropdownDataCacheUsable(data)) _profilesCache = data;" in fetch_body
     assert "_profileDropdownWriteStoredCache(data);" in fetch_body
     assert "\n    _profilesCache = data;\n" not in fetch_body
@@ -86,7 +86,7 @@ def test_profile_dropdown_closing_invalidates_inflight_refresh():
 
 def test_profiles_panel_refresh_updates_dropdown_cache():
     body = _function_body(PANELS_JS, "async function loadProfilesPanel() {")
-    api_idx = body.index("const data = await api('/api/profiles');")
+    api_idx = body.index("const data = await api('/api/profiles?fast=1');")
     cache_idx = body.index("_profileDropdownWriteStoredCache(data);")
     render_idx = body.index("panel.innerHTML = '';")
     assert api_idx < cache_idx < render_idx
@@ -100,6 +100,8 @@ def test_profile_dropdown_prefetches_after_page_load():
 
 def test_poisoned_profile_cache_opens_then_switches_after_fresh_refresh():
     snippets = [
+        _function_body(PANELS_JS, "function botDisplayName(p){"),
+        _function_body(PANELS_JS, "function botAvatarHtml(p){"),
         PANELS_JS[
             PANELS_JS.index("let _profilesCache = null;") : PANELS_JS.index("async function _profileSwitchPanelLoad(){")
         ],
@@ -172,11 +174,11 @@ def test_poisoned_profile_cache_opens_then_switches_after_fresh_refresh():
           single_profile_mode: false,
           profiles: [
             {{ name: 'default', visible: true, is_default: true }},
-            {{ name: 'other', visible: true }},
+            {{ name: 'other', visible: true, total_skills: 12, enabled_skills: 0, skill_counts_pending: true }},
           ],
         }};
         let apiResponse = multiProfileResponse;
-        globalThis.api = () => Promise.resolve(apiResponse);
+        globalThis.api = (path) => {{ assert.strictEqual(path, '/api/profiles?fast=1'); return Promise.resolve(apiResponse); }};
 
         eval(snippets.join(String.fromCharCode(10)) + String.fromCharCode(10) + `;globalThis.__profileTest={{
           key: PROFILE_DROPDOWN_CACHE_KEY,

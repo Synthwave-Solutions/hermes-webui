@@ -133,6 +133,8 @@ def _serialize_access(access) -> dict:
     Never includes claims or token scopes (port of the reference
     serialize_effective_access).
     """
+    from api.governance.nav import administrative_access
+
     subject = access.subject
     return {
         "mode": access.mode,
@@ -149,7 +151,7 @@ def _serialize_access(access) -> dict:
         "profiles": sorted(access.profiles),
         "routes": sorted(access.routes),
         "grant_sources": list(access.grant_sources),
-        "is_admin": access.has_permission("governance:read") or access.has_permission("governance:write"),
+        "is_admin": administrative_access(access),
     }
 
 
@@ -385,9 +387,16 @@ def _handle_me(handler, parsed, policy, subject, access) -> bool:
             # The client hides these on top of the user's own hidden_tabs; the
             # APIs stay the real enforcement.
             "hidden_nav": _hidden_nav(access, policy),
+            "nav_audience": _nav_audience(access, policy),
         },
     )
     return True
+
+
+def _nav_audience(access, policy) -> str:
+    from api.governance.nav import navigation_audience
+
+    return navigation_audience(access, policy)
 
 
 def _hidden_nav(access, policy) -> list:

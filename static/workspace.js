@@ -159,6 +159,7 @@ function recordClientSSEError(source, details={}){
       url_path:(typeof location!=='undefined'&&location.pathname)||'/',
       reason:details.reason||'EventSource.onerror',
     };
+    if(typeof _canUseFeature==='function'&&!_canUseFeature('status:read'))return;
     void api('/api/client-events/log',{method:'POST',body:JSON.stringify(payload),timeoutMs:3000,timeoutToast:false}).catch(()=>{});
   }catch(_){}
 }
@@ -443,7 +444,7 @@ function _escHtml(s){
 }
 
 const ARTIFACT_IGNORE_RE = /(^|\/)(?:\.git|\.hg|\.svn|node_modules|\.venv|venv|__pycache__|dist|build|\.next|\.cache)(?:\/|$)/;
-// Canonical Hermes mutators plus MCP filesystem aliases that can create/edit files.
+// Canonical SynPulse mutators plus MCP filesystem aliases that can create/edit files.
 const ARTIFACT_MUTATION_TOOLS = new Set(['write_file','patch','edit_file','create_file','mcp_filesystem_write_file','mcp_filesystem_edit_file']);
 
 function _normalizeArtifactPath(path){

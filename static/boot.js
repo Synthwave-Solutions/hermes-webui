@@ -307,6 +307,14 @@ function handleWorkspaceClose(){
   closeWorkspacePanel();
 }
 
+function _isRestoredPersonalScratchSession(session, urlSession){
+  // Explicit links and configured collaboration have durable identity even
+  // before their first message. Never replace them with a private composer.
+  return !!session && !urlSession && !session.project_id && !session.project_shared
+    && !(Array.isArray(session.participants) && session.participants.length)
+    && !(Array.isArray(session.bot_participants) && session.bot_participants.length);
+}
+
 async function _maybeBindFreshDefaultWorkspaceSession(prefillIntent=null){
   if(_prefillHasDraftText(prefillIntent)) return false;
   if(S.session) return false;
@@ -735,7 +743,7 @@ function _micToastKeyForRecognitionError(error){
   // Persist SR failure across reloads (e.g. Tailscale/network error)
   const _micForceMediaRecorderKey='mic_force_mediarecorder';
   const _micForceMediaRecorderStored=localStorage.getItem(_micForceMediaRecorderKey);
-  // Prefer SynthPulse server-side STT (MediaRecorder -> /api/transcribe) only
+  // Prefer SynPulse server-side STT (MediaRecorder -> /api/transcribe) only
   // after the server confirms an STT provider is available. No stored key must
   // keep browser SpeechRecognition as the first-click default until then; that
   // avoids dropping the first dictation on installs without server STT.
@@ -2296,7 +2304,7 @@ $('modelSelect').onchange=async()=>{
   // re-reverts a cross-family pick (the #3737 bug, Codex catch). send() clears it
   // after reading a matching pending pick. (#3739/#3737)
   _applySessionContextMetadataUpdate(data);
-  // Warn if selected model belongs to a different provider than what SynthPulse is configured for
+  // Warn if selected model belongs to a different provider than what SynPulse is configured for
   if(typeof _checkProviderMismatch==='function'){
     const warn=_checkProviderMismatch(selectedModel);
     if(warn&&typeof showToast==='function') showToast(warn,4000);
@@ -2708,7 +2716,7 @@ const _SKINS=[
   {name:'Catppuccin',colors:['#CBA6F7','#B4BEFE','#8839EF']},
   {name:'Hepburn',   colors:['#c6246a','#ec5597','#f2abca']},
   {name:'Steel',    value:'nous', colors:['#4682B4','#3A6E9A','#2C5F88']},
-  {name:'SynthPulse', colors:['#009DFF','#0F172A','#39D98A']},
+  {name:'SynPulse', value:'synthpulse', colors:['#009DFF','#0F172A','#39D98A']},
   {name:'Neon',     colors:['#B347FF','#C76BFF','#00DDFF']},
   {name:'Neon Soft', value:'neon-soft', colors:['#B347FF','#C76BFF','#00DDFF']},
   {name:'Neon Paint', value:'neon-paint', colors:['#FF2D95','#00E5FF','#FFB800']},
@@ -3374,7 +3382,7 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
     _applyComposerControlOrder(window._composerControlOrder);
     window._showTitlebarProfile=!!s.show_titlebar_profile;
     _applyTitlebarProfileVisibility();
-    window._botName=s.bot_name||'SynthPulse';
+    window._botName=s.bot_name||'SynPulse';
     if(s.default_model_provider) window._activeProvider=s.default_model_provider;
     if(s.default_model){
       window._defaultModel=s.default_model;
@@ -3521,7 +3529,7 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
     window._composerControlVisibility=_composerControlVisibilityFromSettings(null);
     window._composerControlOrder=[];
     _applyComposerControlOrder(window._composerControlOrder);
-    window._botName='SynthPulse';
+    window._botName='SynPulse';
     _bootSettings={check_for_updates:false};
     if(typeof setLocale==='function'){
       const _lang=typeof resolvePreferredLocale==='function'
@@ -3839,7 +3847,7 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
         ? _restoredDraft.files.filter(Boolean)
         : [];
       const _restoredHasDraft = !!(_restoredDraftText || _restoredDraftFiles.length);
-      if(S.session && (S.session.message_count||0) === 0 && !_restoredInFlight && !_restoredHasDraft){
+      if(_isRestoredPersonalScratchSession(S.session, urlSession) && (S.session.message_count||0) === 0 && !_restoredInFlight && !_restoredHasDraft){
         S.session=null; S.messages=[];
         S._bootReady=true;
         // Restore panel pref before syncing so the workspace panel stays visible
@@ -3942,8 +3950,8 @@ window.addEventListener('pageshow', async (event) => {
 
 async function shutdownServer() {
   const ok = await showConfirmDialog({
-    title: (typeof t === 'function' ? t('settings_shutdown_confirm_title') : 'Stop SynthPulse WebUI'),
-    message: (typeof t === 'function' ? t('settings_shutdown_confirm_message') : 'Stop the SynthPulse WebUI server?'),
+    title: (typeof t === 'function' ? t('settings_shutdown_confirm_title') : 'Stop SynPulse WebUI'),
+    message: (typeof t === 'function' ? t('settings_shutdown_confirm_message') : 'Stop the SynPulse WebUI server?'),
     confirmLabel: (typeof t === 'function' ? t('settings_shutdown_confirm_btn') : 'Stop'),
     danger: true,
   });

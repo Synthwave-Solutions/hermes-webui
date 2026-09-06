@@ -6444,6 +6444,7 @@ def _run_agent_streaming(
     goal_related=False,
     moa_config=None,
     sender_email=None,
+    sender_identity=None,
     execution_profile=None,
 ):
     """Run agent in background thread, writing SSE events to STREAMS[stream_id].
@@ -6903,12 +6904,19 @@ def _run_agent_streaming(
         # Group conversations: the principal is whoever sent this message, not
         # the person who happens to own the conversation.
         _turn_principal = str(sender_email or '').strip().lower() or getattr(s, 'owner_email', None)
+        _turn_identity = sender_identity if isinstance(sender_identity, dict) else {'email': _turn_principal}
+        if str(_turn_identity.get('email') or '').strip().lower() != str(_turn_principal or '').strip().lower():
+            raise PermissionError('Turn identity does not match the authenticated sender')
         if sender_email or execution_profile:
             from api.group_chat import require_turn_membership
-            require_turn_membership(s, _turn_principal)
+            require_turn_membership(s, _turn_identity)
         if execution_profile:
             from api.group_chat import bot_allowed, normalize_bots
-            if execution_profile not in normalize_bots(getattr(s, 'bot_participants', None)) or not bot_allowed(_turn_principal, execution_profile):
+            from api.project_collaboration import project_for as _worker_project_for
+            _worker_project = _worker_project_for(getattr(s, 'project_id', None))
+            if _worker_project and _worker_project.get('collaboration') and execution_profile not in _worker_project.get('bot_participants', []):
+                raise PermissionError('Selected bot was removed from the project')
+            if execution_profile not in normalize_bots(getattr(s, 'bot_participants', None)) or not bot_allowed(_turn_identity, execution_profile):
                 raise PermissionError('Selected group bot is no longer allowed')
         from api import approval_resume
         import hashlib
@@ -6919,14 +6927,18 @@ def _run_agent_streaming(
             _approval_prompt_hash, cancel_event,
             fresh=lambda: approval_resume.input_is_fresh(s, _approval_workspace, _approval_prompt_hash),
         )
+        from api.project_collaboration import runtime_file_scope
+        _project_workspace, _project_access_check = runtime_file_scope(s, _turn_identity, execution_profile)
         _governance_turn_token = bind_governed_agent_turn(
-            _turn_principal,
+            _turn_identity,
             active_profile=str(execution_profile or getattr(s, 'profile', None) or 'default'),
             session_id=session_id,
             request_id=stream_id,
             user_message_sha256=_approval_prompt_hash,
             user_message=str(msg_text or ""),
             approval_waiter=_approval_waiter,
+            project_workspace=_project_workspace,
+            project_access_check=_project_access_check,
         )
         # Conversation chat mode (Michael Ramirez, 28 Aug 2026), read once per
         # turn from the live session object rather than from the sidecar: a
@@ -7479,6 +7491,14 @@ def _run_agent_streaming(
                 elif len(cb_args) == 1:
                     name = cb_args[0]
                     event_type = 'tool.started'
+
+                from api.subagent_progress import normalize as normalize_subagent, remember as remember_subagent
+                subagent = normalize_subagent(event_type, cb_kwargs)
+                if subagent:
+                    if stream_id in STREAM_LIVE_TOOL_CALLS:
+                        remember_subagent(STREAM_LIVE_TOOL_CALLS[stream_id], subagent)
+                    put('subagent', subagent)
+                    return
 
                 if event_type in ('reasoning.available', '_thinking'):
                     reason_text = preview if event_type == 'reasoning.available' else name

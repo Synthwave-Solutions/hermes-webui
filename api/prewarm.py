@@ -1,16 +1,10 @@
 """Background cache pre-warm at server start.
 
-The two dominant cold-start costs both live in process-local caches, so the
-first user after a restart used to pay them interactively:
+Sidebar metadata has a disposable persistent index; its first build still
+parses source transcripts. Model discovery is independent and may use network
+providers. Warming either must not delay starting the other.
 
-1. The Claude Code transcript parse cache. The sidebar projection parses every
-   ``~/.claude/projects/**/*.jsonl`` once per process (10-27s measured on a
-   2.2GB / 1.6k-file tree); afterwards `_parse_claude_code_jsonl_cached` makes
-   it a stat() per file. Warming simply runs the same projection once.
-2. The provider/model catalog. A cold `get_available_models()` rebuild takes
-   5-17s against a large router catalog; warm reads are ~60ms.
-
-This thread runs both sequentially at startup so the first real
+Separate workers start both immediately at startup so the first real
 ``/api/sessions`` and ``/api/models`` hit warm caches. It is best-effort and
 gated the same way as the request paths: transcript warming is skipped when
 the "show Claude Code sessions" setting is off. Disable entirely with
@@ -47,6 +41,11 @@ def _run() -> None:
     except Exception as e:
         print(f"[prewarm] claude-code warm failed: {e!r}", flush=True)
 
+
+    print(f"[prewarm] done in {time.time()-started:.1f}s", flush=True)
+
+
+def _warm_model_catalog() -> None:
     # 2. Provider/model catalog (cold rebuild is 5-17s, warm ~60ms).
     try:
         from api.config import get_available_models
@@ -62,13 +61,13 @@ def _run() -> None:
     except Exception as e:
         print(f"[prewarm] model catalog warm failed: {e!r}", flush=True)
 
-    print(f"[prewarm] done in {time.time()-started:.1f}s", flush=True)
-
 
 def start_prewarm_thread() -> bool:
     """Start the pre-warm thread; returns True when started."""
     if not _prewarm_enabled():
         return False
+    # Network discovery and local transcript projection are independent.
+    threading.Thread(target=_warm_model_catalog, name="webui-prewarm-models", daemon=True).start()
     t = threading.Thread(target=_run, name="webui-prewarm", daemon=True)
     t.start()
     return True
