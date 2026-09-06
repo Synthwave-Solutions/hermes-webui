@@ -54,6 +54,7 @@ jobs:
           tests/test_bot_metadata.py
           tests/test_profile_metadata_only.py
           tests/test_bot_builder.py
+          tests/test_bot_knowledge.py
           tests/test_governance_agent_context.py
           tests/test_synpulse_role_navigation.py
           tests/test_governance_nav_visibility.py

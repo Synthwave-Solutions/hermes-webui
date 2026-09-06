@@ -13469,6 +13469,16 @@ def handle_get(handler, parsed) -> bool:
         return _handle_memory_read(handler, parsed)
 
     # ── Profile API (GET) ──
+    if parsed.path == "/api/bots/knowledge":
+        from api import bot_knowledge
+        from api.governance.enforce import _request_identity
+        try:
+            return j(handler, bot_knowledge.catalog(_request_identity(handler), (parse_qs(parsed.query).get("profile") or [""])[0]))
+        except PermissionError as exc:
+            return bad(handler, str(exc), 403)
+        except (ValueError, OSError) as exc:
+            return bad(handler, str(exc), 400)
+
     if parsed.path == "/api/bots/builder":
         from api import bot_builder
         from api.governance.enforce import _request_identity
@@ -15511,6 +15521,18 @@ def handle_post(handler, parsed) -> bool:
             return bad(handler,str(exc),409)
         except (ValueError,OSError) as exc:
             return bad(handler,str(exc),400)
+
+    if parsed.path == "/api/bots/knowledge":
+        from api import bot_knowledge
+        from api.governance.enforce import _request_identity
+        try:
+            return j(handler, bot_knowledge.mutate(_request_identity(handler), body))
+        except PermissionError as exc:
+            return bad(handler, str(exc), 403)
+        except RuntimeError as exc:
+            return bad(handler, str(exc), 409)
+        except (ValueError, OSError) as exc:
+            return bad(handler, str(exc), 400)
 
     if parsed.path == "/api/bots/builder":
         from api import bot_builder

@@ -1,0 +1,9 @@
+{
+  "shared_runtime_note_present": true,
+  "unauthorized_runtime_note_empty": true,
+  "legacy_private_sentinel_absent": true,
+  "legacy_hashes": {
+    "USER.md": "1c1a8425d764a6e854ea94496d8c1585e0d7dd15d05a3fb387ecdef171a7df6e",
+    "MEMORY.md": "ecf69a7ec6b1ccaa01c62cafdfb97addab51e8ddf4fb8fb3ef428d4cd2c32a20"
+  }
+}

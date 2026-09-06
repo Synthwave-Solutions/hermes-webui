@@ -27,10 +27,14 @@ await p.evaluate(saved=>{
 await p.evaluate(()=>BotBuilder.open('review-bot'));
 assert.equal(await p.locator('#builderName').getAttribute('readonly'),'');
 assert.equal(await p.locator('.bot-builder-photo').count(),1);
-await p.locator('#builderNext').click();
+await p.locator('[data-builder-tab="1"]').click();
 assert.equal(await p.locator('#builderPrompt').inputValue(),'Review supplied evidence. Never invent payments.');
 await p.locator('#builderPrompt').fill('Updated bot instructions.');
-await p.locator('#builderNext').click();await p.locator('#builderNext').click();await p.locator('#builderNext').click();
+await p.locator('[data-builder-tab="5"]').click();
+await p.locator('[data-builder-tab="2"]').click();
+await p.locator('[data-builder-tab="1"]').click();
+assert.equal(await p.locator('#builderPrompt').inputValue(),'Updated bot instructions.');
+await p.locator('#builderNext').click();
 const edited=await p.evaluate(()=>sent.at(-1));
 assert.equal(edited.revision,7);assert.equal(edited.system_prompt,'Updated bot instructions.');
 assert.equal('avatar_url' in edited,false);
@@ -49,7 +53,7 @@ await p.evaluate(()=>{window.api=previousApi;});
 await p.evaluate(()=>BotBuilder.open('review-bot'));
 await p.locator('#builderPhoto').setInputFiles([]);
 assert.equal(await p.locator('#builderError').isVisible(),false);
-await p.locator('#builderNext').click();await p.locator('#builderNext').click();await p.locator('#builderNext').click();
+await p.locator('[data-builder-tab="3"]').click();
 await p.evaluate(()=>{window.postCount=0;window.api=()=>{postCount++;return new Promise(resolve=>window.resolveSave=resolve);};});
 await p.locator('#builderNext').click();
 assert.equal(await p.locator('#builderBack').isDisabled(),true);
@@ -59,4 +63,26 @@ assert.equal(await p.evaluate(()=>postCount),1);
 await p.evaluate(()=>{BotBuilder.invalidate();document.getElementById('profileDetailBody').textContent='Other view';resolveSave({ok:true});});
 await p.waitForTimeout(30);
 assert.equal(await p.locator('#profileDetailBody').textContent(),'Other view');
+// Deep links select the requested existing bot section without profile switching.
+await p.evaluate(()=>{window.api=previousApi;});
+for(const [section,selector] of [['soul','#builderPrompt'],['skills','[data-selection="skills"]'],['settings','[data-selection="mcp_servers"]'],['memory','#builderMemory']]){
+  await p.evaluate(section=>BotBuilder.open('review-bot',section),section);
+  assert.equal(await p.locator(selector).isVisible(),true);
+}
+await p.locator('#builderMemory').fill('Shared bot working notes.');
+await p.locator('[data-builder-tab="1"]').click();
+await p.locator('[data-builder-tab="4"]').click();
+assert.equal(await p.locator('#builderMemory').inputValue(),'Shared bot working notes.');
+await p.locator('#builderNext').click();
+assert.equal(await p.evaluate(()=>sent.at(-1).bot_memory),'Shared bot working notes.');
+// Knowledge drafts cannot be discarded by Save bot or an in-flight tab switch.
+await p.evaluate(()=>{window.BotKnowledge={mount:()=>{},hasUnsaved:()=>true,isBusy:()=>false,forget:()=>{}};});
+await p.evaluate(()=>BotBuilder.open('review-bot','memory'));
+const beforeKnowledgeSave=await p.evaluate(()=>sent.length);
+await p.locator('#builderNext').click();
+assert.equal(await p.evaluate(()=>sent.length),beforeKnowledgeSave);
+assert.match(await p.locator('#builderError').textContent(),/knowledge file selection/);
+await p.evaluate(()=>{BotKnowledge.isBusy=()=>true;});
+await p.locator('[data-builder-tab="1"]').click();
+assert.equal(await p.locator('#builderMemory').isVisible(),true);
 await b.close();console.log('PASS: four-step payload, no early create, selected tools/access, resized photo, 390px no overflow');})().catch(e=>{console.error(e);process.exit(1)});

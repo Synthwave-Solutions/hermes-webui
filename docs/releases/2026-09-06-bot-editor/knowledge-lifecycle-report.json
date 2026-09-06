@@ -1,0 +1,8 @@
+{
+  "unsaved_selection_survives_tabs": true,
+  "bot_save_blocked_while_knowledge_dirty": true,
+  "save_after_knowledge_success": true,
+  "stale_selection_conflict": 409,
+  "conflict_draft_preserved": true,
+  "errors": []
+}
