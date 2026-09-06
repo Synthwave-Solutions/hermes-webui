@@ -7768,7 +7768,6 @@ html[data-nav-audience="member"] [data-dashboard-link]{display:none!important;}
 }
 
 html[data-nav-audience="member"] [data-panel="kanban"],
-html[data-nav-audience="member"] [data-panel="memory"],
 html[data-nav-audience="member"] [data-panel="workspaces"],
 html[data-nav-audience="member"] [data-panel="files"],
 html[data-nav-audience="member"] [data-panel="todos"],

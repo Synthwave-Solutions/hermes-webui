@@ -1,6 +1,6 @@
-# SynPulse chat and bot setup — QA report
+# SynPulse chat and bot setup: QA report
 
-Date: 6 September 2026. This report uses synthetic QA identities and data. Production promotion details are recorded below after deployment.
+Date: 6 September 2026. This report uses synthetic QA identities and data. Production promotion and live verification are recorded in the linked release note.
 
 ## Acceptance coverage
 
@@ -13,17 +13,22 @@ Date: 6 September 2026. This report uses synthetic QA identities and data. Produ
 | Guided bot setup | Bounded creator completed all four steps. No POST before final save. Prompt, selected skill/MCP/CLI, users and group persisted; editing and photo reload passed. An unavailable CLI selection was refused. |
 | Managed bot execution | Both owner and group member completed real composer → worker → deterministic provider turns. Stored bot instructions reached the model request; the caller's remaining permissions still limited the actual tool surface. |
 | Personal memory | Alice, Bob and an administrator each used their own four synthetic private markers. Spoofed body identities did not alter ownership. Foreign-user and foreign-session reads were refused. Shared group requests contained no private markers. |
+| Personal navigation | Signed member clicked Memory and all four personal sections at 1440-pixel desktop and 390-pixel mobile widths. No data writes, page errors or horizontal overflow. |
 | File boundaries | Generic file/list/media routes checked direct, escaped and symlink paths. Engine file tools check the same private scope. |
 | Approval and delegation | Engine regressions verify that refreshed human permissions are intersected with the immutable bot ceiling, including project-file exceptions and delegated context. |
 | Revocation and legacy routes | Fresh active-cookie ACLs, explicit targets, owner-only configuration writes, private clone/delete and transaction rollback have independent review and regression coverage. Final real-browser revocation results are listed below. |
+| Compatibility and ownership | Bootstrap-only administrators can edit their own bots. The explicitly auth-disabled legacy Gateway route is retained; 18 dispatch cases cover the route contract. |
+| Terminal outcomes | Actual normal and terminal lifecycle checks passed. Terminal errors persist as authoritative outcomes; stale-run events cannot overwrite a newer run. |
 | Loading feedback | Reproduced the persistent “Loading conversation…” placeholder on an empty chat; it now disappears after successful hydration. |
 | Browser lifecycle | Delayed catalog/save responses cannot reclaim a different panel; Back/Continue cannot double-submit a pending save. |
 
 ## Automated results
 
-Final combined WebUI result: **245 passed in 20.88 seconds**, on code commit `cb215cb8`. The final browser run passed all **13 checks**, with no page errors, at 1440 × 950, 1024 × 768 and 390 × 844.
+Final focused WebUI result: **282 passed in 18.45 seconds**, on code commit `f93bac36`, with the paired engine selected explicitly through `HERMES_WEBUI_AGENT_DIR`. The isolated browser suite passed all **13 checks**, with no page errors, at 1440 × 950, 1024 × 768 and 390 × 844.
 
-The neighboring session/profile authorization suite also passed **18 tests**. Its two older session doubles were missing the existing `save()` lifecycle method; the fixture was corrected without changing runtime behavior. The focused CI runs all 263 tests together, plus recipient rules, full-page browser smoke and the guided-builder browser regression.
+The focused GitHub workflow runs these 282 tests, recipient rules, full-page browser smoke, the guided-builder browser regression and both normal and terminal-error Gateway lifecycle checks. Both actual lifecycle checks passed locally on the final patch, including preserved activity and hard-reload parity. Six Gateway regressions cover session identity, stale-run refusal, durable error state and redaction before storage, journal and live delivery.
+
+The neighboring session/profile authorization tests are included in this total. Two older session doubles were corrected to implement the existing `save()` lifecycle method, without changing runtime behavior.
 
 The real revocation rerun passed: a retained selected-bot cookie no longer exposes the bot in the list, and avatar, builder, direct chat and group chat return HTTP 403. Misleading query parameters do not bypass the refusal. No provider request is dispatched. The worker's early-access-error path also has a regression test so an asynchronous revocation emits a visible access error and clears runtime state.
 
@@ -35,7 +40,7 @@ The initial focused GitHub run exposed a test dependency on the VPS's installed 
 
 ## Known baseline and evidence boundaries
 
-- Existing full WebUI CI already fails collection at production base `27861048` on missing upstream symbols. The existing workflow is retained; focused release checks are separate. Compare the final full-CI errors with that baseline before representing anything as a new regression.
+- Full WebUI CI had 11 collection errors at production base `27861048`; the current comparison has 10, still caused by missing upstream symbols. The broad suite never reached test execution and is not green. The existing workflow is retained; focused release results do not replace or imply a passing broad suite.
 - Existing full engine Python, Windows and Nix jobs use custom runner labels unavailable in this fork. Focused actor/bot checks run on standard Ubuntu runners. Queued jobs are not reported as passed.
 - Browser QA uses the real local WebUI and engine, signed synthetic identities, and a deterministic loopback completion provider. No real colleagues were impersonated and no customer tools were executed.
 - An external microphone/WebRTC/speech-provider conversation was not exercised by these automated tests. Capability UI and error handling were tested separately.
@@ -44,7 +49,7 @@ The initial focused GitHub run exposed a test dependency on the VPS's installed 
 
 ## Evidence files
 
-Sanitized reports: `privacy-browser-report.json`, `builder-alice-qa.json`, `builder-access-qa.json`, `builder-runtime-provider-qa.json`, `builder-revocation-qa.json`. Screenshots: desktop chat, mobile chat, uploaded avatar editor and mobile bot review. Private fixture session cookies are excluded from deliverables.
+Sanitized reports: `privacy-browser-report.json`, `builder-alice-qa.json`, `builder-access-qa.json`, `builder-runtime-provider-qa.json`, `builder-revocation-qa.json`, `memory-nav-qa.json`. Screenshots: desktop chat, mobile chat, uploaded avatar editor, mobile bot review, and personal navigation at desktop/mobile widths. Private fixture session cookies are excluded from deliverables.
 
 Unchanged legacy skill selections were also verified above the former 100-item limit. The live default profile has 554 catalogued skills; editing its other fields preserves the existing installed skill tree and previous wildcard skill behavior.
 

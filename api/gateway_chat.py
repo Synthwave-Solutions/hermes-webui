@@ -565,6 +565,46 @@ def _run_gateway_chat_streaming(
     def put_gateway_event(event, data):
         if cancel_event.is_set() and event not in ("cancel", "error", "apperror"):
             return
+        # Terminal errors must identify the authoritative local session before
+        # journaling and live delivery; the browser rejects unowned events.
+        if event == "apperror":
+            data = {**data, "session_id": session_id}
+            # Normalize all upstream failure paths before durable or live use.
+            for field in ("message", "hint"):
+                data[field] = _redact_text(str(data.get(field) or ""))
+            if s is not None:
+                try:
+                    from api.streaming import (
+                        _materialize_pending_user_turn_before_error,
+                        _snapshot_and_append_partial_on_error,
+                        _session_payload_with_full_messages,
+                    )
+                    with _get_session_agent_lock(session_id):
+                        failed_session = get_session(session_id)
+                        if not _stream_writeback_is_current(failed_session, stream_id):
+                            return
+                        _materialize_pending_user_turn_before_error(failed_session)
+                        _snapshot_and_append_partial_on_error(failed_session, stream_id)
+                        hint = str(data.get("hint") or "")
+                        failed_session.messages.append({
+                            "role": "assistant",
+                            "content": "**Error:** " + str(data.get("message") or "Gateway request failed.")
+                                       + ("\n\n*" + hint + "*" if hint else ""),
+                            "timestamp": time.time(),
+                            "_turnDuration": max(0.0, time.time() - float(
+                                getattr(failed_session, "pending_started_at", None) or time.time())),
+                            "_error": True,
+                        })
+                        failed_session.active_stream_id = None
+                        failed_session.pending_user_message = None
+                        failed_session.pending_attachments = None
+                        failed_session.pending_started_at = None
+                        failed_session.pending_user_source = None
+                        failed_session.save()
+                        data["session"] = redact_session_data(
+                            _session_payload_with_full_messages(failed_session, tool_calls=[]))
+                except Exception:
+                    logger.exception("Failed to persist gateway failure for %s", session_id)
         event_id = None
         if run_journal is not None:
             try:
