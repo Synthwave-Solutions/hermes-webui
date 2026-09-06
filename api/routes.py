@@ -20263,54 +20263,30 @@ def _read_active_project_context(workspace: Path | None) -> dict:
 
 
 def _handle_memory_read(handler, parsed=None):
+    from api import personal_context
+    from api.governance.enforce import _request_identity
     try:
-        from api.profiles import get_active_hermes_home
-
-        home = get_active_hermes_home()
-        mem_dir = home / "memories"
-    except ImportError:
-        home = Path.home() / ".hermes"
-        mem_dir = home / "memories"
-    mem_file = mem_dir / "MEMORY.md"
-    user_file = mem_dir / "USER.md"
-    soul_file = home / "SOUL.md"
-    memory = (
-        mem_file.read_text(encoding="utf-8", errors="replace")
-        if mem_file.exists()
-        else ""
-    )
-    user = (
-        user_file.read_text(encoding="utf-8", errors="replace")
-        if user_file.exists()
-        else ""
-    )
-    soul = (
-        soul_file.read_text(encoding="utf-8", errors="replace")
-        if soul_file.exists()
-        else ""
-    )
-    project_context = _read_active_project_context(_memory_project_context_workspace(parsed))
-    return j(
-        handler,
-        {
-            "memory": _redact_text(memory),
-            "user": _redact_text(user),
-            "soul": _redact_text(soul),
-            "project_context": _redact_text(project_context["content"]),
-            "memory_path": str(mem_file),
-            "user_path": str(user_file),
-            "soul_path": str(soul_file),
-            "project_context_path": project_context["path"],
-            "project_context_name": project_context.get("name", ""),
-            "project_context_workspace": project_context["workspace"],
-            "memory_mtime": mem_file.stat().st_mtime if mem_file.exists() else None,
-            "user_mtime": user_file.stat().st_mtime if user_file.exists() else None,
-            "soul_mtime": soul_file.stat().st_mtime if soul_file.exists() else None,
-            "project_context_mtime": project_context["mtime"],
-            "project_context_shadowed": project_context["shadowed"],
-            "external_notes_enabled": _external_notes_sources_enabled(),
-        },
-    )
+        identity = _request_identity(handler)
+        sid = parse_qs(parsed.query or "").get("session_id", [""])[0] if parsed else ""
+        session = personal_context.session_for(identity, sid)
+        values = personal_context.read(identity, session)
+        paths = personal_context.paths(identity, session)
+        shared = personal_context.shared_project_context(identity, session)
+        payload = {key: _redact_text(value) for key, value in values.items()}
+        for key, path in paths.items():
+            payload[key + "_path"] = str(path)
+            payload[key + "_mtime"] = path.stat().st_mtime if path.exists() else None
+        payload.update(scope="personal", legacy_shared_data_preserved=True,
+                       shared_project_context=_redact_text(shared["content"]),
+                       shared_project_context_path=shared["path"],
+                       shared_project_context_name=shared["name"],
+                       shared_project_context_scope=shared["scope"],
+                       project_context_shadowed=[], external_notes_enabled=False)
+        return j(handler, payload)
+    except PermissionError as exc:
+        return bad(handler, str(exc), 403)
+    except (ValueError, KeyError):
+        return bad(handler, "Invalid personal context request", 400)
 
 
 # ── POST route helpers ────────────────────────────────────────────────────────
@@ -20940,7 +20916,7 @@ def _start_chat_stream_for_session(
     if goal_related:
         STREAM_GOAL_RELATED[stream_id] = True
     diag.stage("worker_thread_start") if diag else None
-    backend_is_gateway = webui_gateway_chat_enabled(get_config()) and not bool(getattr(s, 'participants', None) or getattr(s, 'bot_participants', None))
+    backend_is_gateway = not bool(sender_identity) and webui_gateway_chat_enabled(get_config()) and not bool(getattr(s, 'participants', None) or getattr(s, 'bot_participants', None))
     worker_target = _run_gateway_chat_streaming if backend_is_gateway else _run_agent_streaming
     worker_kwargs = {"model_provider": model_provider, "goal_related": goal_related}
     if sender_identity and not backend_is_gateway:
@@ -25025,54 +25001,17 @@ def _handle_skill_toggle(handler, body):
 
 
 def _handle_memory_write(handler, body):
+    from api import personal_context
+    from api.governance.enforce import _request_identity
     try:
-        require(body, "section", "content")
-    except ValueError as e:
-        return bad(handler, str(e))
-    try:
-        from api.profiles import get_active_hermes_home
-
-        home = get_active_hermes_home()
-        mem_dir = home / "memories"
-    except ImportError:
-        home = Path.home() / ".hermes"
-        mem_dir = home / "memories"
-    mem_dir.mkdir(parents=True, exist_ok=True)
-    section = body["section"]
-    if section == "memory":
-        target = mem_dir / "MEMORY.md"
-    elif section == "user":
-        target = mem_dir / "USER.md"
-    elif section == "soul":
-        target = home / "SOUL.md"
-    else:
-        return bad(handler, 'section must be "memory", "user", or "soul"')
-    # Refuse to write through a symlinked target file: a symlink planted at the
-    # memory path (e.g. via a restored/imported workspace) would otherwise let a
-    # memory write clobber an arbitrary file outside the memories directory. This
-    # mirrors the symlink-rejection hardening already shipped for skills/plugins
-    # (#4217/#4234/#4240).
-    if target.is_symlink():
-        return bad(handler, "Cannot write to a symlinked memory file")
-    try:
-        target.write_text(body["content"], encoding="utf-8")
-    except OSError as exc:
-        if not isinstance(exc, PermissionError) and getattr(exc, "errno", None) != errno.EROFS:
-            raise
-        mode_hint = ""
-        try:
-            mode_hint = f" (mode {target.stat().st_mode & 0o777:o})"
-        except OSError:
-            pass
-        return bad(
-            handler,
-            (
-                f"{target.name} is not writable{mode_hint}: {target}. "
-                "Run chmod 644 on the file or fix ownership on the shared volume."
-            ),
-            403,
-        )
-    return j(handler, {"ok": True, "section": section, "path": str(target)})
+        identity = _request_identity(handler)
+        session = personal_context.session_for(identity, body.get("session_id"))
+        target = personal_context.write(identity, body.get("section"), body.get("content"), session)
+        return j(handler, {"ok": True, "section": body["section"], "path": str(target), "scope": "personal"})
+    except PermissionError as exc:
+        return bad(handler, str(exc), 403)
+    except (ValueError, KeyError):
+        return bad(handler, "Invalid personal context request", 400)
 
 
 def _normalize_message_for_import_refresh(message: object) -> object:
