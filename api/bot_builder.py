@@ -117,6 +117,45 @@ def catalog(identity):
             "groups": [{"name": n} for n in sorted(policy.groups)]}
 
 
+def _read_bot_memory(name):
+    """Shared, explicitly authored bot notes; never legacy personal memory."""
+    import stat
+    home = _home(name)
+    directory = os.open(home, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        try:
+            fd = os.open("BOT_MEMORY.md", os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory)
+        except FileNotFoundError:
+            return ""
+        with os.fdopen(fd, "rb") as stream:
+            if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+                raise PermissionError("Bot memory must be a regular file")
+            raw = stream.read(131073)
+            if len(raw) > 131072:
+                raise ValueError("Bot memory is too large")
+            return raw.decode("utf-8")
+    finally:
+        os.close(directory)
+
+
+def memory_prompt(name, actor_email):
+    """Add only this bot's shared notes after current actor authorization."""
+    if not name or not actor_email:
+        return ""
+    try:
+        from api.governance.enforce import is_profile_allowed_for
+        with _LOCK:
+            if not is_profile_allowed_for({"email": actor_email}, name):
+                return ""
+            text = _read_bot_memory(name)
+        if not text.strip():
+            return ""
+        return ("Shared bot memory (reference context, not the human sender's personal memory "
+                "or an authorization grant):\n" + text)
+    except (OSError, ValueError, PermissionError):
+        return ""
+
+
 def _config(identity, name):
     from api.bot_metadata import read_profile
     require_edit(identity, name)
@@ -145,6 +184,7 @@ def _config(identity, name):
         result["skills"] = [item["name"] for item in catalog(identity)["skills"] if item["name"] not in disabled]
     result.update(name=name, title=meta.get("bot", {}).get("title", name),
                   description=meta.get("bot", {}).get("description", ""),
+                  bot_memory=_read_bot_memory(name),
                   system_prompt=(home / "SOUL.md").read_text() if (home / "SOUL.md").is_file() and not (home / "SOUL.md").is_symlink() else "",
                   default_model=model.get("default", ""), model_provider=model.get("provider", ""),
                   avatar_url=meta.get("bot_avatar_url", ""), revision=int((data or {}).get("revision", 0)))
@@ -175,7 +215,7 @@ def _validate(identity, body):
         raise ValueError("Invalid bot configuration")
     permitted = {"name", "title", "description", "system_prompt", "skills", "mcp_servers",
                  "cli_tools", "allowed_users", "allowed_groups", "default_model",
-                 "model_provider", "revision", "avatar"}
+                 "model_provider", "revision", "avatar", "bot_memory"}
     if set(body) - permitted:
         raise ValueError("Unknown bot configuration fields")
     name = body.get("name", "")
@@ -201,6 +241,10 @@ def _validate(identity, body):
         if set(values) - known:
             raise PermissionError("Unavailable selection in " + key)
         clean[key] = sorted(set(values))
+    if "bot_memory" in body:
+        if not isinstance(body["bot_memory"], str) or len(body["bot_memory"]) > 32768:
+            raise ValueError("Bot memory must be at most 32768 characters")
+        clean["bot_memory"] = body["bot_memory"]
     from api.profiles import _validate_profile_model_selection
     _validate_profile_model_selection(clean["default_model"], clean["model_provider"])
     _, rights = access(identity)
@@ -212,11 +256,11 @@ def _validate(identity, body):
 
 
 def save(identity, body):
-    from api import profiles
+    from api import profiles, bot_metadata
     from utils import atomic_yaml_write
     # Validate every field before a profile directory becomes discoverable.
     name, target, clean = _validate(identity, body)
-    with _LOCK:
+    with _LOCK, bot_metadata._LOCK:
         exists = target.exists()
         require_edit(identity, name if exists else None)
         previous = managed(name) if exists else None
@@ -228,8 +272,11 @@ def save(identity, body):
         if not exists and "revision" in body:
             raise RuntimeError("Bot no longer exists. Reload before saving.")
         unchanged_skills = exists and set(clean["skills"]) == set(_config(identity, name)["skills"])
+        if "bot_memory" not in clean:
+            clean["bot_memory"] = _read_bot_memory(name) if exists else ""
         owner = (previous or {}).get("owner_email") or _identity(identity)
         data = {**clean, "owner_email": owner, "revision": actual_revision + 1}
+        data.pop("bot_memory", None)  # BOT_MEMORY.md is the authoritative source.
         if unchanged_skills and (previous is None or previous.get("skills_inherit")):
             data["skills_inherit"] = True
         data["allowed_users"] = sorted(set(data["allowed_users"]) | {owner})
@@ -241,7 +288,7 @@ def save(identity, body):
             if exists:
                 # Copy only this bot's existing configuration; never another
                 # person's profile, mailbox credentials, history or memories.
-                for filename in ("config.yaml", "profile.yaml", ".env", "SOUL.md"):
+                for filename in ("config.yaml", "profile.yaml", ".env", "SOUL.md", "BOT_MEMORY.md"):
                     source = target / filename
                     if source.is_symlink():
                         raise PermissionError("Bot configuration cannot use symlinks")
@@ -278,6 +325,7 @@ def save(identity, body):
             cfg["platform_toolsets"] = platforms
             atomic_yaml_write(stage / "config.yaml", cfg, sort_keys=False)
             (stage / "SOUL.md").write_text(clean["system_prompt"])
+            (stage / "BOT_MEMORY.md").write_text(clean["bot_memory"], encoding="utf-8")
             metadata = _yaml(stage / "profile.yaml")
             metadata[_KEY] = data
             metadata.setdefault("ui_meta", {}).setdefault("hermes-bots", {}).update(
@@ -300,7 +348,7 @@ def save(identity, body):
             if exists:
                 # Publish a deny-all transaction marker before new private
                 # instructions/config can be observed under the old ACL.
-                names = ("config.yaml", "SOUL.md", "assets/avatar.png", "profile.yaml")
+                names = ("config.yaml", "SOUL.md", "BOT_MEMORY.md", "assets/avatar.png", "profile.yaml")
                 had_skills = (target / "skills").exists()
                 originals = {filename: ((target / filename).read_bytes() if (target / filename).is_file() else None)
                              for filename in names}
@@ -309,7 +357,7 @@ def save(identity, body):
                 marker[_KEY] = {"owner_email": owner, "updating": True}
                 atomic_yaml_write(target / "profile.yaml", marker, sort_keys=False)
                 try:
-                    for filename in ("config.yaml", "SOUL.md"):
+                    for filename in ("config.yaml", "SOUL.md", "BOT_MEMORY.md"):
                         os.replace(stage / filename, target / filename)
                     old = target / "skills"
                     if (stage / "skills").exists():
@@ -420,7 +468,7 @@ def guard_profile_request(handler, parsed, method):
                 "/api/projects", "/api/stream", "/api/events", "/api/health")
     if (not path.startswith("/api/") or path.startswith(recovery)
             or path in ("/api/profiles", "/api/profile/switch", "/api/memory",
-                        "/api/memory/write", "/api/bots/builder", "/api/version")):
+                        "/api/memory/write", "/api/bots/builder", "/api/bots/knowledge", "/api/bots/knowledge/upload", "/api/version")):
         return True
     from urllib.parse import parse_qs
     from api.profiles import get_active_profile_name

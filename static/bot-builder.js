@@ -6,6 +6,7 @@
     steps:['Identity & photo','Instructions & skills','Connections & tools','Access & review'],
     next:'Continue',back:'Back',save:'Create bot',saving:'Saving…'
   };
+  const tr=(key,fallback)=>typeof t==='function'?t(key):fallback;
   function input(id){return document.getElementById(id);}
   async function readAvatar(file){
     if(!file || !['image/png','image/jpeg','image/webp'].includes(file.type))
@@ -32,6 +33,9 @@
   }
   function choices(label,key,rows){
     const chosen=state.config[key]||[];
+    rows=[...(rows||[])];
+    const available=new Set(rows.map(row=>row.name||row.email));
+    for(const value of chosen)if(!available.has(value))rows.push({name:value,description:tr('bot_editor_unavailable_selection',"Previously selected; currently unavailable. Remove this selection to save.")});
     return '<fieldset class="bot-builder-options"><legend>'+esc(label)+'</legend>'+
       '<input type="search" data-filter="'+key+'" aria-label="Filter '+esc(label)+'" placeholder="Filter '+esc(label.toLowerCase())+'">'+
       '<div class="bot-builder-choice-list">'+(rows||[]).map(row=>{
@@ -42,7 +46,7 @@
   function collect(){
     if(!state)return;
     const c=state.config;
-    for(const [id,key] of [['builderName','name'],['builderTitle','title'],['builderDescription','description'],['builderPrompt','system_prompt']]){
+    for(const [id,key] of [['builderName','name'],['builderTitle','title'],['builderDescription','description'],['builderPrompt','system_prompt'],['builderMemory','bot_memory']]){
       if(input(id))c[key]=input(id).value;
     }
     for(const key of ['skills','mcp_servers','cli_tools','allowed_users','allowed_groups']){
@@ -53,12 +57,12 @@
   function validate(){
     collect();
     const c=state.config;
-    if(state.step===0){
+    if(state.edit||state.step===0){
       c.name=(c.name||'').trim().toLowerCase();
       if(!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(c.name))throw new Error('Use a bot ID with lowercase letters, numbers, hyphens or underscores.');
       if(!(c.title||'').trim())throw new Error('Give your bot a display name.');
     }
-    if(state.step===1&&!(c.system_prompt||'').trim())throw new Error('Describe the bot’s role and instructions before continuing.');
+    if((state.edit||state.step===1)&&!(c.system_prompt||'').trim())throw new Error('Describe the bot’s role and instructions before continuing.');
   }
   function error(message){
     const el=input('builderError');if(el){el.textContent=message;el.hidden=false;}
@@ -80,11 +84,17 @@
     }else if(step===1){
       content=field('System instructions','builderPrompt',c.system_prompt,true)+
         '<p>Define the role, expected outputs and boundaries. These are the bot’s instructions, not your personal memory.</p>'+
-        choices('Skills','skills',cat.skills);
+        (state.edit?'':choices('Skills','skills',cat.skills));
     }else if(step===2){
       content='<p>Only connections and tools already available to your account can be selected. Credentials stay on the server.</p>'+
         choices('MCP connections','mcp_servers',cat.mcp_servers)+choices('CLI tools','cli_tools',cat.cli_tools)+
         '<p>Model: <strong>'+esc(c.default_model||'Configured default')+'</strong> '+esc(c.model_provider||'')+'</p>';
+    }else if(step===4){
+      content=field(tr('bot_editor_memory',"Bot memory"),'builderMemory',c.bot_memory||'',true)+
+        '<p>'+esc(tr('bot_editor_memory_hint',"Shared with the users of this bot. Separate from My Notes and your personal user profile."))+'</p>'+
+        '<p>'+esc(tr('bot_editor_knowledge_hint',"File selections are saved separately using Save knowledge below."))+'</p><div id="builderKnowledge"></div>';
+    }else if(step===5){
+      content=choices('Skills','skills',cat.skills);
     }else{
       content='<p>Private to you by default. Add only the people or groups who should be able to use this bot.</p>'+
         choices('Allowed users','allowed_users',cat.users)+choices('Allowed groups','allowed_groups',cat.groups)+
@@ -92,8 +102,26 @@
         [['Bot',c.title+' (@'+c.name+')'],['Instructions',c.system_prompt],['Skills',(c.skills||[]).join(', ')||'None selected'],['MCP connections',(c.mcp_servers||[]).join(', ')||'None selected'],['CLI tools',(c.cli_tools||[]).join(', ')||'None selected']].map(([a,b])=>'<dt>'+esc(a)+'</dt><dd>'+esc(b)+'</dd>').join('')+'</dl>'+
         '<p>The bot becomes available only after all configuration and access checks succeed.</p>';
     }
-    body.innerHTML='<div class="main-view-content bot-builder"><ol class="bot-builder-steps">'+copy.steps.map((s,i)=>'<li '+(i===step?'aria-current="step"':'')+'>'+esc(s)+'</li>').join('')+'</ol>'+content+
-      '<p id="builderError" role="alert" hidden></p><div class="bot-builder-actions"><button type="button" class="sm-btn" id="builderBack" '+(step===0?'disabled':'')+'>Back</button><button type="button" class="sm-btn primary" id="builderNext">'+(step===3?(state.edit?'Save bot':'Create bot'):'Continue')+'</button></div></div>';
+    const sections=[[0,tr('bot_editor_identity',"Identity & photo")],[1,tr('bot_editor_instructions',"Instructions")],[4,tr('bot_editor_memory_tab',"Memory & knowledge")],[5,tr('bot_editor_skills',"Skills")],[2,tr('bot_editor_connections',"Connections & tools")],[3,tr('bot_editor_access',"Access")]];
+    const navigation=state.edit?'<div class="bot-builder-tabs" role="tablist" aria-label="'+esc(tr('bot_editor_tabs','Bot configuration'))+'">'+sections.map(([i,label])=>'<button type="button" role="tab" id="builderTab'+i+'" aria-controls="builderTabPanel" aria-selected="'+(i===step)+'" tabindex="'+(i===step?0:-1)+'" data-builder-tab="'+i+'">'+esc(label)+'</button>').join('')+'</div>':'<ol class="bot-builder-steps">'+copy.steps.map((s,i)=>'<li '+(i===step?'aria-current="step"':'')+'>'+esc(s)+'</li>').join('')+'</ol>';
+    body.innerHTML='<div class="main-view-content bot-builder">'+navigation+'<section id="builderTabPanel" '+(state.edit?'role="tabpanel" aria-labelledby="builderTab'+step+'"':'')+'>'+content+'</section>'+
+      '<p id="builderError" role="alert" hidden></p><div class="bot-builder-actions"><button type="button" class="sm-btn" id="builderBack" '+(step===0||state.edit?'disabled':'')+'>Back</button><button type="button" class="sm-btn primary" id="builderNext">'+(state.edit?'Save bot':step===3?'Create bot':'Continue')+'</button></div></div>';
+    if(state.edit){
+      input('builderBack').hidden=true;
+      body.querySelectorAll('[data-builder-tab]').forEach(tab=>{
+        tab.onclick=()=>{if(!state||state.saving)return;if(window.BotKnowledge&&window.BotKnowledge.isBusy&&window.BotKnowledge.isBusy(state.config.name)){error(tr('bot_editor_knowledge_busy',"Wait for the knowledge file operation to finish."));return;}collect();state.step=Number(tab.dataset.builderTab);render();input('builderTab'+state.step).focus();};
+        tab.onkeydown=event=>{
+          if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
+          event.preventDefault();const tabs=[...body.querySelectorAll('[data-builder-tab]')];let index=tabs.indexOf(tab);
+          index=event.key==='Home'?0:event.key==='End'?tabs.length-1:(index+(event.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length;
+          tabs[index].click();
+        };
+      });
+      if(step===4){
+        if(window.BotKnowledge)window.BotKnowledge.mount(input('builderKnowledge'),c.name);
+        else input('builderKnowledge').textContent=tr('bot_editor_knowledge_unavailable',"Knowledge files are unavailable. Reload the page.");
+      }
+    }
     if(state.edit&&input('builderName'))input('builderName').readOnly=true;
     body.querySelectorAll('[data-filter]').forEach(el=>el.oninput=()=>{
       body.querySelectorAll('[data-choice="'+el.dataset.filter+'"]').forEach(row=>row.hidden=!row.textContent.toLowerCase().includes(el.value.toLowerCase()));
@@ -107,10 +135,11 @@
     };
     input('builderBack').onclick=()=>{if(!state||state.saving)return;collect();state.step--;render();};
     input('builderNext').onclick=async()=>{
-      try{if(!state||state.saving)return;validate();if(state.step<3){state.step++;render();}else await save();}catch(err){error(err.message);}
+      try{if(!state||state.saving)return;validate();if(!state.edit&&state.step<3){state.step++;render();}else await save();}catch(err){error(err.message);}
     };
   }
-  async function open(name){
+  async function open(name,section){
+    if(window.BotKnowledge&&window.BotKnowledge.forget)window.BotKnowledge.forget();
     const intent=++epoch;state=null;
     _profileMode='create';
     if(typeof switchPanel==='function' && await switchPanel('profiles')===false)return;
@@ -122,29 +151,38 @@
     });
     if(epoch!==intent||!data)return;
     if(!data.can_edit){body.textContent='You do not have permission to configure this bot.';return;}
-    state={step:0,edit:!!name,catalog:data.catalog||{},config:{name:'',title:'',description:'',system_prompt:'',skills:[],mcp_servers:[],cli_tools:[],allowed_users:[],allowed_groups:[],...data.config}};
+    const steps={identity:0,soul:1,memory:4,knowledge:4,skills:5,settings:2,access:3};
+    state={step:name?(steps[section]??0):0,edit:!!name,catalog:data.catalog||{},config:{name:'',title:'',description:'',system_prompt:'',skills:[],mcp_servers:[],cli_tools:[],allowed_users:[],allowed_groups:[],...data.config}};
     if(!name)delete state.config.revision;
     render();
   }
   async function save(){
-    if(!state||state.step!==3||state.saving)return;
-    collect();const current=state,button=input('builderNext');
+    if(!state||(!state.edit&&state.step!==3)||state.saving)return;
+    if(window.BotKnowledge&&window.BotKnowledge.isBusy&&window.BotKnowledge.isBusy(state.config.name)){
+      error(tr('bot_editor_knowledge_busy',"Wait for the knowledge file operation to finish."));return;
+    }
+    if(window.BotKnowledge&&window.BotKnowledge.hasUnsaved&&window.BotKnowledge.hasUnsaved(state.config.name)){
+      error(tr('bot_editor_knowledge_unsaved',"Save your knowledge file selection first, then save the bot."));return;
+    }
+    validate();const current=state,button=input('builderNext');
     state.saving=true;button.disabled=true;button.textContent='Saving…';
     input('builderBack').disabled=true;
+    input('profileDetailBody').querySelectorAll('[data-builder-tab]').forEach(tab=>tab.disabled=true);
     const payload={...state.config};
     delete payload.avatar_url;
     if(state.avatar)payload.avatar=state.avatar;
     try{
       await api('/api/bots/builder',{method:'POST',body:JSON.stringify(payload)});
       if(state!==current)return;
+      if(window.BotKnowledge&&window.BotKnowledge.forget)window.BotKnowledge.forget();
       state=null;epoch++;_profileMode='read';
       _profileDropdownClearStoredCache();
       window.dispatchEvent(new CustomEvent('synpulse:bot-updated',{detail:{name:payload.name}}));
       await loadProfilesPanel();openProfileDetail(payload.name);
       showToast('Bot saved');
-    }catch(err){if(state===current){current.saving=false;error(err.message);button.disabled=false;input('builderBack').disabled=false;button.textContent=current.edit?'Save bot':'Create bot';}}
+    }catch(err){if(state===current){current.saving=false;input('profileDetailBody').querySelectorAll('[data-builder-tab]').forEach(tab=>tab.disabled=false);error(err.message);button.disabled=false;input('builderBack').disabled=false;button.textContent=current.edit?'Save bot':'Create bot';}}
   }
-  function invalidate(){epoch++;state=null;}
+  function invalidate(){epoch++;state=null;if(window.BotKnowledge&&window.BotKnowledge.forget)window.BotKnowledge.forget();}
   window.BotBuilder={readAvatar,open,save,invalidate};
 
 })();

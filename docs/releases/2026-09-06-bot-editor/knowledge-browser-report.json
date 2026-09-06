@@ -1,0 +1,12 @@
+{
+  "file_input_upload_two": true,
+  "upload_not_automatically_selected": true,
+  "search_selection_save_reload": true,
+  "separate_bot_catalog": true,
+  "cross_bot_selection_denied": 400,
+  "member_read_denied": 403,
+  "member_upload_denied": 403,
+  "traversal_denied": 400,
+  "mobile_overflow": false,
+  "errors": []
+}
