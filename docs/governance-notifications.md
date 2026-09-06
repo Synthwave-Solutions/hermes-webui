@@ -35,3 +35,9 @@ invocation returned successfully, not independent verification of an external
 business outcome. Run teardown without an observed tool return becomes
 input-needed. Cancelling consent cancels outstanding waits; it cannot undo an
 operation already released for execution. Normal chat Stop still cancels the run.
+
+Approval rows show the catalogue capability and scope directly above the
+technical disclosure. Missing historical user messages are identified as
+not recorded; the system never invents a reason. Rules-based risk advice uses
+sentences instead of internal risk flags. If catalogue or model advice is
+unavailable, the row explicitly explains the uncertainty and asks for details.

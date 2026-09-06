@@ -898,6 +898,9 @@ def _approval_row(entry: dict, *, explain: bool = False, access=None) -> dict:
             )
         except Exception:
             row["explanation"] = {}
+        if not isinstance(row.get("explanation"), dict) or not row["explanation"].get("capability"):
+            from api.capability_risk import unavailable_explanation
+            row["explanation"] = unavailable_explanation()
         # The advisory block: why this person most likely asked, the realistic
         # worst case, and a recommendation. Written by a model where one is
         # reachable, from the risk catalogue otherwise; the block says which.
@@ -910,6 +913,9 @@ def _approval_row(entry: dict, *, explain: bool = False, access=None) -> dict:
                 row["advice"] = approval_advice.advise(entry, row.get("explanation"))
             except Exception:
                 row["advice"] = {}
+            if not isinstance(row.get("advice"), dict) or not row["advice"].get("recommendation"):
+                from api.approval_advice import _rules_advice
+                row["advice"] = _rules_advice(entry, row["explanation"], "Advisory explanation unavailable; showing the platform catalogue.")
     return row
 
 

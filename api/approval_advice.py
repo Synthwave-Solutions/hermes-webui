@@ -140,6 +140,7 @@ def _rules_advice(entry: dict, explanation: dict, note: str) -> dict:
     approver should be able to tell advice from a model apart from a default.
     """
     explanation = explanation if isinstance(explanation, dict) else {}
+    from api.capability_risk import RISK_DESCRIPTIONS
     risks = [r for r in (explanation.get("risks") or []) if _clean(r)]
     alternatives = [a for a in (explanation.get("alternatives") or []) if _clean(a)]
     ask = _requester_ask(entry)
@@ -167,8 +168,8 @@ def _rules_advice(entry: dict, explanation: dict, note: str) -> dict:
         reason = "The catalogue has no entry for this capability, so it needs a human read."
 
     return {
-        "why": ask and f"Their own message was: {ask[:400]}" or "",
-        "risk": risks[0] if risks else _clean(explanation.get("data")),
+        "why": ask and f"Their own message was: {ask[:400]}" or "The original request was not recorded. Ask the requester which task needs this access.",
+        "risk": RISK_DESCRIPTIONS.get(risks[0], _clean(explanation.get("data")) or "The effect of this access has not been verified.") if risks else (_clean(explanation.get("data")) or "The effect of this access has not been verified."),
         "recommendation": recommendation,
         "recommendation_reason": reason,
         "narrower_alternative": alternatives[0] if alternatives else "",

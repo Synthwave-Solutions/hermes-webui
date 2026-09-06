@@ -1438,6 +1438,10 @@ function _govApprovalRow(item) {
       + _govEsc(trigger) + '</div>'
     : '';
   const ex = (item.explanation && typeof item.explanation === 'object') ? item.explanation : null;
+  const plainCapability = ex && ex.capability ? String(ex.capability) : _govT('governance_explain_unavailable', 'The effect of this access has not been verified. Ask for the exact action and scope before deciding.');
+  const plainScope = ex && ex.scope_text ? String(ex.scope_text) : '';
+  const plainExplanation = '<div class="gov-approval-explanation">' + _govEsc(plainCapability)
+    + (plainScope ? '<br>' + _govEsc(plainScope) : '') + '</div>';
   const explainHtml = ex ? _govExplainHtml(ex) : '';
   const adviceHtml = _govAdviceHtml(item.advice);
   // Related access (ticket 10) hangs off access requests only: the chain it
@@ -1456,7 +1460,7 @@ function _govApprovalRow(item) {
     ' data-key="' + _govEsc(key) + '">' + label2 + '</button>';
   return '<tr>' +
     '<td class="gov-nowrap"><span class="gov-chip' + _govKindChipClass(kind) + '">' + _govEsc(_govKindLabel(kind)) + '</span></td>' +
-    '<td>' + _govEsc(primary) + secondary + detail + triggerHtml + adviceHtml + explainHtml + sugHtml + '</td>' +
+    '<td>' + _govEsc(primary) + secondary + detail + plainExplanation + triggerHtml + adviceHtml + explainHtml + sugHtml + '</td>' +
     '<td>' + _govEsc(item.owner_email || '') + '</td>' +
     '<td class="gov-nowrap">' + _govEsc(when) + '</td>' +
     '<td class="gov-row-actions">' +

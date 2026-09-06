@@ -57,6 +57,24 @@ RISKS = (
     RISK_FINANCIAL,
 )
 
+RISK_DESCRIPTIONS = {
+    RISK_EXTERNAL_COMMS: "It could send information to people outside the conversation.",
+    RISK_DATA_ACCESS: "It could read personal or confidential information within the granted scope.",
+    RISK_FILE_WRITE: "It could create, overwrite or change files within the granted scope.",
+    RISK_SCHEDULING: "It could schedule work that runs later without someone watching.",
+    RISK_FINANCIAL: "It could use paid services or cause spending.",
+}
+
+
+def unavailable_explanation():
+    return {
+        "capability": "The platform could not determine what this request would allow.",
+        "data": "The data and actions in scope have not been verified.",
+        "scope_text": "Ask the requester for the exact action and scope before deciding.",
+        "risks": [],
+        "status": "unavailable",
+    }
+
 # There is no expiry mechanism in api/approvals.py or in the policy document,
 # so the duration line states that rather than implying a time box.
 DURATION_UNTIL_REVOKED = (
