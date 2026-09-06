@@ -225,6 +225,10 @@ def _gateway_tool_progress_event(payload: dict) -> tuple[str, dict] | None:
     if not isinstance(payload, dict):
         return None
     event_type = str(payload.get("event") or "").strip().lower()
+    from api.subagent_progress import normalize
+    subagent = normalize(event_type, payload)
+    if subagent:
+        return "subagent", subagent
     if event_type == "reasoning.available":
         reason_delta = _gateway_reasoning_delta(payload)
         if not reason_delta:
@@ -408,10 +412,13 @@ def _run_gateway_runs_api_streaming(
                     put_gateway_event("approval", approval_data)
                 sse_event = "message"
                 continue
-            if payload_event in {"tool.started", "tool.completed", "reasoning.available"}:
-                translated = _gateway_tool_progress_event(payload)
+            if payload_event in {"tool.started", "tool.completed", "reasoning.available", "subagent"}:
+                translated = _gateway_tool_progress_event({**payload, "event": payload_event})
                 if translated:
                     event_name, event_payload = translated
+                    if event_name == "subagent":
+                        from api.subagent_progress import remember
+                        remember(STREAM_LIVE_TOOL_CALLS.setdefault(stream_id, []), event_payload)
                     if event_name == "reasoning":
                         reason_delta = event_payload.get("text")
                         if reason_delta and stream_id in STREAM_REASONING_TEXT:
@@ -435,7 +442,7 @@ def _run_gateway_runs_api_streaming(
                                     shared_tc["is_error"] = bool(event_payload.get("is_error"))
                                     break
                     put_gateway_event(event_name, event_payload)
-                    if event_name != "reasoning":
+                    if event_name in {"tool", "tool_complete"}:
                         update_active_run(stream_id, phase="gateway-tool", latest_tool=event_payload.get("name"))
                 sse_event = "message"
                 continue
@@ -777,6 +784,9 @@ def _run_gateway_chat_streaming(
                         translated = _gateway_tool_progress_event(payload)
                         if translated:
                             event_name, event_payload = translated
+                            if event_name == "subagent":
+                                from api.subagent_progress import remember
+                                remember(STREAM_LIVE_TOOL_CALLS.setdefault(stream_id, []), event_payload)
                             if event_name == "reasoning":
                                 reason_delta = event_payload.get("text")
                                 if reason_delta and stream_id in STREAM_REASONING_TEXT:
@@ -789,7 +799,7 @@ def _run_gateway_chat_streaming(
                                         "done": False,
                                         **({"tid": event_payload.get("tid")} if event_payload.get("tid") else {}),
                                     })
-                                else:
+                                elif event_name == "tool_complete":
                                     for shared_tc in reversed(STREAM_LIVE_TOOL_CALLS[stream_id]):
                                         if shared_tc.get("done"):
                                             continue
@@ -800,7 +810,7 @@ def _run_gateway_chat_streaming(
                                             shared_tc["is_error"] = bool(event_payload.get("is_error"))
                                             break
                             put_gateway_event(event_name, event_payload)
-                            if event_name != "reasoning":
+                            if event_name in {"tool", "tool_complete"}:
                                 update_active_run(stream_id, phase="gateway-tool", latest_tool=event_payload.get("name"))
                         sse_event = "message"
                         continue

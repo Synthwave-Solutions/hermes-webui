@@ -7480,6 +7480,14 @@ def _run_agent_streaming(
                     name = cb_args[0]
                     event_type = 'tool.started'
 
+                from api.subagent_progress import normalize as normalize_subagent, remember as remember_subagent
+                subagent = normalize_subagent(event_type, cb_kwargs)
+                if subagent:
+                    if stream_id in STREAM_LIVE_TOOL_CALLS:
+                        remember_subagent(STREAM_LIVE_TOOL_CALLS[stream_id], subagent)
+                    put('subagent', subagent)
+                    return
+
                 if event_type in ('reasoning.available', '_thinking'):
                     reason_text = preview if event_type == 'reasoning.available' else name
                     if reason_text:

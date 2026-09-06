@@ -72,6 +72,7 @@ _CLI_SESSIONS_CACHE_STALE_WAIT_SECONDS = 0.10
 _CLAUDE_CODE_PARSE_CACHE_LOCK = threading.Lock()
 _CLAUDE_CODE_PARSE_CACHE: "collections.OrderedDict[tuple, tuple]" = collections.OrderedDict()
 _CLAUDE_CODE_PARSE_CACHE_MAX = 1000
+_CLAUDE_CODE_SIDEBAR_LOCK = threading.Lock()
 
 # Per-file cache for the UI-owned sidecar metadata (title + archived) that the
 # state.db sidebar projection overlays onto each CLI/cron row (#4842). The
@@ -5194,6 +5195,12 @@ def _claude_code_title(messages: list[dict], summary_title: str | None) -> str:
 
 
 def get_claude_code_sessions(projects_dir: Path | str | None = None, *, max_files: int = CLAUDE_CODE_MAX_FILES, max_file_bytes: int = CLAUDE_CODE_MAX_FILE_BYTES) -> list:
+    # Collapse the startup warmer and concurrent sidebar reads into one scan.
+    with _CLAUDE_CODE_SIDEBAR_LOCK:
+        return _get_claude_code_sessions(projects_dir, max_files=max_files, max_file_bytes=max_file_bytes)
+
+
+def _get_claude_code_sessions(projects_dir, *, max_files, max_file_bytes) -> list:
     """Read Claude Code JSONL sessions as read-only external-agent rows.
 
     The bridge is additive and defensive: it skips symlinks, oversized files,
@@ -5201,6 +5208,10 @@ def get_claude_code_sessions(projects_dir: Path | str | None = None, *, max_file
     listing. Tests pass ``projects_dir`` fixtures so Michael's real ~/.claude is
     never read during test runs.
     """
+    from api import claude_sidebar_cache as sidebar_cache
+    cache_path = _cfg.STATE_DIR / "claude-sidebar-index.json"
+    cached = sidebar_cache.load(cache_path)
+    fresh = {}
     sessions = []
     # ``get_last_workspace()`` is loop-invariant (the same active workspace for
     # every Claude Code row) but internally stats config.yaml + probes terminal
@@ -5208,9 +5219,15 @@ def get_claude_code_sessions(projects_dir: Path | str | None = None, *, max_file
     # sidebar build (#4718). Resolve it a single time.
     cc_workspace = str(get_last_workspace())
     for path in _iter_claude_code_jsonl_files(projects_dir, max_files=max_files, max_file_bytes=max_file_bytes) or []:
-        messages, summary_title, first_ts, last_ts = _parse_claude_code_jsonl_cached(path)
-        if not messages:
+        metadata, cache_entry = sidebar_cache.metadata(
+            path, cached, parse=_parse_claude_code_jsonl, title=_claude_code_title,
+            max_messages=CLAUDE_CODE_MAX_MESSAGES_PER_FILE,
+        )
+        if cache_entry is not None:
+            fresh[str(path.resolve())] = cache_entry
+        if not metadata or not metadata["message_count"]:
             continue
+        first_ts, last_ts = metadata["first_ts"], metadata["last_ts"]
         sid = _claude_code_session_id(path)
         # Match the truthiness fallback used in the assignments below: the old
         # inline code was ``first_ts or last_ts or path.stat().st_mtime``, which
@@ -5229,10 +5246,10 @@ def get_claude_code_sessions(projects_dir: Path | str | None = None, *, max_file
         updated_at = last_ts or first_ts or _mtime
         sessions.append({
             'session_id': sid,
-            'title': _claude_code_title(messages, summary_title),
+            'title': metadata['title'],
             'workspace': cc_workspace,
             'model': 'claude-code',
-            'message_count': len(messages),
+            'message_count': metadata['message_count'],
             'created_at': created_at,
             'updated_at': updated_at,
             'last_message_at': updated_at,
@@ -5247,6 +5264,9 @@ def get_claude_code_sessions(projects_dir: Path | str | None = None, *, max_file
             'is_cli_session': True,
             'read_only': True,
         })
+    # Persist only the current bounded source set, never transcript contents.
+    if fresh != cached:
+        sidebar_cache.save(cache_path, fresh)
     sessions.sort(key=lambda s: s.get('last_message_at') or s.get('updated_at') or 0, reverse=True)
     return sessions
 
