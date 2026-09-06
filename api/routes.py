@@ -13423,7 +13423,7 @@ def handle_get(handler, parsed) -> bool:
         return j(
             handler,
             {
-                "profiles": [{**p, **bot_metadata.read_profile(p["name"])} for p in profiles_api.list_profiles_api() if _chat_profile_target_allowed(handler,p["name"])],
+                "profiles": [{**p, **bot_metadata.read_profile(p["name"])} for p in profiles_api.list_profiles_api(fast=(parse_qs(parsed.query).get("fast") or [""])[0] == "1") if _chat_profile_target_allowed(handler,p["name"])],
                 "active": profiles_api.get_active_profile_name(),
                 "single_profile_mode": _is_isolated_profile_mode(),
             },
