@@ -581,6 +581,8 @@ window.__registerHermesLocale('en', {
     save_failed: 'Save failed: ',
     image_load_failed: 'Could not load image',
     file_open_failed: 'Could not open file',
+    artifact_download_failed: 'The file could not be downloaded. Retry the download; if it remains unavailable, ask the agent to regenerate the file.',
+    artifact_download_denied: 'Access to this file could not be verified. Sign in again or request access, then retry the download.',
     downloading: (name) => `Downloading ${name}\u2026`,
     double_click_rename: 'Double-click to rename',
     symlink_link_to: 'Symlink → {target}',

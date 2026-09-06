@@ -1241,17 +1241,63 @@ async function openFile(path, opts={}){
   }
 }
 
+// Fetch the authorized bytes before asking the browser to save. A Blob holds
+// this response snapshot even if the source artifact changes immediately after.
+async function downloadArtifact(url, filename){
+  let objectUrl=null;
+  let anchor=null;
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),60000);
+  try{
+    const target=new URL(url,window.location.href);
+    if(target.origin!==window.location.origin) throw new Error('external');
+    target.searchParams.set('download','1');
+    target.searchParams.delete('inline');
+    const response=await fetch(target.href,{
+      credentials:'same-origin',cache:'no-store',redirect:'error',signal:controller.signal
+    });
+    if(!response.ok) throw new Error(String(response.status));
+    const blob=await response.blob();
+    objectUrl=URL.createObjectURL(blob);
+    anchor=document.createElement('a');
+    anchor.href=objectUrl;
+    anchor.download=String(filename||'download').split(/[\\/]/).pop();
+    document.body.appendChild(anchor);
+    anchor.click();
+    showToast(t('downloading',anchor.download),2000);
+    // Retain the object URL long enough for browser download handoff.
+    const handedOffUrl=objectUrl;
+    setTimeout(()=>URL.revokeObjectURL(handedOffUrl),60000);
+    objectUrl=null;
+    return true;
+  }catch(error){
+    const key=error.message==='401'||error.message==='403'?'artifact_download_denied':'artifact_download_failed';
+    showToast(t(key),8000,'error');
+    return false;
+  }finally{
+    clearTimeout(timer);
+    if(anchor) anchor.remove();
+    if(objectUrl) URL.revokeObjectURL(objectUrl);
+  }
+}
+
 function downloadFile(path){
   if(!S.session)return;
-  // Trigger browser download via the raw file endpoint with content-disposition attachment
-  const url=_workspaceRouteForPath(path, 'raw', {download:true});
-  const filename=path.split('/').pop();
-  const a=document.createElement('a');
-  a.href=url;a.download=filename;
-  document.body.appendChild(a);a.click();
-  setTimeout(()=>document.body.removeChild(a),100);
-  showToast(t('downloading',filename),2000);
+  return downloadArtifact(_workspaceRouteForPath(path,'raw',{download:true}),path.split('/').pop());
 }
+
+// Includes generated MEDIA links, HTML/PDF preview downloads and attachment
+// links. Leave public/external downloads and ordinary preview navigation alone.
+document.addEventListener('click',event=>{
+  const anchor=event.target.closest&&event.target.closest('a[download]');
+  if(!anchor) return;
+  const target=new URL(anchor.href,window.location.href);
+  if(target.origin!==window.location.origin ||
+     !/\/api\/(?:media|file\/raw|escape\/file\/raw)$/.test(target.pathname)) return;
+  event.preventDefault();
+  event.stopPropagation();
+  downloadArtifact(target.href,anchor.getAttribute('download')||'download');
+},true);
 
 
 // ── Render breadcrumb for file preview mode ──────────────────────────────────

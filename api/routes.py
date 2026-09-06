@@ -16948,7 +16948,7 @@ def _handle_escape_file_raw(handler, parsed):
     sandbox_csp = "sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox"
     # Content-Security-Policy sandboxing is carried through the csp=sandbox_csp handoff below.
     csp = sandbox_csp if (inline_preview and not force_download and disposition == "inline") else None
-    if html_inline_ok:
+    if html_inline_ok and not force_download:
         return _serve_inline_html_preview(handler, target, "no-store", csp=sandbox_csp, anchor_root=anchor_root)
     return _serve_file_bytes(handler, target, mime, disposition, "no-store", csp=csp, anchor_root=anchor_root)
 
@@ -18622,10 +18622,11 @@ def _handle_media(handler, parsed):
     # granting same-origin access to the WebUI. SVG is always a download (XSS risk).
     _INLINE_PREVIEW_TYPES = _INLINE_IMAGE_TYPES | _AUDIO_VIDEO_PDF_TYPES
     _DOWNLOAD_TYPES = {"image/svg+xml"}  # SVG: XSS risk, force download
-    inline_preview = qs.get("inline", [""])[0] == "1"
+    force_download = qs.get("download", [""])[0] == "1"
+    inline_preview = qs.get("inline", [""])[0] == "1" and not force_download
     html_inline_ok = inline_preview and mime == "text/html"
     disposition = "inline" if (
-        mime not in _DOWNLOAD_TYPES and (
+        not force_download and mime not in _DOWNLOAD_TYPES and (
             mime in _INLINE_IMAGE_TYPES or (inline_preview and mime in _INLINE_PREVIEW_TYPES)
             or html_inline_ok
         )
@@ -18858,7 +18859,7 @@ def _handle_file_raw(handler, parsed):
     sandbox_csp = "sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox"
     csp = sandbox_csp if (inline_preview and not force_download and disposition == "inline") else None
     # _serve_file_bytes sends Content-Security-Policy when csp is set.
-    if html_inline_ok:
+    if html_inline_ok and not force_download:
         return _serve_inline_html_preview(handler, target, "no-store", csp=sandbox_csp, anchor_root=anchor_root)
     return _serve_file_bytes(handler, target, mime, disposition, "no-store", csp=csp, anchor_root=anchor_root)
 
