@@ -406,6 +406,7 @@ def ingest_spool() -> int:
             if not email or gkind not in _GRANT_TARGETS or not value:
                 continue
             rk = f"{approvals.KIND_GRANT}:{skey}"
+            notification = None
             with approvals._REGISTRY_LOCK:
                 registry = approvals.load()
                 entry = registry.get(rk)
@@ -435,16 +436,15 @@ def ingest_spool() -> int:
                     }
                     approvals.save(registry)
                     pending += 1
-                    # A newly created request is the one moment an admin needs
-                    # to hear about it out of band (27 Aug 2026 ticket). Fires
-                    # once per request, outside the registry lock's purpose but
-                    # inside it by necessity: it is a best-effort, non-raising
-                    # call that never blocks the queue from rendering.
-                    _notify_admins_of_request(registry[rk])
+                    # Reserve notification only for the ingest that created the
+                    # row; network delivery must not hold the registry lock.
+                    notification = dict(registry[rk])
                 elif str(entry.get("status") or "pending") == "pending":
                     entry["payload"] = payload
                     approvals.save(registry)
                     pending += 1
+            if notification is not None:
+                _notify_admins_of_request(notification)
         return pending
     except Exception as exc:  # pragma: no cover: queue must render regardless
         logger.debug("grant request ingest failed: %s", exc)
