@@ -20702,8 +20702,11 @@ def _start_chat_stream_for_session(
     if execution_profile:
         from types import SimpleNamespace
         bot_provider, bot_model, _ = _read_profile_model_config(SimpleNamespace(profile=execution_profile), None)
-        if bot_model:
-            model, model_provider, normalized_model = bot_model, bot_provider, bot_model
+        if not bot_model:
+            # A conversation may last have used a different bot/provider. Never
+            # borrow that route for an incompletely configured selected bot.
+            return {'error': f'Bot {execution_profile} has no configured default model. Configure its model before starting a group turn.', '_status': 400}
+        model, model_provider, normalized_model = bot_model, bot_provider, bot_model
     # Prevent duplicate runs in the same session while a stream is still active.
     # This commonly happens after page refresh/reconnect races and can produce
     # duplicated clarify cards for what appears to be a single user request.

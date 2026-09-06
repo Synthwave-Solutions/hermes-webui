@@ -103,3 +103,20 @@ def test_worker_membership_recheck_refuses_removed_sender():
     with pytest.raises(PermissionError):group_chat.require_turn_membership(session,'alice@example.test')
     group_chat.require_turn_membership(session,'owner@example.test')
     with pytest.raises(PermissionError):group_chat.require_turn_membership(session,None)
+
+
+def test_provider_only_bot_cannot_inherit_previous_bot_model(monkeypatch):
+    from api import routes
+    session=SimpleNamespace(session_id='provider-only',profile='conversation',bot_participants=['reviewer'],
+        owner_email='owner@example.test',participants=['alice@example.test'])
+    monkeypatch.setattr(group_chat,'bot_allowed',lambda actor,bot:actor=='alice@example.test')
+    monkeypatch.setattr(routes,'_read_profile_model_config',lambda s,p:('custom:reviewer',None,{'model':{'provider':'custom:reviewer'}}))
+    def must_not_queue(*args):raise AssertionError('incomplete selected bot must not queue a worker')
+    monkeypatch.setattr(routes,'_get_session_agent_lock',must_not_queue)
+    response=routes._start_chat_stream_for_session(session,msg='@reviewer Review',attachments=[],workspace='/tmp',
+        model='writer-model',model_provider='custom:writer',normalized_model='writer-model',sender_email='alice@example.test')
+    assert response['_status']==400
+    assert 'model' in response['error'].lower()
+    assert 'reviewer' in response['error']
+    assert session.profile=='conversation'
+    assert session.participants==['alice@example.test']
