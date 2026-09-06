@@ -1,5 +1,5 @@
 const fs=require('fs'),vm=require('vm'),assert=require('node:assert/strict');
-const context={window:{},document:{addEventListener(){}},S:{}};
+const context={window:{addEventListener(){}},document:{addEventListener(){}},S:{}};
 vm.runInNewContext(fs.readFileSync('static/chat-bots.js','utf8'),context);
 const {available,address}=context.window.chatBotRecipientRules;
 const rows=[{name:'writer'},{name:'reviewer'},{name:'private',visible:false}];
