@@ -18,8 +18,8 @@ const api=(url,opt)=>{calls.push({url,body:JSON.parse(opt.body)});return new Pro
 (async()=>{
 setChatMode('normal');assert.equal(S._pendingChatMode,'normal');assert.equal(elements.chatModeNormal['aria-pressed'],'true');
 S.session={session_id:'one',chat_mode:'normal'};
-setChatMode('super');assert.deepEqual(calls[0].body,{session_id:'one',mode:'super'});
-resolve({ok:true,chat_mode:'super'});await Promise.resolve();assert.equal(S.session.chat_mode,'super');
+setChatMode('super');assert.equal(elements.chatModeNormal.disabled,true);assert.equal(elements.chatModeSuper.disabled,true);assert.deepEqual(calls[0].body,{session_id:'one',mode:'super'});
+resolve({ok:true,chat_mode:'super'});await new Promise(r=>setImmediate(r));assert.equal(S.session.chat_mode,'super');assert.equal(elements.chatModeNormal.disabled,false);
 setChatMode('normal');assert.deepEqual(calls[1].body,{session_id:'one',mode:'normal'});
 S.session={session_id:'two',chat_mode:'super'};resolve({ok:true,chat_mode:'normal'});await Promise.resolve();assert.equal(S.session.chat_mode,'super');
 })();

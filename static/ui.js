@@ -5565,12 +5565,17 @@ document.addEventListener('click',function(e){
 // POST to /api/session/mode. Every new conversation starts in "super", so the
 // chip changes nothing until a user clicks it.
 let _currentChatMode = 'super';
+let _chatModePending = false;
 
 function _applyChatModeChip(mode) {
   _currentChatMode = (mode === 'normal') ? 'normal' : 'super';
   for (const [id, value] of [['chatModeNormal', 'normal'], ['chatModeSuper', 'super']]) {
     const button = $(id);
-    if (button) button.setAttribute('aria-pressed', String(_currentChatMode === value));
+    if (button) {
+      button.setAttribute('aria-pressed', String(_currentChatMode === value));
+      button.disabled = _chatModePending;
+      button.setAttribute('aria-busy', String(_chatModePending));
+    }
   }
 }
 
@@ -5587,6 +5592,7 @@ function syncChatModeChip() {
 }
 
 function setChatMode(mode) {
+  if (_chatModePending) return;
   if (typeof S === 'undefined' || !S) return;
   const next = mode === 'normal' ? 'normal' : 'super';
   if (next === _currentChatMode) return;
@@ -5597,6 +5603,8 @@ function setChatMode(mode) {
     return;
   }
   const sid = S.session.session_id;
+  _chatModePending = true;
+  _applyChatModeChip(_currentChatMode);
   api('/api/session/mode', {
     method: 'POST',
     body: JSON.stringify({ session_id: sid, mode: next })
@@ -5613,6 +5621,10 @@ function setChatMode(mode) {
     })
     .catch(function(err) {
       showToast(t('chat_mode_failed') + (err.message || err), 3000, 'error');
+    })
+    .finally(function() {
+      _chatModePending = false;
+      _syncChatModeChip();
     });
 }
 function toggleChatMode() { setChatMode(_currentChatMode === 'normal' ? 'super' : 'normal'); }
