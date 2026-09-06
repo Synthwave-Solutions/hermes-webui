@@ -20860,7 +20860,8 @@ def _start_chat_stream_for_session(
     from api.bot_builder import allowed as _managed_bot_allowed
     _bot_actor = sender_identity if isinstance(sender_identity, dict) else {"email": sender_email or getattr(s, "owner_email", None)}
     try:
-        if _managed_bot_allowed(_bot_actor, execution_profile or getattr(s, "profile", None) or "default") is False:
+        _managed_bot_access = _managed_bot_allowed(_bot_actor, execution_profile or getattr(s, "profile", None) or "default")
+        if _managed_bot_access is False:
             return {"error": "Bot access was revoked. Select an available bot.", "_status": 403}
     except (PermissionError, ValueError, OSError):
         return {"error": "Bot access is unavailable. Select an available bot.", "_status": 403}
@@ -20989,7 +20990,15 @@ def _start_chat_stream_for_session(
     if goal_related:
         STREAM_GOAL_RELATED[stream_id] = True
     diag.stage("worker_thread_start") if diag else None
-    backend_is_gateway = not bool(sender_identity) and webui_gateway_chat_enabled(get_config()) and not bool(getattr(s, 'participants', None) or getattr(s, 'bot_participants', None))
+    # Auth-disabled gateway installations carry a sentinel identity, not a
+    # signed user. Preserve that legacy route; managed bots, projects and
+    # authenticated/private-memory turns require the governed local worker.
+    backend_is_gateway = (
+        _managed_bot_access is None
+        and (not sender_identity or sender_identity.get("method") == "auth_disabled")
+        and webui_gateway_chat_enabled(get_config())
+        and not bool(getattr(s, 'participants', None) or getattr(s, 'bot_participants', None) or getattr(s, 'project_id', None))
+    )
     worker_target = _run_gateway_chat_streaming if backend_is_gateway else _run_agent_streaming
     worker_kwargs = {"model_provider": model_provider, "goal_related": goal_related}
     if sender_identity and not backend_is_gateway:
