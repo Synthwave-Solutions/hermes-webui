@@ -5568,18 +5568,10 @@ let _currentChatMode = 'super';
 
 function _applyChatModeChip(mode) {
   _currentChatMode = (mode === 'normal') ? 'normal' : 'super';
-  const wrap = $('composerChatModeWrap');
-  const label = $('composerChatModeLabel');
-  const chip = $('composerChatModeChip');
-  if (!wrap || !label || !chip) return;
-  // Visibility belongs to the responsive CSS: unlike the toolsets chip the mode
-  // is never width-gated away, it only degrades to an icon on narrow composers.
-  wrap.style.display = '';
-  const isNormal = _currentChatMode === 'normal';
-  label.textContent = isNormal ? t('chat_mode_normal') : t('chat_mode_super');
-  chip.classList.toggle('mode-normal', isNormal);
-  chip.setAttribute('aria-pressed', isNormal ? 'true' : 'false');
-  chip.title = t('chat_mode') + ': ' + (isNormal ? t('chat_mode_normal_title') : t('chat_mode_super_title'));
+  for (const [id, value] of [['chatModeNormal', 'normal'], ['chatModeSuper', 'super']]) {
+    const button = $(id);
+    if (button) button.setAttribute('aria-pressed', String(_currentChatMode === value));
+  }
 }
 
 function _syncChatModeChip() {
@@ -5594,9 +5586,10 @@ function syncChatModeChip() {
   _syncChatModeChip();
 }
 
-function toggleChatMode() {
+function setChatMode(mode) {
   if (typeof S === 'undefined' || !S) return;
-  const next = (_currentChatMode === 'normal') ? 'super' : 'normal';
+  const next = mode === 'normal' ? 'normal' : 'super';
+  if (next === _currentChatMode) return;
   if (!S.session) {
     S._pendingChatMode = next;
     _applyChatModeChip(next);
@@ -5609,6 +5602,7 @@ function toggleChatMode() {
     body: JSON.stringify({ session_id: sid, mode: next })
   })
     .then(function(r) {
+      if (!S.session || S.session.session_id !== sid) return;
       if (r && r.ok) {
         S.session.chat_mode = r.chat_mode || 'super';
         _applyChatModeChip(S.session.chat_mode);
@@ -5621,7 +5615,8 @@ function toggleChatMode() {
       showToast(t('chat_mode_failed') + (err.message || err), 3000, 'error');
     });
 }
-if (typeof window !== 'undefined') window.toggleChatMode = toggleChatMode;
+function toggleChatMode() { setChatMode(_currentChatMode === 'normal' ? 'super' : 'normal'); }
+if (typeof window !== 'undefined') { window.toggleChatMode = toggleChatMode; window.setChatMode = setChatMode; }
 
 // ── Group conversations: who else is in this chat ──────────────────────────
 // Before a conversation exists the pick is staged on S._pendingParticipants and
