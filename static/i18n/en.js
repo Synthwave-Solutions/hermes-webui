@@ -1,5 +1,9 @@
 // Locale bundle; loaded on demand by static/i18n.js.
 window.__registerHermesLocale('en', {
+    chat_bots_address: 'Send to',
+    chat_bots_choose: 'Your bots',
+    chat_bots_loading: 'Loading bots…',
+    chat_bots_unavailable: 'No available bots',
     subagent_status_last_seen: 'Working at last update',
     subagent_status_queued: 'Queued',
     subagent_status_running: 'Working',
@@ -1062,7 +1066,7 @@ window.__registerHermesLocale('en', {
     nav_collapse_labels: 'Hide labels',
     tab_tasks: 'Scheduled tasks',
     tab_skills: 'Skills library',
-    tab_memory: 'Memory',
+    tab_memory: 'Personal memory',
     tab_workspaces: 'Spaces',
     tab_files: 'Files',
     files_open_chat_first: 'Files follow the active conversation: open or start a chat, then the file browser opens on its workspace.',
@@ -1072,7 +1076,7 @@ window.__registerHermesLocale('en', {
     bot_description: 'Role and description',
     bot_avatar: 'Avatar',
     bot_upload: 'Upload your own image',
-    bot_avatar_limit: 'PNG, JPEG or WebP, at most 2 MB. Images are stored with this bot.',
+    bot_avatar_limit: 'PNG, JPEG or WebP, up to 10 MB. Photos are resized and stored with this bot.',
     bot_saved: 'Bot saved',
     bot_prompt: 'Prompt and instructions',
     bot_knowledge: 'Bot memory',

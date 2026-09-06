@@ -478,6 +478,9 @@ def test_session_new_skips_prev_session_commit_from_other_profile(monkeypatch):
         def compact(self):
             return {"session_id": self.session_id}
 
+        def save(self):
+            pass
+
     monkeypatch.setattr(routes, "_check_csrf", lambda _handler: True)
     monkeypatch.setattr(routes, "read_body", lambda _handler: {"prev_session_id": "foreign_session"})
     monkeypatch.setattr(routes, "_get_active_profile_name", lambda: "default")
@@ -511,6 +514,9 @@ def test_session_new_keeps_prev_session_commit_for_same_profile(monkeypatch):
 
         def compact(self):
             return {"session_id": self.session_id}
+
+        def save(self):
+            pass
 
     monkeypatch.setattr(routes, "_check_csrf", lambda _handler: True)
     monkeypatch.setattr(routes, "read_body", lambda _handler: {"prev_session_id": "visible_session"})

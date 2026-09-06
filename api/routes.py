@@ -11729,6 +11729,9 @@ def _handle_projects_hub_detail(handler, parsed) -> bool:
 
 def handle_get(handler, parsed) -> bool:
     """Handle all GET routes. Returns True if handled, False for 404."""
+    from api.bot_builder import guard_profile_request
+    if not guard_profile_request(handler, parsed, "GET"):
+        return True
     proxy_result = _handle_extension_sidecar_proxy(handler, parsed, "GET")
     if proxy_result is not False:
         return proxy_result
@@ -13002,6 +13005,12 @@ def handle_get(handler, parsed) -> bool:
     if parsed.path == "/api/sessions/search":
         return _handle_sessions_search(handler, parsed)
 
+    from api.personal_file_guard import guard_request as _guard_personal_files
+    try:
+        _guard_personal_files(handler, parsed.path, {k: v[0] for k, v in parse_qs(parsed.query).items()})
+    except PermissionError:
+        return bad(handler, "Personal context is private", 403)
+
     if parsed.path == "/api/list":
         return _handle_list_dir(handler, parsed)
 
@@ -13460,6 +13469,16 @@ def handle_get(handler, parsed) -> bool:
         return _handle_memory_read(handler, parsed)
 
     # ── Profile API (GET) ──
+    if parsed.path == "/api/bots/builder":
+        from api import bot_builder
+        from api.governance.enforce import _request_identity
+        try:
+            return j(handler, bot_builder.get(_request_identity(handler), (parse_qs(parsed.query).get("profile") or [None])[0]))
+        except PermissionError as exc:
+            return bad(handler, str(exc), 403)
+        except (ValueError, OSError) as exc:
+            return bad(handler, str(exc), 400)
+
     if parsed.path == "/api/profiles":
         from api import profiles as profiles_api, bot_metadata
 
@@ -13746,6 +13765,9 @@ from api.project_collaboration import transaction as _project_transaction
 @_project_transaction
 def handle_post(handler, parsed) -> bool:
     """Handle all POST routes. Returns True if handled, False for 404."""
+    from api.bot_builder import guard_profile_request
+    if not guard_profile_request(handler, parsed, "POST"):
+        return True
     diag = RequestDiagnostics.maybe_start("POST", parsed.path, logger=logger)
     if parsed.path == "/api/csp-report":
         if diag:
@@ -15187,6 +15209,12 @@ def handle_post(handler, parsed) -> bool:
         return _handle_git_stash_checkout(handler, body)
 
     # ── File ops (POST) ──
+    from api.personal_file_guard import guard_request as _guard_personal_files
+    try:
+        _guard_personal_files(handler, parsed.path, body)
+    except PermissionError:
+        return bad(handler, "Personal context is private", 403)
+
     if parsed.path == "/api/file/delete":
         return _handle_file_delete(handler, body)
 
@@ -15417,6 +15445,7 @@ def handle_post(handler, parsed) -> bool:
                 return bad(handler, "profile_not_allowed", 403)
         except Exception:
             logger.warning("profile switch governance check failed for %s", name, exc_info=True)
+            return bad(handler, "profile_access_unavailable", 403)
         try:
             from api.profiles import switch_profile, _validate_profile_name
             from api.helpers import build_profile_cookie
@@ -15457,12 +15486,30 @@ def handle_post(handler, parsed) -> bool:
         if not name or not _chat_profile_target_allowed(handler,name):
             return bad(handler,"Bot not found",404)
         try:
+            from api import bot_builder
+            from api.governance.enforce import _request_identity
+            if bot_builder.managed(name) is not None:
+                bot_builder.require_edit(_request_identity(handler), name)
             result = bot_metadata.save_avatar(name,body.get("avatar")) if parsed.path.endswith("/avatar") else bot_metadata.save_profile(name,body.get("bot"),body.get("revision"))
             return j(handler,{"ok":True, **result})
+        except PermissionError as exc:
+            return bad(handler, str(exc), 403)
         except RuntimeError as exc:
             return bad(handler,str(exc),409)
         except (ValueError,OSError) as exc:
             return bad(handler,str(exc),400)
+
+    if parsed.path == "/api/bots/builder":
+        from api import bot_builder
+        from api.governance.enforce import _request_identity
+        try:
+            return j(handler, bot_builder.save(_request_identity(handler), body))
+        except PermissionError as exc:
+            return bad(handler, str(exc), 403)
+        except RuntimeError as exc:
+            return bad(handler, str(exc), 409)
+        except (ValueError, OSError) as exc:
+            return bad(handler, str(exc), 400)
 
     if parsed.path == "/api/profile/create":
         name = body.get("name", "").strip()
@@ -15476,6 +15523,13 @@ def handle_post(handler, parsed) -> bool:
                 "Invalid profile name: lowercase letters, numbers, hyphens, underscores only",
             )
         clone_from = body.get("clone_from")
+        if clone_from:
+            from api import bot_builder
+            try:
+                if bot_builder.managed(str(clone_from)) is not None:
+                    return bad(handler, "Use the guided builder to copy a private bot with explicit access", 403)
+            except (ValueError, PermissionError):
+                return bad(handler, "Clone source is not available", 403)
         if clone_from is not None:
             clone_from = str(clone_from).strip()
             if not _re.match(r"^[a-z0-9][a-z0-9_-]{0,63}$", clone_from):
@@ -15509,6 +15563,10 @@ def handle_post(handler, parsed) -> bool:
         if not name:
             return bad(handler, "name is required")
         try:
+            from api import bot_builder
+            from api.governance.enforce import _request_identity
+            if bot_builder.managed(name) is not None:
+                bot_builder.require_edit(_request_identity(handler), name)
             from api.profiles import delete_profile_api, _validate_profile_name
 
             _validate_profile_name(name)
@@ -16550,6 +16608,9 @@ def handle_post(handler, parsed) -> bool:
 
 def handle_patch(handler, parsed) -> bool:
     """Handle all PATCH routes. Returns True if handled, False for 404."""
+    from api.bot_builder import guard_profile_request
+    if not guard_profile_request(handler, parsed, "PATCH"):
+        return True
     if not _check_csrf(handler):
         return j(handler, {"error": _csrf_rejection_error(handler)}, status=403)
     proxy_result = _handle_extension_sidecar_proxy(
@@ -16578,6 +16639,9 @@ def handle_patch(handler, parsed) -> bool:
 
 def handle_delete(handler, parsed) -> bool:
     """Handle all DELETE routes. Returns True if handled, False for 404."""
+    from api.bot_builder import guard_profile_request
+    if not guard_profile_request(handler, parsed, "DELETE"):
+        return True
     if not _check_csrf(handler):
         return j(handler, {"error": _csrf_rejection_error(handler)}, status=403)
     proxy_result = _handle_extension_sidecar_proxy(
@@ -16643,6 +16707,9 @@ def handle_delete(handler, parsed) -> bool:
 
 def handle_put(handler, parsed) -> bool:
     """Handle all PUT routes. Returns True if handled, False for 404."""
+    from api.bot_builder import guard_profile_request
+    if not guard_profile_request(handler, parsed, "PUT"):
+        return True
     if not _check_csrf(handler):
         return j(handler, {"error": "Cross-origin request rejected"}, status=403)
     proxy_result = _handle_extension_sidecar_proxy(
@@ -20262,54 +20329,30 @@ def _read_active_project_context(workspace: Path | None) -> dict:
 
 
 def _handle_memory_read(handler, parsed=None):
+    from api import personal_context
+    from api.governance.enforce import _request_identity
     try:
-        from api.profiles import get_active_hermes_home
-
-        home = get_active_hermes_home()
-        mem_dir = home / "memories"
-    except ImportError:
-        home = Path.home() / ".hermes"
-        mem_dir = home / "memories"
-    mem_file = mem_dir / "MEMORY.md"
-    user_file = mem_dir / "USER.md"
-    soul_file = home / "SOUL.md"
-    memory = (
-        mem_file.read_text(encoding="utf-8", errors="replace")
-        if mem_file.exists()
-        else ""
-    )
-    user = (
-        user_file.read_text(encoding="utf-8", errors="replace")
-        if user_file.exists()
-        else ""
-    )
-    soul = (
-        soul_file.read_text(encoding="utf-8", errors="replace")
-        if soul_file.exists()
-        else ""
-    )
-    project_context = _read_active_project_context(_memory_project_context_workspace(parsed))
-    return j(
-        handler,
-        {
-            "memory": _redact_text(memory),
-            "user": _redact_text(user),
-            "soul": _redact_text(soul),
-            "project_context": _redact_text(project_context["content"]),
-            "memory_path": str(mem_file),
-            "user_path": str(user_file),
-            "soul_path": str(soul_file),
-            "project_context_path": project_context["path"],
-            "project_context_name": project_context.get("name", ""),
-            "project_context_workspace": project_context["workspace"],
-            "memory_mtime": mem_file.stat().st_mtime if mem_file.exists() else None,
-            "user_mtime": user_file.stat().st_mtime if user_file.exists() else None,
-            "soul_mtime": soul_file.stat().st_mtime if soul_file.exists() else None,
-            "project_context_mtime": project_context["mtime"],
-            "project_context_shadowed": project_context["shadowed"],
-            "external_notes_enabled": _external_notes_sources_enabled(),
-        },
-    )
+        identity = _request_identity(handler)
+        sid = parse_qs(parsed.query or "").get("session_id", [""])[0] if parsed else ""
+        session = personal_context.session_for(identity, sid)
+        values = personal_context.read(identity, session)
+        paths = personal_context.paths(identity, session)
+        shared = personal_context.shared_project_context(identity, session)
+        payload = {key: _redact_text(value) for key, value in values.items()}
+        for key, path in paths.items():
+            payload[key + "_path"] = str(path)
+            payload[key + "_mtime"] = path.stat().st_mtime if path.exists() else None
+        payload.update(scope="personal", legacy_shared_data_preserved=True,
+                       shared_project_context=_redact_text(shared["content"]),
+                       shared_project_context_path=shared["path"],
+                       shared_project_context_name=shared["name"],
+                       shared_project_context_scope=shared["scope"],
+                       project_context_shadowed=[], external_notes_enabled=False)
+        return j(handler, payload)
+    except PermissionError as exc:
+        return bad(handler, str(exc), 403)
+    except (ValueError, KeyError):
+        return bad(handler, "Invalid personal context request", 400)
 
 
 # ── POST route helpers ────────────────────────────────────────────────────────
@@ -20814,6 +20857,13 @@ def _start_chat_stream_for_session(
         execution_profile = selected_bot(s, msg, sender_identity or sender_email or getattr(s, 'owner_email', None))
     except ValueError as exc:
         return {'error': str(exc), '_status': 403}
+    from api.bot_builder import allowed as _managed_bot_allowed
+    _bot_actor = sender_identity if isinstance(sender_identity, dict) else {"email": sender_email or getattr(s, "owner_email", None)}
+    try:
+        if _managed_bot_allowed(_bot_actor, execution_profile or getattr(s, "profile", None) or "default") is False:
+            return {"error": "Bot access was revoked. Select an available bot.", "_status": 403}
+    except (PermissionError, ValueError, OSError):
+        return {"error": "Bot access is unavailable. Select an available bot.", "_status": 403}
     if execution_profile:
         from types import SimpleNamespace
         bot_provider, bot_model, _ = _read_profile_model_config(SimpleNamespace(profile=execution_profile), None)
@@ -20939,7 +20989,7 @@ def _start_chat_stream_for_session(
     if goal_related:
         STREAM_GOAL_RELATED[stream_id] = True
     diag.stage("worker_thread_start") if diag else None
-    backend_is_gateway = webui_gateway_chat_enabled(get_config()) and not bool(getattr(s, 'participants', None) or getattr(s, 'bot_participants', None))
+    backend_is_gateway = not bool(sender_identity) and webui_gateway_chat_enabled(get_config()) and not bool(getattr(s, 'participants', None) or getattr(s, 'bot_participants', None))
     worker_target = _run_gateway_chat_streaming if backend_is_gateway else _run_agent_streaming
     worker_kwargs = {"model_provider": model_provider, "goal_related": goal_related}
     if sender_identity and not backend_is_gateway:
@@ -25024,54 +25074,17 @@ def _handle_skill_toggle(handler, body):
 
 
 def _handle_memory_write(handler, body):
+    from api import personal_context
+    from api.governance.enforce import _request_identity
     try:
-        require(body, "section", "content")
-    except ValueError as e:
-        return bad(handler, str(e))
-    try:
-        from api.profiles import get_active_hermes_home
-
-        home = get_active_hermes_home()
-        mem_dir = home / "memories"
-    except ImportError:
-        home = Path.home() / ".hermes"
-        mem_dir = home / "memories"
-    mem_dir.mkdir(parents=True, exist_ok=True)
-    section = body["section"]
-    if section == "memory":
-        target = mem_dir / "MEMORY.md"
-    elif section == "user":
-        target = mem_dir / "USER.md"
-    elif section == "soul":
-        target = home / "SOUL.md"
-    else:
-        return bad(handler, 'section must be "memory", "user", or "soul"')
-    # Refuse to write through a symlinked target file: a symlink planted at the
-    # memory path (e.g. via a restored/imported workspace) would otherwise let a
-    # memory write clobber an arbitrary file outside the memories directory. This
-    # mirrors the symlink-rejection hardening already shipped for skills/plugins
-    # (#4217/#4234/#4240).
-    if target.is_symlink():
-        return bad(handler, "Cannot write to a symlinked memory file")
-    try:
-        target.write_text(body["content"], encoding="utf-8")
-    except OSError as exc:
-        if not isinstance(exc, PermissionError) and getattr(exc, "errno", None) != errno.EROFS:
-            raise
-        mode_hint = ""
-        try:
-            mode_hint = f" (mode {target.stat().st_mode & 0o777:o})"
-        except OSError:
-            pass
-        return bad(
-            handler,
-            (
-                f"{target.name} is not writable{mode_hint}: {target}. "
-                "Run chmod 644 on the file or fix ownership on the shared volume."
-            ),
-            403,
-        )
-    return j(handler, {"ok": True, "section": section, "path": str(target)})
+        identity = _request_identity(handler)
+        session = personal_context.session_for(identity, body.get("session_id"))
+        target = personal_context.write(identity, body.get("section"), body.get("content"), session)
+        return j(handler, {"ok": True, "section": body["section"], "path": str(target), "scope": "personal"})
+    except PermissionError as exc:
+        return bad(handler, str(exc), 403)
+    except (ValueError, KeyError):
+        return bad(handler, "Invalid personal context request", 400)
 
 
 def _normalize_message_for_import_refresh(message: object) -> object:

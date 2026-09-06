@@ -174,3 +174,20 @@ def test_revoke_negotiated_call_hangs_up_without_returning_sdp():
     with pytest.raises(PermissionError):
         voice.create_call("v=0", "alice", post=post, access_check=lambda: False)
     assert calls[-1] == "https://api.openai.com/v1/realtime/calls/rtc_fixture/hangup"
+
+
+def test_user_voice_capability_and_disabled_errors_are_provider_neutral(monkeypatch):
+    from api import routes
+    from api.governance import enforce
+    monkeypatch.setattr(enforce, "_request_identity", lambda h: {"email":"alice@example.test"})
+    monkeypatch.setattr(routes, "get_session", lambda *a, **kw: SimpleNamespace())
+    monkeypatch.setattr(routes, "_session_visible_to_request", lambda *a: True)
+    monkeypatch.delenv("SYNPULSE_REALTIME_VOICE_ENABLED")
+    for capability in (True, False):
+        handler = Handler({"session_id":"voicefixture1", "sdp":"v=0"})
+        voice.handle(handler, capability=capability)
+        assert handler.status == (200 if capability else 503)
+        visible = json.dumps(handler.payload()).lower()
+        assert "openai" not in visible
+        assert "api key" not in visible
+        assert "billing" not in visible

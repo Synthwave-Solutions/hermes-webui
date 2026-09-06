@@ -384,23 +384,18 @@ def test_every_staged_toolsets_reset_also_clears_the_staged_mode():
     assert "_pendingChatMode:null" in UI_JS
 
 
-def test_the_chip_label_is_owned_by_js_and_refreshed_on_a_locale_switch():
-    """A static data-i18n key on the label would relabel a normal-mode chip as
-    "Super agent" the moment applyLocaleToDOM() runs."""
+def test_mode_segments_remain_explicit_and_sync_on_locale_change():
     index_html = (REPO / "static" / "index.html").read_text(encoding="utf-8")
-    label = index_html[index_html.index('id="composerChatModeLabel"') :][:120]
-    assert "data-i18n" not in label
-
+    assert 'id="chatModeNormal"' in index_html
+    assert 'id="chatModeSuper"' in index_html
+    assert 'id="composerChatModeLabel"' not in index_html
     i18n_js = (REPO / "static" / "i18n.js").read_text(encoding="utf-8")
     apply_dom = i18n_js[i18n_js.index("function applyLocaleToDOM()") :]
     assert "syncChatModeChip()" in apply_dom[: apply_dom.index("\n}")]
 
 
-def test_chip_is_registered_in_the_composer_control_defs():
-    defs = BOOT_JS[BOOT_JS.index("const _COMPOSER_CONTROL_TOGGLE_DEFS=["):]
-    defs = defs[: defs.index("];")]
-    assert "key:'hide_composer_chat_mode'" in defs
-    assert "#composerChatModeWrap" in defs
+def test_top_mode_is_not_a_hideable_composer_control():
+    assert "key:'hide_composer_chat_mode'" not in BOOT_JS
 
 
 def test_chip_is_not_width_gated_away():

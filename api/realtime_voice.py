@@ -58,7 +58,7 @@ def create_call(sdp, actor, *, post=requests.post, access_check=None):
         timeout=25,
     )
     if response.status_code not in (200, 201) or not response.text.startswith("v=0"):
-        raise RuntimeError("Realtime speech connection unavailable; check API access and billing")
+        raise RuntimeError("Voice mode is unavailable. Ask an administrator to check the speech service.")
     if access_check is not None and not access_check():
         call_id = response.headers.get("Location", "").rstrip("/").rsplit("/", 1)[-1]
         if re.fullmatch(r"[A-Za-z0-9_-]{1,128}", call_id):
@@ -81,8 +81,7 @@ def handle(handler, *, capability=False):
         return bad(handler, "Sign in to use realtime voice", 401)
     if capability:
         return j(handler, {"available": configured(), "model": MODEL,
-                           "credential": "OpenAI API key",
-                           "help": "Enable SYNPULSE_REALTIME_VOICE_ENABLED with a server OPENAI_API_KEY and API billing",
+                           "help": "Ask an administrator to enable speech if voice mode is unavailable",
                            "subscription_supported": False})
     try:
         body = routes._read_json_request_body(handler, max_bytes=70000)
@@ -96,7 +95,7 @@ def handle(handler, *, capability=False):
         if not routes._session_visible_to_request(session, handler):
             return bad(handler, "Session not found", 404)
         if not configured():
-            return bad(handler, "Realtime voice requires a server OpenAI API key with API billing", 503)
+            return bad(handler, "Voice mode is not enabled. Ask an administrator to enable speech.", 503)
         def access_check():
             try:
                 current = routes.get_session(sid, metadata_only=True)
@@ -115,4 +114,4 @@ def handle(handler, *, capability=False):
     except ValueError as exc:
         return bad(handler, str(exc), 400)
     except Exception:
-        return bad(handler, "Realtime speech connection unavailable; check API access and billing", 502)
+        return bad(handler, "Voice mode is unavailable. Ask an administrator to check the speech service.", 502)

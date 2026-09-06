@@ -109,6 +109,17 @@ def evaluate_request(identity: dict | None, method: str, path: str) -> Decision:
     if not route_path.startswith("/api/"):
         return Decision(True, "non_api", "", "enforce")
 
+    if query:
+        from api.bot_builder import allowed as _bot_allowed
+        for target in parse_qs(query).get("profile", []):
+            if target and target != "active":
+                try:
+                    managed_access = _bot_allowed(identity, target)
+                except Exception:
+                    managed_access = False
+                if managed_access is False:
+                    return Decision(False, "bot_not_allowed", "", "enforce")
+
     try:
         policy = loader.get_policy()
     except Exception:
@@ -147,7 +158,7 @@ def evaluate_request(identity: dict | None, method: str, path: str) -> Decision:
             target = str(target).strip()
             if not target or target == "active":
                 continue
-            if not access.is_profile_allowed(target):
+            if not is_profile_allowed_for(identity, target):
                 return Decision(False, "profile_not_allowed", perm or "", policy.mode)
 
     return Decision(True, "allowed", perm or "", policy.mode)
@@ -168,6 +179,14 @@ def is_profile_allowed_for(identity: dict | None, profile: str) -> bool:
     The "active"/empty sentinels and "default" resolve via is_profile_allowed.
     """
     target = str(profile or "").strip()
+    if target and target != "active":
+        from api.bot_builder import allowed as _bot_allowed
+        try:
+            managed_access = _bot_allowed(identity, target)
+        except Exception:
+            return False
+        if managed_access is not None:
+            return managed_access
     if not target or target == "active":
         return True
     try:

@@ -119,12 +119,12 @@ if(typeof document!=='undefined') (function(){
     if(!sid){showToast('Open or create a chat before starting voice');return;}
     const intent=++launchEpoch;launchPending=true;
     if(!window.isSecureContext||!navigator.mediaDevices?.getUserMedia||typeof RTCPeerConnection==='undefined'){
-      launchPending=false;showToast('Realtime voice needs HTTPS and microphone support');return;
+      launchPending=false;showToast('Voice mode needs HTTPS and microphone support');return;
     }
     const cap=await api('/api/voice/realtime/capability',{retries:0}).catch(()=>null);
     if(intent!==launchEpoch||current()!==sid){launchPending=false;return;}
     launchPending=false;
-    if(!cap?.available){showToast('Realtime voice is not enabled. Ask an administrator to enable OpenAI API speech.');return;}
+    if(!cap?.available){showToast('Voice mode is not enabled. Ask an administrator to enable speech.');return;}
     if(typeof window._voiceModeActive==='function'&&window._voiceModeActive()){
       showToast('Turn off the existing voice mode first');return;
     }
