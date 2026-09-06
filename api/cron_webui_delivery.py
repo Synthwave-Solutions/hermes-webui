@@ -369,7 +369,7 @@ def deliver_external_notice(destination: str, text: str) -> tuple[bool, str | No
     try:
         response = send_message_tool({"action": "send", "target": destination, "message": text})
         result = json.loads(response) if isinstance(response, str) else response
-        ok = isinstance(result, dict) and result.get("success") is True
+        ok = isinstance(result, dict) and result.get("success") is True and not result.get("skipped")
         return ok, None if ok else "external delivery not confirmed"
     except Exception as exc:  # pragma: no cover
         return False, str(exc)

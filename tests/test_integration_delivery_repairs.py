@@ -25,7 +25,8 @@ def test_catalog_exposes_credential_fields(monkeypatch):
 
 
 @pytest.mark.parametrize('response, expected', [
-    ({'success': True}, True), ({'success': False, 'error': 'unavailable'}, False),
+    ({'success': True}, True), ({'success': True, 'skipped': True}, False),
+    ({'success': False, 'error': 'unavailable'}, False),
     ({'success': 'false'}, False), ({}, False), ('invalid-json', False),
 ])
 def test_external_notice_uses_installed_transport(monkeypatch, response, expected):
