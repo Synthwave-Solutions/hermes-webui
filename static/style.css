@@ -7835,3 +7835,9 @@ html[data-nav-audience="member"]:not([data-advanced-chat-controls="1"]) #compose
 
 /* The realtime waveform is the single conversation voice entry point. */
 #btnVoiceMode{display:none!important}
+
+/* A single recognizable voice action beside the everyday chat controls. */
+#btnRealtimeVoice{min-width:40px;min-height:40px;border-radius:50%;background:var(--surface)}
+#btnRealtimeVoice svg{width:20px;height:20px}
+
+.main[class*="showing-"] #chatModeHeader{display:none}

@@ -1,0 +1,63 @@
+name: SynPulse chat QA
+
+on:
+  pull_request:
+    branches: [dev, staging, master]
+  push:
+    branches: [dev, staging, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  chat-privacy-and-controls:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      HERMES_WEBUI_AGENT_DIR: ${{ github.workspace }}/engine
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: Synthwave-Solutions/hermes-agent
+          ref: ec698c918c04d69e88df4516a2ff998074269098
+          path: engine
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install declared test dependencies
+        run: pip install -r requirements-dev.txt playwright
+      - name: Install browser test dependency
+        run: npm install --no-save --package-lock=false playwright
+      - name: Run chat, bot authorization and personal context regressions
+        run: >-
+          ./scripts/test.sh
+          tests/test_chat_controls_v2.py
+          tests/test_chat_mode_toggle.py
+          tests/test_chat_mode_tool_surface.py
+          tests/test_personal_memory_ui.py
+          tests/test_personal_context.py
+          tests/test_personal_file_guard.py
+          tests/test_bot_selection_http.py
+          tests/test_realtime_voice.py
+          tests/test_group_chat.py
+          tests/test_group_bots.py
+          tests/test_chat_worker_identity_dispatch.py
+          tests/test_bot_metadata.py
+          tests/test_bot_builder.py
+          tests/test_governance_agent_context.py
+          tests/test_synpulse_role_navigation.py
+          tests/test_governance_nav_visibility.py
+          -q
+      - name: Check recipient behavior
+        run: node tests/chat_bot_roster_behavior.cjs
+      - name: Install Chromium
+        run: python -m playwright install --with-deps chromium
+      - name: Verify full application loads without browser errors
+        run: python tests/browser_smoke.py
+      - name: Verify guided bot configuration and navigation races
+        run: node tests/bot_builder_browser.cjs
