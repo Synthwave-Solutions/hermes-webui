@@ -1,0 +1,9 @@
+.chat-bot-roster { display:flex; align-items:center; gap:8px; overflow-x:auto; max-width:100%; padding:6px 0 10px; }
+.chat-bot-roster-label,.chat-bot-roster-state { color:var(--muted); font-size:12px; white-space:nowrap; }
+.chat-bot-recipient { display:inline-flex; align-items:center; gap:4px; flex-shrink:0; min-height:44px; padding:4px 10px; border:1px solid var(--border); border-radius:8px; background:transparent; color:var(--text); cursor:pointer; }
+.chat-bot-recipient[aria-pressed="true"] { border-color:var(--link); background:var(--sidebar); }
+.chat-bot-recipient:focus-visible { outline:2px solid var(--link); outline-offset:2px; }
+.chat-bot-recipient:disabled { opacity:.6; cursor:wait; }
+.chat-bot-recipient img,.chat-bot-recipient svg { flex-shrink:0; }
+.chat-bot-recipient span { max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+@media(max-width:640px) { .chat-bot-roster { gap:6px; } .chat-bot-roster-label { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); } }

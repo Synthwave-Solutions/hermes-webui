@@ -49,7 +49,8 @@ This gives you nearly **1:1 parity with Hermes CLI from a convenient web UI** wh
 
 Members use Chats, Bots, Projects, Scheduled tasks, Skills library, Connections
 and My approvals. Effective feature grants and administrative grants determine
-which navigation is shown. See [daily work navigation](docs/role-navigation.md).
+which navigation is shown. See [daily work navigation](docs/role-navigation.md)
+and [chat bot recipients](docs/chat-bot-roster.md).
 
 ## Contents
 

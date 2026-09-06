@@ -21,7 +21,7 @@ PANEL_PERMISSIONS = {
     # /api/projects and the hub route already need.
     "projects": "sessions:read",
     "skills": "skills:read",
-    "memory": "memory:read",
+    "memory": "chat:use",
     "workspaces": "files:read",
     "files": "files:read",
     "profiles": "profiles:read",
@@ -38,7 +38,7 @@ PANEL_PERMISSIONS = {
 # Never hidden, whatever the grants: the user would otherwise lose the ability
 # to work, to reach their own preferences, or to ask for help.
 ESSENTIAL_PANELS = frozenset({"chat", "settings", "approvals"})
-MEMBER_PANELS = frozenset({"chat", "profiles", "projects", "tasks", "skills", "integrations", "approvals", "settings"})
+MEMBER_PANELS = frozenset({"chat", "profiles", "projects", "tasks", "skills", "integrations", "approvals", "memory", "settings"})
 
 
 def _permissions(access) -> frozenset:

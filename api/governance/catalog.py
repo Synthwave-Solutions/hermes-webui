@@ -100,8 +100,11 @@ ROUTE_CATALOG: tuple[RouteRule, ...] = (
     RouteRule("/api/governance",          "governance:read",  "governance:write"),
 
     # profiles
+    RouteRule("/api/bots/builder", "profiles:admin", "profiles:admin", match="exact"),
     RouteRule("/api/profiles",            "profiles:read"),
     RouteRule("/api/profile/active",      "profiles:read", match="exact"),
+    # Selecting a permitted bot is chat use, not profile administration.
+    RouteRule("/api/profile/switch",      "profiles:read", "chat:use", match="exact"),
     RouteRule("/api/profile",             "profiles:read", "profiles:admin"),
 
     # sessions, projects, background
@@ -172,8 +175,8 @@ ROUTE_CATALOG: tuple[RouteRule, ...] = (
     RouteRule("/api/personalities",       "config:read", match="exact"),
     RouteRule("/api/personality",         "config:write", "config:write"),
     RouteRule("/api/prompts",             "config:read", "config:write", match="exact"),
-    RouteRule("/api/memory/write",        "memory:write", "memory:write", match="exact"),
-    RouteRule("/api/memory",              "memory:read", match="exact"),
+    RouteRule("/api/memory/write",        "chat:use", "chat:use", match="exact"),
+    RouteRule("/api/memory",              "chat:use", match="exact"),
     RouteRule("/api/admin",               "config:write", "config:write"),
     RouteRule("/api/dashboard",           "dashboard:read", "dashboard:write"),
     RouteRule("/api/insights",            "analytics:read"),

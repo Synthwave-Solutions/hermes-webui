@@ -19,3 +19,6 @@ cryptography>=42.0
 
 # Decode and normalize uploaded bot avatars; never serve user-supplied SVG.
 Pillow>=12.3.0,<13
+
+# Server-side realtime speech transport.
+requests>=2.32,<3

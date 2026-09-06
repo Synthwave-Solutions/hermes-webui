@@ -35,3 +35,11 @@ def test_effective_permissions_take_precedence_over_unresolved_grants():
     caller = access()
     caller.grants.permissions = frozenset({'*'})
     assert 'governance' in hidden_panels(caller, POLICY)
+
+
+def test_chat_user_can_open_personal_memory_without_admin_features():
+    visible = set(visible_panels(access('chat:use'), POLICY))
+    assert 'memory' in visible
+    assert 'governance' not in visible
+    assert 'logs' not in visible
+    assert 'memory' not in set(visible_panels(access('memory:read'), POLICY))
