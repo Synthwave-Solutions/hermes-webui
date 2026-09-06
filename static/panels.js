@@ -7747,7 +7747,7 @@ function _applyTabOrder(order){
 // presentation only, and it can never REVEAL a panel, only hide one.
 window._govHiddenNav = window._govHiddenNav || [];
 window._navAudience = 'member';
-const _MEMBER_NAV_ORDER = ['profiles','projects','tasks','skills','integrations','approvals'];
+const _MEMBER_NAV_ORDER = ['profiles','projects','tasks','skills','integrations','approvals','memory'];
 function _canUseFeature(permission){
   const me=window.__GOV_ME__;
   if(!me)return false;

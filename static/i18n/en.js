@@ -1066,7 +1066,7 @@ window.__registerHermesLocale('en', {
     nav_collapse_labels: 'Hide labels',
     tab_tasks: 'Scheduled tasks',
     tab_skills: 'Skills library',
-    tab_memory: 'Memory',
+    tab_memory: 'Personal memory',
     tab_workspaces: 'Spaces',
     tab_files: 'Files',
     files_open_chat_first: 'Files follow the active conversation: open or start a chat, then the file browser opens on its workspace.',

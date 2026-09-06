@@ -55,3 +55,8 @@ Navigation labels are always visible for members, so the redundant Show labels
 toggle is hidden.
 
 Bot lists and pickers request /api/profiles?fast=1: cold skill counts are omitted while the server computes them in its bounded background worker. Pending counts are never rendered as zero; reopening the list refreshes counts without polling.
+
+Personal memory is an eighth daily-use area after My approvals. It requires
+chat:use, matching the private memory API. It does not require or grant access
+to shared memory administration, logs or governance. Existing admin navigation
+remains unchanged.
