@@ -3,9 +3,9 @@
 (function(root){
   'use strict';
   const rank={queued:0,running:1,completed:2,failed:2,cancelled:2};
-  function createProjector(){
+  function createProjector(restoredCalls){
     const seen=new Map();
-    return function project(data){
+    function project(data){
       if(!data||typeof data!=='object') return null;
       const id=String(data.id||'');
       const status=String(data.status||'');
@@ -20,9 +20,10 @@
         task:String(data.summary||'').replace(/[\r\n\t]+/g,' ').slice(0,120),
         tool_count:integer(data.tool_count,100000),
       };
+      if(prior) args.tool_count=Math.max(args.tool_count,prior.tool_count||0);
       const signature=JSON.stringify(args);
       if(prior&&prior.signature===signature) return null;
-      seen.set(id,{status,signature});
+      seen.set(id,{status,signature,tool_count:args.tool_count});
       return {
         event:rank[status]===2?'tool_complete':'tool',
         data:{
@@ -32,7 +33,13 @@
           is_error:status==='failed',
         },
       };
-    };
+    }
+    for(const tc of Array.isArray(restoredCalls)?restoredCalls:[]){
+      if(tc?.name!=='subagent_progress'||!String(tc.tid||'').startsWith('subagent:')) continue;
+      const a=tc.args||{};
+      project({id:tc.tid.slice(9),...a,summary:a.task});
+    }
+    return project;
   }
   function label(tc,translate){
     const a=tc&&tc.args||{};

@@ -25,3 +25,9 @@ const bounded=p.createProjector()({...event,summary:'x'.repeat(500),reasoning:'P
 assert.equal(bounded.data.args.task.length,120);
 assert.ok(!JSON.stringify(bounded).includes('PRIVATE'));
 console.log('Subagent lifecycle: replay, concurrency, ordering, cancel/error and bounded presentation passed.');
+
+const restored=p.createProjector([{...complete.data,done:true}]);
+assert.equal(restored(event),null,'fresh attachment rejects replay older than restored completion');
+assert.equal(restored({...event,status:'running'}),null);
+const resume=p.createProjector([{name:'subagent_progress',tid:'subagent:worker1',args:{status:'running',tool_count:8}}]);
+assert.equal(resume({...event,status:'running',tool_count:2}).data.args.tool_count,8,'late progress cannot lower tool count');

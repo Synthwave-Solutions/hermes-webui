@@ -5686,7 +5686,7 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
     // Project worker lifecycle through the same durable Anchor/tool rendering.
     // One projector belongs to this EventSource: replay is idempotent, and a
     // late event cannot regress a worker or escape into another conversation.
-    const projectSubagent=window.SynPulseSubagentProgress?.createProjector();
+    const projectSubagent=window.SynPulseSubagentProgress?.createProjector(INFLIGHT[activeSid]?.toolCalls);
     source.addEventListener('subagent',e=>{
       if(_terminalStateReached||_streamFinalized||!projectSubagent) return;
       if(!S.session||S.session.session_id!==activeSid||S.activeStreamId!==streamId) return;
@@ -5696,7 +5696,14 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
       if(!projected) return;
       const event={data:JSON.stringify(projected.data),lastEventId:e.lastEventId};
       if(projected.event==='tool_complete') handleLiveToolCompleteEvent(event);
-      else handleLiveToolEvent(event);
+      else if((INFLIGHT[activeSid]?.toolCalls||[]).some(tc=>tc.tid===projected.data.tid)){
+        // Updating a worker is not a new parent-assistant prose boundary.
+        const tc=upsertLiveToolCall(projected.data,'start');
+        if(!tc) return;
+        _applyToAnchor('tool',{...projected.data,...tc},event);
+        appendLiveToolCard(tc,{sessionId:activeSid,streamId});
+        snapshotLiveTurn();
+      }else handleLiveToolEvent(event);
     });
 
     // Phase 2: dedicated `todo_state` event carries a full snapshot of
