@@ -13002,6 +13002,12 @@ def handle_get(handler, parsed) -> bool:
     if parsed.path == "/api/sessions/search":
         return _handle_sessions_search(handler, parsed)
 
+    from api.personal_file_guard import guard_request as _guard_personal_files
+    try:
+        _guard_personal_files(handler, parsed.path, {k: v[0] for k, v in parse_qs(parsed.query).items()})
+    except PermissionError:
+        return bad(handler, "Personal context is private", 403)
+
     if parsed.path == "/api/list":
         return _handle_list_dir(handler, parsed)
 
@@ -15187,6 +15193,12 @@ def handle_post(handler, parsed) -> bool:
         return _handle_git_stash_checkout(handler, body)
 
     # ── File ops (POST) ──
+    from api.personal_file_guard import guard_request as _guard_personal_files
+    try:
+        _guard_personal_files(handler, parsed.path, body)
+    except PermissionError:
+        return bad(handler, "Personal context is private", 403)
+
     if parsed.path == "/api/file/delete":
         return _handle_file_delete(handler, body)
 
