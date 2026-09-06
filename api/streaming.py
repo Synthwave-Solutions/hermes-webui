@@ -6925,6 +6925,7 @@ def _run_agent_streaming(
             session_id=session_id,
             request_id=stream_id,
             user_message_sha256=_approval_prompt_hash,
+            user_message=str(msg_text or ""),
             approval_waiter=_approval_waiter,
         )
         # Conversation chat mode (Michael Ramirez, 28 Aug 2026), read once per

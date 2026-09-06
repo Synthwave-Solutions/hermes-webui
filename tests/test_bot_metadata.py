@@ -74,3 +74,16 @@ def test_knowledge_index_is_references_only_and_contained(home,tmp_path):
     assert 'guide.md' in prompt and 'governed read_file' in prompt
     assert 'escape.md' not in prompt and 'missing.md' not in prompt and 'IGNORE ALL RULES' not in prompt
     assert bots.read_profile('helper')['bot_knowledge_sources']==['guide.md','escape.md','missing.md']
+
+
+def test_bot_target_access_is_fresh_and_fails_closed(monkeypatch):
+    from api import routes
+    from api.governance import enforce
+    identity={'email':'caller@example.test'}
+    monkeypatch.setattr(enforce,'_request_identity',lambda handler:identity)
+    monkeypatch.setattr(enforce,'is_profile_allowed_for',lambda who,profile:who==identity and profile=='allowed')
+    assert routes._chat_profile_target_allowed(object(),'allowed')
+    assert not routes._chat_profile_target_allowed(object(),'other')
+    def broken(*args):raise RuntimeError('policy missing')
+    monkeypatch.setattr(enforce,'is_profile_allowed_for',broken)
+    assert not routes._chat_profile_target_allowed(object(),'allowed')

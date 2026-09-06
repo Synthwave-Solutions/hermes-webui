@@ -131,7 +131,7 @@ def _audit_bind_failure(email: str, session_id: str, request_id: str,
 
 def bind_governed_agent_turn(identity: Any, *, active_profile: str = "default",
                              session_id: str = "", request_id: str = "",
-                             user_message_sha256: str = "", approval_waiter=None):
+                             user_message_sha256: str = "", user_message: str = "", approval_waiter=None):
     """Bind the caller's governance principal to the CURRENT thread's context.
 
     Returns an opaque token for reset_governed_agent_turn, or None when the
@@ -176,6 +176,9 @@ def bind_governed_agent_turn(identity: Any, *, active_profile: str = "default",
         from .loader import resolve_policy_path
         fields = getattr(ctx, "__dataclass_fields__", {})
         updates = {}
+        if "user_message_redacted" in fields:
+            from hermes_cli.dashboard_governance.grant_requests import redact_trigger
+            updates["user_message_redacted"] = redact_trigger(user_message)
         if "user_message_sha256" in fields:
             updates["user_message_sha256"] = str(user_message_sha256 or "")
         if "approval_waiter" in fields and "approval_policy_path" in fields:

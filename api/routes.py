@@ -1720,6 +1720,15 @@ def _cron_admin_allowed(handler) -> bool:
         return False
 
 
+def _chat_profile_target_allowed(handler, profile: str) -> bool:
+    """Fresh principal grant check for bot presentation, never active-cookie bypass."""
+    try:
+        from api.governance.enforce import _request_identity, is_profile_allowed_for
+        return bool(is_profile_allowed_for(_request_identity(handler), profile))
+    except Exception:
+        return False
+
+
 def _body_profile_allowed(handler, profile: str) -> bool:
     """Body-sink guard for a per-request ``profile`` field.
 
@@ -13414,7 +13423,7 @@ def handle_get(handler, parsed) -> bool:
         return j(
             handler,
             {
-                "profiles": [{**p, **bot_metadata.read_profile(p["name"])} for p in profiles_api.list_profiles_api()],
+                "profiles": [{**p, **bot_metadata.read_profile(p["name"])} for p in profiles_api.list_profiles_api() if _chat_profile_target_allowed(handler,p["name"])],
                 "active": profiles_api.get_active_profile_name(),
                 "single_profile_mode": _is_isolated_profile_mode(),
             },

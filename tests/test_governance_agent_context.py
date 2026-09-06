@@ -362,3 +362,22 @@ class TestEnvVarGrantCrossesToTheAgent:
         from api.governance.models import GrantSet
         granted = GrantSet.from_mapping({"env": {"vars": ["A", "B"]}})
         assert granted.subtract(GrantSet.from_mapping({"env": {"vars": ["A"]}})).env_vars == frozenset({"B"})
+
+
+def test_original_ask_reaches_real_denial_redacted(enforce_policy,tmp_path,monkeypatch):
+    from hermes_cli.dashboard_governance.context import current_governance_context
+    from hermes_cli.dashboard_governance import grant_requests
+    monkeypatch.setenv('HERMES_WEBUI_STATE_DIR',str(tmp_path))
+    monkeypatch.setenv('HERMES_SESSION_LAST_USER_MESSAGE','wrong person stale ask')
+    original='Please read the project plan. token=secretvalue '+('details '*100)
+    token=bind_governed_agent_turn(FREELANCER,session_id='session-test',request_id='request-test',user_message=original)
+    try:
+        ctx=current_governance_context()
+        assert ctx.user_message_redacted.startswith('Please read the project plan.')
+        assert len(ctx.user_message_redacted)<=400
+        grant_requests.record_denial(ctx,'terminal','cli_command_not_allowed','example',tool_call_id='call-test',dispatch_session_id='session-test')
+        entry=next(iter(grant_requests.load_store().values()))
+        assert entry['trigger']==ctx.user_message_redacted
+        assert 'secretvalue' not in entry['trigger'] and 'stale ask' not in entry['trigger']
+        assert next(iter(entry['operations'].values()))['trigger_redacted']==entry['trigger']
+    finally:reset_governed_agent_turn(token)
