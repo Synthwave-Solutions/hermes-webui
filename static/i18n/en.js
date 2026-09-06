@@ -1,5 +1,21 @@
 // Locale bundle; loaded on demand by static/i18n.js.
 window.__registerHermesLocale('en', {
+  "chat_mentions_picker": "Mention a person or bot",
+  "chat_mentions_bot": "Bot",
+  "chat_mentions_person": "Person",
+  "chat_mentions_empty": "No matching people or bots",
+  "chat_roster_show": "Show bots",
+  "chat_roster_hide": "Hide bots",
+  "chat_mentions_preparing": "Preparing recipients\u2026",
+  "chat_mentions_hint": "@ people: new group from private chat. First @ bot responds.",
+  "chat_mentions_busy": "Wait for this turn to finish before sending mentions. Your draft is kept.",
+  "chat_mentions_loading": "People and bots are still loading. Please try again.",
+  "chat_mentions_attachments": "Remove private attachments or selections first. You can attach files explicitly in the group.",
+  "chat_mentions_changed": "The chat or draft changed. Nothing was sent.",
+  "chat_mentions_failed": "Recipients could not be prepared. Your draft is kept.",
+  "chat_mentions_navigation": "The chat changed. Nothing was sent.",
+  "chat_mentions_error": "Could not prepare recipients. Your draft is kept.",
+
     chat_bots_address: 'Send to',
     chat_bots_choose: 'Your bots',
     chat_bots_loading: 'Loading bots…',

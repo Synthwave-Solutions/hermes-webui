@@ -1,20 +1,35 @@
-# Chat bot recipients
+# Chat recipients and mentions
 
-The avatar roster above the composer uses the authenticated profile list. In a
-personal chat, selecting another bot uses the existing profile switch, preserving
-profile history boundaries. In a group, only assigned bots visible to the sender
-appear. Clicking one inserts or replaces a leading `@bot-id` in the message draft.
-The literal recipient travels with the message through sending and queues; there
-is no separate hidden recipient state.
+The bot roster above the composer can be collapsed and expanded. Its disclosure
+preference belongs to the signed-in account in that browser. Collapsing it does
+not change the selected bot or remove any group members.
 
-The server remains authoritative: group membership, project assignments and bot
-access are checked before dispatch and again in the execution worker. Adding a
-name to a draft does not grant access or add a group participant. A profile lookup
-failure displays an unavailable state and never exposes a cached global roster.
+Type `@` in the composer to search available bots and people. Results distinguish
+bots from human accounts, including when their names are identical. Pick a result
+with the keyboard or touch. A selected bot is the recipient for the next agent
+response; multiple human mentions can join the same conversation.
 
-Selecting a bot requires `chat:use`, not `profiles:admin`. The body-selected
-profile still has to be permitted by the caller policy. Both member and admin
-switches are per-client (`process_wide=False`), with a signed profile cookie;
-they do not change another user’s active profile. Profile creation and editing
-remain administrative actions. Rejected writes before body consumption close
-the HTTP connection so unread JSON cannot become a subsequent request.
+Recipients are prepared when you send. Adding a human to a private conversation
+starts a fresh group, without copying previous messages, files, personal memory,
+or the private workspace. The existing private conversation remains available.
+Add any intended shared attachments explicitly in the new group. Existing groups
+keep their history; only their owner or an authorized administrator can add new
+recipients. Project membership is managed through project controls.
+
+The server is authoritative for known people, bot permissions, project membership
+and dispatch. Mentioning someone never grants access to a bot or project. Failed
+recipient preparation leaves the draft available. Recipient changes wait until
+the current response is finished instead of silently becoming a steer or queue
+entry for the previous audience.
+
+Selecting a bot requires `chat:use`, not `profiles:admin`. Profile creation and
+editing retain their administrative controls. Bot switches are per-client and do
+not change another user's selected bot.
+
+Assistant messages retain their server-selected bot name and avatar identity when
+stored history is reconciled and reloaded. The client never infers the author
+from response text.
+
+Group uploads use the same authenticated session visibility check as opening the
+chat and recheck current membership. A different process-wide active bot does
+not prevent an authorized participant from attaching a file.

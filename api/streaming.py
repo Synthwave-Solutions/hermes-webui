@@ -4632,7 +4632,7 @@ def _stamp_group_bot_author(session, msg_text, profile) -> None:
     # Exact user boundary, never infer bot identity from response content.
     boundary = next((i for i in range(len(messages)-1, -1, -1)
                      if isinstance(messages[i], dict) and messages[i].get('role') == 'user'
-                     and _message_text(messages[i].get('content')).strip() == str(msg_text).strip()), None)
+                     and _message_text(messages[i].get('content')).strip() == ' '.join(str(msg_text).split())), None)
     if boundary is None:
         return
     label = profile

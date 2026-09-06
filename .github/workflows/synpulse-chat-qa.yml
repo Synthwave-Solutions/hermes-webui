@@ -45,6 +45,10 @@ jobs:
           tests/test_bot_selection_http.py
           tests/test_realtime_voice.py
           tests/test_group_chat.py
+          tests/test_chat_mentions.py
+          tests/test_upload_request_visibility.py
+          tests/test_chat_upload_attachment_paths.py
+          tests/test_group_bot_attribution_reconcile.py
           tests/test_group_bots.py
           tests/test_chat_worker_identity_dispatch.py
           tests/test_bot_metadata.py

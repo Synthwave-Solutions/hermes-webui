@@ -1297,6 +1297,7 @@ function _restoreComposerDraftAfterFailedSend(draftText, filesSnapshot, sid, cle
 }
 
 async function send(){
+  if(typeof chatMentionsBlockBusySend==='function' && chatMentionsBlockBusySend()) return;
   // Static guards expect _defaultMessageMode to stay near send() while the actual
   // read remains in the S.busy branch below.
   // _defaultMessageMode
@@ -1321,6 +1322,7 @@ async function send(){
   }
   _sendInProgress = true;
   try{
+  if(typeof prepareChatMentions==='function' && !(await prepareChatMentions())) return;
   const options=arguments[0]||{};
   const literalSlash=!!(options&&options.literalSlash);
   let text=$('msg').value.trim();

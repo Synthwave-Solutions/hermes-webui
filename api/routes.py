@@ -13880,6 +13880,19 @@ def handle_post(handler, parsed) -> bool:
             diag.finish()
         return True
 
+    if parsed.path == "/api/chat/mentions/prepare":
+        from api.chat_mentions import prepare
+        try:
+            return j(handler, prepare(handler, body))
+        except PermissionError as exc:
+            return bad(handler, str(exc), 403)
+        except (KeyError, FileNotFoundError):
+            return bad(handler, "Conversation not found", 404)
+        except RuntimeError as exc:
+            return bad(handler, str(exc), 409)
+        except ValueError as exc:
+            return bad(handler, str(exc), 400)
+
     if parsed.path in ("/api/projects/team", "/api/projects/files", "/api/projects/chat"):
         return _handle_project_collaboration(handler, parsed, body)
 
@@ -19069,7 +19082,7 @@ def _handle_file_raw(handler, parsed):
     if not sid:
         return bad(handler, "session_id is required")
     try:
-        s = get_session_for_file_ops(sid)
+        s = get_session_for_file_ops(sid, handler=handler)
     except KeyError:
         return bad(handler, "Session not found", 404)
     rel = qs.get("path", [""])[0]
