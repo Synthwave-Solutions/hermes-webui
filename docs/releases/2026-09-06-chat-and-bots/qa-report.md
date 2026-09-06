@@ -23,6 +23,8 @@ Date: 6 September 2026. This report uses synthetic QA identities and data. Produ
 
 Final combined WebUI result: **245 passed in 20.88 seconds**, on code commit `cb215cb8`. The final browser run passed all **13 checks**, with no page errors, at 1440 × 950, 1024 × 768 and 390 × 844.
 
+The neighboring session/profile authorization suite also passed **18 tests**. Its two older session doubles were missing the existing `save()` lifecycle method; the fixture was corrected without changing runtime behavior. The focused CI runs all 263 tests together, plus recipient rules, full-page browser smoke and the guided-builder browser regression.
+
 The real revocation rerun passed: a retained selected-bot cookie no longer exposes the bot in the list, and avatar, builder, direct chat and group chat return HTTP 403. Misleading query parameters do not bypass the refusal. No provider request is dispatched. The worker's early-access-error path also has a regression test so an asynchronous revocation emits a visible access error and clears runtime state.
 
 Engine: **101 passed, 2 skipped** in the combined memory, file-tool, bot-ceiling and approval-provenance run. The two skips are explicitly native Windows-only tests on Linux. The focused GitHub workflow passed on engine commit `ec698c918c04d69e88df4516a2ff998074269098`.
@@ -48,4 +50,4 @@ Unchanged legacy skill selections were also verified above the former 100-item l
 
 ## Promotion and live verification
 
-Pending final checks and paired deployment. The engine production branch is `main`; the WebUI production branch is `master`. Promotion proceeds through `dev` and `staging` in both repositories.
+The engine production branch is `main`; the WebUI production branch is `master`. Promotion proceeds through `dev` and `staging` in both repositories. Exact promotion commits and the deployment/live-check outcome are maintained in the [project release note](https://www.notion.so/3d3937f18d888101811dfbaf63083725), alongside this QA evidence. The release-note status distinguishes prepared code from verified live deployment.
