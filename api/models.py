@@ -1086,6 +1086,7 @@ class Session:
                  bot_participants=None,
                  composer_draft=None,
                  anchor_activity_scenes=None,
+                 cost_status=None, cost_source=None,
                  **kwargs):
         self.session_id = session_id or uuid.uuid4().hex[:12]
         self.title = title
@@ -1106,7 +1107,9 @@ class Session:
         self.owner_email = str(owner_email).strip().lower() if owner_email else None
         self.input_tokens = input_tokens or 0
         self.output_tokens = output_tokens or 0
-        self.estimated_cost = estimated_cost
+        self.estimated_cost = None if cost_status == "unknown" else estimated_cost
+        self.cost_status = cost_status
+        self.cost_source = cost_source
         self.cache_read_tokens = cache_read_tokens or 0
         self.cache_write_tokens = cache_write_tokens or 0
         self.personality = personality
@@ -1215,7 +1218,7 @@ class Session:
         METADATA_FIELDS = [
             'session_id', 'title', 'workspace', 'model', 'model_provider', 'created_at', 'updated_at',
             'pinned', 'archived', 'project_id', 'profile', 'owner_email',
-            'input_tokens', 'output_tokens', 'estimated_cost',
+            'input_tokens', 'output_tokens', 'estimated_cost', 'cost_status', 'cost_source',
             'cache_read_tokens', 'cache_write_tokens',
             'personality', 'active_stream_id',
             'pending_user_message', 'pending_attachments', 'pending_started_at', 'pending_user_source',
@@ -1461,6 +1464,8 @@ class Session:
             'input_tokens': self.input_tokens,
             'output_tokens': self.output_tokens,
             'estimated_cost': self.estimated_cost,
+            'cost_status': self.cost_status,
+            'cost_source': self.cost_source,
             'cache_read_tokens': self.cache_read_tokens,
             'cache_write_tokens': self.cache_write_tokens,
             'cache_hit_percent': prompt_cache_hit_percent(self.cache_read_tokens, self.input_tokens),
@@ -2457,9 +2462,11 @@ def _apply_core_sync_or_error_marker(
             _stream_id = stream_id_for_recheck or session.active_stream_id
             session.messages = core_messages
             session.tool_calls = core.get('tool_calls', [])
-            for field in ('input_tokens', 'output_tokens', 'estimated_cost'):
+            for field in ('input_tokens', 'output_tokens', 'estimated_cost', 'cost_status', 'cost_source'):
                 if core.get(field) is not None:
                     setattr(session, field, core[field])
+            if session.cost_status == 'unknown':
+                session.estimated_cost = None
             _pending_text = _normalize_journal_recovery_text(session.pending_user_message)
             _already_checkpointed = False
             if _pending_text and session.messages:

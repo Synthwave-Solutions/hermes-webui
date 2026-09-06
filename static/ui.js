@@ -7162,11 +7162,11 @@ function _mergeUsageForCtxIndicator(latest, fallback){
   const fallbackObj=(fallback&&typeof fallback==='object')?fallback:{};
   const merged={...latestObj};
   for(const field of [
-    'input_tokens','output_tokens','estimated_cost',
+    'input_tokens','output_tokens','estimated_cost','cost_status','cost_source',
     'cache_read_tokens','cache_write_tokens','cache_hit_percent',
     'turn_cache_hit_percent','duration_seconds','tps','gateway_routing',
   ]){
-    if(merged[field]==null&&fallbackObj[field]!=null){
+    if(merged[field]==null&&fallbackObj[field]!=null&&!(field==='estimated_cost'&&latestObj.cost_status==='unknown')){
       merged[field]=fallbackObj[field];
     }
   }
@@ -7278,7 +7278,12 @@ function _syncCtxIndicator(usage){
   }
   let costText='';
   if(costLine){
-    if(cost){
+    if(usage.cost_status==='unknown'){
+      costText='Cost unavailable';
+      if(cacheText) costText+=` · ${cacheText}`;
+      costLine.style.display='';
+      costLine.textContent=costText;
+    }else if(typeof cost==='number' && Number.isFinite(cost)){
       costText=`Estimated cost: $${cost<0.01?cost.toFixed(4):cost.toFixed(2)}`;
       if(cacheText) costText+=` \u00b7 ${cacheText}`;
       costLine.style.display='';
@@ -17867,7 +17872,8 @@ function renderMessages(options){
         const outTok=msg._turnUsage.output_tokens||0;
         const cost=msg._turnUsage.estimated_cost;
         let text=`${_fmtTokens(inTok)} in · ${_fmtTokens(outTok)} out`;
-        if(cost) text+=` · ~$${cost<0.01?cost.toFixed(4):cost.toFixed(2)}`;
+        if(msg._turnUsage.cost_status==='unknown') text+=' · Cost unavailable';
+        else if(typeof cost==='number' && Number.isFinite(cost)) text+=` · ~$${cost<0.01?cost.toFixed(4):cost.toFixed(2)}`;
         const cacheHitPct=msg._turnUsage.cache_hit_percent;
         if(cacheHitPct!=null) text+=` · ${t('usage_cached_percent',cacheHitPct)}`;
         usage.textContent=text;
