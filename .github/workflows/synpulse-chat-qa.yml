@@ -52,6 +52,7 @@ jobs:
           tests/test_governance_agent_context.py
           tests/test_synpulse_role_navigation.py
           tests/test_governance_nav_visibility.py
+          tests/test_streaming_early_access_denial.py
           -q
       - name: Check recipient behavior
         run: node tests/chat_bot_roster_behavior.cjs

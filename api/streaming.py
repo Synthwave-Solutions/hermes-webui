@@ -6492,6 +6492,10 @@ def _run_agent_streaming(
         except Exception:
             logger.debug("Failed to append worker_started turn journal event", exc_info=True)
     s = None
+    # Access checks can refuse the turn before provider resolution. Keep the
+    # error path safe and report that refusal instead of crashing the worker.
+    resolved_model = model
+    resolved_provider = model_provider
     _rt = {}
     old_cwd = None
     old_exec_ask = None
@@ -9819,7 +9823,7 @@ def _run_agent_streaming(
         _exc_is_interrupted = _classification['type'] == 'interrupted'
 
         # The user hint still points to Settings / `hermes model` from _classify_provider_error().
-        if isinstance(e, GovernanceBindingError):
+        if isinstance(e, (GovernanceBindingError, PermissionError)):
             # Track A fail-closed refusal (non-admin under mode enforce whose
             # governance context could not be built/bound): surface the safe
             # message verbatim instead of running the provider-error
