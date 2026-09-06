@@ -233,10 +233,6 @@ def _validate(identity, body):
         values = body.get(key, [])
         if not isinstance(values, list) or len(values) > 10000 or any(not isinstance(v, str) for v in values):
             raise ValueError("Invalid " + key)
-        preserve_large_skills = (key == "skills" and target.exists() and
-                                 set(values) == set(_config(identity, name)["skills"]))
-        if len(values) > 100 and not preserve_large_skills:
-            raise ValueError("Invalid " + key)
         known = {entry.get("email", entry.get("name")) for entry in choices[{"allowed_users":"users", "allowed_groups":"groups"}.get(key, key)]}
         if set(values) - known:
             raise PermissionError("Unavailable selection in " + key)
@@ -246,7 +242,14 @@ def _validate(identity, body):
             raise ValueError("Bot memory must be at most 32768 characters")
         clean["bot_memory"] = body["bot_memory"]
     from api.profiles import _validate_profile_model_selection
-    _validate_profile_model_selection(clean["default_model"], clean["model_provider"])
+    existing = _config(identity, name) if target.exists() else None
+    unchanged_model = existing is not None and all(
+        clean[key] == existing[key] for key in ("default_model", "model_provider"))
+    # Editing instructions/photo must not depend on live provider discovery
+    # for the exact model already configured on this bot. Grants below remain
+    # authoritative, and any new selection still uses strict validation.
+    if not unchanged_model:
+        _validate_profile_model_selection(clean["default_model"], clean["model_provider"])
     _, rights = access(identity)
     for field, value in ((rights.grants.models, clean["default_model"]),
                          (rights.grants.model_providers, clean["model_provider"])):
