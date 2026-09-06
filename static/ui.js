@@ -9,7 +9,8 @@ const S={session:null,messages:[],entries:[],busy:false,pendingFiles:[],toolCall
 
 function assistantDisplayName(){
   if(S.activeProfile&&S.activeProfile!=='default') return S.activeProfile.charAt(0).toUpperCase()+S.activeProfile.slice(1);
-  return window._botName||'SynthPulse';
+  const name=window._botName||'SynPulse';
+  return /^(?:Hermes|SynthPulse)(?: Control)?$/.test(name)?'SynPulse':name;
 }
 const INFLIGHT={};  // keyed by session_id while request in-flight
 const SESSION_QUEUES={};  // keyed by session_id for queued follow-up turns
@@ -2109,6 +2110,8 @@ function _applyDashboardStatus(status){
   });
 }
 async function refreshDashboardStatus(force=false){
+  if(typeof loadGovernanceNavVisibility==='function')await loadGovernanceNavVisibility();
+  if(typeof _canUseFeature==='function'&&!_canUseFeature('dashboard:read'))return null;
   const now=Date.now();
   // Skip the interval-driven poll while the tab is hidden: the 60s interval
   // equals the cache TTL, so every background tick was a real /api/dashboard/status
@@ -2133,6 +2136,8 @@ async function refreshDashboardStatus(force=false){
   return _dashboardStatusCache;
 }
 async function loadDashboardSettings(){
+  if(typeof loadGovernanceNavVisibility==='function')await loadGovernanceNavVisibility();
+  if(typeof _canUseFeature==='function'&&!_canUseFeature('dashboard:read'))return;
   const modeEl=$('settingsDashboardMode');
   const urlEl=$('settingsDashboardUrl');
   if(!modeEl&&!urlEl) return;
@@ -3978,7 +3983,7 @@ async function _fetchLiveModels(provider, sel, requestSeq=null){
 
 /**
  * Check if the given model ID belongs to a different provider than the one
- * currently configured in Hermes. Returns a warning string if mismatched,
+ * currently configured in SynPulse. Returns a warning string if mismatched,
  * or null if the selection looks compatible.
  *
  * Provider detection is intentionally loose — we compare the model's slash
@@ -10182,7 +10187,7 @@ document.addEventListener('visibilitychange',_syncSystemHealthMonitorVisibility)
 if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',startSystemHealthMonitor);
 else startSystemHealthMonitor();
 
-// ── SynthPulse agent/gateway heartbeat alert (#716) ──
+// ── SynPulse agent/gateway heartbeat alert (#716) ──
 const AGENT_HEALTH_INTERVAL_MS=30000;
 const AGENT_HEALTH_DISMISSED_KEY='agent-health-dismissed';
 let _agentHealthTimer=null;
@@ -10208,7 +10213,7 @@ function _showAgentHealthAlert(payload){
   const title=$('agentHealthTitle');
   const details=$('agentHealthDetails');
   if(!banner) return;
-  if(title) title.textContent='SynthPulse agent is not responding';
+  if(title) title.textContent='SynPulse agent is not responding';
   const state=payload&&payload.details&&payload.details.gateway_state?` State: ${payload.details.gateway_state}.`:'';
   if(details) details.textContent=`Gateway heartbeat failed.${state} Messages may not be delivered until it comes back.`;
   banner.hidden=false;
@@ -10245,6 +10250,8 @@ async function restartGatewayService(){
   }
 }
 async function pollAgentHealth(){
+  if(typeof loadGovernanceNavVisibility==='function')await loadGovernanceNavVisibility();
+  if(typeof _canUseFeature==='function'&&!_canUseFeature('status:read'))return;
   if(document.visibilityState !== 'visible') return;
   if(Date.now() - _lastGatewayRestartTime < 15000) return;
   try{
@@ -11389,7 +11396,7 @@ function _createAssistantTurn(tsTitle='', tpsText=''){
 }
 function _setLatestAssistantTurnLandmark(turn, isLatest){
   if(!turn) return;
-  const label='Latest SynthPulse response';
+  const label='Latest SynPulse response';
   if(isLatest){
     if(typeof document!=='undefined'){
       document.querySelectorAll('.assistant-turn[data-latest-assistant-response="true"]').forEach(el=>{
@@ -12114,7 +12121,7 @@ function _syncTransparentEventControls(turn){
     label.setAttribute('data-transparent-tool-count',String(toolCount));
   }
   bar.setAttribute('data-tool-count',String(toolCount));
-  // Wire the SynthPulse chat name tag toggle for the live turn.
+  // Wire the SynPulse chat name tag toggle for the live turn.
   _wireTransparentTurnToggle(turn);
   // Apply recency fade so the newest activity stands out while streaming. The
   // fade helper is internally gated to the live turn, so this no-ops on settled
@@ -12389,7 +12396,7 @@ function _setTransparentRowsExpanded(root, expanded){
     _setTransparentCardOpen(card,!!expanded);
   });
 }
-// ── Transparent turn-level collapse (SynthPulse chat name tag) ───────────────
+// ── Transparent turn-level collapse (SynPulse chat name tag) ───────────────
 // In transparent_stream mode the assistant role label is the turn's "name
 // tag". Clicking it collapses the entire event stack underneath so the
 // transcript shows only the final answer (Output only). A chevron on the
@@ -17387,7 +17394,7 @@ function renderMessages(options){
     }catch(e){}
     S.messages.forEach((m,rawIdx)=>{
       if(!m) return;
-      // OpenAI / Hermes CLI format: role=tool with tool_call_id
+      // OpenAI / SynPulse CLI format: role=tool with tool_call_id
       if(m.role==='tool'){
         const tid=m.tool_call_id||m.tool_use_id||'';
         if(tid) resultsByTid[tid]=_cliToolResultSnippet(m.content);
@@ -17876,7 +17883,7 @@ function renderMessages(options){
       }
     }
   }
-  // Transparent mode per-turn wiring: collapsible SynthPulse chat name tag, old-event
+  // Transparent mode per-turn wiring: collapsible SynPulse chat name tag, old-event
   // fading, and the bottom-of-turn footer (elapsed · tokens · TTFT · status).
   // Runs after the per-turn duration block above so the footer can reuse the
   // computed durationText / tokens / TTFT for each settled assistant turn.

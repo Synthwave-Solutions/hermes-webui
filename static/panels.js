@@ -40,11 +40,11 @@ let _logsSeverityFilter = 'all';
 
 // Map of panel names → i18n keys for the app titlebar label.
 const APP_TITLEBAR_KEYS = {
-  chat: 'tab_chat', tasks: 'tab_tasks', skills: 'tab_skills',
+  approvals: 'tab_approvals', chat: 'tab_chat', tasks: 'tab_tasks', skills: 'tab_skills',
   memory: 'tab_memory', workspaces: 'tab_workspaces',
   profiles: 'tab_profiles', todos: 'tab_todos', insights: 'tab_insights', logs: 'tab_logs', governance: 'tab_governance', integrations: 'tab_integrations', projects: 'tab_projects', settings: 'tab_settings',
 };
-const MAIN_VIEW_PANELS = ['settings','skills','memory','tasks','kanban','workspaces','profiles','insights','logs','governance','integrations','projects','plugin'];
+const MAIN_VIEW_PANELS = ['approvals','settings','skills','memory','tasks','kanban','workspaces','profiles','insights','logs','governance','integrations','projects','plugin'];
 const MAIN_VIEW_SIDEBAR_PANEL_FALLBACKS = { plugin: 'settings' };
 
 /**
@@ -425,6 +425,7 @@ async function switchPanel(name, opts = {}) {
   // callers (server enforces regardless), so fall back to the chat panel.
   if (nextPanel === 'governance' && !(await loadGovernance())) return switchPanel('chat');
   if (nextPanel === 'integrations') await loadIntegrations();
+  if (nextPanel === 'approvals') await loadMyAccessRequests(false,{pendingOnly:true});
   if (nextPanel === 'projects') await loadProjectsHub();
   _syncLogsAutoRefresh();
   if (typeof _syncSystemHealthMonitorVisibility === 'function') _syncSystemHealthMonitorVisibility();
@@ -970,12 +971,12 @@ function _cronGatewayNoticeHtml(status) {
         ? 'Gateway endpoint not reachable'
         : 'Gateway not running';
   const body = notConfigured
-    ? 'In SynthPulse Control, scheduled jobs require the agent gateway daemon. If this is a single-container Docker install, jobs can be created and run manually here, but scheduled ticks need a separate gateway service running outside the WebUI.'
+    ? 'In SynPulse Control, scheduled jobs require the agent gateway daemon. If this is a single-container Docker install, jobs can be created and run manually here, but scheduled ticks need a separate gateway service running outside the WebUI.'
     : isStaleMetadata
       ? 'The gateway is marked as configured, but its health metadata has gone stale. In Docker, scheduled jobs require a live gateway daemon that refreshes runtime metadata while ticking cron.'
       : isRemoteUnreachable
         ? 'The gateway health endpoint is not reachable from WebUI. Verify the configured gateway URL environment variable points to a reachable gateway service and network path before relying on cron ticking.'
-        : 'In SynthPulse Control, scheduled jobs require the agent gateway daemon to be running. Start the gateway service before relying on offline scheduled runs.';
+        : 'In SynPulse Control, scheduled jobs require the agent gateway daemon to be running. Start the gateway service before relying on offline scheduled runs.';
   const docsHref = 'https://synthwave.solutions/';
   const helpLink = notConfigured || isRemoteUnreachable || isStaleMetadata
     ? `<p><a href="${docsHref}" target="_blank" rel="noopener">How to enable scheduled jobs in Docker ↗</a></p>`
@@ -3155,7 +3156,7 @@ async function createKanbanTask(){
 // click-on-backdrop closes). The modal markup lives in static/index.html as
 // #kanbanTaskModal — see the section just above </body>.
 //
-// The assignee field auto-completes against the union of (a) live Hermes
+// The assignee field auto-completes against the union of (a) live SynPulse
 // profile names from /api/profiles and (b) historical assignees on the
 // active board, with an inline hint that explains the dispatcher claim
 // contract — most users will pick a profile name from the dropdown rather
@@ -6699,7 +6700,7 @@ async function loadProfilesPanel() {
     // Hide "New profile" button in single profile mode
     const newProfileBtn = document.querySelector('[onclick="openProfileCreate()"]');
     if (newProfileBtn) {
-      newProfileBtn.style.display = data.single_profile_mode ? 'none' : '';
+      newProfileBtn.style.display = data.single_profile_mode||!_canUseFeature('profiles:admin') ? 'none' : '';
     }
 
     // In single profile mode, don't show the explanatory card
@@ -6732,11 +6733,15 @@ async function loadProfilesPanel() {
       const card = document.createElement('div');
       card.className = 'profile-card';
       card.dataset.name = p.name;
+      card.tabIndex=0;card.setAttribute('role','button');
+      card.setAttribute('aria-label',botDisplayName(p));
+      card.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();card.click();}};
       const meta = [];
       if (typeof p.model === 'string' && p.model) meta.push(p.model.split('/').pop());
-      if (p.provider) meta.push(p.provider);
+      if (p.provider&&window._navAudience==='admin') meta.push(p.provider);
+      if(p.bot&&p.bot.description)meta.unshift(p.bot.description);
       if (p.total_skills && p.total_skills > 0) meta.push(t('profile_skill_count', p.total_skills).replace(String(p.total_skills), `${p.enabled_skills} / ${p.total_skills}`));
-      const gwDot = p.gateway_running
+      const gwDot = window._navAudience==='member'?'':p.gateway_running
         ? `<span class="profile-opt-badge running" title="${esc(t('profile_gateway_running'))}"></span>`
         : `<span class="profile-opt-badge stopped" title="${esc(t('profile_gateway_stopped'))}"></span>`;
       const isActive = p.name === activeName;
@@ -6817,27 +6822,34 @@ function _renderProfileDetail(p, activeName){
   rows.push(`<div class="detail-row"><div class="detail-row-label">API key</div><div class="detail-row-value">${p.has_env ? esc(t('profile_api_keys_configured')) : '<span style="color:var(--muted)">Not configured</span>'}</div></div>`);
   if (p.total_skills && p.total_skills > 0) rows.push(`<div class="detail-row"><div class="detail-row-label">Skills</div><div class="detail-row-value">${esc(t('profile_skill_count', p.total_skills).replace(String(p.total_skills), `${p.enabled_skills} / ${p.total_skills}`))}</div></div>`);
   if (p.default_workspace) rows.push(`<div class="detail-row"><div class="detail-row-label">Default space</div><div class="detail-row-value"><code>${esc(p.default_workspace)}</code></div></div>`);
+  const editable=_canUseFeature('profiles:admin');
   body.innerHTML = `
-    <div class="main-view-content">
-      <div class="detail-card">
-        <div class="detail-card-title">${botAvatarHtml(p)}${esc(t('bot_identity'))}</div>
-        <label>${esc(t('bot_name'))}<input id="botTitle" value="${esc((p.bot&&p.bot.title)||p.name)}" maxlength="80" style="width:100%"></label>
-        <label>${esc(t('bot_description'))}<textarea id="botDescription" maxlength="400" style="width:100%">${esc((p.bot&&p.bot.description)||'')}</textarea></label>
-        <label>${esc(t('bot_avatar'))} <select id="botShape">${['circle','squircle','hexagon'].map(shape=>`<option value="${shape}" ${(p.bot&&p.bot.shape)===shape?'selected':''}>${shape}</option>`).join('')}</select> <input type="color" id="botColor" value="${/^#[0-9a-f]{6}$/i.test((p.bot&&p.bot.color)||'')?p.bot.color:'#6688aa'}"></label>
-        <label>Knowledge source files (relative to this bot's chat workspace)<textarea id="botKnowledge" style="width:100%" placeholder="docs/product.md">${esc((p.bot_knowledge_sources||[]).join('\n'))}</textarea></label>
-        <p>One file per line. Files are read only when relevant and allowed for the human sender. Missing files are skipped. Upload documents into the chat workspace first.</p>
-        <button type="button" onclick="saveBotAppearance()">${esc(t('save'))}</button>
-        <label>${esc(t('bot_upload'))}<input type="file" accept="image/png,image/jpeg,image/webp" onchange="uploadBotAvatar(this)"></label>
-        <p>${esc(t('bot_avatar_limit'))}</p>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button onclick="openBotConfiguration('soul')">${esc(t('bot_prompt'))}</button>
-          <button onclick="openBotConfiguration('memory')">${esc(t('bot_knowledge'))}</button>
-          <button onclick="openBotConfiguration('skills')">${esc(t('tab_skills'))}</button>
-          <button onclick="openBotConfiguration('settings')">${esc(t('bot_tools'))}</button>
-          <button onclick="openBotConfiguration('workspaces')">${esc(t('tab_workspaces'))}</button>
-        </div>
-        ${rows.join('')}
+    <div class="main-view-content bot-detail-content">
+      <section class="bot-overview"><div class="bot-overview-avatar">${botAvatarHtml(p)}</div><div><h2>${esc(botDisplayName(p))}</h2><p>${esc((p.bot&&p.bot.description)||t('bot_description_empty'))}</p></div></section>
+      <div class="bot-configuration-links">
+        <button type="button" class="sm-btn" onclick="openBotConfiguration('soul')">${esc(t('bot_prompt'))}</button>
+        <button type="button" class="sm-btn" onclick="openBotConfiguration('memory')">${esc(t('bot_knowledge'))}</button>
+        <button type="button" class="sm-btn" onclick="openBotConfiguration('skills')">${esc(t('tab_skills'))}</button>
+        ${window._navAudience==='admin'?`<button type="button" class="sm-btn" onclick="openBotConfiguration('settings')">${esc(t('bot_tools'))}</button>`:''}
       </div>
+      <form class="bot-editor" onsubmit="event.preventDefault();saveBotAppearance()">
+        <fieldset ${editable?'':'disabled'}>
+          <legend>${esc(t('bot_identity'))}</legend>
+          <div class="bot-editor-grid">
+            <label for="botTitle">${esc(t('bot_name'))}<input id="botTitle" value="${esc((p.bot&&p.bot.title)||p.name)}" maxlength="80" required></label>
+            <label for="botDescription" class="bot-editor-wide">${esc(t('bot_description'))}<textarea id="botDescription" maxlength="400" rows="3">${esc((p.bot&&p.bot.description)||'')}</textarea></label>
+            <label for="botShape">${esc(t('bot_avatar'))}<select id="botShape">${['circle','squircle','hexagon'].map(shape=>`<option value="${shape}" ${(p.bot&&p.bot.shape)===shape?'selected':''}>${shape}</option>`).join('')}</select></label>
+            <label for="botColor">${esc(t('bot_color'))}<input type="color" id="botColor" value="${/^#[0-9a-f]{6}$/i.test((p.bot&&p.bot.color)||'')?p.bot.color:'#6688aa'}"></label>
+            <label class="bot-editor-wide" for="botAvatarFile">${esc(t('bot_upload'))}<input id="botAvatarFile" type="file" accept="image/png,image/jpeg,image/webp" onchange="uploadBotAvatar(this)" aria-describedby="botAvatarHint"></label>
+          </div>
+          <p class="bot-field-hint" id="botAvatarHint">${esc(t('bot_avatar_limit'))}</p>
+          <label for="botKnowledge">${esc(t('bot_knowledge_files'))}<textarea id="botKnowledge" rows="4" placeholder="docs/product.md" aria-describedby="botKnowledgeHint">${esc((p.bot_knowledge_sources||[]).join('\n'))}</textarea></label>
+          <p class="bot-field-hint" id="botKnowledgeHint">${esc(t('bot_knowledge_files_hint'))}</p>
+          ${editable?`<button type="submit" class="sm-btn primary">${esc(t('save'))}</button>`:''}
+        </fieldset>
+        ${editable?'':`<p class="bot-field-hint">${esc(t('bot_read_only'))}</p>`}
+      </form>
+      <details class="bot-technical-details"><summary>${esc(t('bot_configuration_details'))}</summary>${rows.join('')}</details>
     </div>`;
   body.style.display = '';
   if (empty) empty.style.display = 'none';
@@ -6858,8 +6870,8 @@ function _setProfileHeaderButtons(mode, p, activeName){
     const isActive = p && p.name === activeName;
     const isDefault = !!(p && p.is_default);
     const singleProfileMode = !!(_profilesCache && _profilesCache.single_profile_mode);
-    if (isActive || singleProfileMode) hide(actBtn); else show(actBtn);
-    if (isDefault || singleProfileMode) hide(delBtn); else show(delBtn);
+    if (isActive || singleProfileMode || !_canUseFeature('profiles:admin')) hide(actBtn); else show(actBtn);
+    if (isDefault || singleProfileMode || !_canUseFeature('profiles:admin')) hide(delBtn); else show(delBtn);
     hide(cancelBtn); hide(saveBtn);
   } else if (mode === 'create') {
     if (header) header.style.display = 'flex';
@@ -7720,16 +7732,35 @@ function _applyTabOrder(order){
 // being a dead end. The APIs behind each panel stay the real gate; this is
 // presentation only, and it can never REVEAL a panel, only hide one.
 window._govHiddenNav = window._govHiddenNav || [];
+window._navAudience = 'member';
+const _MEMBER_NAV_ORDER = ['profiles','projects','tasks','skills','integrations','approvals'];
+function _canUseFeature(permission){
+  const me=window.__GOV_ME__;
+  if(!me)return false;
+  if(me.mode==='off'||me.mode==='report_only')return true;
+  const permissions=Array.isArray(me.permissions)?me.permissions:[];
+  return permissions.includes('*')||permissions.includes(permission)||permissions.includes(permission.split(':')[0]+':admin');
+}
+function _applyNavigationAudience(me){
+  window._navAudience=me&&me.nav_audience==='admin'?'admin':'member';
+  document.documentElement.dataset.navAudience=window._navAudience;
+  if(window._navAudience==='member'){
+    document.querySelectorAll('[data-dashboard-link]').forEach(el=>el.classList.remove('dashboard-link-visible'));
+  }
+}
+
 
 async function loadGovernanceNavVisibility(){
   try{
     const me = window.__GOV_ME__ || await api('/api/governance/me',{redirect401:false,timeoutToast:false});
     if(!me||!Array.isArray(me.hidden_nav)) return;
+    window.__GOV_ME__=me;
+    _applyNavigationAudience(me);
     window._govHiddenNav = me.hidden_nav.filter(x=>typeof x==='string'&&x.trim());
     if(typeof _applyTabVisibility==='function'&&typeof _getHiddenTabs==='function'){
       _applyTabVisibility(_getHiddenTabs());
     }
-  }catch(_){ /* not governed, or endpoint unavailable: show everything */ }
+  }catch(_){ _applyNavigationAudience(null); /* backend authorization remains authoritative */ }
 }
 window.loadGovernanceNavVisibility=loadGovernanceNavVisibility;
 
@@ -7737,12 +7768,13 @@ function _applyTabVisibility(hidden){
   hidden=_sanitizeTabPanelList(hidden);
   const govHidden=Array.isArray(window._govHiddenNav)?window._govHiddenNav:[];
   if(govHidden.length) hidden=hidden.concat(govHidden.filter(p=>hidden.indexOf(p)===-1));
-  _applyTabOrder(_getTabOrder());
+  _applyTabOrder(window._navAudience==='member'?_MEMBER_NAV_ORDER:_getTabOrder());
   // Hide/unhide all [data-panel] elements (sidebar-nav buttons + rail buttons)
   document.querySelectorAll('[data-panel]').forEach(function(el){
     var panel=el.dataset.panel;
     if(!panel)return;
     var shouldHide=hidden.indexOf(panel)!==-1;
+    if(window._navAudience==='member'&&!['chat','settings',..._MEMBER_NAV_ORDER].includes(panel)) shouldHide=true;
     // Never hide always-visible panels (chat, settings) even if present in hidden_tabs
     if(_ALWAYS_VISIBLE_TABS.has(panel)) shouldHide=false;
     el.classList.toggle('nav-tab-hidden',shouldHide);
@@ -9695,7 +9727,7 @@ async function loadSettingsPanel(){
     // Bot name — debounced autosave (text input)
     const botNameField=$('settingsBotName');
     if(botNameField){
-      botNameField.value=settings.bot_name||'SynthPulse';
+      botNameField.value=settings.bot_name||'SynPulse';
       let botNameTimer=null;
       botNameField.addEventListener('input',()=>{
         if(botNameTimer) clearTimeout(botNameTimer);
@@ -12025,7 +12057,7 @@ function _applySavedSettingsUi(saved, body, opts){
   if(Object.prototype.hasOwnProperty.call(body,'structured_code_default_view')){
     _applyStructuredCodeViewSettings(body.structured_code_default_view,body.structured_code_auto_tree_lines,false);
   }
-  window._botName=body.bot_name||'SynthPulse';
+  window._botName=body.bot_name||'SynPulse';
   if(typeof applyBotName==='function') applyBotName();
   else if(typeof _applyBusyComposerPlaceholder==='function') _applyBusyComposerPlaceholder();
   if(typeof setLocale==='function') setLocale(language);
@@ -12704,7 +12736,7 @@ async function saveSettings(andClose){
   body.default_message_mode=defaultMessageMode;
   body.auto_title_refresh_every=(($('settingsAutoTitleRefresh')||{}).value||'0');
   const botName=(($('settingsBotName')||{}).value||'').trim();
-  body.bot_name=botName||'SynthPulse';
+  body.bot_name=botName||'SynPulse';
   // Password: only act if the field has content; blank = leave auth unchanged
   if(pw && pw.trim()){
     const currentPwField=$('settingsCurrentPassword');
@@ -13438,17 +13470,19 @@ async function approvalResumeHtml(){
   }
   return html;
 }
-async function loadMyAccessRequests(animate){
-  const box=$('accessRequestsList');
+async function loadMyAccessRequests(animate,options={}){
+  const pendingOnly=!!options.pendingOnly;
+  const box=$(pendingOnly?'myApprovalsList':'accessRequestsList');
   if(!box) return;
-  const btn=$('btnAccessRequestsRefresh');
+  const btn=$(pendingOnly?'btnMyApprovalsRefresh':'btnAccessRequestsRefresh');
   if(animate&&btn) btn.disabled=true;
   try{
-    const resumeHtml=await approvalResumeHtml();
+    const resumeHtml=pendingOnly?'':await approvalResumeHtml();
     const data=await api('/api/governance/approvals/mine');
-    const rows=Array.isArray(data&&data.requests)?data.requests.slice():[];
+    const allRows=Array.isArray(data&&data.requests)?data.requests.slice():[];
+    const rows=pendingOnly?allRows.filter(row=>String(row.status||'pending').toLowerCase()==='pending'):allRows;
     if(!rows.length){
-      box.innerHTML=resumeHtml+`<div class="access-requests-empty">${esc(t('access_requests_empty'))}</div>`;
+      box.innerHTML=resumeHtml+`<div class="access-requests-empty">${esc(t(pendingOnly?'my_approvals_empty':'access_requests_empty'))}</div>`;
       return;
     }
     const order={pending:0,approved:1,rejected:2};

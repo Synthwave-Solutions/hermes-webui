@@ -1,7 +1,7 @@
 {
   "id": "./",
-  "name": "SynthPulse Control",
-  "short_name": "SynthPulse",
+  "name": "SynPulse Control",
+  "short_name": "SynPulse",
   "description": "Synthwave Solutions control surface for agent operations.",
   "start_url": "./?source=pwa",
   "scope": "./",
@@ -22,7 +22,7 @@
     {
       "name": "New conversation",
       "short_name": "New chat",
-      "description": "Open SynthPulse ready for a new chat",
+      "description": "Open SynPulse ready for a new chat",
       "url": "./?source=pwa&action=new-chat",
       "icons": [
         {

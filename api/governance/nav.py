@@ -1,23 +1,8 @@
-"""Which left-navigation items a caller may see.
+"""Role-aware presentation derived from effective administrative and feature grants.
 
-Reported 27 Aug 2026 ("Let administrators configure visible left-navigation
-items by user group"): customers were shown menu items for features their
-deployment or their permissions do not include, so every one of those was a
-dead end.
-
-Navigation is DERIVED from effective access rather than configured twice. Each
-panel names the permission its own API already requires, so a group that is
-not granted that permission simply does not get the menu item, and the item
-cannot come back through a client-side setting. Two consequences worth stating:
-
-* Enforcement does not live here. The APIs behind each panel are gated by the
-  route catalog; this module only stops a user from walking into a wall.
-* An administrator changes navigation the same way they change everything
-  else: by granting or withholding the permission on the group. There is no
-  second, drifting list of "visible tabs" per group.
-
-``essential`` panels are never hidden: a user must always keep chat, their own
-settings and the help surfaces, however narrow their grants.
+Members get daily work destinations. Administrators retain the full console.
+Backend routes remain the authorization boundary; this module only chooses
+navigation. See docs/role-navigation.md for the intentional presentation contract.
 """
 from __future__ import annotations
 
@@ -27,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 # panel id (data-panel in static/index.html) -> permission its API requires.
 PANEL_PERMISSIONS = {
+    "approvals": "self:read",
     "tasks": "cron:read",
     "kanban": "kanban:read",
     # Projects hub (ticket 12): every aggregated section inside the payload
@@ -51,7 +37,8 @@ PANEL_PERMISSIONS = {
 
 # Never hidden, whatever the grants: the user would otherwise lose the ability
 # to work, to reach their own preferences, or to ask for help.
-ESSENTIAL_PANELS = frozenset({"chat", "settings"})
+ESSENTIAL_PANELS = frozenset({"chat", "settings", "approvals"})
+MEMBER_PANELS = frozenset({"chat", "profiles", "projects", "tasks", "skills", "integrations", "approvals", "settings"})
 
 
 def _permissions(access) -> frozenset:
@@ -63,6 +50,9 @@ def _permissions(access) -> frozenset:
     navigation. Hiding is presentation; the APIs stay the real gate.
     """
     try:
+        effective = getattr(access, "permissions", None)
+        if effective is not None:
+            return frozenset(effective)
         return frozenset(getattr(getattr(access, "grants", None), "permissions", None) or ())
     except Exception:
         logger.debug("nav permission read failed", exc_info=True)
@@ -76,36 +66,38 @@ def _has(permissions: frozenset, permission: str) -> bool:
     return f"{permission.split(':', 1)[0]}:admin" in permissions
 
 
-def hidden_panels(access, policy=None) -> list:
-    """Panels the caller must not see, newest policy state included.
+def navigation_audience(access, policy=None) -> str:
+    """Presentation audience from effective administrative grants, never role names.
 
-    Returns an empty list when governance is off or the caller holds a
-    wildcard: nothing is hidden that the person could actually use.
+    The ungoverned local-owner interface retains its complete navigation.
+    Read-only governance access is not administrative access.
     """
-    try:
-        if policy is not None and not getattr(policy, "enabled", True):
-            return []
-        if policy is not None and str(getattr(policy, "mode", "")) == "report_only":
-            # report_only never enforces, here as everywhere else.
-            return []
-        permissions = _permissions(access)
-        if permissions is None:
-            return []
-        hidden = []
-        for panel, permission in PANEL_PERMISSIONS.items():
-            if panel in ESSENTIAL_PANELS:
-                continue
-            if not _has(permissions, permission):
-                hidden.append(panel)
-        return sorted(hidden)
-    except Exception:
-        logger.debug("nav visibility resolution failed", exc_info=True)
+    if policy is not None and (not getattr(policy, "enabled", True)
+                               or getattr(policy, "mode", "") == "report_only"):
+        return "admin"
+    permissions = _permissions(access) or frozenset()
+    return "admin" if permissions.intersection({"*", "governance:write", "governance:admin"}) else "member"
+
+
+def hidden_panels(access, policy=None) -> list:
+    """Daily work navigation for members; complete navigation for administrators.
+
+    Feature grants still hide inaccessible daily panels. Own approvals and
+    preferences always remain reachable. This is presentation only: every
+    backend endpoint continues to authorize the request independently.
+    Unreadable policy state fails to the member surface with no feature grants.
+    """
+    if navigation_audience(access, policy) == "admin":
         return []
+    permissions = _permissions(access) or frozenset()
+    return sorted(panel for panel, permission in PANEL_PERMISSIONS.items()
+                  if panel not in ESSENTIAL_PANELS
+                  and (panel not in MEMBER_PANELS or not _has(permissions, permission)))
 
 
 def visible_panels(access, policy=None) -> list:
     """The complement of hidden_panels, for a preview of a group's navigation."""
     hidden = set(hidden_panels(access, policy))
     return sorted(
-        [p for p in PANEL_PERMISSIONS if p not in hidden] + sorted(ESSENTIAL_PANELS)
+        set(p for p in PANEL_PERMISSIONS if p not in hidden) | ESSENTIAL_PANELS
     )

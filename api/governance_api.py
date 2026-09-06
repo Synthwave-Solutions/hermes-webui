@@ -385,9 +385,16 @@ def _handle_me(handler, parsed, policy, subject, access) -> bool:
             # The client hides these on top of the user's own hidden_tabs; the
             # APIs stay the real enforcement.
             "hidden_nav": _hidden_nav(access, policy),
+            "nav_audience": _nav_audience(access, policy),
         },
     )
     return True
+
+
+def _nav_audience(access, policy) -> str:
+    from api.governance.nav import navigation_audience
+
+    return navigation_audience(access, policy)
 
 
 def _hidden_nav(access, policy) -> list:

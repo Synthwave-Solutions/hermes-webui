@@ -167,7 +167,7 @@ def test_me_shape_admin(policy_file, as_user):
         "roles", "groups", "permissions", "profiles",
         # Left-navigation items this caller may not see, derived from the same
         # permissions that gate the panels' APIs (27 Aug 2026 ticket).
-        "hidden_nav",
+        "hidden_nav", "nav_audience",
     }
 
 
