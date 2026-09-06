@@ -7801,3 +7801,18 @@ html[data-nav-audience="member"]:not([data-advanced-chat-controls="1"]) #provide
 html[data-nav-audience="member"]:not([data-advanced-chat-controls="1"]) #composerMobileModelAction,
 html[data-nav-audience="member"]:not([data-advanced-chat-controls="1"]) #composerMobileReasoningAction,
 html[data-nav-audience="member"]:not([data-advanced-chat-controls="1"]) #composerMobileQuotaAction{display:none!important;}
+
+/* Project collaboration controls share the surrounding panel's visual system. */
+.proj-field{display:flex;flex-direction:column;gap:7px;font-size:12px;color:var(--muted);min-width:0;margin-bottom:12px}
+.proj-field input{box-sizing:border-box;width:100%;min-width:0;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font:inherit}
+.proj-field input:focus-visible{outline:2px solid var(--link);outline-offset:2px}
+.proj-field input[type=file]{padding:8px}
+.proj-field input::file-selector-button{border:1px solid var(--border);border-radius:6px;background:var(--surface-2);color:var(--text);padding:7px 10px;margin-right:10px;cursor:pointer}
+.proj-team-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;margin-bottom:16px}
+.proj-team-section{min-width:0}.proj-team-section h3{font-size:13px;margin:0 0 12px;color:var(--text)}
+.proj-choices{display:flex;flex-direction:column;gap:6px}.proj-choice{display:flex;align-items:center;gap:8px;padding:8px 0;font-size:12px;overflow-wrap:anywhere;cursor:pointer}
+.proj-choice input{accent-color:var(--link);flex-shrink:0}.proj-choice .bot-avatar{width:24px;height:24px}
+.proj-owner{font-size:12px;color:var(--muted);padding:8px 0;overflow-wrap:anywhere}
+.proj-actions{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}.proj-actions button{max-width:100%;overflow-wrap:anywhere}
+.proj-create .app-dialog-btn{width:100%}
+@media(max-width:640px){.proj-team-grid{grid-template-columns:minmax(0,1fr);gap:16px}}

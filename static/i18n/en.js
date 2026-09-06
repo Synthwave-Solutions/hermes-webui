@@ -1208,7 +1208,7 @@ window.__registerHermesLocale('en', {
     governance_audit: 'Audit',
     tab_projects: 'Projects',
     projects_title: 'Projects',
-    projects_subtitle: 'A read-only view of what this workstation knows about each project.',
+    projects_subtitle: 'Bring conversations, people, bots and files together.',
     projects_desc: 'Everything this workstation holds about a project, in one place.',
     projects_refresh: 'Refresh',
     projects_empty_title: 'Select a project',
