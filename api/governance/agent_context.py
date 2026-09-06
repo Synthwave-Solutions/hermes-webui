@@ -96,12 +96,20 @@ def _translate_context(agent_mod, policy, email: str, groups: tuple[str, ...],
     """
     subject = GovernanceSubject(email=email, groups=groups)
     access = resolve_effective_access(policy, subject)
+    from api.bot_builder import access_ceiling
+    from dataclasses import replace
+    ceiling = access_ceiling({"email": email, "groups": list(groups)}, active_profile, access)
+    if ceiling is not None:
+        access = replace(access, profiles=access.profiles | {active_profile})
     shim = SimpleNamespace(
         access=access,
         active_profile=str(active_profile or "default"),
         session_id=str(session_id or ""),
         request_id=str(request_id or ""),
+        bot_access_ceiling=ceiling,
     )
+    if ceiling is not None and "bot_access_ceiling" not in getattr(agent_mod.DashboardGovernanceContext, "__dataclass_fields__", {}):
+        raise GovernanceBindingError("This engine does not support bot capability limits")
     payload = agent_mod.serialize_context_for_env(shim)
     ctx = agent_mod.context_from_env_payload(payload)
     if ctx is None:
@@ -158,7 +166,9 @@ def bind_governed_agent_turn(identity: Any, *, active_profile: str = "default",
         return None
 
     email = _identity_email(identity)
-    if email and email in {str(a).strip().lower() for a in policy.bootstrap_admins} and not project_workspace:
+    from api.bot_builder import managed as _managed_bot
+    _has_bot_policy = _managed_bot(active_profile) is not None
+    if email and email in {str(a).strip().lower() for a in policy.bootstrap_admins} and not project_workspace and not _has_bot_policy:
         # Never-deny principals: run unbound. The resolver would grant
         # wildcard anyway; skipping the bind keeps admin turns byte-identical
         # to today's behavior (and immune to translation bugs).
@@ -181,6 +191,12 @@ def bind_governed_agent_turn(identity: Any, *, active_profile: str = "default",
         from .loader import resolve_policy_path
         fields = getattr(ctx, "__dataclass_fields__", {})
         updates = {}
+        if _has_bot_policy:
+            if "bot_access_check" not in fields:
+                raise GovernanceBindingError("This engine does not support fresh bot access checks")
+            from api.bot_builder import allowed as _builder_allowed
+            captured_identity = {"email": email, "groups": list(_identity_groups(identity))}
+            updates["bot_access_check"] = lambda: _builder_allowed(captured_identity, active_profile) is True
         if project_workspace:
             if not {'project_workspace', 'project_access_check'} <= set(fields) or not callable(project_access_check):
                 raise GovernanceBindingError('This engine does not support scoped project file access')
