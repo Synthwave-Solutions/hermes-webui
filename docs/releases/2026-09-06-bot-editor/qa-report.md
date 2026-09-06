@@ -22,3 +22,9 @@ Knowledge is a file reference library, not vector RAG. File contents are read by
 ## Release
 
 Candidate awaits dev → staging → master promotion and live source/health verification. Production evidence is recorded separately after deployment.
+
+## Live-catalog follow-up
+
+A read-only check using the actual authorized editor and default profile found 554 selected skills and 154 selected CLI tools. Existing GET worked, but unchanged save validation rejected CLI count above100. Three regression tests reproduce those counts and fail the previous code. The fix retains the 10,000-entry bound plus actual-catalog/current-grant checks and removes the contradictory100 limit. Tests cover save, narrowing/restoring, new bots, unavailable commands and10001-entry rejection. Production user data is not mutated by the read-only validation check.
+
+The same real configuration also exposed a second stale validation: unchanged configured model/provider was rejected when live discovery did not advertise it. Editing existing bot settings now preserves the exact persisted model/provider without querying live availability, while model/provider grants remain required. New or changed model selections still validate against provider availability. Regression tests cover all three cases.
