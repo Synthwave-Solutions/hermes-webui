@@ -1,0 +1,102 @@
+[
+  {
+    "event": "action_approval",
+    "extra": {
+      "decision": "approve",
+      "operation_id": "a5f480a9e9134087a74af70caea1f680",
+      "policy_revision": "108abb010bf4dba6a99327d2549611392be9841142c5ebb8195ed34dd7059bd6",
+      "request_id": "339b636f61db4f08b2f585bb9937b8c1",
+      "session_id": "20ddc12ff8bb",
+      "source": "automatic",
+      "tool": "write_file"
+    },
+    "method": "",
+    "mode": "enforce",
+    "path": "",
+    "reason": "Deterministic QA review for this synthetic action.",
+    "report_only": false,
+    "subject_email_hash": "38533e7ecf4361ced3de281c",
+    "subject_user_id_hash": "",
+    "ts": "2026-09-08T20:28:48.114482+00:00"
+  },
+  {
+    "event": "action_approval",
+    "extra": {
+      "decision": "deny",
+      "operation_id": "c38a2f5f072f4f6a879c0b30c78d8865",
+      "policy_revision": "108abb010bf4dba6a99327d2549611392be9841142c5ebb8195ed34dd7059bd6",
+      "request_id": "e7cca785e2c6401cbb979f032e3938ae",
+      "session_id": "f0870fcfb0f9",
+      "source": "automatic",
+      "tool": "write_file"
+    },
+    "method": "",
+    "mode": "enforce",
+    "path": "",
+    "reason": "Deterministic QA review for this synthetic action.",
+    "report_only": false,
+    "subject_email_hash": "9fdd94a9ec7ff0b437d41d9c",
+    "subject_user_id_hash": "",
+    "ts": "2026-09-08T20:28:49.762789+00:00"
+  },
+  {
+    "event": "action_approval",
+    "extra": {
+      "decision": "approve",
+      "operation_id": "39f488991bef425b8922995df6141f6d",
+      "policy_revision": "108abb010bf4dba6a99327d2549611392be9841142c5ebb8195ed34dd7059bd6",
+      "request_id": "27da060030fa437e9939b862a868ee32",
+      "session_id": "0e1d13f974c8",
+      "source": "manual",
+      "tool": "write_file"
+    },
+    "method": "",
+    "mode": "enforce",
+    "path": "",
+    "reason": "Approved for this action by the user.",
+    "report_only": false,
+    "subject_email_hash": "c54f0b65f3ffdbfed628fac6",
+    "subject_user_id_hash": "",
+    "ts": "2026-09-08T20:28:51.484408+00:00"
+  },
+  {
+    "event": "action_approval",
+    "extra": {
+      "decision": "deny",
+      "operation_id": "07ca0d5271594407a5892cf05098b50e",
+      "policy_revision": "108abb010bf4dba6a99327d2549611392be9841142c5ebb8195ed34dd7059bd6",
+      "request_id": "02c69919684441c981cedf3de6ba876d",
+      "session_id": "3e72ece255ab",
+      "source": "manual",
+      "tool": "write_file"
+    },
+    "method": "",
+    "mode": "enforce",
+    "path": "",
+    "reason": "Manual approval was denied or did not complete.",
+    "report_only": false,
+    "subject_email_hash": "8499b6f4bab1cee783715694",
+    "subject_user_id_hash": "",
+    "ts": "2026-09-08T20:28:53.433752+00:00"
+  },
+  {
+    "event": "action_approval",
+    "extra": {
+      "decision": "approve",
+      "operation_id": "ff78bcf85b9e46c4875a37babd483748",
+      "policy_revision": "108abb010bf4dba6a99327d2549611392be9841142c5ebb8195ed34dd7059bd6",
+      "request_id": "55569f49f2074f69ae5425b5ba86af8a",
+      "session_id": "5263cecfb5d3",
+      "source": "manual",
+      "tool": "write_file"
+    },
+    "method": "",
+    "mode": "enforce",
+    "path": "",
+    "reason": "Approved for this action by the user.",
+    "report_only": false,
+    "subject_email_hash": "d4c6a37ef0362e64de69188f",
+    "subject_user_id_hash": "",
+    "ts": "2026-09-08T20:28:55.345129+00:00"
+  }
+]

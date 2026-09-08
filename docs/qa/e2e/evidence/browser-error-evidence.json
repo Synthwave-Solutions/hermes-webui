@@ -1,0 +1,706 @@
+[
+  {
+    "scenario": "US-SP-AUTH-001 actual password login rejects invalid input then establishes authenticated session",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-AUTH-LOGOUT sign out revokes browser access and redirects to login",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-AUTH-ANONYMOUS authenticated data APIs reject absent cookie",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-CHAT-006 queue follow-up waits then produces two persisted ordered turns",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-CHAT-009 Stop generation cancels in-flight run and accepts a fresh next turn",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-CHAT-012 hard reload mid-stream restores the same session and finished response once",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-CHAT-011 persisted unsent draft survives hard reload without creating a turn",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-CHAT-008 explicit interrupt cancels first response and starts requested next message",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-CHAT-007 actual steer accepted mid-turn influences next model iteration",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-CHAT-001 real composer dispatches through real engine and deterministic provider, persists reload",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-CHAT-002 modes change through header and survive reload",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-CHAT-004 Shift Enter inserts newline without sending",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-GROUP-001 selecting named colleague stages participants and persists actual group",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-CHAT-ROSTER bot roster hides and shows through its real toggle",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-VOICE-001 voice policy denial explains prerequisite without hanging",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-CHAT-ATTACH actual text attachments remove one upload exact bytes and persist transcript",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-CHAT-EDIT actual cancel edit resubmit and regenerate preserve one edited user turn after reload",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-CHAT-PROMPTS saved prompt validates empty input saves reloads inserts exact text and deletes",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-FILE-DEEP editor save reopen download rename cancel and delete persist on disk",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-TERM-DEEP actual terminal executes harmless local command collapses expands restarts closes",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-SESS-SPLIT all split counts create real independent frames and exit",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-TODO-DEEP real agent todo create update clear renders live and survives session reload",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-BOT-DEEP all editable tab fields filter select save and delete lifecycle",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-CHAT-017 actual delegate tool spawns two real child agents and renders their completion",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-FILE-001 file and folder dialogs write real isolated workspace and support cancel",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PREF-THEMES all built-in theme and font-size buttons apply and reload",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PREF-SKINS every rendered skin button applies its own skin value",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-LOG-001 logfile tail severity wrap and refresh controls remain usable",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-INS-001 all analytics periods request and render their selected window",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-UX-ERROR-TOAST error toast retains clickable dismiss control",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-GOV-ADMIN-GROUPS all templates and six grant fields create edit cancel clear and delete with persisted negative checks",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-GOV-ADMIN-USERS role and group assignment persists cancel preserves policy and assigned group cannot be deleted",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-GOV-ADMIN-APPROVAL actual denied route becomes admin approval then grants one route while rejection and replay remain bounded",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-GOV-ADMIN-LEGACY unchanged group save preserves command denials metadata and unexposed grants",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-GOV-006 [field roundtrip] all 14 extra allow and 14 deny controls persist through real save and reload",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-GOV-006 [field removal] clearing all extra grants and denials removes persisted entries",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-POL-032 [legacy subset] unchanged user save preserves unexposed command denials and policy metadata",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-POL-013 [bootstrap affordance] typing a recovery admin identity explains and locks ineffective restrictions",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-POL-001 [legacy level-only edit] Keep existing policy retains assigned role access when changing level",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-UX-007 [preview lifecycle] a stale preview for the same reselected user cannot replace its newer policy",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-UX-007 [save lifecycle] a late save cannot discard a newly selected user draft",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-UX-007 [inspector lifecycle] late standalone preview cannot replace a more recently requested user",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-POL-001 new policy defaults to user whitelist manual and renders at desktop and mobile",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-POL-RESPONSIVE desktop edits policy prompt and saves accessible last controls after reload",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-POL-RESPONSIVE laptop edits policy prompt and saves accessible last controls after reload",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-POL-RESPONSIVE mobile edits policy prompt and saves accessible last controls after reload",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-POL-VALIDATION automatic without policy prompt rejects before mutation",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-POL-LEGACY editing a legacy user preserves omitted access level and mode",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-POL-002 whitelist with role but zero direct grant cannot use work APIs",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-POL-004 blacklist elevated automatic policy and narrow denials survive save reload",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-GOV-PREVIEW real preview button shows chosen user and effective grants",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-AUTH-CSRF cross-origin cookie-auth mutation without CSRF is rejected",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-POL-REVOKE-WHITELIST direct skill grant permits actual browser read then removal denies retained-session requests",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-POL-REVOKE-BLACKLIST group wildcard cannot override direct denial and clearing denial restores the same signed session",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-POL-REVOKE-LEVELS user elevated and admin choices persist while only explicit admin can administer policy",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-GOV-REQUESTER-STATUS retained requester sees pending approved rejected while another account cannot read or decide those requests",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-POL-RUNTIME-autoapprove actual model decision allows actual tool effect",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-POL-RUNTIME-autodeny actual model decision blocks actual tool effect",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-POL-RUNTIME-manualapprove parked action waits for real frontend once decision",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-POL-RUNTIME-manualdeny parked action waits for real frontend deny decision",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-POL-RUNTIME-automanual parked action waits for real frontend once decision",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-UX-MOBILE approvals hamburger navigation allows actual main refresh control",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-UX-MOBILE integrations hamburger navigation allows actual main refresh control",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-CHAT-NAV chat opens through visible navigation",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-BOT-NAV profiles opens through visible navigation",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PROJ-NAV projects opens through visible navigation",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-CRON-NAV tasks opens through visible navigation",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-SKILL-NAV skills opens through visible navigation",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-CONN-NAV integrations opens through visible navigation",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-GOV-NAV approvals opens through visible navigation",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-MEM-NAV memory opens through visible navigation",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-KAN-NAV kanban opens through visible navigation",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-WS-NAV workspaces opens through visible navigation",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-TODO-NAV todos opens through visible navigation",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-INS-NAV insights opens through visible navigation",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-LOG-NAV logs opens through visible navigation",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-GOV-NAV governance opens through visible navigation",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PREF-NAV settings opens through visible navigation",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-GOV-TAB-overview governance overview tab opens and renders",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-GOV-TAB-users governance users tab opens and renders",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-GOV-TAB-groups governance groups tab opens and renders",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-GOV-TAB-workspaces governance workspaces tab opens and renders",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-GOV-TAB-approvals governance approvals tab opens and renders",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-GOV-TAB-integrations governance integrations tab opens and renders",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-GOV-TAB-preview governance preview tab opens and renders",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-GOV-TAB-audit governance audit tab opens and renders",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PREF-TAB-appearance settings appearance renders",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PREF-TAB-preferences settings preferences renders",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PREF-TAB-providers settings providers renders",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PREF-TAB-plugins settings plugins renders",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PREF-TAB-extensions settings extensions renders",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PREF-TAB-system settings system renders",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PREF-TAB-help settings help renders",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PREF-BEHAVIOR-SEARCH search selects actual setting and clears stale results",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PREF-BEHAVIOR-LANGUAGE German selection translates visible interface then restores English",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PREF-BEHAVIOR-EMPTY suggestions and entire welcome panel hide independently and survive reload",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PREF-BEHAVIOR-TODOS workspace preference controls actual tab while sidebar remains usable",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-VOICE-REALTIME-TURNS native speech answers two turns without submitting chat or replacing draft",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-VOICE-REALTIME-BACKGROUND native dispatch performs real file write once and preserves ongoing conversation",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-VOICE-REALTIME-END ending call leaves a real engine task running to completion",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-VOICE-REALTIME-ONCE governed native action waits for exact child approval while voice stays open",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-VOICE-REALTIME-DENY governed native action waits for exact child approval while voice stays open",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-VOICE-REALTIME-AUTOAPPROVE native tool effect follows the user's real AI review decision",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-VOICE-REALTIME-AUTODENY native tool effect follows the user's real AI review decision",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-VOICE-REALTIME-CONTROLS microphone, push to talk, interruption and session change release capture correctly",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-VOICE-REALTIME-MIC-DENIED microphone refusal fails without creating a provider call",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-VOICE-REALTIME-REMOTE-END removed server call stops browser microphone capture",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-VOICE-REALTIME-LAUNCH-RACE canceled capability response cannot release a newer pending launch",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-VOICE-REALTIME-CHAT native chat mode executes actual engine work and status tool",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-VOICE-REALTIME-SUBAGENTS native subagents mode executes actual engine work and status tool",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-VOICE-REALTIME-IDLE result speech waits until native audio playback is finished",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-VOICE-REALTIME-SLOW-SUBAGENTS idle parent remains running until delayed actual children and their continuation finish",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-VOICE-REALTIME-CONTINUATION original signed SSO restriction survives actual child completion and parent wakeup",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-POL-RESOURCE resource denials saved in frontend block real named skill settings and model API bypasses",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-LIFECYCLE-CRON edit, cancel, duplicate, run locally, pause, resume and delete persist",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-LIFECYCLE-KAN edit, comment, complete, archive and restore survive reload",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-LIFECYCLE-KAN-DEFECT visible Done action must complete an existing Todo task",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-SESS-DISCOVERY rename Enter and Escape plus title content and URL search select persisted conversation",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-SESS-ARCHIVE archive reload show archived and restore preserve authoritative transcript",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-SESS-SHARE create public snapshot read anonymously cancel revoke then revoke invalidates public link",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-SESS-ACTIONS pin duplicate and delete operate on chosen persisted session",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-SESS-EXPORT-JSON actual download includes persisted transcript",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-SESS-EXPORT-HTML actual download includes persisted transcript",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-SESS-EXPORT-Markdown actual download includes persisted transcript",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-SESS-CLEAR clear cancel preserves messages and confirm clears persisted transcript",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-UX-MOBILE drawer and chat mode remain reachable at 390px",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PREF-CONTROL-session_jump_buttons both switch states save and reload",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PREF-CONTROL-session_endless_scroll both switch states save and reload",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PREF-CONTROL-auto_scroll_follow both switch states save and reload",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PREF-CONTROL-render_user_markdown both switch states save and reload",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PREF-CONTROL-large_text_paste_as_attachment both switch states save and reload",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PREF-CONTROL-project_quick_create_buttons both switch states save and reload",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PREF-CONTROL-show_titlebar_profile both switch states save and reload",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PREF-CONTROL-worklog_details_expanded_default both switch states save and reload",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PREF-CONTROL-show_token_usage both switch states save and reload",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PREF-CONTROL-show_quota_chip both switch states save and reload",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PREF-CONTROL-show_conversation_outline both switch states save and reload",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PREF-CONTROL-show_tps both switch states save and reload",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PREF-CONTROL-fade_text_effect both switch states save and reload",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PREF-CONTROL-terminal_auto_expand_on_output both switch states save and reload",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PREF-CONTROL-show_busy_placeholder_hint both switch states save and reload",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PREF-CONTROL-rtl both switch states save and reload",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PREF-CONTROL-sound_enabled both switch states save and reload",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PREF-CONTROL-whats_new_summary_enabled both switch states save and reload",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PREF-ACTIVITY all activity display modes persist and timestamps toggle independently",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PREF-STRUCTURED JSON and YAML view choices and threshold persist",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-AUTH-009 virtual authenticator registers signs in and removes an actual passkey",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PREF-SELECT-send_key every offered option saves and restores",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PREF-SELECT-sidebar_density every offered option saves and restores",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PREF-SELECT-default_message_mode every offered option saves and restores",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PREF-SELECT-auto_title_refresh_every every offered option saves and restores",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PREF-NUMBERS pinned limit and assistant display name save and reload",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PREF-TAB-CHIPS each configurable navigation chip hides and restores its panel",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PREF-COMPOSER-CHIPS every footer visibility chip saves both states",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-SYSTEM-CAPACITY four capacity controls save reload sanitize and refuse an ungranted identity",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-SYSTEM-DASHBOARD all legacy dashboard modes save loopback URL reload and reject ungranted write",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-SYSTEM-MCP configured local server toggles persist and empty tool search and every page size remain honest",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-SYSTEM-AUX-SLOTS every actual auxiliary slot saves chosen local provider model and reset cancellation preserves assignments",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-SYSTEM-AUX-ADVANCED real modal validates JSON saves all fields hides synthetic key and clears or cancels precisely",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-SYSTEM-MAIN-ADVANCED main model options cancel and save persist without changing loopback provider pair",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-SYSTEM-PLUGIN local dashboard plugin toggle page sandbox and disabled routes persist with negative checks",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-SYSTEM-PROVIDER actual self-hosted connection test save and inference use only the loopback provider",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-CHAT-TOOL-STATUS successful writes and reads of error-looking content remain successful after reload",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-BOT-001 wizard validates, preserves draft back navigation and creates real bot",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-BOT-004 six editor tabs, keyboard navigation, and save from instructions preserve real configuration",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-KNOW-001 upload does not select; explicit selection saves and survives editor reopen",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-PROJ-001 create project, configure people and bots, upload file, reopen membership",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-MEM-001 personal memory edits persist, cancel preserves previous value",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-SKILL-001 create real skill and filter list without changing stored content",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-WS-001 invalid workspace rejected; valid child added and renamed",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-CRON-001 creates local scheduled task, reads persisted config and pauses",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-KAN-001 creates unassigned Triage task, opens detail and filters list",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-WS-OWNERSHIP owner member fields normalize persist and per-user lens add remove clear preserves ownership",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-WS-REVOKE removing workspace membership blocks retained session file reads and fresh activation despite role ceiling",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-WS-FOREIGN named policy ceiling cannot expose or activate an owned workspace without membership",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-WS-RUNTIME revoking workspace member while real write awaits approval blocks engine effect after Allow once",
+    "errors": []
+  }
+]

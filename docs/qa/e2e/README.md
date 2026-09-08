@@ -184,3 +184,5 @@ NOT RUN or BLOCKED for these rows. Deterministic provider output must never be
 reported as live external integration proof.
 
 The terminal uses the committed xterm distribution files under `static/vendor`, with the existing versions and SRI hashes. The browser suite verifies that all four assets load from the application origin before checking actual shell command and restart effects. Activity-layout-specific scenarios select their required persisted layout explicitly through Settings; they cannot rely on the previous case leaving a particular preference.
+
+Review the [acceptance stories](user-stories.md), [coverage matrix](coverage-plan.csv), [remaining clicks](remaining-clicks-priority.md) and [focused backend verification](backend-verification.md). The [review notes](evidence/run-review-notes.json) retain earlier failures and reporter warnings.

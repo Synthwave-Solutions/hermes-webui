@@ -138,7 +138,7 @@ current manual/automatic mode and prompt; it does not repeat a historical
 approval workflow. The captured external SSO group claims are not refreshed
 from the identity provider during autonomous continuation.
 
-Live workspace membership is checked before each tool and each primary model
+Live workspace membership and managed-bot access are checked before each tool and each primary model
 request, including delegated work. The primary model permission envelope is
 the turn's bound policy plus retained original ceilings; these request checks
 do not reload external model policy mid-turn. Tool action review does reload
