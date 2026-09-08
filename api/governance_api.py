@@ -1167,7 +1167,7 @@ def _handle_approvals_mine(handler, parsed, policy, subject, access) -> bool:
     requests, and the route is listed in catalog._SELF_ROUTES so a plain
     authenticated session reaches it under enforce.
     """
-    from api import approvals
+    from api import approvals, grant_requests
 
     email = subject.normalized_email or str(subject.email or "").strip().lower()
     if not email:
@@ -1175,6 +1175,10 @@ def _handle_approvals_mine(handler, parsed, policy, subject, access) -> bool:
         # can be attributed to the caller, so the list is empty by definition.
         j(handler, {"requests": [], "owner_email": None})
         return True
+    # Route/tool denials are initially spooled. The requester must see their
+    # pending item without waiting for an administrator to open the queue.
+    # Never derive this scope from query parameters supplied by the caller.
+    grant_requests.ingest_spool(owner_scope=email)
     kinds = _approval_kinds_param(parsed)
     rows = [
         _approval_row(entry)

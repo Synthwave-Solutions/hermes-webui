@@ -5,6 +5,12 @@ controls. Changes require `governance:write`; browser controls do not replace
 server authorization. User edits retain the policy's optimistic `If-Match`
 revision check and audit trail.
 
+Activate the global policy's `mode: enforce` to apply these restrictions and
+action reviews. `off` permits work without enforcement; `report_only` records
+policy decisions without blocking. Saving per-user controls does not silently
+change this global operating mode. Upgrade the WebUI and engine together before
+activation, and retain an authenticated bootstrap recovery owner.
+
 ```yaml
 users:
   person@example.test:

@@ -20,6 +20,8 @@ def filter_file_entries(identity, root, entries):
 
 
 def ensure_file_access(identity, path, *, write=False):
+    from api.workspace_access import ensure_identity_workspace_access
+    ensure_identity_workspace_access(identity, path)
     try:
         policy = loader.get_policy()
     except Exception:

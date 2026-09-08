@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 const file = path.resolve(process.env.QA_SESSIONS || '../e2e-state/browser-sessions.json');
 export const auth = JSON.parse(fs.readFileSync(file, 'utf8'));
-export type User = 'govrequest' | 'resource' | 'admin' | 'alice' | 'bob' | 'outsider' | 'denied' | 'autoapprove' | 'autodeny' | 'automanual' | 'manualapprove' | 'manualdeny';
+export type User = 'continuation' | 'govrequest' | 'resource' | 'admin' | 'alice' | 'bob' | 'outsider' | 'denied' | 'voicedenied' | 'autoapprove' | 'autodeny' | 'automanual' | 'manualapprove' | 'manualdeny';
 export const test = base.extend<{ user: User; errors: string[] }>({
   user: ['admin', { option: true }],
   errors: [async ({ page }, use, info) => {
@@ -15,6 +15,16 @@ export const test = base.extend<{ user: User; errors: string[] }>({
   }, {auto:true}],
   context: async ({ context, user }, use, info) => {
     expect(auth.base_url, 'must target the seeded fixture').toBe(process.env.QA_BASE_URL || 'http://127.0.0.1:19086');
+    await context.route('**/*', route => {
+      const url = new URL(route.request().url());
+      return ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname)
+        ? route.continue() : route.abort('blockedbyclient');
+    });
+    await context.routeWebSocket('**/*', socket => {
+      const host = new URL(socket.url()).hostname;
+      if (['127.0.0.1', 'localhost', '[::1]'].includes(host)) socket.connectToServer();
+      else socket.close({code:1008,reason:'QA requires loopback networking'});
+    });
     await context.addCookies([{ name: auth.cookie_name, value: auth.cookies[user], url: auth.base_url, httpOnly: true, sameSite: 'Lax' }]);
     const actions: any[] = [];
     await context.exposeBinding('__qaRecordAction', (_source, action) => { actions.push(action); });

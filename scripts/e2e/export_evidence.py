@@ -36,12 +36,23 @@ def main():
     for suite in results.get('suites',[]):visit(suite)
     out=args.out;out.mkdir(parents=True,exist_ok=True)
     with (out/'executed-scenarios.csv').open('w',newline='') as file:
-        writer=csv.DictWriter(file,fieldnames=['file','line','scenario','status','test_outcome','duration_ms','attempts','evidence_scope']);writer.writeheader();writer.writerows(rows)
+        writer=csv.DictWriter(file,fieldnames=['file','line','scenario','status','test_outcome','duration_ms','attempts','evidence_scope'],lineterminator='\n');writer.writeheader();writer.writerows(rows)
     manifest_path=args.results.parent.parent/'run.json'
     manifest=json.loads(manifest_path.read_text()) if manifest_path.is_file() else {}
     counts={status:sum(r['status']==status for r in rows) for status in sorted({r['status'] for r in rows})}
     summary={'scenario_count':len(rows),'outcomes':counts,'report_global_error_count':len(results.get('errors',[])),'all_features_certified':False,'story_certification_note':'These outcomes certify only explicit scenario assertions. Navigation, observed controls, and interaction counts do not certify all acceptance criteria.','source_unchanged_during_run':manifest.get('source_unchanged_during_run'),'test_exit_code':manifest.get('test_exit_code'),'webui_source_sha256':manifest.get('initial_source',{}).get('webui',{}).get('source_sha256'),'engine_source_sha256':manifest.get('initial_source',{}).get('engine',{}).get('source_sha256'),'run_directory':args.results.parent.parent.name,'boundary':'Real Chromium, backend persistence, Hermes engine, terminal and child agents; deterministic loopback model/reviewer. External credentials, provider quality, physical authenticators, audio and delivery are separate.','excluded_artifacts':['private test state','cookies and generated password','raw browser traces','raw network captures','session/auth databases']}
     summary['browser_error_collection']={'scenarios_with_error_collection':len(browser_errors),'uncaught_errors':sum(len(item['errors']) for item in browser_errors)}
+    isolation_events = args.results.parent.parent/'e2e-state/isolation-events.jsonl'
+    blocked = {}
+    if isolation_events.is_file():
+        for line in isolation_events.read_text().splitlines():
+            event = json.loads(line).get('event', 'unknown')
+            blocked[event] = blocked.get(event, 0) + 1
+    server_log = args.results.parent.parent/'server.log'
+    log = server_log.read_text(errors='replace') if server_log.is_file() else ''
+    summary['isolation'] = dict(manifest.get('isolation') or {'verified': False})
+    summary['isolation']['blocked_attempt_counts'] = blocked
+    summary['isolation']['raw_copilot_token_fallback_observed'] = 'RAW token' in log
     (out/'execution-summary.json').write_text(json.dumps(summary,indent=2)+'\n')
     (out/'browser-error-evidence.json').write_text(json.dumps(browser_errors,indent=2)+'\n')
     (out/'governance-runtime-audit-evidence.json').write_text(json.dumps(audits,indent=2)+'\n')

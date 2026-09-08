@@ -5692,6 +5692,18 @@ def _live_usage_session_snapshot(session_id, current_session, cache_ref, *, load
     return loaded
 
 
+def _tool_result_is_error(raw) -> bool:
+    """Inspect the result envelope, never words inside successful file content."""
+    try:
+        value = raw if isinstance(raw, dict) else json.loads(raw)
+    except (ValueError, TypeError):
+        return False
+    return isinstance(value, dict) and (
+        value.get('is_error') is True or value.get('isError') is True
+        or value.get('success') is False or bool(value.get('error'))
+    )
+
+
 def _tool_result_snippet(raw, limit: int = _TOOL_RESULT_SNIPPET_MAX) -> str:
     """Extract a bounded result preview from a stored tool message payload."""
     if limit <= 0:
@@ -5774,13 +5786,15 @@ def _extract_tool_calls_from_messages(messages, live_tool_calls=None):
         elif role == 'tool':
             tid = m.get('tool_call_id') or m.get('tool_use_id', '')
             raw = m.get('content', '')
-            seq = {'msg_idx': msg_idx, 'raw': raw, 'resolved': False}
+            seq = {'msg_idx': msg_idx, 'raw': raw, 'resolved': False,
+                   'is_error': bool(m.get('is_error')) or _tool_result_is_error(raw)}
             if tid:
                 name = pending_names.get(tid, '')
                 if name and name != 'tool':
                     tool_calls.append({
                         'name': name,
                         'snippet': _tool_result_snippet(raw),
+                        'is_error': seq['is_error'],
                         'tid': tid,
                         'assistant_msg_idx': pending_asst_idx.get(tid, -1),
                         'args': _truncate_tool_args(pending_args.get(tid, {})),
@@ -5799,6 +5813,7 @@ def _extract_tool_calls_from_messages(messages, live_tool_calls=None):
             tool_calls.append({
                 'name': live_tc.get('name', 'tool'),
                 'snippet': _tool_result_snippet(seq.get('raw', '')),
+                'is_error': seq['is_error'],
                 'tid': live_tc.get('tid', '') or '',
                 'assistant_msg_idx': _nearest_assistant_msg_idx(messages, seq.get('msg_idx', -1)),
                 'args': _truncate_tool_args(live_tc.get('args', {}), limit=4),
@@ -6454,6 +6469,7 @@ def _run_agent_streaming(
     moa_config=None,
     sender_email=None,
     sender_identity=None,
+    continuation_ref=None,
     execution_profile=None,
 ):
     """Run agent in background thread, writing SSE events to STREAMS[stream_id].
@@ -6887,6 +6903,7 @@ def _run_agent_streaming(
     # to the `try:` (preserves the Issue #765 static-locator invariant).
     _turn_session_identity_tokens = None
     _governance_turn_token = None
+    _continuation_turn_tokens = None
     _streaming_cron_profile_home_token = None
     _personal_memory_token = None
     # Widest mode until the session is read below, so an early failure can never
@@ -6963,6 +6980,8 @@ def _run_agent_streaming(
         )
         from api.project_collaboration import runtime_file_scope
         _project_workspace, _project_access_check = runtime_file_scope(s, _turn_identity, execution_profile)
+        from api.workspace_access import runtime_workspace_scope
+        _workspace_path, _workspace_access_check = runtime_workspace_scope(s, _turn_identity, workspace=workspace)
         _governance_turn_token = bind_governed_agent_turn(
             _turn_identity,
             active_profile=str(execution_profile or getattr(s, 'profile', None) or 'default'),
@@ -6973,7 +6992,19 @@ def _run_agent_streaming(
             approval_waiter=_approval_waiter,
             project_workspace=_project_workspace,
             project_access_check=_project_access_check,
+            workspace_path=_workspace_path,
+            workspace_access_check=_workspace_access_check,
         )
+        if isinstance(sender_identity, dict) and str(sender_identity.get('email') or '').strip():
+            from api.governance.continuation import begin_turn as begin_continuation_turn
+            _continuation_turn_tokens = begin_continuation_turn(
+                s, sender_identity,
+                active_profile=str(execution_profile or getattr(s, 'profile', None) or 'default'),
+                execution_profile=execution_profile, request_id=stream_id,
+                reference=continuation_ref,
+            )
+        elif continuation_ref:
+            raise PermissionError('Async continuation requires its authenticated initiator')
         # Conversation chat mode (Michael Ramirez, 28 Aug 2026), read once per
         # turn from the live session object rather than from the sidecar: a
         # brand-new conversation has no sidecar on disk yet (no write until the
@@ -7747,12 +7778,14 @@ def _run_agent_streaming(
                     if tool_call_id and tool_call_id not in _live_tool_event_complete_ids:
                         _live_tool_event_complete_ids.add(tool_call_id)
                         result_snippet = _tool_result_snippet(function_result)
+                        result_is_error = _tool_result_is_error(function_result)
                         for live_tc in reversed(_live_tool_calls):
                             if live_tc.get('done'):
                                 continue
                             if live_tc.get('tid') == tool_call_id or (not live_tc.get('tid') and live_tc.get('name') == name):
                                 live_tc['done'] = True
                                 live_tc['snippet'] = result_snippet
+                                live_tc['is_error'] = result_is_error
                                 break
                         if stream_id in STREAM_LIVE_TOOL_CALLS:
                             for shared_tc in reversed(STREAM_LIVE_TOOL_CALLS[stream_id]):
@@ -7761,6 +7794,7 @@ def _run_agent_streaming(
                                 if shared_tc.get('tid') == tool_call_id or (not shared_tc.get('tid') and shared_tc.get('name') == name):
                                     shared_tc['done'] = True
                                     shared_tc['snippet'] = result_snippet
+                                    shared_tc['is_error'] = result_is_error
                                     break
                         _checkpoint_activity[0] += 1
                         put('tool_complete', {
@@ -7769,7 +7803,7 @@ def _run_agent_streaming(
                             'preview': result_snippet,
                             'args': _tool_args_snapshot(args),
                             'tid': tool_call_id,
-                            'is_error': False,
+                            'is_error': result_is_error,
                         })
                         # Mirror the todo tool's in-memory state into
                         # a dedicated SSE event so the Todos panel can
@@ -10062,6 +10096,8 @@ def _run_agent_streaming(
         # semantics, None-safe) so a reused thread-pool worker or the next
         # turn on this thread leaks no grants. Same lifecycle slot as the
         # session-identity restore above.
+        from api.governance.continuation import end_turn as end_continuation_turn
+        end_continuation_turn(_continuation_turn_tokens)
         reset_governed_agent_turn(_governance_turn_token)
         try:
             from api import approval_resume as _resume_cleanup

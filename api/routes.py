@@ -11738,6 +11738,9 @@ def handle_get(handler, parsed) -> bool:
     from api.governance.resource_scope import guard_request as guard_resource_request
     if not guard_resource_request(handler, parsed, "GET"):
         return True
+    from api.workspace_access import guard_session_request as guard_workspace_request
+    if not guard_workspace_request(handler, parsed):
+        return True
     proxy_result = _handle_extension_sidecar_proxy(handler, parsed, "GET")
     if proxy_result is not False:
         return proxy_result
@@ -12261,6 +12264,9 @@ def handle_get(handler, parsed) -> bool:
     if parsed.path == "/api/voice/realtime/capability":
         from api.realtime_voice import handle as handle_realtime_voice
         return handle_realtime_voice(handler, capability=True)
+    if parsed.path == "/api/voice/realtime/status":
+        from api.realtime_voice import handle_status
+        return handle_status(handler, parsed)
 
     if parsed.path == "/api/transcribe/capability":
         return handle_transcribe_capability(handler)
@@ -12988,13 +12994,23 @@ def handle_get(handler, parsed) -> bool:
         # (shared picker, behavior-preserving). Filtering lives here in the
         # route, never inside load_workspaces(): that helper has identity-less
         # internal callers (build_workspace, last-workspace fallbacks).
-        from api.ownership import request_is_admin
-
+        from api.ownership import request_is_admin, request_owner_scope
+        from api.workspace_access import load_acl_entries, ensure_workspace_selection
+        try:
+            entries = load_workspaces() if request_owner_scope(handler) == 'all' else load_acl_entries()
+            visible = _workspaces_response_list(entries, handler)
+            last_workspace = get_last_workspace()
+            try:
+                ensure_workspace_selection(handler, last_workspace, entries=entries)
+            except PermissionError:
+                last_workspace = visible[0]['path'] if visible else None
+        except PermissionError as exc:
+            return bad(handler, str(exc), 403)
         return j(
             handler,
             {
-                "workspaces": _workspaces_response_list(load_workspaces(), handler),
-                "last": get_last_workspace(),
+                "workspaces": visible,
+                "last": last_workspace,
                 "terminal_remote_backend": _terminal_remote_backend_enabled(),
                 "viewer_is_admin": request_is_admin(handler),
             },
@@ -13613,12 +13629,14 @@ def handle_get(handler, parsed) -> bool:
     # ── Plugin shared assets (e.g. /plugins/plugin.css) ──
     # Restricted to shared plugin assets only — no cross-plugin file access.
     if parsed.path.startswith("/plugins/"):
-        from api.plugins import _get_plugin_base
+        from api.plugins import _get_plugin_base, authorize_plugin_request
         plugin_base = _get_plugin_base()
         rel = parsed.path[len("/plugins/"):]
         allowed = {"plugin.css"}
         if rel not in allowed:
             return False  # 404
+        if not authorize_plugin_request(handler):
+            return True
         safe = (plugin_base / rel).resolve()
         try:
             safe.relative_to(plugin_base.resolve())
@@ -13652,7 +13670,9 @@ def handle_get(handler, parsed) -> bool:
             # entire URL surface shut off, not merely hidden in the UI.
             if not _dashboard_plugin_enabled(plugin_name):
                 return False  # 404 — disabled plugins serve nothing
-            from api.plugins import serve_plugin_static
+            from api.plugins import authorize_plugin_request, serve_plugin_static
+            if not authorize_plugin_request(handler):
+                return True  # governance already sent the denial
             result = serve_plugin_static(plugin_name, rel_path)
             if result:
                 data, content_type = result
@@ -13671,7 +13691,7 @@ def handle_get(handler, parsed) -> bool:
                 return True
 
     # ── Plugin pages (HTML shell) ──
-    from api.plugins import PLUGIN_MANIFESTS, _PLUGIN_STATIC_ROOTS
+    from api.plugins import PLUGIN_MANIFESTS, _PLUGIN_STATIC_ROOTS, authorize_plugin_request, build_plugin_iife_page
     for name, manifest in PLUGIN_MANIFESTS.items():
         tab = manifest.get("tab", {})
         tab_path = tab.get("path", f"/{name}")
@@ -13679,6 +13699,8 @@ def handle_get(handler, parsed) -> bool:
             # Server-side enable-gate (opt-in): a disabled plugin's page 404s.
             if not _dashboard_plugin_enabled(name):
                 return False
+            if not authorize_plugin_request(handler):
+                return True  # same canonical permission as the Plugins panel
             dashboard_dir = _PLUGIN_STATIC_ROOTS.get(name)
             if dashboard_dir:
                 # 1) dashboard/dist/index.html (full SPA build)
@@ -13704,28 +13726,10 @@ def handle_get(handler, parsed) -> bool:
                     handler.end_headers()
                     handler.wfile.write(data)
                     return True
-                # 3) Fallback: generate shell that loads the IIFE bundle
-                index_js = dashboard_dir / "dist" / "index.js"
-                if index_js.is_file():
-                    import html
-                    label = html.escape(manifest.get("label") or name)
-                    css = html.escape(manifest.get("css", ""))
-                    name_escaped = html.escape(name)
-                    css_tag = f'<link rel="stylesheet" href="/dashboard-plugins/{name_escaped}/{css}">' if css else ""
-                    html_content = (
-                        f"<!doctype html>\n"
-                        f"<html lang=\"en\">\n"
-                        f"<head>\n"
-                        f"  <meta charset=\"utf-8\">\n"
-                        f"  <title>{label}</title>\n"
-                        f"  {css_tag}\n"
-                        f"</head>\n"
-                        f"<body>\n"
-                        f'  <div id="pluginPageContainer"></div>\n'
-                        f'  <script src="/dashboard-plugins/{name_escaped}/dist/index.js"></script>\n'
-                        f"</body>\n"
-                        f"</html>\n"
-                    ).encode("utf-8")
+                # 3) Self-contained IIFE: embed validated built files so the
+                # opaque sandbox does not need the parent's session cookie.
+                html_content = build_plugin_iife_page(name, manifest)
+                if html_content is not None:
                     handler.send_response(200)
                     handler.send_header("Content-Type", "text/html; charset=utf-8")
                     handler.send_header("Content-Security-Policy", "sandbox allow-scripts allow-forms allow-popups")
@@ -13871,6 +13875,9 @@ def handle_post(handler, parsed) -> bool:
     if parsed.path == "/api/voice/realtime/call":
         from api.realtime_voice import handle as handle_realtime_voice
         return handle_realtime_voice(handler)
+    if parsed.path == "/api/voice/realtime/end":
+        from api.realtime_voice import handle_end
+        return handle_end(handler)
 
     if parsed.path == "/api/transcribe":
         return handle_transcribe(handler)
@@ -13902,6 +13909,9 @@ def handle_post(handler, parsed) -> bool:
         return True
     from api.governance.resource_scope import guard_request as guard_resource_request
     if not guard_resource_request(handler, parsed, "POST", body):
+        return True
+    from api.workspace_access import guard_session_request as guard_workspace_request
+    if not guard_workspace_request(handler, parsed, body):
         return True
 
     if parsed.path == "/api/chat/mentions/prepare":
@@ -14048,6 +14058,12 @@ def handle_post(handler, parsed) -> bool:
             workspace = str(resolve_trusted_workspace(body.get("workspace"))) if body.get("workspace") else None
         except (TypeError, ValueError) as e:
             return bad(handler, str(e))
+        from api.workspace_access import ensure_workspace_selection
+        try:
+            workspace = workspace or get_last_workspace()
+            ensure_workspace_selection(handler, workspace)
+        except PermissionError as e:
+            return bad(handler, str(e), 403)
         worktree_info = None
         worktree_requested = (
             body.get("worktree") is True
@@ -14701,6 +14717,11 @@ def handle_post(handler, parsed) -> bool:
             new_ws = str(resolve_trusted_workspace(body.get("workspace", s.workspace)))
         except ValueError as e:
             return bad(handler, str(e))
+        from api.workspace_access import ensure_workspace_selection
+        try:
+            ensure_workspace_selection(handler, new_ws)
+        except PermissionError as e:
+            return bad(handler, str(e), 403)
         with _get_session_agent_lock(body["session_id"]):
             s.workspace = new_ws
             if "model" in body or "model_provider" in body:
@@ -20960,6 +20981,7 @@ def _start_chat_stream_for_session(
     moa_config=None,
     sender_email=None,
     sender_identity=None,
+    continuation_ref=None,
 ):
     """Persist pending state, register an SSE channel, and start an agent turn.
 
@@ -20973,8 +20995,15 @@ def _start_chat_stream_for_session(
     # its human sender. Personal gateway chats keep their configured backend.
     from api.group_chat import selected_bot
     try:
-        execution_profile = selected_bot(s, msg, sender_identity or sender_email or getattr(s, 'owner_email', None))
-    except ValueError as exc:
+        if continuation_ref:
+            from api.governance.continuation import resolve as resolve_continuation
+            authority = resolve_continuation(continuation_ref, s)
+            if sender_identity != authority['identity']:
+                raise PermissionError('Async continuation sender changed')
+            execution_profile = authority.get('execution_profile')
+        else:
+            execution_profile = selected_bot(s, msg, sender_identity or sender_email or getattr(s, 'owner_email', None))
+    except (ValueError, PermissionError) as exc:
         return {'error': str(exc), '_status': 403}
     from api.bot_builder import allowed as _managed_bot_allowed
     _bot_actor = sender_identity if isinstance(sender_identity, dict) else {"email": sender_email or getattr(s, "owner_email", None)}
@@ -21113,7 +21142,8 @@ def _start_chat_stream_for_session(
     # signed user. Preserve that legacy route; managed bots, projects and
     # authenticated/private-memory turns require the governed local worker.
     backend_is_gateway = (
-        _managed_bot_access is None
+        not continuation_ref
+        and _managed_bot_access is None
         and (not sender_identity or sender_identity.get("method") == "auth_disabled")
         and webui_gateway_chat_enabled(get_config())
         and not bool(getattr(s, 'participants', None) or getattr(s, 'bot_participants', None) or getattr(s, 'project_id', None))
@@ -21122,6 +21152,8 @@ def _start_chat_stream_for_session(
     worker_kwargs = {"model_provider": model_provider, "goal_related": goal_related}
     if sender_identity and not backend_is_gateway:
         worker_kwargs['sender_identity'] = sender_identity
+    if continuation_ref:
+        worker_kwargs['continuation_ref'] = continuation_ref
     if execution_profile:
         worker_kwargs['execution_profile'] = execution_profile
     _sender = str(sender_email or "").strip().lower()
@@ -21217,6 +21249,7 @@ def _start_run(
     moa_config=None,
     sender_email=None,
     sender_identity=None,
+    continuation_ref=None,
 ):
     """Shared start-run helper for /api/chat/start and start_session_turn.
 
@@ -21244,7 +21277,7 @@ def _start_run(
         runtime_adapter_runner_enabled,
     )
 
-    if (runtime_adapter_enabled() or runtime_adapter_runner_enabled()) and not (getattr(s, 'participants', None) or getattr(s, 'bot_participants', None)):
+    if not continuation_ref and (runtime_adapter_enabled() or runtime_adapter_runner_enabled()) and not (getattr(s, 'participants', None) or getattr(s, 'bot_participants', None)):
         def _legacy_start_run(request: StartRunRequest) -> dict:
             return _start_chat_stream_for_session(
                 s,
@@ -21301,6 +21334,7 @@ def _start_run(
         moa_config=moa_config,
         sender_email=sender_email,
         sender_identity=sender_identity,
+        **({'continuation_ref': continuation_ref} if continuation_ref else {}),
     )
 
 
@@ -21309,6 +21343,7 @@ def start_session_turn(
     message: str,
     *,
     source: str = "process_wakeup",
+    continuation_ref=None,
 ):
     """Start a server-side agent turn for ``session_id`` with ``message``.
 
@@ -21321,9 +21356,11 @@ def start_session_turn(
     gateway self-wake from a ``notify_on_complete`` completion.
 
     Contract:
-      - Resolves the session record (profile/workspace/model/model_provider are
-        already persisted on it; no user auth needed — same trust level as
-        gateway/cron starting a turn).
+      - Resolves the persisted profile/workspace/model/provider. Async delegation
+        also requires the opaque server-owned job reference: it restores the
+        original authenticated principal and rechecks local membership/policy.
+        It never substitutes the conversation owner or a later participant.
+        Other process wakeups retain their existing server-side trust contract.
       - Resolves workspace + model/provider through the SAME helpers
         ``_handle_chat_start`` uses, so a process-wakeup turn is constructed
         identically to a human-typed turn. If the session record has no model
@@ -21347,6 +21384,26 @@ def start_session_turn(
         s = get_session(session_id)
     except KeyError:
         return {"error": "Session not found", "_status": 404}
+
+    continuation_kwargs = {}
+    if source == 'async_delegation':
+        try:
+            from api import auth as continuation_auth
+            from api.governance.continuation import resolve as resolve_continuation
+            anonymous_legacy = (
+                not continuation_ref and not continuation_auth.is_auth_enabled()
+                and not any(getattr(s, field, None) for field in
+                            ('owner_email', 'participants', 'bot_participants', 'project_id'))
+            )
+            if not anonymous_legacy:
+                authority = resolve_continuation(continuation_ref, s)
+                continuation_kwargs = {'sender_identity': authority['identity'],
+                                       'sender_email': authority['identity']['email'],
+                                       'continuation_ref': continuation_ref}
+        except PermissionError as exc:
+            return {'error': str(exc), '_status': 403}
+    elif continuation_ref:
+        return {'error': 'Continuation authority requires an async job', '_status': 400}
 
     try:
         workspace = _resolve_chat_workspace_with_recovery(s, None)
@@ -21381,6 +21438,7 @@ def start_session_turn(
         normalized_model=normalized_model,
         source="process_wakeup",
         route="start_session_turn",
+        **continuation_kwargs,
     )
 
     # ── Defect B: live-view of server-initiated turns ──────────────────────
@@ -23305,19 +23363,14 @@ def _workspaces_response_list(wss, handler) -> list:
     if scope == "all":
         return [dict(w) for w in wss]
 
-    # De governance is de bron: `grants.workspaces` per persoon, met "*" voor
-    # wie alles mag zien. Valt die lijst niet op te halen, dan vallen we terug
-    # op de ledenlijst in het bestand, en pas als die ook leeg is op tonen.
-    # Zo kan een storing in de policy nooit stilletjes alles openzetten voor
-    # iemand die niets had mogen zien: een lege lijst betekent hier niets tonen.
-    toegestaan = _governance_workspace_names(scope)
+    from api.workspace_access import ensure_workspace_selection
     out = []
     for w in wss:
-        naam = str(w.get("name") or "")
-        if toegestaan is not None:
-            if "*" not in toegestaan and naam.lower() not in toegestaan:
-                continue
-            out.append(dict(w))
+        # The picker uses exactly the activation rule: ownership and RBAC
+        # intersect, including path/name aliases and explicit denials.
+        try:
+            ensure_workspace_selection(handler, w.get("path"), entries=wss)
+        except PermissionError:
             continue
         emails = _workspace_entry_emails(w)
         if emails and scope not in emails:
@@ -23327,39 +23380,6 @@ def _workspaces_response_list(wss, handler) -> list:
             entry["legacy_unowned"] = True
         out.append(entry)
     return out
-
-
-def _governance_workspace_names(email: str):
-    """De workspace-namen die deze persoon volgens de governance mag zien.
-
-    Geeft None terug als de policy niet te lezen is of de persoon er niet in
-    staat; dan beslist de aanroeper met de oude regel. Namen worden
-    kleingeschreven vergeleken, want een beheerder typt ze met de hand.
-    """
-    try:
-        from api.governance.loader import get_policy
-        from api.governance.models import GovernanceSubject
-        from api.governance.resolver import resolve_effective_access
-
-        policy = get_policy()
-        if policy is None:
-            return None
-        access = resolve_effective_access(
-            policy, GovernanceSubject(email=email, groups=[]))
-        namen = getattr(getattr(access, "grants", None), "workspaces", None)
-        if namen:
-            return {str(n).strip().lower() for n in namen}
-        # Leeg is niet hetzelfde als onbekend. Staat deze persoon in het
-        # beleid, dan is een lege lijst een besluit: hij ziet geen enkele
-        # workspace. Alleen wie helemaal niet in het beleid voorkomt valt
-        # terug op de oude ledenlijst.
-        gebruikers = getattr(policy, "users", None) or {}
-        if email.strip().lower() in {str(k).strip().lower() for k in gebruikers}:
-            return set()
-        return None
-    except Exception:
-        logger.debug("workspace-grants niet op te halen", exc_info=True)
-        return None
 
 
 def _handle_workspace_add(handler, body):

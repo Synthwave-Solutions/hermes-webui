@@ -7827,6 +7827,15 @@ html[data-nav-audience="member"]:not([data-advanced-chat-controls="1"]) #compose
 #realtimeVoiceBar { flex-wrap:wrap; gap:8px; padding:8px; }
 #realtimeVoiceBar[hidden] { display:none; }
 #realtimeVoiceBar button { color:var(--text); background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px; padding:6px 10px; }
+#realtimeVoiceBar button:disabled { opacity:.5;cursor:wait; }
+.realtime-voice-transcript,.realtime-voice-tasks,.realtime-voice-warning { flex-basis:100%;min-width:0;overflow-wrap:anywhere; }
+.realtime-voice-transcript { max-height:100px;overflow:auto;font-size:12px;line-height:1.5;color:var(--muted); }
+.realtime-voice-tasks { max-height:180px;overflow:auto; }
+.realtime-voice-task { padding:6px 0;border-top:1px solid var(--border);font-size:12px; }
+.realtime-voice-task summary { cursor:pointer;font-weight:600; }
+.realtime-voice-task p { margin:6px 0;white-space:pre-wrap; }
+.realtime-voice-approval { display:flex;gap:8px;margin-top:8px; }
+.realtime-voice-warning { font-size:12px;color:var(--muted); }
 #realtimeVoiceBar[data-state="listening"] #realtimeVoiceStatus,
 #realtimeVoiceBar[data-state="speaking"] #realtimeVoiceStatus { animation:voicePulse 1.2s ease-in-out infinite alternate; }
 @keyframes voicePulse { to { opacity:.5; } }

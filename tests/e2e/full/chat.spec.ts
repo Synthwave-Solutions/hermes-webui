@@ -25,8 +25,11 @@ test('US-SP-GROUP-001 selecting named colleague stages participants and persists
  await expect(page.locator('#messages')).toContainText('QA_REPLY: QA_GROUP_FRONTEND',{timeout:30000});
  const sid=page.url().split('/session/')[1];expect((await api(page,`/api/session?session_id=${sid}`)).body.session.participants).toContain('bob@example.test');
 });
-test('US-SP-VOICE-001 voice disabled feedback explains prerequisite without hanging',async({page})=>{
+test.describe('voice policy prerequisite',()=>{
+test.use({user:'voicedenied'});
+test('US-SP-VOICE-001 voice policy denial explains prerequisite without hanging',async({page})=>{
  await open(page);await session(page);await page.locator('#btnRealtimeVoice').click();await expect(page.getByText('Voice mode is not enabled. Ask an administrator to enable speech.',{exact:false})).toBeVisible();
+});
 });
 test('US-SP-CHAT-ROSTER bot roster hides and shows through its real toggle',async({page})=>{
  await open(page);await expect(page.locator('#chatBotRoster button[data-bot="default"]')).toBeVisible();await expect(page.locator('#chatBotRoster button[data-bot="qa-research"]')).toBeVisible();await page.locator('#chatBotRosterToggle').click();

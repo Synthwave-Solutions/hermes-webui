@@ -13077,6 +13077,10 @@ function _anchorSceneToolCallFromRow(row, opts){
     : firstValidTimestampSeconds(row&&row.created_at, row&&row.timestamp, row&&row.ts, row&&row.started_at, row&&row.completed_at);
   const id=tool.id||row.tool_call_id||payload.tid||payload.id||payload.tool_call_id||payload.tool_use_id||payload.call_id||'';
   const settled=!!(opts&&opts.settled);
+  // A settled anchor may predate the durable error result. Reconcile by the
+  // exact call ID; the preview is display text and is never parsed as a failure.
+  const historyErrors=settled&&typeof S!=='undefined'&&Array.isArray(S.messages)
+    ? _toolResultErrorsByTid(S.messages):{};
   return {
     name:tool.name||payload.name||'tool',
     args:(tool.args&&typeof tool.args==='object')?tool.args:((payload.args&&typeof payload.args==='object')?payload.args:{}),
@@ -13087,7 +13091,7 @@ function _anchorSceneToolCallFromRow(row, opts){
       row&&row.status!=='running'&&row.status!=='pending'?row.text:''
     )||'',
     done:settled?true:(tool.done!==null&&tool.done!==undefined?tool.done:(row.status!=='running'&&row.status!=='pending')),
-    is_error:!!(tool.is_error||payload.is_error||row.status==='error'||row.status==='failed'),
+    is_error:!!(tool.is_error||payload.is_error||row.status==='error'||row.status==='failed'||historyErrors[id]),
     is_diff:!!(tool.is_diff||payload.is_diff||payload.isDiff),
     duration:tool.duration||payload.duration||payload.duration_seconds,
     started_at:firstValidTimestampSeconds(tool.started_at, payload.started_at, rowTs),
@@ -15308,13 +15312,13 @@ function _messageRenderCacheSignature(){
   add(messages.length);
   for(const m of messages){
     if(!m||typeof m!=='object'){ add('missing'); continue; }
-    add(m.role);add(m.timestamp);add(m._ts);add(m._error);add(m._statusCard);
+    add(m.role);add(m.timestamp);add(m._ts);add(m._error);add(m._statusCard);add(m.is_error);
     add(msgContent(m));
     if(Array.isArray(m.content)){
       add('content-array');
       m.content.forEach(part=>{
         if(!part||typeof part!=='object'){ add(part); return; }
-        add(part.type);add(part.id);add(part.name);add(part.text);add(part.content);
+        add(part.type);add(part.id);add(part.name);add(part.text);add(part.content);add(part.is_error);
       });
     }
     if(Array.isArray(m.tool_calls)){
@@ -15323,7 +15327,7 @@ function _messageRenderCacheSignature(){
     }
     if(Array.isArray(m._partial_tool_calls)){
       add('partial-tool-calls');add(m._partial_tool_calls.length);
-      m._partial_tool_calls.forEach(tc=>{add(tc&&tc.id);add(tc&&tc.name);add(tc&&tc.snippet);});
+      m._partial_tool_calls.forEach(tc=>{add(tc&&tc.id);add(tc&&tc.name);add(tc&&tc.snippet);add(tc&&tc.is_error);});
     }
     if(_messageHasReasoningPayload(m)) add(m.reasoning||m.thinking||m._reasoning||'reasoning');
     if(Array.isArray(m.attachments)) m.attachments.forEach(a=>add(a&&typeof a==='object'?JSON.stringify(a):a));
@@ -15332,7 +15336,7 @@ function _messageRenderCacheSignature(){
   add('settled-tool-calls');add(toolCalls.length);
   toolCalls.forEach(tc=>{
     if(!tc||typeof tc!=='object'){ add(tc); return; }
-    add(tc.tid);add(tc.id);add(tc.name);add(tc.done);add(tc.is_diff);add(tc.assistant_msg_idx);add(tc.snippet);add(JSON.stringify(tc.args||{}));
+    add(tc.tid);add(tc.id);add(tc.name);add(tc.done);add(tc.is_error);add(tc.is_diff);add(tc.assistant_msg_idx);add(tc.snippet);add(JSON.stringify(tc.args||{}));
   });
   if(S.session){
     add(S.session.message_count);add(S.session.updated_at);add(S.session.compression_anchor_visible_idx);
@@ -15375,6 +15379,35 @@ function _cliLooksLikePatchDiff(text){
   return false;
 }
 
+function _toolResultIsError(raw){
+  let value=raw;
+  if(typeof value==='string'){
+    try{value=JSON.parse(value);}catch(e){return false;}
+  }
+  return !!(value&&typeof value==='object'&&!Array.isArray(value)&&
+    (value.is_error===true||value.isError===true||value.success===false||value.error));
+}
+function _toolResultErrorsByTid(messages){
+  const errors={};
+  for(const message of messages||[]){
+    if(!message)continue;
+    for(const tool of message._partial_tool_calls||[]){
+      const id=tool&&(tool.tid||tool.id||tool.tool_call_id||tool.call_id);
+      if(id&&tool.is_error===true)errors[id]=true;
+    }
+    if(message.role==='tool'){
+      const id=message.tool_call_id||message.tool_use_id;
+      if(id)errors[id]=message.is_error===true||_toolResultIsError(message.content);
+    }
+    if(Array.isArray(message.content))for(const part of message.content){
+      if(part&&part.type==='tool_result'&&part.tool_use_id){
+        const raw=Array.isArray(part.content)?part.content.map(item=>item&&item.text||'').join(''):part.content;
+        errors[part.tool_use_id]=part.is_error===true||_toolResultIsError(raw);
+      }
+    }
+  }
+  return errors;
+}
 function _cliToolResultSnippet(raw){
   const fullText=_cliToolResultText(raw);
   if(_cliLooksLikePatchDiff(fullText)) return _clipCliToolSnippet(fullText);
@@ -15650,7 +15683,7 @@ function _idLinkedHistoricalTurnScene(messages, turnStart, turnEnd, options){
     const isDiff=_cliToolCardHasDiffSnippet(resultSnippet,patchSnippet);
     const snippet=_idLinkedHistoricalRedactSnippet(_cliToolCardSnippet(resultSnippet,patchSnippet));
     const status=String(resultEntry.message.status||'').trim().toLowerCase();
-    const isError=resultEntry.message.is_error===true||status==='error'||status==='failed'||status==='failure';
+    const isError=resultEntry.message.is_error===true||status==='error'||status==='failed'||status==='failure'||_toolResultIsError(resultRaw);
     activityEvents.push({
       source_type:'tool_complete',
       seq:index+1,
@@ -16224,7 +16257,7 @@ function _collectToolResultSnippetsByTid(messages){
   }
   return resultsByTid;
 }
-function _transparentOrderedToolCall(part, rawIdx, toolCallsByTid, resultsByTid, persistedByTid, messageTs){
+function _transparentOrderedToolCall(part, rawIdx, toolCallsByTid, resultsByTid, persistedByTid, messageTs, resultErrorsByTid){
   const tid=String(part&&part.toolUseId||'').trim();
   const firstValidTimestampSeconds=typeof _firstValidTimestampSeconds==='function'
     ? _firstValidTimestampSeconds
@@ -16240,6 +16273,7 @@ function _transparentOrderedToolCall(part, rawIdx, toolCallsByTid, resultsByTid,
   const liveTool=tid&&toolCallsByTid&&toolCallsByTid.get(tid);
   if(liveTool){
     const next={...liveTool};
+    if(resultErrorsByTid&&resultErrorsByTid[tid])next.is_error=true;
     const hasEventStamp=firstValidTimestampSeconds(next.ts, next.timestamp, next.created_at, next.started_at, next.completed_at);
     const fallbackStamp=partStamp||messageStamp;
     if(!hasEventStamp&&fallbackStamp){
@@ -16270,6 +16304,7 @@ function _transparentOrderedToolCall(part, rawIdx, toolCallsByTid, resultsByTid,
     args:_toolArgsSnapshot(args),
     snippet:_cliToolCardSnippet(resultSnippet,patchSnippet),
     is_diff:_cliToolCardHasDiffSnippet(resultSnippet,patchSnippet),
+    is_error:!!(resultErrorsByTid&&resultErrorsByTid[tid]),
     done:true,
     ts:primaryStamp||undefined,
     timestamp:primaryStamp||undefined,
@@ -16875,6 +16910,7 @@ function renderMessages(options){
     }catch(e){}
   }
   const transparentToolResultsByTid=_transparentModeActive?_collectToolResultSnippetsByTid(S.messages):{};
+  const transparentToolErrorsByTid=_transparentModeActive?_toolResultErrorsByTid(S.messages):{};
   const latestRenderedAssistantRawIdx=(()=>{
     for(let i=renderVisWithIdx.length-1;i>=0;i--){
       const entry=renderVisWithIdx[i];
@@ -17198,7 +17234,7 @@ function renderMessages(options){
       orderedTransparentParts.forEach((part, partIdx)=>{
         if(!part) return;
         if(part.kind==='tool'){
-        const toolCall=_transparentOrderedToolCall(part, rawIdx, transparentOrderedToolCallsByTid, transparentToolResultsByTid, transparentPersistedSnippetByTid);
+        const toolCall=_transparentOrderedToolCall(part, rawIdx, transparentOrderedToolCallsByTid, transparentToolResultsByTid, transparentPersistedSnippetByTid, undefined, transparentToolErrorsByTid);
           const toolRow=_decorateTransparentEventRow(buildToolCard(toolCall),{
             type:'tool',
             name:toolCall&&toolCall.name,
@@ -17408,6 +17444,7 @@ function renderMessages(options){
     // fallback-built cards carry their result snippet (not just the command).
     // Without this step CLI-origin sessions reload with empty tool cards.
     const resultsByTid={};
+    const resultErrorsByTid=_toolResultErrorsByTid(S.messages);
     const fallbackToolSources=[];
     // Durable fallback: the persisted compact summary (session.tool_calls, built
     // by _extract_tool_calls_from_messages) carries a bounded result `snippet`
@@ -17461,6 +17498,7 @@ function renderMessages(options){
     });
     const usedLiveToolMetadata=new Set();
     const copyLiveToolMetadata=(next,name,tid)=>{
+      if(resultErrorsByTid[tid])next.is_error=true;
       let matchEntry=tid?liveMetadataByTid.get(tid):null;
       if(!matchEntry){
         const matchIdx=liveToolMetadata.findIndex((tc,i)=>tc&&!usedLiveToolMetadata.has(i)&&(!name||tc.name===name));
@@ -17469,6 +17507,7 @@ function renderMessages(options){
       if(matchEntry){
         usedLiveToolMetadata.add(matchEntry.idx);
         const live=matchEntry.tc||{};
+        if(live.is_error)next.is_error=true;
         for(const key of ['activityBurstId','duration','started_at']){
           if((next[key]===undefined||next[key]===null)&&live[key]!==undefined&&live[key]!==null) next[key]=live[key];
         }
@@ -17517,6 +17556,7 @@ function renderMessages(options){
         const argsSnap=_toolArgsSnapshot(args);
         derived.push(copyLiveToolMetadata({
           name,
+          is_error:tc.is_error===true,
           snippet:_cliToolCardSnippet(resultSnippet,patchSnippet),
           is_diff:_cliToolCardHasDiffSnippet(resultSnippet,patchSnippet),
           tid,
@@ -17559,6 +17599,7 @@ function renderMessages(options){
           const argsSnap=_toolArgsSnapshot(args,4);
           derived.push(copyLiveToolMetadata({
             name,
+            is_error:tc.is_error===true,
             snippet:_cliToolCardSnippet(resultSnippet,patchSnippet),
             is_diff:_cliToolCardHasDiffSnippet(resultSnippet,patchSnippet),
             tid,
@@ -18484,17 +18525,18 @@ function _toolWorklogSummary(toolCalls, opts){
   if(!cards.length) return (opts&&opts.live)?'Running':'Worklog';
   if(cards.length===1){
     const part=_toolWorklogActionParts(cards[0]);
+    if(part.isErr)return part.actionLabel||'1 failed';
     const line=_toolWorklogSummaryLine(part.kind,part.isDone?'done':'running',1);
-    return part.isErr?`${line}, 1 failed`:line;
+    return line;
   }
   const order=['shell','read','search','write','skill','memory','web','list','delegate','unknown'];
   const runningCounts={}, doneCounts={};
   let failed=0;
   for(const tc of cards){
     const part=_toolWorklogActionParts(tc);
+    if(part.isErr){failed+=1;continue;}
     const counts=part.isDone?doneCounts:runningCounts;
     counts[part.kind]=(counts[part.kind]||0)+1;
-    if(part.isErr) failed+=1;
   }
   const emit=(counts,state)=>{
     const out=[];

@@ -5,6 +5,8 @@ from pathlib import Path
 import secrets
 import sys
 
+from isolation import fixture_environment, install_guard
+
 def main():
     repo = Path(sys.argv[1]).resolve()
     qa = Path(sys.argv[2]).resolve()
@@ -19,10 +21,13 @@ def main():
     runtime_python = sys.executable
     port = int(sys.argv[4]) if len(sys.argv) > 4 else 19086
     provider_port = int(sys.argv[5]) if len(sys.argv) > 5 else 19087
+    realtime_http_port = int(sys.argv[6]) if len(sys.argv) > 6 else None
+    realtime_ws_port = int(sys.argv[7]) if len(sys.argv) > 7 else None
     qa_password = secrets.token_urlsafe(30)
-    for key in list(os.environ):
-        if key not in {'HOME', 'PATH', 'LANG', 'LC_ALL', 'TERM'}:
-            os.environ.pop(key, None)
+    isolated_env = fixture_environment(qa)
+    os.environ.clear()
+    os.environ.update(isolated_env)
+    install_guard(qa)
     os.environ.update({
         'SHELL': '/bin/sh',
         'HERMES_HOME': str(home),
@@ -39,6 +44,7 @@ def main():
         'HERMES_WEBUI_SKIP_ONBOARDING': '1',
         'HERMES_WEBUI_PREWARM': '0',
         'HERMES_WEBUI_DISABLE_PROFILE_SYNC': '1',
+        'HERMES_WEBUI_PLUGINS_DIR': str(home / 'plugins'),
         'HERMES_WEBUI_NANGO_API_URL': f'http://127.0.0.1:{provider_port}',
         'HERMES_WEBUI_NANGO_CONNECT_URL': f'http://127.0.0.1:{provider_port}',
         'HERMES_WEBUI_NANGO_SECRET_KEY_FILE': str(qa / 'intentionally-unconfigured-nango-secret'),
@@ -50,7 +56,26 @@ def main():
     os.chdir(repo)
     import yaml
 
-    users = ['govrequest', 'resource', 'admin', 'alice', 'bob', 'outsider', 'denied', 'autoapprove', 'autodeny', 'automanual', 'manualapprove', 'manualdeny']
+    if realtime_http_port and realtime_ws_port:
+        import requests
+        from urllib.parse import urlsplit
+        import websockets.sync.client
+        original_post = requests.post
+        original_connect = websockets.sync.client.connect
+        def realtime_post(url, **kwargs):
+            if url.startswith('https://api.openai.com/v1/realtime/calls'):
+                url = f'http://127.0.0.1:{realtime_http_port}' + urlsplit(url).path
+            return original_post(url, **kwargs)
+        def realtime_connect(url, **kwargs):
+            if url.startswith('wss://api.openai.com/v1/realtime?'):
+                url = f'ws://127.0.0.1:{realtime_ws_port}/realtime?' + urlsplit(url).query
+            return original_connect(url, **kwargs)
+        requests.post = realtime_post
+        websockets.sync.client.connect = realtime_connect
+        os.environ['SYNPULSE_REALTIME_VOICE_ENABLED'] = '1'
+        os.environ['OPENAI_API_KEY'] = 'qa-realtime-local-only'
+
+    users = ['continuation', 'govrequest', 'resource', 'admin', 'alice', 'bob', 'outsider', 'denied', 'voicedenied', 'autoapprove', 'autodeny', 'automanual', 'manualapprove', 'manualdeny']
     permissions = ['chat:use', 'sessions:read', 'sessions:write', 'profiles:read',
                    'files:read', 'files:write', 'cron:read', 'cron:write',
                    'skills:read', 'skills:write', 'workspaces:read', 'workspaces:write', 'memory:read', 'memory:write', 'integrations:read',
@@ -69,12 +94,15 @@ def main():
     }
     for who, mode, rules in [('autoapprove','automatic','QA_ALLOW_ONLY: allow synthetic reads and writes.'),('autodeny','automatic','QA_DENY_ONLY: deny all requested synthetic actions.'),('automanual','automatic','QA_MANUAL_ONLY: require a human review.'),('manualapprove','manual',''),('manualdeny','manual','')]:
         policy['users'][who+'@example.test'].update({'access_level':'user','access_mode':'blacklist','approval':{'mode':mode,'prompt':rules}})
+    policy['users']['voicedenied@example.test']['deny'] = {'models': {'providers': ['openai']}}
     # A creator can configure bots without becoming a governance administrator.
     policy['roles']['bot_creator'] = {'grants': {
         'permissions': ['profiles:admin'], 'cli': {'commands': ['git']},
         'mcp': {'servers': ['qa-local']}}}
     policy['users']['alice@example.test']['roles'].append('bot_creator')
     policy['groups'] = {'qa-team': {'roles': ['member']}}
+    policy['groups']['qa-sso-restricted'] = {'grants': {'files': {
+        'denied_globs': [str(workspace / 'qa-continuation-protected-*')]}}}
     policy['users']['bob@example.test']['groups'] = ['qa-team']
     (home / 'dashboard-governance.yaml').write_text(yaml.safe_dump(policy))
     config = {'model': {'default': 'qa-deterministic', 'provider': 'custom:qa',
@@ -84,6 +112,15 @@ def main():
               'agent': {'max_turns': 12}, 'delegation': {'max_concurrent_children': 3}}
     config['webui_passkey_enabled'] = True
     config['mcp_servers'] = {'qa-local': {'command': '/usr/bin/false', 'enabled': False}}
+    dashboard = home / 'plugins' / 'qa-dashboard' / 'dashboard'
+    (dashboard / 'dist').mkdir(parents=True, exist_ok=True)
+    (dashboard / 'manifest.json').write_text(json.dumps({
+        'name': 'qa-dashboard', 'label': 'QA Dashboard', 'version': '1.0.0',
+        'description': 'Synthetic local dashboard for browser QA.',
+        'tab': {'path': '/qa-dashboard', 'label': 'QA Dashboard'},
+    }))
+    (dashboard / 'dist' / 'index.js').write_text(
+        "document.body.append(Object.assign(document.createElement('p'),{textContent:'QA_PLUGIN_PAGE'}));\n")
     skill_dir = home / 'skills' / 'qa-review'
     skill_dir.mkdir(parents=True, exist_ok=True)
     (skill_dir / 'SKILL.md').write_text('---\nname: qa-review\ndescription: Review synthetic QA evidence\n---\nSummarize only the synthetic evidence supplied.\n')
@@ -98,10 +135,10 @@ def main():
     (bot / 'SOUL.md').write_text('QA_BOT_RESEARCH. You are the Research bot. Answer briefly.\n')
     (bot / 'profile.yaml').write_text(yaml.safe_dump({'version': 1, 'name': 'qa-research', 'ui_meta': {'hermes-bots': {'title': 'Research', 'description': 'Research bot for QA'}}}))
     from api import auth
-    cookies = {u: auth.create_session({'email': u + '@example.test', 'groups': [],
+    cookies = {u: auth.create_session({'email': u + '@example.test', 'groups': ['qa-sso-restricted'] if u == 'continuation' else [],
                                      'claims_subset': {'name': u.title()}, 'method': 'qa_seed'}) for u in users}
     private = qa / 'browser-sessions.json'
-    private.write_text(json.dumps({'cookies': cookies, 'cookie_name': auth.COOKIE_NAME, 'base_url': f'http://127.0.0.1:{port}', 'login_password': qa_password, 'workspace': str(workspace)}))
+    private.write_text(json.dumps({'cookies': cookies, 'cookie_name': auth.COOKIE_NAME, 'base_url': f'http://127.0.0.1:{port}', 'login_password': qa_password, 'workspace': str(workspace), 'realtime_http_base': f'http://127.0.0.1:{realtime_http_port}' if realtime_http_port else None, 'realtime_ws_base': f'ws://127.0.0.1:{realtime_ws_port}' if realtime_ws_port else None}))
     private.chmod(0o600)
     print('QA signed sessions prepared for admin, alice, bob, outsider; production state isolated.', flush=True)
     import server

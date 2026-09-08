@@ -23,6 +23,10 @@ class Handler(BaseHTTPRequestHandler):
         tool_calls=None
         is_review='You review one already-permitted tool action for an administrator.' in system_text
         review_decision=None
+        continuation_origin = next((m['content'] for m in messages if m.get('role') == 'user'
+            and isinstance(m.get('content'), str) and 'QA_CONTINUATION_PARENT|' in m['content']), '')
+        if not is_review and 'QA_SLOW_CHILD' in last and 'QA_DELEGATE_SLOW_PARENT' not in last:
+            time.sleep(5)
         if not is_review and 'QA_STEER_WINDOW' in last and data.get('tools'):
             with (Path(os.environ['QA_STATE'])/'provider-evidence.jsonl').open('a') as record:
                 record.write(json.dumps({'phase':'request_started','marker':'QA_STEER_WINDOW'})+'\n')
@@ -38,12 +42,31 @@ class Handler(BaseHTTPRequestHandler):
             target=str(Path(os.environ['QA_STATE'])/'workspace'/'qa-evidence.txt')
             tool_calls=[{'id':'qa-steer-'+str(time.time_ns()),'type':'function','function':{'name':'read_file','arguments':json.dumps({'path':target})}}]
             answer=None
-        elif 'QA_DELEGATE_PARENT' in last and (data.get('tools') or any(m.get('role')=='tool' for m in messages[last_index+1:])):
+        elif continuation_origin:
+            results = [m.get('content', '') for m in messages[last_index+1:] if m.get('role') == 'tool']
+            if results:
+                answer = 'QA_CONTINUATION_RESULT: ' + str(results[-1])
+            elif 'ASYNC DELEGATION BATCH COMPLETE' in last:
+                target = continuation_origin.split('QA_CONTINUATION_PARENT|', 1)[1].splitlines()[0].strip()
+                tool_calls = [{'id': 'qa-continuation-write-' + str(time.time_ns()), 'type': 'function',
+                    'function': {'name': 'write_file', 'arguments': json.dumps({'path': target,
+                        'content': 'QA_FORBIDDEN_CONTINUATION_EFFECT'})}}]
+                answer = None
+            elif 'QA_CONTINUATION_PARENT|' in last:
+                tool_calls = [{'id': 'qa-continuation-delegate-' + str(time.time_ns()), 'type': 'function',
+                    'function': {'name': 'delegate_task', 'arguments': json.dumps({'tasks': [
+                        {'goal': 'QA_SLOW_CHILD. Return exactly QA_CHILD_ONE_DONE. No tools required.'},
+                        {'goal': 'QA_SLOW_CHILD. Return exactly QA_CHILD_TWO_DONE. No tools required.'}]})}}]
+                answer = None
+            else:
+                answer = 'QA_CONTINUATION_WAITING_FOR_CHILDREN'
+        elif ('QA_DELEGATE_PARENT' in last or 'QA_DELEGATE_SLOW_PARENT' in last) and (data.get('tools') or any(m.get('role')=='tool' for m in messages[last_index+1:])):
             results=[m.get('content','') for m in messages[last_index+1:] if m.get('role')=='tool']
             if results:
                 answer='QA_DELEGATE_RESULT: '+str(results[-1])
             else:
-                tool_calls=[{'id':'qa-delegate-'+str(time.time_ns()),'type':'function','function':{'name':'delegate_task','arguments':json.dumps({'tasks':[{'goal':'Return exactly QA_CHILD_ONE_DONE. This is a synthetic QA task; no tools required.'},{'goal':'Return exactly QA_CHILD_TWO_DONE. This is a synthetic QA task; no tools required.'}]})}}]
+                slow = 'QA_SLOW_CHILD. ' if 'QA_DELEGATE_SLOW_PARENT' in last else ''
+                tool_calls=[{'id':'qa-delegate-'+str(time.time_ns()),'type':'function','function':{'name':'delegate_task','arguments':json.dumps({'tasks':[{'goal':slow+'Return exactly QA_CHILD_ONE_DONE. This is a synthetic QA task; no tools required.'},{'goal':slow+'Return exactly QA_CHILD_TWO_DONE. This is a synthetic QA task; no tools required.'}]})}}]
                 answer=None
         elif 'QA_TODO|' in last and (data.get('tools') or any(m.get('role')=='tool' for m in messages[last_index+1:])):
             results=[m.get('content','') for m in messages[last_index+1:] if m.get('role')=='tool']

@@ -930,7 +930,9 @@ def check_auth(handler, parsed) -> bool:
     if cookie_val and verify_session(cookie_val):
         return True
     # Not authorized
-    if parsed.path.startswith('/api/'):
+    if parsed.path.startswith(('/api/', '/dashboard-plugins/', '/plugins/')):
+        # Plugin assets are subresources, including inside opaque sandboxed
+        # frames. A relative login redirect there recurses under the asset path.
         body = b'{"error":"Authentication required"}'
         handler.send_response(401)
         handler.send_header('Content-Type', 'application/json')

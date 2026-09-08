@@ -626,6 +626,9 @@
           <button type="button" id="realtimeVoiceMic" aria-pressed="false">Unmute microphone</button>
           <button type="button" id="realtimeVoiceInterrupt">Interrupt speech</button>
           <button type="button" id="realtimeVoiceEnd">End voice</button>
+          <div id="realtimeVoiceWarning" class="realtime-voice-warning" role="status" hidden></div>
+          <div id="realtimeVoiceTranscript" class="realtime-voice-transcript" aria-label="Voice transcript" aria-live="polite" hidden></div>
+          <div id="realtimeVoiceTasks" class="realtime-voice-tasks" aria-label="Voice background tasks" hidden></div>
         </div>
         <div class="voice-mode-bar" id="voiceModeBar" style="display:none">
           <span class="voice-mode-indicator" id="voiceModeIndicator"></span>
