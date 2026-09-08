@@ -10,7 +10,14 @@ test('US-SP-FILE-DEEP editor save reopen download rename cancel and delete persi
  const newRow=page.locator('#fileTree .file-item').filter({hasText:renamed});await newRow.click({button:'right'});await page.locator('.file-ctx-menu').getByText('Delete',{exact:true}).click();await page.locator('#appDialogCancel').click();expect(fs.existsSync(next)).toBe(true);await newRow.click({button:'right'});await page.locator('.file-ctx-menu').getByText('Delete',{exact:true}).click();await page.locator('#appDialogConfirm').click();await expect(newRow).toHaveCount(0);expect(fs.existsSync(next)).toBe(false);await capture(page,'file-after-delete',info);
 });
 test('US-SP-TERM-DEEP actual terminal executes harmless local command collapses expands restarts closes',async({page},info)=>{
+ const terminalAssets:string[]=[];const terminalResponses:{url:string,status:number}[]=[];
+ page.on('request',r=>{if(/xterm/.test(r.url()))terminalAssets.push(r.url());});
+ page.on('response',r=>{if(/\/static\/vendor\/xterm[^/]*\//.test(r.url()))terminalResponses.push({url:r.url(),status:r.status()});});
  await open(page);await session(page);await page.locator('#msg').fill('/terminal');await page.locator('#btnSend').click();await expect(page.locator('#composerTerminalPanel')).toBeVisible();
+ await expect(page.locator('#terminalSurface .xterm-helper-textarea')).toBeAttached();
+ await expect.poll(()=>terminalResponses.filter(r=>r.status===200).length).toBe(4);
+ expect(terminalAssets).toHaveLength(4);for(const asset of terminalAssets)expect(new URL(asset).origin).toBe(new URL(auth.base_url).origin);
+ await info.attach('terminal-local-assets',{body:JSON.stringify(terminalResponses),contentType:'application/json'});
  const target=path.join(auth.workspace,unique('qa-terminal')+'.txt');await page.locator('#terminalSurface .xterm-helper-textarea').focus();await page.keyboard.insertText("printf QA_TERMINAL_EXECUTED > '"+target+"'");await page.keyboard.press('Enter');await expect.poll(()=>fs.existsSync(target)&&fs.readFileSync(target,'utf8')).toBe('QA_TERMINAL_EXECUTED');
  await page.locator('#btnTerminalCollapse').click();await expect(page.locator('#composerTerminalDock')).toBeVisible();await page.locator('#btnTerminalExpand').click();await expect(page.locator('#terminalSurface')).toBeVisible();await page.locator('#btnTerminalClear').click();await page.locator('#btnTerminalRestart').click();await expect(page.locator('#terminalSurface .xterm-helper-textarea')).toBeAttached();await page.locator('#terminalSurface .xterm-helper-textarea').focus();await page.keyboard.insertText("printf QA_TERMINAL_RESTARTED > '"+target+"'");await page.keyboard.press('Enter');await expect.poll(()=>fs.readFileSync(target,'utf8')).toBe('QA_TERMINAL_RESTARTED');await capture(page,'terminal-executed',info);await page.locator('#btnTerminalClose').click();await expect(page.locator('#composerTerminalPanel')).toBeHidden();
 });

@@ -182,3 +182,5 @@ negative permission combinations remain distinct stories until their exact
 scenario is exercised. The comprehensive user-story matrix should retain
 NOT RUN or BLOCKED for these rows. Deterministic provider output must never be
 reported as live external integration proof.
+
+The terminal uses the committed xterm distribution files under `static/vendor`, with the existing versions and SRI hashes. The browser suite verifies that all four assets load from the application origin before checking actual shell command and restart effects. Activity-layout-specific scenarios select their required persisted layout explicitly through Settings; they cannot rely on the previous case leaving a particular preference.

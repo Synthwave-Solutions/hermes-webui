@@ -17,8 +17,9 @@ Provider credentials and raw diagnostics never reach the browser.
 
 The browser needs HTTPS, WebRTC and microphone permission. Startup is muted;
 Hold to talk or Unmute explicitly enables capture. Interrupt speech clears
-playback without cancelling engine work. End voice, navigation, transport
-failure or the 15-minute limit close the call. Existing dispatched chats remain
+playback without cancelling engine work. End voice, leaving the page, changing
+conversation, transport failure or the 15-minute limit close the call. In-app
+panel navigation and opening a dispatched task in a separate tab preserve voice. Existing dispatched chats remain
 available and continue under normal engine governance; stop them with the normal
 chat Stop control. A failed voice service leaves written chat usable.
 
@@ -148,7 +149,10 @@ authorization and do not make an unrestricted host shell an OS sandbox.
 Authority records are created only when an actual async job captures its
 reference. They remain private under `continuation-authority` alongside the
 durable job lifecycle so delayed jobs can resume after a restart; unknown or
-missing authority fails closed. Records should be removed only after every
+missing authority fails closed. The store is bounded at 10,000 records and
+256,000 bytes per record. At capacity, new authority captures fail closed while
+existing valid references remain usable. There is no automatic expiry or cleanup.
+Records should be removed only after every
 referencing job and queued delivery has completed or been explicitly discarded.
 Ending voice does not delete that authority or cancel the underlying work.
 

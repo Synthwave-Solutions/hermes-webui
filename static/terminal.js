@@ -129,10 +129,10 @@ function _loadXtermScript(src,integrity){
 function _loadXterm(){
   if(_xtermReady())return Promise.resolve();
   if(_xtermLoadPromise)return _xtermLoadPromise;
-  if(!document.getElementById('xterm-theme')){const link=document.createElement('link');link.id='xterm-theme';link.rel='stylesheet';link.href='https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css';link.integrity='sha384-LJcOxlx9IMbNXDqJ2axpfEQKkAYbFjJfhXexLfiRJhjDU81mzgkiQq8rkV0j6dVh';link.crossOrigin='anonymous';document.head.appendChild(link);}
-  _xtermLoadPromise=_loadXtermScript('https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js','sha384-/nfmYPUzWMS6v2atn8hbljz7NE0EI1iGx34lJaNzyVjWGDzMv+ciUZUeJpKA3Glc')
-    .then(()=>_loadXtermScript('https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js','sha384-AQLWHRKAgdTxkolJcLOELg4E9rE89CPE2xMy3tIRFn08NcGKPTsELdvKomqji+DL'))
-    .then(()=>_loadXtermScript('https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.9.0/lib/xterm-addon-web-links.js','sha384-U4fBROT3kCM582gaYiNaOSQiJbXPzd9SfR1598Y7yeGSYVBzikXrNg0XyuU+mOnl'))
+  if(!document.getElementById('xterm-theme')){const link=document.createElement('link');link.id='xterm-theme';link.rel='stylesheet';link.href='static/vendor/xterm/5.3.0/css/xterm.css';link.integrity='sha384-LJcOxlx9IMbNXDqJ2axpfEQKkAYbFjJfhXexLfiRJhjDU81mzgkiQq8rkV0j6dVh';link.crossOrigin='anonymous';document.head.appendChild(link);}
+  _xtermLoadPromise=_loadXtermScript('static/vendor/xterm/5.3.0/lib/xterm.js','sha384-/nfmYPUzWMS6v2atn8hbljz7NE0EI1iGx34lJaNzyVjWGDzMv+ciUZUeJpKA3Glc')
+    .then(()=>_loadXtermScript('static/vendor/xterm-addon-fit/0.8.0/lib/xterm-addon-fit.js','sha384-AQLWHRKAgdTxkolJcLOELg4E9rE89CPE2xMy3tIRFn08NcGKPTsELdvKomqji+DL'))
+    .then(()=>_loadXtermScript('static/vendor/xterm-addon-web-links/0.9.0/lib/xterm-addon-web-links.js','sha384-U4fBROT3kCM582gaYiNaOSQiJbXPzd9SfR1598Y7yeGSYVBzikXrNg0XyuU+mOnl'))
     .catch(err=>{_xtermLoadPromise=null;throw err;});
   return _xtermLoadPromise;
 }
@@ -142,7 +142,7 @@ function _ensureXterm(){
   if(!surface)return null;
   if(TERMINAL_UI.term)return TERMINAL_UI.term;
   if(!_xtermReady()){
-    surface.textContent='Terminal library failed to load. Check network access to cdn.jsdelivr.net.';
+    surface.textContent='Terminal library failed to load. Reload the page and check the application assets.';
     return null;
   }
   const term=new window.Terminal({
