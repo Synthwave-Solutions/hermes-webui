@@ -158,8 +158,8 @@ test('US-SP-LIFECYCLE-KAN edit, comment, complete, archive and restore survive r
   await preview.getByRole('button', { name: 'Add comment', exact: true }).click();
   await expect(preview.locator('.kanban-detail-comments')).toContainText(comment);
   expect((await task(page, id)).comments.some((item: any) => item.body === comment)).toBe(true);
-  // The engine's completion contract starts at Ready. No assignee is set,
-  // so this transition cannot dispatch a worker in the isolated fixture.
+  // Retain the Ready path as a separate lifecycle regression. Direct human
+  // Todo completion is exercised below; no worker is assigned in either case.
   await preview.locator('.kanban-status-actions').getByRole('button', { name: 'Ready', exact: true }).click();
   await expect.poll(async () => (await task(page, id)).task.status).toBe('ready');
   await preview.locator('.kanban-status-actions').getByRole('button', { name: 'Done', exact: true }).click();
@@ -213,10 +213,8 @@ test('US-SP-LIFECYCLE-KAN edit, comment, complete, archive and restore survive r
 });
 
 test('US-SP-LIFECYCLE-KAN-DEFECT visible Done action must complete an existing Todo task', async ({ page }, info) => {
-  // Known existing frontend/engine contract mismatch: the UI offers Done for
-  // Todo, but the real engine accepts completion only from Ready or later.
-  // Keep this acceptance check failing until that product decision is fixed;
-  // a mocked Kanban database would incorrectly make this interaction pass.
+  // This previously returned404 for an existing Todo task. The real engine
+  // must now record manual completion without first queuing a worker.
   await open(page, 'kanban');
   await page.locator('#kanbanNewTaskBtn').click();
   const name = 'QA Kanban completion defect ' + Date.now();
@@ -235,5 +233,9 @@ test('US-SP-LIFECYCLE-KAN-DEFECT visible Done action must complete an existing T
   const response = await changed;
   await info.attach('todo-completion-response', { body: JSON.stringify({ status: response.status(), response: await response.json(), persisted: await task(page, id) }), contentType: 'application/json' });
   expect(response.status(), 'A visible Done action must accept this existing task or be unavailable before the click').toBe(200);
+  expect((await task(page, id)).task.status).toBe('done');
+  await page.reload();
+  await page.locator('.rail-btn[data-panel="kanban"]').click();
+  await expect(page.locator('.kanban-column[data-status="done"] .kanban-card').filter({hasText:name})).toBeVisible();
   expect((await task(page, id)).task.status).toBe('done');
 });
