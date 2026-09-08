@@ -9198,6 +9198,9 @@ from api.route_approvals import (  # noqa: F401 — re-exports for backward comp
     _approval_sse_notify,
     _GATEWAY_MIRROR_FLAG,
     approval_required_approver,
+    approval_choice_allowed,
+    approval_entry_choice_allowed,
+    require_yolo_eligible,
     _gateway_mirrored_pending_run_id,
     reconcile_gateway_pending_mirror_locked,
     submit_gateway_pending_mirror,
@@ -11732,6 +11735,9 @@ def handle_get(handler, parsed) -> bool:
     from api.bot_builder import guard_profile_request
     if not guard_profile_request(handler, parsed, "GET"):
         return True
+    from api.governance.resource_scope import guard_request as guard_resource_request
+    if not guard_resource_request(handler, parsed, "GET"):
+        return True
     proxy_result = _handle_extension_sidecar_proxy(handler, parsed, "GET")
     if proxy_result is not False:
         return proxy_result
@@ -12123,6 +12129,7 @@ def handle_get(handler, parsed) -> bool:
         return True
 
     if parsed.path == "/api/models":
+        from api.governance.resource_scope import filter_models
         # Profile-scoping for non-default profiles (#3957) is handled INSIDE
         # get_available_models() — it binds the active profile's env + TLS on
         # the detached rebuild worker (and the legacy synchronous rebuild),
@@ -12130,10 +12137,10 @@ def handle_get(handler, parsed) -> bool:
         # api.config.get_available_models cold path + profile_scope_for_detached_worker.
         freshness = parse_qs(parsed.query or "").get("freshness", [""])[0].strip().lower()
         if freshness == "session_visit":
-            return j(handler, get_available_models_for_session_visit())
+            return j(handler, filter_models(handler, get_available_models_for_session_visit()))
         if freshness:
             return bad(handler, f"unknown models freshness: {freshness}", status=400)
-        return j(handler, get_available_models())
+        return j(handler, filter_models(handler, get_available_models()))
 
     if parsed.path == "/api/models/live":
         from api.profiles import profile_env_for_active_request
@@ -12143,7 +12150,8 @@ def handle_get(handler, parsed) -> bool:
     # ── Auxiliary models (GET/POST) ──
     if parsed.path == "/api/model/auxiliary":
         from api.config import get_auxiliary_models
-        return j(handler, get_auxiliary_models())
+        from api.governance.resource_scope import filter_auxiliary_models
+        return j(handler, filter_auxiliary_models(handler, get_auxiliary_models()))
 
     if parsed.path == "/api/dashboard/status":
         from api import dashboard_probe
@@ -12247,7 +12255,8 @@ def handle_get(handler, parsed) -> bool:
             settings["agent_version"] = AGENT_VERSION
         except Exception:
             pass
-        return j(handler, settings)
+        from api.governance.resource_scope import filter_settings
+        return j(handler, filter_settings(handler, settings))
 
     if parsed.path == "/api/voice/realtime/capability":
         from api.realtime_voice import handle as handle_realtime_voice
@@ -13376,6 +13385,7 @@ def handle_get(handler, parsed) -> bool:
     # ── Skills API (GET) ──
     if parsed.path == "/api/skills":
         from api.ownership import request_owner_scope
+        from api.governance.resource_scope import filter_skills
 
         qs = parse_qs(parsed.query)
         category = qs.get("category", [None])[0]
@@ -13384,7 +13394,7 @@ def handle_get(handler, parsed) -> bool:
             category=category,
             ownership_scope=request_owner_scope(handler),
         )
-        return j(handler, {"skills": data.get("skills", [])})
+        return j(handler, {"skills": filter_skills(handler, data.get("skills", []))})
 
     if parsed.path == "/api/skills/usage":
         from api.skill_usage import read_skill_usage
@@ -13415,12 +13425,13 @@ def handle_get(handler, parsed) -> bool:
             1 for e in usage.values()
             if e.get("use_count", 0) > 0 or e.get("view_count", 0) > 0 or e.get("patch_count", 0) > 0
         )
-        return j(handler, {
+        from api.governance.resource_scope import filter_skill_usage
+        return j(handler, filter_skill_usage(handler, {
             "usage": usage,
             "skill_names": skill_names,
             "total_invocations": total,
             "unique_skills_used": unique,
-        })
+        }))
 
     if parsed.path == "/api/skills/content":
         qs = parse_qs(parsed.query)
@@ -13888,6 +13899,9 @@ def handle_post(handler, parsed) -> bool:
     if not _guard_request_session_visibility(handler, parsed, body=body, method="POST"):
         if diag:
             diag.finish()
+        return True
+    from api.governance.resource_scope import guard_request as guard_resource_request
+    if not guard_resource_request(handler, parsed, "POST", body):
         return True
 
     if parsed.path == "/api/chat/mentions/prepare":
@@ -15090,6 +15104,11 @@ def handle_post(handler, parsed) -> bool:
         sid = body["session_id"]
         enabled = bool(body.get("enabled", True))
         if enabled:
+            from api.governance.enforce import _request_identity
+            try:
+                require_yolo_eligible(_request_identity(handler), sid)
+            except PermissionError as exc:
+                return j(handler, {"ok": False, "code": "governance_approval_required", "error": str(exc)}, status=403)
             enable_session_yolo(sid)
             # Also resolve any pending approvals for this session so the
             # agent doesn't stay stuck waiting on an already-dismissed card.
@@ -17070,6 +17089,9 @@ def _handle_list_dir(handler, parsed):
     try:
         rel_path = qs.get("path", ["."])[0]
         entries = list_dir(Path(workspace), rel_path)
+        from api.governance.enforce import _request_identity
+        from api.governance.resource_access import filter_file_entries
+        entries = filter_file_entries(_request_identity(handler), workspace, entries)
         return j(
             handler,
             {
@@ -17143,6 +17165,14 @@ def _handle_escape_list_dir(handler, parsed):
     rel_path = qs.get("path", ["."])[0]
     try:
         payload = list_authorized_escape_dir(Path(s.workspace), sid, token, rel_path)
+        from api.governance.enforce import _request_identity
+        from api.governance.resource_access import file_allowed
+        from api.workspace import resolve_authorized_escape_request
+        identity = _request_identity(handler)
+        payload["entries"] = [entry for entry in payload["entries"] if file_allowed(identity,
+            resolve_authorized_escape_request(Path(s.workspace), sid, token, entry["path"])["target"])]
+        # The old signature included hidden entries; derive it from visible rows.
+        payload["signature"] = hashlib.sha256(json.dumps(payload["entries"], sort_keys=True).encode()).hexdigest()
         return j(handler, payload)
     except FileNotFoundError as exc:
         return bad(handler, _sanitize_error(exc), 404)
@@ -18957,7 +18987,7 @@ def _folder_zip_max_files() -> int:
 
 
 def _folder_download_collect(target: Path, workspace_root: Path,
-                              max_bytes: int, max_files: int):
+                              max_bytes: int, max_files: int, allowed=None):
     """Walk target dir; return (files, total_bytes, hit_limit_reason_or_None).
 
     files is a list of (filesystem_path, archive_name) tuples. Each filesystem
@@ -18970,6 +19000,9 @@ def _folder_download_collect(target: Path, workspace_root: Path,
     for root, dirs, names in _os.walk(target, followlinks=False):
         root_path = Path(root)
         try:
+            if allowed is not None and not allowed(root_path):
+                dirs[:] = []
+                continue
             if not root_path.resolve().is_relative_to(workspace_root):
                 dirs[:] = []
                 continue
@@ -18978,6 +19011,8 @@ def _folder_download_collect(target: Path, workspace_root: Path,
             continue
         for name in names:
             fp = root_path / name
+            if allowed is not None and not allowed(fp):
+                continue
             if fp.is_symlink():
                 try:
                     if not fp.resolve().is_relative_to(workspace_root):
@@ -19036,8 +19071,12 @@ def _handle_folder_download(handler, parsed):
     max_bytes = _folder_zip_max_bytes()
     max_files = _folder_zip_max_files()
 
+    from api.governance.enforce import _request_identity
+    from api.governance.resource_access import file_allowed, ensure_file_access
+    identity = _request_identity(handler)
     files, total_bytes, limit_hit = _folder_download_collect(
-        target, workspace_root, max_bytes, max_files
+        target, workspace_root, max_bytes, max_files,
+        allowed=lambda path: file_allowed(identity, path)
     )
     if limit_hit == "max_files":
         return j(handler, {
@@ -19076,6 +19115,7 @@ def _handle_folder_download(handler, parsed):
         for fp, arcname in files:
             fd = None
             try:
+                ensure_file_access(identity, fp)
                 fd = open_anchored_fd(workspace_root, fp.resolve(), want_dir=False)
                 info = zipfile.ZipInfo(arcname)
                 info.compress_type = zipfile.ZIP_DEFLATED
@@ -19605,11 +19645,13 @@ def _handle_live_models(handler, parsed):
         cache_key = _live_models_cache_key(provider)
         cached = _get_cached_live_models(cache_key)
         if cached is not None:
-            return j(handler, cached)
+            from api.governance.resource_scope import filter_models
+            return j(handler, filter_models(handler, cached))
 
         def _finish(payload: dict):
             _set_cached_live_models(cache_key, payload)
-            return j(handler, payload)
+            from api.governance.resource_scope import filter_models
+            return j(handler, filter_models(handler, payload))
 
         # Delegate to the agent's live-fetch + fallback resolver.
         # provider_model_ids() tries live endpoints first and falls back to
@@ -23500,6 +23542,8 @@ def _resolve_approval_legacy(sid: str, approval_id: str, choice: str) -> bool:
                 # Find and remove the specific entry by approval_id.
                 for i, entry in enumerate(queue):
                     if entry.get("approval_id") == approval_id:
+                        if not approval_entry_choice_allowed(entry, choice):
+                            return False
                         pending = queue.pop(i)
                         found_target = True
                         break
@@ -23509,6 +23553,9 @@ def _resolve_approval_legacy(sid: str, approval_id: str, choice: str) -> bool:
                     # bounded as not-active by the adapter route.
                     pending = None
             else:
+                if queue and (not approval_entry_choice_allowed(queue[0], choice)
+                              or queue[0].get("governance_action") or queue[0].get("required_approver")):
+                    return False
                 pending = queue.pop(0) if queue else None
                 found_target = pending is not None
             if not queue:
@@ -23516,6 +23563,10 @@ def _resolve_approval_legacy(sid: str, approval_id: str, choice: str) -> bool:
         elif queue:
             # Legacy single-dict value.
             if not approval_id or queue.get("approval_id") == approval_id:
+                if not approval_entry_choice_allowed(queue, choice) or (
+                    not approval_id and (queue.get("governance_action") or queue.get("required_approver"))
+                ):
+                    return False
                 pending = _pending.pop(sid, None)
                 found_target = pending is not None
         # When no _pending entry found AND no explicit approval_id was
@@ -23531,6 +23582,8 @@ def _resolve_approval_legacy(sid: str, approval_id: str, choice: str) -> bool:
                 # _gateway_queues stores _ApprovalEntry objects; their
                 # .data dict carries command, pattern_key, pattern_keys.
                 gw_data = getattr(gw_entry, 'data', None) or {}
+                if not approval_entry_choice_allowed(gw_data, choice) or gw_data.get("governance_action") or gw_data.get("required_approver"):
+                    return False
                 gateway_keys = gw_data.get("pattern_keys") or [gw_data.get("pattern_key", "")]
                 # Peek is not strict — a concurrent resolver may pop a
                 # different gateway entry before we reach
@@ -23552,7 +23605,9 @@ def _resolve_approval_legacy(sid: str, approval_id: str, choice: str) -> bool:
     # Collect keys from both _pending and _gateway_queues
     keys_from_pending = pending.get("pattern_keys") or [pending.get("pattern_key", "")] if pending else []
     all_keys = [k for k in keys_from_pending if k] + [k for k in gateway_keys if k]
-    governance_one_shot = bool(pending and pending.get("approval_kind") == "governance_cli")
+    governance_one_shot = bool(pending and (pending.get("approval_kind") == "governance_cli"
+        or pending.get("governance_action") or pending.get("required_approver")
+        or pending.get("allow_session") is False))
     if choice in ("once", "session") and not governance_one_shot:
         for k in all_keys:
             approve_session(sid, k)
@@ -23566,7 +23621,11 @@ def _resolve_approval_legacy(sid: str, approval_id: str, choice: str) -> bool:
     # thread is parked in entry.event.wait() and needs to be woken up.
     gateway_resolved = 0
     if found_target or not approval_id:
-        gateway_resolved = resolve_gateway_approval(sid, choice, resolve_all=False) or 0
+        request_id = pending.get("request_id") if pending else None
+        if request_id:
+            gateway_resolved = resolve_gateway_approval(sid, choice, resolve_all=False, request_id=request_id) or 0
+        else:
+            gateway_resolved = resolve_gateway_approval(sid, choice, resolve_all=False) or 0
     # Keep the historical no-id response path truthy for old clients/tests while
     # making stale explicit ids bounded as not-active for Slice 3b.
     resolved = bool(pending) or bool(gateway_resolved) or not bool(approval_id)
@@ -23635,12 +23694,12 @@ def _handle_approval_respond(handler, body):
     # deny/cancel their own request, but only the explicitly named approver may
     # grant once/session. Fail closed before local or remote resolution.
     required_approver = approval_required_approver(sid, approval_id)
-    if required_approver and choice not in ("once", "deny"):
+    if not approval_choice_allowed(sid, approval_id, choice):
         return j(handler, {
             "ok": False,
             "choice": choice,
             "code": "governance_one_shot_only",
-            "error": "Governance command approvals are one-shot only",
+            "error": "This approval does not permit session or permanent acceptance",
         }, status=400)
     if required_approver and choice != "deny":
         from api.ownership import request_owner_email

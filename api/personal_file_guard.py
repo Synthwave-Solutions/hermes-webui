@@ -14,6 +14,9 @@ def guard_request(handler, route, values):
     from api import personal_context
     from api.governance.enforce import _request_identity
     identity = _request_identity(handler)
+    from api.governance.resource_access import ensure_file_access
+    write = route in {"/api/file/delete", "/api/file/save", "/api/file/office-save",
+                      "/api/file/create", "/api/file/rename", "/api/file/move", "/api/file/create-dir"}
     sid = values.get('session_id')
     from api.routes import get_session_for_file_ops
     try:
@@ -29,11 +32,13 @@ def guard_request(handler, route, values):
         except (ValueError, FileNotFoundError):
             raise PermissionError('Invalid private file authorization') from None
         personal_context.ensure_actor_path(identity, resolved['target'], session)
+        ensure_file_access(identity, resolved['target'], write=write)
     if route == '/api/file/raw' and session:
         from api.routes import _file_raw_target
         resolved = _file_raw_target(session, sid, values.get('path') or '')
         if resolved:
             personal_context.ensure_actor_path(identity, resolved[1], session)
+            ensure_file_access(identity, resolved[1], write=write)
     for key in ('path', 'dest_dir', 'new_path'):
         raw = values.get(key)
         if raw is None:
@@ -50,3 +55,4 @@ def guard_request(handler, route, values):
         candidates.append(candidates[0].parent / str(values['new_name']))
     for path in candidates:
         personal_context.ensure_actor_path(identity, path, session)
+        ensure_file_access(identity, path, write=write)

@@ -100,7 +100,10 @@ def _translate_context(agent_mod, policy, email: str, groups: tuple[str, ...],
     from dataclasses import replace
     ceiling = access_ceiling({"email": email, "groups": list(groups)}, active_profile, access)
     if ceiling is not None:
-        access = replace(access, profiles=access.profiles | {active_profile})
+        role_ceiling = access.role_ceiling
+        if role_ceiling is not None:
+            role_ceiling = replace(role_ceiling, profiles=role_ceiling.profiles | {active_profile})
+        access = replace(access, profiles=access.profiles | {active_profile}, role_ceiling=role_ceiling)
     shim = SimpleNamespace(
         access=access,
         active_profile=str(active_profile or "default"),
@@ -117,6 +120,18 @@ def _translate_context(agent_mod, policy, email: str, groups: tuple[str, ...],
         # the turn unrestricted (governance_inactive); refuse instead so the
         # caller applies the per-mode failure policy.
         raise GovernanceBindingError("agent governance payload did not round-trip")
+    if access.access_mode or access.access_level or not access.deny.is_empty() or access.approval_configured:
+        import json
+        encoded = json.loads(payload).get("access", {})
+        if encoded.get("policy_controls_version") != 1 or not hasattr(ctx.access, "deny"):
+            raise GovernanceBindingError("This engine does not support per-user governance controls")
+        if ctx.access.deny.to_mapping() != access.deny.to_mapping():
+            raise GovernanceBindingError("Agent governance denies did not round-trip")
+        expected_ceiling = access.role_ceiling.to_mapping() if access.role_ceiling is not None else None
+        actual_ceiling = ctx.access.role_ceiling.to_mapping() if ctx.access.role_ceiling is not None else None
+        if actual_ceiling != expected_ceiling or any(getattr(ctx.access, field, None) != getattr(access, field)
+                for field in ("access_mode", "access_level", "approval_mode", "approval_prompt", "approval_configured")):
+            raise GovernanceBindingError("Agent governance policy controls did not round-trip")
     return ctx
 
 

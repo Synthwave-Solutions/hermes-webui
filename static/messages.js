@@ -7085,6 +7085,8 @@ function _updateYoloPill() {
 async function toggleYoloFromApproval() {
   const sid = S.session && S.session.session_id;
   if (!sid) return;
+  const pending = (_approvalPendingBySession.get(sid) || {}).pending;
+  if (pending && !_approvalChoiceAllowed(pending, 'session')) return;
   try {
     await api('/api/session/yolo', {
       method: 'POST',
@@ -7286,6 +7288,14 @@ function showApprovalForSession(sid, pending, pendingCount) {
   showApprovalCard(pending, pendingCount);
 }
 
+function _approvalChoiceAllowed(pending, choice) {
+  if (choice === 'deny') return true;
+  if (pending.governance_action || pending.required_approver) return choice === 'once';
+  if (choice === 'session' && pending.allow_session === false) return false;
+  if (choice === 'always' && pending.allow_permanent === false) return false;
+  return !Array.isArray(pending.choices) || !pending.choices.length || pending.choices.includes(choice);
+}
+
 function showApprovalCard(pending, pendingCount) {
   const sid = _rememberApprovalPending(pending, pendingCount);
   if (!_approvalPromptBelongsToActiveSession(sid)) return;
@@ -7301,6 +7311,14 @@ function showApprovalCard(pending, pendingCount) {
   _approvalSessionId = sid;
   _approvalCurrentId = pending.approval_id || null;
   _approvalSignature = sig;
+  for (const [id, choice] of [['approvalBtnOnce', 'once'], ['approvalBtnSession', 'session'], ['approvalBtnAlways', 'always'], ['approvalSkipAll', 'session']]) {
+    const button = $(id);
+    if (button) {
+      const allowed = _approvalChoiceAllowed(pending, choice);
+      button.hidden = !allowed;
+      button.style.display = allowed ? '' : 'none';
+    }
+  }
   // Show "1 of N" counter when multiple approvals are queued
   const counter = $("approvalCounter");
   if (counter) {
@@ -7414,6 +7432,8 @@ function toggleApprovalCardCollapsed(forceCollapsed) {
 async function respondApproval(choice) {
   const sid = _approvalSessionId || (S.session && S.session.session_id);
   if (!sid) return;
+  const pending = (_approvalPendingBySession.get(sid) || {}).pending;
+  if (pending && !_approvalChoiceAllowed(pending, choice)) return;
   const approvalId = _approvalCurrentId;
   if (_approvalResponseMatches(sid, approvalId)) return;
   _unmarkApprovalDismissed(sid, approvalId);

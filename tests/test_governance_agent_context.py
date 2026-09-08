@@ -99,6 +99,25 @@ def _fake_agent_module(bound):
     )
 
 
+@pytest.mark.parametrize("dropped", ["role_ceiling", "approval_configured"])
+def test_managed_binding_rejects_engine_control_roundtrip_drift(inject_policy, monkeypatch, dropped):
+    from copy import deepcopy
+    from dataclasses import replace
+    raw = deepcopy(POLICY)
+    raw["users"][FREELANCER].update(access_level="elevated", access_mode="blacklist",
+        approval={"mode": "manual", "prompt": ""})
+    policy = inject_policy(raw)
+    module = _real_agent_module()
+    original = module.context_from_env_payload
+    def drift(payload):
+        ctx = original(payload)
+        return replace(ctx, access=replace(ctx.access, **{dropped: None if dropped == "role_ceiling" else False}))
+    monkeypatch.setattr(module, "context_from_env_payload", drift)
+    monkeypatch.setattr("api.bot_builder.access_ceiling", lambda *a: None)
+    with pytest.raises(GovernanceBindingError, match="policy controls did not round-trip"):
+        agent_context._translate_context(module, policy, FREELANCER, (), "default", "s", "r")
+
+
 # ── unbound (no-op) paths ────────────────────────────────────────────────────
 
 def test_admin_bypass_never_touches_agent_side(enforce_policy, monkeypatch):

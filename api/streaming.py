@@ -7206,14 +7206,22 @@ def _run_agent_streaming(
                 # client that is polling (no live SSE) still sees this approval,
                 # and attach the reconciled pending count to the SSE event so
                 # both transports agree on the same number.
+                event_data = dict(approval_data) if isinstance(approval_data, dict) else approval_data
                 if _submit_pending_for_polling is not None:
                     try:
                         head, total = _submit_pending_for_polling(session_id, approval_data)
-                        if isinstance(approval_data, dict):
-                            approval_data.update({"pending_count": total})
+                        # The mirror owns the browser approval_id. Send that
+                        # exact card immediately; emitting the raw callback
+                        # produced id-less first clicks until the next poll.
+                        # Copy so a parallel producer cannot acquire the
+                        # current head's identity by mutating its own data.
+                        if isinstance(head, dict):
+                            event_data = {**head, "pending_count": total}
+                        elif isinstance(event_data, dict):
+                            event_data["pending_count"] = total
                     except Exception:
                         logger.warning("Failed to mirror approval into WebUI polling state", exc_info=True)
-                put('approval', approval_data)
+                put('approval', event_data)
             _reg_notify(session_id, _approval_notify_cb)
             _approval_registered = True
         except ImportError:

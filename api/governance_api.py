@@ -15,6 +15,7 @@ under report_only and off.
 """
 
 import io
+from copy import deepcopy
 import json
 import logging
 from urllib.parse import parse_qs
@@ -44,7 +45,7 @@ _AUDIT_LIMIT_MAX = 500
 # Whitelist of keys accepted in group/user policy entries (the rest of the
 # schema is owned by the full-document POST /api/governance/policy replace).
 _GROUP_ENTRY_KEYS = frozenset({"description", "sso_groups", "roles", "grants"})
-_USER_ENTRY_KEYS = frozenset({"description", "roles", "groups", "grants", "deny"})
+_USER_ENTRY_KEYS = frozenset({"description", "roles", "groups", "grants", "deny", "access_level", "access_mode", "approval"})
 
 
 # ── Caller resolution ────────────────────────────────────────────────────────
@@ -151,6 +152,12 @@ def _serialize_access(access) -> dict:
         "profiles": sorted(access.profiles),
         "routes": sorted(access.routes),
         "grant_sources": list(access.grant_sources),
+        "access_level": access.access_level or "legacy",
+        "access_mode": access.access_mode or "legacy",
+        "approval_mode": access.approval_mode if access.approval_configured else "",
+        "deny": access.deny.to_mapping(),
+        "role_ceiling": access.role_ceiling.to_mapping() if access.role_ceiling is not None else None,
+        "bootstrap_admin": "bootstrap_admin" in access.grant_sources,
         "is_admin": administrative_access(access),
     }
 
@@ -251,6 +258,13 @@ def _validated_entry(handler, raw_entry, *, kind: str) -> dict | None:
                 {"error": "invalid_payload", "message": f"{kind} {grants_key} must be an object"},
                 status=400,
             )
+            return None
+    if kind == "user":
+        try:
+            from api.governance.loader import _parse_user
+            _parse_user("validation@example.test", raw_entry)
+        except GovernancePolicyError as exc:
+            j(handler, {"error": "invalid_payload", "message": str(exc)}, status=400)
             return None
     return dict(raw_entry)
 
@@ -382,6 +396,11 @@ def _handle_me(handler, parsed, policy, subject, access) -> bool:
             "groups": sorted(access.groups),
             "permissions": sorted(access.permissions),
             "profiles": sorted(access.profiles),
+            "access_level": access.access_level or "legacy",
+            "access_mode": access.access_mode or "legacy",
+            "approval_mode": access.approval_mode if access.approval_configured else "",
+            "can_chat": access.has_permission("chat:use"),
+            "effective_access": _serialize_access(access),
             # Left-navigation items this caller must not see, derived from the
             # same permissions that gate the panels' APIs (27 Aug 2026 ticket).
             # The client hides these on top of the user's own hidden_tabs; the
@@ -426,7 +445,10 @@ def _handle_collection_get(handler, parsed, policy, subject, access, *, key: str
         return True
     raw = _policy_raw(policy)
     entries = raw.get(key) if isinstance(raw.get(key), dict) else {}
-    j(handler, {key: entries or {}, "etag": policy_etag(raw)})
+    result = {key: entries or {}, "etag": policy_etag(raw)}
+    if key == "users":
+        result["bootstrap_admins"] = list(policy.bootstrap_admins)
+    j(handler, result)
     return True
 
 
@@ -563,6 +585,7 @@ def _handle_preview(handler, parsed, policy, subject, access) -> bool:
         handler,
         {
             "effective_access": {
+                **_serialize_access(preview),
                 "roles": sorted(preview.roles),
                 "groups": sorted(preview.groups),
                 "permissions": sorted(preview.permissions),
@@ -570,18 +593,7 @@ def _handle_preview(handler, parsed, policy, subject, access) -> bool:
                 "routes": sorted(preview.routes),
                 # Grant detail for the admin UI's per-user on/off toggles.
                 # Post-deny (the resolver already subtracted users[email].deny).
-                "grants": {
-                    "skills": {
-                        "view": sorted(preview.grants.skills_view),
-                        "load": sorted(preview.grants.skills_load),
-                        "manage": sorted(preview.grants.skills_manage),
-                    },
-                    "mcp": {"servers": sorted(preview.grants.mcp_servers)},
-                    "cli": {
-                        "commands": sorted(preview.grants.cli_commands),
-                        "approval_commands": sorted(preview.grants.cli_approval_commands),
-                    },
-                },
+                "grants": preview.grants.to_mapping(),
             },
             "grant_sources": list(preview.grant_sources),
             "permission_sources": {
@@ -1390,11 +1402,15 @@ def _handle_grant_request_decide(handler, parsed, policy, subject, body) -> bool
             except GovernancePolicyError as exc:
                 j(handler, {"error": "policy_error", "message": str(exc)}, status=500)
                 return True
-            raw = _policy_raw(current_policy)
+            raw = deepcopy(_policy_raw(current_policy))
             old_etag = policy_etag(raw)
             result = grant_requests.apply_grant_to_policy(raw, payload)
             if result is None:
                 j(handler, {"error": "invalid_payload", "message": "request does not describe an applicable grant"}, status=400)
+                return True
+            from api.governance.request_bounds import grant_within_bounds
+            if not grant_within_bounds(parse_governance_policy(raw), payload):
+                j(handler, {"error": "forbidden", "message": "This request exceeds the user's role scope or an explicit deny. Edit the policy explicitly."}, status=403)
                 return True
             before, after = result
             try:

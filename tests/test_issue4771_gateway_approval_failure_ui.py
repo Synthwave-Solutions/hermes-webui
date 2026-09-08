@@ -63,6 +63,7 @@ def _run_failure_case(api_js: str) -> dict:
             _extract_fn(MESSAGES_JS, "_approvalResponseMatches"),
             _extract_fn(MESSAGES_JS, "_setApprovalControlsDisabled"),
             _extract_fn(MESSAGES_JS, "_setPromptFlyoutHidden"),
+            _extract_fn(MESSAGES_JS, "_approvalChoiceAllowed"),
             _extract_fn(MESSAGES_JS, "showApprovalCard"),
             _extract_fn(MESSAGES_JS, "_restoreFailedApprovalResponse"),
             _extract_fn(MESSAGES_JS, "respondApproval", prefix="async function "),
@@ -95,6 +96,7 @@ function makeButton(id) {{
   return {{
     id,
     disabled: false,
+    style: {{}},
     classList: {{
       values: new Set(),
       add(value) {{ this.values.add(value); }},
@@ -245,6 +247,7 @@ def test_poll_rerender_keeps_inflight_buttons_disabled_and_blocks_duplicates():
             _extract_fn(MESSAGES_JS, "_approvalResponseMatches"),
             _extract_fn(MESSAGES_JS, "_setApprovalControlsDisabled"),
             _extract_fn(MESSAGES_JS, "_setPromptFlyoutHidden"),
+            _extract_fn(MESSAGES_JS, "_approvalChoiceAllowed"),
             _extract_fn(MESSAGES_JS, "showApprovalCard"),
             _extract_fn(MESSAGES_JS, "_restoreFailedApprovalResponse"),
             _extract_fn(MESSAGES_JS, "respondApproval", prefix="async function "),
@@ -274,6 +277,7 @@ function makeButton(id) {{
   return {{
     id,
     disabled: false,
+    style: {{}},
     classList: {{
       values: new Set(),
       add(value) {{ this.values.add(value); }},

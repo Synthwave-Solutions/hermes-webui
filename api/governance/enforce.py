@@ -143,6 +143,9 @@ def evaluate_request(identity: dict | None, method: str, path: str) -> Decision:
 
     access = resolve_effective_access(policy, subject)
 
+    if (access.access_mode or access.access_level) and route_path in {"/api/auth/me", "/api/governance/me", "/api/governance/effective-access", "/api/governance/approvals/mine"}:
+        return Decision(True, "self_route", "", policy.mode)
+
     if not access.is_route_allowed(route_path):
         return Decision(False, "route_not_allowed", "", policy.mode)
 
