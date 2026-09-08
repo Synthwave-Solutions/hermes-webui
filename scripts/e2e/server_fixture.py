@@ -1,0 +1,112 @@
+"""Isolated SynPulse QA server with real signed sessions and no production state."""
+import json
+import os
+from pathlib import Path
+import secrets
+import sys
+
+def main():
+    repo = Path(sys.argv[1]).resolve()
+    qa = Path(sys.argv[2]).resolve()
+    assert qa != Path.home() and qa != repo and 'e2e-state' in qa.name, 'Refuse non-QA state directory'
+    qa.mkdir(mode=0o700, parents=True, exist_ok=True)
+    state = qa / 'state'
+    home = qa / 'home'
+    workspace = qa / 'workspace'
+    for path in (state, home, workspace):
+        path.mkdir(mode=0o700, exist_ok=True)
+    engine = str(Path(sys.argv[3]).resolve()) if len(sys.argv) > 3 else str(repo.parent / 'hermes-agent')
+    runtime_python = sys.executable
+    port = int(sys.argv[4]) if len(sys.argv) > 4 else 19086
+    provider_port = int(sys.argv[5]) if len(sys.argv) > 5 else 19087
+    qa_password = secrets.token_urlsafe(30)
+    for key in list(os.environ):
+        if key not in {'HOME', 'PATH', 'LANG', 'LC_ALL', 'TERM'}:
+            os.environ.pop(key, None)
+    os.environ.update({
+        'SHELL': '/bin/sh',
+        'HERMES_HOME': str(home),
+        'HERMES_BASE_HOME': str(home),
+        'HERMES_CONFIG_PATH': str(home / 'config.yaml'),
+        'HERMES_WEBUI_STATE_DIR': str(state),
+        'HERMES_WEBUI_DEFAULT_WORKSPACE': str(workspace),
+        'HERMES_WEBUI_HOST': '127.0.0.1',
+        'HERMES_WEBUI_PORT': str(port),
+        'HERMES_WEBUI_PASSWORD': qa_password,
+        'HERMES_WEBUI_PASSWORD_IDENTITY': 'admin@example.test',
+        'HERMES_WEBUI_AGENT_DIR': engine,
+        'HERMES_WEBUI_PYTHON': runtime_python,
+        'HERMES_WEBUI_SKIP_ONBOARDING': '1',
+        'HERMES_WEBUI_PREWARM': '0',
+        'HERMES_WEBUI_DISABLE_PROFILE_SYNC': '1',
+        'HERMES_WEBUI_NANGO_API_URL': f'http://127.0.0.1:{provider_port}',
+        'HERMES_WEBUI_NANGO_CONNECT_URL': f'http://127.0.0.1:{provider_port}',
+        'HERMES_WEBUI_NANGO_SECRET_KEY_FILE': str(qa / 'intentionally-unconfigured-nango-secret'),
+        'HERMES_WEBUI_NANGO_PROVIDERS_YAML': str(qa / 'intentionally-unconfigured-nango-providers.yaml'),
+        'HERMES_WEBUI_GOVERNANCE_POLICY': str(home / 'dashboard-governance.yaml'),
+        'AWS_EC2_METADATA_DISABLED': 'true',
+    })
+    sys.path[:0] = [str(repo), engine]
+    os.chdir(repo)
+    import yaml
+
+    users = ['govrequest', 'resource', 'admin', 'alice', 'bob', 'outsider', 'denied', 'autoapprove', 'autodeny', 'automanual', 'manualapprove', 'manualdeny']
+    permissions = ['chat:use', 'sessions:read', 'sessions:write', 'profiles:read',
+                   'files:read', 'files:write', 'cron:read', 'cron:write',
+                   'skills:read', 'skills:write', 'workspaces:read', 'workspaces:write', 'memory:read', 'memory:write', 'integrations:read',
+                   'integrations:connect', 'model:read', 'model:write', 'config:read']
+    policy = {
+        'version': 1, 'mode': 'enforce', 'default_effect': 'deny',
+        'bootstrap_admins': ['admin@example.test'],
+        'roles': {'member': {'grants': {
+            'permissions': permissions, 'profiles': ['default', 'qa-research'],
+            'routes': ['*'], 'files': {'read_roots': [str(workspace)], 'write_roots': [str(workspace)]},
+            'workspaces': [str(workspace)], 'models': {'providers': ['*'], 'models': ['*']},
+            'skills': {'view': ['*'], 'load': ['*']},
+            'tools': {'toolsets': ['file', 'delegation', 'todo'], 'builtins': ['read_file','write_file','delegate_task','todo']},
+        }}},
+        'users': {u + '@example.test': {'roles': ['member']} for u in users if u not in {'admin', 'denied'}},
+    }
+    for who, mode, rules in [('autoapprove','automatic','QA_ALLOW_ONLY: allow synthetic reads and writes.'),('autodeny','automatic','QA_DENY_ONLY: deny all requested synthetic actions.'),('automanual','automatic','QA_MANUAL_ONLY: require a human review.'),('manualapprove','manual',''),('manualdeny','manual','')]:
+        policy['users'][who+'@example.test'].update({'access_level':'user','access_mode':'blacklist','approval':{'mode':mode,'prompt':rules}})
+    # A creator can configure bots without becoming a governance administrator.
+    policy['roles']['bot_creator'] = {'grants': {
+        'permissions': ['profiles:admin'], 'cli': {'commands': ['git']},
+        'mcp': {'servers': ['qa-local']}}}
+    policy['users']['alice@example.test']['roles'].append('bot_creator')
+    policy['groups'] = {'qa-team': {'roles': ['member']}}
+    policy['users']['bob@example.test']['groups'] = ['qa-team']
+    (home / 'dashboard-governance.yaml').write_text(yaml.safe_dump(policy))
+    config = {'model': {'default': 'qa-deterministic', 'provider': 'custom:qa',
+                        'base_url': f'http://127.0.0.1:{provider_port}/v1'},
+              'custom_providers': [{'name': 'qa', 'base_url': f'http://127.0.0.1:{provider_port}/v1', 'api_key': 'qa-local-only'}],
+              'toolsets': ['file','delegation','todo'], 'max_turns': 12,
+              'agent': {'max_turns': 12}, 'delegation': {'max_concurrent_children': 3}}
+    config['webui_passkey_enabled'] = True
+    config['mcp_servers'] = {'qa-local': {'command': '/usr/bin/false', 'enabled': False}}
+    skill_dir = home / 'skills' / 'qa-review'
+    skill_dir.mkdir(parents=True, exist_ok=True)
+    (skill_dir / 'SKILL.md').write_text('---\nname: qa-review\ndescription: Review synthetic QA evidence\n---\nSummarize only the synthetic evidence supplied.\n')
+    (home / 'config.yaml').write_text(yaml.safe_dump(config))
+    (workspace / 'qa-evidence.txt').write_text('Synthetic QA workspace evidence.\n')
+    (workspace / 'qa-folder').mkdir(exist_ok=True)
+    (state / 'settings.json').write_text(json.dumps({'show_cli_sessions': False}))
+    (home / 'SOUL.md').write_text('QA_BOT_DEFAULT. You are SynPulse QA. Answer the request briefly. Do not perform external actions.\n')
+    bot = home / 'profiles' / 'qa-research'
+    bot.mkdir(parents=True, exist_ok=True)
+    (bot / 'config.yaml').write_text(yaml.safe_dump(config))
+    (bot / 'SOUL.md').write_text('QA_BOT_RESEARCH. You are the Research bot. Answer briefly.\n')
+    (bot / 'profile.yaml').write_text(yaml.safe_dump({'version': 1, 'name': 'qa-research', 'ui_meta': {'hermes-bots': {'title': 'Research', 'description': 'Research bot for QA'}}}))
+    from api import auth
+    cookies = {u: auth.create_session({'email': u + '@example.test', 'groups': [],
+                                     'claims_subset': {'name': u.title()}, 'method': 'qa_seed'}) for u in users}
+    private = qa / 'browser-sessions.json'
+    private.write_text(json.dumps({'cookies': cookies, 'cookie_name': auth.COOKIE_NAME, 'base_url': f'http://127.0.0.1:{port}', 'login_password': qa_password, 'workspace': str(workspace)}))
+    private.chmod(0o600)
+    print('QA signed sessions prepared for admin, alice, bob, outsider; production state isolated.', flush=True)
+    import server
+    server.main()
+
+
+if __name__ == "__main__":
+    main()

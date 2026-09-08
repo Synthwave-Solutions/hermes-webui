@@ -1,0 +1,27 @@
+{
+  "scenario_count": 139,
+  "outcomes": {
+    "failed": 2,
+    "passed": 137
+  },
+  "report_global_error_count": 0,
+  "all_features_certified": false,
+  "story_certification_note": "These outcomes certify only explicit scenario assertions. Navigation, observed controls, and interaction counts do not certify all acceptance criteria.",
+  "source_unchanged_during_run": true,
+  "test_exit_code": 1,
+  "webui_source_sha256": "c1cdc9e3db9a081723e98289a1718c6316d5534afd4306b61b3fab8be6c50fa8",
+  "engine_source_sha256": "83ebaa4c08293fa262ffdc1d85acaf8079aca7a83e4a942dca16f91d9c670b2b",
+  "run_directory": "20260908-202702-435893000",
+  "boundary": "Real Chromium, backend persistence, Hermes engine, terminal and child agents; deterministic loopback model/reviewer. External credentials, provider quality, physical authenticators, audio and delivery are separate.",
+  "excluded_artifacts": [
+    "private test state",
+    "cookies and generated password",
+    "raw browser traces",
+    "raw network captures",
+    "session/auth databases"
+  ],
+  "browser_error_collection": {
+    "scenarios_with_error_collection": 139,
+    "uncaught_errors": 0
+  }
+}

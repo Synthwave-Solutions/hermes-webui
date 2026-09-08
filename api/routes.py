@@ -14867,8 +14867,34 @@ def handle_post(handler, parsed) -> bool:
             return bad(handler, "Session not found", 404)
         sid = body["session_id"]
         with _get_session_agent_lock(sid):
-            s.messages = []
+            # Rebind under the mutation lock: a parallel cold load may have
+            # replaced the instance retrieved above.
+            s = get_session(sid)
+            from api.session_ops import _live_active_stream_id, truncate_session_at_keep
+            if _live_active_stream_id(s):
+                return bad(handler, "Stop the active response before clearing this conversation", 409)
+            truncate_session_at_keep(s, 0)
+            s.context_messages = []
             s.tool_calls = []
+            # Persist the existing recovery protocol's explicit clear marker.
+            # Empty display rows alone are treated as accidental data loss and
+            # rehydrated from model context, state.db or a pre-clear backup.
+            s.clear_generation = uuid.uuid4().hex
+            s.active_stream_id = None
+            s.pending_user_message = None
+            s.pending_attachments = []
+            s.pending_started_at = None
+            s.pending_user_source = None
+            s.compression_anchor_visible_idx = None
+            s.compression_anchor_message_key = None
+            s.compression_anchor_summary = None
+            s.pre_compression_snapshot = False
+            s.compression_anchor_engine = None
+            s.compression_anchor_mode = None
+            s.compression_anchor_details = {}
+            s.context_engine_state = {}
+            s.context_length = None
+            s.last_prompt_tokens = None
             # Reset the title via the rename helper so clearing a manually-named
             # session also clears manual_title/llm_title_generated — otherwise the
             # reused session keeps its manual-title protection and never auto-names
@@ -15639,7 +15665,6 @@ def handle_post(handler, parsed) -> bool:
         # validated in api/capacity_alerts.py; an invalid one is dropped rather
         # than stored, so a typo can never silently disable alerting.
         from api.capacity_alerts import effective_config, sanitize_config
-        from api.config import save_settings
 
         clean = sanitize_config(body)
         if not clean:
@@ -16557,15 +16582,17 @@ def handle_post(handler, parsed) -> bool:
             })
         else:
             cookie_val = create_session()
+        response_body = json.dumps({"ok": True}).encode()
         handler.send_response(200)
         handler.send_header("Content-Type", "application/json")
+        handler.send_header("Content-Length", str(len(response_body)))
         handler.send_header("Cache-Control", "no-store")
         _security_headers(handler)
         set_auth_cookie(handler, cookie_val)
         if require_sso_first():
             clear_sso_pending_cookie(handler)
         handler.end_headers()
-        handler.wfile.write(json.dumps({"ok": True}).encode())
+        handler.wfile.write(response_body)
         return True
 
     if parsed.path == "/api/auth/passkey/register/options":
@@ -17649,6 +17676,21 @@ def _handle_terminal_output(handler, parsed):
     if term is None:
         return j(handler, {"error": "terminal not running"}, status=404)
 
+    try:
+        after_seq = max(0, int(handler.headers.get("Last-Event-ID", "")))
+    except (ValueError, TypeError):
+        after_seq = None
+    output = term.subscribe(after_seq=after_seq)
+
+    try:
+        return _stream_terminal_output(handler, term, output)
+    except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+        return True
+    finally:
+        term.unsubscribe(output)
+
+
+def _stream_terminal_output(handler, term, output):
     handler.send_response(200)
     handler.send_header("Content-Type", "text/event-stream; charset=utf-8")
     handler.send_header("Cache-Control", "no-cache")
@@ -17659,15 +17701,15 @@ def _handle_terminal_output(handler, parsed):
     try:
         while True:
             try:
-                event, data = term.output.get(timeout=_SSE_HEARTBEAT_INTERVAL_SECONDS)
+                seq, event, data = output.get(timeout=_SSE_HEARTBEAT_INTERVAL_SECONDS)
             except queue.Empty:
                 handler.wfile.write(b": terminal heartbeat\n\n")
                 handler.wfile.flush()
-                if term.closed.is_set() and term.output.empty():
+                if term.closed.is_set() and output.empty():
                     _sse(handler, "terminal_closed", {"exit_code": term.proc.poll()})
                     break
                 continue
-            _sse(handler, event, data)
+            _sse_with_id(handler, event, data, event_id=seq)
             if event in ("terminal_closed", "terminal_error"):
                 break
     except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
@@ -22125,6 +22167,8 @@ def _selected_profile_snapshot_updates(
 def _handle_cron_create(handler, body):
     try:
         require(body, "prompt", "schedule")
+        if "enabled" in body and not isinstance(body["enabled"], bool):
+            raise ValueError("enabled must be a boolean")
     except ValueError as e:
         return bad(handler, str(e))
     try:
@@ -22144,6 +22188,7 @@ def _handle_cron_create(handler, body):
             skills=body.get("skills") or [],
             model=requested_model,
             provider=requested_provider,
+            **({"enabled": body["enabled"]} if "enabled" in body else {}),
         )
         post_create_updates = {}
         if profile is not None:

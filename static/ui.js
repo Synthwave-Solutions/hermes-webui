@@ -454,6 +454,23 @@ let _drainingQueueEntry=null;
 // One pending re-check timer while a foreign claim blocks this tab's drain
 // (D3 recovery: pick the entry up after the claiming tab dies).
 let _queueDrainRetryTimer=null;
+function _scheduleQueueConflictRetry(sid){
+  if(_queueDrainRetryTimer)return;
+  _queueDrainRetryTimer=setTimeout(async()=>{
+    _queueDrainRetryTimer=null;
+    if(!S.session||S.session.session_id!==sid||!getQueuedSessionCount(sid))return;
+    try{
+      const state=await api('/api/session/status?session_id='+encodeURIComponent(sid));
+      if(!S.session||S.session.session_id!==sid)return;
+      if(state.agent_running||state.active_stream_id){_scheduleQueueConflictRetry(sid);return;}
+      S.activeStreamId=null;
+      S.session.active_stream_id=null;
+      S.session.pending_user_message=null;
+      S.session.pending_started_at=null;
+      setBusy(false);
+    }catch(_){_scheduleQueueConflictRetry(sid);}
+  },1000);
+}
 function _queueDrainEntryAccepted(sid){
   const d=_drainingQueueEntry;
   if(!d||d.sid!==sid) return false;
@@ -8572,6 +8589,7 @@ function setBusy(v){
 // transcript (drop when the turn landed, revert to 'queued' when it did not).
 function drainQueuedSessionMessage(sid){
   if(!sid||S.busy) return;
+  if(_queueDrainRetryTimer)return;
   if(_drainingQueueEntry) return; // a drained send is still settling
   // Cross-tab claim protocol (D3): re-read the SHARED persisted queue right
   // before claiming (localStorage has no compare-and-set), so claims, sends,

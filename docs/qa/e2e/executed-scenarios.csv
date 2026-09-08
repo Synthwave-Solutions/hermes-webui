@@ -1,0 +1,140 @@
+file,line,scenario,status,test_outcome,duration_ms,attempts,evidence_scope
+authentication.spec.ts,2,US-SP-AUTH-001 actual password login rejects invalid input then establishes authenticated session,passed,expected,1130,1,exact assertions in test script
+authentication.spec.ts,6,US-SP-AUTH-LOGOUT sign out revokes browser access and redirects to login,passed,expected,1740,1,exact assertions in test script
+authentication.spec.ts,9,US-SP-AUTH-ANONYMOUS authenticated data APIs reject absent cookie,passed,expected,126,1,exact assertions in test script
+chat-lifecycle.spec.ts,5,US-SP-CHAT-006 queue follow-up waits then produces two persisted ordered turns,passed,expected,8189,1,exact assertions in test script
+chat-lifecycle.spec.ts,8,US-SP-CHAT-009 Stop generation cancels in-flight run and accepts a fresh next turn,passed,expected,7510,1,exact assertions in test script
+chat-lifecycle.spec.ts,11,US-SP-CHAT-012 hard reload mid-stream restores the same session and finished response once,passed,expected,6865,1,exact assertions in test script
+chat-lifecycle.spec.ts,14,US-SP-CHAT-011 persisted unsent draft survives hard reload without creating a turn,passed,expected,1307,1,exact assertions in test script
+chat-lifecycle.spec.ts,17,US-SP-CHAT-008 explicit interrupt cancels first response and starts requested next message,passed,expected,6800,1,exact assertions in test script
+chat-lifecycle.spec.ts,20,US-SP-CHAT-007 actual steer accepted mid-turn influences next model iteration,passed,expected,6936,1,exact assertions in test script
+chat.spec.ts,3,"US-SP-CHAT-001 real composer dispatches through real engine and deterministic provider, persists reload",passed,expected,1481,1,exact assertions in test script
+chat.spec.ts,10,US-SP-CHAT-002 modes change through header and survive reload,passed,expected,971,1,exact assertions in test script
+chat.spec.ts,16,US-SP-CHAT-004 Shift Enter inserts newline without sending,passed,expected,654,1,exact assertions in test script
+chat.spec.ts,20,US-SP-GROUP-001 selecting named colleague stages participants and persists actual group,passed,expected,1308,1,exact assertions in test script
+chat.spec.ts,28,US-SP-VOICE-001 voice disabled feedback explains prerequisite without hanging,passed,expected,617,1,exact assertions in test script
+chat.spec.ts,31,US-SP-CHAT-ROSTER bot roster hides and shows through its real toggle,passed,expected,523,1,exact assertions in test script
+composer-content.spec.ts,4,US-SP-CHAT-ATTACH actual text attachments remove one upload exact bytes and persist transcript,passed,expected,1634,1,exact assertions in test script
+composer-content.spec.ts,20,US-SP-CHAT-EDIT actual cancel edit resubmit and regenerate preserve one edited user turn after reload,passed,expected,2112,1,exact assertions in test script
+composer-content.spec.ts,38,US-SP-CHAT-PROMPTS saved prompt validates empty input saves reloads inserts exact text and deletes,passed,expected,1956,1,exact assertions in test script
+deep-workflows.spec.ts,5,US-SP-FILE-DEEP editor save reopen download rename cancel and delete persist on disk,passed,expected,2373,1,exact assertions in test script
+deep-workflows.spec.ts,12,US-SP-TERM-DEEP actual terminal executes harmless local command collapses expands restarts closes,passed,expected,1626,1,exact assertions in test script
+deep-workflows.spec.ts,17,US-SP-SESS-SPLIT all split counts create real independent frames and exit,passed,expected,5081,1,exact assertions in test script
+deep-workflows.spec.ts,20,US-SP-TODO-DEEP real agent todo create update clear renders live and survives session reload,passed,expected,2882,1,exact assertions in test script
+deep-workflows.spec.ts,26,US-SP-BOT-DEEP all editable tab fields filter select save and delete lifecycle,passed,expected,1713,1,exact assertions in test script
+delegation.spec.ts,2,US-SP-CHAT-017 actual delegate tool spawns two real child agents and renders their completion,passed,expected,1380,1,exact assertions in test script
+frontend-extras.spec.ts,2,US-SP-FILE-001 file and folder dialogs write real isolated workspace and support cancel,passed,expected,1420,1,exact assertions in test script
+frontend-extras.spec.ts,8,US-SP-PREF-THEMES all built-in theme and font-size buttons apply and reload,passed,expected,1532,1,exact assertions in test script
+frontend-extras.spec.ts,14,US-SP-PREF-SKINS every rendered skin button applies its own skin value,passed,expected,4046,1,exact assertions in test script
+frontend-extras.spec.ts,18,US-SP-LOG-001 logfile tail severity wrap and refresh controls remain usable,passed,expected,627,1,exact assertions in test script
+frontend-extras.spec.ts,21,US-SP-INS-001 all analytics periods request and render their selected window,passed,expected,812,1,exact assertions in test script
+frontend-extras.spec.ts,24,US-SP-UX-ERROR-TOAST error toast retains clickable dismiss control,passed,expected,846,1,exact assertions in test script
+governance-administration.spec.ts,10,US-SP-GOV-ADMIN-GROUPS all templates and six grant fields create edit cancel clear and delete with persisted negative checks,passed,expected,6983,1,exact assertions in test script
+governance-administration.spec.ts,28,US-SP-GOV-ADMIN-USERS role and group assignment persists cancel preserves policy and assigned group cannot be deleted,passed,expected,1911,1,exact assertions in test script
+governance-administration.spec.ts,39,US-SP-GOV-ADMIN-APPROVAL actual denied route becomes admin approval then grants one route while rejection and replay remain bounded,passed,expected,2248,1,exact assertions in test script
+governance-administration.spec.ts,59,US-SP-GOV-ADMIN-LEGACY unchanged group save preserves command denials metadata and unexposed grants,passed,expected,992,1,exact assertions in test script
+governance-field-roundtrip.spec.ts,86,US-SP-GOV-006 [field roundtrip] all 14 extra allow and 14 deny controls persist through real save and reload,passed,expected,3553,1,exact assertions in test script
+governance-field-roundtrip.spec.ts,112,US-SP-GOV-006 [field removal] clearing all extra grants and denials removes persisted entries,passed,expected,7877,1,exact assertions in test script
+governance-field-roundtrip.spec.ts,141,US-SP-POL-032 [legacy subset] unchanged user save preserves unexposed command denials and policy metadata,passed,expected,1928,1,exact assertions in test script
+governance-field-roundtrip.spec.ts,170,US-SP-POL-013 [bootstrap affordance] typing a recovery admin identity explains and locks ineffective restrictions,passed,expected,1053,1,exact assertions in test script
+governance-field-roundtrip.spec.ts,183,US-SP-POL-001 [legacy level-only edit] Keep existing policy retains assigned role access when changing level,passed,expected,1529,1,exact assertions in test script
+governance-field-roundtrip.spec.ts,197,US-SP-UX-007 [preview lifecycle] a stale preview for the same reselected user cannot replace its newer policy,passed,expected,1947,1,exact assertions in test script
+governance-field-roundtrip.spec.ts,240,US-SP-UX-007 [save lifecycle] a late save cannot discard a newly selected user draft,passed,expected,1964,1,exact assertions in test script
+governance-field-roundtrip.spec.ts,273,US-SP-UX-007 [inspector lifecycle] late standalone preview cannot replace a more recently requested user,passed,expected,2190,1,exact assertions in test script
+governance-policy.spec.ts,5,US-SP-POL-001 new policy defaults to user whitelist manual and renders at desktop and mobile,passed,expected,1236,1,exact assertions in test script
+governance-policy.spec.ts,10,US-SP-POL-RESPONSIVE desktop edits policy prompt and saves accessible last controls after reload,passed,expected,2083,1,exact assertions in test script
+governance-policy.spec.ts,10,US-SP-POL-RESPONSIVE laptop edits policy prompt and saves accessible last controls after reload,passed,expected,2552,1,exact assertions in test script
+governance-policy.spec.ts,10,US-SP-POL-RESPONSIVE mobile edits policy prompt and saves accessible last controls after reload,passed,expected,2559,1,exact assertions in test script
+governance-policy.spec.ts,31,US-SP-POL-VALIDATION automatic without policy prompt rejects before mutation,passed,expected,943,1,exact assertions in test script
+governance-policy.spec.ts,36,US-SP-POL-LEGACY editing a legacy user preserves omitted access level and mode,passed,expected,1026,1,exact assertions in test script
+governance-policy.spec.ts,40,US-SP-POL-002 whitelist with role but zero direct grant cannot use work APIs,passed,expected,1031,1,exact assertions in test script
+governance-policy.spec.ts,44,US-SP-POL-004 blacklist elevated automatic policy and narrow denials survive save reload,passed,expected,2130,1,exact assertions in test script
+governance-policy.spec.ts,50,US-SP-GOV-PREVIEW real preview button shows chosen user and effective grants,passed,expected,959,1,exact assertions in test script
+governance-policy.spec.ts,53,US-SP-AUTH-CSRF cross-origin cookie-auth mutation without CSRF is rejected,passed,expected,749,1,exact assertions in test script
+governance-runtime.spec.ts,15,US-SP-POL-RUNTIME-autoapprove actual model decision allows actual tool effect,passed,expected,3123,1,exact assertions in test script
+governance-runtime.spec.ts,15,US-SP-POL-RUNTIME-autodeny actual model decision blocks actual tool effect,passed,expected,2486,1,exact assertions in test script
+governance-runtime.spec.ts,20,US-SP-POL-RUNTIME-manualapprove parked action waits for real frontend once decision,passed,expected,2940,1,exact assertions in test script
+governance-runtime.spec.ts,20,US-SP-POL-RUNTIME-manualdeny parked action waits for real frontend deny decision,passed,expected,1975,1,exact assertions in test script
+governance-runtime.spec.ts,20,US-SP-POL-RUNTIME-automanual parked action waits for real frontend once decision,passed,expected,2083,1,exact assertions in test script
+mobile-summary-panels.spec.ts,7,US-SP-UX-MOBILE approvals hamburger navigation allows actual main refresh control,passed,expected,853,1,exact assertions in test script
+mobile-summary-panels.spec.ts,7,US-SP-UX-MOBILE integrations hamburger navigation allows actual main refresh control,passed,expected,865,1,exact assertions in test script
+navigation.spec.ts,9,US-SP-CHAT-NAV chat opens through visible navigation,passed,expected,563,1,navigation/tab reachability
+navigation.spec.ts,9,US-SP-BOT-NAV profiles opens through visible navigation,passed,expected,539,1,navigation/tab reachability
+navigation.spec.ts,9,US-SP-PROJ-NAV projects opens through visible navigation,passed,expected,530,1,navigation/tab reachability
+navigation.spec.ts,9,US-SP-CRON-NAV tasks opens through visible navigation,passed,expected,558,1,navigation/tab reachability
+navigation.spec.ts,9,US-SP-SKILL-NAV skills opens through visible navigation,passed,expected,613,1,navigation/tab reachability
+navigation.spec.ts,9,US-SP-CONN-NAV integrations opens through visible navigation,passed,expected,589,1,navigation/tab reachability
+navigation.spec.ts,9,US-SP-GOV-NAV approvals opens through visible navigation,passed,expected,543,1,navigation/tab reachability
+navigation.spec.ts,9,US-SP-MEM-NAV memory opens through visible navigation,passed,expected,533,1,navigation/tab reachability
+navigation.spec.ts,9,US-SP-KAN-NAV kanban opens through visible navigation,passed,expected,571,1,navigation/tab reachability
+navigation.spec.ts,9,US-SP-WS-NAV workspaces opens through visible navigation,passed,expected,559,1,navigation/tab reachability
+navigation.spec.ts,9,US-SP-TODO-NAV todos opens through visible navigation,passed,expected,663,1,navigation/tab reachability
+navigation.spec.ts,9,US-SP-INS-NAV insights opens through visible navigation,passed,expected,560,1,navigation/tab reachability
+navigation.spec.ts,9,US-SP-LOG-NAV logs opens through visible navigation,passed,expected,647,1,navigation/tab reachability
+navigation.spec.ts,9,US-SP-GOV-NAV governance opens through visible navigation,passed,expected,564,1,navigation/tab reachability
+navigation.spec.ts,9,US-SP-PREF-NAV settings opens through visible navigation,passed,expected,595,1,navigation/tab reachability
+navigation.spec.ts,13,US-SP-GOV-TAB-overview governance overview tab opens and renders,passed,expected,632,1,navigation/tab reachability
+navigation.spec.ts,13,US-SP-GOV-TAB-users governance users tab opens and renders,passed,expected,692,1,navigation/tab reachability
+navigation.spec.ts,13,US-SP-GOV-TAB-groups governance groups tab opens and renders,passed,expected,579,1,navigation/tab reachability
+navigation.spec.ts,13,US-SP-GOV-TAB-workspaces governance workspaces tab opens and renders,passed,expected,712,1,navigation/tab reachability
+navigation.spec.ts,13,US-SP-GOV-TAB-approvals governance approvals tab opens and renders,passed,expected,647,1,navigation/tab reachability
+navigation.spec.ts,13,US-SP-GOV-TAB-integrations governance integrations tab opens and renders,passed,expected,574,1,navigation/tab reachability
+navigation.spec.ts,13,US-SP-GOV-TAB-preview governance preview tab opens and renders,passed,expected,754,1,navigation/tab reachability
+navigation.spec.ts,13,US-SP-GOV-TAB-audit governance audit tab opens and renders,passed,expected,652,1,navigation/tab reachability
+navigation.spec.ts,18,US-SP-PREF-TAB-appearance settings appearance renders,passed,expected,730,1,navigation/tab reachability
+navigation.spec.ts,18,US-SP-PREF-TAB-preferences settings preferences renders,passed,expected,695,1,navigation/tab reachability
+navigation.spec.ts,18,US-SP-PREF-TAB-providers settings providers renders,passed,expected,682,1,navigation/tab reachability
+navigation.spec.ts,18,US-SP-PREF-TAB-plugins settings plugins renders,passed,expected,686,1,navigation/tab reachability
+navigation.spec.ts,18,US-SP-PREF-TAB-extensions settings extensions renders,passed,expected,755,1,navigation/tab reachability
+navigation.spec.ts,18,US-SP-PREF-TAB-system settings system renders,passed,expected,696,1,navigation/tab reachability
+navigation.spec.ts,18,US-SP-PREF-TAB-help settings help renders,passed,expected,651,1,navigation/tab reachability
+resource-security.spec.ts,3,US-SP-POL-RESOURCE resource denials saved in frontend block real named skill settings and model API bypasses,passed,expected,1857,1,exact assertions in test script
+scheduler-kanban-lifecycle.spec.ts,38,"US-SP-LIFECYCLE-CRON edit, cancel, duplicate, run locally, pause, resume and delete persist",passed,expected,6173,1,exact assertions in test script
+scheduler-kanban-lifecycle.spec.ts,123,"US-SP-LIFECYCLE-KAN edit, comment, complete, archive and restore survive reload",passed,expected,4063,1,exact assertions in test script
+scheduler-kanban-lifecycle.spec.ts,215,US-SP-LIFECYCLE-KAN-DEFECT visible Done action must complete an existing Todo task,failed,unexpected,975,1,exact assertions in test script
+session-discovery-share.spec.ts,16,US-SP-SESS-DISCOVERY rename Enter and Escape plus title content and URL search select persisted conversation,passed,expected,5778,1,exact assertions in test script
+session-discovery-share.spec.ts,38,US-SP-SESS-ARCHIVE archive reload show archived and restore preserve authoritative transcript,passed,expected,3993,1,exact assertions in test script
+session-discovery-share.spec.ts,52,US-SP-SESS-SHARE create public snapshot read anonymously cancel revoke then revoke invalidates public link,failed,unexpected,1581,1,exact assertions in test script
+session-lifecycle.spec.ts,5,US-SP-SESS-ACTIONS pin duplicate and delete operate on chosen persisted session,passed,expected,5203,1,exact assertions in test script
+session-lifecycle.spec.ts,10,US-SP-SESS-EXPORT-JSON actual download includes persisted transcript,passed,expected,1001,1,exact assertions in test script
+session-lifecycle.spec.ts,10,US-SP-SESS-EXPORT-HTML actual download includes persisted transcript,passed,expected,1162,1,exact assertions in test script
+session-lifecycle.spec.ts,10,US-SP-SESS-EXPORT-Markdown actual download includes persisted transcript,passed,expected,1129,1,exact assertions in test script
+session-lifecycle.spec.ts,13,US-SP-SESS-CLEAR clear cancel preserves messages and confirm clears persisted transcript,passed,expected,2265,1,exact assertions in test script
+session-lifecycle.spec.ts,17,US-SP-UX-MOBILE drawer and chat mode remain reachable at 390px,passed,expected,926,1,exact assertions in test script
+settings-complete.spec.ts,23,US-SP-PREF-CONTROL-session_jump_buttons both switch states save and reload,passed,expected,2151,1,exact assertions in test script
+settings-complete.spec.ts,23,US-SP-PREF-CONTROL-session_endless_scroll both switch states save and reload,passed,expected,2599,1,exact assertions in test script
+settings-complete.spec.ts,23,US-SP-PREF-CONTROL-auto_scroll_follow both switch states save and reload,passed,expected,3709,1,exact assertions in test script
+settings-complete.spec.ts,23,US-SP-PREF-CONTROL-render_user_markdown both switch states save and reload,passed,expected,3860,1,exact assertions in test script
+settings-complete.spec.ts,23,US-SP-PREF-CONTROL-large_text_paste_as_attachment both switch states save and reload,passed,expected,3729,1,exact assertions in test script
+settings-complete.spec.ts,23,US-SP-PREF-CONTROL-project_quick_create_buttons both switch states save and reload,passed,expected,3019,1,exact assertions in test script
+settings-complete.spec.ts,23,US-SP-PREF-CONTROL-show_titlebar_profile both switch states save and reload,passed,expected,2227,1,exact assertions in test script
+settings-complete.spec.ts,23,US-SP-PREF-CONTROL-worklog_details_expanded_default both switch states save and reload,passed,expected,2697,1,exact assertions in test script
+settings-complete.spec.ts,23,US-SP-PREF-CONTROL-show_token_usage both switch states save and reload,passed,expected,2367,1,exact assertions in test script
+settings-complete.spec.ts,23,US-SP-PREF-CONTROL-show_quota_chip both switch states save and reload,passed,expected,2300,1,exact assertions in test script
+settings-complete.spec.ts,23,US-SP-PREF-CONTROL-show_conversation_outline both switch states save and reload,passed,expected,2329,1,exact assertions in test script
+settings-complete.spec.ts,23,US-SP-PREF-CONTROL-show_tps both switch states save and reload,passed,expected,2456,1,exact assertions in test script
+settings-complete.spec.ts,23,US-SP-PREF-CONTROL-fade_text_effect both switch states save and reload,passed,expected,2373,1,exact assertions in test script
+settings-complete.spec.ts,23,US-SP-PREF-CONTROL-terminal_auto_expand_on_output both switch states save and reload,passed,expected,2398,1,exact assertions in test script
+settings-complete.spec.ts,23,US-SP-PREF-CONTROL-show_busy_placeholder_hint both switch states save and reload,passed,expected,2221,1,exact assertions in test script
+settings-complete.spec.ts,23,US-SP-PREF-CONTROL-rtl both switch states save and reload,passed,expected,2161,1,exact assertions in test script
+settings-complete.spec.ts,23,US-SP-PREF-CONTROL-sound_enabled both switch states save and reload,passed,expected,2128,1,exact assertions in test script
+settings-complete.spec.ts,23,US-SP-PREF-CONTROL-whats_new_summary_enabled both switch states save and reload,passed,expected,2127,1,exact assertions in test script
+settings-complete.spec.ts,34,US-SP-PREF-ACTIVITY all activity display modes persist and timestamps toggle independently,passed,expected,3270,1,exact assertions in test script
+settings-complete.spec.ts,46,US-SP-PREF-STRUCTURED JSON and YAML view choices and threshold persist,passed,expected,2678,1,exact assertions in test script
+settings-complete.spec.ts,58,US-SP-AUTH-009 virtual authenticator registers signs in and removes an actual passkey,passed,expected,2126,1,exact assertions in test script
+settings-complete.spec.ts,81,US-SP-PREF-SELECT-send_key every offered option saves and restores,passed,expected,2324,1,exact assertions in test script
+settings-complete.spec.ts,81,US-SP-PREF-SELECT-sidebar_density every offered option saves and restores,passed,expected,1876,1,exact assertions in test script
+settings-complete.spec.ts,81,US-SP-PREF-SELECT-default_message_mode every offered option saves and restores,passed,expected,2345,1,exact assertions in test script
+settings-complete.spec.ts,81,US-SP-PREF-SELECT-auto_title_refresh_every every offered option saves and restores,passed,expected,2780,1,exact assertions in test script
+settings-complete.spec.ts,88,US-SP-PREF-NUMBERS pinned limit and assistant display name save and reload,passed,expected,3367,1,exact assertions in test script
+settings-complete.spec.ts,96,US-SP-PREF-TAB-CHIPS each configurable navigation chip hides and restores its panel,passed,expected,13949,1,exact assertions in test script
+settings-complete.spec.ts,112,US-SP-PREF-COMPOSER-CHIPS every footer visibility chip saves both states,passed,expected,8176,1,exact assertions in test script
+workflows.spec.ts,4,"US-SP-BOT-001 wizard validates, preserves draft back navigation and creates real bot",passed,expected,1204,1,exact assertions in test script
+workflows.spec.ts,14,"US-SP-BOT-004 six editor tabs, keyboard navigation, and save from instructions preserve real configuration",passed,expected,1327,1,exact assertions in test script
+workflows.spec.ts,21,US-SP-KNOW-001 upload does not select; explicit selection saves and survives editor reopen,passed,expected,976,1,exact assertions in test script
+workflows.spec.ts,28,"US-SP-PROJ-001 create project, configure people and bots, upload file, reopen membership",passed,expected,1337,1,exact assertions in test script
+workflows.spec.ts,34,"US-SP-MEM-001 personal memory edits persist, cancel preserves previous value",passed,expected,1068,1,exact assertions in test script
+workflows.spec.ts,39,US-SP-SKILL-001 create real skill and filter list without changing stored content,passed,expected,863,1,exact assertions in test script
+workflows.spec.ts,43,US-SP-WS-001 invalid workspace rejected; valid child added and renamed,passed,expected,1048,1,exact assertions in test script
+workflows.spec.ts,47,"US-SP-CRON-001 creates local scheduled task, reads persisted config and pauses",passed,expected,995,1,exact assertions in test script
+workflows.spec.ts,50,"US-SP-KAN-001 creates unassigned Triage task, opens detail and filters list",passed,expected,875,1,exact assertions in test script

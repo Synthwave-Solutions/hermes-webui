@@ -1,0 +1,4 @@
+import {test,expect,open,session,api,capture} from './fixtures';
+test('US-SP-CHAT-017 actual delegate tool spawns two real child agents and renders their completion',async({page},info)=>{
+ test.setTimeout(60000);await open(page);const sid=await session(page);await page.locator('#msg').fill('QA_DELEGATE_PARENT');await page.locator('#btnSend').click();await expect(page.locator('#messages')).toContainText('QA_DELEGATE_RESULT:',{timeout:40000});await expect.poll(async()=>JSON.stringify((await api(page,'/api/session?session_id='+sid)).body),{timeout:40000}).toContain('QA_CHILD_ONE_DONE');await expect.poll(async()=>JSON.stringify((await api(page,'/api/session?session_id='+sid)).body),{timeout:40000}).toContain('QA_CHILD_TWO_DONE');await expect(page.locator('#messages')).toContainText(/subagent|Subagent/);await capture(page,'real-delegation',info);
+});

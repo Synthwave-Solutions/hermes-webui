@@ -1354,8 +1354,16 @@ async function send(){
 
   const compressionRunning=typeof isCompressionUiRunning==='function'&&isCompressionUiRunning();
   _clearStaleBusyStateBeforeSend({compressionRunning});
+  // A drained queue entry is already a request for a new turn. A stale
+  // session poll can restore busy while a cancelled worker is unwinding;
+  // applying the composer's default Steer mode here would consume the
+  // queued replacement into that cancelled run. Let /chat/start arbitrate:
+  // its existing conflict path restores this same queue entry in place.
+  const queueDrainOwnsSend=typeof _drainingQueueEntry!=='undefined'
+    && _drainingQueueEntry && S.session
+    && _drainingQueueEntry.sid===S.session.session_id;
   // If busy or a manual compression is still running, handle based on default_message_mode
-  if(S.busy||compressionRunning){
+  if((S.busy||compressionRunning)&&!queueDrainOwnsSend){
     if(text||S.pendingFiles.length){
       if(!S.session){await newSession();await renderSessionList();}
       // Busy-control slash commands must be intercepted HERE, before the
@@ -1796,6 +1804,8 @@ async function send(){
     }
     const conflictActiveStream=/session already has an active stream/i.test(errMsg);
     if(conflictActiveStream){
+      const drainConflict=typeof _drainingQueueEntry!=='undefined'
+        && _drainingQueueEntry && _drainingQueueEntry.sid===activeSid;
       delete INFLIGHT[activeSid];
       if(typeof clearInflightState==='function') clearInflightState(activeSid);
       stopApprovalPolling();
@@ -1808,6 +1818,15 @@ async function send(){
         queueSessionMessage(activeSid,{text:msgText,files:[],model:_retryModelState.model,model_provider:_retryModelState.model_provider,profile:S.activeProfile||'default'});
       }
       updateQueueBadge(activeSid);
+      if(drainConflict){
+        // A cancelled worker can still own the backend while it unwinds.
+        // Keep the same durable entry and retry after a status check instead
+        // of racing repeated loadSession calls or converting it into Steer.
+        S.messages=(S.messages||[]).filter(m=>m!==userMsg);
+        renderMessages({preserveScroll:true});
+        _scheduleQueueConflictRetry(activeSid);
+        return;
+      }
       showToast('Current session is still running. Reconnected and queued your message.',2600);
       try{
         await loadSession(activeSid);
