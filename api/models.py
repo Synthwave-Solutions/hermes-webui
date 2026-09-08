@@ -1088,6 +1088,7 @@ class Session:
                  composer_draft=None,
                  anchor_activity_scenes=None,
                  cost_status=None, cost_source=None,
+                 share_token=None, share_created_at=None,
                  **kwargs):
         self.session_id = session_id or uuid.uuid4().hex[:12]
         self.title = title
@@ -1102,6 +1103,8 @@ class Session:
         self.archived = bool(archived)
         self.project_id = project_id or None
         self.project_shared = bool(project_shared)
+        self.share_token = str(share_token).strip() if share_token else None
+        self.share_created_at = share_created_at
         self.profile = profile
         # Per-user ownership (docs/user-isolation-design.md): lowercased email
         # of the creating identity, or None for legacy/cron/CLI rows (admin-only).
@@ -1220,6 +1223,7 @@ class Session:
         METADATA_FIELDS = [
             'session_id', 'title', 'workspace', 'model', 'model_provider', 'created_at', 'updated_at',
             'pinned', 'archived', 'project_id', 'profile', 'owner_email',
+            'share_token', 'share_created_at',
             'input_tokens', 'output_tokens', 'estimated_cost', 'cost_status', 'cost_source',
             'cache_read_tokens', 'cache_write_tokens',
             'personality', 'active_stream_id',
@@ -1514,6 +1518,8 @@ class Session:
             'participants': list(self.participants or []),
             'bot_participants': list(self.bot_participants or []),
             'project_shared': self.project_shared,
+            'share_token': self.share_token,
+            'share_created_at': self.share_created_at,
             'composer_draft': self.composer_draft if isinstance(self.composer_draft, dict) else {},
             'is_streaming': _is_streaming_session(
                 self.active_stream_id, active_stream_ids

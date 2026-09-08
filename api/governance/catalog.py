@@ -89,6 +89,8 @@ class RouteRule:
 # enforcement treats that as unknown_route so new endpoints fail closed until
 # classified here (tests/test_governance_catalog_coverage.py is the net).
 ROUTE_CATALOG: tuple[RouteRule, ...] = (
+    RouteRule("/api/share/create", "sessions:write", "sessions:write", match="exact"),
+    RouteRule("/api/share/revoke", "sessions:write", "sessions:write", match="exact"),
     # governance admin (mirror reference)
     RouteRule("/api/governance/policy",   "governance:read",  "governance:write"),
     RouteRule("/api/governance/validate", "governance:read",  "governance:read"),

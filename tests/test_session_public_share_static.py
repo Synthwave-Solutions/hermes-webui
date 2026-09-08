@@ -5,7 +5,7 @@ ROOT = Path(__file__).resolve().parents[1]
 INDEX_HTML = (ROOT / "static" / "index.html").read_text(encoding="utf-8")
 BOOT_JS = (ROOT / "static" / "boot.js").read_text(encoding="utf-8")
 PANELS_JS = (ROOT / "static" / "panels.js").read_text(encoding="utf-8")
-I18N_JS = (ROOT / "static" / "i18n.js").read_text(encoding="utf-8")
+I18N_JS = (ROOT / "static" / "i18n" / "en.js").read_text(encoding="utf-8")
 SESSIONS_JS = (ROOT / "static" / "sessions.js").read_text(encoding="utf-8")
 SHARE_HTML = (ROOT / "static" / "share.html").read_text(encoding="utf-8")
 SHARE_JS = (ROOT / "static" / "share.js").read_text(encoding="utf-8")
@@ -55,7 +55,7 @@ def test_share_i18n_keys_exist_in_english_locale():
 
 
 def test_public_share_page_assets_exist():
-    assert "Hermes Shared Conversation" in SHARE_HTML
+    assert "SynPulse Shared Conversation" in SHARE_HTML
     assert "/static/style.css" in SHARE_HTML
     assert "/static/share.js" in SHARE_HTML
     assert "function _shareLoad()" in SHARE_JS

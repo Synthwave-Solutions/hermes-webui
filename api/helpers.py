@@ -177,7 +177,7 @@ def _build_csp_report_only_policy(
     )
 
 
-def _security_headers(handler):
+def _security_headers(handler, *, referrer_policy="same-origin"):
     """Add security headers to every response."""
     extra_connect_src = _csp_extra_connect_src()
     extra_frame_src = _csp_extra_frame_src()
@@ -185,7 +185,7 @@ def _security_headers(handler):
     handler._csp_extra_frame_src = extra_frame_src
     handler.send_header('X-Content-Type-Options', 'nosniff')
     handler.send_header('X-Frame-Options', 'SAMEORIGIN')
-    handler.send_header('Referrer-Policy', 'same-origin')
+    handler.send_header('Referrer-Policy', referrer_policy)
     handler.send_header(_CSP_HEADER_NAME, _build_csp_enforced_policy(extra_connect_src, extra_frame_src))
     handler.send_header(
         'Permissions-Policy',
@@ -254,10 +254,11 @@ def j(handler, payload, status: int=200, extra_headers: dict=None, *, pretty: bo
 
     handler.send_header('Content-Length', str(len(body)))
     handler.send_header('Cache-Control', 'no-store')
-    _security_headers(handler)
+    _security_headers(handler, referrer_policy=(extra_headers or {}).get("Referrer-Policy", "same-origin"))
     if extra_headers:
         for k, v in extra_headers.items():
-            handler.send_header(k, v)
+            if k != "Referrer-Policy":
+                handler.send_header(k, v)
     _safe_write(handler, body)
 
 

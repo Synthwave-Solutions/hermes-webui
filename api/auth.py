@@ -922,6 +922,9 @@ def check_auth(handler, parsed) -> bool:
     If not authorized, sends 401 (API) or 302 redirect (page) and returns False."""
     if not is_auth_enabled():
         return True
+    from api.share_routes import is_public_share_request
+    if is_public_share_request(parsed.path, getattr(handler, "command", "GET")):
+        return True
     # Public paths don't require auth
     if parsed.path in PUBLIC_PATHS or parsed.path.startswith('/static/') or parsed.path.startswith('/session/static/'):
         return True

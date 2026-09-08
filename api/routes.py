@@ -11732,6 +11732,9 @@ def _handle_projects_hub_detail(handler, parsed) -> bool:
 
 def handle_get(handler, parsed) -> bool:
     """Handle all GET routes. Returns True if handled, False for 404."""
+    from api.share_routes import handle_public as handle_public_share
+    if handle_public_share(handler, parsed) is not False:
+        return True
     from api.bot_builder import guard_profile_request
     if not guard_profile_request(handler, parsed, "GET"):
         return True
@@ -13839,6 +13842,7 @@ def handle_post(handler, parsed) -> bool:
     if diag:
         diag.stage("csrf")
     if not _csrf_exempt_path(parsed.path) and not _check_csrf(handler):
+        handler.close_connection = True  # Rejected request body has not been consumed.
         try:
             return j(handler, {"error": _csrf_rejection_error(handler)}, status=403)
         finally:
@@ -13913,6 +13917,10 @@ def handle_post(handler, parsed) -> bool:
     from api.workspace_access import guard_session_request as guard_workspace_request
     if not guard_workspace_request(handler, parsed, body):
         return True
+
+    if parsed.path in ("/api/share/create", "/api/share/revoke"):
+        from api.share_routes import handle_mutation as handle_share_mutation
+        return handle_share_mutation(handler, body, revoke=parsed.path == "/api/share/revoke")
 
     if parsed.path == "/api/chat/mentions/prepare":
         from api.chat_mentions import prepare

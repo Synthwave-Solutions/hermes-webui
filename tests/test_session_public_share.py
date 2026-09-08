@@ -130,10 +130,22 @@ def test_share_revoke_endpoint_hides_share_token_from_session():
 
 
 def test_share_page_serves_public_html():
-    body, status, _ = get("/share/example-token")
-    assert status == 200
-    assert "Hermes Shared Conversation" in body
-    assert "static/share.js" in body
+    sid = _make_session_with_messages()
+    try:
+        created, status = post("/api/share/create", {"session_id": sid})
+        assert status == 200
+        href = created["share"]["url"]
+        body, status, headers = get(href)
+        assert status == 200
+        assert "SynPulse Shared Conversation" in body
+        assert "static/share.js" in body
+        assert headers["Cache-Control"] == "no-store"
+        assert headers["Referrer-Policy"] == "no-referrer"
+        post("/api/share/revoke", {"session_id": sid})
+        _, status, _ = get(href)
+        assert status == 404
+    finally:
+        post("/api/session/delete", {"session_id": sid})
 
 
 def test_share_create_supports_raw_messaging_session_without_webui_sidecar():
