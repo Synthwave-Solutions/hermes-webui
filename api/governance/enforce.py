@@ -200,8 +200,30 @@ def is_profile_allowed_for(identity: dict | None, profile: str) -> bool:
     subject = subject_from_identity(identity)
     if subject.normalized_email and subject.normalized_email in {a.lower() for a in policy.bootstrap_admins}:
         return True
+    # The root ("default") profile is the AMBIENT one: a governed user without a
+    # profile cookie already runs in it, and their per-user runtime grants
+    # (skills, tools, files, models) apply there exactly as in any other
+    # profile. Returning to it is therefore never an escalation, and a user
+    # who switched to their own profile must be able to switch back to reach
+    # the conversations they started there (Stephen Edwick, 8 Sep 2026: "I
+    # changed to the steve astra bot and I cannot access any of my old
+    # conversations from the old default profile"). Naming any OTHER profile
+    # is still a selection and still needs the grant.
+    if not target or _is_root_alias(target):
+        return True
     access = resolve_effective_access(policy, subject)
     return access.is_profile_allowed(target)
+
+
+def _is_root_alias(profile: str) -> bool:
+    """True for the literal 'default' alias or the (possibly renamed) root profile."""
+    if profile == "default":
+        return True
+    try:
+        from api.profiles import _is_root_profile
+        return bool(_is_root_profile(profile))
+    except Exception:
+        return False
 
 
 def identity_has_permission(identity: dict | None, permission: str) -> bool:

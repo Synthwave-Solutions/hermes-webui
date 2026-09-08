@@ -389,3 +389,30 @@ def test_subject_from_identity_mapping():
 
     assert subject_from_identity(None).email == ""
     assert subject_from_identity({}).normalized_email == ""
+
+
+def test_scoped_user_can_always_return_to_the_ambient_default_profile(inject_policy):
+    """8 Sep 2026, Stephen Edwick: after switching to his own profile he could
+    not switch back to "default", where his earlier conversations lived. The
+    root profile is the ambient one every governed user already runs in, so
+    returning to it is never an escalation; other profiles still need a grant."""
+    inject_policy(
+        {
+            "version": 1,
+            "mode": "enforce",
+            "default_effect": "deny",
+            "bootstrap_admins": [BOOTSTRAP],
+            "users": {
+                "scoped@example.test": {
+                    "roles": [],
+                    "grants": {"profiles": ["own-profile"], "permissions": ["chat:use"]},
+                }
+            },
+        }
+    )
+    from api.governance.enforce import is_profile_allowed_for
+
+    scoped = _identity("scoped@example.test")
+    assert is_profile_allowed_for(scoped, "own-profile") is True
+    assert is_profile_allowed_for(scoped, "default") is True
+    assert is_profile_allowed_for(scoped, "finance") is False
