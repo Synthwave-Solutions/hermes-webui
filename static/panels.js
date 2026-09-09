@@ -3334,10 +3334,10 @@ function openKanbanCreate(){
     _kanbanTaskModalFocusCleanup = null;
   }
   _kanbanTaskModalFocusCleanup = _trapModalFocus(modal);
-  setTimeout(() => {
-    const titleEl = document.getElementById('kanbanTaskModalTitleInput');
-    if (titleEl) titleEl.focus();
-  }, 50);
+  // The modal is visible now. Finish initial focus before the user can move
+  // to another field; a delayed callback would steal their next keystroke.
+  const titleEl = document.getElementById('kanbanTaskModalTitleInput');
+  if (titleEl) titleEl.focus();
   document.addEventListener('keydown', _kanbanTaskModalKey);
 }
 
@@ -3388,10 +3388,8 @@ async function openKanbanEdit(taskId){
     _kanbanTaskModalFocusCleanup = null;
   }
   _kanbanTaskModalFocusCleanup = _trapModalFocus(modal);
-  setTimeout(() => {
-    const titleEl = document.getElementById('kanbanTaskModalTitleInput');
-    if (titleEl) { titleEl.focus(); titleEl.select(); }
-  }, 50);
+  const titleEl = document.getElementById('kanbanTaskModalTitleInput');
+  if (titleEl) { titleEl.focus(); titleEl.select(); }
   document.addEventListener('keydown', _kanbanTaskModalKey);
 }
 
