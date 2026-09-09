@@ -168,6 +168,8 @@ def main():
                                      'claims_subset': {'name': u.title()}, 'method': 'qa_seed'}) for u in users}
     from extension_fixture import setup as setup_extension_fixture
     extension_fixture = setup_extension_fixture(qa)
+    from interrupt_fixture import setup as setup_interrupt_fixture
+    setup_interrupt_fixture(qa)
     private = qa / 'browser-sessions.json'
     private.write_text(json.dumps({'cookies': cookies, 'cookie_name': auth.COOKIE_NAME, 'base_url': f'http://127.0.0.1:{port}', 'login_password': qa_password, 'workspace': str(workspace), 'engine': engine, 'extension_fixture': extension_fixture, 'realtime_http_base': f'http://127.0.0.1:{realtime_http_port}' if realtime_http_port else None, 'realtime_ws_base': f'ws://127.0.0.1:{realtime_ws_port}' if realtime_ws_port else None}))
     private.chmod(0o600)

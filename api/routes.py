@@ -20951,23 +20951,27 @@ def _active_run_stream_for_session(session_id: str | None) -> str | None:
 
     cancel_stream() intentionally clears ``session.active_stream_id`` before the
     worker thread fully exits so Stop remains responsive. During that unwind
-    window ACTIVE_RUNS is the worker-lifecycle truth; a successor chat/start for
-    the same session must wait or it can reuse the cached agent while the old
-    interrupt is still landing (#3808).
+    window actual in-process ownership is authoritative; a successor chat/start
+    must wait until both the worker and its leased interrupt callbacks finish,
+    or it can rearm the old cached agent and race its final writeback.
 
     Bounded: the post-cancel unwind is short (dominated by the worker finally's
     ``_ckpt_thread.join(timeout=15)``), and ``unregister_active_run`` runs in that
-    finally, so a healthy worker leaves ACTIVE_RUNS within seconds. A detached /
-    wedged worker that never reaches its finally (e.g. stuck in a provider call,
-    or leaked by SIGKILL without restart) must NOT 409 the session forever — so an
-    entry older than the unwind ceiling (180s) is treated as stale and ignored
-    here. A legitimately long-running turn keeps ``active_stream_id`` SET
-    and is handled by ``_active_stream_blocks_chat_start`` above; this guard only
-    covers the cleared-stream-id unwind window. (Codex brick-gate hardening, #3822.)
+    finally, so a healthy worker leaves within seconds. A genuinely blocked
+    owned worker remains fenced regardless of age. Advisory entries without
+    an actual owner retain the 180s stale-entry recovery below (#3822); elapsed
+    time alone never proves a locally owned worker has finished.
     """
     sid = str(session_id or "").strip()
     if not sid:
         return None
+    # Advisory ACTIVE_RUNS entries can age out after cancellation. A worker
+    # still on the Python stack (or its leased interrupt callback) cannot:
+    # starting again would reuse/rearm its agent and race its final writeback.
+    from api.worker_ownership import live_stream
+    owned_stream = live_stream(sid)
+    if owned_stream:
+        return owned_stream
     ceiling = 180.0  # generous vs the 15s checkpoint-join unwind; finite to avoid permanent-409
     now = time.time()
     try:

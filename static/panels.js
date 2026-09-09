@@ -3728,6 +3728,9 @@ async function addKanbanComment(taskId){
 async function addKanbanDependency(taskId){
   const input = document.getElementById('kanbanDependencyInput');
   const linkTo = input ? input.value.trim() : '';
+  const submittedValue = input ? input.value : '';
+  const submittedRevision = input ? Number(input.dataset.draftRevision || 0) : 0;
+  const boardKey = _kanbanCurrentBoard || 'default';
   if (!taskId || !linkTo) return;
   if (linkTo === taskId) {
     showToast(t('kanban_dependency_self') || 'A task cannot depend on itself', 'error');
@@ -3743,8 +3746,12 @@ async function addKanbanDependency(taskId){
       method: 'POST',
       body: JSON.stringify({parent_id: linkTo, child_id: taskId}),
     });
-    if (input) input.value = '';
-    await loadKanbanTask(taskId);
+    // A response for an older editor must not navigate back or erase a newer
+    // draft. Live same-task refreshes retain this exact input node below.
+    if (_kanbanCurrentTaskId !== taskId || (_kanbanCurrentBoard || 'default') !== boardKey
+        || document.getElementById('kanbanDependencyInput') !== input) return;
+    if (input.value === submittedValue && Number(input.dataset.draftRevision || 0) === submittedRevision) input.value = '';
+    await loadKanbanTask(taskId, {preserveSelection: true});
   } catch(e) { showToast(t('kanban_unavailable') + ': ' + (e.message || e), 'error'); }
 }
 
@@ -3802,6 +3809,7 @@ async function loadKanbanTask(taskId, {preserveSelection = false} = {}){
   if (!taskId) return;
   if (preserveSelection && taskId !== _kanbanCurrentTaskId) return;
   const requestId = ++_kanbanTaskDetailRequestId;
+  const boardKey = _kanbanCurrentBoard || 'default';
   _kanbanCurrentTaskId = taskId;
   // Commit click selection before I/O, so a subsequent modifier-click cannot
   // be erased when the first card's slower detail request finishes.
@@ -3811,9 +3819,9 @@ async function loadKanbanTask(taskId, {preserveSelection = false} = {}){
   }
   try {
     const data = await api('/api/kanban/tasks/' + encodeURIComponent(taskId) + _kanbanBoardQuery());
-    if (requestId !== _kanbanTaskDetailRequestId) return;
+    if (requestId !== _kanbanTaskDetailRequestId || boardKey !== (_kanbanCurrentBoard || 'default')) return;
     try { data.log = await api('/api/kanban/tasks/' + encodeURIComponent(taskId) + '/log' + _kanbanBoardQuery({tail: 65536})); } catch(e) { data.log = {}; }
-    if (requestId !== _kanbanTaskDetailRequestId) return;
+    if (requestId !== _kanbanTaskDetailRequestId || boardKey !== (_kanbanCurrentBoard || 'default')) return;
     const task = data.task || {};
     const title = _kanbanTaskTitle(task);
     const board = $('kanbanBoard');
@@ -3826,8 +3834,29 @@ async function loadKanbanTask(taskId, {preserveSelection = false} = {}){
     }
     const preview = $('kanbanTaskPreview');
     if (preview) {
+      // Read the current editor immediately before rendering, after all I/O.
+      // Retaining its node preserves newer text, explicit clears and revision
+      // ownership while an SSE refresh updates the surrounding task detail.
+      const sameEditor = preview.dataset.taskId === taskId && preview.dataset.board === boardKey;
+      const draft = sameEditor ? preview.querySelector('#kanbanDependencyInput') : null;
+      const focused = draft && document.activeElement === draft;
+      const selection = focused ? [draft.selectionStart, draft.selectionEnd, draft.selectionDirection] : null;
       preview.style.display = '';
       preview.innerHTML = _kanbanRenderTaskDetail(data);
+      preview.dataset.taskId = taskId;
+      preview.dataset.board = boardKey;
+      const freshInput = preview.querySelector('#kanbanDependencyInput');
+      if (draft && freshInput) {
+        freshInput.replaceWith(draft);
+        if (focused) {
+          draft.focus({preventScroll: true});
+          draft.setSelectionRange(...selection);
+        }
+      } else if (freshInput) {
+        freshInput.addEventListener('input', () => {
+          freshInput.dataset.draftRevision = String(Number(freshInput.dataset.draftRevision || 0) + 1);
+        });
+      }
     }
     _closeMobileSidebarAfterPanelSelection();
     if (!preserveSelection) showToast(`${t('kanban_task')}: ${title}`);

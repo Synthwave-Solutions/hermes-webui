@@ -6262,6 +6262,9 @@ def _close_evicted_agent_at_session_boundary(session_id: str, agent) -> bool:
     """
     if agent is None:
         return True
+    from api.worker_ownership import owned_by_other_thread
+    if owned_by_other_thread(session_id):
+        return False
 
     should_close_evicted_agent = True
     try:
@@ -6313,6 +6316,9 @@ def _refresh_cached_agent_runtime(agent, agent_kwargs: dict) -> bool:
     tool state) while swapping only the runtime credential/client.
     """
     if agent is None or not isinstance(agent_kwargs, dict):
+        return False
+    from api.worker_ownership import owned_by_other_thread
+    if owned_by_other_thread(str(getattr(agent, 'session_id', '') or '')):
         return False
 
     new_pool = agent_kwargs.get('credential_pool')
@@ -6400,6 +6406,28 @@ def _cached_agent_session_identity(agent) -> str | None:
             if isinstance(value, str) and value:
                 return value
     return None
+
+
+def _clear_cached_agent_interrupt(agent) -> bool:
+    """Reset a finished turn through the engine's complete interrupt contract.
+
+    Initialization cancellation can return before the engine finalizer runs.
+    Clearing only the historical ``_interrupted`` attribute leaves its actual
+    pending interrupt and per-thread tool signals armed. Rebuild an older or
+    broken cached agent when it cannot perform this reset safely. The new
+    request's independent cancel_event is checked again after registration.
+    """
+    from api.worker_ownership import owned_by_other_thread
+    if owned_by_other_thread(str(getattr(agent, 'session_id', '') or '')):
+        return False
+    clear = getattr(agent, 'clear_interrupt', None)
+    if not callable(clear):
+        return False
+    try:
+        return clear() is not False
+    except Exception:
+        logger.debug('Could not clear cached agent interrupt state', exc_info=True)
+        return False
 
 
 def _cached_agent_matches_session(agent, session_id: str) -> bool:
@@ -6490,6 +6518,10 @@ def _run_agent_streaming(
         # leaking a STREAM_SESSION_OWNERS entry that the teardown finally never sees.
         unregister_stream_owner(stream_id)
         return
+    # A cancellation snapshot can outlive ACTIVE_RUNS. Carry the strict local
+    # worker provenance on its exact queue too, so late snapshots never fall
+    # through to legacy cache interruption after the registry entry disappears.
+    q._worker_lifetime_tracked = True
     register_active_run(
         stream_id,
         session_id=session_id,
@@ -6499,6 +6531,7 @@ def _run_agent_streaming(
         model=model,
         provider=model_provider,
         ephemeral=bool(ephemeral),
+        worker_lifetime_tracked=True,
     )
     try:
         run_journal = RunJournalWriter(session_id, stream_id)
@@ -6906,6 +6939,17 @@ def _run_agent_streaming(
     _continuation_turn_tokens = None
     _streaming_cron_profile_home_token = None
     _personal_memory_token = None
+    _worker_ownership_token = None
+    def _drain_after_worker_retirement():
+        # Worker finally may precede a leased cancellation callback. Wakeups
+        # must run when the last owner retires; draining earlier would hit409
+        # and strand a deferred process completion until another human turn.
+        try:
+            from api.background_process import drain_deferred_wakeups_for_session
+            drain_deferred_wakeups_for_session(session_id)
+        except Exception:
+            logger.debug('turn-retirement deferred-wakeup drain failed for session %s',
+                         session_id, exc_info=True)
     # Widest mode until the session is read below, so an early failure can never
     # leave the turn narrower than the user asked for. Declared above the
     # Issue #765 group so `_checkpoint_stop = None` keeps its adjacency to `try:`.
@@ -6917,6 +6961,9 @@ def _run_agent_streaming(
     _ckpt_thread = None
     _agent_lock = None
     try:
+        from api.worker_ownership import claim as claim_worker
+        _worker_ownership_token = claim_worker(
+            session_id, stream_id, on_retired=_drain_after_worker_retirement)
         # Bind THIS turn's session identity to the worker thread/context BEFORE
         # any agent work (so every mid-turn notify_on_complete background spawn
         # captures THIS session, not a concurrent turn's process-global env).
@@ -8173,7 +8220,8 @@ def _run_agent_streaming(
                 if agent is not None:
                     # Refresh volatile runtime credentials selected from provider
                     # pools without discarding cross-turn agent/provider state.
-                    if not _refresh_cached_agent_runtime(agent, _agent_kwargs):
+                    if (not _refresh_cached_agent_runtime(agent, _agent_kwargs)
+                            or not _clear_cached_agent_interrupt(agent)):
                         logger.warning(
                             '[webui] Cached agent runtime could not be safely refreshed; rebuilding agent for session %s',
                             session_id,
@@ -8220,12 +8268,6 @@ def _run_agent_streaming(
                         agent._session_db = _session_db
                     if hasattr(agent, '_api_call_count'):
                         agent._api_call_count = 0
-                    # Reset interrupt state from a prior cancel so the reused
-                    # agent does not think it is still interrupted.
-                    if hasattr(agent, '_interrupted'):
-                        agent._interrupted = False
-                    if hasattr(agent, '_interrupt_message'):
-                        agent._interrupt_message = None
                 else:
                     agent = _AIAgent(**_agent_kwargs)
                     # Register the new agent with the memory lifecycle so
@@ -8254,6 +8296,8 @@ def _run_agent_streaming(
                                     _active_sids.add(_sid)
                     except Exception:
                         _active_sids = set()
+                    from api.worker_ownership import live_sessions
+                    _active_sids.update(live_sessions())
                     with SESSION_AGENT_CACHE_LOCK:
                         SESSION_AGENT_CACHE[session_id] = (agent, _agent_sig)
                         SESSION_AGENT_CACHE.move_to_end(session_id)  # LRU: mark as recently used
@@ -8289,7 +8333,11 @@ def _run_agent_streaming(
             with STREAMS_LOCK:
                 AGENT_INSTANCES[stream_id] = agent
                 # Check if cancel was requested during agent initialization
-                if stream_id in CANCEL_FLAGS and CANCEL_FLAGS[stream_id].is_set():
+                # cancel_stream may already have removed CANCEL_FLAGS while
+                # this worker initialized. Its retained Event still owns this
+                # request, including a Stop received while a cached agent's
+                # previous interrupt state was being cleared.
+                if cancel_event.is_set():
                     # Cancel arrived during agent creation - interrupt immediately
                     try:
                         agent.interrupt("Cancelled before start")
@@ -10069,90 +10117,65 @@ def _run_agent_streaming(
             _error_payload['old_session_id'] = session_id
         put('apperror', _error_payload)
     finally:
-        if _personal_memory_token is not None:
-            reset_personal_memory_dir(_personal_memory_token)
-        # Stop the periodic checkpoint thread before the final recovery path.
-        # The checkpoint thread also uses the per-session lock; joining it first
-        # avoids contending with checkpoint writes during stale-pending repair.
-        if _checkpoint_stop is not None:
-            _checkpoint_stop.set()
-        if _ckpt_thread is not None:
-            _ckpt_thread.join(timeout=15)
-        if (s is not None
-                and getattr(s, 'active_stream_id', None) == stream_id
-                and getattr(s, 'pending_user_message', None)):
-            update_active_run(stream_id, phase="finalizing")
-            _last_resort_sync_from_core(s, stream_id, _agent_lock)
-        _clear_thread_env()  # TD1: always clear thread-local context
-        if _streaming_cron_profile_home_token is not None:
-            _STREAMING_CRON_PROFILE_HOME.reset(_streaming_cron_profile_home_token)
-        # xsession wakeup misroute root fix (Option 1): restore the per-turn
-        # session-identity context-locals (reset-token semantics). MUST run on
-        # every exit path so a reused thread-pool worker leaks no identity and
-        # CLI/cron env fallback resumes — same lifecycle slot as the env
-        # restore above.
-        _reset_turn_session_identity(_turn_session_identity_tokens)
-        # Track A: restore the per-turn governance principal (reset-token
-        # semantics, None-safe) so a reused thread-pool worker or the next
-        # turn on this thread leaks no grants. Same lifecycle slot as the
-        # session-identity restore above.
-        from api.governance.continuation import end_turn as end_continuation_turn
-        end_continuation_turn(_continuation_turn_tokens)
-        reset_governed_agent_turn(_governance_turn_token)
         try:
-            from api import approval_resume as _resume_cleanup
-            _resume_cleanup.close_run(stream_id)
-        except Exception:
-            logger.exception("Could not settle ended approval continuation")
-        with STREAMS_LOCK:
-            STREAMS.pop(stream_id, None)
-            CANCEL_FLAGS.pop(stream_id, None)
-            AGENT_INSTANCES.pop(stream_id, None)  # Clean up agent instance reference
-            STREAM_PARTIAL_TEXT.pop(stream_id, None)  # Clean up partial text buffer (#893)
-            STREAM_REASONING_TEXT.pop(stream_id, None)  # Clean up reasoning trace (#1361 §A)
-            STREAM_LIVE_TOOL_CALLS.pop(stream_id, None)  # Clean up tool calls (#1361 §B)
-            STREAM_GOAL_RELATED.pop(stream_id, None)  # Clean up goal-related flag (#1932)
-            STREAM_LAST_EVENT_ID.pop(stream_id, None)  # Clean up event_id pointer (stage-364)
-            unregister_active_run(stream_id)
-            # NOTE: do NOT discard PENDING_GOAL_CONTINUATION here. The marker
-            # is set by goal_continue (line ~3328) inside the SAME function
-            # call and consumed atomically by `_start_chat_stream_for_session`
-            # in routes.py (around line 6522) when the next stream starts.
-            # Discarding here in the streaming worker's `finally` would
-            # almost always race ahead of the frontend's SSE-receive →
-            # POST /api/chat/start round-trip and erase the marker before
-            # the next stream can read it, breaking the goal-continuation
-            # chain. Stage-326 critical fix per Opus advisor review.
+            if _personal_memory_token is not None:
+                reset_personal_memory_dir(_personal_memory_token)
+            # Stop the periodic checkpoint thread before the final recovery path.
+            # The checkpoint thread also uses the per-session lock; joining it first
+            # avoids contending with checkpoint writes during stale-pending repair.
+            if _checkpoint_stop is not None:
+                _checkpoint_stop.set()
+            if _ckpt_thread is not None:
+                _ckpt_thread.join(timeout=15)
+            if (s is not None
+                    and getattr(s, 'active_stream_id', None) == stream_id
+                    and getattr(s, 'pending_user_message', None)):
+                update_active_run(stream_id, phase="finalizing")
+                _last_resort_sync_from_core(s, stream_id, _agent_lock)
+            _clear_thread_env()  # TD1: always clear thread-local context
+            if _streaming_cron_profile_home_token is not None:
+                _STREAMING_CRON_PROFILE_HOME.reset(_streaming_cron_profile_home_token)
+            # xsession wakeup misroute root fix (Option 1): restore the per-turn
+            # session-identity context-locals (reset-token semantics). MUST run on
+            # every exit path so a reused thread-pool worker leaks no identity and
+            # CLI/cron env fallback resumes — same lifecycle slot as the env
+            # restore above.
+            _reset_turn_session_identity(_turn_session_identity_tokens)
+            # Track A: restore the per-turn governance principal (reset-token
+            # semantics, None-safe) so a reused thread-pool worker or the next
+            # turn on this thread leaks no grants. Same lifecycle slot as the
+            # session-identity restore above.
+            from api.governance.continuation import end_turn as end_continuation_turn
+            end_continuation_turn(_continuation_turn_tokens)
+            reset_governed_agent_turn(_governance_turn_token)
+            try:
+                from api import approval_resume as _resume_cleanup
+                _resume_cleanup.close_run(stream_id)
+            except Exception:
+                logger.exception("Could not settle ended approval continuation")
+            with STREAMS_LOCK:
+                STREAMS.pop(stream_id, None)
+                CANCEL_FLAGS.pop(stream_id, None)
+                AGENT_INSTANCES.pop(stream_id, None)  # Clean up agent instance reference
+                STREAM_PARTIAL_TEXT.pop(stream_id, None)  # Clean up partial text buffer (#893)
+                STREAM_REASONING_TEXT.pop(stream_id, None)  # Clean up reasoning trace (#1361 §A)
+                STREAM_LIVE_TOOL_CALLS.pop(stream_id, None)  # Clean up tool calls (#1361 §B)
+                STREAM_GOAL_RELATED.pop(stream_id, None)  # Clean up goal-related flag (#1932)
+                STREAM_LAST_EVENT_ID.pop(stream_id, None)  # Clean up event_id pointer (stage-364)
+                unregister_active_run(stream_id)
+                # NOTE: do NOT discard PENDING_GOAL_CONTINUATION here. The marker
+                # is set by goal_continue (line ~3328) inside the SAME function
+                # call and consumed atomically by `_start_chat_stream_for_session`
+                # in routes.py (around line 6522) when the next stream starts.
+                # Discarding here in the streaming worker's `finally` would
+                # almost always race ahead of the frontend's SSE-receive →
+                # POST /api/chat/start round-trip and erase the marker before
+                # the next stream can read it, breaking the goal-continuation
+                # chain. Stage-326 critical fix per Opus advisor review.
 
-        # ── Defer-path fix: turn-teardown idle-hook ────────────────────────
-        # The session has just transitioned active→idle: unregister_active_run
-        # above cleared this stream's ACTIVE_RUNS row (under ACTIVE_RUNS_LOCK,
-        # independent of STREAMS_LOCK), so _session_has_active_turn() is now
-        # False for this session unless a *different* stream is still active
-        # (cancel/reconnect — drain_deferred_wakeups_for_session guards on
-        # that and leaves the marker for the later teardown). A FAST
-        # background task that completed while this turn was tearing down was
-        # deferred by api/background_process._process_one (it could not start
-        # a turn → would 409) and its wakeup_prompt persisted in
-        # DEFERRED_PROCESS_WAKEUPS. For an autonomous agent there is no next
-        # user turn, so the PR #2279 next-turn drain never runs; without this
-        # hook the deferred wakeup is lost forever (the Test B failure). This
-        # makes the busy-at-completion case symmetric with the idle case:
-        # idle now → fire now (Option Z idle branch); busy now → fire here at
-        # turn-end. claim_deferred_wakeups pops atomically, so this is
-        # idempotent with the next-turn drain (no double-fire) and the wakeup
-        # turn's own teardown finds nothing claimed (no wakeup loop). The
-        # drain spawns its own daemon thread, so teardown never blocks.
-        try:
-            from api.background_process import drain_deferred_wakeups_for_session
-
-            drain_deferred_wakeups_for_session(session_id)
-        except Exception:
-            logger.debug(
-                "turn-teardown deferred-wakeup drain failed for session %s",
-                session_id,
-                exc_info=True,
-            )
+        finally:
+            from api.worker_ownership import release as release_worker
+            release_worker(_worker_ownership_token)
 
 # ============================================================
 # SECTION: HTTP Request Handler
@@ -10259,9 +10282,9 @@ def _handle_chat_steer(handler, body: dict) -> bool:
 def cancel_stream(stream_id: str) -> bool:
     """Signal an in-flight stream to cancel. Returns True if work was found.
 
-    Eagerly releases the session lock (pops STREAMS/CANCEL_FLAGS/AGENT_INSTANCES
-    and clears session.active_stream_id) so new /api/chat/start requests succeed
-    immediately after cancel, even if the agent thread is still blocked.
+    Eagerly clears visible stream state (STREAMS/CANCEL_FLAGS/AGENT_INSTANCES
+    and session.active_stream_id). Successor admission remains fenced by the
+    actual worker lifetime and leased cancellation callbacks until they finish.
 
     The worker thread's finally block uses .pop(key, None), so the double-pop is
     a safe no-op. Session cleanup runs outside STREAMS_LOCK to preserve lock
@@ -10301,6 +10324,7 @@ def cancel_stream(stream_id: str) -> bool:
     _snap_tool_calls = None
     _snap_flag = None
     _snap_agent = None
+    _snap_worker_tracked = False
     _cancel_session_payload = None
 
     with streams_lock:
@@ -10329,14 +10353,17 @@ def cancel_stream(stream_id: str) -> bool:
                 _snap_tool_calls = list(_live_tools.get(stream_id, []) or [])
         if stream_present:
             q = streams.get(stream_id)
-        else:
-            try:
-                with _live_config.ACTIVE_RUNS_LOCK:
-                    active_run_entry = dict((_live_config.ACTIVE_RUNS or {}).get(stream_id) or {})
-            except Exception:
-                active_run_entry = None
-            if not active_run_entry:
-                return False
+            _snap_worker_tracked = bool(getattr(q, '_worker_lifetime_tracked', False))
+        # Capture provenance under the same lock as the agent/queue snapshot.
+        # Teardown may remove ACTIVE_RUNS immediately after this lock releases.
+        try:
+            with _live_config.ACTIVE_RUNS_LOCK:
+                active_run_entry = dict((_live_config.ACTIVE_RUNS or {}).get(stream_id) or {})
+        except Exception:
+            active_run_entry = None
+        if not stream_present and not active_run_entry:
+            return False
+        if active_run_entry:
             active_run_session_id = str(active_run_entry.get("session_id") or "").strip() or None
 
     if active_run_entry is None:
@@ -10371,32 +10398,37 @@ def cancel_stream(stream_id: str) -> bool:
                 agent = cached[0]
         except Exception:
             pass
-    if agent:
+    def _interrupt_owned_agent():
+        if agent:
+            try:
+                agent.interrupt("Cancelled by user")
+            except Exception as e:
+                logger.debug("Failed to interrupt agent for stream %s: %s", stream_id, e)
+        # Clarify belongs to the same lease: an old cancel must not dismiss a
+        # successor's prompt after its worker finally releases the session.
         try:
-            agent.interrupt("Cancelled by user")
-        except Exception as e:
-            # Log but don't block the cancel flow
-            import logging
-            logging.getLogger(__name__).debug(
-                f"Failed to interrupt agent for stream {stream_id}: {e}"
-            )
-    elif stream_present:
+            from api.clarify import clear_pending as _clear_clarify_pending
+            _clarify_session_id = getattr(agent, 'session_id', None) if agent else active_run_session_id
+            if _clarify_session_id:
+                _clear_clarify_pending(_clarify_session_id)
+        except Exception:
+            logger.debug('Failed to clear clarify prompt during cancel')
+
+    if _snap_worker_tracked or (active_run_entry or {}).get('worker_lifetime_tracked'):
+        from api.worker_ownership import run_if_live
+        _owned_sid = active_run_session_id or (getattr(agent, 'session_id', None) if agent else None)
+        run_if_live(_owned_sid, stream_id, _interrupt_owned_agent)
+    else:
+        # Legacy externally registered streams have no local worker lifetime.
+        # Every _run_agent_streaming worker advertises the strict path above.
+        _interrupt_owned_agent()
+    if not agent and stream_present:
         # Agent not yet stored - cancel_event flag will be checked by agent thread
         import logging
         logging.getLogger(__name__).debug(
             f"Cancel requested for stream {stream_id} before agent ready - "
             f"cancel_event flag set, will be checked on agent startup"
         )
-
-    # Clear any pending clarify prompt so the blocked tool call can unwind.
-    try:
-        from api.clarify import clear_pending as _clear_clarify_pending
-
-        _clarify_session_id = getattr(agent, "session_id", None) if agent else active_run_session_id
-        if _clarify_session_id:
-            _clear_clarify_pending(_clarify_session_id)
-    except Exception:
-        logger.debug("Failed to clear clarify prompt during cancel")
 
     # Capture the queue while the stream still exists, but do not emit the
     # terminal cancel event until the session cleanup below confirms the turn
@@ -10405,9 +10437,9 @@ def cancel_stream(stream_id: str) -> bool:
     _emit_cancel_event = True
 
     # ── Eager session lock release (fixes #653) ──────────────────────────
-    # Pop stream state now so the 409 guard in routes.py sees the session
-    # as idle and allows new /api/chat/start immediately after cancel,
-    # even if the agent thread is still blocked in a C-level syscall.
+    # Pop visible stream state now so cancellation settles promptly. The
+    # separate actual-worker fence keeps a successor queued while this worker
+    # is still blocked or an interrupt callback is completing.
     # The worker thread's finally block uses .pop(key, None) too, so a
     # double-pop here is safe (no-op).
     if stream_present:
