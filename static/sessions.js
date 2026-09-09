@@ -2922,10 +2922,11 @@ function _syncHandoffDockSpace(open) {
   const messages = _handoffMessagesEl();
   if (!messages) return;
   const wasNearBottom = _handoffIsMessagesNearBottom(messages);
+  const follow = _messageDockFollowCallback(messages, wasNearBottom);
   if (!open) {
     messages.classList.remove('handoff-dock-visible');
     messages.style.removeProperty('--handoff-dock-height');
-    if (wasNearBottom && typeof scrollToBottom === 'function') requestAnimationFrame(scrollToBottom);
+    if (wasNearBottom && typeof scrollToBottom === 'function') requestAnimationFrame(follow);
     return;
   }
   messages.classList.add('handoff-dock-visible');
@@ -2933,7 +2934,7 @@ function _syncHandoffDockSpace(open) {
     const container = $('handoffHintContainer');
     const h = container && container.getBoundingClientRect().height;
     if (h > 0) messages.style.setProperty('--handoff-dock-height', Math.ceil(h + 24) + 'px');
-    if (wasNearBottom && typeof scrollToBottom === 'function') scrollToBottom();
+    if (wasNearBottom && typeof scrollToBottom === 'function') follow();
   };
   requestAnimationFrame(measure);
   setTimeout(measure, 360);

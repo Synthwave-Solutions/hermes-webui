@@ -7388,6 +7388,19 @@ document.addEventListener('DOMContentLoaded',function(){
   tooltip.addEventListener('click',function(e){e.stopPropagation();});
 });
 
+function _messageDockFollowCallback(messages, wasNearBottom){
+  const sessionId=S.session&&S.session.session_id;
+  const inputGeneration=_messageScrollInputGeneration;
+  // Layout settling is automatic. A Start/End click, manual scroll, or session
+  // switch after scheduling owns the viewport over this earlier dock intent.
+  return ()=>{
+    if(!wasNearBottom||$('messages')!==messages||
+        (S.session&&S.session.session_id)!==sessionId||
+        _messageScrollInputGeneration!==inputGeneration||
+        _messageUserUnpinned||!_scrollPinned) return;
+    scrollToBottom();
+  };
+}
 function _setMessageScrollToBottom(){
   const el=$('messages');
   if(!el) return;

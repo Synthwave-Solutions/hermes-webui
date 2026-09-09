@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type {Page} from '@playwright/test';
+import type {Page, TestInfo} from '@playwright/test';
 import {test, expect, open, session, api, auth} from './fixtures';
 
 declare const S: any, _oldestIdx: number, _messagesTruncated: boolean, _messagesGeneration: number, _scrollPinned: boolean, _messageUserUnpinned: boolean, _messageScrollInputGeneration: number, _programmaticScroll: boolean, _loadingOlder: boolean, _loadingSessionId: string|null;
@@ -44,7 +44,34 @@ async function chooseFile(page: Page, name: string) {
 }
 
 test('SUPPLEMENT TRANSCRIPT FILES virtualized long history supports Start outline and End without losing or duplicating turns', async ({page}, info) => {
+  await virtualizedLongHistory(page, info, false);
+});
+
+test('SUPPLEMENT TRANSCRIPT FILES delayed terminal dock follow cannot override newer Start navigation', async ({page}, info) => {
+  await virtualizedLongHistory(page, info, true);
+});
+
+async function virtualizedLongHistory(page: Page, info: TestInfo, holdDock: boolean) {
   test.setTimeout(90000);
+  if (holdDock) await page.addInitScript(() => {
+    const w = window as any;
+    const raf = window.requestAnimationFrame.bind(window);
+    w.__qaHeldDockFollow = [];
+    w.__qaDockFollowSchedulers = [];
+    window.requestAnimationFrame = callback => {
+      const stack = new Error().stack;
+      return raf(timestamp => {
+        if (w.__qaHoldDockFollow && /at _sync(?:HandoffDockSpace|TerminalTranscriptSpace|ApprovalTranscriptSpace|ClarifyTranscriptSpace)\b/.test(stack || '')) {
+          w.__qaHeldDockFollow.push(callback);
+          w.__qaDockFollowSchedulers.push(stack);
+        } else callback(timestamp);
+      });
+    };
+    w.__qaReleaseDockFollow = () => {
+      w.__qaHoldDockFollow = false;
+      for (const callback of w.__qaHeldDockFollow.splice(0)) raf(callback);
+    };
+  });
   await open(page);
   await preference(page, 'preferences', 'settingsVirtualizeTranscript', 'virtualize_transcript', true);
   await preference(page, 'preferences', 'settingsShowConversationOutline', 'show_conversation_outline', true);
@@ -63,9 +90,20 @@ test('SUPPLEMENT TRANSCRIPT FILES virtualized long history supports Start outlin
   expect(response.status()).toBe(200);
   const sid = (await response.json()).session.session_id;
   await expect(page).toHaveURL(new RegExp('/session/' + sid));
-  await page.waitForFunction("typeof _loadingSessionId === 'undefined' || _loadingSessionId === null");
+  await page.waitForFunction(() => typeof _loadingSessionId === 'undefined' || _loadingSessionId === null);
   await expect(page.locator('#messages')).toContainText('SUPPLEMENT_ANSWER_119');
   await expect(page.locator('#jumpToSessionStartBtn')).toBeVisible();
+  if (holdDock) {
+    // Close a real disposable terminal while at the tail, then delay only the
+    // actual dock-layout RAF. Its captured follow intent must yield to Start.
+    await page.locator('#msg').fill('/terminal');
+    await page.locator('#btnSend').click();
+    await expect(page.locator('#terminalSurface .xterm-helper-textarea')).toBeAttached();
+    await page.evaluate(() => { (window as any).__qaHoldDockFollow = true; });
+    await page.locator('#btnTerminalClose').click();
+    await expect(page.locator('#composerTerminalPanel')).toBeHidden();
+    await expect.poll(() => page.evaluate(() => (window as any).__qaHeldDockFollow.length)).toBeGreaterThan(0);
+  }
   await page.evaluate(() => {
     const w = window as any;
     const el = document.getElementById('messages')!;
@@ -90,10 +128,16 @@ test('SUPPLEMENT TRANSCRIPT FILES virtualized long history supports Start outlin
   await page.locator('#jumpToSessionStartBtn').click();
   try {
     await expect(page.locator('#msg-user-0')).toBeInViewport();
+    if (holdDock) {
+      await page.evaluate(() => (window as any).__qaReleaseDockFollow());
+      await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+      await expect(page.locator('#msg-user-0')).toBeInViewport();
+    }
     const obsoleteTailMoves = await page.evaluate(() => (window as any).__qaStartNavigation.filter((event: any) =>
       event.kind === 'scroll-write' && event.after.state.count === 240 && event.requested > document.getElementById('messages')!.clientHeight));
     expect(obsoleteTailMoves, 'Start must not restore the previous tail while mounting full history').toEqual([]);
   } finally {
+    if (holdDock) await info.attach('dock-follow-schedulers', {body: JSON.stringify(await page.evaluate(() => (window as any).__qaDockFollowSchedulers)), contentType:'application/json'});
     await info.attach('start-navigation-diagnostics', {body: JSON.stringify(await page.evaluate(() => (window as any).__qaStartNavigation)), contentType:'application/json'});
     await page.evaluate(() => (window as any).__qaStartNavigationRestore());
   }
@@ -131,7 +175,7 @@ test('SUPPLEMENT TRANSCRIPT FILES virtualized long history supports Start outlin
   const denied = await page.request.get(`/api/session?session_id=${sid}&messages=1`, {headers: {Cookie: auth.cookie_name + '=' + auth.cookies.bob}});
   expect(denied.status()).toBe(404);
   expect(await denied.text()).not.toContain('SUPPLEMENT_QUESTION_');
-});
+}
 
 test('SUPPLEMENT TRANSCRIPT FILES CSV table and valid or malformed JSON preserve literal content and exact downloads', async ({page}) => {
   const csvName = unique('qa-preview') + '.csv';
@@ -246,7 +290,7 @@ test('SUPPLEMENT TRANSCRIPT FILES delayed outline history cannot replace a newer
   expect(response.status()).toBe(200);
   const sid = (await response.json()).session.session_id;
   await expect(page).toHaveURL(new RegExp('/session/' + sid));
-  await page.waitForFunction("_loadingSessionId === null");
+  await page.waitForFunction(() => _loadingSessionId === null);
   await expect(page.locator('#messages')).toContainText('SUPPLEMENT_RACE_ANSWER_39');
   expect(await page.evaluate('Boolean(_messagesTruncated)')).toBe(true);
   let captured!: () => void;
@@ -275,7 +319,7 @@ test('SUPPLEMENT TRANSCRIPT FILES delayed outline history cannot replace a newer
   const beforeRelease = await page.evaluate('({truncated:_messagesTruncated,oldest:_oldestIdx})');
   expect(beforeRelease.truncated).toBe(true);
   release();
-  await page.waitForFunction('_loadingOlder === false');
+  await page.waitForFunction(() => _loadingOlder === false);
   expect(await page.evaluate('({truncated:_messagesTruncated,oldest:_oldestIdx})')).toEqual(beforeRelease);
   await expect(page.locator('#messages')).toContainText(marker);
   await expect(page.locator('#outlinePanel .outline-entry')).toHaveCount(0);
@@ -311,7 +355,7 @@ test('SUPPLEMENT TRANSCRIPT FILES newer manual scroll during history loading kee
   expect(importedResponse.status()).toBe(200);
   const sid = (await importedResponse.json()).session.session_id;
   await expect(page).toHaveURL(new RegExp('/session/' + sid));
-  await page.waitForFunction('_loadingSessionId === null');
+  await page.waitForFunction(() => _loadingSessionId === null);
   await expect(page.locator('#messages')).toContainText('SUPPLEMENT_END_RACE_ANSWER_39');
   expect(await page.evaluate('({truncated:_messagesTruncated,oldest:_oldestIdx,count:S.messages.length})')).toEqual({truncated:true,oldest:50,count:30});
   await page.waitForFunction(() => !_programmaticScroll);

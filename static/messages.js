@@ -7437,13 +7437,14 @@ function _syncApprovalTranscriptSpace(card, opts) {
   const messages = $("messages");
   if (!messages) return;
   const wasNearBottom = _approvalMessagesNearBottom(messages);
+  const follow = _messageDockFollowCallback(messages, wasNearBottom);
   if (!card || !card.classList.contains("visible")) {
     messages.classList.remove("approval-open");
     messages.classList.remove("approval-collapsed");
     messages.style.removeProperty("--approval-card-height");
     messages.style.removeProperty("--approval-dock-height");
     if (wasNearBottom && typeof scrollToBottom === "function" && typeof requestAnimationFrame === "function") {
-      requestAnimationFrame(scrollToBottom);
+      requestAnimationFrame(follow);
     }
     return;
   }
@@ -7457,7 +7458,7 @@ function _syncApprovalTranscriptSpace(card, opts) {
     if (h > 0) {
       messages.style.setProperty(collapsed ? "--approval-dock-height" : "--approval-card-height", Math.ceil(h + 24) + "px");
     }
-    if (wasNearBottom && typeof scrollToBottom === "function") scrollToBottom();
+    if (wasNearBottom && typeof scrollToBottom === "function") follow();
   };
   if (opts.immediate) measure();
   if (typeof requestAnimationFrame === "function") requestAnimationFrame(measure);
@@ -8255,13 +8256,14 @@ function _syncClarifyTranscriptSpace(card, opts) {
   const messages = $("messages");
   if (!messages) return;
   const wasNearBottom = _clarifyMessagesNearBottom(messages);
+  const follow = _messageDockFollowCallback(messages, wasNearBottom);
   if (!card || !card.classList.contains("visible")) {
     messages.classList.remove("clarify-open");
     messages.classList.remove("clarify-collapsed");
     messages.style.removeProperty("--clarify-card-height");
     messages.style.removeProperty("--clarify-dock-height");
     if (wasNearBottom && typeof scrollToBottom === "function" && typeof requestAnimationFrame === "function") {
-      requestAnimationFrame(scrollToBottom);
+      requestAnimationFrame(follow);
     }
     return;
   }
@@ -8275,7 +8277,7 @@ function _syncClarifyTranscriptSpace(card, opts) {
     if (h > 0) {
       messages.style.setProperty(collapsed ? "--clarify-dock-height" : "--clarify-card-height", Math.ceil(h + 24) + "px");
     }
-    if (wasNearBottom && typeof scrollToBottom === "function") scrollToBottom();
+    if (wasNearBottom && typeof scrollToBottom === "function") follow();
   };
   if (opts.immediate) measure();
   if (typeof requestAnimationFrame === "function") requestAnimationFrame(measure);
