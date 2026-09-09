@@ -22,10 +22,8 @@ import shutil
 import socket
 import sqlite3
 import ssl
-import stat
 import subprocess
 import tempfile
-import time
 
 EXPECTED_HOST = "synthwave-vps"
 EXPECTED_USER = "synthwavehq"
@@ -284,7 +282,7 @@ print(json.dumps(out))
 def interpreter_inspection(executable, policy, configs):
     try:
         env = {"HOME": pwd.getpwuid(os.getuid()).pw_dir, "PATH": "/usr/bin:/bin", "LANG": "C.UTF-8"}
-        result = subprocess.run([executable, "-I", "-c", INSPECTOR],
+        result = subprocess.run([executable, "-B", "-I", "-c", INSPECTOR],
             input=json.dumps({"policy": str(policy), "configs": [str(p) for p in configs]}).encode(),
             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, env=env, timeout=15)
         if result.returncode or len(result.stdout) > 256 * 1024:

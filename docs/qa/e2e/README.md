@@ -6,6 +6,18 @@ OpenAI-compatible provider supplies deterministic synthetic responses. The suite
 proves the application paths exercised by its assertions; it does not prove the
 quality, uptime, OAuth credentials or behavior of an external provider.
 
+## Verified release evidence
+
+Frozen run `20260908-234115-847878000` completed **187 browser scenarios: 187 passed, zero failed**, with zero uncaught application errors across all 187 collections and zero report-level errors. The runner retained **11 Playwright fixture-bookkeeping warning entries**, including one entry with a repeated fixture ID; these are harness warnings, separately recorded in the review notes.
+
+The inventory contains **1,052 entries: 508 interacted with in passing scenarios and 544 without interaction evidence**. The strict all-click gate remains incomplete. The separate catalog contains **363 acceptance stories: 21 fully demonstrated, 190 partial and 152 not run**. A passed browser scenario certifies its explicit assertions; it does not certify all criteria of every related story.
+
+Canonical focused backend checks passed **439 WebUI tests across 32 files** at `704d5737da750931eba0b2ef5aa5d3e9a6e75677` and **357 engine tests across 29 files** at `49bf59875c41e84baf5ac53bd1194859d54be94d`. These are the paired code commits used by the frozen browser run. Exact test lists are in [backend verification](backend-verification.md). These checks do not certify global repository CI.
+
+Public Share creation, anonymous snapshot readback, explicit refresh, cancellation, revocation and owner/CSRF boundaries now pass. Manual Todo/Triage completion and Todo blocking pass with dependency checks, reload persistence, authorization denials, dependency-aware unblocking and repeated-block escalation. The earlier Share and Todo→Done 404 results remain historical findings, not current failing tests.
+
+Production deployment is authorized by the user and pending a separately verified live result. These local results do not establish production deployment, physical audio quality or external-provider behavior.
+
 ## Install and run
 
 Use Python 3.11–3.13 and an isolated virtual environment with the WebUI runtime
@@ -42,7 +54,7 @@ that run as historical evidence; use the subsequent isolated rerun for release
 validation. Safe exports contain no credential values.
 Scheduled test jobs deliver
 locally; explicit Run now uses the deterministic provider, while duplicate jobs
-are verified paused. Task-board fixtures are unassigned and never dispatched.
+are verified paused. Task-board fixtures exercise manual transitions and dry-run dispatch previews; they do not launch live board workers.
 Nango paths point to intentionally absent files inside private test state, so
 the mobile Connections test checks the visible unavailable-service response.
 Private browser cookies and the generated login password stay in the test-state
