@@ -1893,32 +1893,66 @@ function _updateSessionStartJumpButton(){
 async function jumpToSessionStart(){
   const container=$('messages');
   if(!container||!S.session) return;
+  const sid=S.session.session_id;
+  const wasActive=!!(S.busy||S.activeStreamId);
+  const messagesBeforeLoad=S.messages;
+  // Explicit navigation owns the viewport over queued tail-settle writes and
+  // snapshots captured before this click, just like manual upward scrolling.
+  _cancelBottomSettle();
+  let navigationGeneration=++_messageScrollInputGeneration;
+  const ownsNavigation=()=>!!(S.session&&S.session.session_id===sid&&
+    _messageScrollInputGeneration===navigationGeneration);
   _scrollPinned=false;
   _messageUserUnpinned=true;
-  _programmaticScroll=true;_programmaticScrollSetAt=performance.now();
   try{
     // During active streaming, skip full message load — API response won't
     // include live messages from the current turn, and replacing S.messages
     // would lose user/assistant/tool messages.
-    if(!(S.busy||S.activeStreamId)){
-      if(typeof _ensureAllMessagesLoaded==='function') await _ensureAllMessagesLoaded();
+    if(!wasActive){
+      if(typeof _ensureAllMessagesLoaded==='function'&&await _ensureAllMessagesLoaded()===false) return;
     }
+    if(!ownsNavigation()){
+      // A newer scroll/End action owns the viewport, but successful history
+      // expansion still changed raw indices. Reconcile the old tail DOM while
+      // preserving that newer viewport, otherwise message actions use stale IDs.
+      if(S.session&&S.session.session_id===sid&&!S.busy&&!S.activeStreamId&&
+          S.messages!==messagesBeforeLoad){
+        renderMessages({ preserveScroll:true });
+      }
+      return;
+    }
+    if(!wasActive&&(S.busy||S.activeStreamId)) return;
+    // Metadata/resize renders may have captured the old tail while history was
+    // loading. Supersede those snapshots before committing this explicit jump.
+    _cancelBottomSettle();
+    navigationGeneration=++_messageScrollInputGeneration;
+    _scrollPinned=false;
+    _messageUserUnpinned=true;
+    _programmaticScroll=true;_programmaticScrollSetAt=performance.now();
+    const navigationMessages=S.messages;
+    const navigationMessageCount=S.messages.length;
     _messageRenderWindowSize=Math.max(_currentMessageRenderWindowSize(),_messageRenderableMessageCount());
     container.scrollTop=0;
     _messageVirtualWindowKey='';
     // During streaming, skip renderMessages — it rebuilds the DOM but tool card
     // insertion is blocked by !S.busy, losing Activity until "done" fires.
     if(!(S.busy||S.activeStreamId)){
-      renderMessages({ preserveScroll:true });
+      renderMessages({ preserveScroll:true, scrollToStart:true });
     }
     requestAnimationFrame(()=>{
+      if(!ownsNavigation()) return;
+      if(S.messages!==navigationMessages||S.messages.length!==navigationMessageCount||
+          (!wasActive&&(S.busy||S.activeStreamId))){
+        _deferClearProgrammaticScroll();
+        return;
+      }
       container.scrollTop=0;
       _updateSessionStartJumpButton();
       _deferClearProgrammaticScroll();
     });
   }catch(e){
     console.warn('jumpToSessionStart failed:',e);
-    _programmaticScroll=false;
+    if(ownsNavigation()) _programmaticScroll=false;
   }
 }
 
@@ -7354,6 +7388,19 @@ document.addEventListener('DOMContentLoaded',function(){
   tooltip.addEventListener('click',function(e){e.stopPropagation();});
 });
 
+function _messageDockFollowCallback(messages, wasNearBottom){
+  const sessionId=S.session&&S.session.session_id;
+  const inputGeneration=_messageScrollInputGeneration;
+  // Layout settling is automatic. A Start/End click, manual scroll, or session
+  // switch after scheduling owns the viewport over this earlier dock intent.
+  return ()=>{
+    if(!wasNearBottom||$('messages')!==messages||
+        (S.session&&S.session.session_id)!==sessionId||
+        _messageScrollInputGeneration!==inputGeneration||
+        _messageUserUnpinned||!_scrollPinned) return;
+    scrollToBottom();
+  };
+}
 function _setMessageScrollToBottom(){
   const el=$('messages');
   if(!el) return;
@@ -15764,6 +15811,14 @@ function _captureMessageScrollSnapshot(){
     userUnpinned:readerAwayFromBottom?true:_messageUserUnpinned,
   };
 }
+function _messageScrollSnapshotForRender(preserveScroll, options){
+  const snapshot=(preserveScroll||_messageUserUnpinned)?_captureMessageScrollSnapshot():null;
+  if(!snapshot||!options||options.scrollToStart!==true) return snapshot;
+  // Full-history loading changes the array indices before replacing the old
+  // tail DOM. Its semantic anchor still points at an old tail message, so an
+  // explicit Start render must restore the beginning instead of that anchor.
+  return {...snapshot,anchor:{rawIdx:0,sessionIdx:0,topOffset:0},top:0,pinned:false,userUnpinned:true};
+}
 function _messageScrollSnapshotInputChanged(snapshot){
   if(!snapshot) return false;
   const captured=Number(snapshot.inputGeneration);
@@ -16561,7 +16616,7 @@ function renderMessages(options){
   // Capture the pre-wipe scroll position when preserving OR when the reader has
   // manually unpinned; both need to restore the reader's position after the DOM
   // rebuild rather than snap to the bottom. (Codex #4006 r3 follow-up.)
-  const scrollSnapshot=(preserveScroll||_messageUserUnpinned)?_captureMessageScrollSnapshot():null;
+  const scrollSnapshot=_messageScrollSnapshotForRender(preserveScroll,options);
   const inner=$('msgInner');
   const sid=S.session?S.session.session_id:null;
   if(!S.busy&&Array.isArray(S.messages)&&typeof _hydrateIdLinkedHistoricalToolScenes==='function'){
@@ -19350,7 +19405,7 @@ function autoResizeTextarea(ta) {
 }
 
 async function submitEdit(msgIdx, newText) {
-  if(!S.session || S.busy) return;
+  if(!S.session || S.busy || S.activeStreamId) return;
   const initialSid = S.session.session_id;
   const absoluteKeepCount = _oldestIdx + msgIdx;
   // #5924: capture the deliberate-pick signal up front (pre-network), scoped to
@@ -19359,9 +19414,12 @@ async function submitEdit(msgIdx, newText) {
   // _deliberateSessionModelPick. null → no re-arm → server resolution runs.
   const _recoveryPick=_deliberateSessionModelPick(initialSid);
   if(typeof _ensureAllMessagesLoaded==='function'){
-    await _ensureAllMessagesLoaded();
+    if(await _ensureAllMessagesLoaded()===false) return;
   }
-  if(!S.session || S.session.session_id !== initialSid) return;
+  if(!S.session || S.session.session_id !== initialSid || S.busy || S.activeStreamId ||
+      (typeof _messagesTruncated!=='undefined' && _messagesTruncated)) return;
+  const previousMessages=S.messages;
+  const previousRows=S.messages.slice();
   try {
     await api('/api/session/truncate', {method:'POST', body:JSON.stringify({
       session_id: initialSid,
@@ -19370,7 +19428,9 @@ async function submitEdit(msgIdx, newText) {
     // #5924 SILENT-race guard: a session switch during the truncate await must not
     // let this recovery apply session A's intent (truncate/re-arm/send) to the
     // newly-visible session.
-    if(!S.session || S.session.session_id !== initialSid) return;
+    if(!S.session || S.session.session_id !== initialSid || S.busy || S.activeStreamId ||
+        S.messages!==previousMessages || S.messages.length!==previousRows.length ||
+        previousRows.some((row,index)=>row!==S.messages[index])) return;
     S.messages = S.messages.slice(0, absoluteKeepCount);
     renderMessages();
     $('msg').value = newText;
@@ -19384,7 +19444,7 @@ async function submitEdit(msgIdx, newText) {
 }
 
 async function regenerateResponse(btn) {
-  if(!S.session || S.busy) return;
+  if(!S.session || S.busy || S.activeStreamId) return;
   const row = btn.closest('[data-msg-idx]');
   if(!row) return;
   const assistantIdx = parseInt(row.dataset.msgIdx, 10);
@@ -19397,14 +19457,20 @@ async function regenerateResponse(btn) {
   }
   if(!lastUserText) return;
   if(typeof _ensureAllMessagesLoaded==='function'){
-    await _ensureAllMessagesLoaded();
+    if(await _ensureAllMessagesLoaded()===false) return;
   }
-  if(!S.session || S.session.session_id !== initialSid) return;
+  if(!S.session || S.session.session_id !== initialSid || S.busy || S.activeStreamId ||
+      (typeof _messagesTruncated!=='undefined' && _messagesTruncated)) return;
+  const previousMessages=S.messages;
+  const previousRows=S.messages.slice();
   try {
     await api('/api/session/truncate', {method:'POST', body:JSON.stringify({
       session_id: initialSid,
       keep_count: absoluteKeepCount
     })});
+    if(!S.session || S.session.session_id !== initialSid || S.busy || S.activeStreamId ||
+        S.messages!==previousMessages || S.messages.length!==previousRows.length ||
+        previousRows.some((row,index)=>row!==S.messages[index])) return;
     S.messages = S.messages.slice(0, absoluteKeepCount);
     renderMessages();
     $('msg').value = lastUserText;
@@ -19728,20 +19794,73 @@ function _csvMediaUrl(path, opts={}){
   return url;
 }
 
+function _parseCsvPreviewRows(text, separator){
+  const rows=[];
+  let row=[],cell='',quoted=false,wasQuoted=false,closedQuote=false,recordStarted=false;
+  const finishCell=()=>{
+    row.push(wasQuoted?cell:cell.trim());
+    cell='';wasQuoted=false;closedQuote=false;
+  };
+  const finishRow=()=>{
+    finishCell();
+    if(recordStarted) rows.push(row);
+    row=[];recordStarted=false;
+  };
+  for(let i=0;i<text.length;i++){
+    const ch=text[i];
+    if(quoted){
+      if(ch==='"'){
+        if(text[i+1]==='"'){cell+='"';i++;}
+        else{quoted=false;closedQuote=true;}
+      }else cell+=ch;
+      continue;
+    }
+    if(ch===separator){recordStarted=true;finishCell();continue;}
+    if(ch==='\n'){finishRow();continue;}
+    if(closedQuote){
+      if(!/\s/.test(ch)) return null;
+      continue;
+    }
+    if(ch==='"'){
+      if(cell.trim()) return null;
+      cell='';quoted=true;wasQuoted=true;recordStarted=true;
+    }else{
+      cell+=ch;
+      if(ch.trim()) recordStarted=true;
+    }
+  }
+  if(quoted) return null;
+  finishRow();
+  return rows;
+}
+
 function buildCsvTablePreview(path, text, downloadUrl=''){
   if(typeof text!=='string') return {errorKey:'csv_error'};
   if(text.length>CSV_MAX_SIZE) return {errorKey:'csv_too_large'};
-  const rows=text.replace(/\r\n/g,'\n').replace(/\r/g,'\n').split('\n').filter(r=>r.trim());
-  if(rows.length<2) return {errorKey:'csv_no_data'};
-  // Auto-detect separator (comma, semicolon, tab)
-  // Heuristic: uses the first separator found in the header row. Edge case:
-  // quoted fields containing commas without non-quoted commas in the header
-  // could cause misdetection — acceptable trade-off for a preview renderer.
-  const firstLine=rows[0];
+  const normalized=text.replace(/^\uFEFF/,'').replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  // Detect comma, semicolon or tab only outside quoted header fields.
   const separators=[',',';','\t'];
-  const sep=separators.find(s=>firstLine.includes(s))||',';
-  const headers=rows[0].split(sep).map(c=>c.trim().replace(/^["']|["']$/g,''));
-  const bodyRows=rows.slice(1).map(r=>'<tr>'+r.split(sep).map(c=>`<td>${esc(c.trim().replace(/^["']|["']$/g,''))}</td>`).join('')+'</tr>').join('');
+  const found=new Set();let quoted=false,headerStarted=false;
+  for(let i=0;i<normalized.length;i++){
+    const ch=normalized[i];
+    if(ch==='"'){
+      headerStarted=true;
+      if(quoted&&normalized[i+1]==='"') i++;
+      else quoted=!quoted;
+    }else if(!quoted){
+      if(ch==='\n'){
+        if(headerStarted) break;
+        continue;
+      }
+      if(ch.trim()||separators.includes(ch)) headerStarted=true;
+      if(separators.includes(ch)) found.add(ch);
+    }
+  }
+  const rows=_parseCsvPreviewRows(normalized,separators.find(s=>found.has(s))||',');
+  if(!rows) return {errorKey:'csv_error'};
+  if(rows.length<2) return {errorKey:'csv_no_data'};
+  const headers=rows[0];
+  const bodyRows=rows.slice(1).map(r=>'<tr>'+r.map(c=>`<td>${esc(c)}</td>`).join('')+'</tr>').join('');
   const headerRow=headers.map(h=>`<th>${esc(h)}</th>`).join('');
   const fname=path.split('/').pop()||path;
   const downloadLink=downloadUrl

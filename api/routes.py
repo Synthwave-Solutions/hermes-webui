@@ -5575,6 +5575,7 @@ def _extension_sidecar_proxy_request_headers(handler) -> dict[str, str]:
             lower in blocked_headers
             or lower in {"authorization", "cookie", "content-length", "host", "origin", "referer"}
             or lower.startswith("x-csrf")
+            or lower.startswith("x-hermes-")
         ):
             continue
         headers[str(name)] = str(value)
@@ -5588,7 +5589,8 @@ def _send_extension_sidecar_proxy_response(handler, status: int, body: bytes, he
     if headers and hasattr(headers, "items"):
         for name, value in headers.items():
             lower = str(name).lower()
-            if lower in blocked_headers or lower in {"content-length", "set-cookie"}:
+            if (lower in blocked_headers or lower in {"content-length", "set-cookie"}
+                    or lower.startswith("x-hermes-")):
                 continue
             if lower == "content-type":
                 sent_content_type = True
@@ -5685,10 +5687,21 @@ def _handle_extension_sidecar_proxy(
             proxy_path,
             query=parsed.query,
         )
+        upstream_headers = _extension_sidecar_proxy_request_headers(handler)
+        if target.get("proxy_auth") == "token-v1":
+            # Only the validated, consent-bound target may supply this secret.
+            # Browser x-hermes-* headers were removed above, including forged
+            # tokens. Never downgrade an unavailable token to a legacy request.
+            token = target.get("auth_token")
+            if not isinstance(token, str) or not re.fullmatch(r"[A-Za-z0-9_-]{16,256}", token):
+                raise ExtensionSidecarProxyError(
+                    "Sidecar proxy auth token is unavailable", status=503
+                )
+            upstream_headers["X-Hermes-Sidecar-Token"] = token
         request = Request(
             target["upstream_url"],
             data=request_body,
-            headers=_extension_sidecar_proxy_request_headers(handler),
+            headers=upstream_headers,
             method=method,
         )
         opener = _extension_sidecar_proxy_same_origin_opener(target["origin"])
@@ -13560,9 +13573,13 @@ def handle_get(handler, parsed) -> bool:
         # resolves to its config.yaml workspace/terminal.cwd rather than leaking the
         # GLOBAL last-workspace file (the #5169 regression Codex flagged). It is
         # profile-scoped via the per-request hermes_profile cookie set in server.py.
-        # Fail open: a resolution error must never 500 this boot-critical endpoint.
+        # The profile's remembered hint is shared across users. Project it
+        # through this actor's current trust/ACL/policy before exposing it.
+        # A resolution error leaves the boot endpoint usable with no selection.
         try:
-            _profile_default_workspace = get_profile_default_workspace()
+            from api.workspace_access import resolve_implicit_workspace
+            _profile_default_workspace = resolve_implicit_workspace(
+                handler, preferred=get_profile_default_workspace())
         except Exception:
             logger.debug("Failed to resolve profile default workspace for /api/profile/active", exc_info=True)
             _profile_default_workspace = None
@@ -14068,8 +14085,11 @@ def handle_post(handler, parsed) -> bool:
             return bad(handler, str(e))
         from api.workspace_access import ensure_workspace_selection
         try:
-            workspace = workspace or get_last_workspace()
-            ensure_workspace_selection(handler, workspace)
+            if workspace:
+                ensure_workspace_selection(handler, workspace)
+            else:
+                from api.workspace_access import resolve_implicit_workspace
+                workspace = resolve_implicit_workspace(handler, preferred=get_profile_default_workspace())
         except PermissionError as e:
             return bad(handler, str(e), 403)
         worktree_info = None
@@ -15551,6 +15571,25 @@ def handle_post(handler, parsed) -> bool:
             # process_wide=False: don't mutate the process-global _active_profile.
             # Per-client profile is managed via cookie + thread-local (#798).
             result = switch_profile(name, process_wide=False)
+            # The response becomes the next New Chat workspace. The target's
+            # remembered hint is shared, so resolve it under the target profile's
+            # registry and this actor's current access before returning it. Keep
+            # the old request context intact for the remainder of this request.
+            from api import profiles as profiles_api
+            from api.workspace_access import resolve_implicit_workspace
+            previous_profile = getattr(profiles_api._tls, 'profile', None)
+            profiles_api.set_request_profile(name)
+            try:
+                result['default_workspace'] = resolve_implicit_workspace(
+                    handler, preferred=result.get('default_workspace'))
+            except Exception:
+                logger.debug("Failed to resolve target profile workspace", exc_info=True)
+                result['default_workspace'] = None
+            finally:
+                if previous_profile is None:
+                    profiles_api.clear_request_profile()
+                else:
+                    profiles_api.set_request_profile(previous_profile)
             # Invalidate the models cache so the very next /api/models request
             # rebuilds from the new profile's config.yaml rather than returning
             # the old profile's cached model list (#1200 — profile-switch model bug).
@@ -20912,23 +20951,27 @@ def _active_run_stream_for_session(session_id: str | None) -> str | None:
 
     cancel_stream() intentionally clears ``session.active_stream_id`` before the
     worker thread fully exits so Stop remains responsive. During that unwind
-    window ACTIVE_RUNS is the worker-lifecycle truth; a successor chat/start for
-    the same session must wait or it can reuse the cached agent while the old
-    interrupt is still landing (#3808).
+    window actual in-process ownership is authoritative; a successor chat/start
+    must wait until both the worker and its leased interrupt callbacks finish,
+    or it can rearm the old cached agent and race its final writeback.
 
     Bounded: the post-cancel unwind is short (dominated by the worker finally's
     ``_ckpt_thread.join(timeout=15)``), and ``unregister_active_run`` runs in that
-    finally, so a healthy worker leaves ACTIVE_RUNS within seconds. A detached /
-    wedged worker that never reaches its finally (e.g. stuck in a provider call,
-    or leaked by SIGKILL without restart) must NOT 409 the session forever — so an
-    entry older than the unwind ceiling (180s) is treated as stale and ignored
-    here. A legitimately long-running turn keeps ``active_stream_id`` SET
-    and is handled by ``_active_stream_blocks_chat_start`` above; this guard only
-    covers the cleared-stream-id unwind window. (Codex brick-gate hardening, #3822.)
+    finally, so a healthy worker leaves within seconds. A genuinely blocked
+    owned worker remains fenced regardless of age. Advisory entries without
+    an actual owner retain the 180s stale-entry recovery below (#3822); elapsed
+    time alone never proves a locally owned worker has finished.
     """
     sid = str(session_id or "").strip()
     if not sid:
         return None
+    # Advisory ACTIVE_RUNS entries can age out after cancellation. A worker
+    # still on the Python stack (or its leased interrupt callback) cannot:
+    # starting again would reuse/rearm its agent and race its final writeback.
+    from api.worker_ownership import live_stream
+    owned_stream = live_stream(sid)
+    if owned_stream:
+        return owned_stream
     ceiling = 180.0  # generous vs the 15s checkpoint-join unwind; finite to avoid permanent-409
     now = time.time()
     try:
@@ -22313,7 +22356,10 @@ def _handle_cron_update(handler, body):
                 updates[k] = v
     except ValueError as e:
         return bad(handler, str(e))
-    job = update_job(body["job_id"], updates)
+    try:
+        job = update_job(body["job_id"], updates)
+    except ValueError as e:
+        return bad(handler, str(e), 400)
     if not job:
         return bad(handler, "Job not found", 404)
     return j(handler, {"ok": True, "job": _cron_job_for_api(job)})
@@ -25691,6 +25737,57 @@ def _mcp_runtime_status_by_name() -> dict[str, dict]:
     }
 
 
+def _mcp_read_access(handler):
+    """Resolve each reader separately; never store identity-filtered inventory globally."""
+    from api.governance.resource_scope import access_for
+    try:
+        return access_for(handler)
+    except Exception:
+        raise PermissionError("MCP governance policy unavailable") from None
+
+
+def _mcp_resource_visible(access, server, tool_name=None):
+    from api.governance.models import grant_matches
+    from api.governance.resource_scope import allowed
+    server = str(server or "")
+    if not server or not allowed(access, "mcp_servers", server, ("mcp-" + server,)):
+        return False
+    if access is None or tool_name is None:
+        return True
+    tool_name = str(tool_name)
+    safe_server = re.sub(r"[^A-Za-z0-9_]", "_", server)
+    names = {tool_name}
+    for prefix in (f"mcp__{safe_server}__", f"mcp_{safe_server}_", f"mcp_{server}_"):
+        if tool_name.startswith(prefix):
+            names.add(tool_name[len(prefix):])
+    keys = ("*", server, "mcp-" + server)
+    if (grant_matches(access.deny.tools, tool_name)
+            or grant_matches(access.deny.toolsets, "mcp-" + server)
+            or any(grant_matches(access.deny.mcp_tools.get(key, ()), name)
+                   for key in keys for name in names)):
+        return False
+    grants = access.grants.mcp_tools
+    # Omitted dimensions retain the same legacy read compatibility as other
+    # resource catalogs; explicit managed policies require a tool grant too.
+    if not grants and access.role_ceiling is None:
+        return True
+    if not any(grant_matches(grants.get(key, ()), name) for key in keys for name in names):
+        return False
+    ceiling = access.role_ceiling
+    return ceiling is None or any(
+        grant_matches(ceiling.mcp_tools.get(key, ()), name)
+        for key in keys for name in names)
+
+
+def _mcp_filter_inventory(access, server_summaries, tools):
+    # Registry/runtime caches span requests and can retain a removed profile's
+    # server. Only the current profile's configured, permitted servers qualify.
+    servers = {name: summary for name, summary in server_summaries.items()
+               if _mcp_resource_visible(access, name)}
+    return servers, [tool for tool in tools if tool.get("server") in servers
+                     and _mcp_resource_visible(access, tool["server"], tool.get("name"))]
+
+
 def _server_summary(name, cfg, runtime_status=None):
     """Return a safe summary of an MCP server config."""
     runtime_status = runtime_status if isinstance(runtime_status, dict) else {}
@@ -25738,7 +25835,8 @@ def _server_summary(name, cfg, runtime_status=None):
         out["status"] = "active"
     else:
         out["status"] = "configured"
-    out["tool_count"] = runtime_status.get("tools") if runtime_status else None
+    count = runtime_status.get("tools") if runtime_status else None
+    out["tool_count"] = len(count) if isinstance(count, list) else count
     return out
 
 
@@ -25894,6 +25992,10 @@ def _mcp_tools_from_registry(server_summaries):
 
 def _handle_mcp_tools_list(handler):
     """List known MCP tools from already-available runtime inventory only."""
+    try:
+        access = _mcp_read_access(handler)
+    except PermissionError as exc:
+        return bad(handler, str(exc), 403)
     cfg = get_config()
     servers = cfg.get("mcp_servers", {})
     if not isinstance(servers, dict):
@@ -25908,6 +26010,7 @@ def _handle_mcp_tools_list(handler):
     if not tools:
         tools = _mcp_tools_from_registry(server_summaries)
         source = "tool_registry" if tools else "none"
+    server_summaries, tools = _mcp_filter_inventory(access, server_summaries, tools)
     tools.sort(key=lambda row: (row.get("server", ""), row.get("name", "")))
     unavailable_servers = [
         summary["name"] for summary in server_summaries.values()
@@ -26034,7 +26137,18 @@ def _configured_note_tool_hints(server_name: str) -> list[dict]:
     ]
 
 
-def _notes_sources_from_mcp_inventory(server_summaries: dict, tools: list[dict]) -> list[dict]:
+def _notes_tool_visible(access, source: str, local_tool: str) -> bool:
+    """Map drawer operations/hints to the same concrete MCP tool permission.
+
+    Joplin search uses search_notes; individual and recent-note reads use
+    get_note, matching the configured tool hints rather than server access alone.
+    """
+    safe_source = re.sub(r"[^A-Za-z0-9_]", "_", source)
+    safe_tool = re.sub(r"[^A-Za-z0-9_]", "_", local_tool)
+    return _mcp_resource_visible(access, source, f"mcp__{safe_source}__{safe_tool}")
+
+
+def _notes_sources_from_mcp_inventory(server_summaries: dict, tools: list[dict], access=None) -> list[dict]:
     """Build a safe notes/knowledge-source inventory from MCP servers/tools.
 
     Some WebUI deployments can read ``mcp_servers`` from config before their
@@ -26074,7 +26188,8 @@ def _notes_sources_from_mcp_inventory(server_summaries: dict, tools: list[dict])
                 "description": desc,
             })
         if not safe_tools:
-            safe_tools = _configured_note_tool_hints(server)
+            safe_tools = [tool for tool in _configured_note_tool_hints(server)
+                          if _notes_tool_visible(access, server, tool["name"])]
             if safe_tools:
                 tool_source = "configured_hint"
         sources.append({
@@ -26104,6 +26219,10 @@ def _handle_notes_sources_list(handler):
             "automatic_recall_unchanged": True,
             "recent_ai_notes": [],
         })
+    try:
+        access = _mcp_read_access(handler)
+    except PermissionError as exc:
+        return bad(handler, str(exc), 403)
     servers = cfg.get("mcp_servers", {})
     if not isinstance(servers, dict):
         servers = {}
@@ -26117,14 +26236,15 @@ def _handle_notes_sources_list(handler):
     if not tools:
         tools = _mcp_tools_from_registry(server_summaries)
         source = "tool_registry" if tools else "none"
+    server_summaries, tools = _mcp_filter_inventory(access, server_summaries, tools)
     return j(handler, {
         "enabled": True,
-        "sources": _notes_sources_from_mcp_inventory(server_summaries, tools),
+        "sources": _notes_sources_from_mcp_inventory(server_summaries, tools, access),
         "source": source,
         "inventory_scope": "already_known_runtime_only",
         "attach_supported": False,
         "automatic_recall_unchanged": True,
-        "recent_ai_notes": _joplin_recent_ai_notes(limit=6),
+        "recent_ai_notes": _joplin_recent_ai_notes(limit=6) if _notes_tool_visible(access, "joplin", "get_note") else [],
     })
 
 
@@ -26387,6 +26507,11 @@ def _handle_notes_search(handler, parsed):
     if source != "joplin":
         return j(handler, {"source": source, "results": [], "error": "Search is currently implemented for Joplin sources only."}, status=400)
     try:
+        if not _notes_tool_visible(_mcp_read_access(handler), source, "search_notes"):
+            return bad(handler, "MCP source is outside your governed scope", 403)
+    except PermissionError as exc:
+        return bad(handler, str(exc), 403)
+    try:
         return j(handler, {"source": "joplin", "query": q, "results": _joplin_search_notes(q, limit=limit)})
     except ValueError as exc:
         return j(handler, {"source": "joplin", "query": q, "results": [], "error": str(exc)}, status=502)
@@ -26400,6 +26525,11 @@ def _handle_notes_item(handler, parsed):
     note_id = str(query.get("id", [""])[0] or "").strip()
     if source != "joplin":
         return j(handler, {"source": source, "error": "Preview is currently implemented for Joplin sources only."}, status=400)
+    try:
+        if not _notes_tool_visible(_mcp_read_access(handler), source, "get_note"):
+            return bad(handler, "MCP source is outside your governed scope", 403)
+    except PermissionError as exc:
+        return bad(handler, str(exc), 403)
     try:
         return j(handler, {"source": "joplin", "note": _joplin_get_note(note_id)})
     except ValueError as exc:
@@ -26574,6 +26704,10 @@ def _handle_mcp_servers_list(handler):
     # never overwrites an existing entry, and can never raise into the list.
     from api import mcp_requests
 
+    try:
+        access = _mcp_read_access(handler)
+    except PermissionError as exc:
+        return bad(handler, str(exc), 403)
     mcp_requests.sync_approved_quietly(path="/api/mcp/servers")
     cfg = get_config()
     servers = cfg.get("mcp_servers", {})
@@ -26583,6 +26717,7 @@ def _handle_mcp_servers_list(handler):
     result = [
         _server_summary(name, scfg, runtime.get(str(name)))
         for name, scfg in servers.items()
+        if _mcp_resource_visible(access, str(name))
     ]
     return j(handler, {
         "servers": result,

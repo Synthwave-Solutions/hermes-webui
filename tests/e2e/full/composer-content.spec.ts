@@ -36,10 +36,10 @@ test('US-SP-CHAT-EDIT actual cancel edit resubmit and regenerate preserve one ed
 });
 
 test('US-SP-CHAT-PROMPTS saved prompt validates empty input saves reloads inserts exact text and deletes',async({page},info)=>{
-  await open(page);await session(page);await page.locator('#btnSavedPrompts').click();await page.locator('.saved-prompt-save-btn').click();
+  await open(page);const sid=await session(page);await page.locator('#btnSavedPrompts').click();await page.locator('.saved-prompt-save-btn').click();
   await expect(page.locator('#toast.error.show')).toContainText(/prompt|input/i);await page.locator('#toast .toast-dismiss').click();await page.locator('#btnSavedPrompts').click();
   const prompt='QA saved prompt '+Date.now()+'\nSecond line';await page.locator('#msg').fill(prompt);await page.locator('#btnSavedPrompts').click();await page.locator('.saved-prompt-save-btn').click();
-  await expect(page.locator('#savedPromptsPopup')).toBeHidden();await page.reload();await page.locator('#msg').fill('');await page.locator('#btnSavedPrompts').click();
+  await expect(page.locator('#savedPromptsPopup')).toBeHidden();await expect.poll(async()=>(await api(page,'/api/session?session_id='+sid)).body.session.composer_draft?.text).toBe(prompt);await page.reload();await expect(page.locator('#msg')).toHaveValue(prompt);await page.locator('#msg').fill('');await page.locator('#btnSavedPrompts').click();
   const row=page.locator('.saved-prompt-row').filter({hasText:'QA saved prompt'});await expect(row).toHaveCount(1);await row.click();await expect(page.locator('#msg')).toHaveValue(prompt+'\n\n');
   await page.locator('#btnSavedPrompts').click();await row.locator('.saved-prompt-delete').click();await expect(row).toHaveCount(0);
   expect(JSON.stringify((await api(page,'/api/prompts')).body)).not.toContain(prompt);await page.reload();await page.locator('#btnSavedPrompts').click();await expect(page.locator('.saved-prompt-row').filter({hasText:'QA saved prompt'})).toHaveCount(0);await capture(page,'saved-prompt-deleted',info);

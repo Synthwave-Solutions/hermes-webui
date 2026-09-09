@@ -65,7 +65,7 @@ def test_kanban_frontend_uses_relative_api_endpoints():
     assert "api('/api/kanban/config" in PANELS
     assert "fetch('/api/kanban" not in PANELS
     assert "kanbanTaskPreview" in PANELS
-    assert "classList.add('selected')" in PANELS
+    assert "classList.toggle('selected', selected)" in PANELS
 
 
 def test_kanban_task_detail_renders_read_only_sections():

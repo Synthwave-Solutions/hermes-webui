@@ -1,8 +1,8 @@
 {
   "result": "passed",
   "chromium": "140.0.7339.186",
-  "user_stories": 362,
-  "scenario_failure_filter": 2,
+  "user_stories": 365,
+  "scenario_failure_filter": 0,
   "voice_scenario_filter": 16,
   "rendered_images": 3,
   "missing_local_links": 0,

@@ -55,6 +55,8 @@ const cases = {
   "30m": _cronScheduleKindForInput("30m"),
   "2h": _cronScheduleKindForInput("2h"),
   "1 day": _cronScheduleKindForInput("1 day"),
+  "in 30m": _cronScheduleKindForInput("in 30m"),
+  "In 2h": _cronScheduleKindForInput("In 2h"),
   "2026-05-11": _cronScheduleKindForInput("2026-05-11"),
   "2026-05-11T08:00": _cronScheduleKindForInput("2026-05-11T08:00"),
   "every 30m": _cronScheduleKindForInput("every 30m"),
@@ -66,9 +68,11 @@ console.log(JSON.stringify(cases));
 """
     kinds = json.loads(_run_node(script))
 
-    assert kinds["30m"] == "once"
-    assert kinds["2h"] == "once"
-    assert kinds["1 day"] == "once"
+    assert kinds["30m"] == "interval"
+    assert kinds["2h"] == "interval"
+    assert kinds["1 day"] == "interval"
+    assert kinds["in 30m"] == "once"
+    assert kinds["In 2h"] == "once"
     assert kinds["2026-05-11"] == "once"
     assert kinds["2026-05-11T08:00"] == "once"
     assert kinds["every 30m"] == "interval"
@@ -386,7 +390,7 @@ elements.cronFormSchedulePreset = makeElement('custom');
 elements.cronFormScheduleOnceWarning = { style: { display: 'none' } };
 
 _initCronSchedulePresetControls();
-elements.cronFormSchedule.value = '30m';
+elements.cronFormSchedule.value = 'in 30m';
 elements.cronFormSchedule.dispatchEvent('input');
 
 console.log(JSON.stringify({
@@ -475,7 +479,7 @@ console.log(JSON.stringify({
 def test_cron_form_surfaces_one_shot_warning_copy_markers_and_preset_markup():
     panels = PANELS_JS.read_text(encoding="utf-8")
     style = STYLE_CSS.read_text(encoding="utf-8")
-    i18n = I18N_JS.read_text(encoding="utf-8")
+    i18n = (ROOT / "static" / "i18n" / "en.js").read_text(encoding="utf-8")
 
     assert "id=\"cronFormScheduleOnceWarning\"" in panels
     assert "id=\"cronFormSchedulePreset\"" in panels
@@ -517,7 +521,7 @@ def test_cron_form_surfaces_one_shot_warning_copy_markers_and_preset_markup():
     custom_idx = panels.index("id: 'custom'")
     monthly_idx = panels.index("id: 'monthly'")
     assert monthly_idx < custom_idx
-    assert "Duration forms like '30m' run once" in i18n
+    assert "'30m' and 'every 30m' repeat" in i18n
 
 
 def test_cron_form_save_payload_still_uses_visible_raw_schedule_only():

@@ -301,13 +301,14 @@ function _syncTerminalTranscriptSpace(open,opts){
   const messages=_terminalMessagesEl();
   if(!messages)return;
   const wasNearBottom=_terminalIsMessagesNearBottom(messages);
+  const follow=_messageDockFollowCallback(messages,wasNearBottom);
   if(!open){
     messages.classList.remove('terminal-open');
     messages.classList.remove('terminal-collapsed');
     messages.classList.remove('terminal-expanding-from-dock');
     messages.style.removeProperty('--terminal-card-height');
     messages.style.removeProperty('--terminal-dock-height');
-    if(wasNearBottom&&typeof scrollToBottom==='function')requestAnimationFrame(scrollToBottom);
+    if(wasNearBottom&&typeof scrollToBottom==='function')requestAnimationFrame(follow);
     return;
   }
   if(open==='collapsed'){
@@ -326,7 +327,7 @@ function _syncTerminalTranscriptSpace(open,opts){
       if(open==='collapsed')messages.style.setProperty('--terminal-dock-height',Math.ceil(h+24)+'px');
       else messages.style.setProperty('--terminal-card-height',Math.ceil(h+24)+'px');
     }
-    if(wasNearBottom&&typeof scrollToBottom==='function')scrollToBottom();
+    if(wasNearBottom&&typeof scrollToBottom==='function')follow();
   };
   if(opts.immediate)measure();
   requestAnimationFrame(measure);

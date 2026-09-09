@@ -8067,12 +8067,15 @@ def _evict_session_agent(session_id: str) -> None:
         return
     # A live run for this session may still hold this agent's _session_db (the
     # worker assigns agent._session_db at run start). Never close it out from
-    # under an in-flight turn — ACTIVE_RUNS is the authoritative liveness signal
-    # (mirrors the worker's own LRU-eviction guard in streaming.py). When a run
+    # under an in-flight turn. Actual worker/callback ownership survives the
+    # advisory ACTIVE_RUNS entry (including its age-based cleanup). When a run
     # is live we still drop the cache handle above (harmless — the worker holds
     # a local ref), but skip the lifecycle commit + _session_db.close() so the
     # running turn can finish persisting. Hardens /clear + model-switch eviction
     # too, not just truncate (#5096 Bug D).
+    from api.worker_ownership import live_stream
+    if live_stream(session_id):
+        return
     _run_active = False
     try:
         with ACTIVE_RUNS_LOCK:

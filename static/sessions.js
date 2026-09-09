@@ -19,7 +19,7 @@ const ICONS={
 // responses from in-flight requests when the user switches sessions again
 // before the first request completes (#1060).
 let _loadingSessionId = null;
-// Each loadSession() invocation gets a monotonically increasing generation.
+// Each loadSession() or newSession() activation gets a monotonically increasing generation.
 // `_loadingSessionId` only tracks destination session_id, so same-session
 // concurrent loads can still race and overwrite each other unless we compare
 // the generation token as well.
@@ -185,6 +185,8 @@ async function _validateCachedSessionScene(sid, scene) {
 
 // Debounced save — prevents hammering the server on every keystroke.
 let _draftSaveTimer = null;
+// A real composer edit owns even an empty value over older draft responses.
+let _composerDraftInputGeneration = 0;
 const _DRAFT_SAVE_DELAY_MS = 400;
 const NEW_CHAT_DRAFT_SESSION_KEY = 'hermes-new-chat-draft-session';
 const _composerDraftKnownPayloadSessions = new Set();
@@ -437,6 +439,9 @@ function _restoreComposerDraft(draft, targetSid, opts={}) {
   const files = (draft && Array.isArray(draft.files)) ? draft.files : [];
   const current = ta.value || '';
   const preserveActiveInput = !!(opts && opts.preserveActiveInput);
+  const inputChanged = Number.isFinite(opts.inputGeneration)
+    && typeof _composerDraftInputGeneration==='number'
+    && opts.inputGeneration!==_composerDraftInputGeneration;
   const restoreSid = targetSid || (S.session && S.session.session_id);
   const hasServerDraftPayload = _composerDraftHasPayload(text, files);
 
@@ -448,6 +453,16 @@ function _restoreComposerDraft(draft, targetSid, opts={}) {
   // composer is the authoritative in-progress draft; never replace non-empty
   // local input with an older server draft. Cross-session switches still restore
   // normally so the previous session's composer contents do not leak forward.
+  if (preserveActiveInput && inputChanged) {
+    // Metadata may have arrived after the user typed and explicitly cleared
+    // the initially blank composer. Preserve that empty value and save it once
+    // the requested session is actually bound; never save into another chat.
+    if (restoreSid && S.session && S.session.session_id===restoreSid
+        && typeof _saveComposerDraftNow==='function') {
+      _saveComposerDraftNow(restoreSid, current, S.pendingFiles ? [...S.pendingFiles] : []);
+    }
+    return;
+  }
   if (preserveActiveInput && current && current !== text) return;
 
   // If there's no text and no files, clear the textarea (a previous session's
@@ -1530,6 +1545,11 @@ async function newSession(flash, options={}){
     if(typeof showToast==='function') showToast(_newSessionPendingText(),1500);
     return _newSessionInFlight;
   }
+  // New Chat is a navigation intent too: retire an older load before its
+  // metadata/error response can replace the new conversation or clear its URL.
+  const activationGeneration=typeof _loadSessionGeneration==='number'
+    ? ++_loadSessionGeneration : null;
+  if(typeof _loadingSessionId!=='undefined') _loadingSessionId=null;
   _setNewSessionPending(true);
   _newSessionInFlight=(async()=>{
     // Starting a brand-new chat must not carry named context blocks selected in
@@ -1639,6 +1659,12 @@ async function newSession(flash, options={}){
         ||null;
     }
     const data=await api('/api/session/new',{method:'POST',body:JSON.stringify(reqBody)});
+    // The record was created successfully, but a later sidebar/navigation
+    // choice owns the screen. Retain the record without activating it.
+    if(activationGeneration!==null&&_loadSessionGeneration!==activationGeneration){
+      if(typeof refreshSessionList==='function') Promise.resolve(refreshSessionList('new-session')).catch(()=>{});
+      return;
+    }
     if(consumedExplicitModelOverride&&typeof _clearEmptyComposerModelOverride==='function'){
       _clearEmptyComposerModelOverride();
     }
@@ -1828,6 +1854,9 @@ async function _switchProfileForSessionLoad(profile){
 
 async function loadSession(sid){
   const opts = arguments[1] || {};
+  const draftInputGeneration=Number.isFinite(opts.draftInputGeneration)
+    ? opts.draftInputGeneration
+    : (typeof _composerDraftInputGeneration==='number'?_composerDraftInputGeneration:null);
   // Resolve canonical lineage SID BEFORE both the direct and sidebar preload
   // notifications so extensions always see the canonical session id, not the
   // raw sidebar click id (which may differ after lineage folding).
@@ -1862,6 +1891,8 @@ async function loadSession(sid){
   // failed loadSession killed; no-ops on real switches.
   _rearmActiveSessionStream();
   if(currentSid===sid && !forceReload && (!_loadingSessionId || _loadingSessionId===sid)){
+    // Staying on the current chat also supersedes a pending New Chat request.
+    if(typeof _newSessionInFlight!=='undefined'&&_newSessionInFlight) ++_loadSessionGeneration;
     // Re-selecting the already-open session is a no-op for transcript/scroll, but
     // it is still a *visit*: clear a stale sidebar unread dot (e.g. one a
     // background completion left on the open, unfocused pane) before returning.
@@ -2543,7 +2574,7 @@ async function loadSession(sid){
   // against stale writes from slow responses racing to restore the previous draft).
   const _draft = S.session && S.session.composer_draft;
   if (_draft && (typeof _restoreComposerDraft === 'function')) {
-    _restoreComposerDraft(_draft, sid, {preserveActiveInput:!!opts.preserveActiveInput || (currentSid===sid&&forceReload)});
+    _restoreComposerDraft(_draft, sid, {preserveActiveInput:!!opts.preserveActiveInput || (currentSid===sid&&forceReload), inputGeneration:draftInputGeneration});
   }
 
   // Clear the in-flight session marker now that this load has completed (#1060).
@@ -2891,10 +2922,11 @@ function _syncHandoffDockSpace(open) {
   const messages = _handoffMessagesEl();
   if (!messages) return;
   const wasNearBottom = _handoffIsMessagesNearBottom(messages);
+  const follow = _messageDockFollowCallback(messages, wasNearBottom);
   if (!open) {
     messages.classList.remove('handoff-dock-visible');
     messages.style.removeProperty('--handoff-dock-height');
-    if (wasNearBottom && typeof scrollToBottom === 'function') requestAnimationFrame(scrollToBottom);
+    if (wasNearBottom && typeof scrollToBottom === 'function') requestAnimationFrame(follow);
     return;
   }
   messages.classList.add('handoff-dock-visible');
@@ -2902,7 +2934,7 @@ function _syncHandoffDockSpace(open) {
     const container = $('handoffHintContainer');
     const h = container && container.getBoundingClientRect().height;
     if (h > 0) messages.style.setProperty('--handoff-dock-height', Math.ceil(h + 24) + 'px');
-    if (wasNearBottom && typeof scrollToBottom === 'function') scrollToBottom();
+    if (wasNearBottom && typeof scrollToBottom === 'function') follow();
   };
   requestAnimationFrame(measure);
   setTimeout(measure, 360);
@@ -4036,7 +4068,9 @@ async function _loadOlderMessages() {
 //   2. Bump _messagesGeneration before mutating S.messages so any
 //      in-flight prefetch's post-await generation check bails out.
 async function _ensureAllMessagesLoaded() {
-  if (!_messagesTruncated || !S.session) return;
+  if (!S.session || S.busy || S.activeStreamId) return false;
+  if (!_messagesTruncated) return true;
+  const requestedSid = S.session.session_id;
   if (_loadingOlder) {
     // A prefetch is mid-flight (between the `_loadingOlder = true` line
     // and its post-await guards). Bumping the generation token now
@@ -4049,18 +4083,27 @@ async function _ensureAllMessagesLoaded() {
     while (_loadingOlder) {
       await new Promise(resolve => setTimeout(resolve, 16));
     }
-    if (!_messagesTruncated || !S.session) return;
+    if (!S.session || S.session.session_id !== requestedSid || S.busy || S.activeStreamId) return false;
+    if (!_messagesTruncated) return true;
   }
   _loadingOlder = true;
   try {
     const sid = S.session.session_id;
+    const generation = _messagesGeneration;
+    const previousMessages = S.messages;
+    const previousRows = Array.isArray(previousMessages) ? previousMessages.slice() : [];
     const data = await api(`/api/session?session_id=${encodeURIComponent(sid)}&messages=1&resolve_model=0`, {timeoutMs:120000});
     // Guard: api() may have redirected (401) and returned undefined.
-    if (!data || !data.session) return;
+    if (!data || !data.session) return false;
     // Session may have been switched while we awaited. Bail rather than
     // overwrite the new session's messages.
-    if (!S.session || S.session.session_id !== sid) return;
-    if (_loadingSessionId !== null && _loadingSessionId !== sid) return;
+    if (!S.session || S.session.session_id !== sid) return false;
+    if (_loadingSessionId !== null && _loadingSessionId !== sid) return false;
+    // A turn may start AND finish while this older snapshot is in flight.
+    // Keep live/newer rows and pagination metadata rather than replacing them.
+    if (S.busy || S.activeStreamId || _messagesGeneration !== generation ||
+        S.messages !== previousMessages || previousRows.length !== S.messages.length ||
+        previousRows.some((row, index) => row !== S.messages[index])) return false;
     const msgs = (data.session.messages || []).filter(m => m && m.role);
     // Bump the generation BEFORE the wholesale replace so any racing
     // prefetch (whose snapshot was taken before this call's mutex
@@ -4081,6 +4124,7 @@ async function _ensureAllMessagesLoaded() {
     if (S.session && S.session.session_id === sid) {
       S.session.message_count = Number(data.session.message_count || msgs.length);
     }
+    return true;
   } finally {
     _loadingOlder = false;
   }

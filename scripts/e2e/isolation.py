@@ -46,6 +46,7 @@ def fixture_environment(state: Path) -> dict[str, str]:
         "AWS_CONFIG_FILE": str(fixture_home / ".aws/config"),
         "AWS_EC2_METADATA_DISABLED": "true",
         "QA_ISOLATION_STATE": str(state),
+        "PYTHONDONTWRITEBYTECODE": "1",
         "PYTHONPATH": str(Path(__file__).resolve().parent),
     }
 

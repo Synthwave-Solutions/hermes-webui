@@ -1587,7 +1587,7 @@ window.__registerHermesLocale('pl', {
     cron_schedule_preset_monthly: 'Co miesiąc',
     cron_schedule_preset_custom: 'Niestandardowe',
     cron_schedule_hint: "Użyj 'every 1h' lub wyrażenia cron dla zadań cyklicznych. Same formy czasu trwania, jak '30m', zostaną uruchomione tylko raz.",
-    cron_schedule_once_warning: 'Formy czasu trwania, takie jak \'30m\', są uruchamiane raz i usuwane po uruchomieniu. Użyj \'every 30m\', aby utrzymać zadanie cykliczne.',
+    cron_schedule_once_warning: "Ten harmonogram uruchamia zadanie tylko raz. Użyj 'in 30m' lub daty i godziny dla jednorazowego zadania; '30m' i 'every 30m' oznaczają powtarzanie.",
     cron_prompt_label: 'Monit',
     cron_deliver_label: 'Dostarcz wyjście do',
     cron_deliver_local: 'Lokalnie (tylko zapisz wyjście)',

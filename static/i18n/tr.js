@@ -1497,7 +1497,7 @@ window.__registerHermesLocale('tr', {
     cron_schedule_preset_monthly: 'Aylık',
     cron_schedule_preset_custom: 'Özel',
     cron_schedule_hint: "Use 'every 1h' or a cron expression for recurring jobs. Bare durations like '30m' run once.",
-    cron_schedule_once_warning: "Duration forms like '30m' run once and are removed after running. Use 'every 30m' to keep a recurring job.",
+    cron_schedule_once_warning: "Bu zamanlama bir kez çalışır. Tek seferlik bir görev için 'in 30m' veya tarih ve saat kullanın; '30m' ve 'every 30m' tekrarlanır.",
     cron_prompt_label: 'Çabuk',
     cron_deliver_label: 'Çıktıyı şuraya ilet:',
     cron_deliver_local: 'Yerel (yalnızca çıktıyı kaydet)',

@@ -7,6 +7,51 @@ import re
 import sys
 import time
 
+
+def stdio_mcp(state):
+    """Actual local MCP JSON-RPC transport; effects confined to one QA ledger."""
+    state = Path(state).resolve()
+    if state.name != 'e2e-state' or not (state / 'workspace').is_dir():
+        raise ValueError('MCP fixture requires private QA state')
+    tools = [{'name': 'qa_mark', 'description': 'Record a synthetic marker locally.',
+              'inputSchema': {'type': 'object', 'properties': {
+                  'marker': {'type': 'string', 'description': 'Synthetic QA marker'}},
+                  'required': ['marker'], 'additionalProperties': False}}]
+    tools += [{'name': 'qa_lookup_' + str(i), 'description': 'Synthetic catalog entry ' + str(i),
+               'inputSchema': {'type': 'object', 'properties': {'value': {'type': 'integer'}},
+                               'required': ['value']}} for i in range(1, 8)]
+    for line in sys.stdin:
+        request = json.loads(line)
+        if 'id' not in request:
+            continue
+        method = request.get('method')
+        if method == 'initialize':
+            result = {'protocolVersion': request.get('params', {}).get('protocolVersion', '2024-11-05'),
+                      'capabilities': {'tools': {}}, 'serverInfo': {'name': 'qa-stdio', 'version': '1.0'}}
+        elif method == 'ping':
+            result = {}
+        elif method == 'tools/list':
+            result = {'tools': tools}
+        elif method == 'tools/call':
+            params = request.get('params', {})
+            marker = str(params.get('arguments', {}).get('marker', ''))
+            if params.get('name') != 'qa_mark' or not re.fullmatch(r'QA_MCP_[A-Z0-9_]+', marker):
+                result = {'content': [{'type': 'text', 'text': 'Unsupported synthetic invocation'}], 'isError': True}
+            else:
+                with (state / 'workspace' / 'qa-mcp-effects.jsonl').open('a') as record:
+                    record.write(json.dumps({'marker': marker, 'pid': os.getpid()}) + '\n')
+                result = {'content': [{'type': 'text', 'text': 'QA_MCP_EXECUTED:' + marker}]}
+        else:
+            print(json.dumps({'jsonrpc': '2.0', 'id': request['id'],
+                              'error': {'code': -32601, 'message': 'Method not found'}}), flush=True)
+            continue
+        print(json.dumps({'jsonrpc': '2.0', 'id': request['id'], 'result': result}), flush=True)
+
+
+if len(sys.argv) > 1 and sys.argv[1] == '--mcp':
+    stdio_mcp(sys.argv[2])
+    raise SystemExit(0)
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *_): pass
     def do_GET(self):
@@ -23,6 +68,14 @@ class Handler(BaseHTTPRequestHandler):
         tool_calls=None
         is_review='You review one already-permitted tool action for an administrator.' in system_text
         review_decision=None
+        clarify_marker = None
+        clarify_phase = None
+        clarify_answers = None
+        clarify_origin = next((m['content'] for m in messages if m.get('role') == 'user'
+            and isinstance(m.get('content'), str) and 'QA_CLARIFY_FLOW|' in m['content']), '')
+        kanban_origin = any('QA_KANBAN_WORKER_FLOW' in str(m.get('content', '')) for m in messages)
+        kanban_start = any(re.fullmatch(r'work kanban task t_[a-f0-9]+', str(m.get('content', '')))
+                           for m in messages if m.get('role') == 'user')
         continuation_origin = next((m['content'] for m in messages if m.get('role') == 'user'
             and isinstance(m.get('content'), str) and 'QA_CONTINUATION_PARENT|' in m['content']), '')
         if not is_review and 'QA_SLOW_CHILD' in last and 'QA_DELEGATE_SLOW_PARENT' not in last:
@@ -37,6 +90,68 @@ class Handler(BaseHTTPRequestHandler):
             rules=str(review.get('administrator_rules',''))
             review_decision='approve' if 'QA_ALLOW_ONLY' in rules else 'deny' if 'QA_DENY_ONLY' in rules else 'manual'
             answer=json.dumps({'decision':review_decision,'reason':'Deterministic QA review for this synthetic action.','confidence':.99})
+        elif clarify_origin and any(tool.get('function', {}).get('name') == 'clarify' for tool in data.get('tools', [])):
+            clarify_marker = clarify_origin.split('QA_CLARIFY_FLOW|', 1)[1].splitlines()[0].strip()
+            if not re.fullmatch(r'[a-z0-9-]+', clarify_marker):
+                raise ValueError('Unsupported clarify fixture marker')
+            # Some provider adapters omit name from tool-result messages;
+            # correlate them to the actual preceding clarify call IDs.
+            call_ids = {c['id'] for m in messages for c in m.get('tool_calls', [])
+                        if c.get('function', {}).get('name') == 'clarify'}
+            results = [m.get('content', '') for m in messages if m.get('role') == 'tool'
+                       and (m.get('name') == 'clarify' or m.get('tool_call_id') in call_ids)]
+            clarify_phase = len(results)
+            if len(results) < 2:
+                question = {'question': ('QA clarification choice ' if not results else 'QA clarification follow-up ') + clarify_marker}
+                if not results:
+                    question['choices'] = ['Alpha', 'Beta']
+                tool_calls = [{'id': 'qa-clarify-' + str(time.time_ns()), 'type': 'function',
+                    'function': {'name': 'clarify', 'arguments': json.dumps({'questions': [question]})}}]
+                answer = None
+            else:
+                clarify_answers = [json.loads(value) for value in results]
+                answer = 'QA_CLARIFY_COMPLETED:' + clarify_marker + ':' + json.dumps(clarify_answers)
+        elif (kanban_origin or kanban_start) and any(tool.get('function', {}).get('name') == 'kanban_show' for tool in data.get('tools', [])):
+            call_ids = {c['id'] for m in messages for c in m.get('tool_calls', [])
+                        if c.get('function', {}).get('name') == 'kanban_complete'}
+            results = [m.get('content', '') for m in messages if m.get('role') == 'tool'
+                       and (m.get('name') == 'kanban_complete' or m.get('tool_call_id') in call_ids)]
+            if results:
+                answer = 'QA_KANBAN_WORKER_FINISHED'
+            elif not kanban_origin:
+                # Read the real task through its dispatcher-owned worker.
+                tool_calls = [{'id': 'qa-kanban-show-' + str(time.time_ns()), 'type': 'function',
+                    'function': {'name': 'kanban_show', 'arguments': '{}'}}]
+                answer = None
+            else:
+                # A real dispatcher-owned worker remains active long enough
+                # to exercise claim fences, then completes with its own token.
+                time.sleep(12)
+                tool_calls = [{'id': 'qa-kanban-complete-' + str(time.time_ns()), 'type': 'function',
+                    'function': {'name': 'kanban_complete', 'arguments': json.dumps({
+                        'summary': 'QA_KANBAN_WORKER_DONE', 'metadata': {'qa_fixture': True}})}}]
+                answer = None
+        elif 'QA_SUPPLEMENT_CLI|' in last or 'QA_SUPPLEMENT_MCP|' in last:
+            results = [m.get('content', '') for m in messages[last_index+1:] if m.get('role') == 'tool']
+            if results:
+                answer = 'QA_SUPPLEMENT_TOOL_RESULT: ' + str(results[-1])
+            else:
+                cli = 'QA_SUPPLEMENT_CLI|' in last
+                value = last.split('QA_SUPPLEMENT_CLI|' if cli else 'QA_SUPPLEMENT_MCP|', 1)[1].splitlines()[0].strip()
+                if cli:
+                    if not re.fullmatch(r'qa-cli-[a-z0-9-]+\.txt', value):
+                        raise ValueError('Unsupported CLI fixture target')
+                    arguments = {'command': '/usr/bin/touch ' + value,
+                                 'workdir': str(Path(os.environ['QA_STATE']) / 'workspace')}
+                else:
+                    # MCP tools are deferred behind the engine's real tool_call
+                    # bridge. Invoking that bridge preserves schema validation
+                    # and the underlying tool's governance/action approval.
+                    arguments = {'name': 'mcp__qa_stdio__qa_mark', 'arguments': {'marker': value}}
+                tool_calls = [{'id': 'qa-supplement-' + str(time.time_ns()), 'type': 'function',
+                               'function': {'name': 'terminal' if cli else 'tool_call',
+                                            'arguments': json.dumps(arguments)}}]
+                answer = None
         elif 'QA_STEER_WINDOW' in last and data.get('tools') and not any(m.get('role')=='tool' for m in messages[last_index+1:]):
             time.sleep(5)
             target=str(Path(os.environ['QA_STATE'])/'workspace'/'qa-evidence.txt')
@@ -95,8 +210,8 @@ class Handler(BaseHTTPRequestHandler):
             answer=('RESEARCH ' if 'QA_BOT_RESEARCH' in system_text else 'DEFAULT ')+'QA_REPLY: '+(markers[-1] if markers else last.splitlines()[0][:80] if last else 'QA')
         evidence=Path(os.environ.get('QA_STATE',str(Path(__file__).parent)))/'provider-evidence.jsonl'
         with evidence.open('a') as record:
-            record.write(json.dumps({'review':is_review,'review_decision':review_decision,'observed_steer':any('QA_ACTUAL_STEER' in str(m.get('content','')) for m in messages),'issued_tools':[c['function']['name'] for c in tool_calls or []],'tools_offered':[t.get('function',{}).get('name') for t in data.get('tools',[])]})+'\n')
-        base={'id':'chatcmpl-qa','created':int(time.time()),'model':'qa-deterministic'}
+            record.write(json.dumps({'review':is_review,'review_decision':review_decision,'request_model':data.get('model'),'last_user_text':last[:500],'clarify_marker':clarify_marker,'clarify_phase':clarify_phase,'clarify_answers':clarify_answers,'observed_steer':any('QA_ACTUAL_STEER' in str(m.get('content','')) for m in messages),'issued_tools':[c['function']['name'] for c in tool_calls or []],'tools_offered':[t.get('function',{}).get('name') for t in data.get('tools',[])]})+'\n')
+        base={'id':'chatcmpl-qa','created':int(time.time()),'model':data.get('model') or 'qa-deterministic'}
         message={'role':'assistant','content':answer}
         if tool_calls: message['tool_calls']=tool_calls
         finish='tool_calls' if tool_calls else 'stop'

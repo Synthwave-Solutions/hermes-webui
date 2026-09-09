@@ -4,6 +4,8 @@ let _kanbanBoard = null;
 let _kanbanLatestEventId = 0;
 let _kanbanPollTimer = null;
 let _kanbanCurrentTaskId = null;
+let _kanbanTaskDetailRequestId = 0;
+const _kanbanSelectedIds = new Set();
 let _kanbanLanesByProfile = true;
 // Multi-board state. _kanbanCurrentBoard is the slug of the active board
 // the UI is currently viewing. null means "use whatever the server reports
@@ -270,6 +272,7 @@ function _beginSettingsPanelSession() {
     _searchResults.innerHTML = '';
   }
   _settingsDirty = false;
+  _auxSettingsDirty = false;
   _settingsThemeOnOpen = localStorage.getItem('hermes-theme') || 'dark';
   _settingsSkinOnOpen = localStorage.getItem('hermes-skin') || 'default';
   _settingsFontSizeOnOpen = localStorage.getItem('hermes-font-size') || 'default';
@@ -299,7 +302,7 @@ function _beginSettingsPanelSession() {
 
 function _beforePanelSwitch(nextPanel) {
   if (_currentPanel !== 'settings' || nextPanel === 'settings') return true;
-  if (_settingsDirty) {
+  if (_settingsDirty || _auxSettingsDirty) {
     _pendingSettingsTargetPanel = nextPanel || 'chat';
     _showSettingsUnsavedBar();
     return false;
@@ -460,12 +463,21 @@ function _cronScheduleKindForInput(value) {
   if (!schedule) return '';
   const lower = schedule.toLowerCase();
   if (lower.startsWith('every ')) return 'interval';
+  if (lower.startsWith('in ')) return 'once';
   if (lower.startsWith('@')) return 'cron';
   const parts = schedule.split(/\s+/);
   if (parts.length >= 5 && parts.slice(0, 5).every(p => /^[\d*\-,/]+$/.test(p))) return 'cron';
   if (schedule.includes('T') || /^\d{4}-\d{2}-\d{2}/.test(schedule)) return 'once';
-  if (/^\d+\s*(m|min|mins|minute|minutes|h|hr|hrs|hour|hours|d|day|days)$/i.test(schedule)) return 'once';
+  if (/^\d+\s*(m|min|mins|minute|minutes|h|hr|hrs|hour|hours|d|day|days)$/i.test(schedule)) return 'interval';
   return '';
+}
+
+function _cronEditableSchedule(job) {
+  const schedule = job && job.schedule;
+  if (schedule && schedule.kind === 'once' && schedule.run_at) return schedule.run_at;
+  if (schedule && schedule.kind === 'cron' && schedule.expr) return schedule.expr;
+  if (schedule && schedule.kind === 'interval' && schedule.minutes) return `every ${schedule.minutes}m`;
+  return job && job.schedule_display || (schedule && schedule.expression) || '';
 }
 
 function _syncCronScheduleWarning() {
@@ -1203,6 +1215,7 @@ function _cronAgentPromptCardHtml(job){
 }
 
 function _renderCronDetail(job){
+  _disposeCronSkillPicker();
   _currentCronDetail = job;
   _currentCronDetailKey = _cronJobKey(job);
   const title = $('taskDetailTitle');
@@ -1459,6 +1472,7 @@ function openCronDetail(jobOrId, el){
 }
 
 function _clearCronDetail(){
+  _disposeCronSkillPicker();
   _currentCronDetail = null;
   _currentCronDetailKey = '';
   _cronMode = 'empty';
@@ -1508,7 +1522,7 @@ function duplicateCurrentCron(){
   }
   _renderCronForm({
     name: dupName,
-    schedule: job.schedule_display || (job.schedule && job.schedule.expression) || '',
+    schedule: _cronEditableSchedule(job),
     prompt: job.prompt || '',
     deliver: job.deliver || 'local',
     profile: job.profile || '',
@@ -1543,6 +1557,7 @@ let _cronIsDuplicate = false;
 let _cronSkillsCache=null;
 let _cronProfilesCache=null;
 let _cronDeliveryOptionsCache=null;
+let _cronSkillPickerCleanup=null;
 
 function openCronCreate(){
   if (typeof switchPanel === 'function' && _currentPanel !== 'tasks') switchPanel('tasks');
@@ -1565,7 +1580,7 @@ function openCronEdit(job){
   _cronSelectedSkills = Array.isArray(job.skills) ? [...job.skills] : [];
   _renderCronForm({
     name: job.name || '',
-    schedule: job.schedule_display || (job.schedule && job.schedule.expression) || '',
+    schedule: _cronEditableSchedule(job),
     prompt: job.prompt || '',
     deliver: job.deliver || 'local',
     profile: job.profile || '',
@@ -1585,6 +1600,7 @@ function openCronEdit(job){
 }
 
 function _renderCronForm({ name, schedule, prompt, deliver, profile, toast_notifications=true, no_agent=false, script='', model='', provider='', isEdit }){
+  _disposeCronSkillPicker();
   const title = $('taskDetailTitle');
   const body = $('taskDetailBody');
   const empty = $('taskDetailEmpty');
@@ -1662,7 +1678,7 @@ function _renderCronForm({ name, schedule, prompt, deliver, profile, toast_notif
           <label for="cronFormSchedule">${esc(t('cron_schedule_label') || 'Cron expression')}</label>
           <input type="text" id="cronFormSchedule" value="${esc(schedule || '')}" placeholder="0 9 * * *  —  every 1h  —  @daily" autocomplete="off" required>
           <div class="detail-form-hint">${esc(t('cron_schedule_hint') || "Cron expression or shorthand like 'every 1h'.")}</div>
-          <div id="cronFormScheduleOnceWarning" class="detail-form-warning cron-once-warning" style="display:none">${esc(t('cron_schedule_once_warning') || "Duration forms like '30m' run once and are removed after running. Use 'every 30m' to keep a recurring job.")}</div>
+          <div id="cronFormScheduleOnceWarning" class="detail-form-warning cron-once-warning" style="display:none">${esc(t('cron_schedule_once_warning') || "This schedule runs once. Use 'in 30m' or a timestamp for a one-time job; '30m' and 'every 30m' repeat.")}</div>
         </div>
         ${scriptBlock}
         ${promptBlock}
@@ -1822,11 +1838,33 @@ function _renderCronSkillTags(){
   }
 }
 
+function _disposeCronSkillPicker(){
+  if(_cronSkillPickerCleanup)_cronSkillPickerCleanup();
+  _cronSkillPickerCleanup=null;
+}
+
 function _bindCronSkillPicker(){
+  _disposeCronSkillPicker();
   const search=$('cronFormSkillSearch');
   const dropdown=$('cronFormSkillDropdown');
   if(!search||!dropdown)return;
+  let active=true;
+  let blurTimer=null;
+  const ownsPicker=()=>active&&$('cronFormSkillSearch')===search&&$('cronFormSkillDropdown')===dropdown;
+  const cancelBlur=()=>{
+    if(blurTimer!==null)clearTimeout(blurTimer);
+    blurTimer=null;
+  };
+  _cronSkillPickerCleanup=()=>{
+    active=false;
+    cancelBlur();
+    search.oninput=null;
+    search.onfocus=null;
+    search.onblur=null;
+  };
   search.oninput=()=>{
+    cancelBlur();
+    if(!ownsPicker()||search.disabled)return;
     const q=search.value.trim().toLowerCase();
     if(!q||!_cronSkillsCache){dropdown.style.display='none';return;}
     const matches=_cronSkillsCache.filter(s=>
@@ -1840,6 +1878,8 @@ function _bindCronSkillPicker(){
       opt.className='skill-opt';
       opt.textContent=s.name+(s.category?' ('+s.category+')':'');
       opt.onclick=()=>{
+        if(!ownsPicker())return;
+        cancelBlur();
         _cronSelectedSkills.push(s.name);
         _renderCronSkillTags();
         search.value='';
@@ -1849,7 +1889,18 @@ function _bindCronSkillPicker(){
     }
     dropdown.style.display='';
   };
-  search.onblur=()=>setTimeout(()=>{dropdown.style.display='none';},150);
+  search.onfocus=()=>search.oninput();
+  search.onblur=()=>{
+    cancelBlur();
+    const pending=setTimeout(()=>{
+      // A queued blur belongs to this binding and this focus transition only.
+      if(!ownsPicker()||blurTimer!==pending)return;
+      blurTimer=null;
+      if(document.activeElement!==search)dropdown.style.display='none';
+    },150);
+    blurTimer=pending;
+  };
+  if(document.activeElement===search)search.oninput();
 }
 
 function cancelCronForm(){
@@ -2439,6 +2490,17 @@ function openKanbanCard(event, taskId){
     }
     return false;
   }
+  if (event && (event.metaKey || event.ctrlKey)) {
+    event.preventDefault();
+    if (_kanbanSelectedIds.has(taskId)) _kanbanSelectedIds.delete(taskId);
+    else _kanbanSelectedIds.add(taskId);
+    const card = event.currentTarget;
+    if (card) {
+      card.classList.toggle('selected', _kanbanSelectedIds.has(taskId));
+      card.setAttribute('aria-pressed', String(_kanbanSelectedIds.has(taskId)));
+    }
+    return false;
+  }
   loadKanbanTask(taskId);
   return false;
 }
@@ -2538,6 +2600,8 @@ function _kanbanRenderBoard(){
   }
   board.classList.toggle('kanban-board-consolidated', !_kanbanLanesByProfile);
   const columns = _kanbanVisibleTasks();
+  const visibleIds = new Set(columns.flatMap(col => (col.tasks || []).map(task => task.id)));
+  for (const id of _kanbanSelectedIds) if (!visibleIds.has(id)) _kanbanSelectedIds.delete(id);
   const total = columns.reduce((n, col) => n + (col.tasks || []).length, 0);
   if ($('kanbanSummary')) $('kanbanSummary').textContent = String(t('kanban_visible_tasks')).replace('{0}', total);
   _kanbanRenderSidebar(columns);
@@ -2558,7 +2622,7 @@ function _kanbanCard(task, status){
   const stale = _kanbanCardStalenessClass(task);
   const body = _kanbanTaskBody(task);
   const assignee = task.assignee ? `<span class="kanban-card-assignee">@${esc(task.assignee)}</span>` : `<span class="kanban-card-unassigned">${esc(t('kanban_unassigned'))}</span>`;
-  return `<article class="kanban-card ${esc(stale)}" data-kanban-task-id="${esc(task.id)}" draggable="true" ondragstart="dragKanbanTask(event, '${esc(task.id)}')" ondragend="finishKanbanDrag(event)" onclick="return openKanbanCard(event, '${esc(task.id)}')" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();loadKanbanTask('${esc(task.id)}')}">
+  return `<article class="kanban-card ${esc(stale)}${_kanbanSelectedIds.has(task.id) ? ' selected' : ''}" data-kanban-task-id="${esc(task.id)}" aria-pressed="${_kanbanSelectedIds.has(task.id)}" title="Click to open; Ctrl or Command-click to select multiple" draggable="true" ondragstart="dragKanbanTask(event, '${esc(task.id)}')" ondragend="finishKanbanDrag(event)" onclick="return openKanbanCard(event, '${esc(task.id)}')" tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openKanbanCard(event,'${esc(task.id)}')}">
     <div class="kanban-card-topline"><span class="kanban-card-id">${esc(task.id || '')}</span>${priority ? `<span class="kanban-badge priority">P${priority}</span>` : ''}${task.tenant ? `<span class="kanban-badge tenant">${esc(task.tenant)}</span>` : ''}</div>
     <div class="kanban-card-title">${esc(_kanbanTaskTitle(task))}</div>
     ${body ? `<div class="kanban-card-body">${_kanbanRenderMarkdown(body)}</div>` : ''}
@@ -2753,7 +2817,7 @@ async function refreshKanbanEvents(){
     if (events && Array.isArray(events.events) && events.events.length) {
       _kanbanLatestEventId = Number(events.latest_event_id || events.cursor || _kanbanLatestEventId);
       await loadKanban(true);
-      if (_kanbanCurrentTaskId && events.events.some(ev => ev.task_id === _kanbanCurrentTaskId)) await loadKanbanTask(_kanbanCurrentTaskId);
+      if (_kanbanCurrentTaskId && events.events.some(ev => ev.task_id === _kanbanCurrentTaskId)) await loadKanbanTask(_kanbanCurrentTaskId, {preserveSelection: true});
     }
   } catch(e) { /* polling should not spam toasts */ }
 }
@@ -2835,7 +2899,7 @@ function _scheduleKanbanRefresh(events){
     try {
       await loadKanban(true);
       if (_kanbanCurrentTaskId && taskIds.includes(_kanbanCurrentTaskId)) {
-        await loadKanbanTask(_kanbanCurrentTaskId);
+        await loadKanbanTask(_kanbanCurrentTaskId, {preserveSelection: true});
       }
     } catch(_) { /* swallow — SSE refresh shouldn't toast */ }
   }, 250);
@@ -2948,8 +3012,8 @@ function _kanbanFormatDispatchResult(result, dryRun){
 }
 
 function _kanbanSelectedTaskIds(){
-  const selected = Array.from(document.querySelectorAll('.kanban-card.selected')).map(card => card.dataset.kanbanTaskId).filter(Boolean);
-  return selected.length ? selected : (_kanbanCurrentTaskId ? [_kanbanCurrentTaskId] : []);
+  return Array.from(document.querySelectorAll('#kanbanBoard .kanban-card.selected'))
+    .map(card => card.dataset.kanbanTaskId).filter(id => _kanbanSelectedIds.has(id));
 }
 
 async function bulkUpdateKanban(){
@@ -2957,8 +3021,15 @@ async function bulkUpdateKanban(){
   const status = $('kanbanBulkStatus') ? $('kanbanBulkStatus').value : '';
   if (!ids.length || !status) return;
   try {
-    await api('/api/kanban/tasks/bulk' + _kanbanBoardQuery(), {method: 'POST', body: JSON.stringify({ids, status})});
-    showToast(t('kanban_bulk_action'));
+    const result = await api('/api/kanban/tasks/bulk' + _kanbanBoardQuery(), {method: 'POST', body: JSON.stringify({ids, status})});
+    const rows = Array.isArray(result.results) ? result.results : [];
+    const failed = ids.filter(id => !rows.some(row => row.id === id && row.ok === true));
+    const details = failed.map(id => {
+      const row = rows.find(item => item.id === id);
+      return id + ': ' + (row && row.error || 'No confirmed result');
+    });
+    showToast((ids.length - failed.length) + ' updated' + (failed.length
+      ? '; ' + failed.length + ' failed — ' + details.join('; ') : ''), 8000, failed.length ? 'error' : 'info');
     await loadKanban(true);
   } catch(e) { showToast(t('kanban_unavailable') + ': ' + (e.message || e), 'error'); }
 }
@@ -2980,14 +3051,19 @@ async function unblockKanbanTask(taskId){
 }
 
 function closeKanbanTaskDetail(){
+  _kanbanTaskDetailRequestId++;
   _kanbanCurrentTaskId = null;
+  _kanbanSelectedIds.clear();
   const preview = $('kanbanTaskPreview');
   if (preview) {
     preview.style.display = 'none';
     preview.innerHTML = '';
   }
   const board = $('kanbanBoard');
-  if (board) board.querySelectorAll('.kanban-card').forEach(card => card.classList.remove('selected'));
+  if (board) board.querySelectorAll('.kanban-card').forEach(card => {
+    card.classList.remove('selected');
+    card.setAttribute('aria-pressed', 'false');
+  });
 }
 
 function _kanbanFormatTimestamp(value){
@@ -3297,10 +3373,10 @@ function openKanbanCreate(){
     _kanbanTaskModalFocusCleanup = null;
   }
   _kanbanTaskModalFocusCleanup = _trapModalFocus(modal);
-  setTimeout(() => {
-    const titleEl = document.getElementById('kanbanTaskModalTitleInput');
-    if (titleEl) titleEl.focus();
-  }, 50);
+  // The modal is visible now. Finish initial focus before the user can move
+  // to another field; a delayed callback would steal their next keystroke.
+  const titleEl = document.getElementById('kanbanTaskModalTitleInput');
+  if (titleEl) titleEl.focus();
   document.addEventListener('keydown', _kanbanTaskModalKey);
 }
 
@@ -3351,10 +3427,8 @@ async function openKanbanEdit(taskId){
     _kanbanTaskModalFocusCleanup = null;
   }
   _kanbanTaskModalFocusCleanup = _trapModalFocus(modal);
-  setTimeout(() => {
-    const titleEl = document.getElementById('kanbanTaskModalTitleInput');
-    if (titleEl) { titleEl.focus(); titleEl.select(); }
-  }, 50);
+  const titleEl = document.getElementById('kanbanTaskModalTitleInput');
+  if (titleEl) { titleEl.focus(); titleEl.select(); }
   document.addEventListener('keydown', _kanbanTaskModalKey);
 }
 
@@ -3691,6 +3765,9 @@ async function addKanbanComment(taskId){
 async function addKanbanDependency(taskId){
   const input = document.getElementById('kanbanDependencyInput');
   const linkTo = input ? input.value.trim() : '';
+  const submittedValue = input ? input.value : '';
+  const submittedRevision = input ? Number(input.dataset.draftRevision || 0) : 0;
+  const boardKey = _kanbanCurrentBoard || 'default';
   if (!taskId || !linkTo) return;
   if (linkTo === taskId) {
     showToast(t('kanban_dependency_self') || 'A task cannot depend on itself', 'error');
@@ -3706,8 +3783,12 @@ async function addKanbanDependency(taskId){
       method: 'POST',
       body: JSON.stringify({parent_id: linkTo, child_id: taskId}),
     });
-    if (input) input.value = '';
-    await loadKanbanTask(taskId);
+    // A response for an older editor must not navigate back or erase a newer
+    // draft. Live same-task refreshes retain this exact input node below.
+    if (_kanbanCurrentTaskId !== taskId || (_kanbanCurrentBoard || 'default') !== boardKey
+        || document.getElementById('kanbanDependencyInput') !== input) return;
+    if (input.value === submittedValue && Number(input.dataset.draftRevision || 0) === submittedRevision) input.value = '';
+    await loadKanbanTask(taskId, {preserveSelection: true});
   } catch(e) { showToast(t('kanban_unavailable') + ': ' + (e.message || e), 'error'); }
 }
 
@@ -3761,27 +3842,64 @@ function _kanbanRenderTaskDetail(data){
     </div>`;
 }
 
-async function loadKanbanTask(taskId){
+async function loadKanbanTask(taskId, {preserveSelection = false} = {}){
   if (!taskId) return;
+  if (preserveSelection && taskId !== _kanbanCurrentTaskId) return;
+  const requestId = ++_kanbanTaskDetailRequestId;
+  const boardKey = _kanbanCurrentBoard || 'default';
+  _kanbanCurrentTaskId = taskId;
+  // Commit click selection before I/O, so a subsequent modifier-click cannot
+  // be erased when the first card's slower detail request finishes.
+  if (!preserveSelection) {
+    _kanbanSelectedIds.clear();
+    _kanbanSelectedIds.add(taskId);
+  }
   try {
     const data = await api('/api/kanban/tasks/' + encodeURIComponent(taskId) + _kanbanBoardQuery());
+    if (requestId !== _kanbanTaskDetailRequestId || boardKey !== (_kanbanCurrentBoard || 'default')) return;
     try { data.log = await api('/api/kanban/tasks/' + encodeURIComponent(taskId) + '/log' + _kanbanBoardQuery({tail: 65536})); } catch(e) { data.log = {}; }
-    _kanbanCurrentTaskId = taskId;
+    if (requestId !== _kanbanTaskDetailRequestId || boardKey !== (_kanbanCurrentBoard || 'default')) return;
     const task = data.task || {};
     const title = _kanbanTaskTitle(task);
     const board = $('kanbanBoard');
     if (board) {
-      board.querySelectorAll('.kanban-card').forEach(card => card.classList.remove('selected'));
-      Array.from(board.querySelectorAll('.kanban-card')).find(card => card.dataset.kanbanTaskId === taskId)?.classList.add('selected');
+      board.querySelectorAll('.kanban-card').forEach(card => {
+        const selected = _kanbanSelectedIds.has(card.dataset.kanbanTaskId);
+        card.classList.toggle('selected', selected);
+        card.setAttribute('aria-pressed', String(selected));
+      });
     }
     const preview = $('kanbanTaskPreview');
     if (preview) {
+      // Read the current editor immediately before rendering, after all I/O.
+      // Retaining its node preserves newer text, explicit clears and revision
+      // ownership while an SSE refresh updates the surrounding task detail.
+      const sameEditor = preview.dataset.taskId === taskId && preview.dataset.board === boardKey;
+      const draft = sameEditor ? preview.querySelector('#kanbanDependencyInput') : null;
+      const focused = draft && document.activeElement === draft;
+      const selection = focused ? [draft.selectionStart, draft.selectionEnd, draft.selectionDirection] : null;
       preview.style.display = '';
       preview.innerHTML = _kanbanRenderTaskDetail(data);
+      preview.dataset.taskId = taskId;
+      preview.dataset.board = boardKey;
+      const freshInput = preview.querySelector('#kanbanDependencyInput');
+      if (draft && freshInput) {
+        freshInput.replaceWith(draft);
+        if (focused) {
+          draft.focus({preventScroll: true});
+          draft.setSelectionRange(...selection);
+        }
+      } else if (freshInput) {
+        freshInput.addEventListener('input', () => {
+          freshInput.dataset.draftRevision = String(Number(freshInput.dataset.draftRevision || 0) + 1);
+        });
+      }
     }
     _closeMobileSidebarAfterPanelSelection();
-    showToast(`${t('kanban_task')}: ${title}`);
-  } catch(e) { showToast(t('kanban_unavailable') + ': ' + (e.message || e), 'error'); }
+    if (!preserveSelection) showToast(`${t('kanban_task')}: ${title}`);
+  } catch(e) {
+    if (requestId === _kanbanTaskDetailRequestId) showToast(t('kanban_unavailable') + ': ' + (e.message || e), 'error');
+  }
 }
 
 // Phase 2: Single-source-of-truth render.
@@ -3907,6 +4025,7 @@ async function loadKanbanBoards(){
   } else if (saved) {
     _kanbanSetSavedBoard('default');
   }
+  if ((_kanbanCurrentBoard || 'default') !== active) closeKanbanTaskDetail();
   _kanbanCurrentBoard = (active === 'default') ? null : active;
   // The switcher is visible whenever ≥1 non-default board exists OR the
   // current board is non-default. (If you only have 'default', a switcher
@@ -4024,6 +4143,7 @@ async function switchKanbanBoard(slug){
     return;
   }
   _kanbanCurrentBoard = newBoard;
+  closeKanbanTaskDetail();
   _kanbanSetSavedBoard(slug);
   _kanbanLatestEventId = 0;  // reset cursor — new board has its own event sequence
   _kanbanBoardMenuOpen = false;
@@ -4065,8 +4185,8 @@ function openKanbanCreateBoard(){
     _kanbanBoardModalFocusCleanup = null;
   }
   _kanbanBoardModalFocusCleanup = _trapModalFocus(modal);
-  // Auto-focus name field
-  setTimeout(() => document.getElementById('kanbanBoardModalName').focus(), 50);
+  // Focus while opening; a delayed focus can steal input from the next field.
+  document.getElementById('kanbanBoardModalName').focus();
   // Auto-suggest slug from name as user types
   const nameEl = document.getElementById('kanbanBoardModalName');
   const slugEl = document.getElementById('kanbanBoardModalSlugInput');
@@ -4109,7 +4229,7 @@ function openKanbanRenameBoard(){
     _kanbanBoardModalFocusCleanup = null;
   }
   _kanbanBoardModalFocusCleanup = _trapModalFocus(modal);
-  setTimeout(() => document.getElementById('kanbanBoardModalName').focus(), 50);
+  document.getElementById('kanbanBoardModalName').focus();
   document.addEventListener('keydown', _kanbanBoardModalEsc);
 }
 
@@ -7592,6 +7712,7 @@ document.addEventListener('drop',e=>{
 // ── Settings panel ───────────────────────────────────────────────────────────
 
 let _settingsDirty = false;
+let _auxSettingsDirty = false;
 let _settingsThemeOnOpen = null; // track theme at open time for discard revert
 let _settingsSkinOnOpen = null; // track skin at open time for discard revert
 let _settingsFontSizeOnOpen = null; // track font size at open time for discard revert
@@ -8512,7 +8633,7 @@ function _hideSettingsPanel(){
 
 // Close with unsaved-changes check. If dirty, show a confirm dialog.
 function _closeSettingsPanel(){
-  if(!_settingsDirty){
+  if(!_settingsDirty && !_auxSettingsDirty){
     _revertSettingsPreview();
     _hideSettingsPanel();
     return;
@@ -8548,6 +8669,7 @@ function _showSettingsUnsavedBar(){
 function _discardSettings(){
   _revertSettingsPreview();
   _settingsDirty = false;
+  _auxSettingsDirty = false;
   _hideSettingsPanel();
 }
 
@@ -12361,7 +12483,7 @@ async function _onAuxModelChange(taskKey){
 function _markAuxDirty(){
  const applyBtn=$('btnApplyAuxModels');
  if(applyBtn) applyBtn.style.display='';
- _markSettingsDirty();
+ _auxSettingsDirty=true;
 }
 
 function _auxAdvancedValue(cfg,key){
@@ -12624,6 +12746,7 @@ async function _loadAuxiliaryModels(){
     if(!(await showConfirmDialog({title:t('settings_aux_reset_confirm_title')||'Reset auxiliary models?',message:t('settings_aux_reset_confirm_msg')||'This will set all auxiliary tasks to auto (use main model).',confirmLabel:t('settings_btn_reset_aux_models')||'Reset',danger:true}))) return;
     try{
      await api('/api/model/set',{method:'POST',body:JSON.stringify({scope:'auxiliary',task:'__reset__',provider:'auto',model:''})});
+     _auxSettingsDirty=false;
      if(typeof showToast==='function') showToast(t('settings_aux_reset_done')||'Auxiliary models reset to auto');
      _loadAuxiliaryModels();
     }catch(e){
@@ -12660,16 +12783,19 @@ async function _applyAuxModels(){
    }catch(e){
     console.warn('[settings] failed to save aux task',task.task,e);
     if(typeof showToast==='function') showToast(t('settings_aux_save_failed')||'Failed to save auxiliary model');
-    return;
+    return false;
    }
   }
  }
  if(typeof showToast==='function') showToast(saved?(t('settings_aux_saved')||'Auxiliary models updated'):(t('settings_aux_no_changes')||'No changes to apply'));
+ _auxSettingsDirty=false;
  // Reload to refresh state
- _loadAuxiliaryModels();
+ await _loadAuxiliaryModels();
+ return true;
 }
 
 async function saveSettings(andClose){
+  if(_auxSettingsDirty && await _applyAuxModels()===false) return;
   const model=($('settingsModel')||{}).value;
   const modelState=(typeof _captureModelDropdownSelection==='function'&&$('settingsModel'))
     ? (_captureModelDropdownSelection($('settingsModel'))||{model:String(model||''),model_provider:null})

@@ -2311,6 +2311,7 @@ $('modelSelect').onchange=async()=>{
   }
 };
 $('msg').addEventListener('input',()=>{
+  if(typeof _composerDraftInputGeneration==='number') ++_composerDraftInputGeneration;
   updateSendBtn();
   scheduleComposerAutoResize();
   // Persist composer draft to server (debounced in _saveComposerDraft).
@@ -3287,6 +3288,20 @@ function _mirrorSpeechSettingsFromServer(s){
 window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
 
 (async()=>{
+  // Boot restore has lower priority than navigation performed while its
+  // settings/metadata requests are pending. Its own load updates this token.
+  let _bootRestoreGeneration=typeof _loadSessionGeneration==='number'?_loadSessionGeneration:null;
+  const _bootDraftInputGeneration=typeof _composerDraftInputGeneration==='number'?_composerDraftInputGeneration:null;
+  async function _finishBootAfterNewerSessionActivation(){
+    if(_bootRestoreGeneration===null||_loadSessionGeneration===_bootRestoreGeneration) return false;
+    if(typeof _newSessionInFlight!=='undefined'&&_newSessionInFlight){
+      try{await _newSessionInFlight;}catch(_){}
+    }
+    S._bootReady=true;window.dispatchEvent(new Event('synpulse:boot-ready'));
+    syncTopbar();syncWorkspacePanelState();await renderSessionList();
+    if(typeof startGatewaySSE==='function') startGatewaySSE();
+    return true;
+  }
   if(window.i18nReady) await window.i18nReady;
   // Load send key preference
   let _bootSettings={};
@@ -3452,7 +3467,7 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
     // confirmed-registered skin — avoids writing a skin the server can't validate).
     if((lsHasExplicitTheme||lsHasExplicitSkin)&&!lsSkinIsPendingExt&&(theme!==srvAppearance.theme||skin!==srvAppearance.skin)){
       try{
-        api('/api/settings',{method:'POST',body:JSON.stringify({theme,skin})});
+        api('/api/settings',{method:'POST',body:JSON.stringify({theme,skin})}).catch(()=>{});
       }catch(_){}
     }
     // Same precedence as theme/skin: an explicit non-default choice in this
@@ -3465,7 +3480,7 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
     localStorage.setItem('hermes-font-size',fontSize);
     _applyFontSize(fontSize);
     if(_lsHasExplicitFont&&s.font_size&&s.font_size!==fontSize){
-      try{api('/api/settings',{method:'POST',body:JSON.stringify({font_size:fontSize})});}catch(_){}
+      try{api('/api/settings',{method:'POST',body:JSON.stringify({font_size:fontSize})}).catch(()=>{});}catch(_){}
     }
     if(typeof setLocale==='function'){
       const _lang=typeof resolvePreferredLocale==='function'
@@ -3765,6 +3780,7 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
   const _srch = document.getElementById('sessionSearch'); if (_srch) _srch.value = '';
   if (typeof syncSessionSearchClear === 'function') syncSessionSearchClear();
   if(typeof refreshProviderQuotaIndicator==='function') refreshProviderQuotaIndicator();
+  if(await _finishBootAfterNewerSessionActivation()) return;
   const urlSession=(typeof _sessionIdFromLocation==='function')?_sessionIdFromLocation():null;
   const pwaLaunchAction=(window.HermesPWA&&typeof window.HermesPWA.launchAction==='function')
     ? window.HermesPWA.launchAction()
@@ -3799,6 +3815,7 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
       const savedSidebarOnlyState=(!urlSession&&savedLocal)
         ? await _savedSessionSidebarOnlyState(savedLocal)
         : null;
+      if(await _finishBootAfterNewerSessionActivation()) return;
       if(savedSidebarOnlyState&&savedSidebarOnlyState.sidebarOnly){
         if(savedSidebarOnlyState.archived){
           try{localStorage.removeItem('hermes-webui-session');}catch(_){}
@@ -3822,13 +3839,18 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
         await renderSessionList();await _finalizeComposerPrefillOnBoot(prefillIntent);if(typeof startGatewaySSE==='function')startGatewaySSE();
         return;
       }
-      await loadSession(saved, {preserveActiveInput:true});
+      const restorePromise=loadSession(saved, {preserveActiveInput:true, draftInputGeneration:_bootDraftInputGeneration});
+      // loadSession claims its generation synchronously before its first await.
+      _bootRestoreGeneration=typeof _loadSessionGeneration==='number'?_loadSessionGeneration:null;
+      await restorePromise;
+      if(await _finishBootAfterNewerSessionActivation()) return;
       // Hard refresh starts from the static HTML model list. Hydrate the live
       // catalog after the saved session is known, then re-apply that session's
       // model before S._bootReady lets syncModelChip reveal the composer label.
       // Otherwise the chip can display the static default (e.g. GPT-5.4 Mini)
       // even though S.session already points at the Codex/current model.
       if(S.session) await _startBootModelDropdown();
+      if(await _finishBootAfterNewerSessionActivation()) return;
       // If the restored session has no messages it is an ephemeral scratch pad —
       // treat the page as a fresh start rather than resuming a blank conversation.
       // loadSession() already ran, so loadDir() has populated the workspace file tree.
@@ -3870,7 +3892,10 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
       }
       S._bootReady=true;window.dispatchEvent(new Event("synpulse:boot-ready"));
       syncTopbar();syncWorkspacePanelState();await renderSessionList();if(typeof startGatewaySSE==='function')startGatewaySSE();await checkInflightOnBoot(saved);await _finalizeComposerPrefillOnBoot(prefillIntent);return;}
-    catch(e){localStorage.removeItem('hermes-webui-session');}
+    catch(e){
+      if(await _finishBootAfterNewerSessionActivation()) return;
+      if(localStorage.getItem('hermes-webui-session')===saved) localStorage.removeItem('hermes-webui-session');
+    }
   }
   // no saved session - show empty state, wait for user to hit +
   S._bootReady=true;window.dispatchEvent(new Event("synpulse:boot-ready"));

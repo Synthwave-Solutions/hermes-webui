@@ -1944,6 +1944,13 @@ async function send(){
 }
 
 const LIVE_STREAMS={};
+// An async reconnect belongs to one attachment attempt, not merely a session
+// or a reusable stream id. A newer attach or navigation retires its authority.
+const _LIVE_STREAM_ATTACHMENTS={};
+function _liveStreamAttachmentIsCurrent(sid,streamId,attachment){
+  return _LIVE_STREAM_ATTACHMENTS[sid]===attachment
+    && _isSessionCurrentPane(sid) && S.activeStreamId===streamId;
+}
 const _STREAM_NOTIFICATION_BACKGROUND={};
 
 // #4416: track whether the tab was hidden at ANY point during a live stream, so
@@ -1992,6 +1999,12 @@ function _shouldForceCompletionNotification(sid, streamId){
 }
 
 function closeLiveStream(sessionId, streamId, source){
+  // Explicit teardown also retires a status probe that has not opened an SSE
+  // source yet. Source-specific error cleanup can still recover its own stream.
+  if(!source){
+    const pending=_LIVE_STREAM_ATTACHMENTS[sessionId];
+    if(pending&&(!streamId||pending.streamId===streamId)) delete _LIVE_STREAM_ATTACHMENTS[sessionId];
+  }
   const live=LIVE_STREAMS[sessionId];
   if(!live) return;
   if(streamId&&live.streamId!==streamId) return;
@@ -2057,7 +2070,7 @@ function closeOtherLiveStreams(activeSid){
 }
 
 function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
-  if(!activeSid||!streamId) return;
+  if(!activeSid||!streamId||!_isSessionCurrentPane(activeSid)||S.activeStreamId!==streamId) return;
   // A live turn mutates the transcript; any cached scene for this sid is stale.
   if(typeof _invalidateSessionSceneCache==='function') _invalidateSessionSceneCache(activeSid);
   const reconnecting=!!options.reconnecting;
@@ -2115,6 +2128,9 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
   }
   closeOtherLiveStreams(activeSid);
   closeLiveStream(activeSid);
+  const _attachment={streamId};
+  _LIVE_STREAM_ATTACHMENTS[activeSid]=_attachment;
+  const _isAttachmentCurrent=()=>_liveStreamAttachmentIsCurrent(activeSid,streamId,_attachment);
   if(!reconnecting&&typeof resetTurnWorkspaceMutations==='function') resetTurnWorkspaceMutations();
   if(!reconnecting&&typeof _resetStreamScrollFollow==='function') _resetStreamScrollFollow();
   // Phase D: restore bottom run status after closeLiveStream(); that helper
@@ -2581,12 +2597,13 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
   }
 
   function _reattachOrRestoreAfterDeferredStreamError(source){
-    if(_terminalStateReached||_streamFinalized) return;
+    if(!_isAttachmentCurrent()||_terminalStateReached||_streamFinalized) return;
     if((S.session&&S.session.session_id)!==activeSid) return;
     (async()=>{
       try{
         if(streamId){
           const st=await api(`/api/chat/stream/status?stream_id=${encodeURIComponent(streamId)}`);
+          if(!_isAttachmentCurrent()) return;
           if(st.active){
             setComposerStatus('Reconnected');
             _wireSSE(new EventSource(new URL(`api/chat/stream?stream_id=${encodeURIComponent(streamId)}${_runJournalReplayParams()}`,document.baseURI||location.href).href,{withCredentials:true}));
@@ -2594,9 +2611,12 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
           }
         }
       }catch(_){
+        if(!_isAttachmentCurrent()) return;
         if(_deferStreamErrorIfOffline()||_pageHiddenForStreamError()) return;
       }
+      if(!_isAttachmentCurrent()) return;
       if(await _restoreSettledSession(source, {preserveVisibleOnShorterTerminalSnapshot:true})) return;
+      if(!_isAttachmentCurrent()) return;
       if(_deferStreamErrorIfOffline()||_pageHiddenForStreamError()) return;
       _flushReasoningToAnchor();
       _scheduleAnchorRegistryCleanup(120000);
@@ -5495,6 +5515,10 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
   }
 
   function _wireSSE(source){
+    if(!_isAttachmentCurrent()){
+      try{source.close();}catch(_){}
+      return;
+    }
     const existingLive=LIVE_STREAMS[activeSid];
     if(existingLive&&existingLive.source&&existingLive.source!==source){
       try{if(existingLive.source.readyState!==2)existingLive.source.close();}catch(_){ }
@@ -6543,10 +6567,11 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
         const _retryDelays=[1500,3000,5000,8000,12000,20000];
         setComposerStatus(`Reconnecting… (1/${_retryDelays.length})`);
         const _probeReconnect=async(attempt=0)=>{
-          if(_terminalStateReached || _streamFinalized) return;
+          if(!_isAttachmentCurrent() || _terminalStateReached || _streamFinalized) return;
           if(!_isSessionCurrentPane(activeSid)) return;
           try{
             const st=await api(`/api/chat/stream/status?stream_id=${encodeURIComponent(streamId)}`);
+            if(!_isAttachmentCurrent()) return;
             if(st&&st.active){
               setComposerStatus('Reconnected');
               _wireSSE(new EventSource(new URL(`api/chat/stream?stream_id=${encodeURIComponent(streamId)}${_runJournalReplayParams()}`,document.baseURI||location.href).href,{withCredentials:true}));
@@ -6558,9 +6583,12 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
               return;
             }
           }catch(_){
+            if(!_isAttachmentCurrent()) return;
             if(_deferStreamErrorIfOffline()) return;
           }
+          if(!_isAttachmentCurrent()) return;
           if(await _restoreSettledSession(source, {preserveVisibleOnShorterTerminalSnapshot:true})) return;
+          if(!_isAttachmentCurrent()) return;
           if(_deferStreamErrorIfOffline()) return;
           if(_deferStreamErrorIfPageHidden(source)) return;
           const nextDelay=_retryDelays[attempt+1];
@@ -6577,6 +6605,7 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
           setComposerStatus('Restoring session…');
           let _restoreTimedOut=false;
           const _restoreTimer=setTimeout(()=>{
+            if(!_isAttachmentCurrent()) return;
             // If _restoreSettledSession hangs (flaky Tailscale), don't leave
             // the UI stuck on "Restoring session…" forever. Fall through to
             // _handleStreamError after 8s.
@@ -6602,7 +6631,7 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
           }
           if(_restoreTimedOut) return; // timer already fired _handleStreamError
           clearTimeout(_restoreTimer);
-          if(_terminalStateReached||_streamFinalized) return;
+          if(!_isAttachmentCurrent()||_terminalStateReached||_streamFinalized) return;
           if(_deferStreamErrorIfOffline()) return;
           if(_deferStreamErrorIfPageHidden(source)) return;
           _flushReasoningToAnchor();
@@ -6613,6 +6642,7 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
         return;
       }
       if(await _restoreSettledSession(source, {preserveVisibleOnShorterTerminalSnapshot:true})) return;
+      if(!_isAttachmentCurrent()) return;
       if(_deferStreamErrorIfOffline()) return;
       if(_deferStreamErrorIfPageHidden(source)) return;
       _flushReasoningToAnchor();
@@ -6780,6 +6810,7 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
       // Opus #2852 race-fix: if a late `done` event ran the finalize path while
       // we were awaiting the network roundtrip, bail out — done already settled.
       if(_streamFinalized) return returnStatus?'restored':true;
+      if(!_isAttachmentCurrent()) return returnStatus?'stale':false;
       const session=data&&data.session;
       if(!session) return returnStatus?'missing':false;
       if(session.active_stream_id||session.pending_user_message) return returnStatus?'active':false;
@@ -6872,7 +6903,7 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
   }
 
   function _handleStreamError(source){
-    if(_isActiveSession() && S.activeStreamId!==streamId){
+    if(!_isAttachmentCurrent()){
       _closeSource(source);
       return;
     }
@@ -6948,6 +6979,7 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
     if(reconnecting){
       try{
         const st=await api(`/api/chat/stream/status?stream_id=${encodeURIComponent(streamId)}`);
+        if(!_isAttachmentCurrent()) return;
         if(!st.active&&st.replay_available){
           replayOnly=true;
         }else if(!st.active){
@@ -6979,6 +7011,7 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
         }
       }catch(_){}
     }
+    if(!_isAttachmentCurrent()) return;
     const replayParams=(reconnecting||replayOnly)?_runJournalReplayParams():'';
     _wireSSE(new EventSource(new URL(`api/chat/stream?stream_id=${encodeURIComponent(streamId)}${replayParams}`,document.baseURI||location.href).href,{withCredentials:true}));
   })();
@@ -7404,13 +7437,14 @@ function _syncApprovalTranscriptSpace(card, opts) {
   const messages = $("messages");
   if (!messages) return;
   const wasNearBottom = _approvalMessagesNearBottom(messages);
+  const follow = _messageDockFollowCallback(messages, wasNearBottom);
   if (!card || !card.classList.contains("visible")) {
     messages.classList.remove("approval-open");
     messages.classList.remove("approval-collapsed");
     messages.style.removeProperty("--approval-card-height");
     messages.style.removeProperty("--approval-dock-height");
     if (wasNearBottom && typeof scrollToBottom === "function" && typeof requestAnimationFrame === "function") {
-      requestAnimationFrame(scrollToBottom);
+      requestAnimationFrame(follow);
     }
     return;
   }
@@ -7424,7 +7458,7 @@ function _syncApprovalTranscriptSpace(card, opts) {
     if (h > 0) {
       messages.style.setProperty(collapsed ? "--approval-dock-height" : "--approval-card-height", Math.ceil(h + 24) + "px");
     }
-    if (wasNearBottom && typeof scrollToBottom === "function") scrollToBottom();
+    if (wasNearBottom && typeof scrollToBottom === "function") follow();
   };
   if (opts.immediate) measure();
   if (typeof requestAnimationFrame === "function") requestAnimationFrame(measure);
@@ -8222,13 +8256,14 @@ function _syncClarifyTranscriptSpace(card, opts) {
   const messages = $("messages");
   if (!messages) return;
   const wasNearBottom = _clarifyMessagesNearBottom(messages);
+  const follow = _messageDockFollowCallback(messages, wasNearBottom);
   if (!card || !card.classList.contains("visible")) {
     messages.classList.remove("clarify-open");
     messages.classList.remove("clarify-collapsed");
     messages.style.removeProperty("--clarify-card-height");
     messages.style.removeProperty("--clarify-dock-height");
     if (wasNearBottom && typeof scrollToBottom === "function" && typeof requestAnimationFrame === "function") {
-      requestAnimationFrame(scrollToBottom);
+      requestAnimationFrame(follow);
     }
     return;
   }
@@ -8242,7 +8277,7 @@ function _syncClarifyTranscriptSpace(card, opts) {
     if (h > 0) {
       messages.style.setProperty(collapsed ? "--clarify-dock-height" : "--clarify-card-height", Math.ceil(h + 24) + "px");
     }
-    if (wasNearBottom && typeof scrollToBottom === "function") scrollToBottom();
+    if (wasNearBottom && typeof scrollToBottom === "function") follow();
   };
   if (opts.immediate) measure();
   if (typeof requestAnimationFrame === "function") requestAnimationFrame(measure);

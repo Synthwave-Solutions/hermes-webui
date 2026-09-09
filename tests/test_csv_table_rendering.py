@@ -1,5 +1,6 @@
 """Test: CSV table rendering (#485)"""
 import re
+import subprocess
 from pathlib import Path
 
 WORKSPACE_JS = Path("static/workspace.js").read_text(encoding="utf-8")
@@ -100,10 +101,45 @@ def test_csv_auto_detect_separator():
 
 
 def test_csv_quote_stripping():
-    """Verify CSV handler strips surrounding quotes from fields."""
-    with open('static/ui.js', encoding="utf-8") as f:
-        src = f.read()
-    assert "replace(/^[\"']|[\"']$/g,'')" in src, "Should strip quotes from CSV fields"
+    """Execute the real preview parser for quoted records and malformed input."""
+    script = r'''
+const fs = require('node:fs');
+const vm = require('node:vm');
+const assert = require('node:assert/strict');
+const source = fs.readFileSync('static/ui.js', 'utf8');
+const start = source.indexOf('function _parseCsvPreviewRows(');
+const end = source.indexOf('function _csvPreviewErrorHtml(', start);
+assert.ok(start >= 0 && end > start);
+const context = {CSV_MAX_SIZE: 256 * 1024, t: key => key,
+  esc: text => String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')};
+vm.createContext(context);
+vm.runInContext(source.slice(start, end), context);
+const parse = text => JSON.parse(JSON.stringify(context._parseCsvPreviewRows(text, ',')));
+assert.deepEqual(parse('name,note\n"café","comma, quoted ""value"""\n'),
+  [['name', 'note'], ['café', 'comma, quoted "value"']]);
+assert.deepEqual(parse('a,b\n"line1\nline2","  spaces  "\n'),
+  [['a', 'b'], ['line1\nline2', '  spaces  ']]);
+assert.deepEqual(parse('a,b\n,\n'), [['a', 'b'], ['', '']]);
+assert.equal(parse('a,b\n"unterminated,value\n'), null);
+assert.equal(parse('a,b\n"closed"unexpected,value\n'), null);
+const cells = text => {
+  const result = context.buildCsvTablePreview('fixture.csv', text);
+  assert.equal(typeof result.html, 'string');
+  return [...result.html.matchAll(/<(?:th|td)>([\s\S]*?)<\/(?:th|td)>/g)].map(match => match[1]);
+};
+assert.deepEqual(cells('\ufeff\r\n"comma, header";value\r\n"semi;colon";12\r\n'),
+  ['comma, header', 'value', 'semi;colon', '12']);
+assert.deepEqual(cells('name\tvalue\rplain\t"tab\tinside"\r'),
+  ['name', 'value', 'plain', 'tab\tinside']);
+// An empty TSV header is a real record. Data commas must not change its delimiter.
+assert.deepEqual(cells('\t\n1,2\t3\n'), ['', '', '1,2', '3']);
+assert.deepEqual(cells('\ufeff\r\n\t\r\n1,2\t3\r\n'), ['', '', '1,2', '3']);
+assert.equal(context.buildCsvTablePreview('fixture.csv', 'a,b\n"unterminated').errorKey, 'csv_error');
+assert.equal(context.buildCsvTablePreview('fixture.csv', 'a,b\n').errorKey, 'csv_no_data');
+assert.equal(context.buildCsvTablePreview('fixture.csv', 'x'.repeat(256 * 1024 + 1)).errorKey, 'csv_too_large');
+'''
+    result = subprocess.run(['node', '-e', script], capture_output=True, text=True, check=False)
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_csv_error_handling():
@@ -164,13 +200,26 @@ def test_csv_line_ending_normalization():
 
 
 def test_csv_i18n_keys():
-    """Verify CSV i18n keys exist in all 7 locales."""
-    with open('static/i18n.js', encoding="utf-8") as f:
-        src = f.read()
-    required_keys = ['csv_loading', 'csv_too_large', 'csv_no_data', 'csv_error']
-    for key in required_keys:
-        count = src.count(f"{key}:")
-        assert count >= 8, f"Key '{key}' found {count} times, expected >= 8 (one per locale)"
+    """Split bundles retain translations and the runtime's English fallback."""
+    bundles = sorted(Path('static/i18n').glob('*.js'))
+    sources = [bundle.read_text(encoding='utf-8') for bundle in bundles]
+    for key in ['csv_loading', 'csv_too_large', 'csv_no_data', 'csv_error']:
+        assert sum(bool(re.search(rf"\b{key}\s*:", source)) for source in sources) >= 8
+    script = r"""
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const ctx={document:{currentScript:null}};ctx.window=ctx;vm.createContext(ctx);
+vm.runInContext(fs.readFileSync('static/i18n.js','utf8').split('window.i18nReady=')[0],ctx);
+for(const name of fs.readdirSync('static/i18n').filter(n=>n.endsWith('.js')))
+  vm.runInContext(fs.readFileSync('static/i18n/'+name,'utf8'),ctx);
+vm.runInContext(`for(const code of Object.keys(LOCALES)) {
+  _locale=LOCALES[code];
+  for(const key of ['csv_loading','csv_too_large','csv_no_data','csv_error']) {
+    if(typeof t(key)!=='string'||!t(key).trim()||t(key)===key) throw new Error(code+': '+key);
+  }
+}`,ctx);
+"""
+    result = subprocess.run(['node', '-e', script], capture_output=True, text=True, check=False)
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_csv_css_classes():

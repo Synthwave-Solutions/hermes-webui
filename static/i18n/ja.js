@@ -1589,7 +1589,7 @@ window.__registerHermesLocale('ja', {
     cron_schedule_preset_monthly: '毎月',
     cron_schedule_preset_custom: 'カスタム',
     cron_schedule_hint: "繰り返し実行には 'every 1h' または Cron 式を使います。'30m' のような期間だけの指定は 1 回だけ実行されます。",
-    cron_schedule_once_warning: "'30m' のような期間指定は 1 回だけ実行され、実行後に削除されます。繰り返すには 'every 30m' を使ってください。",
+    cron_schedule_once_warning: "このスケジュールは1回だけ実行されます。一度だけ実行するには 'in 30m' または日時を指定してください。'30m' と 'every 30m' は繰り返し実行されます。",
     cron_prompt_label: 'プロンプト',
     cron_deliver_label: '出力先',
     cron_deliver_local: 'ローカル (出力を保存のみ)',

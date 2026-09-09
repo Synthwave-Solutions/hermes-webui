@@ -1143,12 +1143,13 @@ def test_status_payload_flags_local_unprotected_when_auth_off(tmp_path, monkeypa
     assert proxy["posture"] == "local_unprotected"  # auth off -> panel warns pre-consent
 
 
-def test_inbound_x_hermes_header_is_stripped(monkeypatch):
+@pytest.mark.parametrize("header", ["X-Hermes-Sidecar-Token", "x-hermes-sidecar-token", "X-HERMES-SIDECAR-TOKEN"])
+def test_inbound_x_hermes_header_is_stripped(monkeypatch, header):
     from api.routes import _extension_sidecar_proxy_request_headers
 
     class H:
         headers = {
-            "X-Hermes-Sidecar-Token": "forged",
+            header: "forged",
             "X-Custom": "ok",
             "Cookie": "secret",
         }
@@ -1237,6 +1238,7 @@ def test_token_v1_route_injects_token_and_strips_response(monkeypatch):
         "Host": "webui.local",
         "Origin": "http://webui.local",
         "Referer": "http://webui.local/",
+        "x-HERMES-sidecar-token": "forged-browser-token",
     }
     result = routes.handle_get(
         handler,
@@ -1247,3 +1249,27 @@ def test_token_v1_route_injects_token_and_strips_response(monkeypatch):
     assert captured["headers"].get("x-hermes-sidecar-token") == "injected-token-abc"
     # token/x-hermes header stripped on the way back to the browser
     assert handler.header("X-Hermes-Echo") is None
+
+
+@pytest.mark.parametrize("token", [None, "", "short", "not-a-valid-token\n-injection", 42])
+def test_token_v1_route_missing_or_invalid_token_never_opens_upstream(monkeypatch, token):
+    from api import routes
+
+    monkeypatch.setattr(
+        "api.extensions.resolve_extension_sidecar_proxy_target",
+        lambda *_args, **_kwargs: {
+            "extension_id": "templates", "origin": "http://127.0.0.1:17787",
+            "upstream_url": "http://127.0.0.1:17787/probe",
+            "proxy_auth": "token-v1", "auth_token": token,
+        },
+    )
+    def refused_opener(_origin):
+        pytest.fail("invalid token must fail before any upstream transport")
+    monkeypatch.setattr(routes, "_extension_sidecar_proxy_same_origin_opener", refused_opener)
+    handler = FakeHandler()
+    handler.headers = {"Host": "webui.local", "Origin": "http://webui.local",
+                       "X-Hermes-Sidecar-Token": "browser-cannot-fill-missing-server-token"}
+    routes.handle_get(handler, SimpleNamespace(
+        path="/api/extensions/templates/sidecar/probe", query=""))
+    assert handler.status == 503
+    assert "browser-cannot" not in bytes(handler.body).decode()

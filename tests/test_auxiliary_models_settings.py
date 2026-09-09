@@ -339,11 +339,12 @@ console.log(JSON.stringify({
         assert "_markAuxDirty" in PANELS_JS, (
             "Missing _markAuxDirty() for dirty detection"
         )
-        # _markAuxDirty should call _markSettingsDirty
+        # Auxiliary Apply has its own save boundary; it must not clear or
+        # leave behind the dirty state of unrelated general settings.
         idx = PANELS_JS.find("function _markAuxDirty")
         body = PANELS_JS[idx:idx + 200]
-        assert "_markSettingsDirty" in body, (
-            "_markAuxDirty must call _markSettingsDirty"
+        assert "_auxSettingsDirty=true" in body, (
+            "_markAuxDirty must track pending auxiliary choices"
         )
 
 

@@ -309,13 +309,14 @@ def test_get_watcher_scopes_lookup_to_active_profile(tmp_path, monkeypatch):
 
 
 def test_profile_switch_restarts_watcher_best_effort(monkeypatch):
-    from api import config, gateway_watcher, profiles, routes
+    from api import config, gateway_watcher, profiles, routes, workspace_access
 
     calls = []
     monkeypatch.setattr(routes, "_check_csrf", lambda handler: True)
     monkeypatch.setattr(routes, "read_body", lambda handler: {"name": "demo"})
     monkeypatch.setattr(profiles, "_validate_profile_name", lambda name: None)
     monkeypatch.setattr(profiles, "switch_profile", lambda name, process_wide=False: {"ok": True, "name": name})
+    monkeypatch.setattr(workspace_access, "resolve_implicit_workspace", lambda *a, **k: "/qa/authorized")
     monkeypatch.setattr(config, "invalidate_models_cache", lambda: calls.append("cache"))
     monkeypatch.setattr(gateway_watcher, "restart_watcher_for_profile", lambda name: calls.append(("watcher", name)))
 
@@ -323,18 +324,19 @@ def test_profile_switch_restarts_watcher_best_effort(monkeypatch):
     routes.handle_post(handler, urlparse("/api/profile/switch"))
 
     assert handler.status == 200
-    assert handler.get_json() == {"ok": True, "name": "demo"}
+    assert handler.get_json() == {"ok": True, "name": "demo", "default_workspace": "/qa/authorized"}
     assert calls == ["cache", ("watcher", "demo")]
     assert any(k == "Set-Cookie" for k, _v in handler.sent_headers)
 
 
 def test_profile_switch_response_survives_watcher_restart_failure(monkeypatch):
-    from api import config, gateway_watcher, profiles, routes
+    from api import config, gateway_watcher, profiles, routes, workspace_access
 
     monkeypatch.setattr(routes, "_check_csrf", lambda handler: True)
     monkeypatch.setattr(routes, "read_body", lambda handler: {"name": "demo"})
     monkeypatch.setattr(profiles, "_validate_profile_name", lambda name: None)
     monkeypatch.setattr(profiles, "switch_profile", lambda name, process_wide=False: {"ok": True, "name": name})
+    monkeypatch.setattr(workspace_access, "resolve_implicit_workspace", lambda *a, **k: "/qa/authorized")
     monkeypatch.setattr(config, "invalidate_models_cache", lambda: None)
     monkeypatch.setattr(
         gateway_watcher,
@@ -346,7 +348,7 @@ def test_profile_switch_response_survives_watcher_restart_failure(monkeypatch):
     routes.handle_post(handler, urlparse("/api/profile/switch"))
 
     assert handler.status == 200
-    assert handler.get_json() == {"ok": True, "name": "demo"}
+    assert handler.get_json() == {"ok": True, "name": "demo", "default_workspace": "/qa/authorized"}
 
 
 def test_subscribe_after_stop_gets_sentinel_immediately():

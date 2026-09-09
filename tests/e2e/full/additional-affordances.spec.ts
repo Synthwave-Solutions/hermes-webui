@@ -242,16 +242,46 @@ test('US-SP-AFFORDANCE-HIDDEN-FILES persisted hidden-file toggle reveals permitt
   }
 });
 
-test('US-SP-AFFORDANCE-MESSAGE-FORK selected message creates an exact persistent prefix and child continuation leaves the private parent unchanged', async ({page}) => {
+test('US-SP-AFFORDANCE-MESSAGE-FORK selected message creates an exact persistent prefix and child continuation leaves the private parent unchanged', async ({page}, info) => {
   await open(page);
   const parentId = await session(page);
   const read = async (sid: string) => (await api(page, '/api/session?session_id=' + sid)).body.session;
   const transcript = (messages: any[]) => messages.map(m => ({role: m.role, content: m.content}));
-  for (const prompt of ['QA_FORK_FIRST', 'QA_FORK_LATER']) {
+  const acceptedStreams = new Set<string>();
+  const sendAccepted = async (sid: string, prompt: string) => {
     await page.locator('#msg').fill(prompt);
-    await page.locator('#btnSend').click();
-    await expect(page.locator('#messages')).toContainText('QA_REPLY: ' + prompt);
+    const actionAt = Date.now();
+    const readiness: any = {session_id: sid, prompt, action_at_utc: new Date(actionAt).toISOString(), accepted_at_utc: null, action_to_accept_ms: null};
+    const started = page.waitForResponse(response => {
+      if (new URL(response.url()).pathname !== '/api/chat/start' || response.request().method() !== 'POST') return false;
+      const request = response.request().postDataJSON();
+      if (request.session_id !== sid || request.message !== prompt) return false;
+      const acceptedAt = Date.now();
+      readiness.accepted_at_utc = new Date(acceptedAt).toISOString();
+      readiness.action_to_accept_ms = acceptedAt - actionAt;
+      readiness.status = response.status();
+      return true;
+    });
+    try {
+      await page.locator('#btnSend').click();
+      const response = await started;
+      expect(response.status()).toBe(200);
+      const accepted = await response.json();
+      readiness.returned_session_id = accepted.session_id;
+      readiness.stream_id = accepted.stream_id;
+      expect(accepted.session_id).toBe(sid);
+      expect(accepted.stream_id).toMatch(/^[0-9a-f]{32}$/);
+      expect(acceptedStreams.has(accepted.stream_id)).toBe(false);
+      acceptedStreams.add(accepted.stream_id);
+    } finally {
+      await info.attach('fork-chat-start-readiness-' + prompt, {body: JSON.stringify(readiness), contentType: 'application/json'});
+    }
+    // The unchanged reply budget starts at accepted dispatch, not a click SLO.
+    await expect.poll(() => page.locator('#messages').innerText(), {intervals: [100], timeout: 10000}).toContain('QA_REPLY: ' + prompt);
     await expect(page.locator('#btnSend')).not.toHaveAttribute('aria-label', 'Stop generation');
+  };
+  for (const prompt of ['QA_FORK_FIRST', 'QA_FORK_LATER']) {
+    await sendAccepted(parentId, prompt);
   }
   const parent = await read(parentId);
   const original = transcript(parent.messages);
@@ -281,10 +311,7 @@ test('US-SP-AFFORDANCE-MESSAGE-FORK selected message creates an exact persistent
   await page.reload();
   await expect(page.locator('#messages')).toContainText('QA_REPLY: QA_FORK_FIRST');
   await expect(page.locator('#messages')).not.toContainText('QA_FORK_LATER');
-  await page.locator('#msg').fill('QA_FORK_CHILD_ONLY');
-  await page.locator('#btnSend').click();
-  await expect(page.locator('#messages')).toContainText('QA_REPLY: QA_FORK_CHILD_ONLY');
-  await expect(page.locator('#btnSend')).not.toHaveAttribute('aria-label', 'Stop generation');
+  await sendAccepted(childId, 'QA_FORK_CHILD_ONLY');
   expect(transcript((await read(childId)).messages)).toEqual([
     ...original.slice(0, 2), {role: 'user', content: 'QA_FORK_CHILD_ONLY'}, {role: 'assistant', content: 'DEFAULT QA_REPLY: QA_FORK_CHILD_ONLY'},
   ]);

@@ -1220,7 +1220,7 @@ window.__registerHermesLocale('zh', {
     cron_schedule_preset_monthly: '每月',
     cron_schedule_preset_custom: '自定义',
     cron_schedule_hint: "循环任务请用 'every 1h' 或 Cron 表达式。像 '30m' 这样的裸时长只会运行一次。",
-    cron_schedule_once_warning: "像 '30m' 这样的时长写法只会运行一次，并在运行后移除。要保留循环任务，请使用 'every 30m'。",
+    cron_schedule_once_warning: "此计划只运行一次。一次性任务请使用 'in 30m' 或指定日期和时间；'30m' 和 'every 30m' 会重复运行。",
     cron_prompt_label: '提示词',
     cron_deliver_label: '输出位置',
     cron_deliver_local: '本地（仅保存输出）',

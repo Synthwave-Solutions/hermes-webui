@@ -249,6 +249,7 @@ async function _govLoadUsers(expectedDraft) {
         _govChipFieldHtml('govUserSkillsLoad', _govT('governance_grants_skills_load', 'Skills load'), 'govDlSkills', 'my-skill') +
         _govChipFieldHtml('govUserSkillsManage', _govT('governance_grants_skills_manage', 'Skills manage'), 'govDlSkills', 'my-skill') +
         _govChipFieldHtml('govUserMcpServers', _govT('governance_grants_mcp_servers', 'MCP servers'), 'govDlMcp', 'notion, playwright') +
+        _govMcpToolMapHtml('govUserMcpTools', 'MCP tools to allow', false, 'govDlMcp') +
         _govChipFieldHtml('govUserCliCommands', _govT('governance_grants_cli_commands', 'CLI commands'), 'govDlCli', 'git, gh') +
         _govChipFieldHtml('govUserCliApproval', _govT('governance_grants_cli_approval', 'CLI commands requiring approval'), 'govDlCli', 'rm, sudo') +
       '</div>' +
@@ -261,6 +262,7 @@ async function _govLoadUsers(expectedDraft) {
         _govChipFieldHtml('govUserDenySkillsManage', _govT('governance_deny_skills_manage', 'Skills management off'), 'govDlSkills', 'my-skill') +
         _govChipFieldHtml('govUserDenyCli', _govT('governance_deny_cli', 'CLI commands off'), 'govDlCli', 'rm') +
         _govChipFieldHtml('govUserDenyMcp', _govT('governance_deny_mcp', 'MCP servers off'), 'govDlMcp', 'playwright') +
+        _govMcpToolMapHtml('govUserDenyMcpTools', 'MCP tools to deny', true, 'govDlMcp') +
       '</div>' +
       '<div id="govUserEffective"></div>' +
       '<datalist id="govDlSkills"></datalist>' +
@@ -274,6 +276,132 @@ async function _govLoadUsers(expectedDraft) {
   _govResetUserForm();
   _govEnsureCatalogs().then(_govFillCatalogDatalists).catch(() => {});
 }
+
+// Per-server MCP tool rules. Server grants and tool grants are separate;
+// adding a row never inserts a wildcard or changes the server allowlist.
+const _govMcpToolMaps = {};
+let _govMcpToolRowSequence = 0;
+
+function _govMcpToolMapHtml(id, label, deny, datalistId) {
+  const note = deny
+    ? 'Block named tools for a server even when other grants allow them. Enter * only to block every tool. An empty list blocks no tools.'
+    : 'Allow named tools for each server. Also allow the server above. Enter * only to allow every tool. An empty list grants no tools; access from other roles or groups still applies.';
+  return '<div class="gov-form-section" id="' + id + '" data-mcp-tool-map="' + id + '" data-server-list="' + datalistId + '">' +
+    '<div class="gov-form-title">' + _govEsc(label) + '</div>' +
+    '<p class="gov-muted">' + _govEsc(note) + '</p>' +
+    '<div data-mcp-tool-rows></div>' +
+    '<button type="button" class="gov-btn" id="' + id + 'Add" onclick="_govMcpToolMapAdd(\'' + id + '\')">Add server tool rule</button>' +
+    '</div>';
+}
+
+function _govMcpToolNames(value) {
+  const values = Array.isArray(value) ? value : typeof value === 'string' ? [value]
+    : value && typeof value === 'object' ? Object.keys(value) : value == null ? [] : [value];
+  return [...new Set(values.map(item => String(item).trim()).filter(Boolean))];
+}
+
+function _govMcpToolMapSet(id, mapping) {
+  const copy = value => value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+  const previous = _govMcpToolMaps[id];
+  if (previous) previous.rows.forEach(row => { delete _govChipState[row.id]; });
+  const state = {original: copy(mapping), rows: [], initial: ''};
+  _govMcpToolMaps[id] = state;
+  const host = $(id);
+  if (host) host.querySelector('[data-mcp-tool-rows]').replaceChildren();
+  if (mapping && typeof mapping === 'object' && !Array.isArray(mapping)) {
+    Object.entries(mapping).forEach(([server, tools]) => _govMcpToolMapAdd(id, server, tools));
+  }
+  state.initial = _govMcpToolMapSignature(id);
+}
+
+function _govMcpToolMapAdd(id, server = '', tools) {
+  const host = $(id), state = _govMcpToolMaps[id];
+  if (!host || !state) return;
+  const rowId = id + 'Rule' + (++_govMcpToolRowSequence);
+  const names = _govMcpToolNames(tools);
+  const row = {id: rowId, originalServer: server, originalNames: names,
+    original: tools === undefined ? undefined : JSON.parse(JSON.stringify(tools))};
+  state.rows.push(row);
+  const node = document.createElement('div');
+  node.className = 'gov-form-section gov-mcp-tool-row'; node.dataset.mcpToolRule = '';
+  node.innerHTML = '<div class="gov-form-row"><label for="' + rowId + 'Server">Server</label>' +
+    '<input id="' + rowId + 'Server" data-mcp-tool-server type="text" list="' + _govEsc(host.dataset.serverList || '') + '" placeholder="Choose or enter a server" autocomplete="off"></div>' +
+    _govChipFieldHtml(rowId, 'Tools', rowId + 'Options', 'Choose or enter a tool name') +
+    '<datalist id="' + rowId + 'Options"></datalist>' +
+    '<button type="button" class="gov-btn" data-mcp-tool-remove>Remove server rule</button>';
+  host.querySelector('[data-mcp-tool-rows]').appendChild(node);
+  row.node = node;
+  const input = $(rowId + 'Server'); input.value = server;
+  input.addEventListener('input', () => _govMcpToolMapOptions(id));
+  node.querySelector('[data-mcp-tool-remove]').addEventListener('click', () => {
+    state.rows = state.rows.filter(item => item !== row);
+    delete _govChipState[row.id]; node.remove();
+  });
+  _govChipsSet(rowId, names);
+  _govMcpToolMapOptions(id);
+  if (!server) input.focus();
+}
+
+function _govMcpToolMapOptions(id) {
+  const state = _govMcpToolMaps[id];
+  if (!state) return;
+  const tools = (window.__GOV_CAT__ || {}).mcpTools || {};
+  state.rows.forEach(row => {
+    const input = $(row.id + 'Server'), list = $(row.id + 'Options');
+    if (!input || !list) return;
+    const values = tools[input.value.trim()];
+    const names = Array.isArray(values) ? values : [];
+    list.replaceChildren(...names.map(name => {
+      const option = document.createElement('option'); option.value = name; return option;
+    }));
+  });
+}
+
+function _govMcpToolMapSignature(id) {
+  const state = _govMcpToolMaps[id];
+  return JSON.stringify(state ? state.rows.map(row => [($(row.id + 'Server') || {}).value || '', _govChipsGet(row.id)]) : []);
+}
+
+function _govMcpToolMapsValid(ids) {
+  for (const id of ids) {
+    const state = _govMcpToolMaps[id];
+    if (!state) continue;
+    const servers = new Set();
+    for (const row of state.rows) {
+      _govChipCommit(row.id);
+      const input = $(row.id + 'Server'), server = (input.value || '').trim();
+      const names = _govChipsGet(row.id);
+      let message = '';
+      if (!server && names.length) message = 'Choose a server for these tool names.';
+      else if (server && servers.has(server)) message = 'Use one tool rule per server. Combine the tool names in the existing rule.';
+      if (message) {
+        if (typeof showToast === 'function') showToast(message, 4000, 'error');
+        input.focus(); return false;
+      }
+      if (server) servers.add(server);
+    }
+  }
+  return true;
+}
+
+function _govCollectMcpToolMap(id, target) {
+  const state = _govMcpToolMaps[id];
+  if (!state) return;
+  // Keep untouched legacy values (string, array or keyed object) exactly as
+  // they arrived. Only an edited rule is normalized to the current list form.
+  if (_govMcpToolMapSignature(id) === state.initial) return;
+  const entries = [];
+  state.rows.forEach(row => {
+    const server = String(($(row.id + 'Server') || {}).value || '').trim();
+    if (!server) return;
+    const names = _govChipsGet(row.id);
+    const unchanged = server === row.originalServer && JSON.stringify(names) === JSON.stringify(row.originalNames);
+    entries.push([server, unchanged && row.original !== undefined ? row.original : names.slice()]);
+  });
+  if (entries.length) target.tools = Object.fromEntries(entries);
+  else delete target.tools;
+}
+
 
 const _GOV_USER_GRANT_FIELDS = ['govUserSkillsView', 'govUserSkillsLoad', 'govUserSkillsManage', 'govUserMcpServers', 'govUserCliCommands', 'govUserCliApproval'];
 const _GOV_USER_DENY_FIELDS = ['govUserDenySkills', 'govUserDenySkillsManage', 'govUserDenyCli', 'govUserDenyMcp'];
@@ -537,7 +665,7 @@ function _govChipKey(event, id) {
 
 async function _govEnsureCatalogs(force) {
   if (window.__GOV_CAT__ && !force) return window.__GOV_CAT__;
-  const cat = { skills: [], mcp: [], cli: [], roles: [], groups: [], emails: [] };
+  const cat = { skills: [], mcp: [], mcpTools: Object.create(null), cli: [], roles: [], groups: [], emails: [] };
   const opts = { redirect401: false, timeoutToast: false, timeoutMs: 15000 };
   await Promise.all([
     api('/api/skills', opts).then(d => {
@@ -545,6 +673,14 @@ async function _govEnsureCatalogs(force) {
     }).catch(() => {}),
     api('/api/mcp/servers', opts).then(d => {
       cat.mcp = (d.servers || []).map(s => s && s.name).filter(Boolean).sort();
+    }).catch(() => {}),
+    api('/api/mcp/tools', opts).then(d => {
+      for (const tool of d.tools || []) {
+        if (!tool || !tool.server || !tool.name) continue;
+        const names = cat.mcpTools[tool.server] || (cat.mcpTools[tool.server] = []);
+        if (!names.includes(tool.name)) names.push(tool.name);
+      }
+      Object.values(cat.mcpTools).forEach(names => names.sort());
     }).catch(() => {}),
     api('/api/governance/policy', opts).then(d => {
       const seen = new Set();
@@ -591,6 +727,7 @@ function _govFillCatalogDatalists(cat) {
   fill('govDlGroupsUsr', cat.groups);
   fill('govDlEmails', cat.emails);
   fill('govDlGroups', cat.groups);
+  Object.keys(_govMcpToolMaps).forEach(_govMcpToolMapOptions);
 }
 
 function _govResetUserForm() {
@@ -605,6 +742,8 @@ function _govResetUserForm() {
   _GOV_USER_GRANT_FIELDS.concat(_GOV_USER_DENY_FIELDS).forEach(id => _govChipsSet(id, []));
   _govSetExtraUserFields('grant', {});
   _govSetExtraUserFields('deny', {});
+  _govMcpToolMapSet('govUserMcpTools');
+  _govMcpToolMapSet('govUserDenyMcpTools');
   if ($('govUserAccessLevel')) $('govUserAccessLevel').value = 'user';
   if ($('govUserAccessMode')) $('govUserAccessMode').value = 'whitelist';
   if ($('govUserApprovalMode')) $('govUserApprovalMode').value = 'manual';
@@ -636,6 +775,7 @@ function _govEditUser(email) {
   _govChipsSet('govUserSkillsLoad', skills.load || []);
   _govChipsSet('govUserSkillsManage', skills.manage || []);
   _govChipsSet('govUserMcpServers', mcp.servers || []);
+  _govMcpToolMapSet('govUserMcpTools', mcp.tools);
   // cli.commands entries may be strings or {id/argv0} objects per the policy schema
   const commands = (cli.commands || []).map(c => (typeof c === 'string') ? c : ((c && (c.id || c.argv0)) || '')).filter(Boolean);
   _govChipsSet('govUserCliCommands', commands);
@@ -652,6 +792,7 @@ function _govEditUser(email) {
   const denyCommands = (denyCli.commands || []).map(c => (typeof c === 'string') ? c : ((c && (c.id || c.argv0)) || '')).filter(Boolean);
   _govChipsSet('govUserDenyCli', denyCommands);
   _govChipsSet('govUserDenyMcp', denyMcp.servers || []);
+  _govMcpToolMapSet('govUserDenyMcpTools', denyMcp.tools);
   _govLoadUserEffective(email);
 }
 
@@ -753,6 +894,7 @@ function _govCollectUserGrants() {
   }
   grants.mcp = grants.mcp || {};
   _govSetEditedList(grants.mcp, 'servers', _govChipsGet('govUserMcpServers'));
+  _govCollectMcpToolMap('govUserMcpTools', grants.mcp);
   grants.cli = grants.cli || {};
   _govSetEditedList(grants.cli, 'commands', _govKeepCommandMetadata(_govChipsGet('govUserCliCommands'), grants.cli.commands));
   _govSetEditedList(grants.cli, 'approval_commands', _govChipsGet('govUserCliApproval'));
@@ -773,6 +915,7 @@ function _govCollectUserDeny() {
   _govSetEditedList(deny.skills, 'manage', _govChipsGet('govUserDenySkillsManage'));
   deny.mcp = deny.mcp || {};
   _govSetEditedList(deny.mcp, 'servers', _govChipsGet('govUserDenyMcp'));
+  _govCollectMcpToolMap('govUserDenyMcpTools', deny.mcp);
   deny.cli = deny.cli || {};
   _govSetEditedList(deny.cli, 'commands', _govKeepCommandMetadata(_govChipsGet('govUserDenyCli'), deny.cli.commands));
   for (const key of ['skills', 'mcp', 'cli']) if (!Object.keys(deny[key]).length) delete deny[key];
@@ -797,6 +940,7 @@ async function _govSaveUser() {
   _govChipCommit('govUserRolesSel');
   _govChipCommit('govUserGroupsSel');
   _GOV_USER_GRANT_FIELDS.concat(_GOV_USER_DENY_FIELDS).forEach(_govChipCommit);
+  if (!_govMcpToolMapsValid(['govUserMcpTools', 'govUserDenyMcpTools'])) return;
   const approvalMode = String(($('govUserApprovalMode') || {}).value || '');
   const approvalPrompt = String(($('govUserApprovalPrompt') || {}).value || '').trim();
   if (approvalMode === 'automatic' && !approvalPrompt) {
@@ -869,6 +1013,7 @@ function _govGroupGrantsHtml() {
     _govChipFieldHtml('govGroupSkillsLoad', _govT('governance_grants_skills_load', 'Skills load'), 'govDlSkillsGrp', 'my-skill') +
     _govChipFieldHtml('govGroupSkillsManage', _govT('governance_grants_skills_manage', 'Skills manage'), 'govDlSkillsGrp', 'my-skill') +
     _govChipFieldHtml('govGroupMcpServers', _govT('governance_grants_mcp_servers', 'MCP servers'), 'govDlMcpGrp', 'notion, playwright') +
+    _govMcpToolMapHtml('govGroupMcpTools', 'MCP tools to allow', false, 'govDlMcpGrp') +
     _govChipFieldHtml('govGroupCliCommands', _govT('governance_grants_cli_commands', 'CLI commands'), 'govDlCliGrp', 'git, gh') +
     _govChipFieldHtml('govGroupCliApproval', _govT('governance_grants_cli_approval', 'CLI commands requiring approval'), 'govDlCliGrp', 'rm, sudo') +
     '<datalist id="govDlSkillsGrp"></datalist><datalist id="govDlCliGrp"></datalist><datalist id="govDlMcpGrp"></datalist>' +
@@ -1046,6 +1191,7 @@ function _govApplyGroupTemplate(key) {
   _govChipsSet('govGroupSkillsManage', skills.manage || []);
   const mcp = (grants.mcp && typeof grants.mcp === 'object') ? grants.mcp : {};
   _govChipsSet('govGroupMcpServers', mcp.servers || []);
+  _govMcpToolMapSet('govGroupMcpTools', mcp.tools);
   const cli = (grants.cli && typeof grants.cli === 'object') ? grants.cli : {};
   _govChipsSet('govGroupCliCommands', (cli.commands || []).map(_govChipIdOf));
   _govChipsSet('govGroupCliApproval', (cli.approval_commands || []).map(_govChipIdOf));
@@ -1068,6 +1214,7 @@ function _govResetGroupForm() {
   const roles = $('govGroupRoles');
   if (roles) roles.value = '';
   _GOV_GROUP_SECTION_FIELDS.forEach(id => _govChipsSet(id, []));
+  _govMcpToolMapSet('govGroupMcpTools');
 }
 
 function _govEditGroup(name) {
@@ -1090,6 +1237,7 @@ function _govEditGroup(name) {
   _govChipsSet('govGroupSkillsManage', skills.manage || []);
   const mcp = (grants.mcp && typeof grants.mcp === 'object') ? grants.mcp : {};
   _govChipsSet('govGroupMcpServers', mcp.servers || []);
+  _govMcpToolMapSet('govGroupMcpTools', mcp.tools);
   const cli = (grants.cli && typeof grants.cli === 'object') ? grants.cli : {};
   _govChipsSet('govGroupCliCommands', (cli.commands || []).map(_govChipIdOf));
   _govChipsSet('govGroupCliApproval', (cli.approval_commands || []).map(_govChipIdOf));
@@ -1105,7 +1253,7 @@ function _govChipIdOf(entry) {
 }
 
 /** Build the grants object from the group form, or null when every field is
- *  empty. Non-edited grant keys (mcp.tools, cli.workdir_roots, usage_caps, ...)
+ *  empty. Non-edited grant keys (cli.workdir_roots, usage_caps, ...)
  *  are carried over from the entry being edited. */
 function _govCollectGroupGrants() {
   const existing = (_govEditingGroup && (window.__GOV_GROUPS__ || {})[_govEditingGroup]) || {};
@@ -1117,6 +1265,7 @@ function _govCollectGroupGrants() {
   }
   grants.mcp = grants.mcp || {};
   _govSetEditedList(grants.mcp, 'servers', _govChipsGet('govGroupMcpServers'));
+  _govCollectMcpToolMap('govGroupMcpTools', grants.mcp);
   grants.cli = grants.cli || {};
   _govSetEditedList(grants.cli, 'commands', _govKeepCommandMetadata(_govChipsGet('govGroupCliCommands'), grants.cli.commands));
   _govSetEditedList(grants.cli, 'approval_commands', _govKeepCommandMetadata(_govChipsGet('govGroupCliApproval'), grants.cli.approval_commands));
@@ -1125,6 +1274,7 @@ function _govCollectGroupGrants() {
 }
 
 async function _govSaveGroup() {
+  if (!_govMcpToolMapsValid(['govGroupMcpTools'])) return;
   const name = String(($('govGroupName') || {}).value || '').trim();
   if (!name) {
     if (typeof showToast === 'function') showToast(_govT('governance_invalid_name', 'Enter a group name'), 3000, 'error');

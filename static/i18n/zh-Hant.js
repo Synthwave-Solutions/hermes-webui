@@ -1586,7 +1586,7 @@ window.__registerHermesLocale('zh-Hant', {
     cron_schedule_preset_monthly: '每月',
     cron_schedule_preset_custom: '自訂',
     cron_schedule_hint: '週期性任務請用「every 1h」或 Cron 表示式。像「30m」這樣的裸時長只會執行一次。',
-    cron_schedule_once_warning: '像「30m」這樣的時長寫法只會執行一次，並在執行後移除。要保留週期性任務，請使用「every 30m」。',
+    cron_schedule_once_warning: "此排程只執行一次。單次任務請使用 'in 30m' 或指定日期和時間；'30m' 和 'every 30m' 會重複執行。",
     cron_prompt_label: '提示',
     cron_deliver_label: '傳送至',
     cron_deliver_local: '本機（僅儲存輸出）',

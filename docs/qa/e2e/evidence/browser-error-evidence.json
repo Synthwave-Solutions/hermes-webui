@@ -1,5 +1,37 @@
 [
   {
+    "scenario": "US-SP-AFFORDANCE-FILE-CANCEL Escape discards edited text and exact original bytes survive reopening and reload",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-AFFORDANCE-SKILL-LINKS linked markdown and Back work while traversal and live revoked access return no new file content",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-AFFORDANCE-HIDDEN-FILES persisted hidden-file toggle reveals permitted system files without bypassing a file denial",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-AFFORDANCE-MESSAGE-FORK selected message creates an exact persistent prefix and child continuation leaves the private parent unchanged",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-SKILL-LIFECYCLE-CLICKS edit cancel save and delete only the selected disposable skill",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-FILE-CHOOSER-CLICKS navigate child upload exact bytes copy relative path and reject denied reader",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-SESS-IMPORT-CLICKS visible JSON chooser imports exact transcript and malformed JSON creates no session",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-CHAT-ATTACH-CHOOSER-CLICKS attach opens real chooser and removal leaves draft and disk untouched",
+    "errors": []
+  },
+  {
     "scenario": "US-SP-AUTH-001 actual password login rejects invalid input then establishes authenticated session",
     "errors": []
   },
@@ -9,6 +41,18 @@
   },
   {
     "scenario": "US-SP-AUTH-ANONYMOUS authenticated data APIs reject absent cookie",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-CHAT-008 startup interrupt leaves the cached successor able to answer",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-CHAT-009 Stop during cached initialization prevents provider admission and permits a later turn",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-CHAT-008 an aged cancelled worker retains its interrupt until its held reply settles",
     "errors": []
   },
   {
@@ -69,6 +113,10 @@
   },
   {
     "scenario": "US-SP-CHAT-PROMPTS saved prompt validates empty input saves reloads inserts exact text and deletes",
+    "errors": []
+  },
+  {
+    "scenario": "SUPPLEMENT CRON SKILL PICKER an old blur cannot close a reopened query and a current outside click still closes it",
     "errors": []
   },
   {
@@ -241,6 +289,38 @@
   },
   {
     "scenario": "US-SP-POL-RUNTIME-automanual parked action waits for real frontend once decision",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-KAN-ADMIN-BOARDS create validate cancel rename switch archive persist with denied administration",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-KAN-ADMIN-DEPENDENCIES add remove reject cycles and guard direct completion until parent finishes",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-KAN-ADMIN-FILTERS exact assignee tenant mine lanes selected bulk completion and dispatcher preview",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-KAN-ADMIN-BLOCK Todo block unblock preserve reason dependency denial and repeated-block escalation",
+    "errors": []
+  },
+  {
+    "scenario": "SUPPLEMENT KANBAN DEPENDENCY DRAFT a late live refresh preserves re-add input and one exact persisted link",
+    "errors": []
+  },
+  {
+    "scenario": "SUPPLEMENT KANBAN DEPENDENCY DRAFT newer clear and task navigation cannot restore or transfer an old draft",
+    "errors": []
+  },
+  {
+    "scenario": "SUPPLEMENT KANBAN DEPENDENCY DRAFT a delayed successful Add keeps the next edited dependency for its own submission",
+    "errors": []
+  },
+  {
+    "scenario": "SUPPLEMENT KANBAN EDIT FOCUS delayed initial focus cannot redirect priority typing into the saved title",
     "errors": []
   },
   {
@@ -452,6 +532,14 @@
     "errors": []
   },
   {
+    "scenario": "US-SP-NAV-PANEL-CLICKS rail labels and workspace edge toggle preserve draft and workspace default survives reload",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-LOG-CLIPBOARD-CLICKS copy exact visible severity lines and refresh reads appended disk evidence",
+    "errors": []
+  },
+  {
     "scenario": "US-SP-POL-RESOURCE resource denials saved in frontend block real named skill settings and model API bypasses",
     "errors": []
   },
@@ -468,6 +556,22 @@
     "errors": []
   },
   {
+    "scenario": "SUPPLEMENT SESSION ACTIVATION newer New Chat survives a delayed available saved-session restore",
+    "errors": []
+  },
+  {
+    "scenario": "SUPPLEMENT SESSION ACTIVATION newer New Chat survives a delayed inaccessible saved-session restore",
+    "errors": []
+  },
+  {
+    "scenario": "SUPPLEMENT SESSION ACTIVATION a later current sidebar choice survives a delayed New Chat response",
+    "errors": []
+  },
+  {
+    "scenario": "SUPPLEMENT SESSION ACTIVATION a later other sidebar choice survives a delayed New Chat response",
+    "errors": []
+  },
+  {
     "scenario": "US-SP-SESS-DISCOVERY rename Enter and Escape plus title content and URL search select persisted conversation",
     "errors": []
   },
@@ -477,6 +581,18 @@
   },
   {
     "scenario": "US-SP-SESS-SHARE create public snapshot read anonymously cancel revoke then revoke invalidates public link",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-SESS-SHARE-AUTH a readable group participant cannot publish or revoke its owners snapshot",
+    "errors": []
+  },
+  {
+    "scenario": "SUPPLEMENT DRAFT RESTORE actual typing and clearing beat late metadata and deliberate prompt reinsertion stays exact",
+    "errors": []
+  },
+  {
+    "scenario": "US-SP-SESS-IMPORT-AUTHORITY JSON chooser rejects unauthorized workspace before creating a session and allowed import ignores forged identity",
     "errors": []
   },
   {
@@ -616,6 +732,122 @@
     "errors": []
   },
   {
+    "scenario": "SUPPLEMENT STREAM OWNERSHIP late old reconnect status cannot replace an interrupted successor",
+    "errors": []
+  },
+  {
+    "scenario": "SUPPLEMENT APPEARANCE rejected automatic preference sync preserves local rendering without uncaught promises",
+    "errors": []
+  },
+  {
+    "scenario": "SUPPLEMENT CLARIFY DISPATCH other clarification collapses answers and resumes once while stale replies cannot consume next question",
+    "errors": []
+  },
+  {
+    "scenario": "SUPPLEMENT CLARIFY DISPATCH choice clarification collapses answers and resumes once while stale replies cannot consume next question",
+    "errors": []
+  },
+  {
+    "scenario": "SUPPLEMENT CLARIFY DISPATCH real Kanban worker claims completes and remains isolated from mixed bulk failures",
+    "errors": []
+  },
+  {
+    "scenario": "SUPPLEMENT CLI MCP command grants manual Once Deny and wildcard hard denial govern actual harmless process effects",
+    "errors": []
+  },
+  {
+    "scenario": "SUPPLEMENT CLI MCP real initialized stdio catalog has exact schemas search and next previous paging",
+    "errors": []
+  },
+  {
+    "scenario": "SUPPLEMENT CLI MCP server grant permits real manual invocation while explicit server deny blocks dispatch and catalog disclosure",
+    "errors": []
+  },
+  {
+    "scenario": "SUPPLEMENT CLI MCP mandatory command review stays manual while the same user automatically approves an eligible read",
+    "errors": []
+  },
+  {
+    "scenario": "SUPPLEMENT CRON ADVANCED weekly Sunday editor and pause resume delete govern future scheduler eligibility",
+    "errors": []
+  },
+  {
+    "scenario": "SUPPLEMENT CRON ADVANCED monthly day31 and custom expression preserve saved state across invalid edit and reload",
+    "errors": []
+  },
+  {
+    "scenario": "SUPPLEMENT CRON ADVANCED one-shot custom warning and Run now retain completed history without future eligibility",
+    "errors": []
+  },
+  {
+    "scenario": "SUPPLEMENT CRON ADVANCED selected profile model and skill reach actual isolated cron execution",
+    "errors": []
+  },
+  {
+    "scenario": "SUPPLEMENT EXTENSION local archive install verifies checksum and rejects nonadmin lifecycle mutations without state changes",
+    "errors": []
+  },
+  {
+    "scenario": "SUPPLEMENT EXTENSION loaded local settings reset storage isolation sidecar consent revoke disable enable and uninstall persist through reload",
+    "errors": []
+  },
+  {
+    "scenario": "SUPPLEMENT MCP TOOL GOVERNANCE complete Users onboarding allows one real tool then local and canonical explicit denies block wildcard dispatch",
+    "errors": []
+  },
+  {
+    "scenario": "SUPPLEMENT MCP TOOL GOVERNANCE Groups rule creation validation removal and untouched user legacy maps round trip",
+    "errors": []
+  },
+  {
+    "scenario": "SUPPLEMENT MODEL ROUTING visible custom composer model reaches the provider and remains conversation scoped after reload",
+    "errors": []
+  },
+  {
+    "scenario": "SUPPLEMENT AUX SAVE navigation Save applies pending auxiliary choices and Apply preserves unrelated edits and failed choices",
+    "errors": []
+  },
+  {
+    "scenario": "SUPPLEMENT PROJECT KNOWLEDGE retained project pages lose files conversation creation and chat access after membership removal",
+    "errors": []
+  },
+  {
+    "scenario": "SUPPLEMENT PROJECT KNOWLEDGE bot catalogs search deselection and foreign document IDs stay scoped to their own bot",
+    "errors": []
+  },
+  {
+    "scenario": "SUPPLEMENT PROJECT KNOWLEDGE concurrent bot editors reject stale selection without overwriting then recover through reopen",
+    "errors": []
+  },
+  {
+    "scenario": "SUPPLEMENT TRANSCRIPT FILES virtualized long history supports Start outline and End without losing or duplicating turns",
+    "errors": []
+  },
+  {
+    "scenario": "SUPPLEMENT TRANSCRIPT FILES delayed terminal dock follow cannot override newer Start navigation",
+    "errors": []
+  },
+  {
+    "scenario": "SUPPLEMENT TRANSCRIPT FILES CSV table and valid or malformed JSON preserve literal content and exact downloads",
+    "errors": []
+  },
+  {
+    "scenario": "SUPPLEMENT TRANSCRIPT FILES HTML preview runs inside an opaque sandbox and cannot read parent identity or cookies",
+    "errors": []
+  },
+  {
+    "scenario": "SUPPLEMENT TRANSCRIPT FILES large Markdown falls back to literal text then explicit render is scoped to the current file",
+    "errors": []
+  },
+  {
+    "scenario": "SUPPLEMENT TRANSCRIPT FILES delayed outline history cannot replace a newer active turn",
+    "errors": []
+  },
+  {
+    "scenario": "SUPPLEMENT TRANSCRIPT FILES newer manual scroll during history loading keeps correct message Edit indices and earlier persisted turns",
+    "errors": []
+  },
+  {
     "scenario": "US-SP-SYSTEM-CAPACITY four capacity controls save reload sanitize and refuse an ungranted identity",
     "errors": []
   },
@@ -685,6 +917,10 @@
   },
   {
     "scenario": "US-SP-KAN-001 creates unassigned Triage task, opens detail and filters list",
+    "errors": []
+  },
+  {
+    "scenario": "SUPPLEMENT WORKSPACE DEFAULT remembered foreign or removed workspace recovers on New chat without widening explicit access",
     "errors": []
   },
   {

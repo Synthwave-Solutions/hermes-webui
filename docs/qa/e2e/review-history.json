@@ -1,0 +1,2950 @@
+{
+  "prior_integrated_attempts": [
+    {
+      "run": "20260908-221421-292673000",
+      "scenarios": 176,
+      "passed": 172,
+      "failed": 4,
+      "source_unchanged": true,
+      "findings": [
+        "Share creation404 was open in this historical run; resolved by the final 187-scenario run",
+        "Todo to Done404 was open in this historical run; resolved by the final 187-scenario run",
+        "Terminal CDN assets blocked by the corrected loopback QA boundary; exact verified assets were bundled locally; focused same-origin asset and command/restart test passed",
+        "Tool status case required compact activity mode but an earlier settings test left transparent stream selected; explicit UI precondition was added; preceding preference plus tool-status ordering regression passed"
+      ]
+    },
+    {
+      "run": "20260908-222640-169443000",
+      "scenarios": 176,
+      "passed": 174,
+      "failed": 2,
+      "source_unchanged": true,
+      "findings": [
+        "Share creation and manual Todo completion still returned404 in this historical run",
+        "The final 187-scenario run passes both regressions and adds Share ownership/privacy and manual Todo blocking coverage"
+      ]
+    },
+    {
+      "run": "20260909-091141-369551000",
+      "scenarios": 202,
+      "passed": 193,
+      "failed": 9,
+      "source_unchanged": true,
+      "findings": [
+        "SQLite optional WAL disappearance race corrected in engine b0aaa74f9; selected regression tests pass.",
+        "Remembered workspace fallback now projects the current actor rights on boot, New Chat and profile switch; explicit invalid paths still reject.",
+        "Forbidden appearance autosync promises are handled; the underlying settings denials remain enforced."
+      ]
+    },
+    {
+      "run": "20260909-101110-65363000",
+      "scenarios": 219,
+      "passed": 217,
+      "failed": 2,
+      "source_unchanged": true,
+      "findings": [
+        "Bot initial navigation trace paused124s during confirmed10:19:57+0200 Clamshell Sleep126s. The90s test budget expired before its Bots click.",
+        "Delayed history Send trace paused46.28s during confirmed10:22:48+0200 Maintenance Sleep48s, exceeding the10s action deadline.",
+        "Original217pass/2fail receipt retained. Unchanged targeted replays passed3project/knowledge and5transcript cases. Full unchanged replay is recorded separately. No forced clicks, retries or deadline increases."
+      ],
+      "diagnosis": "full-run-sleep-diagnosis.md"
+    },
+    {
+      "run": "20260909-103512-455381000",
+      "scenarios": 219,
+      "passed": 217,
+      "failed": 2,
+      "source_unchanged": true,
+      "findings": [
+        "Both prior sleep-related cases pass in this historical run.",
+        "Confirmed delayed board autofocus redirected slug typing into the name; immediate focus corrects create and rename. Four regressions fail before and pass after; original exact-name worker and board workflows pass.",
+        "Confirmed full-history Start restored an obsolete tail anchor at30110 pixels. Explicit Start snapshot and session/navigation/turn ownership guards correct it. A new browser no-tail-jump assertion fails before and passes after;35 focused adjacent/behavior tests pass.",
+        "Both fixes are committed in242bcc97. This historical217pass/2fail receipt remains unchanged; final combined acceptance is recorded separately."
+      ],
+      "cleanup": "Known runner descendants and exact private-state/PID-birth census returned zero remaining candidates.",
+      "final_frozen_replay": {
+        "receipt": "work/navigation-draft-final-replay.json",
+        "run": "20260909-124140-843191000",
+        "webui_head": "7b2620b3ac40956496bb014d25392d40d95fa5bd",
+        "engine_head": "b0aaa74f9dcfe9e7caa4692656b4535ce04104e1",
+        "results_sha256": "91f96e528001fbf75a60823fe1aebe78b814c8bb6f96639cfe168404074b60d4",
+        "scope": "Relevant navigation/history cases passed in the separately recorded complete Mac225 replay. Original historical failures, sleep qualification and Linux failures are unchanged."
+      }
+    },
+    {
+      "run": "20260909-110627-297437000",
+      "scenarios": 219,
+      "passed": 217,
+      "failed": 2,
+      "source_unchanged": true,
+      "findings": [
+        "MCP scenario failed before dispatch because a late bootstrap restore of an old inaccessible conversation cleared a newly created session URL. New Chat/navigation generation correction is under independent review.",
+        "Workspace revocation initial setup crossed confirmed11:20:55\u201311:25:07+0200 Clamshell Sleep252s with a250.602s matching trace gap. The45s test deadline expired before the actual workspace revocation scenario; unchanged Linux replay is recorded separately.",
+        "Independent review additionally reproduced stale Edit indices when a successfully loaded Start action was superseded by same-session navigation. The prior anchor correction passed; this additional reconciliation case requires a new regression."
+      ],
+      "cleanup": "Exact private-state/PID-birth census found zero surviving owned candidates.",
+      "diagnosis": "workspace-runtime-sleep-242bcc97.json",
+      "final_frozen_replay": {
+        "receipt": "work/navigation-draft-final-replay.json",
+        "run": "20260909-124140-843191000",
+        "webui_head": "7b2620b3ac40956496bb014d25392d40d95fa5bd",
+        "engine_head": "b0aaa74f9dcfe9e7caa4692656b4535ce04104e1",
+        "results_sha256": "91f96e528001fbf75a60823fe1aebe78b814c8bb6f96639cfe168404074b60d4",
+        "scope": "Relevant navigation/history cases passed in the separately recorded complete Mac225 replay. Original historical failures, sleep qualification and Linux failures are unchanged."
+      }
+    },
+    {
+      "run": "20260909-120039-662326096",
+      "platform": "linux",
+      "scenarios": 224,
+      "passed": 203,
+      "failed": 21,
+      "skipped": 0,
+      "flaky": 0,
+      "source_unchanged": true,
+      "source": {
+        "webui": {
+          "head": "530710751934b36f0105313aae75e368b1817583",
+          "source_sha256": "fcf90afd8d0bdd75cd6fac47b8ed50b165d07b9027bc7bf68cca425f944006d8"
+        },
+        "engine": {
+          "head": "b0aaa74f9dcfe9e7caa4692656b4535ce04104e1",
+          "source_sha256": "653c3f66da11449a366b3ecaa5463306d0e5865456883d6fce205be738c82bf7"
+        }
+      },
+      "qualification_receipt": "work/qa-linux-failure-qualification-20260909.json",
+      "qualification_receipt_sha256": "386f2a0524232b38126868510d7984cdfbb841037d912f0873506fdf531a9bc7",
+      "run_manifest_sha256": "c45600711cbf241505a43ad13a0ab06b3e86bb961a80961575fa5a7d426437ab",
+      "results_sha256": "be33ee5a2046a8dabb2e1bb0e4a916be7901e8631ad815dfd185490f6322f221",
+      "operator": {
+        "status": "failed",
+        "python": "3.11.14",
+        "playwright": "Version 1.55.1",
+        "elapsed_seconds": 3144.2,
+        "runner_exit_code": 1,
+        "selected_engine_child_verified": true
+      },
+      "failed_scenarios": [
+        {
+          "title": "US-SP-AFFORDANCE-MESSAGE-FORK selected message creates an exact persistent prefix and child continuation leaves the private parent unchanged",
+          "file": "additional-affordances.spec.ts",
+          "line": 245,
+          "status": "unexpected",
+          "attempts": [
+            {
+              "status": "failed",
+              "duration_ms": 18570
+            }
+          ]
+        },
+        {
+          "title": "US-SP-CHAT-008 explicit interrupt cancels first response and starts requested next message",
+          "file": "chat-lifecycle.spec.ts",
+          "line": 17,
+          "status": "unexpected",
+          "attempts": [
+            {
+              "status": "failed",
+              "duration_ms": 39257
+            }
+          ]
+        },
+        {
+          "title": "US-SP-CHAT-PROMPTS saved prompt validates empty input saves reloads inserts exact text and deletes",
+          "file": "composer-content.spec.ts",
+          "line": 38,
+          "status": "unexpected",
+          "attempts": [
+            {
+              "status": "failed",
+              "duration_ms": 23887
+            }
+          ]
+        },
+        {
+          "title": "US-SP-SESS-SPLIT all split counts create real independent frames and exit",
+          "file": "deep-workflows.spec.ts",
+          "line": 24,
+          "status": "unexpected",
+          "attempts": [
+            {
+              "status": "timedOut",
+              "duration_ms": 53738
+            }
+          ]
+        },
+        {
+          "title": "US-SP-GOV-006 [field removal] clearing all extra grants and denials removes persisted entries",
+          "file": "governance-field-roundtrip.spec.ts",
+          "line": 112,
+          "status": "unexpected",
+          "attempts": [
+            {
+              "status": "timedOut",
+              "duration_ms": 48370
+            }
+          ]
+        },
+        {
+          "title": "US-SP-POL-REVOKE-LEVELS user elevated and admin choices persist while only explicit admin can administer policy",
+          "file": "governance-revocation.spec.ts",
+          "line": 50,
+          "status": "unexpected",
+          "attempts": [
+            {
+              "status": "timedOut",
+              "duration_ms": 49747
+            }
+          ]
+        },
+        {
+          "title": "US-SP-GOV-REQUESTER-STATUS retained requester sees pending approved rejected while another account cannot read or decide those requests",
+          "file": "governance-revocation.spec.ts",
+          "line": 65,
+          "status": "unexpected",
+          "attempts": [
+            {
+              "status": "timedOut",
+              "duration_ms": 51648
+            }
+          ]
+        },
+        {
+          "title": "US-SP-KAN-ADMIN-DEPENDENCIES add remove reject cycles and guard direct completion until parent finishes",
+          "file": "kanban-administration.spec.ts",
+          "line": 89,
+          "status": "unexpected",
+          "attempts": [
+            {
+              "status": "failed",
+              "duration_ms": 40231
+            }
+          ]
+        },
+        {
+          "title": "US-SP-VOICE-REALTIME-CONTROLS microphone, push to talk, interruption and session change release capture correctly",
+          "file": "realtime-voice.spec.ts",
+          "line": 198,
+          "status": "unexpected",
+          "attempts": [
+            {
+              "status": "failed",
+              "duration_ms": 12442
+            }
+          ]
+        },
+        {
+          "title": "US-SP-VOICE-REALTIME-MIC-DENIED microphone refusal fails without creating a provider call",
+          "file": "realtime-voice.spec.ts",
+          "line": 221,
+          "status": "unexpected",
+          "attempts": [
+            {
+              "status": "failed",
+              "duration_ms": 13099
+            }
+          ]
+        },
+        {
+          "title": "US-SP-VOICE-REALTIME-REMOTE-END removed server call stops browser microphone capture",
+          "file": "realtime-voice.spec.ts",
+          "line": 228,
+          "status": "unexpected",
+          "attempts": [
+            {
+              "status": "failed",
+              "duration_ms": 12861
+            }
+          ]
+        },
+        {
+          "title": "US-SP-VOICE-REALTIME-LAUNCH-RACE canceled capability response cannot release a newer pending launch",
+          "file": "realtime-voice.spec.ts",
+          "line": 237,
+          "status": "unexpected",
+          "attempts": [
+            {
+              "status": "failed",
+              "duration_ms": 13081
+            }
+          ]
+        },
+        {
+          "title": "SUPPLEMENT SESSION ACTIVATION newer New Chat survives a delayed inaccessible saved-session restore",
+          "file": "session-activation-races.spec.ts",
+          "line": 6,
+          "status": "unexpected",
+          "attempts": [
+            {
+              "status": "failed",
+              "duration_ms": 6643
+            }
+          ]
+        },
+        {
+          "title": "US-SP-SESS-SHARE-AUTH a readable group participant cannot publish or revoke its owners snapshot",
+          "file": "session-discovery-share.spec.ts",
+          "line": 107,
+          "status": "unexpected",
+          "attempts": [
+            {
+              "status": "failed",
+              "duration_ms": 8755
+            }
+          ]
+        },
+        {
+          "title": "US-SP-SESS-IMPORT-AUTHORITY JSON chooser rejects unauthorized workspace before creating a session and allowed import ignores forged identity",
+          "file": "session-import-authority.spec.ts",
+          "line": 7,
+          "status": "unexpected",
+          "attempts": [
+            {
+              "status": "failed",
+              "duration_ms": 4699
+            }
+          ]
+        },
+        {
+          "title": "SUPPLEMENT PROJECT KNOWLEDGE retained project pages lose files conversation creation and chat access after membership removal",
+          "file": "supplement-project-knowledge.spec.ts",
+          "line": 119,
+          "status": "unexpected",
+          "attempts": [
+            {
+              "status": "failed",
+              "duration_ms": 9917
+            }
+          ]
+        },
+        {
+          "title": "SUPPLEMENT TRANSCRIPT FILES virtualized long history supports Start outline and End without losing or duplicating turns",
+          "file": "supplement-transcript-files.spec.ts",
+          "line": 46,
+          "status": "unexpected",
+          "attempts": [
+            {
+              "status": "failed",
+              "duration_ms": 23761
+            }
+          ]
+        },
+        {
+          "title": "SUPPLEMENT TRANSCRIPT FILES CSV table and valid or malformed JSON preserve literal content and exact downloads",
+          "file": "supplement-transcript-files.spec.ts",
+          "line": 136,
+          "status": "unexpected",
+          "attempts": [
+            {
+              "status": "failed",
+              "duration_ms": 6978
+            }
+          ]
+        },
+        {
+          "title": "SUPPLEMENT TRANSCRIPT FILES HTML preview runs inside an opaque sandbox and cannot read parent identity or cookies",
+          "file": "supplement-transcript-files.spec.ts",
+          "line": 185,
+          "status": "unexpected",
+          "attempts": [
+            {
+              "status": "failed",
+              "duration_ms": 7621
+            }
+          ]
+        },
+        {
+          "title": "SUPPLEMENT TRANSCRIPT FILES large Markdown falls back to literal text then explicit render is scoped to the current file",
+          "file": "supplement-transcript-files.spec.ts",
+          "line": 202,
+          "status": "unexpected",
+          "attempts": [
+            {
+              "status": "failed",
+              "duration_ms": 11439
+            }
+          ]
+        },
+        {
+          "title": "US-SP-WS-REVOKE removing workspace membership blocks retained session file reads and fresh activation despite role ceiling",
+          "file": "workspace-governance.spec.ts",
+          "line": 27,
+          "status": "unexpected",
+          "attempts": [
+            {
+              "status": "failed",
+              "duration_ms": 12040
+            }
+          ]
+        }
+      ],
+      "served_source_checks": {
+        "sessions.js": true,
+        "boot.js": true,
+        "ui.js": true,
+        "governance.js": true
+      },
+      "served_source_check_note": "Independently compared actual loopback static response bytes with frozen530 QA clone while run was active.",
+      "cleanup": {
+        "sampled_process_identities": 626,
+        "remaining_sampled_identities": [],
+        "unit_cgroup_exists": false,
+        "fixture_health_responds": false,
+        "scope": "Sampled exact cgroup PID/start-tick identities plus one known fixture health listener; not universal process history."
+      },
+      "resource_adjustment": {
+        "unit": "synthpulse-qa-full-20260909-v2.service",
+        "at_utc": "2026-09-09T10:26:44Z",
+        "run": "20260909-120039-662326096",
+        "previous_cpu_quota": "2s",
+        "new_cpu_quota": "4s",
+        "measured_prior_host_idle_percent": 43.4,
+        "prior_throttled_periods": 11010,
+        "prior_periods": 13489,
+        "prior_memory_oom_events": 0,
+        "reported_failures_before_change": 8,
+        "scope": "Only independently owned synthetic QA unit changed. Existing failed outcomes remain failures; no assertion/deadline/source changed."
+      },
+      "findings": [
+        "Failed Linux224 replay on frozen530. Does not qualify as a release pass. Subsequent225 Mac run on7b is a separate result. CPU throttling was measured and cap raised from200% to400% midrun; causation of individual failures remains unproven. Saved-prompt draft race/setup was subsequently repaired with separate failing-before and passing-after browser evidence; other Linux failures remain unresolved.",
+        "All 21 failed names and their original attempt statuses remain failures in this historical Linux receipt. The subsequent passing Mac225 run is separate; neither that pass nor measured CPU throttling resolves the other 20 Linux failures.",
+        "An exact replay of these 21 scenarios on commit 7b2620b3 with the QA unit CPU cap at 400% is planned separately. No result is attributed to that replay until its own receipt is verified."
+      ]
+    },
+    {
+      "run": "20260909-130921-466614373",
+      "kind": "separate_exact21_linux_replay",
+      "webui_head": "7b2620b3ac40956496bb014d25392d40d95fa5bd",
+      "engine_head": "b0aaa74f9dcfe9e7caa4692656b4535ce04104e1",
+      "passed": 19,
+      "failed": 2,
+      "selected": 21,
+      "source_unchanged": true,
+      "operator_sha256": "b538d359ae149276445e7181a86e5bab410d79f376aa783f0d500bba0da08d25",
+      "results_sha256": "460436bf8a1a0fc0aebd4581b468b2a0e11e7b63ba0e3e4396abf6893445ab37",
+      "run_manifest_sha256": "8636b538c8281fc87c85b10804329f280496bb12ad2f15bf02dfcc8919716e9e",
+      "private_assertion_receipt_sha256": "185fb296b85dbaac343085087815950c0c04daadb93e70502559465bd32be59e",
+      "post_unit_cleanup": {
+        "unit_cgroup_exists": false,
+        "fixture_health_responds": false
+      },
+      "remaining_sampled_identities_before_exit": [],
+      "scope": "Fresh-state replay of exactly21 failures from earlier224Linuxrun, one attempt per selected case and unchanged deadlines. Does not replace the earlier full run or certify all Linux features.",
+      "failures": [
+        {
+          "file": "chat-lifecycle.spec.ts",
+          "title": "US-SP-CHAT-008 explicit interrupt cancels first response and starts requested next message",
+          "status": "failed",
+          "duration_ms": 36261
+        },
+        {
+          "file": "kanban-administration.spec.ts",
+          "title": "US-SP-KAN-ADMIN-DEPENDENCIES add remove reject cycles and guard direct completion until parent finishes",
+          "status": "failed",
+          "duration_ms": 24650
+        }
+      ],
+      "diagnosis": {
+        "interrupt": "Successor provider call and persisted assistant reply succeeded; new journal completed. Browser reattached old canceled stream after successor start. Frontend fix pending.",
+        "kanban": "Re-add after successful dependency removal produced no POST. Controlled held-detail response reproduced wiping new dependency input; fix pending."
+      }
+    },
+    {
+      "run": "20260909-135540-455902000",
+      "kind": "complete_mac_frozen232_attempt",
+      "webui_head": "bd24eeb1210287429fa88aae60890fc234fb5032",
+      "engine_head": "b0aaa74f9dcfe9e7caa4692656b4535ce04104e1",
+      "source_sha256": "d536782cbdee919b96b6ebf5f9b8030ae0af4963d3cd267eaee3f9891fc083eb",
+      "source_unchanged": true,
+      "passed": 230,
+      "failed": 2,
+      "skipped": 0,
+      "flaky": 0,
+      "results_sha256": "7827f3fa6e9dbb860d0e885cba361f97b9fe8e9b8f3a7b1e60647a29f65b6064",
+      "run_manifest_sha256": "27321ddf3039bd378091686ab6c42f400e8b67ee261dcb387a637d580238bf31",
+      "failures": [
+        {
+          "file": "supplement-transcript-files.spec.ts",
+          "title": "SUPPLEMENT TRANSCRIPT FILES virtualized long history supports Start outline and End without losing or duplicating turns",
+          "status": "unexpected",
+          "duration_ms": 12931
+        },
+        {
+          "file": "supplement-transcript-files.spec.ts",
+          "title": "SUPPLEMENT TRANSCRIPT FILES delayed outline history cannot replace a newer active turn",
+          "status": "unexpected",
+          "duration_ms": 1724
+        }
+      ],
+      "cleanup_receipt": "work/ownership-final-run-census-after.json",
+      "remaining_sampled_identities": 0,
+      "qualification": "Both actual failures retained. Start ordering remains under investigation; string wait predicate CSP issue independently traced to repeated eval in installed Playwright1.55.1. No retry, deadline increase or source change occurred during this run."
+    },
+    {
+      "kind": "separate_exact21_linux_replay",
+      "run": "20260909-135948-854974059",
+      "passed": 21,
+      "failed": 0,
+      "skipped": 0,
+      "flaky": 0,
+      "selected": 21,
+      "source": {
+        "webui": {
+          "head": "bd24eeb1210287429fa88aae60890fc234fb5032",
+          "source_sha256": "d536782cbdee919b96b6ebf5f9b8030ae0af4963d3cd267eaee3f9891fc083eb"
+        },
+        "engine": {
+          "head": "b0aaa74f9dcfe9e7caa4692656b4535ce04104e1",
+          "source_sha256": "653c3f66da11449a366b3ecaa5463306d0e5865456883d6fce205be738c82bf7"
+        }
+      },
+      "source_unchanged": true,
+      "operator_sha256": "2836c699350a452eea3dfbe7dea2fe915b920be4d6b173907dc0185acc6fdee7",
+      "run_manifest_sha256": "49e8e232df95795ae02ff8a4975cdebd102f2f659a87739cd8b9e3427c2fc25a",
+      "results_sha256": "d0b7291ebe2d5faa088e85c356bbaad7ad6c6b9c1336e1b6668ce298240b2b27",
+      "receipt": "work/qa-linux-failed21-qualification-20260909-v2.json",
+      "receipt_sha256": "3ea6e743c3835c32801a59b63869866dc222212edbc7cad69b5e179bce8f568c",
+      "sampled_identities": 61,
+      "remaining_sampled_identities": 0,
+      "post_unit_cleanup": {
+        "unit_cgroup_exists": false,
+        "known_fixture_listener_closed": true
+      },
+      "scope": "Fresh exact21 replay on this source pair, not a complete Linux feature run. Prior failed runs remain recorded; cleanup covers sampled exact identities and the known unit/listener."
+    },
+    {
+      "kind": "complete_mac_frozen233_attempt",
+      "run": "20260909-142056-714653000",
+      "source": {
+        "webui": {
+          "head": "5a49094164147ffbee43d53ae886b8a26cf23d14",
+          "source_sha256": "f9d76557529f3e252b5a491da4bc3d14c255f6a49d96975ccbf15113b7dc7d68"
+        },
+        "engine": {
+          "head": "b0aaa74f9dcfe9e7caa4692656b4535ce04104e1",
+          "source_sha256": "653c3f66da11449a366b3ecaa5463306d0e5865456883d6fce205be738c82bf7"
+        }
+      },
+      "source_unchanged": true,
+      "passed": 232,
+      "failed": 1,
+      "skipped": 0,
+      "flaky": 0,
+      "run_manifest_sha256": "a7bf8192376a21bf5d78a0edc9e2655f86a3574bbbccfd8f70d1c51d70ab41f7",
+      "results_sha256": "f23d8eda5be363720fead1c43c22d5a67c9508be9402e6f94573ab20d9acd93a",
+      "failures": [
+        {
+          "file": "scheduler-kanban-lifecycle.spec.ts",
+          "title": "US-SP-LIFECYCLE-KAN edit, comment, complete, archive and restore survive reload",
+          "project": "",
+          "result": "failed",
+          "attempts": 1,
+          "error": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveText\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: locator('#kanbanTaskPreview').locator('.kanban-task-preview-title')\nExpected string: \u001b[32m\"QA Kanban lifecycle 1788956765443 edited\"\u001b[39m\nReceived string: \u001b[31m\"2\"\u001b[39m\nTimeout: 10000ms\n\nCall log:\n\u001b[2m  - Expect \"toHaveText\" with timeout 10000ms\u001b[22m\n\u001b[2m  - waiting for locator('#kanbanTaskPreview').locator('.kanban-task-preview-title')\u001b[22m\n\u001b[2m    2 \u00d7 locator resolved to <div class=\"kanban-task-preview-title\">QA Kanban lifecycle 1788956765443</div>\u001b[22m\n\u001b[2m      - unexpected value \"QA Kanban lifecycle 1788956765443\"\u001b[22m\n\u001b[2m    12 \u00d7 locator resolved to <div class=\"kanban-task-preview-title\">2</div>\u001b[22m\n\u001b[2m       - unexpected value \"2\"\u001b[22m\n"
+        }
+      ],
+      "receipt": "work/dock-final-readiness.json",
+      "cleanup_receipt": "work/dock-final-run-census-after.json",
+      "remaining_sampled_identities": 0,
+      "qualification": "Actual task-edit title corruption retained. Eight latest controlled and ordinary navigation/worker clauses passed individually; the complete run failed and does not qualify deployment."
+    },
+    {
+      "kind": "separate_exact21_linux_replay",
+      "run": "20260909-142219-288833573",
+      "passed": 21,
+      "failed": 0,
+      "skipped": 0,
+      "flaky": 0,
+      "selected": 21,
+      "source": {
+        "webui": {
+          "head": "5a49094164147ffbee43d53ae886b8a26cf23d14",
+          "source_sha256": "f9d76557529f3e252b5a491da4bc3d14c255f6a49d96975ccbf15113b7dc7d68"
+        },
+        "engine": {
+          "head": "b0aaa74f9dcfe9e7caa4692656b4535ce04104e1",
+          "source_sha256": "653c3f66da11449a366b3ecaa5463306d0e5865456883d6fce205be738c82bf7"
+        }
+      },
+      "source_unchanged": true,
+      "operator_sha256": "3b44335b7785f9666cf15e2d18fb9e1202633ad882056a38c2590675c4e7dd6c",
+      "run_manifest_sha256": "5617d4055662d5a4b0bbe8365ff0246932ff76d2449cca18bb3720879b48b49f",
+      "results_sha256": "3ff8837e6c4155a54ac0724d639daca225719b20dab8583a6bcf7416c7bb7c58",
+      "receipt": "work/qa-linux-failed21-qualification-20260909-v3.json",
+      "receipt_sha256": "4b41dfefbde3a8b2a6dbbe2b9e821ae05d993f4c9b2395f10fcc4ae8f0cb35cc",
+      "sampled_identities": 58,
+      "remaining_sampled_identities": 0,
+      "post_unit_cleanup": {
+        "unit_cgroup_exists": false,
+        "known_fixture_listener_closed": true
+      },
+      "scope": "Fresh exact21 replay on this source pair, not a complete Linux feature run. Prior failed runs remain recorded; cleanup covers sampled exact identities and the known unit/listener."
+    },
+    {
+      "kind": "complete_mac_frozen234_attempt",
+      "run": "20260909-173345-41676000",
+      "source": {
+        "webui": {
+          "head": "65e791a7ceb9aa6bc4898a3753ab90484c46072f",
+          "source_sha256": "5c2a905d381c7bfb94c7f2314b05316cf8938862f1b6f3429efcaaf9d88157e6"
+        },
+        "engine": {
+          "head": "b0aaa74f9dcfe9e7caa4692656b4535ce04104e1",
+          "source_sha256": "653c3f66da11449a366b3ecaa5463306d0e5865456883d6fce205be738c82bf7"
+        }
+      },
+      "source_unchanged": true,
+      "passed": 233,
+      "failed": 1,
+      "skipped": 0,
+      "flaky": 0,
+      "run_manifest_sha256": "b353645b58c5f43332615afa64e14a16a44eb2994849b77b3c1df6969d2b4cb9",
+      "results_sha256": "2cd6a2ec69b132b2e1bb6df6c31eac43b3798f500f6410c42ae79dbfac5fd00b",
+      "failures": [
+        {
+          "file": "supplement-cron-advanced.spec.ts",
+          "title": "SUPPLEMENT CRON ADVANCED selected profile model and skill reach actual isolated cron execution",
+          "project": "",
+          "result": "failed",
+          "attempts": 1,
+          "error": "TimeoutError: locator.click: Timeout 10000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('#cronFormSkillDropdown .skill-opt').filter({ hasText: 'qa-cron-1788968585692' })\u001b[22m\n\u001b[2m    - locator resolved to <div class=\"skill-opt\">qa-cron-1788968585692</div>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 \u00d7 waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is not visible\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m    - waiting 20ms\u001b[22m\n\u001b[2m    2 \u00d7 waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is not visible\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 100ms\u001b[22m\n\u001b[2m    19 \u00d7 waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m       - element is not visible\u001b[22m\n\u001b[2m     - retrying click action\u001b[22m\n\u001b[2m       - waiting 500ms\u001b[22m\n"
+        }
+      ],
+      "receipt": "work/task-focus-final-readiness.json",
+      "cleanup_receipt": "work/task-focus-final-run-census-after.json",
+      "remaining_sampled_identities": 0,
+      "qualification": "Cron profile/model/skill case fails before Save/Run on reopened hidden skill picker. No cron execution failure inferred. New task focus fix and originaltask lifecycle passed."
+    }
+  ],
+  "supplemental_backend_prior_attempts": [
+    {
+      "snapshot": "0ded200599bb0f12a891c87ea9762eab40cf7791",
+      "passed": 644,
+      "failed": 1,
+      "failure": "test_1003_appearance_autosave.py::test_appearance_autosave_status_line_and_i18n_keys_exist",
+      "qualification": "Exact unchanged failure reproduced on deployed6d; current selector bundle uses per-user appearance store tests and records its scope",
+      "evidence": "work/appearance-baseline-review.json"
+    }
+  ],
+  "linux_operator_startup_attempts": [
+    {
+      "run": "20260909-115307-452928457",
+      "webui_head": "530710751934b36f0105313aae75e368b1817583",
+      "engine_head": "b0aaa74f9dcfe9e7caa4692656b4535ce04104e1",
+      "status": "failed_before_browser_test_command",
+      "runner_exit_code": 1,
+      "completed_run_manifest": false,
+      "browser_result_count": null,
+      "failure": "server_fixture.py:73 ModuleNotFoundError: No module named requests; run_full.py:81 fixture process exited",
+      "elapsed_seconds_approx": 5,
+      "evidence_source": "Root-verified VPS operator receipt and startup logs; no raw logs imported for this history entry",
+      "remote_archive": "/home/synthwavehq/work/synthpulse-qa-20260909-v1/runs-startup-failed-v1/20260909-115307-452928457",
+      "cleanup_scope": "Sampled same-unit owned-survivor list empty; not universal process cleanup",
+      "prerequisite_correction": "QA-only .venv symlink now selects verified Python3.11.14 service interpreter with requests/openai/yaml/mcp/websockets/PIL present; no production venv installation or rebuild",
+      "next_attempt": "Unchanged-source v2 invocation7a106021a394495bbcb92cffbe8eb6d7; outcome and cleanup pending separate review"
+    }
+  ],
+  "supplemental_frontend_regressions": [
+    {
+      "kind": "late_composer_draft_response_ownership",
+      "base_head": "530710751934b36f0105313aae75e368b1817583",
+      "fix_commit": "7b2620b3ac40956496bb014d25392d40d95fa5bd",
+      "evidence": "work/draft-restore-evidence.json",
+      "before_run": "work/supplement-runs/draft-restore-proof/20260909-122644-700840000",
+      "before_result": {
+        "passed": 0,
+        "failed": 2,
+        "scope": "Additive controlled diagnostic scenarios against exact 530 application bytes. Clearing an already-empty field emitted no input event; typing and clearing emitted two trusted input events. Both then reproduced duplicate saved-prompt insertion after a held actual 200 metadata response was released."
+      },
+      "focused_run": "work/supplement-runs/draft-restore/20260909-123200-306176000",
+      "focused_result": {
+        "passed": 6,
+        "failed": 0,
+        "skipped": 0,
+        "flaky": 0,
+        "browser_error_collections": 6,
+        "browser_errors": 0,
+        "source_unchanged": true
+      },
+      "focused_source": {
+        "webui": {
+          "head": "530710751934b36f0105313aae75e368b1817583",
+          "tracked_diff_sha256": "de2372b18fec91d999b8f2c428a8b19556de56f07079c64b572e9edc82d387e9",
+          "source_sha256": "c2181bdce76363ec895680f328687485d177bdd6e119e040ca48f0672e537244"
+        },
+        "engine": {
+          "head": "b0aaa74f9dcfe9e7caa4692656b4535ce04104e1",
+          "tracked_diff_sha256": "841f54537c5f7db3c597ae0a173323b8222a2c190c8a4724c84adc165c8b8f6d",
+          "source_sha256": "653c3f66da11449a366b3ecaa5463306d0e5865456883d6fce205be738c82bf7"
+        }
+      },
+      "commit_binding": {
+        "commit": "7b2620b3ac40956496bb014d25392d40d95fa5bd",
+        "source_sha256": "c2181bdce76363ec895680f328687485d177bdd6e119e040ca48f0672e537244",
+        "meaning": "Focused run preceded the commit and used the recorded 530 HEAD plus tracked changes; its runtime source hash equals the new committed canonical backend receipt. The focused run is not relabeled as a committed-head execution.",
+        "committed_file_sha256": {
+          "static/sessions.js": "1423963fef0f8f8ec175fe36195d5dfaa6ac89a607e221facf0ae8d91d0d1af4",
+          "static/boot.js": "8e330bd267369c4820eb9dbbf7473a49add398b7897003f03088a256c0311632",
+          "tests/e2e/full/composer-content.spec.ts": "fb289b1cb5b9a4abb52f05963d00af8fc363ad15580b4a42a1855d27d9e9473c",
+          "tests/e2e/full/session-draft-restoration.spec.ts": "028e12a6e0f86767c4f764f70726badd92889fd987fbb96a19aaf0dd1482b6b6",
+          "tests/test_composer_draft_restore_intent.py": "6d1113ff2a611adade65f5cd13bb6714607094fedb00e37893b7437264a1c1e7"
+        }
+      },
+      "findings": [
+        "An older restored draft could overwrite an actual newer type-then-clear edit because the prior preservation guard required nonempty current text.",
+        "Input generation is captured before asynchronous restoration and preserves newer empty edits. Immediate persistence requires the current session to match the requested target; ordinary cross-session restoration is unchanged.",
+        "The controlled actual-HTTP browser regression verifies two trusted input events, empty after release and persisted empty draft, then exact deliberate first and second saved-prompt insertions and reload.",
+        "The original saved-prompt lifecycle verifies autosave and restoration before clearing. This corrects its missing steady-state precondition without replacing the separate actual edit-race regression.",
+        "No forced clicks, longer deadlines, fake HTTP responses or prompt deduplication were introduced. Independent read-only review approved the bounded behavior."
+      ],
+      "backend_neighbor_qualification": {
+        "passed": 36,
+        "failed": 2,
+        "new_cases_passed": 4,
+        "log": "work/draft-restore-neighbors.log",
+        "baseline_passed": 20,
+        "baseline_failed": 2,
+        "baseline_log": "work/draft-restore-baseline-530.log",
+        "baseline_scope": "Both failing test files and the actual messages.js bytes match exact 530. Their two obsolete structural assertions reproduce on that baseline.",
+        "candidate_only_failures": [],
+        "unchanged_byte_proof": {
+          "tests/test_composer_draft_after_send.py": "25dceba9691107fdba77e1cd0b66d1e1a0db5519418fb6043a6b4488b16aa0a1",
+          "tests/test_issue5472_preserve_draft_on_failed_send.py": "0753a9c993fcbde2831f2dcfcd690657fb125b4614cf5189234b3f20cf60ae57",
+          "static/messages.js": "005f0d5ac9e7166029fb7e2cdd617edc61ff154b845e7b965f8808780b77f07b"
+        }
+      },
+      "canonical_backend": {
+        "snapshot": "7b2620b3ac40956496bb014d25392d40d95fa5bd",
+        "source_sha256": "c2181bdce76363ec895680f328687485d177bdd6e119e040ca48f0672e537244",
+        "passed": 690,
+        "failed": 0,
+        "skipped": 0,
+        "files": 58,
+        "receipt": "work/release-webui-supplement-final.json",
+        "scope": "Repeated selected release bundle including four new draft-intent cases; not additive to the earlier 686-case bundle or focused neighbor results."
+      },
+      "acceptance_boundary": "The full 225-scenario Mac replay was still running when this entry was prepared. No final replay, Linux remediation outcome, deployment or exhaustive click-completion claim is made here.",
+      "final_frozen_replay": {
+        "receipt": "work/navigation-draft-final-replay.json",
+        "run": "20260909-124140-843191000",
+        "webui_head": "7b2620b3ac40956496bb014d25392d40d95fa5bd",
+        "engine_head": "b0aaa74f9dcfe9e7caa4692656b4535ce04104e1",
+        "results_sha256": "91f96e528001fbf75a60823fe1aebe78b814c8bb6f96639cfe168404074b60d4",
+        "matched_cases": [
+          {
+            "title": "US-SP-CHAT-PROMPTS saved prompt validates empty input saves reloads inserts exact text and deletes",
+            "file": "composer-content.spec.ts",
+            "line": 38,
+            "status": "passed",
+            "attempts": 1,
+            "uncaught_errors": []
+          },
+          {
+            "title": "SUPPLEMENT DRAFT RESTORE actual typing and clearing beat late metadata and deliberate prompt reinsertion stays exact",
+            "file": "session-draft-restoration.spec.ts",
+            "line": 4,
+            "status": "passed",
+            "attempts": 1,
+            "uncaught_errors": []
+          }
+        ],
+        "scope": "Original saved-prompt lifecycle and held actual draft-response regression each passed once in the complete frozen Mac225 replay; no Linux replay result implied."
+      }
+    },
+    {
+      "kind": "ownership_regressions_history_candidate_for_root_integration",
+      "reviewed_at": "2026-09-09T12:07:55.905909+00:00",
+      "central_review_history_modified": false,
+      "current_commit": "bd24eeb1210287429fa88aae60890fc234fb5032",
+      "current_webui_source_sha256": "d536782cbdee919b96b6ebf5f9b8030ae0af4963d3cd267eaee3f9891fc083eb",
+      "engine_commit": "b0aaa74f9dcfe9e7caa4692656b4535ce04104e1",
+      "committed_file_sha256": {
+        "api/worker_ownership.py": "172177cfa8ff449f68d5e556a1a85f6b4726004967a355602e48b6b6efef6796",
+        "api/streaming.py": "53d908d78ad628f2cd6c8567877e964a09937ba553e0ff12f8600ba7ddd09ca6",
+        "api/config.py": "a6b015643f219ad79d0d7e11037317c239485a848d5da6d0ff3f0a66951362ce",
+        "api/routes.py": "77fac3d00d95d61f20f3ca37b32365fbbac45f22f19ab87f8f5ae96e16a558ec",
+        "scripts/e2e/server_fixture.py": "b9f78ef529b4fad25426faad3d1f0044a69460709d58b286f62f00f8e557af4e",
+        "scripts/e2e/interrupt_fixture.py": "cfe8966b771d91e69626c8072b2c6c2ad0561420f50c5743241d42ed47a1ce0e",
+        "tests/e2e/full/chat-interrupt-startup.spec.ts": "e317dcb92da162bfed702f6bdfb60fbdd99179ab441a2c941cf02f6d352ca81d",
+        "tests/test_cached_agent_interrupt_reset.py": "882dc46f10b7f8def1134c40e8a7fa40dbe574b469d6fe31fbd61664d967331e",
+        "tests/test_worker_ownership.py": "84a0eadbd69c0c0279351a65c3745fe2bf8ecc6ea7cb256930b7da6939d1fcf0",
+        "static/messages.js": "c15470c729c1c21699a875f4c0fb2dca80e243ae5993717083dc0df58a7e7160",
+        "tests/test_stream_reconnect_ownership.py": "e3ebc4e6afca056d1c551c99438b11bc36c58c4a604f15b6f366011cca0ead69",
+        "tests/e2e/full/stream-reconnect-ownership.spec.ts": "04111e3f0a226926d212e24436348565da8f2e60bf27c7058aa1f2b9ed899b15",
+        "static/panels.js": "d723ef8e4148c181686ad5bd32276f6e5e7c69516462e92ff4cbaa4cc2217ab3",
+        "tests/e2e/full/kanban-dependency-draft-races.spec.ts": "8ec4fc1ec8cb1bdef25b0958eb87c5bc1bf99db7996b998b9b9afd8f690a7d85",
+        "tests/test_kanban_dependency_draft.py": "180dccdbbb38a04a8eaa7535564bc503f48664a05e331256693d9d651e904f99"
+      },
+      "original_receipts": {
+        "interrupt-cache-review.json": {
+          "path": "work/interrupt-cache-review.json",
+          "sha256": "69b85bb69f96d9055265e1eeab3226639a7d082c34e0aff9f8914c7dac482bff"
+        },
+        "stream-reconnect-ownership-review.json": {
+          "path": "work/stream-reconnect-ownership-review.json",
+          "sha256": "62fda6d72c91cc323468c79b10f59b98794cfc4934f536a5ae3ff5809ce55fee"
+        },
+        "kanban-dependency-draft-evidence.json": {
+          "path": "work/kanban-dependency-draft-evidence.json",
+          "sha256": "dc29ca7796b1e78a6a7922fea4e2b07ec1a7b8884edf16b7a4af1b0390144c5a"
+        }
+      },
+      "source_binding": "Focused runs retain their original dcdf20bb working HEAD and original source fingerprints. Their relevant final file hashes were independently compared to bd24eeb1 committed bytes. These are precommit executions of those bytes, not runs executed on bd24eeb1; do not relabel their dates/HEADs.",
+      "linux_cause_distinction": "The failed Linux interrupt run durably completed its successor and sent its real provider request. Its visible failure was the stale old-stream attachment. Cached initialization and live-worker interrupt ownership defects below were separately reproduced; they are not relabeled as that observed Linux cause.",
+      "focused_runs": {
+        "chat_worker_stream_joint_final10": {
+          "run": "work/interrupt-owned-worker-final/20260909-135210-797015000",
+          "manifest_sha256": "649710bf939c079a20c6fc16ec17f0e0e3383a95f0da1909e0f91889e54f7630",
+          "results_sha256": "cd631e15f3c00aaf92c8f91f9a132298973c64c9a1241f2e017c03b3e59e3e84",
+          "stats": {
+            "startTime": "2026-09-09T11:52:12.664Z",
+            "duration": 51627.145,
+            "expected": 10,
+            "skipped": 0,
+            "unexpected": 0,
+            "flaky": 0
+          },
+          "cases": [
+            {
+              "file": "chat-interrupt-startup.spec.ts",
+              "title": "US-SP-CHAT-008 startup interrupt leaves the cached successor able to answer",
+              "outcome": "expected",
+              "attempts": [
+                "passed"
+              ]
+            },
+            {
+              "file": "chat-interrupt-startup.spec.ts",
+              "title": "US-SP-CHAT-009 Stop during cached initialization prevents provider admission and permits a later turn",
+              "outcome": "expected",
+              "attempts": [
+                "passed"
+              ]
+            },
+            {
+              "file": "chat-interrupt-startup.spec.ts",
+              "title": "US-SP-CHAT-008 an aged cancelled worker retains its interrupt until its held reply settles",
+              "outcome": "expected",
+              "attempts": [
+                "passed"
+              ]
+            },
+            {
+              "file": "chat-lifecycle.spec.ts",
+              "title": "US-SP-CHAT-006 queue follow-up waits then produces two persisted ordered turns",
+              "outcome": "expected",
+              "attempts": [
+                "passed"
+              ]
+            },
+            {
+              "file": "chat-lifecycle.spec.ts",
+              "title": "US-SP-CHAT-009 Stop generation cancels in-flight run and accepts a fresh next turn",
+              "outcome": "expected",
+              "attempts": [
+                "passed"
+              ]
+            },
+            {
+              "file": "chat-lifecycle.spec.ts",
+              "title": "US-SP-CHAT-012 hard reload mid-stream restores the same session and finished response once",
+              "outcome": "expected",
+              "attempts": [
+                "passed"
+              ]
+            },
+            {
+              "file": "chat-lifecycle.spec.ts",
+              "title": "US-SP-CHAT-011 persisted unsent draft survives hard reload without creating a turn",
+              "outcome": "expected",
+              "attempts": [
+                "passed"
+              ]
+            },
+            {
+              "file": "chat-lifecycle.spec.ts",
+              "title": "US-SP-CHAT-008 explicit interrupt cancels first response and starts requested next message",
+              "outcome": "expected",
+              "attempts": [
+                "passed"
+              ]
+            },
+            {
+              "file": "chat-lifecycle.spec.ts",
+              "title": "US-SP-CHAT-007 actual steer accepted mid-turn influences next model iteration",
+              "outcome": "expected",
+              "attempts": [
+                "passed"
+              ]
+            },
+            {
+              "file": "stream-reconnect-ownership.spec.ts",
+              "title": "SUPPLEMENT STREAM OWNERSHIP late old reconnect status cannot replace an interrupted successor",
+              "outcome": "expected",
+              "attempts": [
+                "passed"
+              ]
+            }
+          ],
+          "source_unchanged": true,
+          "test_exit_code": 0,
+          "report_errors_count": 0,
+          "uncaught_browser_error_collections": 10,
+          "uncaught_browser_errors": 0,
+          "initial_source": {
+            "webui": {
+              "head": "dcdf20bb3a1234528e1adf0a9c6765f493776f6d",
+              "tracked_diff_sha256": "837625ede4432e537a26b48a4581c2a05cfb1d90392b19db249d3b634bcc5074",
+              "source_sha256": "d536782cbdee919b96b6ebf5f9b8030ae0af4963d3cd267eaee3f9891fc083eb"
+            },
+            "engine": {
+              "head": "b0aaa74f9dcfe9e7caa4692656b4535ce04104e1",
+              "tracked_diff_sha256": "841f54537c5f7db3c597ae0a173323b8222a2c190c8a4724c84adc165c8b8f6d",
+              "source_sha256": "653c3f66da11449a366b3ecaa5463306d0e5865456883d6fce205be738c82bf7"
+            }
+          }
+        },
+        "kanban_dependency_final7": {
+          "run": "work/supplement-runs/kanban-dependency-draft-frozen/20260909-133442-848066000",
+          "manifest_sha256": "7b46e09b4f284f801dfca36165324201e1146a1925f04ff21470a7134c3bbc88",
+          "results_sha256": "3e7804340a7bc76c462b16fd2926237d2094756bfea7079b28fdad43457bd948",
+          "stats": {
+            "startTime": "2026-09-09T11:34:44.658Z",
+            "duration": 19835.025999999998,
+            "expected": 7,
+            "skipped": 0,
+            "unexpected": 0,
+            "flaky": 0
+          },
+          "cases": [
+            {
+              "file": "kanban-administration.spec.ts",
+              "title": "US-SP-KAN-ADMIN-BOARDS create validate cancel rename switch archive persist with denied administration",
+              "outcome": "expected",
+              "attempts": [
+                "passed"
+              ]
+            },
+            {
+              "file": "kanban-administration.spec.ts",
+              "title": "US-SP-KAN-ADMIN-DEPENDENCIES add remove reject cycles and guard direct completion until parent finishes",
+              "outcome": "expected",
+              "attempts": [
+                "passed"
+              ]
+            },
+            {
+              "file": "kanban-administration.spec.ts",
+              "title": "US-SP-KAN-ADMIN-FILTERS exact assignee tenant mine lanes selected bulk completion and dispatcher preview",
+              "outcome": "expected",
+              "attempts": [
+                "passed"
+              ]
+            },
+            {
+              "file": "kanban-administration.spec.ts",
+              "title": "US-SP-KAN-ADMIN-BLOCK Todo block unblock preserve reason dependency denial and repeated-block escalation",
+              "outcome": "expected",
+              "attempts": [
+                "passed"
+              ]
+            },
+            {
+              "file": "kanban-dependency-draft-races.spec.ts",
+              "title": "SUPPLEMENT KANBAN DEPENDENCY DRAFT a late live refresh preserves re-add input and one exact persisted link",
+              "outcome": "expected",
+              "attempts": [
+                "passed"
+              ]
+            },
+            {
+              "file": "kanban-dependency-draft-races.spec.ts",
+              "title": "SUPPLEMENT KANBAN DEPENDENCY DRAFT newer clear and task navigation cannot restore or transfer an old draft",
+              "outcome": "expected",
+              "attempts": [
+                "passed"
+              ]
+            },
+            {
+              "file": "kanban-dependency-draft-races.spec.ts",
+              "title": "SUPPLEMENT KANBAN DEPENDENCY DRAFT a delayed successful Add keeps the next edited dependency for its own submission",
+              "outcome": "expected",
+              "attempts": [
+                "passed"
+              ]
+            }
+          ],
+          "source_unchanged": true,
+          "test_exit_code": 0,
+          "report_errors_count": 0,
+          "uncaught_browser_error_collections": 7,
+          "uncaught_browser_errors": 0,
+          "initial_source": {
+            "webui": {
+              "head": "dcdf20bb3a1234528e1adf0a9c6765f493776f6d",
+              "tracked_diff_sha256": "2f7c6f0a9eff9660e243c4c90260daf9071358942649f2841f58826f7cea1127",
+              "source_sha256": "65e2e7ddee7958e68f68fa25ceee76d12c4e430d9f64b193e0324c05e29a75cc"
+            },
+            "engine": {
+              "head": "b0aaa74f9dcfe9e7caa4692656b4535ce04104e1",
+              "tracked_diff_sha256": "841f54537c5f7db3c597ae0a173323b8222a2c190c8a4724c84adc165c8b8f6d",
+              "source_sha256": "653c3f66da11449a366b3ecaa5463306d0e5865456883d6fce205be738c82bf7"
+            }
+          }
+        }
+      },
+      "regressions": [
+        {
+          "id": "cached_initialization_interrupt_reset",
+          "before": {
+            "run": "work/interrupt-startup-before/20260909-132547-536109000",
+            "manifest_sha256": "d01760585a8ccdccfbe3c4ee53f597fc75e173040dcddceb950e95eb1bf1ff25",
+            "results_sha256": "36b5e05234482672d6549b8b80db0c58a16f2fae5c5dbba364319666ef3401d4",
+            "stats": {
+              "startTime": "2026-09-09T11:25:50.141Z",
+              "duration": 33435.168999999994,
+              "expected": 0,
+              "skipped": 0,
+              "unexpected": 1,
+              "flaky": 0
+            },
+            "cases": [
+              {
+                "file": "chat-interrupt-startup.spec.ts",
+                "title": "US-SP-CHAT-008 startup interrupt leaves the cached successor able to answer",
+                "outcome": "unexpected",
+                "attempts": [
+                  "failed"
+                ]
+              }
+            ],
+            "source_unchanged": false,
+            "test_exit_code": 1,
+            "report_errors_count": 0,
+            "uncaught_browser_error_collections": 1,
+            "uncaught_browser_errors": 0,
+            "initial_source": {
+              "webui": {
+                "head": "dcdf20bb3a1234528e1adf0a9c6765f493776f6d",
+                "tracked_diff_sha256": "7aea8ca516751d6aa46dcac366b9866defdfc2c0344a3104511ba710dfa5f8f9",
+                "source_sha256": "6d98723fc120f366f46792d48415fbcdf924cb03f551194e892d9f2a39bdbbac"
+              },
+              "engine": {
+                "head": "b0aaa74f9dcfe9e7caa4692656b4535ce04104e1",
+                "tracked_diff_sha256": "841f54537c5f7db3c597ae0a173323b8222a2c190c8a4724c84adc165c8b8f6d",
+                "source_sha256": "653c3f66da11449a366b3ecaa5463306d0e5865456883d6fce205be738c82bf7"
+              }
+            }
+          },
+          "before_source_qualification": {
+            "webui": [
+              "static/panels.js",
+              "tests/e2e/full/kanban-dependency-draft-races.spec.ts"
+            ],
+            "engine": []
+          },
+          "finding": "Actual early initialization cancellation left the real cached engine interrupt_requested flag set; successor entered with interrupted=true and could not answer. The before run also contains unrelated sibling Kanban source drift, explicitly preserved.",
+          "fix": "Use the real clear_interrupt contract only for safely reusable ownership, retain the new worker local cancellation Event even after advisory map removal, and prevent provider admission for a new live Stop.",
+          "final_run_ref": "chat_worker_stream_joint_final10",
+          "new_browser_cases": 2,
+          "unit_cases": 7
+        },
+        {
+          "id": "actual_worker_lifetime_and_callback_leases",
+          "before": {
+            "run": "work/interrupt-owned-worker-before-confirmed/20260909-134149-2311000",
+            "manifest_sha256": "c3bad009303703eb972cf2b50b37e010857c2bbf538f99a3feca1645639c0f50",
+            "results_sha256": "472474ae8633124ca377f6995cfe7a2018a91267b916407b9f9df7b910daeba2",
+            "stats": {
+              "startTime": "2026-09-09T11:41:50.495Z",
+              "duration": 3259.3,
+              "expected": 0,
+              "skipped": 0,
+              "unexpected": 1,
+              "flaky": 0
+            },
+            "cases": [
+              {
+                "file": "chat-interrupt-startup.spec.ts",
+                "title": "US-SP-CHAT-008 an aged cancelled worker retains its interrupt until its held reply settles",
+                "outcome": "unexpected",
+                "attempts": [
+                  "failed"
+                ]
+              }
+            ],
+            "source_unchanged": true,
+            "test_exit_code": 1,
+            "report_errors_count": 0,
+            "uncaught_browser_error_collections": 1,
+            "uncaught_browser_errors": 0,
+            "initial_source": {
+              "webui": {
+                "head": "dcdf20bb3a1234528e1adf0a9c6765f493776f6d",
+                "tracked_diff_sha256": "99f8d362c3990c064640a8e9d3a4ae80662db9b0c0474480cc76c770aad96bd9",
+                "source_sha256": "3947cc68670a7dbfd7345bab3bc37443d658fe3dae9ed7577ab3d2bf7e1735a7"
+              },
+              "engine": {
+                "head": "b0aaa74f9dcfe9e7caa4692656b4535ce04104e1",
+                "tracked_diff_sha256": "841f54537c5f7db3c597ae0a173323b8222a2c190c8a4724c84adc165c8b8f6d",
+                "source_sha256": "653c3f66da11449a366b3ecaa5463306d0e5865456883d6fce205be738c82bf7"
+              }
+            }
+          },
+          "finding": "The180s advisory stale-run expiry admitted a replacement while the original provider response remained held. The reused cached agent actually cleared the predecessor interrupt; before records prove response released with interrupted=false.",
+          "fix": "Authoritative worker token fences same-session admission irrespective of advisory age. Cancellation callbacks lease the original owner without nested application locks; final retirement waits worker+callbacks. Tracked queue/run snapshots cannot fall back to legacy on late cancellation. Reset/refresh/resource close and explicit eviction respect actual ownership. The existing deferred wakeup drain runs exactly once outside the registry lock at actual retirement.",
+          "assertions": [
+            "Actual old provider response held and advisory timestamp only aged; replacement returns409 while the old worker remains owned.",
+            "After real response release, interrupt remains true; obsolete requested write never occurs; queued replacement reaches provider, renders and persists exactly once.",
+            "Missing/aged advisory entry alone cannot confer ownership; genuine ownerless aged entry retains existing cleanup semantics.",
+            "Exact-token release, pending cancel after worker finishes, stale old cancel snapshot, cache resource protection, callback exception cleanup, worker cleanup exceptions, and deferred wakeup retirement tested."
+          ],
+          "final_run_ref": "chat_worker_stream_joint_final10",
+          "new_browser_cases": 1,
+          "unit_cases": 15,
+          "independent_reviewer": "governance_design approved final exact bytes; retirement callback runs once outside registry lock after worker finished and cancellation leases retire."
+        },
+        {
+          "id": "frontend_stream_attachment_ownership",
+          "before": {
+            "run": "work/supplement-runs/stream-ownership-before/20260909-133121-391551000",
+            "manifest_sha256": "027c02a85f6d15d497fe4f711a92785fdd4f7fae81452c51ecc4ca0c2b436d4c",
+            "results_sha256": "b616db13ef82497f9f5034a36d746f268da73a3090bd1ada9ca0941da9d95ba0",
+            "stats": {
+              "startTime": "2026-09-09T11:31:23.207Z",
+              "duration": 34895.441999999995,
+              "expected": 0,
+              "skipped": 0,
+              "unexpected": 1,
+              "flaky": 0
+            },
+            "cases": [
+              {
+                "file": "stream-reconnect-ownership.spec.ts",
+                "title": "SUPPLEMENT STREAM OWNERSHIP late old reconnect status cannot replace an interrupted successor",
+                "outcome": "unexpected",
+                "attempts": [
+                  "failed"
+                ]
+              }
+            ],
+            "source_unchanged": true,
+            "test_exit_code": 1,
+            "report_errors_count": 0,
+            "uncaught_browser_error_collections": 1,
+            "uncaught_browser_errors": 0,
+            "initial_source": {
+              "webui": {
+                "head": "dcdf20bb3a1234528e1adf0a9c6765f493776f6d",
+                "tracked_diff_sha256": "d9eb804a63ed0c00e6b4e4ed1d914fe055a032c8c696565b7b769cd51c769624",
+                "source_sha256": "cf9e9f16eef4e72ab70b85924d9277f74dac086318fe76be997537edcdcde7a6"
+              },
+              "engine": {
+                "head": "b0aaa74f9dcfe9e7caa4692656b4535ce04104e1",
+                "tracked_diff_sha256": "841f54537c5f7db3c597ae0a173323b8222a2c190c8a4724c84adc165c8b8f6d",
+                "source_sha256": "653c3f66da11449a366b3ecaa5463306d0e5865456883d6fce205be738c82bf7"
+              }
+            }
+          },
+          "finding": "An old successful status response could attach the old cancelled stream after a new stream was already selected, despite the successor being durably complete.",
+          "fix": "Validate pane/stream ownership before attachment setup, and attachment identity after every asynchronous status/replay await; preserve positive active/replay/dead handling and reject late same-ID recovery or stale offline caller.",
+          "final_run_ref": "chat_worker_stream_joint_final10",
+          "new_browser_cases": 1,
+          "unit_cases": 10,
+          "independent_reviewers": [
+            "frontend_qa",
+            "governance_design"
+          ]
+        },
+        {
+          "id": "kanban_dependency_editor_async_ownership",
+          "before": {
+            "run": "work/supplement-runs/kanban-dependency-draft-before/20260909-132414-502719000",
+            "manifest_sha256": "4d97388d0c0db9ef043f24e6bc2d9ccd930dbf87c3303c5d93424ee631d313dd",
+            "results_sha256": "c92369fc54c32784de051556d556105028a6322fce85b536f35d585aea36a3e5",
+            "stats": {
+              "startTime": "2026-09-09T11:24:16.662Z",
+              "duration": 15200.822,
+              "expected": 0,
+              "skipped": 0,
+              "unexpected": 2,
+              "flaky": 0
+            },
+            "cases": [
+              {
+                "file": "kanban-dependency-draft-races.spec.ts",
+                "title": "SUPPLEMENT KANBAN DEPENDENCY DRAFT a late live refresh preserves re-add input and one exact persisted link",
+                "outcome": "unexpected",
+                "attempts": [
+                  "failed"
+                ]
+              },
+              {
+                "file": "kanban-dependency-draft-races.spec.ts",
+                "title": "SUPPLEMENT KANBAN DEPENDENCY DRAFT newer clear and task navigation cannot restore or transfer an old draft",
+                "outcome": "unexpected",
+                "attempts": [
+                  "failed"
+                ]
+              }
+            ],
+            "source_unchanged": true,
+            "test_exit_code": 1,
+            "report_errors_count": 0,
+            "uncaught_browser_error_collections": 2,
+            "uncaught_browser_errors": 0,
+            "initial_source": {
+              "webui": {
+                "head": "dcdf20bb3a1234528e1adf0a9c6765f493776f6d",
+                "tracked_diff_sha256": "6fee01660045d8ebc21b9707b56a556f07c46a0be3b6666e828f3ef775ca20ee",
+                "source_sha256": "0f5496c2c97aa85b8b7e6b7cff026c3bad6784c214fac27eb063cba1b8be9fce"
+              },
+              "engine": {
+                "head": "b0aaa74f9dcfe9e7caa4692656b4535ce04104e1",
+                "tracked_diff_sha256": "841f54537c5f7db3c597ae0a173323b8222a2c190c8a4724c84adc165c8b8f6d",
+                "source_sha256": "653c3f66da11449a366b3ecaa5463306d0e5865456883d6fce205be738c82bf7"
+              }
+            }
+          },
+          "before_qualification": {
+            "product_failure": "Actual delete and real task PATCH/SSE, held successful log response, visible typed parent ID becomes empty immediately after refreshed title renders. New regression fails at exact retained input assertion.",
+            "separate_harness_failure": "Second negative case hit Route is already handled during route teardown; helper was corrected to await actual response delivery before unroute. This is not counted as a product regression."
+          },
+          "fix": "Retain the actual dependency input node, latest value/revision and focused caret only while the same task and board owns the preview. New task/board gets a fresh editor. Successful Add clears only its unchanged submitted input revision; late response cannot navigate back or erase a newer dependency. Captured board identity is checked after both awaits, including changes that do not start a newer detail request.",
+          "final_run_ref": "kanban_dependency_final7",
+          "new_browser_cases": 3,
+          "unchanged_neighbor_browser_cases": 4,
+          "unit_cases": 11,
+          "independent_review": {
+            "reviewer": "qa_inventory",
+            "verdict": "approved",
+            "scope": "Final explicit board identity and request ownership checks; same-task/board input node/caret/listener; submitted input/value/revision; worker and dependency semantics unchanged."
+          }
+        }
+      ],
+      "backend": {
+        "canonical": {
+          "path": "work/release-backend-verification.json",
+          "sha256": "86f6b88d93c8775f901d2d6c3cc1120a164a2e544db4d3a570c81af9fcd1f281"
+        },
+        "webui_passed": 733,
+        "webui_files": 62,
+        "engine_passed": 453,
+        "engine_files": 32,
+        "focused_logs": {
+          "interrupt-owned-worker-final-backend.log": {
+            "path": "work/interrupt-owned-worker-final-backend.log",
+            "sha256": "e05898312f8455147f19c24986ed39a9765ca0a4795441d8310d918af98f452d"
+          },
+          "interrupt-wakeup-compatibility.log": {
+            "path": "work/interrupt-wakeup-compatibility.log",
+            "sha256": "448cc7cf0805aed1ab0a60bc51431e72401cb149e7ad19482527c1d7c78595df"
+          },
+          "stream-ownership-final-unit.log": {
+            "path": "work/stream-ownership-final-unit.log",
+            "sha256": "c8a41c5af71872f2593c959e0a316146a58b68eb7bd43804cfc5291e10a5e5a5"
+          },
+          "kanban-dependency-draft-unit-final.log": {
+            "path": "work/kanban-dependency-draft-unit-final.log",
+            "sha256": "26b0ec5452df7783520c206bc5b55f24bf337eeba7fa1cd8f29a17ec4ae59c4c"
+          }
+        },
+        "focused_counts": {
+          "worker_cache_and_existing_neighbors": 61,
+          "existing_wakeup_identity_compatibility": 45,
+          "stream_ownership": 10,
+          "kanban_dependency": 11
+        },
+        "qualification": "Focused counts overlap the canonical bundle and are never added to its733 total. Engine453 is unchanged prior evidence, not rerun. New four backend files add exactly43 cases to the prior690."
+      },
+      "preserved_baseline_failures": {
+        "cache": {
+          "initial_candidate_sweep": {
+            "passed": 76,
+            "failed": 3,
+            "total": 79
+          },
+          "baseline_head": "7b2620b3ac40956496bb014d25392d40d95fa5bd",
+          "baseline_workspace": "interrupt-baseline-7b",
+          "baseline_runner": "./scripts/test.sh",
+          "baseline_log": "interrupt-baseline-three-failures.log",
+          "baseline_log_sha256": "9884ecb8567e7c45ead64a499b9cdf54ae1fbcaabefb871adcc6a8ac03554763",
+          "baseline_failed": 3,
+          "selectors": [
+            "tests/test_cancelled_turn_status.py::TestCancelledTurnClassification::test_provider_empty_response_still_uses_no_response",
+            "tests/test_cancelled_turn_status.py::TestCancelledTurnPersistenceGuards::test_streamed_progress_without_final_assistant_still_reports_error",
+            "tests/test_issue1361_cancel_data_loss.py::test_stream_error_pending_materialization_does_not_duplicate_eager_checkpoint"
+          ],
+          "classification": "All three identical failures reproduced on frozen7b; unrelated prose/source-string/whitespace-dedup assertions left unchanged."
+        },
+        "cache_additional": {
+          "candidate_sweep": "66 passed,1failed; tests/test_stale_stream_cleanup.py::test_service_worker_cache_bumped_for_frontend_fix_delivery",
+          "baseline_head": "7b2620b3ac40956496bb014d25392d40d95fa5bd",
+          "baseline_log": "interrupt-baseline-serviceworker.log",
+          "baseline_log_sha256": "337a9e9724a4a0cb5b9e51f0c3cd93b13b0f211b4c06434a8d41a9cfd5ca78a7",
+          "classification": "Same literal service-worker shell-cache assertion fails on frozen7b; source unchanged by this fix."
+        },
+        "kanban": {
+          "candidate_passed": 80,
+          "candidate_failed": 5,
+          "baseline_passed": 69,
+          "baseline_failed": 5,
+          "baseline_commit": "7b2620b3ac40956496bb014d25392d40d95fa5bd",
+          "failures": [
+            "tests/test_kanban_ui_static.py::test_kanban_edit_mode_preserves_status_when_dropdown_untouched",
+            "tests/test_kanban_ui_static.py::test_kanban_i18n_keys_exist_in_every_locale_block",
+            "tests/test_kanban_ui_static.py::test_kanban_locale_parity",
+            "tests/test_issue3797_kanban_cli_parity.py::TestKanbanWorkspaceSelector::test_i18n_keys_for_workspace_selector",
+            "tests/test_issue3797_kanban_cli_parity.py::TestDependencyControls::test_i18n_keys_for_dependencies"
+          ],
+          "candidate_only_failures": [],
+          "candidate_log": "work/kanban-dependency-draft-neighbors.log",
+          "baseline_log": "work/kanban-dependency-baseline-7b.log",
+          "unchanged_file_sha256": {
+            "tests/test_kanban_ui_static.py": "bab89f501459c68a8424776c734ce382d4682ef1d679939769497f6a043f69da",
+            "tests/test_issue3797_kanban_cli_parity.py": "94ab245edfafcad65cd5c3c8318882fce0c753463ada20bd59351d2a11e4ae51",
+            "tests/test_kanban_board_ui.py": "03e0be6132925975dd8e3d8cdb941af5e28cb657230fd29492a8c8c48c79cb8f",
+            "tests/test_kanban_board_focus.py": "ed788fe24041d0a593f619ff5cefb9b89bbe72e608c1fcd7488cf9e846585aa8",
+            "static/i18n.js": "128c835fbe7b02c97e67d732e61e70a377ca09f407eb473229c1a3465b3ee042"
+          },
+          "scope": "Four old UI/static test files plus new11cases in candidate. Existing inline-locale and old untouched-status structural assertions fail identically on baseline; no broader backend pass implied."
+        },
+        "stream": "work/stream-reuse-baseline-review.json"
+      },
+      "integration_status": {
+        "full232_mac": "Completed on unchanged bd24 source:230passed/2failed; Start missing first row and strict-CSP string polling failure. No final full PASS.",
+        "linux_exact21_v2": "Verified21PASS on unchangedbd24;61sampled identities gone, unitcgroup absent and knownfixture listener closed. Receipt work/qa-linux-failed21-qualification-20260909-v2.json SHA3ea6e743c3835c32801a59b63869866dc222212edbc7cad69b5e179bce8f568c. Does not turn separate Mac230/2 run into a pass.",
+        "deployment": "No deployment approval/result is established by these local scoped runs.",
+        "all_features_or_all_clicks_certified": false
+      },
+      "safety_scope": "Actual isolated synthetic HTTP/UI/engine/provider fixtures; controlled real response timing and explicit advisory timestamp aging. No forced clicks, deadline extension, test retries, mocked successful application payloads or production mutations. The interrupt fixture is imported only by scripts/e2e/server_fixture.py under isolated state, not production startup."
+    },
+    {
+      "kind": "dock_regression_history_candidate_for_root_integration",
+      "status": "READY_FOR_ROOT_HISTORY_INTEGRATION_FULL_RUNS_PENDING",
+      "recorded_at": "2026-09-09T12:21:06.970492+00:00",
+      "base_commit": "bd24eeb1210287429fa88aae60890fc234fb5032",
+      "source_file_sha256": {
+        "static/ui.js": "b2bc7ef0f7ed04b7a5a0c4fc89983152a729ad75ffccf473b129d09de3f25037",
+        "static/sessions.js": "bfe94b164c544c85018c5046350692e4ad6b5a997f3358967b10ac175ab94567",
+        "static/messages.js": "932a266d16406a1fcc37d4266e119ceb5a6595d1635b0aee0df03f03beb36b2f",
+        "static/terminal.js": "80933ffc8eace29027e7f71d7f00e9ee14ec302e35516c6b55ad23ff9ec4e3ba",
+        "tests/test_dock_follow_ownership.py": "91c6c616c0ad567f0d1173d4a6a82238eeffba673072c67e80797a873a9a75bd",
+        "tests/e2e/full/supplement-transcript-files.spec.ts": "2532e933b9a4506fe7cdf8473b93697c52ecf258d30f6d6636492e48e9a4c5ed"
+      },
+      "observed_full_run_failure": {
+        "run": "work/supplement-ownership-final-runs/20260909-135540-455902000",
+        "outcome": "230 passed / 2 failed, retained as failed",
+        "start": "Actual full history loaded30\u2192240; Start wrote0, then a direct queued dock scrollToBottom repinned with input generation unchanged. The original stack identifies direct RAF follow, not its scheduler.",
+        "outline": "String waitForFunction first evaluated false; its next RAF used eval and was blocked by existing CSP. No production CSP policy change."
+      },
+      "before": {
+        "run": "work/dock-follow-before-controlled/20260909-141258-689193000",
+        "manifest_sha256": "b69ad7f566fc729abf12e0f9f9db10d98d3c41ccc15776ad25ae3d800eafa230",
+        "results_sha256": "cb0d857c537b1eeb538e384c06c21dd9e81ed494f86af1aec08b0be8696c2d00",
+        "stats": {
+          "startTime": "2026-09-09T12:13:01.716Z",
+          "duration": 15904.365,
+          "expected": 0,
+          "skipped": 0,
+          "unexpected": 1,
+          "flaky": 0
+        },
+        "source_unchanged": true,
+        "exit_code": 1,
+        "initial_source": {
+          "webui": {
+            "head": "bd24eeb1210287429fa88aae60890fc234fb5032",
+            "tracked_diff_sha256": "b58c6953ab9fde97d8f7c986d6ef8b02d56511cf6c759b2900a942a2d51ccda4",
+            "source_sha256": "039dfaccc5cb5fb2791d86dab1134fe921e19781fc67a9f82808bcccd9994e06"
+          },
+          "engine": {
+            "head": "b0aaa74f9dcfe9e7caa4692656b4535ce04104e1",
+            "tracked_diff_sha256": "841f54537c5f7db3c597ae0a173323b8222a2c190c8a4724c84adc165c8b8f6d",
+            "source_sha256": "653c3f66da11449a366b3ecaa5463306d0e5865456883d6fce205be738c82bf7"
+          }
+        },
+        "cases": [
+          {
+            "file": "supplement-transcript-files.spec.ts",
+            "title": "SUPPLEMENT TRANSCRIPT FILES virtualized long history supports Start outline and End without losing or duplicating turns",
+            "outcome": "unexpected",
+            "attempts": [
+              "failed"
+            ]
+          }
+        ],
+        "browser_error_collections": 1,
+        "browser_errors_count": 0,
+        "global_errors_count": 0,
+        "held_scheduler_count": 1,
+        "held_scheduler_functions": [
+          "terminal close"
+        ]
+      },
+      "before_qualification": "Controlled development revision of the original Start test added a real terminal open/Close and held actual dock RAF. Start succeeded first; releasing the captured callback unmounted the first row. Final suite separates that controlled variant into its own title and restores the original ordinary journey; this before receipt is not relabeled as a final-catalog execution.",
+      "fix": "Capture session, scroll input generation and exact scroller when each dock schedules follow. Closed RAF and open delayed-measure callbacks recheck ownership and pin/unpin state before scrollToBottom. Geometry updates still run. All four string polling calls in the transcript spec now use equivalent function predicates under unchanged CSP/timeouts.",
+      "after": {
+        "run": "work/dock-follow-final/20260909-141732-119136000",
+        "manifest_sha256": "bf4a17c078346fd8f3b18901caf541520987670ddaab85fd2f6834e243d6da9b",
+        "results_sha256": "1da3697bfc351ce3820b808eee810d7109f9a8d57c3e2b670d63fa9187ceef93",
+        "stats": {
+          "startTime": "2026-09-09T12:17:34.354Z",
+          "duration": 34364.432,
+          "expected": 8,
+          "skipped": 0,
+          "unexpected": 0,
+          "flaky": 0
+        },
+        "source_unchanged": true,
+        "exit_code": 0,
+        "initial_source": {
+          "webui": {
+            "head": "bd24eeb1210287429fa88aae60890fc234fb5032",
+            "tracked_diff_sha256": "857628eba5f1be038f941f5842660a56590d8f63dd4438586f0f3af97cfbac41",
+            "source_sha256": "f9d76557529f3e252b5a491da4bc3d14c255f6a49d96975ccbf15113b7dc7d68"
+          },
+          "engine": {
+            "head": "b0aaa74f9dcfe9e7caa4692656b4535ce04104e1",
+            "tracked_diff_sha256": "841f54537c5f7db3c597ae0a173323b8222a2c190c8a4724c84adc165c8b8f6d",
+            "source_sha256": "653c3f66da11449a366b3ecaa5463306d0e5865456883d6fce205be738c82bf7"
+          }
+        },
+        "cases": [
+          {
+            "file": "deep-workflows.spec.ts",
+            "title": "US-SP-TERM-DEEP actual terminal executes harmless local command collapses expands restarts closes",
+            "outcome": "expected",
+            "attempts": [
+              "passed"
+            ]
+          },
+          {
+            "file": "supplement-transcript-files.spec.ts",
+            "title": "SUPPLEMENT TRANSCRIPT FILES virtualized long history supports Start outline and End without losing or duplicating turns",
+            "outcome": "expected",
+            "attempts": [
+              "passed"
+            ]
+          },
+          {
+            "file": "supplement-transcript-files.spec.ts",
+            "title": "SUPPLEMENT TRANSCRIPT FILES delayed terminal dock follow cannot override newer Start navigation",
+            "outcome": "expected",
+            "attempts": [
+              "passed"
+            ]
+          },
+          {
+            "file": "supplement-transcript-files.spec.ts",
+            "title": "SUPPLEMENT TRANSCRIPT FILES CSV table and valid or malformed JSON preserve literal content and exact downloads",
+            "outcome": "expected",
+            "attempts": [
+              "passed"
+            ]
+          },
+          {
+            "file": "supplement-transcript-files.spec.ts",
+            "title": "SUPPLEMENT TRANSCRIPT FILES HTML preview runs inside an opaque sandbox and cannot read parent identity or cookies",
+            "outcome": "expected",
+            "attempts": [
+              "passed"
+            ]
+          },
+          {
+            "file": "supplement-transcript-files.spec.ts",
+            "title": "SUPPLEMENT TRANSCRIPT FILES large Markdown falls back to literal text then explicit render is scoped to the current file",
+            "outcome": "expected",
+            "attempts": [
+              "passed"
+            ]
+          },
+          {
+            "file": "supplement-transcript-files.spec.ts",
+            "title": "SUPPLEMENT TRANSCRIPT FILES delayed outline history cannot replace a newer active turn",
+            "outcome": "expected",
+            "attempts": [
+              "passed"
+            ]
+          },
+          {
+            "file": "supplement-transcript-files.spec.ts",
+            "title": "SUPPLEMENT TRANSCRIPT FILES newer manual scroll during history loading keeps correct message Edit indices and earlier persisted turns",
+            "outcome": "expected",
+            "attempts": [
+              "passed"
+            ]
+          }
+        ],
+        "browser_error_collections": 8,
+        "browser_errors_count": 0,
+        "global_errors_count": 0,
+        "held_scheduler_count": 1,
+        "held_scheduler_functions": [
+          "terminal close"
+        ]
+      },
+      "new_browser_title": "SUPPLEMENT TRANSCRIPT FILES delayed terminal dock follow cannot override newer Start navigation",
+      "catalog_total": 233,
+      "independent_review": {
+        "reviewer": "governance_design",
+        "verdict": "APPROVED",
+        "verified_source_sha256": "f9d76557529f3e252b5a491da4bc3d14c255f6a49d96975ccbf15113b7dc7d68",
+        "scope": "Capture before scheduling, same session/node/input ownership, open/closed geometry/follow behavior, original normal Start and separate actual terminal-close held callback; all8 final browser cases and empty error collections verified."
+      },
+      "backend": {
+        "new_file": "tests/test_dock_follow_ownership.py",
+        "new_cases": 8,
+        "owned_and_history_cases_passed": 14,
+        "owned_log": {
+          "path": "work/dock-follow-owned-unit-final.log",
+          "sha256": "000cf328548b299d795cc13ed045aae468d79ca2758271136191b7079b2bbecb"
+        },
+        "before_actual_helpers": {
+          "path": "work/dock-follow-unit-before-corrected.log",
+          "sha256": "d16c4b45634d7fc324943f771d71b3deff775723d692126c854519c293f035c8",
+          "failed": 4,
+          "passed": 4,
+          "scope": "Each of four existing dock callbacks follows after newer Start; four normal open/close positive cases already pass."
+        },
+        "broader_candidate": {
+          "path": "work/dock-follow-unit-final.log",
+          "sha256": "aba06d982df29faeb28755db1f34e761c0807b5f354f5fd659b27f159c2b9b07",
+          "passed": 33,
+          "failed": 4
+        },
+        "baseline": {
+          "path": "work/dock-follow-handoff-baseline-bd24.log",
+          "sha256": "87bf198ad0fcff358757ba4496084bd60207fe30c5b1337dcf1d8a99e8a9786f",
+          "commit": "bd24eeb1210287429fa88aae60890fc234fb5032",
+          "passed": 19,
+          "failed": 4
+        },
+        "identical_failures": [
+          "FAILED tests/test_issue1013_handoff_dock.py::test_stale_runtime_handoff_summary_returns_typed_409_without_persisting",
+          "FAILED tests/test_issue1013_handoff_dock.py::test_handoff_summary_codex_output_cap_matches_provider_compatibility[openai-codex-https://chatgpt.com/backend-api/codex-False-False]",
+          "FAILED tests/test_issue1013_handoff_dock.py::test_handoff_summary_codex_output_cap_matches_provider_compatibility[custom:chatgpt-codex-https://chatgpt.com/backend-api/codex-False-False]",
+          "FAILED tests/test_issue1013_handoff_dock.py::test_handoff_summary_codex_output_cap_matches_provider_compatibility[custom:chatgpt-codex-  https://chatgpt.com/backend-api/codex  -False-True]"
+        ],
+        "unchanged_backend_and_neighbor_test": {
+          "api/routes.py": "77fac3d00d95d61f20f3ca37b32365fbbac45f22f19ab87f8f5ae96e16a558ec",
+          "tests/test_issue1013_handoff_dock.py": "1fd3ce26776c3bae21cf83c94bf42c47df77b80e856ea5378eb7854916b2000f"
+        },
+        "qualification": "All4 adjacent handoff runtime/provider-compatibility failures reproduce on the exact bd24 baseline. They remain failures, are unrelated to this JS-only production change, and are not counted as passing. Earlier7b comparison also matches but bd24 is authoritative here."
+      },
+      "development_harness_attempts": [
+        {
+          "path": "work/dock-follow-before/20260909-141051-94504000",
+          "outcome": "FAIL before reaching Start: barrier armed during import withheld initial tail positioning. Not counted as product-failure proof; barrier moved to a normal terminal Close after loaded-session readiness."
+        },
+        {
+          "log": "work/dock-follow-unit-before.log",
+          "outcome": "Eight syntax failures in initial scratch harness; corrected before meaningful old-source proof."
+        },
+        {
+          "log": "work/dock-follow-unit-after.log",
+          "outcome": "13 pass/1 harness failure: fake node-replacement test replaced all $ lookups, breaking handoff geometry. Corrected only the scroller lookup, preserving geometry assertions."
+        }
+      ],
+      "limitations": "These focused passes do not turn the previous230/2 full run into a pass. New full233 and exact historical21 Linux replay require separate verified receipts. No forced clicks, retry/deadline extension, real-user data, external provider/vendor use or production changes. Parent owns commits/deployment; current run is a precommit test of frozen source bytes.",
+      "history_candidate_created_at": "2026-09-09T12:25:12.900676+00:00",
+      "original_evidence_receipt": {
+        "path": "work/dock-follow-regression-evidence.json",
+        "sha256": "0842cf78276054115acca5c932bd7af1fd89ea67fc288f12523e3b80385db387"
+      },
+      "current_source_binding": {
+        "commit": "5a49094164147ffbee43d53ae886b8a26cf23d14",
+        "source_sha256": "f9d76557529f3e252b5a491da4bc3d14c255f6a49d96975ccbf15113b7dc7d68",
+        "engine_commit": "b0aaa74f9dcfe9e7caa4692656b4535ce04104e1",
+        "selected_fix_file_sha256": {
+          "static/ui.js": "b2bc7ef0f7ed04b7a5a0c4fc89983152a729ad75ffccf473b129d09de3f25037",
+          "static/sessions.js": "bfe94b164c544c85018c5046350692e4ad6b5a997f3358967b10ac175ab94567",
+          "static/messages.js": "932a266d16406a1fcc37d4266e119ceb5a6595d1635b0aee0df03f03beb36b2f",
+          "static/terminal.js": "80933ffc8eace29027e7f71d7f00e9ee14ec302e35516c6b55ad23ff9ec4e3ba",
+          "tests/test_dock_follow_ownership.py": "91c6c616c0ad567f0d1173d4a6a82238eeffba673072c67e80797a873a9a75bd",
+          "tests/e2e/full/supplement-transcript-files.spec.ts": "2532e933b9a4506fe7cdf8473b93697c52ecf258d30f6d6636492e48e9a4c5ed"
+        },
+        "verified_current_and_committed_bytes": true,
+        "qualification": "All six relevant source/test files and the final included-source fingerprint match the bytes tested in the original precommit eight-case run. That run keeps original bd24 HEAD, timestamps, stats and source map; it is not relabeled as execution on5a490941."
+      },
+      "canonical_backend": {
+        "receipt": {
+          "path": "work/release-backend-verification.json",
+          "sha256": "714b3f23a1c9116eeb6660680825139d5c1f6b2295ba42338e2bee40e9ff7abd"
+        },
+        "webui_passed": 741,
+        "webui_files": 63,
+        "selector_count": 64,
+        "partial_selectors": [
+          "tests/test_auxiliary_models_settings.py::TestAuxiliaryModelsHTML",
+          "tests/test_auxiliary_models_settings.py::TestAuxiliaryModelsJS",
+          "tests/test_session_jump_buttons.py::test_jump_to_session_start_button_loads_full_history_and_scrolls_top"
+        ],
+        "new_dock_cases": 8,
+        "engine_passed": 453,
+        "engine_files": 32,
+        "qualification": "The8 new dock units are included within741; focused14 and neighboring33 are overlapping evidence and are never added. Engine453 remains unchanged earlier evidence at b0."
+      },
+      "integration_status": "Integrated by root; focused pass bound to5a bytes, whole233 execution failed on a separate task-edit focus issue."
+    },
+    {
+      "kind": "task_modal_initial_focus_ownership",
+      "status": "SOURCE_FROZEN_AWAITING_FINAL_INDEPENDENT_VERDICT",
+      "recorded_at": "2026-09-09T12:38:30.419609+00:00",
+      "base_commit": "5a49094164147ffbee43d53ae886b8a26cf23d14",
+      "source_file_sha256": {
+        "static/panels.js": "db5959f00d4dfba2d54bc0f67b381eaf8dad68211fd3bbe882d545a3f876414e",
+        "tests/test_kanban_edit_focus_ownership.py": "470d9152d33e979580052e9d33d37026242041bfa0938dc8081a2ac9daec002e",
+        "tests/e2e/full/kanban-edit-focus-race.spec.ts": "47f6baa3bc25b3bb996b173e9bd5c0ed968e828c178f41e5aaa262bdbda48a83"
+      },
+      "before": {
+        "run": "work/task-focus-before/20260909-143552-847149000",
+        "manifest_sha256": "744ec61f910d78989d98ac556980bf31afa48d955087999d8a1a34b2d7c1dcef",
+        "results_sha256": "b755c1b07e95a1bae1862bf920bcc525d65b0eabe37e459e1b7eb7e580585636",
+        "stats": {
+          "startTime": "2026-09-09T12:35:55.045Z",
+          "duration": 2564.686,
+          "expected": 0,
+          "skipped": 0,
+          "unexpected": 1,
+          "flaky": 0
+        },
+        "source_unchanged": true,
+        "exit_code": 1,
+        "initial_source": {
+          "webui": {
+            "head": "5a49094164147ffbee43d53ae886b8a26cf23d14",
+            "tracked_diff_sha256": "6fee01660045d8ebc21b9707b56a556f07c46a0be3b6666e828f3ef775ca20ee",
+            "source_sha256": "9cfdfb23f9b529f1245e645d7615890ff38e7009045758d34e1c94f0f260fbc9"
+          },
+          "engine": {
+            "head": "b0aaa74f9dcfe9e7caa4692656b4535ce04104e1",
+            "tracked_diff_sha256": "841f54537c5f7db3c597ae0a173323b8222a2c190c8a4724c84adc165c8b8f6d",
+            "source_sha256": "653c3f66da11449a366b3ecaa5463306d0e5865456883d6fce205be738c82bf7"
+          }
+        },
+        "cases": [
+          {
+            "file": "kanban-edit-focus-race.spec.ts",
+            "title": "SUPPLEMENT KANBAN EDIT FOCUS delayed initial focus cannot redirect priority typing into the saved title",
+            "outcome": "unexpected",
+            "attempts": [
+              "failed"
+            ]
+          }
+        ],
+        "uncaught_error_collections": 1,
+        "uncaught_errors": 0,
+        "global_errors": 0,
+        "readbacks": [
+          {
+            "released": 1,
+            "schedulers": [
+              "Error\n    at window.setTimeout (<anonymous>:8:21)\n    at openKanbanEdit (http://127.0.0.1:64138/static/panels.js?v=exp-v0.52.65-681-g5a490941-dirty-dcceed86:3391:3)"
+            ],
+            "patch": {
+              "title": "2",
+              "body": "Exact body typed before priority.",
+              "assignee": null,
+              "tenant": null,
+              "priority": 0
+            },
+            "persisted": {
+              "id": "t_55b1488c",
+              "title": "2",
+              "body": "Exact body typed before priority.",
+              "assignee": null,
+              "status": "todo",
+              "priority": 0,
+              "created_by": "webui",
+              "created_at": 1788957356,
+              "started_at": null,
+              "completed_at": null,
+              "workspace_kind": "scratch",
+              "workspace_path": null,
+              "claim_lock": null,
+              "claim_expires": null,
+              "tenant": null,
+              "branch_name": null,
+              "project_id": null,
+              "result": null,
+              "idempotency_key": null,
+              "consecutive_failures": 0,
+              "worker_pid": null,
+              "last_failure_error": null,
+              "max_runtime_seconds": null,
+              "last_heartbeat_at": null,
+              "current_run_id": null,
+              "workflow_template_id": null,
+              "current_step_key": null,
+              "skills": null,
+              "model_override": null,
+              "provider_override": null,
+              "reasoning_effort": null,
+              "max_retries": null,
+              "goal_mode": false,
+              "goal_max_turns": null,
+              "session_id": null,
+              "block_kind": null,
+              "block_recurrences": 0,
+              "age_seconds": {
+                "created_age_seconds": 1,
+                "started_age_seconds": null,
+                "time_to_complete_seconds": null
+              },
+              "age": {
+                "created_age_seconds": 1,
+                "started_age_seconds": null,
+                "time_to_complete_seconds": null
+              },
+              "progress": null
+            }
+          }
+        ]
+      },
+      "after": {
+        "run": "work/task-focus-final/20260909-143648-341296000",
+        "manifest_sha256": "0a2ac16af28d279c71f85cd92c4e0822b74dfa5e91eab3aa5574c59c340ff75c",
+        "results_sha256": "d80b52bf02ad6be90c13d7c3a73ba57a4409d3cf4f7c915548760da971e17875",
+        "stats": {
+          "startTime": "2026-09-09T12:36:50.579Z",
+          "duration": 13477.124,
+          "expected": 6,
+          "skipped": 0,
+          "unexpected": 0,
+          "flaky": 0
+        },
+        "source_unchanged": true,
+        "exit_code": 0,
+        "initial_source": {
+          "webui": {
+            "head": "5a49094164147ffbee43d53ae886b8a26cf23d14",
+            "tracked_diff_sha256": "8d5d569fbb890684576c54efcd0ae4da8f3c251ae1ae58154c18b19be3d14b6e",
+            "source_sha256": "5c2a905d381c7bfb94c7f2314b05316cf8938862f1b6f3429efcaaf9d88157e6"
+          },
+          "engine": {
+            "head": "b0aaa74f9dcfe9e7caa4692656b4535ce04104e1",
+            "tracked_diff_sha256": "841f54537c5f7db3c597ae0a173323b8222a2c190c8a4724c84adc165c8b8f6d",
+            "source_sha256": "653c3f66da11449a366b3ecaa5463306d0e5865456883d6fce205be738c82bf7"
+          }
+        },
+        "cases": [
+          {
+            "file": "kanban-dependency-draft-races.spec.ts",
+            "title": "SUPPLEMENT KANBAN DEPENDENCY DRAFT a late live refresh preserves re-add input and one exact persisted link",
+            "outcome": "expected",
+            "attempts": [
+              "passed"
+            ]
+          },
+          {
+            "file": "kanban-dependency-draft-races.spec.ts",
+            "title": "SUPPLEMENT KANBAN DEPENDENCY DRAFT newer clear and task navigation cannot restore or transfer an old draft",
+            "outcome": "expected",
+            "attempts": [
+              "passed"
+            ]
+          },
+          {
+            "file": "kanban-dependency-draft-races.spec.ts",
+            "title": "SUPPLEMENT KANBAN DEPENDENCY DRAFT a delayed successful Add keeps the next edited dependency for its own submission",
+            "outcome": "expected",
+            "attempts": [
+              "passed"
+            ]
+          },
+          {
+            "file": "kanban-edit-focus-race.spec.ts",
+            "title": "SUPPLEMENT KANBAN EDIT FOCUS delayed initial focus cannot redirect priority typing into the saved title",
+            "outcome": "expected",
+            "attempts": [
+              "passed"
+            ]
+          },
+          {
+            "file": "scheduler-kanban-lifecycle.spec.ts",
+            "title": "US-SP-LIFECYCLE-KAN edit, comment, complete, archive and restore survive reload",
+            "outcome": "expected",
+            "attempts": [
+              "passed"
+            ]
+          },
+          {
+            "file": "scheduler-kanban-lifecycle.spec.ts",
+            "title": "US-SP-LIFECYCLE-KAN-DEFECT visible Done action must complete an existing Todo task",
+            "outcome": "expected",
+            "attempts": [
+              "passed"
+            ]
+          }
+        ],
+        "uncaught_error_collections": 6,
+        "uncaught_errors": 0,
+        "global_errors": 0,
+        "readbacks": [
+          {
+            "released": 0,
+            "schedulers": [],
+            "patch": {
+              "title": "Exact task title 1788957417689 edited",
+              "body": "Exact body typed before priority.",
+              "assignee": null,
+              "tenant": null,
+              "priority": 2
+            },
+            "persisted": {
+              "id": "t_00b62b21",
+              "title": "Exact task title 1788957417689 edited",
+              "body": "Exact body typed before priority.",
+              "assignee": null,
+              "status": "todo",
+              "priority": 2,
+              "created_by": "webui",
+              "created_at": 1788957417,
+              "started_at": null,
+              "completed_at": null,
+              "workspace_kind": "scratch",
+              "workspace_path": null,
+              "claim_lock": null,
+              "claim_expires": null,
+              "tenant": null,
+              "branch_name": null,
+              "project_id": null,
+              "result": null,
+              "idempotency_key": null,
+              "consecutive_failures": 0,
+              "worker_pid": null,
+              "last_failure_error": null,
+              "max_runtime_seconds": null,
+              "last_heartbeat_at": null,
+              "current_run_id": null,
+              "workflow_template_id": null,
+              "current_step_key": null,
+              "skills": null,
+              "model_override": null,
+              "provider_override": null,
+              "reasoning_effort": null,
+              "max_retries": null,
+              "goal_mode": false,
+              "goal_max_turns": null,
+              "session_id": null,
+              "block_kind": null,
+              "block_recurrences": 0,
+              "age_seconds": {
+                "created_age_seconds": 1,
+                "started_age_seconds": null,
+                "time_to_complete_seconds": null
+              },
+              "age": {
+                "created_age_seconds": 1,
+                "started_age_seconds": null,
+                "time_to_complete_seconds": null
+              },
+              "progress": null
+            }
+          }
+        ]
+      },
+      "observed_full_run": {
+        "path": "work/task-modal-focus-failure-5a490941.json",
+        "sha256": "fdc7c04f7982367c81242076031715d2743b6da264c4cb545eada1c9e02d27a8"
+      },
+      "cause": "Edit scheduled title.focus()+select()50ms after displaying the form. After the user typed the new title/body and focused priority, that callback selected the title; native typing2 overwrote the title and left priority empty, serialized0. Controlled real UI reproduces the exact PATCH200 and persisted field corruption from the rejected full run.",
+      "fix": "After making the modal visible and installing its Tab trap, perform initial title focus synchronously; Edit also selects synchronously. Apply to the same Create task modal delayed-focus helper. Keep task/profile HTTP loading and all other focus flows unchanged; no new timers or broad focus abstraction.",
+      "bounds": "One real UI regression uses API-only disposable unassigned task/board setup, actual Edit controls/native typing/Save, actual PATCH plus durable GET, visible preview, and reload/reopen. The timing adapter captures only the old openKanbanEdit50ms callback; fixed source schedules none. Original lifecycle test remains byte-identical to5a490941.",
+      "backend": {
+        "new_file": "tests/test_kanban_edit_focus_ownership.py",
+        "new_cases": 4,
+        "before": {
+          "path": "work/task-focus-unit-before.log",
+          "sha256": "48775432a28d18c246adc9ff0da2c15ac605f83d62a255bfa0af77438617289b",
+          "failed": 4
+        },
+        "after": {
+          "path": "work/task-focus-unit-after.log",
+          "sha256": "465e9aa545d5f4992efc2cc398f1f3219c3142a60750fe1ed24910f0bf50c3cd",
+          "passed": 19,
+          "failed": 0
+        },
+        "files": [
+          "tests/test_kanban_edit_focus_ownership.py",
+          "tests/test_kanban_dependency_draft.py",
+          "tests/test_kanban_board_focus.py"
+        ],
+        "scopes": [
+          "Create/Edit initial focus complete on return, Edit selects initial title",
+          "No queued focus can steal later priority interaction or reopen a closed modal",
+          "Existing dependency and board focus behaviors remain green"
+        ]
+      },
+      "unchanged_original_test": {
+        "path": "tests/e2e/full/scheduler-kanban-lifecycle.spec.ts",
+        "sha256": "10c04e980e377cd58db3c480655597ef9a6c83f284d95e41396f23c356719a1c"
+      },
+      "new_browser_title": "SUPPLEMENT KANBAN EDIT FOCUS delayed initial focus cannot redirect priority typing into the saved title",
+      "catalog_total": 234,
+      "validation": [
+        "node --check static/panels.js",
+        "ruff check tests/test_kanban_edit_focus_ownership.py",
+        "git diff --check for three owned paths"
+      ],
+      "limitations": "This scoped six-case pass does not relabel the rejected233 full run as passed. It includes one new focus case, three dependency cases, the unchanged original task lifecycle and unchanged manual Todo Done case. It does not imply the four Kanban administration cases matched the grep. The historical Linux21 selection excludes this new focus case and the original failing lifecycle. A new full234 run is required. No retry, force click, timeout extension, production mutation, vendor account or fake successful application response.",
+      "root_review_receipt": "work/task-modal-focus-root-review.json",
+      "specialist_final_verdict": "Approved independently after user resumed, before subsequent cron edit.",
+      "committed_head": "65e791a7ceb9aa6bc4898a3753ab90484c46072f"
+    },
+    {
+      "kind": "linux_exact21_v4_failure",
+      "receipt": "work/qa-linux-failed21-qualification-20260909-v4.json",
+      "receipt_sha256": "92edd5855f026d71ac0a074336f112bb0e0b4216a2970b455673ae4b791bd073",
+      "webui_head": "65e791a7ceb9aa6bc4898a3753ab90484c46072f",
+      "engine_head": "b0aaa74f9dcfe9e7caa4692656b4535ce04104e1",
+      "passed": 20,
+      "failed": 1,
+      "scope": "First parent reply absent at10s before fork; diagnosis open. Preserved failure, not qualified."
+    },
+    {
+      "kind": "cron_skill_picker_history_candidate_for_root_integration",
+      "status": "APPROVED_FOCUSED_FIX_NEW_FULL_SUITE_PENDING",
+      "recorded_at": "2026-09-09T16:03:10.256909+00:00",
+      "original_regression_receipt": {
+        "path": "work/cron-skill-picker-regression-evidence.json",
+        "sha256": "28d3fec1d5aa55a8be0e35ecdf57f3edc4eebb3162086ff2e5ee7928b205da10"
+      },
+      "observed_full_run": {
+        "status": "FAILED_PRESERVED",
+        "run": "work/supplement-task-focus-final-runs/20260909-173345-41676000",
+        "manifest": {
+          "path": "work/supplement-task-focus-final-runs/20260909-173345-41676000/run.json",
+          "sha256": "b353645b58c5f43332615afa64e14a16a44eb2994849b77b3c1df6969d2b4cb9"
+        },
+        "report": {
+          "path": "work/supplement-task-focus-final-runs/20260909-173345-41676000/results/results.json",
+          "sha256": "2cd6a2ec69b132b2e1bb6df6c31eac43b3798f500f6410c42ae79dbfac5fd00b"
+        },
+        "stats": {
+          "startTime": "2026-09-09T15:33:48.881Z",
+          "duration": 706206.9689999999,
+          "expected": 233,
+          "skipped": 0,
+          "unexpected": 1,
+          "flaky": 0
+        },
+        "source": {
+          "webui": {
+            "head": "65e791a7ceb9aa6bc4898a3753ab90484c46072f",
+            "source_sha256": "5c2a905d381c7bfb94c7f2314b05316cf8938862f1b6f3429efcaaf9d88157e6"
+          },
+          "engine": {
+            "head": "b0aaa74f9dcfe9e7caa4692656b4535ce04104e1",
+            "source_sha256": "653c3f66da11449a366b3ecaa5463306d0e5865456883d6fce205be738c82bf7"
+          }
+        },
+        "source_unchanged": true,
+        "failures": [
+          {
+            "file": "supplement-cron-advanced.spec.ts",
+            "title": "SUPPLEMENT CRON ADVANCED selected profile model and skill reach actual isolated cron execution",
+            "status": "failed",
+            "location": "spec143 second removed-skill re-selection; before Save",
+            "interpretation": "Normal click could not act on matching hidden option; subsequent job creation/run/provider assertions were never reached."
+          }
+        ],
+        "browser_error_collections": 234,
+        "uncaught_browser_errors": 0,
+        "global_errors": 0,
+        "independent_qualification": {
+          "path": "work/task-focus-final-readiness.json",
+          "sha256": "7c46c350a042c0dcabfb0b7c132f8c945ce5eda0690dcb452275cb173b4c96e8"
+        },
+        "process_census_scope": {
+          "before": {
+            "path": "/Users/michaelramirez/Documents/Codex/2026-09-08/do-x20/work/task-focus-final-run-census-before.json",
+            "sha256": "19e6c0752ad59dd20100c00d278dad51d78c99296cc9db5c31a44b1b94a0726b",
+            "at_utc": "2026-09-09T15:35:19.283133+00:00",
+            "candidate_count": 12,
+            "scope": "Known runner descendants, exact private-state argument/cwd matches, and surviving previously captured PID/birth identities. Not an OS-wide sandbox or universal descendant history."
+          },
+          "after": {
+            "path": "/Users/michaelramirez/Documents/Codex/2026-09-08/do-x20/work/task-focus-final-run-census-after.json",
+            "sha256": "9ddfe45fbe3baa0079878ac1a2500b0b0e2dce5e74033cb2bb7a2e2cc89cd794",
+            "at_utc": "2026-09-09T15:46:59.410366+00:00",
+            "candidate_count": 0,
+            "scope": "Known runner descendants, exact private-state argument/cwd matches, and surviving previously captured PID/birth identities. Not an OS-wide sandbox or universal descendant history."
+          }
+        }
+      },
+      "cause": "An unconditional 150ms search blur callback hid the dropdown after a newer input/refocus reopened it. Controlled browser release reproduces the exact hidden-option failure.",
+      "fix": "Each binding owns its timer. Refocus/input/selection cancel pending blur; queued callbacks require the same binding, nodes and pending timer. A current outside blur still hides. Rebind and form/detail/clear replacement dispose old handlers/timers.",
+      "before": {
+        "run": "work/cron-picker-before/20260909-175013-91756000",
+        "manifest": {
+          "path": "work/cron-picker-before/20260909-175013-91756000/run.json",
+          "sha256": "95c640f84559a24be4b3250e6a216cce64df87568eb0451b2574dd340a873167"
+        },
+        "report": {
+          "path": "work/cron-picker-before/20260909-175013-91756000/results/results.json",
+          "sha256": "3b21decfd30bbd6946def89c990af6cfffe9b053c1758fa5e90a3b938303c851"
+        },
+        "stats": {
+          "startTime": "2026-09-09T15:50:15.691Z",
+          "duration": 12008.818000000001,
+          "expected": 0,
+          "skipped": 0,
+          "unexpected": 1,
+          "flaky": 0
+        },
+        "global_errors": [],
+        "source_unchanged": true,
+        "source": {
+          "webui": {
+            "head": "65e791a7ceb9aa6bc4898a3753ab90484c46072f",
+            "source_sha256": "4006ed92a6366b04f5f0d402ff7448acb59b862a81648e90769f463d60c40acd"
+          },
+          "engine": {
+            "head": "b0aaa74f9dcfe9e7caa4692656b4535ce04104e1",
+            "source_sha256": "653c3f66da11449a366b3ecaa5463306d0e5865456883d6fce205be738c82bf7"
+          }
+        },
+        "cases": [
+          {
+            "title": "SUPPLEMENT CRON SKILL PICKER an old blur cannot close a reopened query and a current outside click still closes it",
+            "file": "cron-skill-picker-race.spec.ts",
+            "status": "failed",
+            "attempts": 1,
+            "uncaught_browser_errors": [],
+            "blur_ordering": {
+              "schedulers": [
+                "Error\n    at window.setTimeout (<anonymous>:8:21)\n    at search.onblur (http://127.0.0.1:57752/static/panels.js?v=exp-v0.52.65-682-g65e791a7-dirty-dcceed86:1864:21)"
+              ],
+              "dropdown": "none",
+              "query": "qa-picker-1788969016792"
+            },
+            "failure": "Actual matching second skill option stayed hidden after the old blur callback was released; normal click timed out at the unchanged 10-second actionability limit."
+          }
+        ]
+      },
+      "after": {
+        "run": "work/cron-picker-final/20260909-175517-145534000",
+        "manifest": {
+          "path": "work/cron-picker-final/20260909-175517-145534000/run.json",
+          "sha256": "9d4556de0f547974fb653d4e366c97348998529555acb2e3d2401b7aaa95cbc6"
+        },
+        "report": {
+          "path": "work/cron-picker-final/20260909-175517-145534000/results/results.json",
+          "sha256": "fe56778b96f9a8a796cd06feb917a13fa909b5fbc38be8dfbc79c45bb452c67f"
+        },
+        "stats": {
+          "startTime": "2026-09-09T15:55:18.938Z",
+          "duration": 14519.932,
+          "expected": 5,
+          "skipped": 0,
+          "unexpected": 0,
+          "flaky": 0
+        },
+        "global_errors": [],
+        "source_unchanged": true,
+        "source": {
+          "webui": {
+            "head": "65e791a7ceb9aa6bc4898a3753ab90484c46072f",
+            "source_sha256": "3260004d4ca7456f419d9aa76899842208cf81ca7cbe32814dd540603477dc79"
+          },
+          "engine": {
+            "head": "b0aaa74f9dcfe9e7caa4692656b4535ce04104e1",
+            "source_sha256": "653c3f66da11449a366b3ecaa5463306d0e5865456883d6fce205be738c82bf7"
+          }
+        },
+        "cases": [
+          {
+            "title": "SUPPLEMENT CRON SKILL PICKER an old blur cannot close a reopened query and a current outside click still closes it",
+            "file": "cron-skill-picker-race.spec.ts",
+            "status": "passed",
+            "attempts": 1,
+            "uncaught_browser_errors": [],
+            "blur_ordering": {
+              "ordering": [
+                {
+                  "stage": "old blur after newer query",
+                  "released": 1,
+                  "schedulers": [
+                    "Error\n    at window.setTimeout (<anonymous>:8:21)\n    at search.onblur (http://127.0.0.1:58696/static/panels.js?v=exp-v0.52.65-682-g65e791a7-dirty-bba74766:1895:19)"
+                  ],
+                  "dropdown": "",
+                  "query": "qa-picker-1788969319860"
+                },
+                {
+                  "stage": "current outside blur",
+                  "released": 2,
+                  "schedulers": [
+                    "Error\n    at window.setTimeout (<anonymous>:8:21)\n    at search.onblur (http://127.0.0.1:58696/static/panels.js?v=exp-v0.52.65-682-g65e791a7-dirty-bba74766:1895:19)",
+                    "Error\n    at window.setTimeout (<anonymous>:8:21)\n    at search.onblur (http://127.0.0.1:58696/static/panels.js?v=exp-v0.52.65-682-g65e791a7-dirty-bba74766:1895:19)",
+                    "Error\n    at window.setTimeout (<anonymous>:8:21)\n    at search.onblur (http://127.0.0.1:58696/static/panels.js?v=exp-v0.52.65-682-g65e791a7-dirty-bba74766:1895:19)"
+                  ],
+                  "dropdown": "none",
+                  "query": "qa-picker-1788969319860"
+                }
+              ]
+            }
+          },
+          {
+            "title": "SUPPLEMENT CRON ADVANCED weekly Sunday editor and pause resume delete govern future scheduler eligibility",
+            "file": "supplement-cron-advanced.spec.ts",
+            "status": "passed",
+            "attempts": 1,
+            "uncaught_browser_errors": []
+          },
+          {
+            "title": "SUPPLEMENT CRON ADVANCED monthly day31 and custom expression preserve saved state across invalid edit and reload",
+            "file": "supplement-cron-advanced.spec.ts",
+            "status": "passed",
+            "attempts": 1,
+            "uncaught_browser_errors": []
+          },
+          {
+            "title": "SUPPLEMENT CRON ADVANCED one-shot custom warning and Run now retain completed history without future eligibility",
+            "file": "supplement-cron-advanced.spec.ts",
+            "status": "passed",
+            "attempts": 1,
+            "uncaught_browser_errors": []
+          },
+          {
+            "title": "SUPPLEMENT CRON ADVANCED selected profile model and skill reach actual isolated cron execution",
+            "file": "supplement-cron-advanced.spec.ts",
+            "status": "passed",
+            "attempts": 1,
+            "uncaught_browser_errors": []
+          }
+        ]
+      },
+      "proof_scope": "Timing adapter holds only actual search.onblur 150ms callbacks; it executes even canceled callbacks to prove ownership. Normal clicks, local synthetic skill, real save/readback/reload. No job dispatch in new case. Unchanged advanced selected-profile case separately runs real isolated Cron and verifies model/profile skill propagation.",
+      "harness_delta": "Final browser spec preserves the same click and callback-release assertions; attachment storage was moved before reload so ordering stacks survive. Unit input branch was separated from refocus to independently exercise oninput. No timeout/retry/force-click changes.",
+      "unit_before": {
+        "passed": 0,
+        "failed": 4,
+        "log": {
+          "path": "work/cron-picker-unit-before.log",
+          "sha256": "12abadcfdd36087230157ee31e1e942832c0ef13461f66a8bf6f10c983863557"
+        }
+      },
+      "unit_after_owned_initial": {
+        "passed": 4,
+        "failed": 0,
+        "log": {
+          "path": "work/cron-picker-unit-after.log",
+          "sha256": "05ba08806014a24ebada8d3bdb65c6ccb40f5b07df2b7bf77a120b4886286973"
+        }
+      },
+      "unit_final_expanded": {
+        "passed": 11,
+        "failed": 1,
+        "files": [
+          "tests/test_cron_skill_picker_focus.py",
+          "tests/test_cron_editor_validation.py",
+          "tests/test_cron_model_provider_picker.py"
+        ],
+        "log": {
+          "path": "work/cron-picker-unit-final.log",
+          "sha256": "655413a5bb22880e9d68d5eb16c71a125bccc85552020324e05ddd275c1cdb42"
+        }
+      },
+      "adjacent_failure_qualification": {
+        "test": "tests/test_cron_model_provider_picker.py::test_cron_model_picker_i18n_keys_exist",
+        "actual": "assert cron_model_label in static/i18n.js; locale keys now live in split catalogs",
+        "base_head": "65e791a7ceb9aa6bc4898a3753ab90484c46072f",
+        "baseline_export_file_sha256": {
+          "static/panels.js": "db5959f00d4dfba2d54bc0f67b381eaf8dad68211fd3bbe882d545a3f876414e",
+          "static/i18n.js": "128c835fbe7b02c97e67d732e61e70a377ca09f407eb473229c1a3465b3ee042",
+          "tests/test_cron_model_provider_picker.py": "6a52cf560bc6eec7a3c817ef2ecf74fa6025160e5fb704fb133e5956a9dfdaa0"
+        },
+        "baseline_failed": 1,
+        "baseline_log": {
+          "path": "work/cron-picker-unit-baseline-65.log",
+          "sha256": "d54ae313fb8ff1fc04f35d0c90653dced3f357edf1914419068ae56960647897"
+        },
+        "scope": "Exact static test and its two module-level source inputs were exported byte-for-byte from the base commit and executed through canonical scripts/test.sh. Same first assertion fails; no test/source changes to suppress it."
+      },
+      "current_committed_source_binding": {
+        "head": "2a90a440aea3a7adac3ebb28b9b1edbfed65d63f",
+        "source_sha256": "3260004d4ca7456f419d9aa76899842208cf81ca7cbe32814dd540603477dc79",
+        "owned_file_sha256": {
+          "static/panels.js": "580621b3cd95b8ea7aeda29830cda3ef0c02723c5425ada59e50015e4ed24435",
+          "tests/test_cron_skill_picker_focus.py": "7d71a5650c440d9c8144e58bfd5daccfe724a0cb10d130640e2a1e1236371989",
+          "tests/e2e/full/cron-skill-picker-race.spec.ts": "496295f2f4481f9c0192357816e8dfbcb52f68555b4cf27b51de369c551a86cc"
+        },
+        "verified_current_and_committed_bytes": true,
+        "qualification": "The original focused run retains its65e791a7 precommit HEAD, timestamp and manifest. Exact tested runtime/test bytes now match the recorded newer commit; the run is not relabeled as a new execution."
+      },
+      "review": {
+        "reviewer": "governance_design",
+        "verdict": "APPROVED",
+        "scope": "Independently verified both raw reports/manifests, five final passing cases and five empty browser-error collections, all three hashes, queued timer identity and form lifecycle disposal; current outside blur and refocus positives retained. Parent also accepted exact three-file freeze."
+      },
+      "integration_prep": {
+        "files": {
+          "run_supplement_webui_backend.py": "b0baaced098c797282f0b6d8c3634119426b15dc1794d7b367fb044cb7a3feef",
+          "reconcile_story_evidence.py": "79393998c9839e4b8392256c37af7b9bd0f7b2e558b02464b662679b3963d9d6",
+          "supplement-story-evidence.md": "a6dfe6699fd1f7950ead9a8bcab6a7243b8318c398ab31667dc5eeef0914c046",
+          "finalize_release_docs.py": "23fe70cae34f97e8920e5e1e4af6b5a607dddec0c470d4be7a28b264aec24abd"
+        },
+        "whole_backend_file": "tests/test_cron_skill_picker_focus.py",
+        "new_backend_cases": 4,
+        "backend_bundle_executed": false,
+        "exact_browser_title": "SUPPLEMENT CRON SKILL PICKER an old blur cannot close a reopened query and a current outside click still closes it",
+        "mapped_existing_story": "US-SP-CRON-005",
+        "narrative": "SUP-44",
+        "scope": "Selection/save/reopen clauses only; no worker/provider/model/profile/permission-negative claim from the new picker case. full_story_pass criteria and existing gaps unchanged.",
+        "new_expected_catalog": 235,
+        "reconciler_or_finalizer_executed": false
+      },
+      "limits": [
+        "Historical full234 remains233PASS/1FAIL. Focused5PASS is not full235.",
+        "No production action or all-features/all-clicks certification.",
+        "Canonical backend updated selection is prepared, not executed. New units overlap focused totals and must not be added to a future combined total twice.",
+        "Central review-history.json remains parent-owned and was not edited."
+      ]
+    },
+    {
+      "kind": "linux_first_turn_delivery_diagnosis",
+      "status": "OBSERVATION_GAP_HARNESS_CORRECTION_PLANNED_ORIGINAL_RUN_REMAINS_FAILED",
+      "receipt": "work/qa-linux-fork-delivery-20260909-v1.json",
+      "sha256": "dcb439d7edaa5aaf0b613680d5cd39a8468f24eab93ca655b4da1674acaf3dd6",
+      "actual_last_failed_dom_poll_ms": 19337.767,
+      "actual_expect_end_ms": 20347.047,
+      "first_correct_dom_snapshot_ms": 20402.348,
+      "scope": "Provider token and SSE completion occurred inside final 1009ms observation gap. Exact first DOM appearance is unknown; no original deadline pass claim or persistent rendering loss observed. Original report startTime+duration arithmetic was insufficient and withdrawn. Use explicit100ms sampling with unchanged10s functional DOM budget and correlated accepted dispatch; qualify new full and Linux runs."
+    }
+  ],
+  "final_frozen_replay": {
+    "receipt": "work/fork-final-readiness.json",
+    "receipt_sha256": "c6b3b9c588a87d067dfc4cd706af8cef69c1ea2df119e7a516ca3c1879f40c40",
+    "run_id": "20260909-184341-281192000",
+    "run_directory": "/Users/michaelramirez/Documents/Codex/2026-09-08/do-x20/work/supplement-fork-final-runs/20260909-184341-281192000",
+    "results_sha256": "3d40d170b75af2b83ddbb0bbe5da3de5b530f83dc9501abf0935f29004426087",
+    "manifest_sha256": "2cab73c6369aa7af5c86ab4c7d81320ba8d6eebdc2d9e36afa384aa2937e0917",
+    "source_unchanged_during_run": true,
+    "test_exit_code": 0,
+    "full_catalog": {
+      "startTime": "2026-09-09T16:43:43.060Z",
+      "duration": 584187.632,
+      "expected": 235,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "webui_head": "90cc10318788db857464663b1874d28eb1e50430",
+    "engine_head": "b0aaa74f9dcfe9e7caa4692656b4535ce04104e1",
+    "source_sha256": {
+      "webui": "eed1f8abfa2ce91ba042d056639ee81dc9248a9aa629cc3b59c13c8093c86bfe",
+      "engine": "653c3f66da11449a366b3ecaa5463306d0e5865456883d6fce205be738c82bf7"
+    },
+    "platform": "Darwin",
+    "scope": "This complete Mac run qualifies its actual assertions on recorded source. Earlier failed Linux/Mac runs remain failed history; no retroactive pass, CPU causality, all-click certification, or deployment claim.",
+    "reporter_warning_count": 17,
+    "browser_error_collections": 235,
+    "uncaught_browser_errors": 0
+  },
+  "current_acceptance": {
+    "status": "full235_and_linux21_v5_pass_pending_ci_and_release",
+    "source_head": "90cc10318788db857464663b1874d28eb1e50430",
+    "source_sha256": "eed1f8abfa2ce91ba042d056639ee81dc9248a9aa629cc3b59c13c8093c86bfe",
+    "required": "One complete235-case pass and Linux exact21 v5 qualification; old failures preserved. Supplemental production promotion remains pending."
+  },
+  "fork_sampling_qualification": {
+    "kind": "fork_test_rendered_reply_sampling_correction",
+    "status": "FOCUSED_PASS_SOURCE_FROZEN_PENDING_FULL_AND_LINUX_REPLAY",
+    "at_utc": "2026-09-09T16:36:36.962174+00:00",
+    "source": {
+      "webui": {
+        "head": "2a90a440aea3a7adac3ebb28b9b1edbfed65d63f",
+        "source_sha256": "eed1f8abfa2ce91ba042d056639ee81dc9248a9aa629cc3b59c13c8093c86bfe"
+      },
+      "engine": {
+        "head": "b0aaa74f9dcfe9e7caa4692656b4535ce04104e1",
+        "source_sha256": "653c3f66da11449a366b3ecaa5463306d0e5865456883d6fce205be738c82bf7"
+      }
+    },
+    "source_binding": "Focused run used an uncommitted change to this one spec atop the recorded WebUI head; it is not relabeled as a later commit.",
+    "owned_file": {
+      "tests/e2e/full/additional-affordances.spec.ts": "5857255fe431ef89ebf7ddd8b6dc8372af9c56ac70680f924a3bc3c98d43aade"
+    },
+    "all_current_source_files_match_final_manifest": true,
+    "other_cases_byte_identical_to_base": true,
+    "timeout_retry_config_unchanged": {
+      "playwright.full.config.ts": "34faeab694f64c3ef05f777b55ffefcfb1d527d8bf275c94e8463ea4e252ca76"
+    },
+    "case_count_change": 0,
+    "change": "One existing fork case shares a send helper: install exact POST/session/prompt response waiter before ordinary Send; assert HTTP200, returned session identity and fresh32hex stream identity; sample actual #messages innerText every100ms within the unchanged10000ms reply budget for all three sends. No generation-completion wait or retry added.",
+    "timing_contract": "Reply expectation follows accepted dispatch. Action-to-accept durations are separate observations, not assertion-budget shifts. The old trace has only7.474ms between expectation start and request completion despite approximately672ms Send-action-start to ACK. No old deadline pass or product latency improvement is claimed.",
+    "run": {
+      "directory": "work/fork-sampling-final/20260909-183010-477943000",
+      "manifest": {
+        "path": "work/fork-sampling-final/20260909-183010-477943000/run.json",
+        "sha256": "16279f675e975d83c9f8509e612b03e634b1d34f53c38ac70bffdc98696ee2f1"
+      },
+      "report": {
+        "path": "work/fork-sampling-final/20260909-183010-477943000/results/results.json",
+        "sha256": "ac56024b005bb6bbd6d4ae0999179c67d51a57e8b7cd1f7073031ee5a982edfa"
+      },
+      "stats": {
+        "startTime": "2026-09-09T16:30:12.848Z",
+        "duration": 4884.8910000000005,
+        "expected": 1,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "test_duration_ms": 3878,
+      "case": "US-SP-AFFORDANCE-MESSAGE-FORK selected message creates an exact persistent prefix and child continuation leaves the private parent unchanged",
+      "test_id": "378e63bd93e14c5124ae-5a98e8a27dfae1776196",
+      "source_unchanged": true,
+      "test_exit_code": 0,
+      "attempts": 1,
+      "browser_errors": [],
+      "global_errors": [],
+      "action_acceptance": [
+        {
+          "session_id": "2369963b4a64",
+          "prompt": "QA_FORK_FIRST",
+          "action_at_utc": "2026-09-09T16:30:14.790Z",
+          "accepted_at_utc": "2026-09-09T16:30:15.094Z",
+          "action_to_accept_ms": 304,
+          "status": 200,
+          "returned_session_id": "2369963b4a64",
+          "stream_id": "c5b3286ad7a44a67b36e7c3de71f5ea9"
+        },
+        {
+          "session_id": "2369963b4a64",
+          "prompt": "QA_FORK_LATER",
+          "action_at_utc": "2026-09-09T16:30:16.221Z",
+          "accepted_at_utc": "2026-09-09T16:30:16.499Z",
+          "action_to_accept_ms": 278,
+          "status": 200,
+          "returned_session_id": "2369963b4a64",
+          "stream_id": "965a2ce96a314294a4e82d15e02574a4"
+        },
+        {
+          "session_id": "6036573377da",
+          "prompt": "QA_FORK_CHILD_ONLY",
+          "action_at_utc": "2026-09-09T16:30:17.124Z",
+          "accepted_at_utc": "2026-09-09T16:30:17.389Z",
+          "action_to_accept_ms": 265,
+          "status": 200,
+          "returned_session_id": "6036573377da",
+          "stream_id": "68f13a4ab55d42f7aca43319bda38925"
+        }
+      ]
+    },
+    "unchanged_acceptance": [
+      "Exact four-message parent transcript before fork",
+      "Actual branch request keep_count2 and different child ID",
+      "Exact child prefix and inherited workspace/profile",
+      "Parent remains byte-equivalent in role/content through child continuation",
+      "Reload retains child prefix before its continuation",
+      "Exact child continuation user/assistant turn",
+      "Bob read/fork404 for parent and child without QA_FORK content"
+    ],
+    "prior_readiness_only_run": {
+      "receipt": {
+        "path": "work/fork-readiness-regression-evidence.json",
+        "sha256": "be984c0b30614b5728d3915b538e20bec25a57c3de6ee538900dbc35fe7e7f29"
+      },
+      "classification": "Earlier focused pass is retained as readiness-only diagnostic history, preceding100ms sampling and later delivery qualification."
+    },
+    "prior_linux_failure": {
+      "receipt": {
+        "path": "work/qa-linux-failed21-qualification-20260909-v4.json",
+        "sha256": "92edd5855f026d71ac0a074336f112bb0e0b4216a2970b455673ae4b791bd073"
+      },
+      "status": "20PASS/1FAIL_REMAINS_FAILED",
+      "delivery_qualification": {
+        "path": "work/linux-fork-delivery-qualification.json",
+        "sha256": "f599171c0b925d03c0eed9af17100121834e2c8d66d6701acee612ce1342766e"
+      },
+      "established": [
+        "Last actual assertion poll lacked the answer; no further assertion poll observed before timeout.",
+        "The captured browser SSE response contains the exact answer token and done/stream_end events.",
+        "The reconstructed after-expect #messages DOM contains the exact correct reply; subsequent snapshots retain it.",
+        "The saved session contains the user prompt and correct assistant response; this case did not reach the fork action."
+      ],
+      "not_established": [
+        "The first time the reply appeared in the DOM; it is only bounded by the last absent sample and first positive snapshot.",
+        "That the original DOM reply met its10-second deadline.",
+        "Cold CPU or initialization as a causal attribution.",
+        "A persistent render-loss defect, or a proven cure from accepted-POST gating.",
+        "An approximately0.7-second assertion deadline shift; actual response-end vs assertion-start estimate is7.474ms."
+      ],
+      "timeline_monotonic_ms": {
+        "expect_start": 10280.504,
+        "last_failed_dom_poll": 19337.767,
+        "first_server_token_projected": 19598.884,
+        "recorded_sse_complete": 19938.547,
+        "expect_end": 20347.047,
+        "first_observed_dom_with_correct_reply": 20402.348
+      }
+    },
+    "independent_review": {
+      "reviewer": "qa_inventory",
+      "verdict": "APPROVED",
+      "reviewed_spec_sha256": "5857255fe431ef89ebf7ddd8b6dc8372af9c56ac70680f924a3bc3c98d43aade",
+      "scope": "Same100ms polling and10000ms budget; exact ACK/stream binding and all existing idle/persistence/privacy checks preserved. Final source review announced in agent message; focused raw result verified here."
+    },
+    "limits": [
+      "Harness observation-frequency correction, not product fix.",
+      "No claim that original failed Linux DOM reply met its deadline; first actual DOM appearance remains unknown.",
+      "No cold-CPU, persistent-render-loss or delivery-loss causal attribution.",
+      "One focused Mac case only; full235 and Linux exact21 replay remain pending.",
+      "Only one existing test case changed; no product, fixture, config, other-case, or catalog-count changes.",
+      "No deployment or production mutation; parent owns commit and release."
+    ]
+  },
+  "prior_final_frozen_replay_225": {
+    "receipt": "work/navigation-draft-final-replay.json",
+    "receipt_sha256": "d64f127bd6b659da72685e750336d9127b4d42ec9324b8ef4dda7fc3da3bc9d3",
+    "run_id": "20260909-124140-843191000",
+    "run_directory": "work/supplement-draft-final-runs/20260909-124140-843191000",
+    "results_sha256": "91f96e528001fbf75a60823fe1aebe78b814c8bb6f96639cfe168404074b60d4",
+    "manifest_sha256": "fb7706812035a69ace2d30fcc901d28e0d0c36b2c15512be2c8311be1a5b6c4c",
+    "source_unchanged_during_run": true,
+    "test_exit_code": 0,
+    "full_catalog": {
+      "startTime": "2026-09-09T10:41:43.701Z",
+      "duration": 567177.658,
+      "expected": 225,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "webui_head": "7b2620b3ac40956496bb014d25392d40d95fa5bd",
+    "engine_head": "b0aaa74f9dcfe9e7caa4692656b4535ce04104e1",
+    "source_sha256": {
+      "webui": "c2181bdce76363ec895680f328687485d177bdd6e119e040ca48f0672e537244",
+      "engine": "653c3f66da11449a366b3ecaa5463306d0e5865456883d6fce205be738c82bf7"
+    },
+    "matched_navigation_and_draft_cases": [
+      {
+        "title": "US-SP-CHAT-PROMPTS saved prompt validates empty input saves reloads inserts exact text and deletes",
+        "file": "composer-content.spec.ts",
+        "line": 38,
+        "status": "passed",
+        "attempts": 1,
+        "uncaught_errors": []
+      },
+      {
+        "title": "SUPPLEMENT SESSION ACTIVATION newer New Chat survives a delayed available saved-session restore",
+        "file": "session-activation-races.spec.ts",
+        "line": 6,
+        "status": "passed",
+        "attempts": 1,
+        "uncaught_errors": []
+      },
+      {
+        "title": "SUPPLEMENT SESSION ACTIVATION newer New Chat survives a delayed inaccessible saved-session restore",
+        "file": "session-activation-races.spec.ts",
+        "line": 6,
+        "status": "passed",
+        "attempts": 1,
+        "uncaught_errors": []
+      },
+      {
+        "title": "SUPPLEMENT SESSION ACTIVATION a later current sidebar choice survives a delayed New Chat response",
+        "file": "session-activation-races.spec.ts",
+        "line": 54,
+        "status": "passed",
+        "attempts": 1,
+        "uncaught_errors": []
+      },
+      {
+        "title": "SUPPLEMENT SESSION ACTIVATION a later other sidebar choice survives a delayed New Chat response",
+        "file": "session-activation-races.spec.ts",
+        "line": 54,
+        "status": "passed",
+        "attempts": 1,
+        "uncaught_errors": []
+      },
+      {
+        "title": "SUPPLEMENT DRAFT RESTORE actual typing and clearing beat late metadata and deliberate prompt reinsertion stays exact",
+        "file": "session-draft-restoration.spec.ts",
+        "line": 4,
+        "status": "passed",
+        "attempts": 1,
+        "uncaught_errors": []
+      },
+      {
+        "title": "SUPPLEMENT TRANSCRIPT FILES virtualized long history supports Start outline and End without losing or duplicating turns",
+        "file": "supplement-transcript-files.spec.ts",
+        "line": 46,
+        "status": "passed",
+        "attempts": 1,
+        "uncaught_errors": []
+      },
+      {
+        "title": "SUPPLEMENT TRANSCRIPT FILES CSV table and valid or malformed JSON preserve literal content and exact downloads",
+        "file": "supplement-transcript-files.spec.ts",
+        "line": 136,
+        "status": "passed",
+        "attempts": 1,
+        "uncaught_errors": []
+      },
+      {
+        "title": "SUPPLEMENT TRANSCRIPT FILES HTML preview runs inside an opaque sandbox and cannot read parent identity or cookies",
+        "file": "supplement-transcript-files.spec.ts",
+        "line": 185,
+        "status": "passed",
+        "attempts": 1,
+        "uncaught_errors": []
+      },
+      {
+        "title": "SUPPLEMENT TRANSCRIPT FILES large Markdown falls back to literal text then explicit render is scoped to the current file",
+        "file": "supplement-transcript-files.spec.ts",
+        "line": 202,
+        "status": "passed",
+        "attempts": 1,
+        "uncaught_errors": []
+      },
+      {
+        "title": "SUPPLEMENT TRANSCRIPT FILES delayed outline history cannot replace a newer active turn",
+        "file": "supplement-transcript-files.spec.ts",
+        "line": 232,
+        "status": "passed",
+        "attempts": 1,
+        "uncaught_errors": []
+      },
+      {
+        "title": "SUPPLEMENT TRANSCRIPT FILES newer manual scroll during history loading keeps correct message Edit indices and earlier persisted turns",
+        "file": "supplement-transcript-files.spec.ts",
+        "line": 296,
+        "status": "passed",
+        "attempts": 1,
+        "uncaught_errors": []
+      }
+    ],
+    "qualification": "This is one complete frozen225-case run, not a sum of focused results. Earlier failed and drifting attempts retain their original verdicts; Linux530 failures remain independently qualified. Browser assertions do not certify all controls or production.",
+    "platform": "Darwin",
+    "scope": "One separate complete Mac225 frozen run. The listed 12 navigation/draft/file matches have one passing attempt each. It does not overturn the failed Linux530 receipt or certify every control."
+  },
+  "linux_exact21_v5": {
+    "receipt": "work/qa-linux-failed21-qualification-20260909-v5.json",
+    "sha256": "303d82829057593452f02f39066eb39d2c1991a8266483f7e187b7145dcebef5",
+    "status": "passed_exact21_with_scoped_cleanup",
+    "execution": {
+      "kind": "isolated_linux_exact_failed21_replay",
+      "status": "passed_exact21_pending_post_unit_cleanup",
+      "prior_failure_receipt_sha256": "386f2a0524232b38126868510d7984cdfbb841037d912f0873506fdf531a9bc7",
+      "prior_run": "20260909-120039-662326096",
+      "prior_results_sha256": "be33ee5a2046a8dabb2e1bb0e4a916be7901e8631ad815dfd185490f6322f221",
+      "selected_cases": [
+        {
+          "file": "additional-affordances.spec.ts",
+          "title": "US-SP-AFFORDANCE-MESSAGE-FORK selected message creates an exact persistent prefix and child continuation leaves the private parent unchanged"
+        },
+        {
+          "file": "chat-lifecycle.spec.ts",
+          "title": "US-SP-CHAT-008 explicit interrupt cancels first response and starts requested next message"
+        },
+        {
+          "file": "composer-content.spec.ts",
+          "title": "US-SP-CHAT-PROMPTS saved prompt validates empty input saves reloads inserts exact text and deletes"
+        },
+        {
+          "file": "deep-workflows.spec.ts",
+          "title": "US-SP-SESS-SPLIT all split counts create real independent frames and exit"
+        },
+        {
+          "file": "governance-field-roundtrip.spec.ts",
+          "title": "US-SP-GOV-006 [field removal] clearing all extra grants and denials removes persisted entries"
+        },
+        {
+          "file": "governance-revocation.spec.ts",
+          "title": "US-SP-POL-REVOKE-LEVELS user elevated and admin choices persist while only explicit admin can administer policy"
+        },
+        {
+          "file": "governance-revocation.spec.ts",
+          "title": "US-SP-GOV-REQUESTER-STATUS retained requester sees pending approved rejected while another account cannot read or decide those requests"
+        },
+        {
+          "file": "kanban-administration.spec.ts",
+          "title": "US-SP-KAN-ADMIN-DEPENDENCIES add remove reject cycles and guard direct completion until parent finishes"
+        },
+        {
+          "file": "realtime-voice.spec.ts",
+          "title": "US-SP-VOICE-REALTIME-CONTROLS microphone, push to talk, interruption and session change release capture correctly"
+        },
+        {
+          "file": "realtime-voice.spec.ts",
+          "title": "US-SP-VOICE-REALTIME-MIC-DENIED microphone refusal fails without creating a provider call"
+        },
+        {
+          "file": "realtime-voice.spec.ts",
+          "title": "US-SP-VOICE-REALTIME-REMOTE-END removed server call stops browser microphone capture"
+        },
+        {
+          "file": "realtime-voice.spec.ts",
+          "title": "US-SP-VOICE-REALTIME-LAUNCH-RACE canceled capability response cannot release a newer pending launch"
+        },
+        {
+          "file": "session-activation-races.spec.ts",
+          "title": "SUPPLEMENT SESSION ACTIVATION newer New Chat survives a delayed inaccessible saved-session restore"
+        },
+        {
+          "file": "session-discovery-share.spec.ts",
+          "title": "US-SP-SESS-SHARE-AUTH a readable group participant cannot publish or revoke its owners snapshot"
+        },
+        {
+          "file": "session-import-authority.spec.ts",
+          "title": "US-SP-SESS-IMPORT-AUTHORITY JSON chooser rejects unauthorized workspace before creating a session and allowed import ignores forged identity"
+        },
+        {
+          "file": "supplement-project-knowledge.spec.ts",
+          "title": "SUPPLEMENT PROJECT KNOWLEDGE retained project pages lose files conversation creation and chat access after membership removal"
+        },
+        {
+          "file": "supplement-transcript-files.spec.ts",
+          "title": "SUPPLEMENT TRANSCRIPT FILES virtualized long history supports Start outline and End without losing or duplicating turns"
+        },
+        {
+          "file": "supplement-transcript-files.spec.ts",
+          "title": "SUPPLEMENT TRANSCRIPT FILES CSV table and valid or malformed JSON preserve literal content and exact downloads"
+        },
+        {
+          "file": "supplement-transcript-files.spec.ts",
+          "title": "SUPPLEMENT TRANSCRIPT FILES HTML preview runs inside an opaque sandbox and cannot read parent identity or cookies"
+        },
+        {
+          "file": "supplement-transcript-files.spec.ts",
+          "title": "SUPPLEMENT TRANSCRIPT FILES large Markdown falls back to literal text then explicit render is scoped to the current file"
+        },
+        {
+          "file": "workspace-governance.spec.ts",
+          "title": "US-SP-WS-REVOKE removing workspace membership blocks retained session file reads and fresh activation despite role ceiling"
+        }
+      ],
+      "selection_sha256": "fb99109517c34653e425afd606df4cb4d1e6d999f5fa99b49f11ae21d83f721a",
+      "operator_sha256": "f543e834b6e889d734e3e9e1e7a03ead352c498c1577e26e2af303ffc1ba058d",
+      "source": {
+        "webui": {
+          "head": "90cc10318788db857464663b1874d28eb1e50430",
+          "source_sha256": "eed1f8abfa2ce91ba042d056639ee81dc9248a9aa629cc3b59c13c8093c86bfe"
+        },
+        "engine": {
+          "head": "b0aaa74f9dcfe9e7caa4692656b4535ce04104e1",
+          "source_sha256": "653c3f66da11449a366b3ecaa5463306d0e5865456883d6fce205be738c82bf7"
+        }
+      },
+      "platform": "linux",
+      "python": "3.11.14",
+      "unit": "synthpulse-qa-failed21-20260909-v5.service",
+      "unit_cgroup": "0::/user.slice/user-1000.slice/user@1000.service/app.slice/synthpulse-qa-failed21-20260909-v5.service",
+      "cpu_quota_percent": 400,
+      "memory_max_gib": 4,
+      "disk_floor_gib": 1.5,
+      "source_unchanged": true,
+      "qualification": "Scoped fresh-state replay only; does not replace the failed224 full run or prove all Linux features.",
+      "at_utc": "2026-09-09T16:52:57.678328+00:00",
+      "stage": "result_validation",
+      "catalog_count": 21,
+      "catalog_sha256": "d3b1b86ab38a0424fe0b37e3b045c6abc1da6f6f22603d84d2e482c165820621",
+      "playwright": "Version 1.55.1",
+      "runner_pid": 636107,
+      "free_gib": 2.2,
+      "elapsed_seconds": 328.8,
+      "reported_passes": 21,
+      "reported_failures": 0,
+      "runner_exit_code": 0,
+      "run_id": "20260909-184734-991570225",
+      "statistics": {
+        "startTime": "2026-09-09T16:47:43.149Z",
+        "duration": 305181.486,
+        "expected": 21,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "run_manifest_sha256": "a09e35c85e831f4103b6f59c4dce8c6c647f257ab690c43c5a79e7e00729421c",
+      "results_sha256": "3ea2597579dfd6aa8b1377df7623d67d9ecec1a6dbe789ebca74e970c4e03163",
+      "report_global_error_count": 0,
+      "scenarios": [
+        {
+          "file": "additional-affordances.spec.ts",
+          "title": "US-SP-AFFORDANCE-MESSAGE-FORK selected message creates an exact persistent prefix and child continuation leaves the private parent unchanged",
+          "test_id": "378e63bd93e14c5124ae-5a98e8a27dfae1776196",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "duration_ms": 19933,
+              "browser_error_count": 0
+            }
+          ]
+        },
+        {
+          "file": "chat-lifecycle.spec.ts",
+          "title": "US-SP-CHAT-008 explicit interrupt cancels first response and starts requested next message",
+          "test_id": "49f0eef772dcc29dd0e4-7acec6718823312d8ea3",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "duration_ms": 11337,
+              "browser_error_count": 0
+            }
+          ]
+        },
+        {
+          "file": "composer-content.spec.ts",
+          "title": "US-SP-CHAT-PROMPTS saved prompt validates empty input saves reloads inserts exact text and deletes",
+          "test_id": "61a6b4fc5de0d2ef77a7-d532e0d4014aef61a28f",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "duration_ms": 9256,
+              "browser_error_count": 0
+            }
+          ]
+        },
+        {
+          "file": "deep-workflows.spec.ts",
+          "title": "US-SP-SESS-SPLIT all split counts create real independent frames and exit",
+          "test_id": "09c87ccd6e9d768a5553-aea3016d07e02b6203e1",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "duration_ms": 27494,
+              "browser_error_count": 0
+            }
+          ]
+        },
+        {
+          "file": "governance-field-roundtrip.spec.ts",
+          "title": "US-SP-GOV-006 [field removal] clearing all extra grants and denials removes persisted entries",
+          "test_id": "f48d1f46ea2d95e75012-d95e92799373a772d7a6",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "duration_ms": 30445,
+              "browser_error_count": 0
+            }
+          ]
+        },
+        {
+          "file": "governance-revocation.spec.ts",
+          "title": "US-SP-POL-REVOKE-LEVELS user elevated and admin choices persist while only explicit admin can administer policy",
+          "test_id": "ff7ae267118692bf800b-76df5b6a3307d4b9fb88",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "duration_ms": 19900,
+              "browser_error_count": 0
+            }
+          ]
+        },
+        {
+          "file": "governance-revocation.spec.ts",
+          "title": "US-SP-GOV-REQUESTER-STATUS retained requester sees pending approved rejected while another account cannot read or decide those requests",
+          "test_id": "ff7ae267118692bf800b-a206ab331983be7ee99c",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "duration_ms": 31923,
+              "browser_error_count": 0
+            }
+          ]
+        },
+        {
+          "file": "kanban-administration.spec.ts",
+          "title": "US-SP-KAN-ADMIN-DEPENDENCIES add remove reject cycles and guard direct completion until parent finishes",
+          "test_id": "327e2a79f8a240a6d58e-46d2633ca9356399b018",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "duration_ms": 17982,
+              "browser_error_count": 0
+            }
+          ]
+        },
+        {
+          "file": "realtime-voice.spec.ts",
+          "title": "US-SP-VOICE-REALTIME-CONTROLS microphone, push to talk, interruption and session change release capture correctly",
+          "test_id": "660113d4da6ca20f1db6-d7fd941c6a1c41244070",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "duration_ms": 9541,
+              "browser_error_count": 0
+            }
+          ]
+        },
+        {
+          "file": "realtime-voice.spec.ts",
+          "title": "US-SP-VOICE-REALTIME-MIC-DENIED microphone refusal fails without creating a provider call",
+          "test_id": "660113d4da6ca20f1db6-8d09c7183f13c4fbed1e",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "duration_ms": 2434,
+              "browser_error_count": 0
+            }
+          ]
+        },
+        {
+          "file": "realtime-voice.spec.ts",
+          "title": "US-SP-VOICE-REALTIME-REMOTE-END removed server call stops browser microphone capture",
+          "test_id": "660113d4da6ca20f1db6-4561db6f306dd95742a3",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "duration_ms": 3607,
+              "browser_error_count": 0
+            }
+          ]
+        },
+        {
+          "file": "realtime-voice.spec.ts",
+          "title": "US-SP-VOICE-REALTIME-LAUNCH-RACE canceled capability response cannot release a newer pending launch",
+          "test_id": "660113d4da6ca20f1db6-8e7229d2087b3807ded7",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "duration_ms": 3590,
+              "browser_error_count": 0
+            }
+          ]
+        },
+        {
+          "file": "session-activation-races.spec.ts",
+          "title": "SUPPLEMENT SESSION ACTIVATION newer New Chat survives a delayed inaccessible saved-session restore",
+          "test_id": "8761a24874ea7e67eea5-0b78a97ea41f704a687e",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "duration_ms": 6685,
+              "browser_error_count": 0
+            }
+          ]
+        },
+        {
+          "file": "session-discovery-share.spec.ts",
+          "title": "US-SP-SESS-SHARE-AUTH a readable group participant cannot publish or revoke its owners snapshot",
+          "test_id": "d82be9e477a37505ca87-9f4872aa6199a47fe797",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "duration_ms": 5913,
+              "browser_error_count": 0
+            }
+          ]
+        },
+        {
+          "file": "session-import-authority.spec.ts",
+          "title": "US-SP-SESS-IMPORT-AUTHORITY JSON chooser rejects unauthorized workspace before creating a session and allowed import ignores forged identity",
+          "test_id": "09a9c99e29c613d8e920-f8c4d5ceb801ec74ae38",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "duration_ms": 5909,
+              "browser_error_count": 0
+            }
+          ]
+        },
+        {
+          "file": "supplement-project-knowledge.spec.ts",
+          "title": "SUPPLEMENT PROJECT KNOWLEDGE retained project pages lose files conversation creation and chat access after membership removal",
+          "test_id": "e0d3b123f262b824458f-a2c1c6e8a80f4e71edf3",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "duration_ms": 32779,
+              "browser_error_count": 0
+            }
+          ]
+        },
+        {
+          "file": "supplement-transcript-files.spec.ts",
+          "title": "SUPPLEMENT TRANSCRIPT FILES virtualized long history supports Start outline and End without losing or duplicating turns",
+          "test_id": "eeedfdf4022cfba96bf4-c7e1fb82aa16774027f3",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "duration_ms": 18870,
+              "browser_error_count": 0
+            }
+          ]
+        },
+        {
+          "file": "supplement-transcript-files.spec.ts",
+          "title": "SUPPLEMENT TRANSCRIPT FILES CSV table and valid or malformed JSON preserve literal content and exact downloads",
+          "test_id": "eeedfdf4022cfba96bf4-61e0d49109f42ab2175d",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "duration_ms": 12874,
+              "browser_error_count": 0
+            }
+          ]
+        },
+        {
+          "file": "supplement-transcript-files.spec.ts",
+          "title": "SUPPLEMENT TRANSCRIPT FILES HTML preview runs inside an opaque sandbox and cannot read parent identity or cookies",
+          "test_id": "eeedfdf4022cfba96bf4-a52fbffb469012d4b1fb",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "duration_ms": 4540,
+              "browser_error_count": 0
+            }
+          ]
+        },
+        {
+          "file": "supplement-transcript-files.spec.ts",
+          "title": "SUPPLEMENT TRANSCRIPT FILES large Markdown falls back to literal text then explicit render is scoped to the current file",
+          "test_id": "eeedfdf4022cfba96bf4-cb9ae55b8e83a858b27a",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "duration_ms": 7895,
+              "browser_error_count": 0
+            }
+          ]
+        },
+        {
+          "file": "workspace-governance.spec.ts",
+          "title": "US-SP-WS-REVOKE removing workspace membership blocks retained session file reads and fresh activation despite role ceiling",
+          "test_id": "814b9e8661d656a7f468-8b90a982d7d597c42bbb",
+          "status": "expected",
+          "attempts": [
+            {
+              "status": "passed",
+              "duration_ms": 16882,
+              "browser_error_count": 0
+            }
+          ]
+        }
+      ],
+      "selected_engine_child_verified": true,
+      "sampled_process_identities": 60,
+      "sampled_owned_survivors_before_unit_exit": [],
+      "cleanup_scope": "Exact own-unit cgroup samples and retained PID/start ticks before operator exit; post-unit cgroup and known listener inspection still required. No universal process-history claim."
+    },
+    "cleanup": {
+      "unit_cgroup_exists": false,
+      "known_fixture_listener_closed": true
+    },
+    "scope": "Fresh exact21 replay on this source pair, not a complete Linux feature run. Prior failed runs remain recorded; cleanup covers sampled exact identities and the known unit/listener."
+  }
+}
