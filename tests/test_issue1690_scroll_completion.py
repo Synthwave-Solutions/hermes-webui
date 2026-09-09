@@ -52,11 +52,14 @@ def test_render_messages_preserve_scroll_option_uses_user_pin_state_not_stream_l
     render_body = _function_body(UI_JS, "renderMessages")
     scroll_helper = _function_body(UI_JS, "_scrollAfterMessageRender")
     follow_helper = _function_body(UI_JS, "_followMessagesAfterDomReplace")
+    render_snapshot = _function_body(UI_JS, "_messageScrollSnapshotForRender")
 
     assert "function renderMessages(options)" in render_body
     assert "const preserveScroll=!!(options&&options.preserveScroll);" in render_body
     assert "_scrollAfterMessageRender(preserveScroll, scrollSnapshot);" in render_body
-    assert "const scrollSnapshot=(preserveScroll||_messageUserUnpinned)?_captureMessageScrollSnapshot():null" in render_body
+    assert "const scrollSnapshot=_messageScrollSnapshotForRender(preserveScroll,options)" in render_body
+    assert "(preserveScroll||_messageUserUnpinned)?_captureMessageScrollSnapshot():null" in render_snapshot
+    assert "if(!snapshot||!options||options.scrollToStart!==true) return snapshot;" in render_snapshot
     assert "if(preserveScroll){" in scroll_helper
     # #4124: a reader clearly away from the bottom (>250px) is treated as an active
     # reading position, so the forced follow-to-bottom is gated behind it.

@@ -3,6 +3,8 @@ import path from 'node:path';
 import type {Page} from '@playwright/test';
 import {test, expect, open, session, api, auth} from './fixtures';
 
+declare const S: any, _oldestIdx: number, _messagesTruncated: boolean, _messagesGeneration: number, _scrollPinned: boolean, _messageUserUnpinned: boolean, _messageScrollInputGeneration: number;
+
 const unique = (prefix: string) => `${prefix}-${Date.now()}`;
 
 async function preference(page: Page, section: string, id: string, key: string, value: boolean) {
@@ -41,7 +43,7 @@ async function chooseFile(page: Page, name: string) {
   await expect(page.locator('#previewPathText')).toHaveText(name);
 }
 
-test('SUPPLEMENT TRANSCRIPT FILES virtualized long history supports Start outline and End without losing or duplicating turns', async ({page}) => {
+test('SUPPLEMENT TRANSCRIPT FILES virtualized long history supports Start outline and End without losing or duplicating turns', async ({page}, info) => {
   test.setTimeout(90000);
   await open(page);
   await preference(page, 'preferences', 'settingsVirtualizeTranscript', 'virtualize_transcript', true);
@@ -64,8 +66,37 @@ test('SUPPLEMENT TRANSCRIPT FILES virtualized long history supports Start outlin
   await page.waitForFunction("typeof _loadingSessionId === 'undefined' || _loadingSessionId === null");
   await expect(page.locator('#messages')).toContainText('SUPPLEMENT_ANSWER_119');
   await expect(page.locator('#jumpToSessionStartBtn')).toBeVisible();
+  await page.evaluate(() => {
+    const w = window as any;
+    const el = document.getElementById('messages')!;
+    const descriptor = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTop')!;
+    w.__qaStartNavigation = [];
+    const state = () => ({time: performance.now(), top: el.scrollTop, height: el.scrollHeight,
+      state: {count:S.messages.length,oldest:_oldestIdx,truncated:_messagesTruncated,generation:_messagesGeneration,pinned:_scrollPinned,unpinned:_messageUserUnpinned,input:_messageScrollInputGeneration},
+      rows: [...el.querySelectorAll('[id^="msg-user-"]')].map(n => n.id)});
+    Object.defineProperty(el, 'scrollTop', {configurable: true, get() {return descriptor.get!.call(this);}, set(value) {
+      const before = state(); descriptor.set!.call(this, value);
+      if (w.__qaStartNavigation.length < 160) w.__qaStartNavigation.push({kind:'scroll-write',requested:value,before,after:state(),stack:new Error().stack});
+    }});
+    const original = w._ensureAllMessagesLoaded;
+    w._ensureAllMessagesLoaded = async (...args: any[]) => {
+      w.__qaStartNavigation.push({kind:'load-start',...state()});
+      const result = await original(...args);
+      w.__qaStartNavigation.push({kind:'load-end',result,...state()});
+      return result;
+    };
+    w.__qaStartNavigationRestore = () => { delete (el as any).scrollTop; w._ensureAllMessagesLoaded = original; };
+  });
   await page.locator('#jumpToSessionStartBtn').click();
-  await expect(page.locator('#msg-user-0')).toBeInViewport();
+  try {
+    await expect(page.locator('#msg-user-0')).toBeInViewport();
+    const obsoleteTailMoves = await page.evaluate(() => (window as any).__qaStartNavigation.filter((event: any) =>
+      event.kind === 'scroll-write' && event.after.state.count === 240 && event.requested > document.getElementById('messages')!.clientHeight));
+    expect(obsoleteTailMoves, 'Start must not restore the previous tail while mounting full history').toEqual([]);
+  } finally {
+    await info.attach('start-navigation-diagnostics', {body: JSON.stringify(await page.evaluate(() => (window as any).__qaStartNavigation)), contentType:'application/json'});
+    await page.evaluate(() => (window as any).__qaStartNavigationRestore());
+  }
   await expect(page.locator('#msg-user-0')).toContainText('SUPPLEMENT_QUESTION_000');
   await expect.poll(() => page.locator('.message-virtual-spacer').count()).toBeGreaterThan(0);
   const renderedQuestions = page.locator('#messages [id^="msg-user-"]');

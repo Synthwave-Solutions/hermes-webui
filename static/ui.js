@@ -1893,36 +1893,55 @@ function _updateSessionStartJumpButton(){
 async function jumpToSessionStart(){
   const container=$('messages');
   if(!container||!S.session) return;
+  const sid=S.session.session_id;
+  const wasActive=!!(S.busy||S.activeStreamId);
   // Explicit navigation owns the viewport over queued tail-settle writes and
   // snapshots captured before this click, just like manual upward scrolling.
   _cancelBottomSettle();
-  _messageScrollInputGeneration++;
+  let navigationGeneration=++_messageScrollInputGeneration;
+  const ownsNavigation=()=>!!(S.session&&S.session.session_id===sid&&
+    _messageScrollInputGeneration===navigationGeneration);
   _scrollPinned=false;
   _messageUserUnpinned=true;
-  _programmaticScroll=true;_programmaticScrollSetAt=performance.now();
   try{
     // During active streaming, skip full message load — API response won't
     // include live messages from the current turn, and replacing S.messages
     // would lose user/assistant/tool messages.
-    if(!(S.busy||S.activeStreamId)){
-      if(typeof _ensureAllMessagesLoaded==='function') await _ensureAllMessagesLoaded();
+    if(!wasActive){
+      if(typeof _ensureAllMessagesLoaded==='function'&&await _ensureAllMessagesLoaded()===false) return;
     }
+    if(!ownsNavigation()||(!wasActive&&(S.busy||S.activeStreamId))) return;
+    // Metadata/resize renders may have captured the old tail while history was
+    // loading. Supersede those snapshots before committing this explicit jump.
+    _cancelBottomSettle();
+    navigationGeneration=++_messageScrollInputGeneration;
+    _scrollPinned=false;
+    _messageUserUnpinned=true;
+    _programmaticScroll=true;_programmaticScrollSetAt=performance.now();
+    const navigationMessages=S.messages;
+    const navigationMessageCount=S.messages.length;
     _messageRenderWindowSize=Math.max(_currentMessageRenderWindowSize(),_messageRenderableMessageCount());
     container.scrollTop=0;
     _messageVirtualWindowKey='';
     // During streaming, skip renderMessages — it rebuilds the DOM but tool card
     // insertion is blocked by !S.busy, losing Activity until "done" fires.
     if(!(S.busy||S.activeStreamId)){
-      renderMessages({ preserveScroll:true });
+      renderMessages({ preserveScroll:true, scrollToStart:true });
     }
     requestAnimationFrame(()=>{
+      if(!ownsNavigation()) return;
+      if(S.messages!==navigationMessages||S.messages.length!==navigationMessageCount||
+          (!wasActive&&(S.busy||S.activeStreamId))){
+        _deferClearProgrammaticScroll();
+        return;
+      }
       container.scrollTop=0;
       _updateSessionStartJumpButton();
       _deferClearProgrammaticScroll();
     });
   }catch(e){
     console.warn('jumpToSessionStart failed:',e);
-    _programmaticScroll=false;
+    if(ownsNavigation()) _programmaticScroll=false;
   }
 }
 
@@ -15768,6 +15787,14 @@ function _captureMessageScrollSnapshot(){
     userUnpinned:readerAwayFromBottom?true:_messageUserUnpinned,
   };
 }
+function _messageScrollSnapshotForRender(preserveScroll, options){
+  const snapshot=(preserveScroll||_messageUserUnpinned)?_captureMessageScrollSnapshot():null;
+  if(!snapshot||!options||options.scrollToStart!==true) return snapshot;
+  // Full-history loading changes the array indices before replacing the old
+  // tail DOM. Its semantic anchor still points at an old tail message, so an
+  // explicit Start render must restore the beginning instead of that anchor.
+  return {...snapshot,anchor:{rawIdx:0,sessionIdx:0,topOffset:0},top:0,pinned:false,userUnpinned:true};
+}
 function _messageScrollSnapshotInputChanged(snapshot){
   if(!snapshot) return false;
   const captured=Number(snapshot.inputGeneration);
@@ -16565,7 +16592,7 @@ function renderMessages(options){
   // Capture the pre-wipe scroll position when preserving OR when the reader has
   // manually unpinned; both need to restore the reader's position after the DOM
   // rebuild rather than snap to the bottom. (Codex #4006 r3 follow-up.)
-  const scrollSnapshot=(preserveScroll||_messageUserUnpinned)?_captureMessageScrollSnapshot():null;
+  const scrollSnapshot=_messageScrollSnapshotForRender(preserveScroll,options);
   const inner=$('msgInner');
   const sid=S.session?S.session.session_id:null;
   if(!S.busy&&Array.isArray(S.messages)&&typeof _hydrateIdLinkedHistoricalToolScenes==='function'){

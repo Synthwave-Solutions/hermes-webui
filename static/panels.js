@@ -4119,8 +4119,8 @@ function openKanbanCreateBoard(){
     _kanbanBoardModalFocusCleanup = null;
   }
   _kanbanBoardModalFocusCleanup = _trapModalFocus(modal);
-  // Auto-focus name field
-  setTimeout(() => document.getElementById('kanbanBoardModalName').focus(), 50);
+  // Focus while opening; a delayed focus can steal input from the next field.
+  document.getElementById('kanbanBoardModalName').focus();
   // Auto-suggest slug from name as user types
   const nameEl = document.getElementById('kanbanBoardModalName');
   const slugEl = document.getElementById('kanbanBoardModalSlugInput');
@@ -4163,7 +4163,7 @@ function openKanbanRenameBoard(){
     _kanbanBoardModalFocusCleanup = null;
   }
   _kanbanBoardModalFocusCleanup = _trapModalFocus(modal);
-  setTimeout(() => document.getElementById('kanbanBoardModalName').focus(), 50);
+  document.getElementById('kanbanBoardModalName').focus();
   document.addEventListener('keydown', _kanbanBoardModalEsc);
 }
 
