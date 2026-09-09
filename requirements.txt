@@ -22,3 +22,5 @@ Pillow>=12.3.0,<13
 
 # Server-side realtime speech transport.
 requests>=2.32,<3
+# Trusted realtime sideband; browser never receives the provider API key.
+websockets>=15,<16

@@ -18,7 +18,6 @@ network, no live server):
 import io
 import json
 import sys
-import time
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -317,6 +316,35 @@ def _server_handler(path, command, body=b""):
     handler.client_address = ("127.0.0.1", 12345)
     handler.request_version = "HTTP/1.1"
     return handler
+
+
+@pytest.mark.parametrize("method,path", [
+    ("GET", "/api/git/diff?session_id=s&path=private.txt"),
+    ("GET", "/api/git/status?session_id=s"),
+    ("GET", "/api/git-info?session_id=s"),
+    ("GET", "/api/git/log?session_id=s"),
+    ("POST", "/api/git/commit-message"), ("POST", "/api/git/checkout"),
+    ("POST", "/api/git/stage"), ("POST", "/api/git/commit"),
+])
+def test_managed_resource_deny_blocks_git_before_any_subprocess(governance_env, monkeypatch, method, path):
+    from copy import deepcopy
+    policy = deepcopy(POLICY)
+    policy["roles"]["admin"]["grants"]["permissions"].extend(["git:read", "git:write"])
+    policy["users"]["admin@example.test"].update(access_level="elevated", access_mode="blacklist",
+        deny={"files": {"read_roots": ["/private/restricted"]}})
+    governance_env["set_policy"](policy)
+    governance_env["identity"] = _identity("admin@example.test")
+    monkeypatch.setattr(server, "check_auth", lambda h, p: True)
+    def forbidden_dispatch(*args):
+        pytest.fail("Git subprocess dispatch must not be reached")
+    monkeypatch.setattr(server, "handle_get", forbidden_dispatch)
+    handler = _server_handler(path, method)
+    handler.requestline = f"{method} {path} HTTP/1.1"
+    if method == "GET":
+        server.Handler.do_GET(handler)
+    else:
+        server.Handler._handle_write(handler, forbidden_dispatch)
+    assert b" 403 " in handler.wfile.getvalue().split(b"\r\n", 1)[0]
 
 
 def test_do_get_runs_hook_after_auth_and_blocks_dispatch(monkeypatch):

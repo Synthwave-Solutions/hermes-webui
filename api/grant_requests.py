@@ -411,18 +411,26 @@ def _operation_payloads(item: dict, email: str, gkind: str, value: str) -> dict:
     return result
 
 
-def ingest_spool() -> int:
+def ingest_spool(owner_scope: str | None = None) -> int:
     """Sync the denial spool into the approvals registry. Returns how many
-    pending grant rows exist afterwards. Never raises."""
+    pending grant rows exist afterwards. Never raises.
+
+    A requester view supplies its verified owner email so reading that view
+    ingests only that person's denials. The administrator queue omits the
+    scope and continues to ingest every owner.
+    """
     try:
         from api import approvals
 
         spool = _load_spool()
+        owner = str(owner_scope).strip().lower() if owner_scope is not None else None
         pending = 0
         for skey, item in spool.items():
             if not isinstance(item, dict):
                 continue
             email = str(item.get("email") or "").strip().lower()
+            if owner is not None and email != owner:
+                continue
             gkind = str(item.get("gkind") or "")
             value = str(item.get("value") or "")
             if not email or gkind not in _GRANT_TARGETS or not value:

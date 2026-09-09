@@ -100,7 +100,10 @@ def _translate_context(agent_mod, policy, email: str, groups: tuple[str, ...],
     from dataclasses import replace
     ceiling = access_ceiling({"email": email, "groups": list(groups)}, active_profile, access)
     if ceiling is not None:
-        access = replace(access, profiles=access.profiles | {active_profile})
+        role_ceiling = access.role_ceiling
+        if role_ceiling is not None:
+            role_ceiling = replace(role_ceiling, profiles=role_ceiling.profiles | {active_profile})
+        access = replace(access, profiles=access.profiles | {active_profile}, role_ceiling=role_ceiling)
     shim = SimpleNamespace(
         access=access,
         active_profile=str(active_profile or "default"),
@@ -117,6 +120,18 @@ def _translate_context(agent_mod, policy, email: str, groups: tuple[str, ...],
         # the turn unrestricted (governance_inactive); refuse instead so the
         # caller applies the per-mode failure policy.
         raise GovernanceBindingError("agent governance payload did not round-trip")
+    if access.access_mode or access.access_level or not access.deny.is_empty() or access.approval_configured:
+        import json
+        encoded = json.loads(payload).get("access", {})
+        if encoded.get("policy_controls_version") != 1 or not hasattr(ctx.access, "deny"):
+            raise GovernanceBindingError("This engine does not support per-user governance controls")
+        if ctx.access.deny.to_mapping() != access.deny.to_mapping():
+            raise GovernanceBindingError("Agent governance denies did not round-trip")
+        expected_ceiling = access.role_ceiling.to_mapping() if access.role_ceiling is not None else None
+        actual_ceiling = ctx.access.role_ceiling.to_mapping() if ctx.access.role_ceiling is not None else None
+        if actual_ceiling != expected_ceiling or any(getattr(ctx.access, field, None) != getattr(access, field)
+                for field in ("access_mode", "access_level", "approval_mode", "approval_prompt", "approval_configured")):
+            raise GovernanceBindingError("Agent governance policy controls did not round-trip")
     return ctx
 
 
@@ -140,7 +155,8 @@ def _audit_bind_failure(email: str, session_id: str, request_id: str,
 def bind_governed_agent_turn(identity: Any, *, active_profile: str = "default",
                              session_id: str = "", request_id: str = "",
                              user_message_sha256: str = "", user_message: str = "", approval_waiter=None,
-                             project_workspace: str = "", project_access_check=None):
+                             project_workspace: str = "", project_access_check=None,
+                             workspace_path: str = "", workspace_access_check=None):
     """Bind the caller's governance principal to the CURRENT thread's context.
 
     Returns an opaque token for reset_governed_agent_turn, or None when the
@@ -158,17 +174,18 @@ def bind_governed_agent_turn(identity: Any, *, active_profile: str = "default",
         # policy_error for every /api request, so a turn that still reaches
         # this point (auth off, legacy path) keeps current unrestricted
         # behavior rather than double-bricking.
-        if project_workspace or _has_bot_policy:
+        if project_workspace or workspace_path or _has_bot_policy:
             raise GovernanceBindingError("Scoped governance policy unavailable") from None
         logger.debug("governed agent turn: policy unreadable, running unbound", exc_info=True)
         return None
     if not getattr(policy, "enabled", False):
         if project_workspace or _has_bot_policy:
             raise GovernanceBindingError("Scoped turns require governance")
-        return None
+        if not workspace_path:
+            return None
 
     email = _identity_email(identity)
-    if email and email in {str(a).strip().lower() for a in policy.bootstrap_admins} and not project_workspace and not _has_bot_policy:
+    if email and email in {str(a).strip().lower() for a in policy.bootstrap_admins} and not project_workspace and not workspace_path and not _has_bot_policy:
         # Never-deny principals: run unbound. The resolver would grant
         # wildcard anyway; skipping the bind keeps admin turns byte-identical
         # to today's behavior (and immune to translation bugs).
@@ -204,6 +221,13 @@ def bind_governed_agent_turn(identity: Any, *, active_profile: str = "default",
                 raise GovernanceBindingError('This engine does not support scoped project file access')
             updates['project_workspace'] = str(project_workspace)
             updates['project_access_check'] = project_access_check
+        if workspace_path:
+            if not {'workspace_path', 'workspace_access_check'} <= set(fields) or not callable(workspace_access_check):
+                raise GovernanceBindingError('This engine does not support live workspace access checks')
+            if workspace_access_check(workspace_path) is not True:
+                raise GovernanceBindingError('Workspace membership was revoked')
+            updates['workspace_path'] = str(workspace_path)
+            updates['workspace_access_check'] = workspace_access_check
         if "user_message_redacted" in fields:
             from hermes_cli.dashboard_governance.grant_requests import redact_trigger
             updates["user_message_redacted"] = redact_trigger(user_message)
@@ -217,7 +241,7 @@ def bind_governed_agent_turn(identity: Any, *, active_profile: str = "default",
         token = agent_mod.bind_governance_context(ctx)
         return (agent_mod, token)
     except Exception as exc:
-        if policy.mode == "enforce" or project_workspace or _has_bot_policy:
+        if policy.mode == "enforce" or project_workspace or workspace_path or _has_bot_policy:
             _audit_bind_failure(email, session_id, request_id, exc,
                                 mode=policy.mode, report_only=False)
             logger.warning("governed agent turn: bind failed under enforce, refusing turn (%s)",

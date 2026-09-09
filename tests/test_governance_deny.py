@@ -315,8 +315,8 @@ def test_api_preview_returns_post_deny_grant_detail(policy_file, as_user):
     assert handler.status == 200
     grants = handler.body["effective_access"]["grants"]
     assert grants["skills"]["load"] == ["a"]
-    assert grants["mcp"] == {"servers": []}
-    assert grants["cli"] == {"commands": [], "approval_commands": []}
+    assert grants["mcp"] == {"servers": [], "tools": {}}
+    assert grants["cli"] == {"commands": [], "approval_commands": [], "denied_commands": [], "workdir_roots": []}
 
 
 def test_api_deny_must_be_mapping(policy_file, as_user):

@@ -21,7 +21,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: Synthwave-Solutions/hermes-agent
-          ref: ec698c918c04d69e88df4516a2ff998074269098
+          # Paired governance, continuation and manual Kanban contract verified
+          # with this WebUI release; an older engine drops managed policy fields.
+          ref: 49bf59875c41e84baf5ac53bd1194859d54be94d
           path: engine
       - uses: actions/setup-python@v5
         with:

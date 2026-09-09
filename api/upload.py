@@ -636,6 +636,13 @@ def handle_workspace_upload(handler):
             return True
 
         # Resolve workspace root from session
+        from api.workspace_access import ensure_session_workspace_access
+        from api.governance.enforce import _request_identity
+        from api.governance.resource_access import ensure_file_access
+        try:
+            ensure_session_workspace_access(handler, session)
+        except PermissionError as exc:
+            return j(handler, {'error': str(exc)}, status=403)
         workspace = resolve_trusted_workspace(session.workspace)
 
         # Resolve target subdirectory within workspace
@@ -648,6 +655,10 @@ def handle_workspace_upload(handler):
         # workspace==target equality case, so the normal subpath='' path passes.)
         if not target_dir.resolve().is_relative_to(workspace.resolve()):
             return j(handler, {'error': 'Upload target escapes workspace'}, status=403)
+        try:
+            ensure_file_access(_request_identity(handler), target_dir, write=True)
+        except PermissionError as exc:
+            return j(handler, {'error': str(exc)}, status=403)
         # #3398: create the upload target dir race-safely under the workspace root
         # (anchored mkdirat) so a raced symlink subpath can't mkdir outside.
         try:
@@ -689,7 +700,11 @@ def handle_workspace_upload(handler):
             # containment checks above cannot redirect the write outside the
             # workspace. The dedup loop guarantees `dest` does not exist.
             try:
+                ensure_session_workspace_access(handler, session)
+                ensure_file_access(_request_identity(handler), dest, write=True)
                 _wfd = open_anchored_create_fd(workspace, dest.resolve())
+            except PermissionError as exc:
+                return j(handler, {'error': str(exc)}, status=403)
             except FileExistsError:
                 return j(handler, {'error': f'Upload destination already exists: {safe_name}'}, status=409)
             except (ValueError, OSError):

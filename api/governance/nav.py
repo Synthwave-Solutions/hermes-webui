@@ -76,6 +76,9 @@ def administrative_access(access) -> bool:
     roles = set(getattr(access, "roles", ()) or ())
     sources = set(getattr(access, "grant_sources", ()) or ())
     subject = getattr(access, "subject", None)
+    if getattr(access, "access_level", ""):
+        return ("bootstrap_admin" in sources or
+                (access.access_level == "admin" and access.has_permission("governance:write")))
     return (getattr(subject, "provider", "") == "auth_disabled"
             or "bootstrap_admin" in sources
             or bool(roles.intersection({"owner", "admin"}))
@@ -100,7 +103,9 @@ def hidden_panels(access, policy=None) -> list:
     permissions = _permissions(access) or frozenset()
     return sorted(panel for panel, permission in PANEL_PERMISSIONS.items()
                   if panel not in ESSENTIAL_PANELS
-                  and (panel not in MEMBER_PANELS or not _has(permissions, permission)))
+                  and (panel not in MEMBER_PANELS or not
+                       (access.has_permission(permission) if callable(getattr(access, "has_permission", None))
+                        else _has(permissions, permission))))
 
 
 def visible_panels(access, policy=None) -> list:

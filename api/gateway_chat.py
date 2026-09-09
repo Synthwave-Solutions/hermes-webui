@@ -290,6 +290,9 @@ def _gateway_runs_approval_event(payload: dict) -> dict | None:
         "approval_id": approval_id,
         "choices": choices,
         "allow_permanent": bool(allow_permanent),
+        "allow_session": payload.get("allow_session") is not False,
+        "governance_action": payload.get("governance_action") is True,
+        "required_approver": str(payload.get("required_approver") or ""),
     }
 
 

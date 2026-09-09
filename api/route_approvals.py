@@ -224,6 +224,63 @@ def approval_required_approver(session_key: str, approval_id: str = "") -> str:
     return ""
 
 
+def approval_entry_choice_allowed(entry, choice):
+    if choice in {"once", "deny"}:
+        return True
+    if entry.get("governance_action") or entry.get("required_approver"):
+        return False
+    if choice == "session" and entry.get("allow_session") is False:
+        return False
+    if choice == "always" and entry.get("allow_permanent") is False:
+        return False
+    return True
+
+
+def approval_choice_allowed(session_key: str, approval_id: str, choice: str) -> bool:
+    """Validate the matching card before any queue or allowlist mutation."""
+    if choice in {"once", "deny"}:
+        return True
+    with _lock:
+        reconcile_gateway_pending_mirror_locked(session_key)
+        pending = _pending.get(session_key)
+        entries = pending if isinstance(pending, list) else ([pending] if pending else [])
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            if approval_id and entry.get("approval_id") != approval_id:
+                continue
+            return approval_entry_choice_allowed(entry, choice)
+    return True  # A stale id still follows the ordinary stale-card handling.
+
+
+def require_yolo_eligible(identity, session_key: str) -> None:
+    """Governed users and live once-only requests cannot enable skip-all."""
+    from api.governance import loader
+    from api.governance.enforce import subject_from_identity
+    from api.governance.resolver import resolve_effective_access
+
+    try:
+        policy = loader.get_policy()
+    except Exception:
+        raise PermissionError("Governance policy unavailable") from None
+    if policy.mode == "enforce":
+        subject = subject_from_identity(identity)
+        access = resolve_effective_access(policy, subject)
+        if subject.normalized_email not in policy.bootstrap_admins and (
+            access.access_mode or access.access_level or access.approval_configured
+        ):
+            raise PermissionError("Governed users cannot skip action approvals")
+    with _lock:
+        reconcile_gateway_pending_mirror_locked(session_key)
+        pending = _pending.get(session_key)
+        entries = pending if isinstance(pending, list) else ([pending] if pending else [])
+        if any(isinstance(entry, dict) and (
+            entry.get("governance_action") or entry.get("required_approver")
+            or entry.get("allow_session") is False
+        ) for entry in entries):
+            raise PermissionError("This pending approval cannot be bypassed")
+
+
 def _gateway_mirrored_pending_run_id(session_key: str, approval_id: str) -> str | None:
     """Return the mirrored gateway approval run_id for a matching pending card.
 

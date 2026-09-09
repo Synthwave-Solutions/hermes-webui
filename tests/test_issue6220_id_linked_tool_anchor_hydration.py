@@ -70,6 +70,8 @@ sandbox._redactToolTargetLabel = value => String(value)
   .replace(/([A-Za-z0-9_]*(?:TOKEN|API[_-]?KEY|SECRET|PASSWORD)[A-Za-z0-9_]*\\s*=\\s*)(?:"[^"]*"|'[^']*'|\\S+)/gi, '$1[redacted]');
 
 for(const name of [
+  '_toolResultIsError',
+  '_toolResultErrorsByTid',
   '_clipCliToolSnippet',
   '_cliToolResultText',
   '_cliLooksLikePatchDiff',
@@ -175,6 +177,8 @@ vm.runInContext(
 sandbox._redactToolTargetLabel = value => String(value);
 
 for(const name of [
+  '_toolResultIsError',
+  '_toolResultErrorsByTid',
   '_clipCliToolSnippet',
   '_cliToolResultText',
   '_cliLooksLikePatchDiff',

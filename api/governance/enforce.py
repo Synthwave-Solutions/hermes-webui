@@ -90,6 +90,9 @@ def evaluate_request(identity: dict | None, method: str, path: str) -> Decision:
     used only for the ?profile= target check).
     """
     route_path, _, query = path.partition("?")
+    from api.share_routes import is_public_share_request
+    if is_public_share_request(route_path, method):
+        return Decision(True, "public_share", "", "enforce")
 
     # Pre-auth public login surface: exempt BEFORE the policy is even read, so
     # these endpoints stay reachable under enforce AND under a broken policy.
@@ -142,6 +145,9 @@ def evaluate_request(identity: dict | None, method: str, path: str) -> Decision:
         return Decision(False, "unauthenticated", "", policy.mode)
 
     access = resolve_effective_access(policy, subject)
+
+    if (access.access_mode or access.access_level) and route_path in {"/api/auth/me", "/api/governance/me", "/api/governance/effective-access", "/api/governance/approvals/mine"}:
+        return Decision(True, "self_route", "", policy.mode)
 
     if not access.is_route_allowed(route_path):
         return Decision(False, "route_not_allowed", "", policy.mode)
