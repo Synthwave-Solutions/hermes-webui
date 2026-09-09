@@ -6,7 +6,6 @@ or click is classified 'interacted', never silently upgraded to 'all tested'.
 Run with --require-complete only when every inventory item has explicit proof.
 """
 import argparse
-import hashlib
 import json
 from pathlib import Path
 import re
