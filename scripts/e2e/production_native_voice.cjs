@@ -8,7 +8,7 @@ const root = '/home/synthwavehq/work/synthpulse';
 const base = 'http://127.0.0.1:8787';
 const title = 'QA native voice connection ' + crypto.randomUUID();
 const report = {kind:'actual_provider_browser_negotiation', physical_microphone:'NOT_USED_SYNTHETIC_MUTED_CAPTURE', started_at_utc:new Date().toISOString(), title, requests:[], page_errors:[], cleanup:{}};
-let browser, context, page, sid, authHeaders;
+let browser, context, page, sid, authHeaders, voiceId;
 let hostVerified = false;
 const need = (value, reason) => { if (!value) throw new Error(reason); };
 (async()=>{
@@ -37,23 +37,26 @@ const need = (value, reason) => { if (!value) throw new Error(reason); };
     need(/^[a-zA-Z0-9_-]{1,128}$/.test(sid),'invalid_synthetic_session');
     page=await context.newPage();
     page.on('pageerror',e=>report.page_errors.push(e.name));
-    page.on('response',r=>{const u=new URL(r.url());if(u.pathname.startsWith('/api/voice/realtime/'))report.requests.push({path:u.pathname,status:r.status()});});
+    page.on('response',async r=>{const u=new URL(r.url());if(u.pathname.startsWith('/api/voice/realtime/'))report.requests.push({path:u.pathname,status:r.status()});if(u.pathname==='/api/voice/realtime/call'&&r.status()===200){try{const body=await r.json();if(/^[A-Za-z0-9_-]{1,128}$/.test(body.voice_id||''))voiceId=body.voice_id;}catch{}}});
     await page.goto(base+'/session/'+sid,{waitUntil:'domcontentloaded'});
+    await page.locator('#messages').getByText('Synthetic connection check only. Do not use tools or start tasks.',{exact:true}).waitFor({state:'visible',timeout:30000});
+    report.synthetic_conversation_loaded=true;
     await page.locator('#msg').fill('Unsent synthetic voice draft');
     await page.locator('#btnRealtimeVoice').click();
     try { await page.locator('#realtimeVoiceStatus').filter({hasText:'Microphone muted'}).waitFor({state:'visible',timeout:45000}); report.provider_connected=true; }
     catch { report.provider_connected=false; }
     report.status_text=await page.locator('#realtimeVoiceStatus').innerText();
-    report.warning_text=await page.locator('#realtimeVoiceWarning').innerText();
+    report.warning_present=Boolean(await page.locator('#realtimeVoiceWarning').innerText());
     report.unmute_enabled=await page.locator('#realtimeVoiceMic').isEnabled();
     report.draft_preserved=await page.locator('#msg').inputValue()==='Unsent synthetic voice draft';
-    report.transcript_text=await page.locator('#realtimeVoiceTranscript').innerText();
+    report.transcript_characters=(await page.locator('#realtimeVoiceTranscript').innerText()).length;
     need(report.provider_connected && report.unmute_enabled && report.draft_preserved,'native_provider_connection_not_established');
     need(report.page_errors.length===0,'browser_page_error');
     report.result='PASS_PROVIDER_NEGOTIATION_ONLY';
   } catch(e) { report.result='FAIL'; report.failure=e.message; }
   finally {
     if(page)try{if(await page.locator('#realtimeVoiceEnd').isVisible()){const ended=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/voice/realtime/end',{timeout:8000});await page.locator('#realtimeVoiceEnd').click();need((await ended).status()===200,'voice_end_failed');report.cleanup.voice_ended=true;} }catch{report.cleanup.voice_end_error=true;}
+    if(context&&voiceId&&!report.cleanup.voice_ended)try{const end=await context.request.post('/api/voice/realtime/end',{headers:authHeaders,data:{voice_id:voiceId}});need([200,404].includes(end.status()),'voice_fallback_end_failed');report.cleanup.voice_ended=true;delete report.cleanup.voice_end_error;}catch{report.cleanup.voice_end_error=true;}
     if(context&&sid)try{
       const read=await context.request.get('/api/session?session_id='+encodeURIComponent(sid));
       const body=await read.json();
@@ -63,10 +66,10 @@ const need = (value, reason) => { if (!value) throw new Error(reason); };
       const deleted=await context.request.post('/api/session/delete',{headers:authHeaders,data:{session_id:sid}});
       need(deleted.status()===200,'synthetic_delete_failed');report.cleanup.synthetic_session_deleted=true;
     }catch{report.cleanup.session_cleanup_error=true;}
-    if(context)try{await context.request.post('/api/auth/logout',{headers:authHeaders,data:{}});report.cleanup.auth_logged_out=true;}catch{report.cleanup.logout_error=true;}
+    if(context)try{need((await context.request.post('/api/auth/logout',{headers:authHeaders,data:{}})).status()===200,'logout_failed');report.cleanup.auth_logged_out=true;}catch{report.cleanup.logout_error=true;}
     if(browser)await browser.close();
     report.completed_at_utc=new Date().toISOString();
-    if(hostVerified)fs.writeFileSync(root+'/qa-release-native-voice-20260909.json',JSON.stringify(report,null,2),{flag:'wx',mode:0o600});
+    if(hostVerified)fs.writeFileSync(root+'/qa-release-native-voice-v2-20260909.json',JSON.stringify(report,null,2),{flag:'wx',mode:0o600});
     process.exitCode=report.result==='PASS_PROVIDER_NEGOTIATION_ONLY'&&!Object.keys(report.cleanup).some(k=>k.endsWith('_error'))?0:1;
   }
 })();
