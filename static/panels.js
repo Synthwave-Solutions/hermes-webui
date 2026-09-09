@@ -1215,6 +1215,7 @@ function _cronAgentPromptCardHtml(job){
 }
 
 function _renderCronDetail(job){
+  _disposeCronSkillPicker();
   _currentCronDetail = job;
   _currentCronDetailKey = _cronJobKey(job);
   const title = $('taskDetailTitle');
@@ -1471,6 +1472,7 @@ function openCronDetail(jobOrId, el){
 }
 
 function _clearCronDetail(){
+  _disposeCronSkillPicker();
   _currentCronDetail = null;
   _currentCronDetailKey = '';
   _cronMode = 'empty';
@@ -1555,6 +1557,7 @@ let _cronIsDuplicate = false;
 let _cronSkillsCache=null;
 let _cronProfilesCache=null;
 let _cronDeliveryOptionsCache=null;
+let _cronSkillPickerCleanup=null;
 
 function openCronCreate(){
   if (typeof switchPanel === 'function' && _currentPanel !== 'tasks') switchPanel('tasks');
@@ -1597,6 +1600,7 @@ function openCronEdit(job){
 }
 
 function _renderCronForm({ name, schedule, prompt, deliver, profile, toast_notifications=true, no_agent=false, script='', model='', provider='', isEdit }){
+  _disposeCronSkillPicker();
   const title = $('taskDetailTitle');
   const body = $('taskDetailBody');
   const empty = $('taskDetailEmpty');
@@ -1834,11 +1838,33 @@ function _renderCronSkillTags(){
   }
 }
 
+function _disposeCronSkillPicker(){
+  if(_cronSkillPickerCleanup)_cronSkillPickerCleanup();
+  _cronSkillPickerCleanup=null;
+}
+
 function _bindCronSkillPicker(){
+  _disposeCronSkillPicker();
   const search=$('cronFormSkillSearch');
   const dropdown=$('cronFormSkillDropdown');
   if(!search||!dropdown)return;
+  let active=true;
+  let blurTimer=null;
+  const ownsPicker=()=>active&&$('cronFormSkillSearch')===search&&$('cronFormSkillDropdown')===dropdown;
+  const cancelBlur=()=>{
+    if(blurTimer!==null)clearTimeout(blurTimer);
+    blurTimer=null;
+  };
+  _cronSkillPickerCleanup=()=>{
+    active=false;
+    cancelBlur();
+    search.oninput=null;
+    search.onfocus=null;
+    search.onblur=null;
+  };
   search.oninput=()=>{
+    cancelBlur();
+    if(!ownsPicker()||search.disabled)return;
     const q=search.value.trim().toLowerCase();
     if(!q||!_cronSkillsCache){dropdown.style.display='none';return;}
     const matches=_cronSkillsCache.filter(s=>
@@ -1852,6 +1878,8 @@ function _bindCronSkillPicker(){
       opt.className='skill-opt';
       opt.textContent=s.name+(s.category?' ('+s.category+')':'');
       opt.onclick=()=>{
+        if(!ownsPicker())return;
+        cancelBlur();
         _cronSelectedSkills.push(s.name);
         _renderCronSkillTags();
         search.value='';
@@ -1861,7 +1889,18 @@ function _bindCronSkillPicker(){
     }
     dropdown.style.display='';
   };
-  search.onblur=()=>setTimeout(()=>{dropdown.style.display='none';},150);
+  search.onfocus=()=>search.oninput();
+  search.onblur=()=>{
+    cancelBlur();
+    const pending=setTimeout(()=>{
+      // A queued blur belongs to this binding and this focus transition only.
+      if(!ownsPicker()||blurTimer!==pending)return;
+      blurTimer=null;
+      if(document.activeElement!==search)dropdown.style.display='none';
+    },150);
+    blurTimer=pending;
+  };
+  if(document.activeElement===search)search.oninput();
 }
 
 function cancelCronForm(){
