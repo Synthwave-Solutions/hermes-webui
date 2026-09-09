@@ -1431,7 +1431,7 @@ window.__registerHermesLocale('vi', {
     cron_schedule_preset_monthly: 'Hàng tháng',
     cron_schedule_preset_custom: 'Tùy chỉnh',
     cron_schedule_hint: "Dùng 'every 1h' hoặc biểu thức cron cho job lặp lại. Các khoảng thời gian đơn như '30m' chỉ chạy một lần.",
-    cron_schedule_once_warning: "Các dạng thời lượng như '30m' chỉ chạy một lần và sẽ bị xóa sau khi chạy. Dùng 'every 30m' để giữ job lặp lại.",
+    cron_schedule_once_warning: "Lịch này chạy một lần. Dùng 'in 30m' hoặc ngày giờ cụ thể cho tác vụ một lần; '30m' và 'every 30m' sẽ lặp lại.",
     cron_prompt_label: 'Prompt',
     cron_deliver_label: 'Gửi output tới',
     cron_deliver_local: 'Cục bộ (chỉ lưu đầu ra)',

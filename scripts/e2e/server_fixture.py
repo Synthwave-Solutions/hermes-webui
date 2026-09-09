@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import secrets
+import subprocess
 import sys
 
 from isolation import fixture_environment, install_guard
@@ -40,6 +41,9 @@ def main():
         'HERMES_WEBUI_PASSWORD': qa_password,
         'HERMES_WEBUI_PASSWORD_IDENTITY': 'admin@example.test',
         'HERMES_WEBUI_AGENT_DIR': engine,
+        # Spawned CLI/Cron/Kanban workers must import the same reviewed engine
+        # as the server. Keep sitecustomize's isolation guard first.
+        'PYTHONPATH': os.pathsep.join([str(repo / 'scripts' / 'e2e'), engine, str(repo)]),
         'HERMES_WEBUI_PYTHON': runtime_python,
         'HERMES_WEBUI_SKIP_ONBOARDING': '1',
         'HERMES_WEBUI_PREWARM': '0',
@@ -53,6 +57,15 @@ def main():
         'AWS_EC2_METADATA_DISABLED': 'true',
     })
     sys.path[:0] = [str(repo), engine]
+    # Regression for module-launched workers: a fresh child in a private cwd
+    # must resolve the selected checkout, independent of editable venv metadata.
+    probe = json.loads(subprocess.check_output([runtime_python, '-c',
+        'import json, os, hermes_cli.kanban_db as k; import isolation; '
+        'print(json.dumps({"engine_module": k.__file__, "pid": os.getpid(), '
+        '"guard_installed": isolation._INSTALLED}))'], cwd=workspace, text=True))
+    assert Path(probe['engine_module']).resolve() == Path(engine) / 'hermes_cli' / 'kanban_db.py'
+    assert probe['guard_installed'] is True
+    (qa / 'runtime-engine.json').write_text(json.dumps(probe))
     os.chdir(repo)
     import yaml
 
@@ -75,7 +88,7 @@ def main():
         os.environ['SYNPULSE_REALTIME_VOICE_ENABLED'] = '1'
         os.environ['OPENAI_API_KEY'] = 'qa-realtime-local-only'
 
-    users = ['continuation', 'govrequest', 'resource', 'admin', 'alice', 'bob', 'outsider', 'denied', 'voicedenied', 'autoapprove', 'autodeny', 'automanual', 'manualapprove', 'manualdeny']
+    users = ['climcp', 'continuation', 'govrequest', 'resource', 'admin', 'alice', 'bob', 'outsider', 'denied', 'voicedenied', 'autoapprove', 'autodeny', 'automanual', 'manualapprove', 'manualdeny']
     permissions = ['chat:use', 'sessions:read', 'sessions:write', 'profiles:read',
                    'files:read', 'files:write', 'cron:read', 'cron:write',
                    'skills:read', 'skills:write', 'workspaces:read', 'workspaces:write', 'memory:read', 'memory:write', 'integrations:read',
@@ -100,6 +113,15 @@ def main():
         'permissions': ['profiles:admin'], 'cli': {'commands': ['git']},
         'mcp': {'servers': ['qa-local']}}}
     policy['users']['alice@example.test']['roles'].append('bot_creator')
+    # Supplemental capability tests use a separate identity and role. Existing
+    # personas keep their original envelopes. Tools still need actual grants.
+    policy['roles']['qa_cli_mcp'] = {'grants': {
+        'permissions': ['terminal:use', 'mcp:read'],
+        'tools': {'builtins': ['terminal'], 'toolsets': ['terminal']},
+        'cli': {'commands': ['*'], 'workdir_roots': [str(workspace)]},
+        'mcp': {'servers': ['qa-stdio'], 'tools': {'qa-stdio': ['*']}},
+    }}
+    policy['users']['climcp@example.test']['roles'].append('qa_cli_mcp')
     policy['groups'] = {'qa-team': {'roles': ['member']}}
     policy['groups']['qa-sso-restricted'] = {'grants': {'files': {
         'denied_globs': [str(workspace / 'qa-continuation-protected-*')]}}}
@@ -112,6 +134,13 @@ def main():
               'agent': {'max_turns': 12}, 'delegation': {'max_concurrent_children': 3}}
     config['webui_passkey_enabled'] = True
     config['mcp_servers'] = {'qa-local': {'command': '/usr/bin/false', 'enabled': False}}
+    config['mcp_servers']['qa-stdio'] = {
+        'command': runtime_python,
+        'args': [str(repo / 'scripts/e2e/provider_fixture.py'), '--mcp', str(qa)],
+        'enabled': False, 'timeout': 10,
+    }
+    # The supplement requests terminal in its own session override. No added
+    # terminal toolset is enabled for existing ordinary fixture conversations.
     dashboard = home / 'plugins' / 'qa-dashboard' / 'dashboard'
     (dashboard / 'dist').mkdir(parents=True, exist_ok=True)
     (dashboard / 'manifest.json').write_text(json.dumps({
@@ -137,8 +166,10 @@ def main():
     from api import auth
     cookies = {u: auth.create_session({'email': u + '@example.test', 'groups': ['qa-sso-restricted'] if u == 'continuation' else [],
                                      'claims_subset': {'name': u.title()}, 'method': 'qa_seed'}) for u in users}
+    from extension_fixture import setup as setup_extension_fixture
+    extension_fixture = setup_extension_fixture(qa)
     private = qa / 'browser-sessions.json'
-    private.write_text(json.dumps({'cookies': cookies, 'cookie_name': auth.COOKIE_NAME, 'base_url': f'http://127.0.0.1:{port}', 'login_password': qa_password, 'workspace': str(workspace), 'realtime_http_base': f'http://127.0.0.1:{realtime_http_port}' if realtime_http_port else None, 'realtime_ws_base': f'ws://127.0.0.1:{realtime_ws_port}' if realtime_ws_port else None}))
+    private.write_text(json.dumps({'cookies': cookies, 'cookie_name': auth.COOKIE_NAME, 'base_url': f'http://127.0.0.1:{port}', 'login_password': qa_password, 'workspace': str(workspace), 'engine': engine, 'extension_fixture': extension_fixture, 'realtime_http_base': f'http://127.0.0.1:{realtime_http_port}' if realtime_http_port else None, 'realtime_ws_base': f'ws://127.0.0.1:{realtime_ws_port}' if realtime_ws_port else None}))
     private.chmod(0o600)
     print('QA signed sessions prepared for admin, alice, bob, outsider; production state isolated.', flush=True)
     import server

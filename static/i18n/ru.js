@@ -1230,7 +1230,7 @@ window.__registerHermesLocale('ru', {
     cron_schedule_preset_monthly: 'Ежемесячно',
     cron_schedule_preset_custom: 'Пользовательский',
     cron_schedule_hint: "Для повторяющихся заданий используйте 'every 1h' или cron-выражение. Простые интервалы вроде '30m' выполняются один раз.",
-    cron_schedule_once_warning: "Интервалы вроде '30m' выполняются один раз и удаляются после запуска. Используйте 'every 30m' для повторяющегося задания.",
+    cron_schedule_once_warning: "Это расписание запускает задание один раз. Для однократного запуска используйте 'in 30m' или дату и время; '30m' и 'every 30m' означают повторение.",
     cron_prompt_label: 'Запрос',
     cron_deliver_label: 'Доставлять вывод',
     cron_deliver_local: 'Локально (только сохранение)',

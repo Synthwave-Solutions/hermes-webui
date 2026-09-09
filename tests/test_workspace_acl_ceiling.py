@@ -54,9 +54,8 @@ def test_name_or_wildcard_grant_never_replaces_membership(scope):
     assert [r['name'] for r in routes._workspaces_response_list(scope.rows, SimpleNamespace())] == ['Shared']
 
 
-@pytest.mark.parametrize('body', [{'workspace': 'PRIVATE'}, {}])
-def test_explicit_and_last_workspace_session_creation_denied_before_side_effect(scope, monkeypatch, body):
-    body = {'workspace': str(scope.private)} if body else body
+def test_explicit_workspace_session_creation_denied_before_side_effect(scope, monkeypatch):
+    body = {'workspace': str(scope.private)}
     monkeypatch.setattr(routes, 'new_session', lambda **_: pytest.fail('unauthorized session creation'))
     assert request('/api/session/new', body).status == 403
 

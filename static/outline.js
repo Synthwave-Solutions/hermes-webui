@@ -66,9 +66,13 @@ function _ensureOutlineMessagesLoaded(sid) {
     return Promise.resolve(false);
   }
   if (typeof _ensureAllMessagesLoaded !== 'function') return Promise.resolve(false);
-  return _ensureAllMessagesLoaded().then(function() {
-    if (!S.session || S.session.session_id !== sid) return false;
+  return _ensureAllMessagesLoaded().then(function(loaded) {
+    if (!loaded || !S.session || S.session.session_id !== sid ||
+        S.busy || S.activeStreamId || _messagesTruncated) return false;
     _expandOutlineRenderWindow();
+    // Full history changes raw indices previously relative to the loaded tail.
+    // Refresh those rows before exposing outline targets with full indices.
+    if (typeof renderMessages === 'function') renderMessages({ preserveScroll: true });
     return true;
   }).catch(function() {
     return false;
@@ -91,9 +95,24 @@ function _excerptText(content) {
 }
 
 // Scrolls to a user message row identified by its rawIdx and flashes it.
+function _outlineTargetRow(rawIdx) {
+  const rowId = 'msg-user-' + rawIdx;
+  let row = document.getElementById(rowId);
+  if (!row && typeof _remountMessageViewportAnchor === 'function') {
+    _expandOutlineRenderWindow();
+    _remountMessageViewportAnchor({ rawIdx: rawIdx });
+    row = document.getElementById(rowId);
+  }
+  return row;
+}
+
 function _jumpToMessage(rawIdx) {
   const sid = _currentSid();
   if (!sid) return;
+  if (typeof _cancelBottomSettle === 'function') _cancelBottomSettle();
+  if (typeof _messageScrollInputGeneration !== 'undefined') _messageScrollInputGeneration++;
+  if (typeof _scrollPinned !== 'undefined') _scrollPinned = false;
+  if (typeof _messageUserUnpinned !== 'undefined') _messageUserUnpinned = true;
 
   const rowId = 'msg-user-' + rawIdx;
   const row   = document.getElementById(rowId);
@@ -112,17 +131,32 @@ function _jumpToMessage(rawIdx) {
   // to request the full transcript here.)
   if (typeof api !== 'function') return;
   if (S.busy || S.activeStreamId) return;
+  // Loaded history can still be outside the virtual DOM. Mount the selected
+  // semantic row using the transcript's existing virtual-offset machinery.
+  const mounted = _outlineTargetRow(rawIdx);
+  if (mounted) {
+    mounted.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    _flashRow(mounted);
+    return;
+  }
+  const previousMessages = S.messages;
+  const previousRows = Array.isArray(previousMessages) ? previousMessages.slice() : [];
+  const generation = typeof _messagesGeneration === 'undefined' ? null : _messagesGeneration;
   api('/api/session?session_id=' + encodeURIComponent(sid) +
       '&messages=1&resolve_model=0')
     .then(function(data) {
       if (!data || !data.session) return;
       if (!S.session || S.session.session_id !== sid) return;  // session switched
+      if (S.busy || S.activeStreamId || S.messages !== previousMessages ||
+          S.messages.length !== previousRows.length ||
+          previousRows.some((row, index) => row !== S.messages[index]) ||
+          (generation !== null && _messagesGeneration !== generation)) return;
       S.messages = data.session.messages || [];                // populate S
       _expandOutlineRenderWindow();
       if (typeof renderMessages === 'function') renderMessages({ preserveScroll: true });
       window.setTimeout(function() {
         if (!S.session || S.session.session_id !== sid) return;
-        const r = document.getElementById('msg-user-' + rawIdx);
+        const r = _outlineTargetRow(rawIdx);
         if (r) { r.scrollIntoView({ block: 'center', behavior: 'smooth' }); _flashRow(r); }
       }, 120);
     })
@@ -176,6 +210,10 @@ function _renderPanel() {
     return;
   }
 
+  if (typeof _messagesTruncated !== 'undefined' && _messagesTruncated) {
+    panel.innerHTML = '<p class="outline-empty">' + t('outline_loading') + '</p>';
+    return;
+  }
   _outlineSid = sid;
   const entries = _buildEntries();
 

@@ -22,6 +22,7 @@ and the real filesystem resolution from a named profile's last_workspace.txt.
 
 from __future__ import annotations
 
+import json
 from types import SimpleNamespace
 from urllib.parse import urlparse
 
@@ -44,7 +45,7 @@ def _capture_j(monkeypatch):
     return captured
 
 
-def test_profile_active_includes_default_workspace_from_resolver(monkeypatch):
+def test_profile_active_includes_default_workspace_from_resolver(monkeypatch, tmp_path):
     """The endpoint must surface whatever the profile-scoped resolver returns.
 
     This pins the wiring: ``default_workspace`` is populated from
@@ -54,10 +55,15 @@ def test_profile_active_includes_default_workspace_from_resolver(monkeypatch):
     """
     captured = _capture_j(monkeypatch)
     monkeypatch.setattr(profiles, "get_active_profile_name", lambda: "work")
-    monkeypatch.setattr(profiles, "get_active_hermes_home", lambda: "/home/u/.hermes/profiles/work")
+    profile_home = tmp_path / 'profile-work'
+    profile_home.mkdir()
+    monkeypatch.setattr(profiles, "get_active_hermes_home", lambda: profile_home)
     monkeypatch.setattr(profiles, "_is_root_profile", lambda name: name in ("default", ""))
     # The resolver is the single source of truth for the workspace value.
-    monkeypatch.setattr(routes, "get_profile_default_workspace", lambda: "/srv/projects/work")
+    selected = tmp_path / 'selected-workspace'
+    selected.mkdir()
+    monkeypatch.setattr(routes, "get_profile_default_workspace", lambda: str(selected))
+    monkeypatch.setattr(workspace, "load_workspaces", lambda: [{"name": "Selected", "path": str(selected)}])
 
     routes.handle_get(SimpleNamespace(), urlparse("/api/profile/active"))
 
@@ -65,7 +71,7 @@ def test_profile_active_includes_default_workspace_from_resolver(monkeypatch):
     payload = captured["payload"]
     assert payload["name"] == "work"
     assert payload["is_default"] is False
-    assert payload["default_workspace"] == "/srv/projects/work", (
+    assert payload["default_workspace"] == str(selected), (
         "GET /api/profile/active must surface the profile-scoped workspace from "
         "get_profile_default_workspace() so the blank new-chat composer chip shows it (#5169)"
     )
@@ -91,6 +97,10 @@ def test_profile_active_default_workspace_resolves_from_named_profile(monkeypatc
     resolved_ws = str(workspace_dir.resolve())
     (profile_home / "webui_state" / "last_workspace.txt").write_text(
         resolved_ws, encoding="utf-8"
+    )
+    # A remembered path is a hint; the selected workspace must remain trusted.
+    (profile_home / "webui_state" / "workspaces.json").write_text(
+        json.dumps([{"name": "Work", "path": resolved_ws}]), encoding="utf-8"
     )
 
     captured = _capture_j(monkeypatch)

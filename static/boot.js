@@ -3452,7 +3452,7 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
     // confirmed-registered skin — avoids writing a skin the server can't validate).
     if((lsHasExplicitTheme||lsHasExplicitSkin)&&!lsSkinIsPendingExt&&(theme!==srvAppearance.theme||skin!==srvAppearance.skin)){
       try{
-        api('/api/settings',{method:'POST',body:JSON.stringify({theme,skin})});
+        api('/api/settings',{method:'POST',body:JSON.stringify({theme,skin})}).catch(()=>{});
       }catch(_){}
     }
     // Same precedence as theme/skin: an explicit non-default choice in this
@@ -3465,7 +3465,7 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
     localStorage.setItem('hermes-font-size',fontSize);
     _applyFontSize(fontSize);
     if(_lsHasExplicitFont&&s.font_size&&s.font_size!==fontSize){
-      try{api('/api/settings',{method:'POST',body:JSON.stringify({font_size:fontSize})});}catch(_){}
+      try{api('/api/settings',{method:'POST',body:JSON.stringify({font_size:fontSize})}).catch(()=>{});}catch(_){}
     }
     if(typeof setLocale==='function'){
       const _lang=typeof resolvePreferredLocale==='function'

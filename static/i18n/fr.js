@@ -1565,7 +1565,7 @@ window.__registerHermesLocale('fr', {
     cron_schedule_preset_monthly: 'Mensuel',
     cron_schedule_preset_custom: 'Personnalisé',
     cron_schedule_hint: "Utilisez 'every 1h' ou une expression cron pour les tâches récurrentes. Les durées simples comme '30m' s'exécutent une fois.",
-    cron_schedule_once_warning: "Les formes de durée comme '30m' s'exécutent une fois et sont supprimées après l'exécution. Utilisez 'every 30m' pour conserver une tâche récurrente.",
+    cron_schedule_once_warning: "Cette planification s'exécute une seule fois. Utilisez 'in 30m' ou une date et une heure pour une tâche unique ; '30m' et 'every 30m' se répètent.",
     cron_prompt_label: 'Invite',
     cron_deliver_label: 'Délivrer la sortie à',
     cron_deliver_local: 'Local (enregistrer la sortie uniquement)',

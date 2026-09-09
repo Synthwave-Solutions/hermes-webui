@@ -1482,7 +1482,7 @@ window.__registerHermesLocale('ko', {
     cron_schedule_preset_monthly: 'Monthly',
     cron_schedule_preset_custom: 'Custom',
     cron_schedule_hint: "Use 'every 1h' or a cron expression for recurring jobs. Bare durations like '30m' run once.",
-    cron_schedule_once_warning: "Duration forms like '30m' run once and are removed after running. Use 'every 30m' to keep a recurring job.",
+    cron_schedule_once_warning: "이 일정은 한 번만 실행됩니다. 일회성 작업에는 'in 30m' 또는 날짜와 시간을 사용하세요. '30m'과 'every 30m'은 반복 실행됩니다.",
     cron_prompt_label: 'Prompt',
     cron_deliver_label: 'Deliver output to',
     cron_deliver_local: 'Local (save output only)',

@@ -58,6 +58,32 @@ def ensure_workspace_selection(handler, path, *, entries=None):
     _ensure_governance_selection(_request_identity(handler), path, entries=entries)
 
 
+def resolve_implicit_workspace(handler, preferred=None):
+    """Choose a usable workspace without rewriting shared selection hints.
+
+    A profile's remembered directory is a hint shared by its users, not a
+    permission grant. Explicit caller selections must use the strict validator.
+    """
+    from api.config import DEFAULT_WORKSPACE
+    from api.workspace import _profile_default_workspace, resolve_trusted_workspace
+
+    entries = load_acl_entries()
+    candidates = [preferred, _profile_default_workspace(), DEFAULT_WORKSPACE,
+                  *(entry['path'] for entry in entries)]
+    seen = set()
+    for candidate in candidates:
+        if not candidate or str(candidate) in seen:
+            continue
+        seen.add(str(candidate))
+        try:
+            resolved = resolve_trusted_workspace(candidate)
+            ensure_workspace_selection(handler, resolved, entries=entries)
+        except (OSError, ValueError, TypeError):
+            continue
+        return str(resolved)
+    raise PermissionError('No authorized workspace is available')
+
+
 def _ensure_governance_selection(identity, path, *, entries=None):
     if not path:
         return

@@ -2068,7 +2068,7 @@ window.__registerHermesLocale('en', {
     cron_schedule_preset_monthly: 'Monthly',
     cron_schedule_preset_custom: 'Custom',
     cron_schedule_hint: "Use 'every 1h' or a cron expression for recurring jobs. Bare durations like '30m' run once.",
-    cron_schedule_once_warning: "Duration forms like '30m' run once and are removed after running. Use 'every 30m' to keep a recurring job.",
+    cron_schedule_once_warning: "This schedule runs once. Use 'in 30m' or a timestamp for a one-time job; '30m' and 'every 30m' repeat.",
     cron_prompt_label: 'Prompt',
     cron_deliver_label: 'Deliver output to',
     cron_deliver_local: 'Local (save output only)',

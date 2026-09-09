@@ -4036,7 +4036,9 @@ async function _loadOlderMessages() {
 //   2. Bump _messagesGeneration before mutating S.messages so any
 //      in-flight prefetch's post-await generation check bails out.
 async function _ensureAllMessagesLoaded() {
-  if (!_messagesTruncated || !S.session) return;
+  if (!S.session || S.busy || S.activeStreamId) return false;
+  if (!_messagesTruncated) return true;
+  const requestedSid = S.session.session_id;
   if (_loadingOlder) {
     // A prefetch is mid-flight (between the `_loadingOlder = true` line
     // and its post-await guards). Bumping the generation token now
@@ -4049,18 +4051,27 @@ async function _ensureAllMessagesLoaded() {
     while (_loadingOlder) {
       await new Promise(resolve => setTimeout(resolve, 16));
     }
-    if (!_messagesTruncated || !S.session) return;
+    if (!S.session || S.session.session_id !== requestedSid || S.busy || S.activeStreamId) return false;
+    if (!_messagesTruncated) return true;
   }
   _loadingOlder = true;
   try {
     const sid = S.session.session_id;
+    const generation = _messagesGeneration;
+    const previousMessages = S.messages;
+    const previousRows = Array.isArray(previousMessages) ? previousMessages.slice() : [];
     const data = await api(`/api/session?session_id=${encodeURIComponent(sid)}&messages=1&resolve_model=0`, {timeoutMs:120000});
     // Guard: api() may have redirected (401) and returned undefined.
-    if (!data || !data.session) return;
+    if (!data || !data.session) return false;
     // Session may have been switched while we awaited. Bail rather than
     // overwrite the new session's messages.
-    if (!S.session || S.session.session_id !== sid) return;
-    if (_loadingSessionId !== null && _loadingSessionId !== sid) return;
+    if (!S.session || S.session.session_id !== sid) return false;
+    if (_loadingSessionId !== null && _loadingSessionId !== sid) return false;
+    // A turn may start AND finish while this older snapshot is in flight.
+    // Keep live/newer rows and pagination metadata rather than replacing them.
+    if (S.busy || S.activeStreamId || _messagesGeneration !== generation ||
+        S.messages !== previousMessages || previousRows.length !== S.messages.length ||
+        previousRows.some((row, index) => row !== S.messages[index])) return false;
     const msgs = (data.session.messages || []).filter(m => m && m.role);
     // Bump the generation BEFORE the wholesale replace so any racing
     // prefetch (whose snapshot was taken before this call's mutex
@@ -4081,6 +4092,7 @@ async function _ensureAllMessagesLoaded() {
     if (S.session && S.session.session_id === sid) {
       S.session.message_count = Number(data.session.message_count || msgs.length);
     }
+    return true;
   } finally {
     _loadingOlder = false;
   }

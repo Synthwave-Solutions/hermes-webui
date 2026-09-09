@@ -874,7 +874,7 @@ window.__registerHermesLocale('de', {
     cron_schedule_preset_monthly: 'Monatlich',
     cron_schedule_preset_custom: 'Benutzerdefiniert',
     cron_schedule_hint: "Für wiederkehrende Aufgaben 'every 1h' oder einen Cron-Ausdruck verwenden. Reine Dauern wie '30m' laufen einmal.",
-    cron_schedule_once_warning: "Dauerangaben wie '30m' laufen einmal und werden nach der Ausführung entfernt. Verwende 'every 30m' für eine wiederkehrende Aufgabe.",
+    cron_schedule_once_warning: "Dieser Zeitplan wird einmal ausgeführt. Verwende 'in 30m' oder einen Zeitstempel für einen einmaligen Auftrag; '30m' und 'every 30m' werden wiederholt.",
     cron_prompt_label: 'Prompt',
     cron_deliver_label: 'Ausgabe senden an',
     cron_deliver_local: 'Lokal (nur speichern)',

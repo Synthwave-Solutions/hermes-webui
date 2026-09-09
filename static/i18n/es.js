@@ -1212,7 +1212,7 @@ window.__registerHermesLocale('es', {
     cron_schedule_preset_monthly: 'Mensual',
     cron_schedule_preset_custom: 'Personalizado',
     cron_schedule_hint: "Usa 'every 1h' o una expresión cron para trabajos recurrentes. Duraciones como '30m' se ejecutan una sola vez.",
-    cron_schedule_once_warning: "Las duraciones como '30m' se ejecutan una vez y se eliminan después de correr. Usa 'every 30m' para mantener un trabajo recurrente.",
+    cron_schedule_once_warning: "Esta programación se ejecuta una sola vez. Usa 'in 30m' o una fecha y hora para una tarea única; '30m' y 'every 30m' se repiten.",
     cron_prompt_label: 'Prompt',
     cron_deliver_label: 'Entregar salida a',
     cron_deliver_local: 'Local (solo guardar salida)',
