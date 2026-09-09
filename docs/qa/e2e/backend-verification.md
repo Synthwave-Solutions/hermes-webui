@@ -4,20 +4,20 @@ Recorded 9 September 2026. These are canonical focused local checks for the pair
 
 ## Source state
 
-The verified WebUI code commit is `704d5737da750931eba0b2ef5aa5d3e9a6e75677` and the verified engine code commit is `49bf59875c41e84baf5ac53bd1194859d54be94d`. The frozen-source browser run `20260908-234115-847878000` used that same pair and passed **187 of 187 scenarios**, with **0 failed**. All 187 application page-error collections were empty; the report recorded zero global errors. The 11 Playwright fixture-bookkeeping warning entries remain in [review notes](../synthpulse-e2e/run-review-notes.json), separately from application errors and scenario results.
+The verified WebUI code commit is `451acb916a33d9267713eaf57aba7f93e462993c` and the verified engine code commit is `97fbbecd35984d5e28a3482d60a1165121333fc9`. The frozen-source browser run `20260909-080212-676633000` used that same pair and passed **192 of 192 scenarios**, with **0 failed**. All 192 application page-error collections were empty; the report recorded zero global errors. The 13 Playwright fixture-bookkeeping warning entries remain in [review notes](run-review-notes.json), separately from application errors and scenario results.
 
-The [execution summary](../synthpulse-e2e/execution-summary.json) and [source manifest](../synthpulse-source/manifest.json) bind these results to the tested code and any later documentation-only delivered commits. The control inventory remains incomplete: 508 of 1052 entries were interacted with in passing tests, leaving 544 without that evidence.
+The [execution summary](execution-summary.json) and [source provenance](evidence/source-provenance.json) bind these results to the tested code and any later documentation-only delivered commits. The control inventory remains incomplete: 514 of 1053 entries were interacted with in passing tests, leaving 539 without that evidence.
 
 Both repositories must be installed together. The engine's unrelated case-colliding contributor-file change is excluded from the committed release patches. Production deployment is user-authorized and pending a separately verified live result.
 
 ## Reproduce the WebUI checks
 
-The canonical `./scripts/test.sh` bundle passed **439 tests, 0 failed across 32 files** at `704d5737da750931eba0b2ef5aa5d3e9a6e75677`. The exact file list below is taken from `work/release-backend-verification.json`; its local log is `work/release-webui-checks.log`. Raw logs are not included in this handoff.
+The canonical `./scripts/test.sh` bundle passed **482 tests, 0 failed across 34 files** at `451acb916a33d9267713eaf57aba7f93e462993c`. The exact file list below comes from `work/release-backend-verification.json`; its local log is `work/release-webui-current.log`. Raw logs are not included in this handoff.
 
-Use the prepared Python 3.12 environment with the matching engine installed from the adjacent checkout. Run from the WebUI repository; the runner keeps its documented test isolation. The Python paths below are relative to those paired checkouts.
+Use the prepared Python 3.12 environment with the matching engine installed from the adjacent checkout. Run from the WebUI repository; these paths are relative to the paired checkouts.
 
 ```sh
-HERMES_WEBUI_TEST_PYTHON=.venv/bin/python ./scripts/test.sh \
+HERMES_WEBUI_TEST_PYTHON=.venv/bin/python HERMES_WEBUI_AGENT_DIR=../hermes-agent ./scripts/test.sh \
   tests/test_continuation_authority.py \
   tests/test_dashboard_plugin_asset_auth.py \
   tests/test_e2e_isolation.py \
@@ -49,14 +49,16 @@ HERMES_WEBUI_TEST_PYTHON=.venv/bin/python ./scripts/test.sh \
   tests/test_workspace_acl_ceiling.py \
   tests/test_workspace_ownership.py \
   tests/test_workspace_upload.py \
-  tests/test_xterm_vendored_assets.py -q
+  tests/test_xterm_vendored_assets.py \
+  tests/test_chat_worker_identity_dispatch.py \
+  tests/test_session_import_workspace_validation.py -q
 ```
 
 ## Reproduce the engine checks
 
-The canonical `scripts/run_tests.sh` bundle passed **357 tests, 0 failed across 29 files** at `49bf59875c41e84baf5ac53bd1194859d54be94d`. The exact file list below is taken from `work/release-backend-verification.json`; its local log is `work/release-engine-checks.log`. Raw logs are not included in this handoff.
+The canonical `scripts/run_tests.sh` bundle passed **357 tests, 0 failed across 29 files** at `97fbbecd35984d5e28a3482d60a1165121333fc9`. The exact file list below comes from `work/release-backend-verification.json`; its local log is `work/release-engine-current.log`. Raw logs are not included in this handoff.
 
-Use the prepared Python 3.12 environment with the matching engine installed from the adjacent checkout. Run from the engine repository; the runner keeps its documented test isolation. The Python paths below are relative to those paired checkouts.
+Use the prepared Python 3.12 environment with the matching engine installed from the adjacent checkout. Run from the engine repository; these paths are relative to the paired checkouts.
 
 ```sh
 HERMES_PYTHON=../hermes-webui/.venv/bin/python scripts/run_tests.sh \
@@ -93,13 +95,17 @@ HERMES_PYTHON=../hermes-webui/.venv/bin/python scripts/run_tests.sh \
 
 ## What the focused bundles verify
 
-The WebUI bundle covers session and delegation lifecycle, exact durable continuation authority, current workspace ownership and permission ceilings, parked-action revocation, file and upload authorization, plugin rendering/authentication, isolated fixtures, realtime voice protocol/TLS behavior, accurate tool-failure persistence, terminal asset integrity, and public Share lifecycle/privacy. Share checks include owner and CSRF boundaries, stale/foreign token rejection, snapshot refresh/revocation, and fail-closed publication when source metadata cannot be saved.
+The WebUI bundle covers import workspace selection before creation, authenticated worker dispatch and continuation forwarding, session and delegation lifecycle, exact durable continuation authority, current workspace ownership and permission ceilings, parked-action revocation, file and upload authorization, plugin rendering/authentication, isolated fixtures, realtime voice protocol/TLS behavior, accurate tool-failure persistence, terminal asset integrity, and public Share lifecycle/privacy. Share checks include owner and CSRF boundaries, stale/foreign token rejection, snapshot refresh/revocation, and fail-closed publication when source metadata cannot be saved.
 
 The engine bundle covers per-user whitelist/blacklist resolution, explicit denials, model/tool/file/environment/usage boundaries, trusted delegation and continuation ceilings, authoritative runtime rechecks, audit provenance and manual/automatic action review. Its Kanban regression files additionally exercise explicitly opted-in manual Todo/Triage completion and Todo blocking, dependency validation, audit/reason retention, recurrence escalation, parent lifecycle effects and unchanged worker run fencing.
 
-These backend checks complement the actual Chromium scenarios; source assertions alone do not prove frontend behavior. The 187-scenario browser run exercises public Share create/refresh/revoke, direct manual completion, Todo→Blocked→Unblock persistence, denied task mutation, parent dependencies, repeated-block escalation, named board administration and dry-run dispatcher preview. It does not launch a production Kanban worker.
+These backend checks complement the actual Chromium scenarios; source assertions alone do not prove frontend behavior. The 192-scenario browser run exercises public Share create/refresh/revoke, direct manual completion, Todo→Blocked→Unblock persistence, denied task mutation, parent dependencies, repeated-block escalation, named board administration and dry-run dispatcher preview. It does not launch a production Kanban worker.
 
 Realtime voice tests use actual local HTTP/WebSocket/HTTPS and engine routes with synthetic media and a deterministic local provider. Certificate pinning is checked against an actual local TLS listener. They do not establish physical microphone acoustics, real WebRTC negotiation, external-provider quality or production credentials. Virtual WebAuthn tests likewise do not certify a physical authenticator.
+
+## Current GitHub CI qualification
+
+At exact WebUI commit `451acb916a33d9267713eaf57aba7f93e462993c`, lint, chat privacy, browser smoke, docs and three conversation-lifecycle checks succeeded. All 15 broad shard checks failed. The separately reviewed [test (3.11, 0) log](https://github.com/Synthwave-Solutions/hermes-webui/actions/runs/34317301596/job/102356195301) has exactly 10 pre-existing missing-contract import failures: its test files are byte-identical to baseline `571c11f9cc184657b49abf93ad9bedf633a437fe`, where the same symbols are absent. The newly introduced engine-tools import failure is gone. The other 14 failure statuses were observed; their latest logs were not individually re-triaged. [Exact CI evidence](evidence/ci-qualification.json) keeps these results separate from the passing focused local bundles and does not certify a later head.
 
 ## Baseline failures and compatibility limits
 

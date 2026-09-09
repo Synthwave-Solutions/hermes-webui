@@ -8,15 +8,19 @@ quality, uptime, OAuth credentials or behavior of an external provider.
 
 ## Verified release evidence
 
-Frozen run `20260908-234115-847878000` completed **187 browser scenarios: 187 passed, zero failed**, with zero uncaught application errors across all 187 collections and zero report-level errors. The runner retained **11 Playwright fixture-bookkeeping warning entries**, including one entry with a repeated fixture ID; these are harness warnings, separately recorded in the review notes.
+Frozen run `20260909-080212-676633000` completed **192 browser scenarios: 192 passed, zero failed**, with zero uncaught application errors across all 192 collections and zero report-level errors. The runner retained **13 Playwright fixture-bookkeeping warning entries**. These harness warnings are recorded separately in the review notes.
 
-The inventory contains **1,052 entries: 508 interacted with in passing scenarios and 544 without interaction evidence**. The strict all-click gate remains incomplete. The separate catalog contains **363 acceptance stories: 21 fully demonstrated, 190 partial and 152 not run**. A passed browser scenario certifies its explicit assertions; it does not certify all criteria of every related story.
+The inventory contains **1,053 entries: 514 interacted with in passing scenarios and 539 without interaction evidence**. The strict all-click gate remains incomplete. The separate catalog contains **365 acceptance stories: 23 fully demonstrated, 191 partial and 151 not run**. A passed browser scenario certifies its explicit assertions; it does not certify all criteria of every related story.
 
-Canonical focused backend checks passed **439 WebUI tests across 32 files** at `704d5737da750931eba0b2ef5aa5d3e9a6e75677` and **357 engine tests across 29 files** at `49bf59875c41e84baf5ac53bd1194859d54be94d`. These are the paired code commits used by the frozen browser run. Exact test lists are in [backend verification](backend-verification.md). These checks do not certify global repository CI.
+Canonical focused backend checks passed **482 WebUI tests across 34 files** at `451acb916a33d9267713eaf57aba7f93e462993c` and **357 engine tests across 29 files** at `97fbbecd35984d5e28a3482d60a1165121333fc9`. These are the paired code commits used by the frozen browser run. Exact test lists are in [backend verification](backend-verification.md). These checks do not certify global repository CI.
 
 Public Share creation, anonymous snapshot readback, explicit refresh, cancellation, revocation and owner/CSRF boundaries now pass. Manual Todo/Triage completion and Todo blocking pass with dependency checks, reload persistence, authorization denials, dependency-aware unblocking and repeated-block escalation. The earlier Share and Todo→Done 404 results remain historical findings, not current failing tests.
 
 Production deployment is authorized by the user and pending a separately verified live result. These local results do not establish production deployment, physical audio quality or external-provider behavior.
+
+JSON import now rejects unauthorized workspace selection before creating a session. The browser also verifies exact allowed transcript/ownership after reload, editor Escape cancellation, hidden-file permission limits, linked-skill revocation and message-prefix forking. These cases retain their precise scope in the story matrix.
+
+GitHub CI is qualified separately: seven substantive checks passed at the tested WebUI commit, while 15 broad shards failed. The reviewed shard reproduced10 unchanged baseline import failures; the other 14 latest logs were not re-triaged. See [CI qualification](backend-verification.md#current-github-ci-qualification).
 
 ## Install and run
 

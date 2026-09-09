@@ -1,9 +1,9 @@
 {
-  "test_executions": 176,
-  "nonpassing_executions": 2,
-  "inventoried_controls": 1007,
-  "interacted_controls": 448,
-  "uncovered_controls": 559,
+  "test_executions": 192,
+  "nonpassing_executions": 0,
+  "inventoried_controls": 1053,
+  "interacted_controls": 514,
+  "uncovered_controls": 539,
   "all_clicks_complete": false,
   "scope_note": "Source extraction includes static IDs in top-level JS templates. Browser observations add anonymous/dynamic controls. Dynamic states never opened, external services, OS dialogs and semantic correctness beyond assertions remain outside this count.",
   "controls": {
@@ -622,7 +622,7 @@
       "source": "static/index.html",
       "line": 641,
       "observed": true,
-      "status": "NOT_INTERACTED"
+      "status": "INTERACTED_IN_PASSING_TEST"
     },
     "#btnCancelMemoryDetail": {
       "tag": "BUTTON",
@@ -652,7 +652,7 @@
       "source": "static/index.html",
       "line": 837,
       "observed": false,
-      "status": "NOT_INTERACTED"
+      "status": "INTERACTED_IN_PASSING_TEST"
     },
     "#btnCancelTaskDetail": {
       "tag": "BUTTON",
@@ -722,7 +722,7 @@
       "source": "static/index.html",
       "line": 1887,
       "observed": true,
-      "status": "NOT_INTERACTED"
+      "status": "INTERACTED_IN_PASSING_TEST"
     },
     "#btnDeleteProfileDetail": {
       "tag": "BUTTON",
@@ -742,7 +742,7 @@
       "source": "static/index.html",
       "line": 836,
       "observed": false,
-      "status": "NOT_INTERACTED"
+      "status": "INTERACTED_IN_PASSING_TEST"
     },
     "#btnDeleteTaskDetail": {
       "tag": "BUTTON",
@@ -832,7 +832,7 @@
       "source": "static/index.html",
       "line": 835,
       "observed": false,
-      "status": "NOT_INTERACTED"
+      "status": "INTERACTED_IN_PASSING_TEST"
     },
     "#btnEditTaskDetail": {
       "tag": "BUTTON",
@@ -902,7 +902,7 @@
       "source": "static/index.html",
       "line": 1098,
       "observed": true,
-      "status": "NOT_INTERACTED"
+      "status": "INTERACTED_IN_PASSING_TEST"
     },
     "#btnKanbanCreateBoard": {
       "tag": "BUTTON",
@@ -912,7 +912,7 @@
       "source": "static/index.html",
       "line": 902,
       "observed": true,
-      "status": "NOT_INTERACTED"
+      "status": "INTERACTED_IN_PASSING_TEST"
     },
     "#btnKanbanPreviewDispatcher": {
       "tag": "BUTTON",
@@ -922,7 +922,7 @@
       "source": "static/index.html",
       "line": 904,
       "observed": true,
-      "status": "NOT_INTERACTED"
+      "status": "INTERACTED_IN_PASSING_TEST"
     },
     "#btnKanbanRunDispatcher": {
       "tag": "BUTTON",
@@ -942,7 +942,7 @@
       "source": "static/index.html",
       "line": 903,
       "observed": true,
-      "status": "NOT_INTERACTED"
+      "status": "INTERACTED_IN_PASSING_TEST"
     },
     "#btnMic": {
       "tag": "BUTTON",
@@ -1182,7 +1182,7 @@
       "source": "static/index.html",
       "line": 1095,
       "observed": true,
-      "status": "NOT_INTERACTED"
+      "status": "INTERACTED_IN_PASSING_TEST"
     },
     "#btnShutdownServer": {
       "tag": "BUTTON",
@@ -1242,7 +1242,7 @@
       "source": "static/index.html",
       "line": 1096,
       "observed": true,
-      "status": "NOT_INTERACTED"
+      "status": "INTERACTED_IN_PASSING_TEST"
     },
     "#btnTerminalClear": {
       "tag": "BUTTON",
@@ -1332,7 +1332,7 @@
       "source": "static/index.html",
       "line": 1863,
       "observed": true,
-      "status": "NOT_INTERACTED"
+      "status": "INTERACTED_IN_PASSING_TEST"
     },
     "#btnUploadWorkspace": {
       "tag": "BUTTON",
@@ -1342,7 +1342,7 @@
       "source": "static/index.html",
       "line": 1867,
       "observed": true,
-      "status": "NOT_INTERACTED"
+      "status": "INTERACTED_IN_PASSING_TEST"
     },
     "#btnVoiceMode": {
       "tag": "BUTTON",
@@ -1362,7 +1362,7 @@
       "source": "static/index.html",
       "line": 1854,
       "observed": true,
-      "status": "NOT_INTERACTED"
+      "status": "INTERACTED_IN_PASSING_TEST"
     },
     "#btnWorkspacePanelToggle": {
       "tag": "BUTTON",
@@ -1382,7 +1382,7 @@
       "source": "static/index.html",
       "line": 1868,
       "observed": true,
-      "status": "NOT_INTERACTED"
+      "status": "INTERACTED_IN_PASSING_TEST"
     },
     "#builderBack": {
       "tag": "BUTTON",
@@ -1780,10 +1780,10 @@
       "observed": true,
       "status": "NOT_INTERACTED"
     },
-    "#cron-default%003d7403972f0b": {
+    "#cron-default%00010c5145f442": {
       "tag": "DIV",
-      "id": "cron-default%003d7403972f0b",
-      "text": "\ud83e\udd16\n          QA Cron lifecycle 1788899442951 edited\n          default\n          active",
+      "id": "cron-default%00010c5145f442",
+      "text": "\ud83e\udd16\n          QA Cron lifecycle 1788933995946 edited\n          default\n          active",
       "onclick": null,
       "panel": null,
       "scope": "panelTasks",
@@ -2234,7 +2234,7 @@
     "#govUserDenyEnvironmentBox": {
       "tag": "DIV",
       "id": "govUserDenyEnvironmentBox",
-      "text": "QA_PUBLIC_NAME\u00d7",
+      "text": "",
       "onclick": "(function(i){if(i)i.focus();})($('govUserDenyEnvironmentInput'))",
       "panel": null,
       "scope": "panelGovernance",
@@ -2260,7 +2260,7 @@
     "#govUserDenyFilesReadBox": {
       "tag": "DIV",
       "id": "govUserDenyFilesReadBox",
-      "text": "/Users/michaelramirez/Documents/Codex/2026-09-08/do-x20/work/e2e-runs/20260908-222640-1694",
+      "text": "",
       "onclick": "(function(i){if(i)i.focus();})($('govUserDenyFilesReadInput'))",
       "panel": null,
       "scope": "panelGovernance",
@@ -2286,7 +2286,7 @@
     "#govUserDenyFilesWriteBox": {
       "tag": "DIV",
       "id": "govUserDenyFilesWriteBox",
-      "text": "/Users/michaelramirez/Documents/Codex/2026-09-08/do-x20/work/e2e-runs/20260908-222640-1694",
+      "text": "",
       "onclick": "(function(i){if(i)i.focus();})($('govUserDenyFilesWriteInput'))",
       "panel": null,
       "scope": "panelGovernance",
@@ -2338,7 +2338,7 @@
     "#govUserDenyModelsBox": {
       "tag": "DIV",
       "id": "govUserDenyModelsBox",
-      "text": "qa-deterministic\u00d7",
+      "text": "",
       "onclick": "(function(i){if(i)i.focus();})($('govUserDenyModelsInput'))",
       "panel": null,
       "scope": "panelGovernance",
@@ -2364,7 +2364,7 @@
     "#govUserDenyPermissionsBox": {
       "tag": "DIV",
       "id": "govUserDenyPermissionsBox",
-      "text": "chat:use\u00d7",
+      "text": "",
       "onclick": "(function(i){if(i)i.focus();})($('govUserDenyPermissionsInput'))",
       "panel": null,
       "scope": "panelGovernance",
@@ -2390,7 +2390,7 @@
     "#govUserDenyProfilesBox": {
       "tag": "DIV",
       "id": "govUserDenyProfilesBox",
-      "text": "default\u00d7",
+      "text": "",
       "onclick": "(function(i){if(i)i.focus();})($('govUserDenyProfilesInput'))",
       "panel": null,
       "scope": "panelGovernance",
@@ -2416,7 +2416,7 @@
     "#govUserDenyProvidersBox": {
       "tag": "DIV",
       "id": "govUserDenyProvidersBox",
-      "text": "custom:qa\u00d7",
+      "text": "",
       "onclick": "(function(i){if(i)i.focus();})($('govUserDenyProvidersInput'))",
       "panel": null,
       "scope": "panelGovernance",
@@ -2442,7 +2442,7 @@
     "#govUserDenyRoutesBox": {
       "tag": "DIV",
       "id": "govUserDenyRoutesBox",
-      "text": "/api/sessions\u00d7",
+      "text": "",
       "onclick": "(function(i){if(i)i.focus();})($('govUserDenyRoutesInput'))",
       "panel": null,
       "scope": "panelGovernance",
@@ -2468,7 +2468,7 @@
     "#govUserDenySettingsReadBox": {
       "tag": "DIV",
       "id": "govUserDenySettingsReadBox",
-      "text": "appearance\u00d7",
+      "text": "",
       "onclick": "(function(i){if(i)i.focus();})($('govUserDenySettingsReadInput'))",
       "panel": null,
       "scope": "panelGovernance",
@@ -2494,7 +2494,7 @@
     "#govUserDenySettingsWriteBox": {
       "tag": "DIV",
       "id": "govUserDenySettingsWriteBox",
-      "text": "appearance\u00d7",
+      "text": "",
       "onclick": "(function(i){if(i)i.focus();})($('govUserDenySettingsWriteInput'))",
       "panel": null,
       "scope": "panelGovernance",
@@ -2546,7 +2546,7 @@
     "#govUserDenySkillsManageBox": {
       "tag": "DIV",
       "id": "govUserDenySkillsManageBox",
-      "text": "qa-review\u00d7",
+      "text": "",
       "onclick": "(function(i){if(i)i.focus();})($('govUserDenySkillsManageInput'))",
       "panel": null,
       "scope": "panelGovernance",
@@ -2572,7 +2572,7 @@
     "#govUserDenyToolsBox": {
       "tag": "DIV",
       "id": "govUserDenyToolsBox",
-      "text": "read_file\u00d7",
+      "text": "",
       "onclick": "(function(i){if(i)i.focus();})($('govUserDenyToolsInput'))",
       "panel": null,
       "scope": "panelGovernance",
@@ -2598,7 +2598,7 @@
     "#govUserDenyToolsetsBox": {
       "tag": "DIV",
       "id": "govUserDenyToolsetsBox",
-      "text": "file\u00d7",
+      "text": "",
       "onclick": "(function(i){if(i)i.focus();})($('govUserDenyToolsetsInput'))",
       "panel": null,
       "scope": "panelGovernance",
@@ -2624,7 +2624,7 @@
     "#govUserDenyWorkdirsBox": {
       "tag": "DIV",
       "id": "govUserDenyWorkdirsBox",
-      "text": "/Users/michaelramirez/Documents/Codex/2026-09-08/do-x20/work/e2e-runs/20260908-222640-1694",
+      "text": "",
       "onclick": "(function(i){if(i)i.focus();})($('govUserDenyWorkdirsInput'))",
       "panel": null,
       "scope": "panelGovernance",
@@ -2650,7 +2650,7 @@
     "#govUserDenyWorkspacesBox": {
       "tag": "DIV",
       "id": "govUserDenyWorkspacesBox",
-      "text": "/Users/michaelramirez/Documents/Codex/2026-09-08/do-x20/work/e2e-runs/20260908-222640-1694",
+      "text": "",
       "onclick": "(function(i){if(i)i.focus();})($('govUserDenyWorkspacesInput'))",
       "panel": null,
       "scope": "panelGovernance",
@@ -2686,7 +2686,7 @@
     "#govUserGrantEnvironmentBox": {
       "tag": "DIV",
       "id": "govUserGrantEnvironmentBox",
-      "text": "QA_PUBLIC_NAME\u00d7",
+      "text": "",
       "onclick": "(function(i){if(i)i.focus();})($('govUserGrantEnvironmentInput'))",
       "panel": null,
       "scope": "panelGovernance",
@@ -2712,7 +2712,7 @@
     "#govUserGrantFilesReadBox": {
       "tag": "DIV",
       "id": "govUserGrantFilesReadBox",
-      "text": "/Users/michaelramirez/Documents/Codex/2026-09-08/do-x20/work/e2e-runs/20260908-222640-1694",
+      "text": "",
       "onclick": "(function(i){if(i)i.focus();})($('govUserGrantFilesReadInput'))",
       "panel": null,
       "scope": "panelGovernance",
@@ -2738,7 +2738,7 @@
     "#govUserGrantFilesWriteBox": {
       "tag": "DIV",
       "id": "govUserGrantFilesWriteBox",
-      "text": "/Users/michaelramirez/Documents/Codex/2026-09-08/do-x20/work/e2e-runs/20260908-222640-1694",
+      "text": "",
       "onclick": "(function(i){if(i)i.focus();})($('govUserGrantFilesWriteInput'))",
       "panel": null,
       "scope": "panelGovernance",
@@ -2764,7 +2764,7 @@
     "#govUserGrantModelsBox": {
       "tag": "DIV",
       "id": "govUserGrantModelsBox",
-      "text": "qa-deterministic\u00d7",
+      "text": "",
       "onclick": "(function(i){if(i)i.focus();})($('govUserGrantModelsInput'))",
       "panel": null,
       "scope": "panelGovernance",
@@ -2790,7 +2790,7 @@
     "#govUserGrantPermissionsBox": {
       "tag": "DIV",
       "id": "govUserGrantPermissionsBox",
-      "text": "chat:use\u00d7",
+      "text": "",
       "onclick": "(function(i){if(i)i.focus();})($('govUserGrantPermissionsInput'))",
       "panel": null,
       "scope": "panelGovernance",
@@ -2816,7 +2816,7 @@
     "#govUserGrantProfilesBox": {
       "tag": "DIV",
       "id": "govUserGrantProfilesBox",
-      "text": "default\u00d7",
+      "text": "",
       "onclick": "(function(i){if(i)i.focus();})($('govUserGrantProfilesInput'))",
       "panel": null,
       "scope": "panelGovernance",
@@ -2842,7 +2842,7 @@
     "#govUserGrantProvidersBox": {
       "tag": "DIV",
       "id": "govUserGrantProvidersBox",
-      "text": "custom:qa\u00d7",
+      "text": "",
       "onclick": "(function(i){if(i)i.focus();})($('govUserGrantProvidersInput'))",
       "panel": null,
       "scope": "panelGovernance",
@@ -2868,7 +2868,7 @@
     "#govUserGrantRoutesBox": {
       "tag": "DIV",
       "id": "govUserGrantRoutesBox",
-      "text": "/api/sessions\u00d7",
+      "text": "",
       "onclick": "(function(i){if(i)i.focus();})($('govUserGrantRoutesInput'))",
       "panel": null,
       "scope": "panelGovernance",
@@ -2894,7 +2894,7 @@
     "#govUserGrantSettingsReadBox": {
       "tag": "DIV",
       "id": "govUserGrantSettingsReadBox",
-      "text": "appearance\u00d7",
+      "text": "",
       "onclick": "(function(i){if(i)i.focus();})($('govUserGrantSettingsReadInput'))",
       "panel": null,
       "scope": "panelGovernance",
@@ -2920,7 +2920,7 @@
     "#govUserGrantSettingsWriteBox": {
       "tag": "DIV",
       "id": "govUserGrantSettingsWriteBox",
-      "text": "appearance\u00d7",
+      "text": "",
       "onclick": "(function(i){if(i)i.focus();})($('govUserGrantSettingsWriteInput'))",
       "panel": null,
       "scope": "panelGovernance",
@@ -2946,7 +2946,7 @@
     "#govUserGrantToolsBox": {
       "tag": "DIV",
       "id": "govUserGrantToolsBox",
-      "text": "read_file\u00d7",
+      "text": "",
       "onclick": "(function(i){if(i)i.focus();})($('govUserGrantToolsInput'))",
       "panel": null,
       "scope": "panelGovernance",
@@ -2972,7 +2972,7 @@
     "#govUserGrantToolsetsBox": {
       "tag": "DIV",
       "id": "govUserGrantToolsetsBox",
-      "text": "file\u00d7",
+      "text": "",
       "onclick": "(function(i){if(i)i.focus();})($('govUserGrantToolsetsInput'))",
       "panel": null,
       "scope": "panelGovernance",
@@ -2998,7 +2998,7 @@
     "#govUserGrantWorkdirsBox": {
       "tag": "DIV",
       "id": "govUserGrantWorkdirsBox",
-      "text": "/Users/michaelramirez/Documents/Codex/2026-09-08/do-x20/work/e2e-runs/20260908-222640-1694",
+      "text": "",
       "onclick": "(function(i){if(i)i.focus();})($('govUserGrantWorkdirsInput'))",
       "panel": null,
       "scope": "panelGovernance",
@@ -3024,7 +3024,7 @@
     "#govUserGrantWorkspacesBox": {
       "tag": "DIV",
       "id": "govUserGrantWorkspacesBox",
-      "text": "/Users/michaelramirez/Documents/Codex/2026-09-08/do-x20/work/e2e-runs/20260908-222640-1694",
+      "text": "",
       "onclick": "(function(i){if(i)i.focus();})($('govUserGrantWorkspacesInput'))",
       "panel": null,
       "scope": "panelGovernance",
@@ -3102,7 +3102,7 @@
     "#govUserRolesSelBox": {
       "tag": "DIV",
       "id": "govUserRolesSelBox",
-      "text": "member\u00d7",
+      "text": "",
       "onclick": "(function(i){if(i)i.focus();})($('govUserRolesSelInput'))",
       "panel": null,
       "scope": "panelGovernance",
@@ -3249,6 +3249,19 @@
       "selection": null,
       "value": null,
       "source": "browser",
+      "status": "NOT_INTERACTED",
+      "observed": true
+    },
+    "#govWsMembers_3": {
+      "tag": "INPUT",
+      "id": "govWsMembers_3",
+      "text": "",
+      "onclick": null,
+      "panel": null,
+      "scope": "panelGovernance",
+      "selection": null,
+      "value": null,
+      "source": "browser",
       "status": "INTERACTED_IN_PASSING_TEST",
       "observed": true
     },
@@ -3281,6 +3294,19 @@
     "#govWsOwner_2": {
       "tag": "INPUT",
       "id": "govWsOwner_2",
+      "text": "",
+      "onclick": null,
+      "panel": null,
+      "scope": "panelGovernance",
+      "selection": null,
+      "value": null,
+      "source": "browser",
+      "status": "NOT_INTERACTED",
+      "observed": true
+    },
+    "#govWsOwner_3": {
+      "tag": "INPUT",
+      "id": "govWsOwner_3",
       "text": "",
       "onclick": null,
       "panel": null,
@@ -3339,7 +3365,7 @@
       "source": "static/index.html",
       "line": 1101,
       "observed": false,
-      "status": "NOT_INTERACTED"
+      "status": "INTERACTED_IN_PASSING_TEST"
     },
     "#insightsPeriod": {
       "tag": "SELECT",
@@ -3399,7 +3425,7 @@
       "source": "static/index.html",
       "line": 238,
       "observed": true,
-      "status": "NOT_INTERACTED"
+      "status": "INTERACTED_IN_PASSING_TEST"
     },
     "#kanbanBoardModalColor": {
       "tag": "INPUT",
@@ -3409,7 +3435,7 @@
       "source": "static/index.html",
       "line": 2015,
       "observed": false,
-      "status": "NOT_INTERACTED"
+      "status": "INTERACTED_IN_PASSING_TEST"
     },
     "#kanbanBoardModalDesc": {
       "tag": "TEXTAREA",
@@ -3419,7 +3445,7 @@
       "source": "static/index.html",
       "line": 2006,
       "observed": false,
-      "status": "NOT_INTERACTED"
+      "status": "INTERACTED_IN_PASSING_TEST"
     },
     "#kanbanBoardModalIcon": {
       "tag": "INPUT",
@@ -3429,7 +3455,7 @@
       "source": "static/index.html",
       "line": 2011,
       "observed": false,
-      "status": "NOT_INTERACTED"
+      "status": "INTERACTED_IN_PASSING_TEST"
     },
     "#kanbanBoardModalName": {
       "tag": "INPUT",
@@ -3439,7 +3465,7 @@
       "source": "static/index.html",
       "line": 1998,
       "observed": false,
-      "status": "NOT_INTERACTED"
+      "status": "INTERACTED_IN_PASSING_TEST"
     },
     "#kanbanBoardModalSlugInput": {
       "tag": "INPUT",
@@ -3449,7 +3475,7 @@
       "source": "static/index.html",
       "line": 2002,
       "observed": false,
-      "status": "NOT_INTERACTED"
+      "status": "INTERACTED_IN_PASSING_TEST"
     },
     "#kanbanBoardModalSubmit": {
       "tag": "BUTTON",
@@ -3459,7 +3485,7 @@
       "source": "static/index.html",
       "line": 2021,
       "observed": false,
-      "status": "NOT_INTERACTED"
+      "status": "INTERACTED_IN_PASSING_TEST"
     },
     "#kanbanBoardSwitcherToggle": {
       "tag": "BUTTON",
@@ -3468,8 +3494,8 @@
       "panel": null,
       "source": "static/index.html",
       "line": 891,
-      "observed": false,
-      "status": "NOT_INTERACTED"
+      "observed": true,
+      "status": "INTERACTED_IN_PASSING_TEST"
     },
     "#kanbanBulkStatus": {
       "tag": "SELECT",
@@ -3479,7 +3505,7 @@
       "source": "static/index.html",
       "line": 244,
       "observed": true,
-      "status": "NOT_INTERACTED"
+      "status": "INTERACTED_IN_PASSING_TEST"
     },
     "#kanbanCommentInput": {
       "tag": "TEXTAREA",
@@ -3499,7 +3525,7 @@
       "source": "static/panels.js",
       "line": 3111,
       "observed": false,
-      "status": "NOT_INTERACTED"
+      "status": "INTERACTED_IN_PASSING_TEST"
     },
     "#kanbanIncludeArchived": {
       "tag": "INPUT",
@@ -3539,7 +3565,7 @@
       "source": "static/index.html",
       "line": 241,
       "observed": true,
-      "status": "NOT_INTERACTED"
+      "status": "INTERACTED_IN_PASSING_TEST"
     },
     "#kanbanRefreshBtn": {
       "tag": "BUTTON",
@@ -3549,7 +3575,7 @@
       "source": "static/index.html",
       "line": 233,
       "observed": true,
-      "status": "NOT_INTERACTED"
+      "status": "INTERACTED_IN_PASSING_TEST"
     },
     "#kanbanSearch": {
       "tag": "INPUT",
@@ -3649,7 +3675,7 @@
       "source": "static/index.html",
       "line": 2062,
       "observed": false,
-      "status": "NOT_INTERACTED"
+      "status": "INTERACTED_IN_PASSING_TEST"
     },
     "#kanbanTaskModalTitleInput": {
       "tag": "INPUT",
@@ -3689,7 +3715,7 @@
       "source": "static/index.html",
       "line": 239,
       "observed": true,
-      "status": "NOT_INTERACTED"
+      "status": "INTERACTED_IN_PASSING_TEST"
     },
     "#logsAutoRefresh": {
       "tag": "INPUT",
@@ -3699,7 +3725,7 @@
       "source": "static/index.html",
       "line": 359,
       "observed": true,
-      "status": "NOT_INTERACTED"
+      "status": "INTERACTED_IN_PASSING_TEST"
     },
     "#logsCopyAll": {
       "tag": "BUTTON",
@@ -3709,7 +3735,7 @@
       "source": "static/index.html",
       "line": 361,
       "observed": true,
-      "status": "NOT_INTERACTED"
+      "status": "INTERACTED_IN_PASSING_TEST"
     },
     "#logsFile": {
       "tag": "SELECT",
@@ -4057,17 +4083,9 @@
       "status": "NOT_INTERACTED"
     },
     "#pw": {
-      "tag": "INPUT",
-      "id": "pw",
-      "text": "",
-      "onclick": null,
-      "panel": null,
-      "scope": "app",
-      "selection": null,
-      "value": null,
-      "source": "browser",
-      "status": "INTERACTED_IN_PASSING_TEST",
-      "observed": true
+      "source": "browser action",
+      "observed": true,
+      "status": "INTERACTED_IN_PASSING_TEST"
     },
     "#queuePill": {
       "tag": "BUTTON",
@@ -4087,7 +4105,7 @@
       "source": "static/index.html",
       "line": 171,
       "observed": true,
-      "status": "NOT_INTERACTED"
+      "status": "INTERACTED_IN_PASSING_TEST"
     },
     "#realtimeVoiceEnd": {
       "tag": "BUTTON",
@@ -4797,7 +4815,7 @@
       "source": "static/index.html",
       "line": 1172,
       "observed": true,
-      "status": "NOT_INTERACTED"
+      "status": "INTERACTED_IN_PASSING_TEST"
     },
     "#settingsWorkspaceTodosTab": {
       "tag": "INPUT",
@@ -4875,10 +4893,10 @@
     "#toast": {
       "tag": "DIV",
       "id": "toast",
-      "text": "Message queued",
+      "text": "Saved",
       "onclick": null,
       "panel": null,
-      "scope": "panelChat",
+      "scope": "panelGovernance",
       "selection": null,
       "value": null,
       "source": "browser",
@@ -4943,7 +4961,7 @@
       "source": "static/index.html",
       "line": 1872,
       "observed": true,
-      "status": "NOT_INTERACTED"
+      "status": "INTERACTED_IN_PASSING_TEST"
     },
     "#workspaceFilesTab": {
       "tag": "BUTTON",
@@ -4996,7 +5014,7 @@
       "source": "static/ui.js",
       "line": 20527,
       "observed": false,
-      "status": "NOT_INTERACTED"
+      "status": "INTERACTED_IN_PASSING_TEST"
     },
     "#workspaceTodosTab": {
       "tag": "BUTTON",
@@ -5049,17 +5067,9 @@
       "status": "NOT_INTERACTED"
     },
     "app:BUTTON:Sign in": {
-      "tag": "BUTTON",
-      "id": "",
-      "text": "Sign in",
-      "onclick": null,
-      "panel": null,
-      "scope": "app",
-      "selection": null,
-      "value": null,
-      "source": "browser",
-      "status": "INTERACTED_IN_PASSING_TEST",
-      "observed": true
+      "source": "browser action",
+      "observed": true,
+      "status": "INTERACTED_IN_PASSING_TEST"
     },
     "onclick:_gatewayAction('start')": {
       "tag": "BUTTON",
@@ -5115,16 +5125,16 @@
       "status": "INTERACTED_IN_PASSING_TEST",
       "observed": true
     },
-    "onclick:_govDeleteGroup(\"qa-admin-engineers-1788899282086-yvij\")": {
+    "onclick:_govDeleteGroup(\"qa-admin-engineers-1788933825756-js5v\")": {
       "source": "browser action",
       "observed": true,
       "status": "INTERACTED_IN_PASSING_TEST"
     },
-    "onclick:_govDeleteGroup(\"qa-admin-legacy-group-1788899288179-ha3u\")": {
+    "onclick:_govDeleteGroup(\"qa-admin-legacy-group-1788933831645-8jac\")": {
       "tag": "BUTTON",
       "id": "",
       "text": "Delete",
-      "onclick": "_govDeleteGroup(\"qa-admin-legacy-group-1788899288179-ha3u\")",
+      "onclick": "_govDeleteGroup(\"qa-admin-legacy-group-1788933831645-8jac\")",
       "panel": null,
       "scope": "panelGovernance",
       "selection": null,
@@ -5133,17 +5143,17 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "onclick:_govDeleteGroup(\"qa-admin-membership-1788899284111-nl4m\")": {
+    "onclick:_govDeleteGroup(\"qa-admin-membership-1788933827671-esd4\")": {
       "source": "browser action",
       "observed": true,
       "status": "INTERACTED_IN_PASSING_TEST"
     },
-    "onclick:_govDeleteGroup(\"qa-admin-operators-1788899279969-t2wy\")": {
+    "onclick:_govDeleteGroup(\"qa-admin-operators-1788933823757-skm3\")": {
       "source": "browser action",
       "observed": true,
       "status": "INTERACTED_IN_PASSING_TEST"
     },
-    "onclick:_govDeleteGroup(\"qa-admin-viewers-1788899277971-h7en\")": {
+    "onclick:_govDeleteGroup(\"qa-admin-viewers-1788933821889-p884\")": {
       "source": "browser action",
       "observed": true,
       "status": "INTERACTED_IN_PASSING_TEST"
@@ -5317,16 +5327,16 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "onclick:_govDeleteUser(\"qa-admin-member-1788899284111-7ehj@example.test\")": {
+    "onclick:_govDeleteUser(\"qa-admin-member-1788933827671-d870@example.test\")": {
       "source": "browser action",
       "observed": true,
       "status": "INTERACTED_IN_PASSING_TEST"
     },
-    "onclick:_govDeleteUser(\"qa-blacklist-1788899310072@example.test\")": {
+    "onclick:_govDeleteUser(\"qa-blacklist-1788933852507@example.test\")": {
       "tag": "BUTTON",
       "id": "",
       "text": "Delete",
-      "onclick": "_govDeleteUser(\"qa-blacklist-1788899310072@example.test\")",
+      "onclick": "_govDeleteUser(\"qa-blacklist-1788933852507@example.test\")",
       "panel": null,
       "scope": "panelGovernance",
       "selection": null,
@@ -5335,11 +5345,11 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "onclick:_govDeleteUser(\"qa-fields-clear-1788899288932-ogl45m@example.test\")": {
+    "onclick:_govDeleteUser(\"qa-fields-clear-1788933832320-s43ejb@example.test\")": {
       "tag": "BUTTON",
       "id": "",
       "text": "Delete",
-      "onclick": "_govDeleteUser(\"qa-fields-clear-1788899288932-ogl45m@example.test\")",
+      "onclick": "_govDeleteUser(\"qa-fields-clear-1788933832320-s43ejb@example.test\")",
       "panel": null,
       "scope": "panelGovernance",
       "selection": null,
@@ -5348,11 +5358,11 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "onclick:_govDeleteUser(\"qa-fields-inspector-new-1788899288932-ogl45m@example.test\")": {
+    "onclick:_govDeleteUser(\"qa-fields-inspector-new-1788933832320-s43ejb@example.test\")": {
       "tag": "BUTTON",
       "id": "",
       "text": "Delete",
-      "onclick": "_govDeleteUser(\"qa-fields-inspector-new-1788899288932-ogl45m@example.test\")",
+      "onclick": "_govDeleteUser(\"qa-fields-inspector-new-1788933832320-s43ejb@example.test\")",
       "panel": null,
       "scope": "panelGovernance",
       "selection": null,
@@ -5361,11 +5371,11 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "onclick:_govDeleteUser(\"qa-fields-inspector-old-1788899288932-ogl45m@example.test\")": {
+    "onclick:_govDeleteUser(\"qa-fields-inspector-old-1788933832320-s43ejb@example.test\")": {
       "tag": "BUTTON",
       "id": "",
       "text": "Delete",
-      "onclick": "_govDeleteUser(\"qa-fields-inspector-old-1788899288932-ogl45m@example.test\")",
+      "onclick": "_govDeleteUser(\"qa-fields-inspector-old-1788933832320-s43ejb@example.test\")",
       "panel": null,
       "scope": "panelGovernance",
       "selection": null,
@@ -5374,11 +5384,11 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "onclick:_govDeleteUser(\"qa-fields-legacy-1788899288932-ogl45m@example.test\")": {
+    "onclick:_govDeleteUser(\"qa-fields-legacy-1788933832320-s43ejb@example.test\")": {
       "tag": "BUTTON",
       "id": "",
       "text": "Delete",
-      "onclick": "_govDeleteUser(\"qa-fields-legacy-1788899288932-ogl45m@example.test\")",
+      "onclick": "_govDeleteUser(\"qa-fields-legacy-1788933832320-s43ejb@example.test\")",
       "panel": null,
       "scope": "panelGovernance",
       "selection": null,
@@ -5387,11 +5397,11 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "onclick:_govDeleteUser(\"qa-fields-level-only-1788899288932-ogl45m@example.test\")": {
+    "onclick:_govDeleteUser(\"qa-fields-level-only-1788933832320-s43ejb@example.test\")": {
       "tag": "BUTTON",
       "id": "",
       "text": "Delete",
-      "onclick": "_govDeleteUser(\"qa-fields-level-only-1788899288932-ogl45m@example.test\")",
+      "onclick": "_govDeleteUser(\"qa-fields-level-only-1788933832320-s43ejb@example.test\")",
       "panel": null,
       "scope": "panelGovernance",
       "selection": null,
@@ -5400,11 +5410,11 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "onclick:_govDeleteUser(\"qa-fields-preview-first-1788899288932-ogl45m@example.test\")": {
+    "onclick:_govDeleteUser(\"qa-fields-preview-first-1788933832320-s43ejb@example.test\")": {
       "tag": "BUTTON",
       "id": "",
       "text": "Delete",
-      "onclick": "_govDeleteUser(\"qa-fields-preview-first-1788899288932-ogl45m@example.test\")",
+      "onclick": "_govDeleteUser(\"qa-fields-preview-first-1788933832320-s43ejb@example.test\")",
       "panel": null,
       "scope": "panelGovernance",
       "selection": null,
@@ -5413,11 +5423,11 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "onclick:_govDeleteUser(\"qa-fields-preview-second-1788899288932-ogl45m@example.test\")": {
+    "onclick:_govDeleteUser(\"qa-fields-preview-second-1788933832320-s43ejb@example.test\")": {
       "tag": "BUTTON",
       "id": "",
       "text": "Delete",
-      "onclick": "_govDeleteUser(\"qa-fields-preview-second-1788899288932-ogl45m@example.test\")",
+      "onclick": "_govDeleteUser(\"qa-fields-preview-second-1788933832320-s43ejb@example.test\")",
       "panel": null,
       "scope": "panelGovernance",
       "selection": null,
@@ -5426,11 +5436,11 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "onclick:_govDeleteUser(\"qa-fields-roundtrip-1788899288932-ogl45m@example.test\")": {
+    "onclick:_govDeleteUser(\"qa-fields-roundtrip-1788933832320-s43ejb@example.test\")": {
       "tag": "BUTTON",
       "id": "",
       "text": "Delete",
-      "onclick": "_govDeleteUser(\"qa-fields-roundtrip-1788899288932-ogl45m@example.test\")",
+      "onclick": "_govDeleteUser(\"qa-fields-roundtrip-1788933832320-s43ejb@example.test\")",
       "panel": null,
       "scope": "panelGovernance",
       "selection": null,
@@ -5439,11 +5449,11 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "onclick:_govDeleteUser(\"qa-fields-save-first-1788899288932-ogl45m@example.test\")": {
+    "onclick:_govDeleteUser(\"qa-fields-save-first-1788933832320-s43ejb@example.test\")": {
       "tag": "BUTTON",
       "id": "",
       "text": "Delete",
-      "onclick": "_govDeleteUser(\"qa-fields-save-first-1788899288932-ogl45m@example.test\")",
+      "onclick": "_govDeleteUser(\"qa-fields-save-first-1788933832320-s43ejb@example.test\")",
       "panel": null,
       "scope": "panelGovernance",
       "selection": null,
@@ -5452,11 +5462,11 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "onclick:_govDeleteUser(\"qa-fields-save-second-1788899288932-ogl45m@example.test\")": {
+    "onclick:_govDeleteUser(\"qa-fields-save-second-1788933832320-s43ejb@example.test\")": {
       "tag": "BUTTON",
       "id": "",
       "text": "Delete",
-      "onclick": "_govDeleteUser(\"qa-fields-save-second-1788899288932-ogl45m@example.test\")",
+      "onclick": "_govDeleteUser(\"qa-fields-save-second-1788933832320-s43ejb@example.test\")",
       "panel": null,
       "scope": "panelGovernance",
       "selection": null,
@@ -5465,11 +5475,11 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "onclick:_govDeleteUser(\"qa-responsive-desktop-1788899303355@example.test\")": {
+    "onclick:_govDeleteUser(\"qa-responsive-desktop-1788933846113@example.test\")": {
       "tag": "BUTTON",
       "id": "",
       "text": "Delete",
-      "onclick": "_govDeleteUser(\"qa-responsive-desktop-1788899303355@example.test\")",
+      "onclick": "_govDeleteUser(\"qa-responsive-desktop-1788933846113@example.test\")",
       "panel": null,
       "scope": "panelGovernance",
       "selection": null,
@@ -5478,11 +5488,11 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "onclick:_govDeleteUser(\"qa-responsive-laptop-1788899304881@example.test\")": {
+    "onclick:_govDeleteUser(\"qa-responsive-laptop-1788933847536@example.test\")": {
       "tag": "BUTTON",
       "id": "",
       "text": "Delete",
-      "onclick": "_govDeleteUser(\"qa-responsive-laptop-1788899304881@example.test\")",
+      "onclick": "_govDeleteUser(\"qa-responsive-laptop-1788933847536@example.test\")",
       "panel": null,
       "scope": "panelGovernance",
       "selection": null,
@@ -5491,11 +5501,11 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "onclick:_govDeleteUser(\"qa-responsive-mobile-1788899306368@example.test\")": {
+    "onclick:_govDeleteUser(\"qa-responsive-mobile-1788933848826@example.test\")": {
       "tag": "BUTTON",
       "id": "",
       "text": "Delete",
-      "onclick": "_govDeleteUser(\"qa-responsive-mobile-1788899306368@example.test\")",
+      "onclick": "_govDeleteUser(\"qa-responsive-mobile-1788933848826@example.test\")",
       "panel": null,
       "scope": "panelGovernance",
       "selection": null,
@@ -5530,16 +5540,16 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "onclick:_govEditGroup(\"qa-admin-engineers-1788899282086-yvij\")": {
+    "onclick:_govEditGroup(\"qa-admin-engineers-1788933825756-js5v\")": {
       "source": "browser action",
       "observed": true,
       "status": "INTERACTED_IN_PASSING_TEST"
     },
-    "onclick:_govEditGroup(\"qa-admin-legacy-group-1788899288179-ha3u\")": {
+    "onclick:_govEditGroup(\"qa-admin-legacy-group-1788933831645-8jac\")": {
       "tag": "BUTTON",
       "id": "",
       "text": "Edit",
-      "onclick": "_govEditGroup(\"qa-admin-legacy-group-1788899288179-ha3u\")",
+      "onclick": "_govEditGroup(\"qa-admin-legacy-group-1788933831645-8jac\")",
       "panel": null,
       "scope": "panelGovernance",
       "selection": null,
@@ -5548,12 +5558,12 @@
       "status": "INTERACTED_IN_PASSING_TEST",
       "observed": true
     },
-    "onclick:_govEditGroup(\"qa-admin-operators-1788899279969-t2wy\")": {
+    "onclick:_govEditGroup(\"qa-admin-operators-1788933823757-skm3\")": {
       "source": "browser action",
       "observed": true,
       "status": "INTERACTED_IN_PASSING_TEST"
     },
-    "onclick:_govEditGroup(\"qa-admin-viewers-1788899277971-h7en\")": {
+    "onclick:_govEditGroup(\"qa-admin-viewers-1788933821889-p884\")": {
       "source": "browser action",
       "observed": true,
       "status": "INTERACTED_IN_PASSING_TEST"
@@ -5727,16 +5737,16 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "onclick:_govEditUser(\"qa-admin-member-1788899284111-7ehj@example.test\")": {
+    "onclick:_govEditUser(\"qa-admin-member-1788933827671-d870@example.test\")": {
       "source": "browser action",
       "observed": true,
       "status": "INTERACTED_IN_PASSING_TEST"
     },
-    "onclick:_govEditUser(\"qa-blacklist-1788899310072@example.test\")": {
+    "onclick:_govEditUser(\"qa-blacklist-1788933852507@example.test\")": {
       "tag": "BUTTON",
       "id": "",
       "text": "Edit",
-      "onclick": "_govEditUser(\"qa-blacklist-1788899310072@example.test\")",
+      "onclick": "_govEditUser(\"qa-blacklist-1788933852507@example.test\")",
       "panel": null,
       "scope": "panelGovernance",
       "selection": null,
@@ -5745,11 +5755,11 @@
       "status": "INTERACTED_IN_PASSING_TEST",
       "observed": true
     },
-    "onclick:_govEditUser(\"qa-fields-clear-1788899288932-ogl45m@example.test\")": {
+    "onclick:_govEditUser(\"qa-fields-clear-1788933832320-s43ejb@example.test\")": {
       "tag": "BUTTON",
       "id": "",
       "text": "Edit",
-      "onclick": "_govEditUser(\"qa-fields-clear-1788899288932-ogl45m@example.test\")",
+      "onclick": "_govEditUser(\"qa-fields-clear-1788933832320-s43ejb@example.test\")",
       "panel": null,
       "scope": "panelGovernance",
       "selection": null,
@@ -5758,11 +5768,11 @@
       "status": "INTERACTED_IN_PASSING_TEST",
       "observed": true
     },
-    "onclick:_govEditUser(\"qa-fields-inspector-new-1788899288932-ogl45m@example.test\")": {
+    "onclick:_govEditUser(\"qa-fields-inspector-new-1788933832320-s43ejb@example.test\")": {
       "tag": "BUTTON",
       "id": "",
       "text": "Edit",
-      "onclick": "_govEditUser(\"qa-fields-inspector-new-1788899288932-ogl45m@example.test\")",
+      "onclick": "_govEditUser(\"qa-fields-inspector-new-1788933832320-s43ejb@example.test\")",
       "panel": null,
       "scope": "panelGovernance",
       "selection": null,
@@ -5771,11 +5781,11 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "onclick:_govEditUser(\"qa-fields-inspector-old-1788899288932-ogl45m@example.test\")": {
+    "onclick:_govEditUser(\"qa-fields-inspector-old-1788933832320-s43ejb@example.test\")": {
       "tag": "BUTTON",
       "id": "",
       "text": "Edit",
-      "onclick": "_govEditUser(\"qa-fields-inspector-old-1788899288932-ogl45m@example.test\")",
+      "onclick": "_govEditUser(\"qa-fields-inspector-old-1788933832320-s43ejb@example.test\")",
       "panel": null,
       "scope": "panelGovernance",
       "selection": null,
@@ -5784,11 +5794,11 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "onclick:_govEditUser(\"qa-fields-legacy-1788899288932-ogl45m@example.test\")": {
+    "onclick:_govEditUser(\"qa-fields-legacy-1788933832320-s43ejb@example.test\")": {
       "tag": "BUTTON",
       "id": "",
       "text": "Edit",
-      "onclick": "_govEditUser(\"qa-fields-legacy-1788899288932-ogl45m@example.test\")",
+      "onclick": "_govEditUser(\"qa-fields-legacy-1788933832320-s43ejb@example.test\")",
       "panel": null,
       "scope": "panelGovernance",
       "selection": null,
@@ -5797,11 +5807,11 @@
       "status": "INTERACTED_IN_PASSING_TEST",
       "observed": true
     },
-    "onclick:_govEditUser(\"qa-fields-level-only-1788899288932-ogl45m@example.test\")": {
+    "onclick:_govEditUser(\"qa-fields-level-only-1788933832320-s43ejb@example.test\")": {
       "tag": "BUTTON",
       "id": "",
       "text": "Edit",
-      "onclick": "_govEditUser(\"qa-fields-level-only-1788899288932-ogl45m@example.test\")",
+      "onclick": "_govEditUser(\"qa-fields-level-only-1788933832320-s43ejb@example.test\")",
       "panel": null,
       "scope": "panelGovernance",
       "selection": null,
@@ -5810,11 +5820,11 @@
       "status": "INTERACTED_IN_PASSING_TEST",
       "observed": true
     },
-    "onclick:_govEditUser(\"qa-fields-preview-first-1788899288932-ogl45m@example.test\")": {
+    "onclick:_govEditUser(\"qa-fields-preview-first-1788933832320-s43ejb@example.test\")": {
       "tag": "BUTTON",
       "id": "",
       "text": "Edit",
-      "onclick": "_govEditUser(\"qa-fields-preview-first-1788899288932-ogl45m@example.test\")",
+      "onclick": "_govEditUser(\"qa-fields-preview-first-1788933832320-s43ejb@example.test\")",
       "panel": null,
       "scope": "panelGovernance",
       "selection": null,
@@ -5823,11 +5833,11 @@
       "status": "INTERACTED_IN_PASSING_TEST",
       "observed": true
     },
-    "onclick:_govEditUser(\"qa-fields-preview-second-1788899288932-ogl45m@example.test\")": {
+    "onclick:_govEditUser(\"qa-fields-preview-second-1788933832320-s43ejb@example.test\")": {
       "tag": "BUTTON",
       "id": "",
       "text": "Edit",
-      "onclick": "_govEditUser(\"qa-fields-preview-second-1788899288932-ogl45m@example.test\")",
+      "onclick": "_govEditUser(\"qa-fields-preview-second-1788933832320-s43ejb@example.test\")",
       "panel": null,
       "scope": "panelGovernance",
       "selection": null,
@@ -5836,11 +5846,11 @@
       "status": "INTERACTED_IN_PASSING_TEST",
       "observed": true
     },
-    "onclick:_govEditUser(\"qa-fields-roundtrip-1788899288932-ogl45m@example.test\")": {
+    "onclick:_govEditUser(\"qa-fields-roundtrip-1788933832320-s43ejb@example.test\")": {
       "tag": "BUTTON",
       "id": "",
       "text": "Edit",
-      "onclick": "_govEditUser(\"qa-fields-roundtrip-1788899288932-ogl45m@example.test\")",
+      "onclick": "_govEditUser(\"qa-fields-roundtrip-1788933832320-s43ejb@example.test\")",
       "panel": null,
       "scope": "panelGovernance",
       "selection": null,
@@ -5849,11 +5859,11 @@
       "status": "INTERACTED_IN_PASSING_TEST",
       "observed": true
     },
-    "onclick:_govEditUser(\"qa-fields-save-first-1788899288932-ogl45m@example.test\")": {
+    "onclick:_govEditUser(\"qa-fields-save-first-1788933832320-s43ejb@example.test\")": {
       "tag": "BUTTON",
       "id": "",
       "text": "Edit",
-      "onclick": "_govEditUser(\"qa-fields-save-first-1788899288932-ogl45m@example.test\")",
+      "onclick": "_govEditUser(\"qa-fields-save-first-1788933832320-s43ejb@example.test\")",
       "panel": null,
       "scope": "panelGovernance",
       "selection": null,
@@ -5862,11 +5872,11 @@
       "status": "INTERACTED_IN_PASSING_TEST",
       "observed": true
     },
-    "onclick:_govEditUser(\"qa-fields-save-second-1788899288932-ogl45m@example.test\")": {
+    "onclick:_govEditUser(\"qa-fields-save-second-1788933832320-s43ejb@example.test\")": {
       "tag": "BUTTON",
       "id": "",
       "text": "Edit",
-      "onclick": "_govEditUser(\"qa-fields-save-second-1788899288932-ogl45m@example.test\")",
+      "onclick": "_govEditUser(\"qa-fields-save-second-1788933832320-s43ejb@example.test\")",
       "panel": null,
       "scope": "panelGovernance",
       "selection": null,
@@ -5875,11 +5885,11 @@
       "status": "INTERACTED_IN_PASSING_TEST",
       "observed": true
     },
-    "onclick:_govEditUser(\"qa-responsive-desktop-1788899303355@example.test\")": {
+    "onclick:_govEditUser(\"qa-responsive-desktop-1788933846113@example.test\")": {
       "tag": "BUTTON",
       "id": "",
       "text": "Edit",
-      "onclick": "_govEditUser(\"qa-responsive-desktop-1788899303355@example.test\")",
+      "onclick": "_govEditUser(\"qa-responsive-desktop-1788933846113@example.test\")",
       "panel": null,
       "scope": "panelGovernance",
       "selection": null,
@@ -5888,11 +5898,11 @@
       "status": "INTERACTED_IN_PASSING_TEST",
       "observed": true
     },
-    "onclick:_govEditUser(\"qa-responsive-laptop-1788899304881@example.test\")": {
+    "onclick:_govEditUser(\"qa-responsive-laptop-1788933847536@example.test\")": {
       "tag": "BUTTON",
       "id": "",
       "text": "Edit",
-      "onclick": "_govEditUser(\"qa-responsive-laptop-1788899304881@example.test\")",
+      "onclick": "_govEditUser(\"qa-responsive-laptop-1788933847536@example.test\")",
       "panel": null,
       "scope": "panelGovernance",
       "selection": null,
@@ -5901,11 +5911,11 @@
       "status": "INTERACTED_IN_PASSING_TEST",
       "observed": true
     },
-    "onclick:_govEditUser(\"qa-responsive-mobile-1788899306368@example.test\")": {
+    "onclick:_govEditUser(\"qa-responsive-mobile-1788933848826@example.test\")": {
       "tag": "BUTTON",
       "id": "",
       "text": "Edit",
-      "onclick": "_govEditUser(\"qa-responsive-mobile-1788899306368@example.test\")",
+      "onclick": "_govEditUser(\"qa-responsive-mobile-1788933848826@example.test\")",
       "panel": null,
       "scope": "panelGovernance",
       "selection": null,
@@ -6025,6 +6035,19 @@
       "selection": null,
       "value": null,
       "source": "browser",
+      "status": "NOT_INTERACTED",
+      "observed": true
+    },
+    "onclick:_govSaveWorkspaceAssign(3)": {
+      "tag": "BUTTON",
+      "id": "",
+      "text": "Save",
+      "onclick": "_govSaveWorkspaceAssign(3)",
+      "panel": null,
+      "scope": "panelGovernance",
+      "selection": null,
+      "value": null,
+      "source": "browser",
       "status": "INTERACTED_IN_PASSING_TEST",
       "observed": true
     },
@@ -6132,21 +6155,21 @@
       "status": "INTERACTED_IN_PASSING_TEST",
       "observed": true
     },
-    "onclick:_govWsToggleMember(2, false)": {
+    "onclick:_govWsToggleMember(3, false)": {
       "source": "browser action",
       "observed": true,
       "status": "INTERACTED_IN_PASSING_TEST"
     },
-    "onclick:_govWsToggleMember(2, true)": {
+    "onclick:_govWsToggleMember(3, true)": {
       "source": "browser action",
       "observed": true,
       "status": "INTERACTED_IN_PASSING_TEST"
     },
-    "onclick:_loadRunContent('3d7403972f0b','2026-09-08_22-30-47.md','cron-det-run-3d7403972f0b-0')": {
+    "onclick:_loadRunContent('010c5145f442','2026-09-09_08-06-39.md','cron-det-run-010c5145f442-0')": {
       "tag": "DIV",
       "id": "",
-      "text": "2026-09-08 22-30-47 769 B\n          \n            \u25be\n            \u25b8",
-      "onclick": "_loadRunContent('3d7403972f0b','2026-09-08_22-30-47.md','cron-det-run-3d7403972f0b-0')",
+      "text": "2026-09-09 08-06-39 769 B\n          \n            \u25be\n            \u25b8",
+      "onclick": "_loadRunContent('010c5145f442','2026-09-09_08-06-39.md','cron-det-run-010c5145f442-0')",
       "panel": null,
       "scope": "panelTasks",
       "selection": null,
@@ -6285,7 +6308,7 @@
       "status": "INTERACTED_IN_PASSING_TEST",
       "observed": true
     },
-    "onclick:_projOpen('584f735f21e8')": {
+    "onclick:_projOpen('ef2e05ffae73')": {
       "source": "browser action",
       "observed": true,
       "status": "INTERACTED_IN_PASSING_TEST"
@@ -6303,7 +6326,32 @@
       "status": "INTERACTED_IN_PASSING_TEST",
       "observed": true
     },
-    "onclick:addKanbanComment('t_2581e808')": {
+    "onclick:addKanbanComment('t_146f6f05')": {
+      "source": "browser action",
+      "observed": true,
+      "status": "INTERACTED_IN_PASSING_TEST"
+    },
+    "onclick:addKanbanDependency(\"t_684c8aa9\")": {
+      "source": "browser action",
+      "observed": true,
+      "status": "INTERACTED_IN_PASSING_TEST"
+    },
+    "onclick:addKanbanDependency(\"t_7080861b\")": {
+      "source": "browser action",
+      "observed": true,
+      "status": "INTERACTED_IN_PASSING_TEST"
+    },
+    "onclick:addKanbanDependency(\"t_7c7f18c5\")": {
+      "source": "browser action",
+      "observed": true,
+      "status": "INTERACTED_IN_PASSING_TEST"
+    },
+    "onclick:archiveKanbanBoard()": {
+      "source": "browser action",
+      "observed": true,
+      "status": "INTERACTED_IN_PASSING_TEST"
+    },
+    "onclick:blockKanbanTask('t_7c7f18c5')": {
       "source": "browser action",
       "observed": true,
       "status": "INTERACTED_IN_PASSING_TEST"
@@ -6318,7 +6366,7 @@
       "selection": null,
       "value": null,
       "source": "browser",
-      "status": "NOT_INTERACTED",
+      "status": "INTERACTED_IN_PASSING_TEST",
       "observed": true
     },
     "onclick:closeKanbanTaskDetail()": {
@@ -6391,7 +6439,7 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "onclick:deletePasskey('tv4hSSIqgsfVMP4EIoQdj__h7k6P92RdIwd1wR2GaSU')": {
+    "onclick:deletePasskey('uO0Rbv3-1_71K9jZ-UlavD6kc9NdWJ--KZYR99q9v38')": {
       "source": "browser action",
       "observed": true,
       "status": "INTERACTED_IN_PASSING_TEST"
@@ -6448,11 +6496,11 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "onclick:event.stopPropagation();toggleCronRunExpanded('3d7403972f0b','2026-09-08_22-30-47.md','cron-det-run-3d7403972f0b-0')": {
+    "onclick:event.stopPropagation();toggleCronRunExpanded('010c5145f442','2026-09-09_08-06-39.md','cron-det-run-010c5145f442-0')": {
       "tag": "BUTTON",
       "id": "",
       "text": "Expand output",
-      "onclick": "event.stopPropagation();toggleCronRunExpanded('3d7403972f0b','2026-09-08_22-30-47.md','cron-det-run-3d7403972f0b-0')",
+      "onclick": "event.stopPropagation();toggleCronRunExpanded('010c5145f442','2026-09-09_08-06-39.md','cron-det-run-010c5145f442-0')",
       "panel": null,
       "scope": "panelTasks",
       "selection": null,
@@ -6497,7 +6545,7 @@
       "selection": null,
       "value": null,
       "source": "browser",
-      "status": "NOT_INTERACTED",
+      "status": "INTERACTED_IN_PASSING_TEST",
       "observed": true
     },
     "onclick:forkFromMessage(3)": {
@@ -6656,11 +6704,11 @@
       "status": "INTERACTED_IN_PASSING_TEST",
       "observed": true
     },
-    "onclick:loadKanbanTask('t_2581e808')": {
+    "onclick:loadKanbanTask('t_146f6f05')": {
       "tag": "BUTTON",
       "id": "",
-      "text": "Todo\n      QA Kanban lifecycle 1788899449689 edited\n      unassigned \u00b7 P2 \u00b7 \ud83d\udcac 1",
-      "onclick": "loadKanbanTask('t_2581e808')",
+      "text": "Todo\n      QA Kanban lifecycle 1788934002406 edited\n      unassigned \u00b7 P2 \u00b7 \ud83d\udcac 1",
+      "onclick": "loadKanbanTask('t_146f6f05')",
       "panel": null,
       "scope": "panelKanban",
       "selection": null,
@@ -6786,7 +6834,12 @@
       "status": "INTERACTED_IN_PASSING_TEST",
       "observed": true
     },
-    "onclick:openKanbanEdit('t_2581e808')": {
+    "onclick:openKanbanEdit('t_146f6f05')": {
+      "source": "browser action",
+      "observed": true,
+      "status": "INTERACTED_IN_PASSING_TEST"
+    },
+    "onclick:openKanbanRenameBoard()": {
       "source": "browser action",
       "observed": true,
       "status": "INTERACTED_IN_PASSING_TEST"
@@ -6830,11 +6883,11 @@
       "status": "INTERACTED_IN_PASSING_TEST",
       "observed": true
     },
-    "onclick:quickKanbanCardAction(event,'t_2581e808','archived')": {
+    "onclick:quickKanbanCardAction(event,'t_146f6f05','archived')": {
       "tag": "BUTTON",
       "id": "",
       "text": "archive",
-      "onclick": "quickKanbanCardAction(event,'t_2581e808','archived')",
+      "onclick": "quickKanbanCardAction(event,'t_146f6f05','archived')",
       "panel": null,
       "scope": "panelKanban",
       "selection": null,
@@ -6843,11 +6896,11 @@
       "status": "INTERACTED_IN_PASSING_TEST",
       "observed": true
     },
-    "onclick:quickKanbanCardAction(event,'t_2581e808','done')": {
+    "onclick:quickKanbanCardAction(event,'t_146f6f05','done')": {
       "tag": "BUTTON",
       "id": "",
       "text": "complete",
-      "onclick": "quickKanbanCardAction(event,'t_2581e808','done')",
+      "onclick": "quickKanbanCardAction(event,'t_146f6f05','done')",
       "panel": null,
       "scope": "panelKanban",
       "selection": null,
@@ -6869,11 +6922,16 @@
       "status": "INTERACTED_IN_PASSING_TEST",
       "observed": true
     },
-    "onclick:return openKanbanCard(event, 't_2581e808')": {
+    "onclick:removeKanbanDependency(\"t_684c8aa9\",\"t_7080861b\")": {
+      "source": "browser action",
+      "observed": true,
+      "status": "INTERACTED_IN_PASSING_TEST"
+    },
+    "onclick:return openKanbanCard(event, 't_146f6f05')": {
       "tag": "ARTICLE",
       "id": "",
-      "text": "t_2581e808P2\n    QA Kanban lifecycle 1788899449689 edited\n    Synthetic lifecycle task. De",
-      "onclick": "return openKanbanCard(event, 't_2581e808')",
+      "text": "t_146f6f05P2\n    QA Kanban lifecycle 1788934002406 edited\n    Synthetic lifecycle task. De",
+      "onclick": "return openKanbanCard(event, 't_146f6f05')",
       "panel": null,
       "scope": "panelKanban",
       "selection": null,
@@ -6881,6 +6939,26 @@
       "source": "browser",
       "status": "INTERACTED_IN_PASSING_TEST",
       "observed": true
+    },
+    "onclick:return openKanbanCard(event, 't_684c8aa9')": {
+      "source": "browser action",
+      "observed": true,
+      "status": "INTERACTED_IN_PASSING_TEST"
+    },
+    "onclick:return openKanbanCard(event, 't_6f3622bc')": {
+      "source": "browser action",
+      "observed": true,
+      "status": "INTERACTED_IN_PASSING_TEST"
+    },
+    "onclick:return openKanbanCard(event, 't_7080861b')": {
+      "source": "browser action",
+      "observed": true,
+      "status": "INTERACTED_IN_PASSING_TEST"
+    },
+    "onclick:return openKanbanCard(event, 't_7c7f18c5')": {
+      "source": "browser action",
+      "observed": true,
+      "status": "INTERACTED_IN_PASSING_TEST"
     },
     "onclick:runKanbanDispatcher()": {
       "tag": "BUTTON",
@@ -6973,6 +7051,16 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
+    "onclick:switchKanbanBoard('default')": {
+      "source": "browser action",
+      "observed": true,
+      "status": "INTERACTED_IN_PASSING_TEST"
+    },
+    "onclick:switchKanbanBoard('qa-board-1788933876458')": {
+      "source": "browser action",
+      "observed": true,
+      "status": "INTERACTED_IN_PASSING_TEST"
+    },
     "onclick:switchPanel('settings');switchSettingsSection('access')": {
       "tag": "BUTTON",
       "id": "",
@@ -7022,7 +7110,7 @@
       "selection": null,
       "value": null,
       "source": "browser",
-      "status": "NOT_INTERACTED",
+      "status": "INTERACTED_IN_PASSING_TEST",
       "observed": true
     },
     "onclick:switchSettingsSection('extensions',{fromSidebarItem:true})": {
@@ -7106,7 +7194,7 @@
     "onclick:this.closest('.tool-card').classList.toggle('open')": {
       "tag": "DIV",
       "id": "",
-      "text": "Updating qa-governance-manualapprove-1788899330482.txtUpdating a file",
+      "text": "Updating qa-governance-manualapprove-1788933870677.txtUpdating a file",
       "onclick": "this.closest('.tool-card').classList.toggle('open')",
       "panel": null,
       "scope": "panelChat",
@@ -7116,11 +7204,11 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "onclick:toggleCronPromptExpanded('3d7403972f0b')": {
+    "onclick:toggleCronPromptExpanded('010c5145f442')": {
       "tag": "BUTTON",
       "id": "",
       "text": "Expand prompt",
-      "onclick": "toggleCronPromptExpanded('3d7403972f0b')",
+      "onclick": "toggleCronPromptExpanded('010c5145f442')",
       "panel": null,
       "scope": "panelTasks",
       "selection": null,
@@ -7147,22 +7235,67 @@
       "status": "INTERACTED_IN_PASSING_TEST",
       "observed": true
     },
-    "onclick:updateKanbanTask('t_2581e808',{status:'archived'})": {
+    "onclick:unblockKanbanTask('t_7c7f18c5')": {
       "source": "browser action",
       "observed": true,
       "status": "INTERACTED_IN_PASSING_TEST"
     },
-    "onclick:updateKanbanTask('t_2581e808',{status:'done'})": {
+    "onclick:updateKanbanTask('t_146f6f05',{status:'archived'})": {
       "source": "browser action",
       "observed": true,
       "status": "INTERACTED_IN_PASSING_TEST"
     },
-    "onclick:updateKanbanTask('t_2581e808',{status:'ready'})": {
+    "onclick:updateKanbanTask('t_146f6f05',{status:'done'})": {
       "source": "browser action",
       "observed": true,
       "status": "INTERACTED_IN_PASSING_TEST"
     },
-    "onclick:updateKanbanTask('t_2581e808',{status:'todo'})": {
+    "onclick:updateKanbanTask('t_146f6f05',{status:'ready'})": {
+      "source": "browser action",
+      "observed": true,
+      "status": "INTERACTED_IN_PASSING_TEST"
+    },
+    "onclick:updateKanbanTask('t_146f6f05',{status:'todo'})": {
+      "source": "browser action",
+      "observed": true,
+      "status": "INTERACTED_IN_PASSING_TEST"
+    },
+    "onclick:updateKanbanTask('t_2d6784a8',{status:'blocked'})": {
+      "source": "browser action",
+      "observed": true,
+      "status": "INTERACTED_IN_PASSING_TEST"
+    },
+    "onclick:updateKanbanTask('t_2d6784a8',{status:'ready'})": {
+      "source": "browser action",
+      "observed": true,
+      "status": "INTERACTED_IN_PASSING_TEST"
+    },
+    "onclick:updateKanbanTask('t_36d90d9c',{status:'done'})": {
+      "source": "browser action",
+      "observed": true,
+      "status": "INTERACTED_IN_PASSING_TEST"
+    },
+    "onclick:updateKanbanTask('t_684c8aa9',{status:'done'})": {
+      "source": "browser action",
+      "observed": true,
+      "status": "INTERACTED_IN_PASSING_TEST"
+    },
+    "onclick:updateKanbanTask('t_7080861b',{status:'done'})": {
+      "source": "browser action",
+      "observed": true,
+      "status": "INTERACTED_IN_PASSING_TEST"
+    },
+    "onclick:updateKanbanTask('t_7c7f18c5',{status:'blocked'})": {
+      "source": "browser action",
+      "observed": true,
+      "status": "INTERACTED_IN_PASSING_TEST"
+    },
+    "onclick:updateKanbanTask('t_a477d4ca',{status:'blocked'})": {
+      "source": "browser action",
+      "observed": true,
+      "status": "INTERACTED_IN_PASSING_TEST"
+    },
+    "onclick:updateKanbanTask('t_a477d4ca',{status:'ready'})": {
       "source": "browser action",
       "observed": true,
       "status": "INTERACTED_IN_PASSING_TEST"
@@ -7795,10 +7928,10 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "panelChat:DIV:9/8/2026, 10:32:56 PM": {
+    "panelChat:DIV:9/9/2026, 8:08:39 AM": {
       "tag": "DIV",
       "id": "",
-      "text": "9/8/2026, 10:32:56 PM",
+      "text": "9/9/2026, 8:08:39 AM",
       "onclick": null,
       "panel": null,
       "scope": "panelChat",
@@ -7838,6 +7971,19 @@
       "tag": "DIV",
       "id": "",
       "text": "DEFAULT QA_REPLY: QA_ACTUAL_STEER3mArchiveDelete",
+      "onclick": null,
+      "panel": null,
+      "scope": "panelChat",
+      "selection": null,
+      "value": null,
+      "source": "browser",
+      "status": "NOT_INTERACTED",
+      "observed": true
+    },
+    "panelChat:DIV:DEFAULT QA_REPLY: QA_ACTUAL_STEER4mArchiveDelete": {
+      "tag": "DIV",
+      "id": "",
+      "text": "DEFAULT QA_REPLY: QA_ACTUAL_STEER4mArchiveDelete",
       "onclick": null,
       "panel": null,
       "scope": "panelChat",
@@ -8042,10 +8188,127 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "panelChat:DIV:DEFAULT QA_REPLY: QA_CHILD_TWO_DONEArchiveDelete": {
+    "panelChat:DIV:DEFAULT QA_REPLY: QA_FORK_FIRST (fork)1mArchiveDelete": {
       "tag": "DIV",
       "id": "",
-      "text": "DEFAULT QA_REPLY: QA_CHILD_TWO_DONEArchiveDelete",
+      "text": "DEFAULT QA_REPLY: QA_FORK_FIRST (fork)1mArchiveDelete",
+      "onclick": null,
+      "panel": null,
+      "scope": "panelChat",
+      "selection": null,
+      "value": null,
+      "source": "browser",
+      "status": "NOT_INTERACTED",
+      "observed": true
+    },
+    "panelChat:DIV:DEFAULT QA_REPLY: QA_FORK_FIRST (fork)2mArchiveDelete": {
+      "tag": "DIV",
+      "id": "",
+      "text": "DEFAULT QA_REPLY: QA_FORK_FIRST (fork)2mArchiveDelete",
+      "onclick": null,
+      "panel": null,
+      "scope": "panelChat",
+      "selection": null,
+      "value": null,
+      "source": "browser",
+      "status": "NOT_INTERACTED",
+      "observed": true
+    },
+    "panelChat:DIV:DEFAULT QA_REPLY: QA_FORK_FIRST (fork)3mArchiveDelete": {
+      "tag": "DIV",
+      "id": "",
+      "text": "DEFAULT QA_REPLY: QA_FORK_FIRST (fork)3mArchiveDelete",
+      "onclick": null,
+      "panel": null,
+      "scope": "panelChat",
+      "selection": null,
+      "value": null,
+      "source": "browser",
+      "status": "NOT_INTERACTED",
+      "observed": true
+    },
+    "panelChat:DIV:DEFAULT QA_REPLY: QA_FORK_FIRST (fork)4mArchiveDelete": {
+      "tag": "DIV",
+      "id": "",
+      "text": "DEFAULT QA_REPLY: QA_FORK_FIRST (fork)4mArchiveDelete",
+      "onclick": null,
+      "panel": null,
+      "scope": "panelChat",
+      "selection": null,
+      "value": null,
+      "source": "browser",
+      "status": "NOT_INTERACTED",
+      "observed": true
+    },
+    "panelChat:DIV:DEFAULT QA_REPLY: QA_FORK_FIRST (fork)6mArchiveDelete": {
+      "tag": "DIV",
+      "id": "",
+      "text": "DEFAULT QA_REPLY: QA_FORK_FIRST (fork)6mArchiveDelete",
+      "onclick": null,
+      "panel": null,
+      "scope": "panelChat",
+      "selection": null,
+      "value": null,
+      "source": "browser",
+      "status": "NOT_INTERACTED",
+      "observed": true
+    },
+    "panelChat:DIV:DEFAULT QA_REPLY: QA_FORK_FIRST1mArchiveDelete": {
+      "tag": "DIV",
+      "id": "",
+      "text": "DEFAULT QA_REPLY: QA_FORK_FIRST1mArchiveDelete",
+      "onclick": null,
+      "panel": null,
+      "scope": "panelChat",
+      "selection": null,
+      "value": null,
+      "source": "browser",
+      "status": "NOT_INTERACTED",
+      "observed": true
+    },
+    "panelChat:DIV:DEFAULT QA_REPLY: QA_FORK_FIRST2mArchiveDelete": {
+      "tag": "DIV",
+      "id": "",
+      "text": "DEFAULT QA_REPLY: QA_FORK_FIRST2mArchiveDelete",
+      "onclick": null,
+      "panel": null,
+      "scope": "panelChat",
+      "selection": null,
+      "value": null,
+      "source": "browser",
+      "status": "NOT_INTERACTED",
+      "observed": true
+    },
+    "panelChat:DIV:DEFAULT QA_REPLY: QA_FORK_FIRST3mArchiveDelete": {
+      "tag": "DIV",
+      "id": "",
+      "text": "DEFAULT QA_REPLY: QA_FORK_FIRST3mArchiveDelete",
+      "onclick": null,
+      "panel": null,
+      "scope": "panelChat",
+      "selection": null,
+      "value": null,
+      "source": "browser",
+      "status": "NOT_INTERACTED",
+      "observed": true
+    },
+    "panelChat:DIV:DEFAULT QA_REPLY: QA_FORK_FIRST4mArchiveDelete": {
+      "tag": "DIV",
+      "id": "",
+      "text": "DEFAULT QA_REPLY: QA_FORK_FIRST4mArchiveDelete",
+      "onclick": null,
+      "panel": null,
+      "scope": "panelChat",
+      "selection": null,
+      "value": null,
+      "source": "browser",
+      "status": "NOT_INTERACTED",
+      "observed": true
+    },
+    "panelChat:DIV:DEFAULT QA_REPLY: QA_FORK_FIRST6mArchiveDelete": {
+      "tag": "DIV",
+      "id": "",
+      "text": "DEFAULT QA_REPLY: QA_FORK_FIRST6mArchiveDelete",
       "onclick": null,
       "panel": null,
       "scope": "panelChat",
@@ -8263,6 +8526,19 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
+    "panelChat:DIV:DEFAULT QA_REPLY: QA_SHARE_OWNER1mArchiveDelete": {
+      "tag": "DIV",
+      "id": "",
+      "text": "DEFAULT QA_REPLY: QA_SHARE_OWNER1mArchiveDelete",
+      "onclick": null,
+      "panel": null,
+      "scope": "panelChat",
+      "selection": null,
+      "value": null,
+      "source": "browser",
+      "status": "NOT_INTERACTED",
+      "observed": true
+    },
     "panelChat:DIV:DEFAULT QA_REPLY: QA_SLOW_RESPONSE1mArchiveDelete": {
       "tag": "DIV",
       "id": "",
@@ -8319,19 +8595,6 @@
       "tag": "DIV",
       "id": "",
       "text": "DEFAULT QA_REPLY: QA_SLOW_RESPONSE5mArchiveDelete",
-      "onclick": null,
-      "panel": null,
-      "scope": "panelChat",
-      "selection": null,
-      "value": null,
-      "source": "browser",
-      "status": "NOT_INTERACTED",
-      "observed": true
-    },
-    "panelChat:DIV:DEFAULT QA_REPLY: QA_SLOW_RESPONSE6mArchiveDelete": {
-      "tag": "DIV",
-      "id": "",
-      "text": "DEFAULT QA_REPLY: QA_SLOW_RESPONSE6mArchiveDelete",
       "onclick": null,
       "panel": null,
       "scope": "panelChat",
@@ -8437,10 +8700,75 @@
       "observed": true,
       "status": "INTERACTED_IN_PASSING_TEST"
     },
-    "panelChat:DIV:QA renamed 17888994568871mArchiveDelete": {
+    "panelChat:DIV:QA click imported 17889337513481mArchiveDelete": {
       "tag": "DIV",
       "id": "",
-      "text": "QA renamed 17888994568871mArchiveDelete",
+      "text": "QA click imported 17889337513481mArchiveDelete",
+      "onclick": null,
+      "panel": null,
+      "scope": "panelChat",
+      "selection": null,
+      "value": null,
+      "source": "browser",
+      "status": "NOT_INTERACTED",
+      "observed": true
+    },
+    "panelChat:DIV:QA click imported 17889337513482mArchiveDelete": {
+      "tag": "DIV",
+      "id": "",
+      "text": "QA click imported 17889337513482mArchiveDelete",
+      "onclick": null,
+      "panel": null,
+      "scope": "panelChat",
+      "selection": null,
+      "value": null,
+      "source": "browser",
+      "status": "NOT_INTERACTED",
+      "observed": true
+    },
+    "panelChat:DIV:QA click imported 17889337513483mArchiveDelete": {
+      "tag": "DIV",
+      "id": "",
+      "text": "QA click imported 17889337513483mArchiveDelete",
+      "onclick": null,
+      "panel": null,
+      "scope": "panelChat",
+      "selection": null,
+      "value": null,
+      "source": "browser",
+      "status": "NOT_INTERACTED",
+      "observed": true
+    },
+    "panelChat:DIV:QA click imported 17889337513484mArchiveDelete": {
+      "tag": "DIV",
+      "id": "",
+      "text": "QA click imported 17889337513484mArchiveDelete",
+      "onclick": null,
+      "panel": null,
+      "scope": "panelChat",
+      "selection": null,
+      "value": null,
+      "source": "browser",
+      "status": "NOT_INTERACTED",
+      "observed": true
+    },
+    "panelChat:DIV:QA click imported 17889337513486mArchiveDelete": {
+      "tag": "DIV",
+      "id": "",
+      "text": "QA click imported 17889337513486mArchiveDelete",
+      "onclick": null,
+      "panel": null,
+      "scope": "panelChat",
+      "selection": null,
+      "value": null,
+      "source": "browser",
+      "status": "NOT_INTERACTED",
+      "observed": true
+    },
+    "panelChat:DIV:QA renamed 17889340072841mArchiveDelete": {
+      "tag": "DIV",
+      "id": "",
+      "text": "QA renamed 17889340072841mArchiveDelete",
       "onclick": null,
       "panel": null,
       "scope": "panelChat",
@@ -8450,12 +8778,12 @@
       "status": "INTERACTED_IN_PASSING_TEST",
       "observed": true
     },
-    "panelChat:DIV:QA renamed 17888994568871mQA_SEARCH_BODY_1788899455201ArchiveDelete": {
+    "panelChat:DIV:QA renamed 17889340072841mQA_SEARCH_BODY_1788934006757ArchiveDelete": {
       "source": "browser action",
       "observed": true,
       "status": "INTERACTED_IN_PASSING_TEST"
     },
-    "panelChat:DIV:QA saved prompt 1788899253034\nSecond line": {
+    "panelChat:DIV:QA saved prompt 1788933799091\nSecond line": {
       "source": "browser action",
       "observed": true,
       "status": "INTERACTED_IN_PASSING_TEST"
@@ -8587,6 +8915,19 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
+    "panelChat:DIV:qa-editor-cancel-1788933736202.txt0.1k\u00d7": {
+      "tag": "DIV",
+      "id": "",
+      "text": "qa-editor-cancel-1788933736202.txt0.1k\u00d7",
+      "onclick": null,
+      "panel": null,
+      "scope": "panelChat",
+      "selection": null,
+      "value": null,
+      "source": "browser",
+      "status": "NOT_INTERACTED",
+      "observed": true
+    },
     "panelChat:DIV:qa-evidence.txt0.0k\u00d7": {
       "tag": "DIV",
       "id": "",
@@ -8600,10 +8941,10 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "panelChat:DIV:qa-file-1788899269336.txt\u00d7": {
+    "panelChat:DIV:qa-file-1788933814393.txt\u00d7": {
       "tag": "DIV",
       "id": "",
-      "text": "qa-file-1788899269336.txt\u00d7",
+      "text": "qa-file-1788933814393.txt\u00d7",
       "onclick": null,
       "panel": null,
       "scope": "panelChat",
@@ -8613,10 +8954,10 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "panelChat:DIV:qa-governance-autoapprove-1788899327598.txt0.0k\u00d7": {
+    "panelChat:DIV:qa-governance-autoapprove-1788933868463.txt0.0k\u00d7": {
       "tag": "DIV",
       "id": "",
-      "text": "qa-governance-autoapprove-1788899327598.txt0.0k\u00d7",
+      "text": "qa-governance-autoapprove-1788933868463.txt0.0k\u00d7",
       "onclick": null,
       "panel": null,
       "scope": "panelChat",
@@ -8626,10 +8967,10 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "panelChat:DIV:qa-governance-automanual-1788899334338.txt0.0k\u00d7": {
+    "panelChat:DIV:qa-governance-automanual-1788933874375.txt0.0k\u00d7": {
       "tag": "DIV",
       "id": "",
-      "text": "qa-governance-automanual-1788899334338.txt0.0k\u00d7",
+      "text": "qa-governance-automanual-1788933874375.txt0.0k\u00d7",
       "onclick": null,
       "panel": null,
       "scope": "panelChat",
@@ -8639,10 +8980,10 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "panelChat:DIV:qa-governance-manualapprove-1788899330482.txt0.0k\u00d7": {
+    "panelChat:DIV:qa-governance-manualapprove-1788933870677.txt0.0k\u00d7": {
       "tag": "DIV",
       "id": "",
-      "text": "qa-governance-manualapprove-1788899330482.txt0.0k\u00d7",
+      "text": "qa-governance-manualapprove-1788933870677.txt0.0k\u00d7",
       "onclick": null,
       "panel": null,
       "scope": "panelChat",
@@ -8652,10 +8993,10 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "panelChat:DIV:qa-terminal-1788899257052.txt0.0k\u00d7": {
+    "panelChat:DIV:qa-import-authority-17889340190611mArchiveDelete": {
       "tag": "DIV",
       "id": "",
-      "text": "qa-terminal-1788899257052.txt0.0k\u00d7",
+      "text": "qa-import-authority-17889340190611mArchiveDelete",
       "onclick": null,
       "panel": null,
       "scope": "panelChat",
@@ -8665,10 +9006,10 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "panelChat:DIV:qa-tool-status-1788899577926.txt0.1k\u00d7": {
+    "panelChat:DIV:qa-terminal-1788933803133.txt0.0k\u00d7": {
       "tag": "DIV",
       "id": "",
-      "text": "qa-tool-status-1788899577926.txt0.1k\u00d7",
+      "text": "qa-terminal-1788933803133.txt0.0k\u00d7",
       "onclick": null,
       "panel": null,
       "scope": "panelChat",
@@ -8678,10 +9019,10 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "panelChat:DIV:qa-voice-autoapprove-1788899392459.txt0.0k\u00d7": {
+    "panelChat:DIV:qa-tool-status-1788934120679.txt0.1k\u00d7": {
       "tag": "DIV",
       "id": "",
-      "text": "qa-voice-autoapprove-1788899392459.txt0.0k\u00d7",
+      "text": "qa-tool-status-1788934120679.txt0.1k\u00d7",
       "onclick": null,
       "panel": null,
       "scope": "panelChat",
@@ -8691,10 +9032,10 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "panelChat:DIV:qa-voice-native-1788899365890.txt0.0k\u00d7": {
+    "panelChat:DIV:qa-voice-autoapprove-1788933942452.txt0.0k\u00d7": {
       "tag": "DIV",
       "id": "",
-      "text": "qa-voice-native-1788899365890.txt0.0k\u00d7",
+      "text": "qa-voice-autoapprove-1788933942452.txt0.0k\u00d7",
       "onclick": null,
       "panel": null,
       "scope": "panelChat",
@@ -8704,10 +9045,23 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "panelChat:DIV:qa-voice-once-1788899386172.txt0.0k\u00d7": {
+    "panelChat:DIV:qa-voice-native-1788933916633.txt0.0k\u00d7": {
       "tag": "DIV",
       "id": "",
-      "text": "qa-voice-once-1788899386172.txt0.0k\u00d7",
+      "text": "qa-voice-native-1788933916633.txt0.0k\u00d7",
+      "onclick": null,
+      "panel": null,
+      "scope": "panelChat",
+      "selection": null,
+      "value": null,
+      "source": "browser",
+      "status": "NOT_INTERACTED",
+      "observed": true
+    },
+    "panelChat:DIV:qa-voice-once-1788933936466.txt0.0k\u00d7": {
+      "tag": "DIV",
+      "id": "",
+      "text": "qa-voice-once-1788933936466.txt0.0k\u00d7",
       "onclick": null,
       "panel": null,
       "scope": "panelChat",
@@ -8743,10 +9097,10 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "panelChat:DIV:\u25b8qa-folder-1788899269776\u00d7": {
+    "panelChat:DIV:\u25b8qa-folder-1788933814781\u00d7": {
       "tag": "DIV",
       "id": "",
-      "text": "\u25b8qa-folder-1788899269776\u00d7",
+      "text": "\u25b8qa-folder-1788933814781\u00d7",
       "onclick": null,
       "panel": null,
       "scope": "panelChat",
@@ -8760,6 +9114,19 @@
       "tag": "DIV",
       "id": "",
       "text": "\u25b8qa-folder\u00d7",
+      "onclick": null,
+      "panel": null,
+      "scope": "panelChat",
+      "selection": null,
+      "value": null,
+      "source": "browser",
+      "status": "NOT_INTERACTED",
+      "observed": true
+    },
+    "panelChat:DIV:\u25b8qa-import-authority-1788934019061\u00d7": {
+      "tag": "DIV",
+      "id": "",
+      "text": "\u25b8qa-import-authority-1788934019061\u00d7",
       "onclick": null,
       "panel": null,
       "scope": "panelChat",
@@ -8826,10 +9193,10 @@
       "status": "INTERACTED_IN_PASSING_TEST",
       "observed": true
     },
-    "panelChat:SPAN:QA Project-1788899583839": {
+    "panelChat:SPAN:QA Project-1788934126468": {
       "tag": "SPAN",
       "id": "",
-      "text": "QA Project-1788899583839",
+      "text": "QA Project-1788934126468",
       "onclick": null,
       "panel": null,
       "scope": "panelChat",
@@ -8862,13 +9229,26 @@
       "selection": null,
       "value": null,
       "source": "browser",
+      "status": "INTERACTED_IN_PASSING_TEST",
+      "observed": true
+    },
+    "panelChat:SPAN:qa-folder-1788933814781": {
+      "tag": "SPAN",
+      "id": "",
+      "text": "qa-folder-1788933814781",
+      "onclick": null,
+      "panel": null,
+      "scope": "panelChat",
+      "selection": null,
+      "value": null,
+      "source": "browser",
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "panelChat:SPAN:qa-folder-1788899269776": {
+    "panelChat:SPAN:qa-import-authority-1788934019061": {
       "tag": "SPAN",
       "id": "",
-      "text": "qa-folder-1788899269776",
+      "text": "qa-import-authority-1788934019061",
       "onclick": null,
       "panel": null,
       "scope": "panelChat",
@@ -9078,10 +9458,10 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "panelProfiles:DIV:qa-deep-bot-1788899265764": {
+    "panelProfiles:DIV:qa-deep-bot-1788933811027": {
       "tag": "DIV",
       "id": "",
-      "text": "qa-deep-bot-1788899265764",
+      "text": "qa-deep-bot-1788933811027",
       "onclick": null,
       "panel": null,
       "scope": "panelProfiles",
@@ -10780,6 +11160,19 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
+    "panelSettings:DIV:qa-editor-cancel-1788933736202.txt0.1k\u00d7": {
+      "tag": "DIV",
+      "id": "",
+      "text": "qa-editor-cancel-1788933736202.txt0.1k\u00d7",
+      "onclick": null,
+      "panel": null,
+      "scope": "panelSettings",
+      "selection": null,
+      "value": null,
+      "source": "browser",
+      "status": "NOT_INTERACTED",
+      "observed": true
+    },
     "panelSettings:DIV:qa-evidence.txt0.0k\u00d7": {
       "tag": "DIV",
       "id": "",
@@ -10793,10 +11186,10 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "panelSettings:DIV:qa-file-1788899269336.txt\u00d7": {
+    "panelSettings:DIV:qa-file-1788933814393.txt\u00d7": {
       "tag": "DIV",
       "id": "",
-      "text": "qa-file-1788899269336.txt\u00d7",
+      "text": "qa-file-1788933814393.txt\u00d7",
       "onclick": null,
       "panel": null,
       "scope": "panelSettings",
@@ -10806,10 +11199,10 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "panelSettings:DIV:qa-governance-autoapprove-1788899327598.txt0.0k\u00d7": {
+    "panelSettings:DIV:qa-governance-autoapprove-1788933868463.txt0.0k\u00d7": {
       "tag": "DIV",
       "id": "",
-      "text": "qa-governance-autoapprove-1788899327598.txt0.0k\u00d7",
+      "text": "qa-governance-autoapprove-1788933868463.txt0.0k\u00d7",
       "onclick": null,
       "panel": null,
       "scope": "panelSettings",
@@ -10819,10 +11212,10 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "panelSettings:DIV:qa-governance-automanual-1788899334338.txt0.0k\u00d7": {
+    "panelSettings:DIV:qa-governance-automanual-1788933874375.txt0.0k\u00d7": {
       "tag": "DIV",
       "id": "",
-      "text": "qa-governance-automanual-1788899334338.txt0.0k\u00d7",
+      "text": "qa-governance-automanual-1788933874375.txt0.0k\u00d7",
       "onclick": null,
       "panel": null,
       "scope": "panelSettings",
@@ -10832,10 +11225,10 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "panelSettings:DIV:qa-governance-manualapprove-1788899330482.txt0.0k\u00d7": {
+    "panelSettings:DIV:qa-governance-manualapprove-1788933870677.txt0.0k\u00d7": {
       "tag": "DIV",
       "id": "",
-      "text": "qa-governance-manualapprove-1788899330482.txt0.0k\u00d7",
+      "text": "qa-governance-manualapprove-1788933870677.txt0.0k\u00d7",
       "onclick": null,
       "panel": null,
       "scope": "panelSettings",
@@ -10845,10 +11238,10 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "panelSettings:DIV:qa-terminal-1788899257052.txt0.0k\u00d7": {
+    "panelSettings:DIV:qa-terminal-1788933803133.txt0.0k\u00d7": {
       "tag": "DIV",
       "id": "",
-      "text": "qa-terminal-1788899257052.txt0.0k\u00d7",
+      "text": "qa-terminal-1788933803133.txt0.0k\u00d7",
       "onclick": null,
       "panel": null,
       "scope": "panelSettings",
@@ -10858,10 +11251,10 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "panelSettings:DIV:qa-voice-autoapprove-1788899392459.txt0.0k\u00d7": {
+    "panelSettings:DIV:qa-voice-autoapprove-1788933942452.txt0.0k\u00d7": {
       "tag": "DIV",
       "id": "",
-      "text": "qa-voice-autoapprove-1788899392459.txt0.0k\u00d7",
+      "text": "qa-voice-autoapprove-1788933942452.txt0.0k\u00d7",
       "onclick": null,
       "panel": null,
       "scope": "panelSettings",
@@ -10871,10 +11264,10 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "panelSettings:DIV:qa-voice-native-1788899365890.txt0.0k\u00d7": {
+    "panelSettings:DIV:qa-voice-native-1788933916633.txt0.0k\u00d7": {
       "tag": "DIV",
       "id": "",
-      "text": "qa-voice-native-1788899365890.txt0.0k\u00d7",
+      "text": "qa-voice-native-1788933916633.txt0.0k\u00d7",
       "onclick": null,
       "panel": null,
       "scope": "panelSettings",
@@ -10884,10 +11277,10 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "panelSettings:DIV:qa-voice-once-1788899386172.txt0.0k\u00d7": {
+    "panelSettings:DIV:qa-voice-once-1788933936466.txt0.0k\u00d7": {
       "tag": "DIV",
       "id": "",
-      "text": "qa-voice-once-1788899386172.txt0.0k\u00d7",
+      "text": "qa-voice-once-1788933936466.txt0.0k\u00d7",
       "onclick": null,
       "panel": null,
       "scope": "panelSettings",
@@ -10897,10 +11290,10 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "panelSettings:DIV:\u25b8qa-folder-1788899269776\u00d7": {
+    "panelSettings:DIV:\u25b8qa-folder-1788933814781\u00d7": {
       "tag": "DIV",
       "id": "",
-      "text": "\u25b8qa-folder-1788899269776\u00d7",
+      "text": "\u25b8qa-folder-1788933814781\u00d7",
       "onclick": null,
       "panel": null,
       "scope": "panelSettings",
@@ -10975,10 +11368,10 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "panelSettings:SPAN:qa-folder-1788899269776": {
+    "panelSettings:SPAN:qa-folder-1788933814781": {
       "tag": "SPAN",
       "id": "",
-      "text": "qa-folder-1788899269776",
+      "text": "qa-folder-1788933814781",
       "onclick": null,
       "panel": null,
       "scope": "panelSettings",
@@ -10988,10 +11381,56 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
+    "panelSkills:A:references/escape.md": {
+      "source": "browser action",
+      "observed": true,
+      "status": "INTERACTED_IN_PASSING_TEST"
+    },
+    "panelSkills:A:references/notes.md": {
+      "source": "browser action",
+      "observed": true,
+      "status": "INTERACTED_IN_PASSING_TEST"
+    },
+    "panelSkills:A:\u2190 Back to qa-linked-skill-1788933738903": {
+      "source": "browser action",
+      "observed": true,
+      "status": "INTERACTED_IN_PASSING_TEST"
+    },
     "panelSkills:DIV:(general) (1)": {
       "tag": "DIV",
       "id": "",
       "text": "(general) (1)",
+      "onclick": null,
+      "panel": null,
+      "scope": "panelSkills",
+      "selection": null,
+      "value": null,
+      "source": "browser",
+      "status": "NOT_INTERACTED",
+      "observed": true
+    },
+    "panelSkills:DIV:(general) (2)": {
+      "tag": "DIV",
+      "id": "",
+      "text": "(general) (2)",
+      "onclick": null,
+      "panel": null,
+      "scope": "panelSkills",
+      "selection": null,
+      "value": null,
+      "source": "browser",
+      "status": "NOT_INTERACTED",
+      "observed": true
+    },
+    "panelSkills:DIV:qa-click-skill-1788933747822Disposable click evidence": {
+      "source": "browser action",
+      "observed": true,
+      "status": "INTERACTED_IN_PASSING_TEST"
+    },
+    "panelSkills:DIV:qa-linked-skill-1788933738903Linked-file QA": {
+      "tag": "DIV",
+      "id": "",
+      "text": "qa-linked-skill-1788933738903Linked-file QA",
       "onclick": null,
       "panel": null,
       "scope": "panelSkills",
@@ -11066,19 +11505,6 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "panelTodos:BUTTON:Delete": {
-      "tag": "BUTTON",
-      "id": "",
-      "text": "Delete",
-      "onclick": null,
-      "panel": null,
-      "scope": "panelTodos",
-      "selection": null,
-      "value": null,
-      "source": "browser",
-      "status": "NOT_INTERACTED",
-      "observed": true
-    },
     "panelTodos:BUTTON:Help me plan a small project.": {
       "tag": "BUTTON",
       "id": "",
@@ -11118,71 +11544,6 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "panelTodos:DIV:qa-evidence.txt0.0k\u00d7": {
-      "tag": "DIV",
-      "id": "",
-      "text": "qa-evidence.txt0.0k\u00d7",
-      "onclick": null,
-      "panel": null,
-      "scope": "panelTodos",
-      "selection": null,
-      "value": null,
-      "source": "browser",
-      "status": "NOT_INTERACTED",
-      "observed": true
-    },
-    "panelTodos:DIV:qa-terminal-1788899257052.txt0.0k\u00d7": {
-      "tag": "DIV",
-      "id": "",
-      "text": "qa-terminal-1788899257052.txt0.0k\u00d7",
-      "onclick": null,
-      "panel": null,
-      "scope": "panelTodos",
-      "selection": null,
-      "value": null,
-      "source": "browser",
-      "status": "NOT_INTERACTED",
-      "observed": true
-    },
-    "panelTodos:DIV:\u25b8qa-folder\u00d7": {
-      "tag": "DIV",
-      "id": "",
-      "text": "\u25b8qa-folder\u00d7",
-      "onclick": null,
-      "panel": null,
-      "scope": "panelTodos",
-      "selection": null,
-      "value": null,
-      "source": "browser",
-      "status": "NOT_INTERACTED",
-      "observed": true
-    },
-    "panelTodos:SPAN:Double-click to rename": {
-      "tag": "SPAN",
-      "id": "",
-      "text": "Double-click to rename",
-      "onclick": null,
-      "panel": null,
-      "scope": "panelTodos",
-      "selection": null,
-      "value": null,
-      "source": "browser",
-      "status": "NOT_INTERACTED",
-      "observed": true
-    },
-    "panelTodos:SPAN:qa-folder": {
-      "tag": "SPAN",
-      "id": "",
-      "text": "qa-folder",
-      "onclick": null,
-      "panel": null,
-      "scope": "panelTodos",
-      "selection": null,
-      "value": null,
-      "source": "browser",
-      "status": "NOT_INTERACTED",
-      "observed": true
-    },
     "panelWorkspaces:DIV:Home\n        /Users/michaelramirez/Documents/Codex/2026-09-08/do-x20/work/e2e-runs/2026090": {
       "tag": "DIV",
       "id": "",
@@ -11196,7 +11557,7 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "selection:allowed_groups:qa-admin-legacy-group-1788899288179-ha3u": {
+    "selection:allowed_groups:qa-admin-legacy-group-1788933831645-8jac": {
       "tag": "INPUT",
       "id": "",
       "text": "",
@@ -11204,7 +11565,7 @@
       "panel": null,
       "scope": "panelProfiles",
       "selection": "allowed_groups",
-      "value": "qa-admin-legacy-group-1788899288179-ha3u",
+      "value": "qa-admin-legacy-group-1788933831645-8jac",
       "source": "browser",
       "status": "NOT_INTERACTED",
       "observed": true
@@ -11391,7 +11752,7 @@
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "selection:allowed_users:qa-blacklist-1788899310072@example.test": {
+    "selection:allowed_users:qa-blacklist-1788933852507@example.test": {
       "tag": "INPUT",
       "id": "",
       "text": "",
@@ -11399,12 +11760,12 @@
       "panel": null,
       "scope": "panelProfiles",
       "selection": "allowed_users",
-      "value": "qa-blacklist-1788899310072@example.test",
+      "value": "qa-blacklist-1788933852507@example.test",
       "source": "browser",
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "selection:allowed_users:qa-fields-clear-1788899288932-ogl45m@example.test": {
+    "selection:allowed_users:qa-fields-clear-1788933832320-s43ejb@example.test": {
       "tag": "INPUT",
       "id": "",
       "text": "",
@@ -11412,12 +11773,12 @@
       "panel": null,
       "scope": "panelProfiles",
       "selection": "allowed_users",
-      "value": "qa-fields-clear-1788899288932-ogl45m@example.test",
+      "value": "qa-fields-clear-1788933832320-s43ejb@example.test",
       "source": "browser",
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "selection:allowed_users:qa-fields-inspector-new-1788899288932-ogl45m@example.test": {
+    "selection:allowed_users:qa-fields-inspector-new-1788933832320-s43ejb@example.test": {
       "tag": "INPUT",
       "id": "",
       "text": "",
@@ -11425,12 +11786,12 @@
       "panel": null,
       "scope": "panelProfiles",
       "selection": "allowed_users",
-      "value": "qa-fields-inspector-new-1788899288932-ogl45m@example.test",
+      "value": "qa-fields-inspector-new-1788933832320-s43ejb@example.test",
       "source": "browser",
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "selection:allowed_users:qa-fields-inspector-old-1788899288932-ogl45m@example.test": {
+    "selection:allowed_users:qa-fields-inspector-old-1788933832320-s43ejb@example.test": {
       "tag": "INPUT",
       "id": "",
       "text": "",
@@ -11438,12 +11799,12 @@
       "panel": null,
       "scope": "panelProfiles",
       "selection": "allowed_users",
-      "value": "qa-fields-inspector-old-1788899288932-ogl45m@example.test",
+      "value": "qa-fields-inspector-old-1788933832320-s43ejb@example.test",
       "source": "browser",
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "selection:allowed_users:qa-fields-legacy-1788899288932-ogl45m@example.test": {
+    "selection:allowed_users:qa-fields-legacy-1788933832320-s43ejb@example.test": {
       "tag": "INPUT",
       "id": "",
       "text": "",
@@ -11451,12 +11812,12 @@
       "panel": null,
       "scope": "panelProfiles",
       "selection": "allowed_users",
-      "value": "qa-fields-legacy-1788899288932-ogl45m@example.test",
+      "value": "qa-fields-legacy-1788933832320-s43ejb@example.test",
       "source": "browser",
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "selection:allowed_users:qa-fields-level-only-1788899288932-ogl45m@example.test": {
+    "selection:allowed_users:qa-fields-level-only-1788933832320-s43ejb@example.test": {
       "tag": "INPUT",
       "id": "",
       "text": "",
@@ -11464,12 +11825,12 @@
       "panel": null,
       "scope": "panelProfiles",
       "selection": "allowed_users",
-      "value": "qa-fields-level-only-1788899288932-ogl45m@example.test",
+      "value": "qa-fields-level-only-1788933832320-s43ejb@example.test",
       "source": "browser",
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "selection:allowed_users:qa-fields-preview-first-1788899288932-ogl45m@example.test": {
+    "selection:allowed_users:qa-fields-preview-first-1788933832320-s43ejb@example.test": {
       "tag": "INPUT",
       "id": "",
       "text": "",
@@ -11477,12 +11838,12 @@
       "panel": null,
       "scope": "panelProfiles",
       "selection": "allowed_users",
-      "value": "qa-fields-preview-first-1788899288932-ogl45m@example.test",
+      "value": "qa-fields-preview-first-1788933832320-s43ejb@example.test",
       "source": "browser",
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "selection:allowed_users:qa-fields-preview-second-1788899288932-ogl45m@example.test": {
+    "selection:allowed_users:qa-fields-preview-second-1788933832320-s43ejb@example.test": {
       "tag": "INPUT",
       "id": "",
       "text": "",
@@ -11490,12 +11851,12 @@
       "panel": null,
       "scope": "panelProfiles",
       "selection": "allowed_users",
-      "value": "qa-fields-preview-second-1788899288932-ogl45m@example.test",
+      "value": "qa-fields-preview-second-1788933832320-s43ejb@example.test",
       "source": "browser",
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "selection:allowed_users:qa-fields-roundtrip-1788899288932-ogl45m@example.test": {
+    "selection:allowed_users:qa-fields-roundtrip-1788933832320-s43ejb@example.test": {
       "tag": "INPUT",
       "id": "",
       "text": "",
@@ -11503,12 +11864,12 @@
       "panel": null,
       "scope": "panelProfiles",
       "selection": "allowed_users",
-      "value": "qa-fields-roundtrip-1788899288932-ogl45m@example.test",
+      "value": "qa-fields-roundtrip-1788933832320-s43ejb@example.test",
       "source": "browser",
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "selection:allowed_users:qa-fields-save-first-1788899288932-ogl45m@example.test": {
+    "selection:allowed_users:qa-fields-save-first-1788933832320-s43ejb@example.test": {
       "tag": "INPUT",
       "id": "",
       "text": "",
@@ -11516,12 +11877,12 @@
       "panel": null,
       "scope": "panelProfiles",
       "selection": "allowed_users",
-      "value": "qa-fields-save-first-1788899288932-ogl45m@example.test",
+      "value": "qa-fields-save-first-1788933832320-s43ejb@example.test",
       "source": "browser",
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "selection:allowed_users:qa-fields-save-second-1788899288932-ogl45m@example.test": {
+    "selection:allowed_users:qa-fields-save-second-1788933832320-s43ejb@example.test": {
       "tag": "INPUT",
       "id": "",
       "text": "",
@@ -11529,12 +11890,12 @@
       "panel": null,
       "scope": "panelProfiles",
       "selection": "allowed_users",
-      "value": "qa-fields-save-second-1788899288932-ogl45m@example.test",
+      "value": "qa-fields-save-second-1788933832320-s43ejb@example.test",
       "source": "browser",
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "selection:allowed_users:qa-responsive-desktop-1788899303355@example.test": {
+    "selection:allowed_users:qa-responsive-desktop-1788933846113@example.test": {
       "tag": "INPUT",
       "id": "",
       "text": "",
@@ -11542,12 +11903,12 @@
       "panel": null,
       "scope": "panelProfiles",
       "selection": "allowed_users",
-      "value": "qa-responsive-desktop-1788899303355@example.test",
+      "value": "qa-responsive-desktop-1788933846113@example.test",
       "source": "browser",
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "selection:allowed_users:qa-responsive-laptop-1788899304881@example.test": {
+    "selection:allowed_users:qa-responsive-laptop-1788933847536@example.test": {
       "tag": "INPUT",
       "id": "",
       "text": "",
@@ -11555,12 +11916,12 @@
       "panel": null,
       "scope": "panelProfiles",
       "selection": "allowed_users",
-      "value": "qa-responsive-laptop-1788899304881@example.test",
+      "value": "qa-responsive-laptop-1788933847536@example.test",
       "source": "browser",
       "status": "NOT_INTERACTED",
       "observed": true
     },
-    "selection:allowed_users:qa-responsive-mobile-1788899306368@example.test": {
+    "selection:allowed_users:qa-responsive-mobile-1788933848826@example.test": {
       "tag": "INPUT",
       "id": "",
       "text": "",
@@ -11568,7 +11929,7 @@
       "panel": null,
       "scope": "panelProfiles",
       "selection": "allowed_users",
-      "value": "qa-responsive-mobile-1788899306368@example.test",
+      "value": "qa-responsive-mobile-1788933848826@example.test",
       "source": "browser",
       "status": "NOT_INTERACTED",
       "observed": true
@@ -11636,6 +11997,19 @@
       "value": "qa-local",
       "source": "browser",
       "status": "INTERACTED_IN_PASSING_TEST",
+      "observed": true
+    },
+    "selection:skills:qa-linked-skill-1788933738903": {
+      "tag": "INPUT",
+      "id": "",
+      "text": "",
+      "onclick": null,
+      "panel": null,
+      "scope": "panelProfiles",
+      "selection": "skills",
+      "value": "qa-linked-skill-1788933738903",
+      "source": "browser",
+      "status": "NOT_INTERACTED",
       "observed": true
     },
     "selection:skills:qa-review": {

@@ -1,8 +1,8 @@
 # SynthPulse frontend E2E user stories and acceptance catalog
 
-> **Final candidate evidence:** run `20260908-222640-169443000` uses private fixture state and loopback-only transports. The earlier 139-case run is historical behavior evidence; its original isolation claim was rejected and is not reused. This catalog distinguishes local synthetic-media acceptance from physical/live-provider evidence and does not claim exhaustive all-click coverage.
+> **Final candidate evidence:** run `20260909-080212-676633000` uses private fixture state and loopback-only transports. The earlier 139-case run is historical behavior evidence; its original isolation claim was rejected and is not reused. This catalog distinguishes local synthetic-media acceptance from physical/live-provider evidence and does not claim exhaustive all-click coverage.
 
-Prepared 2026-09-08. **362 acceptance stories across 26 feature areas. Execution reconciliation: 21 PASS; 175 PARTIAL; 2 FAIL; 164 NOT RUN. Passing stories certify only their stated acceptance scope; no all-features pass is claimed.**
+Prepared 2026-09-08. **365 acceptance stories across 26 feature areas. Execution reconciliation: 23 PASS; 191 PARTIAL; 0 FAIL; 151 NOT RUN. Passing stories certify only their stated acceptance scope; no all-features pass is claimed.**
 
 This acceptance catalog began from the September 2 source export, September 6 feature material and the requested governance behavior. Current isolated browser execution is now mapped conservatively to its actual assertions. PASS means every stated acceptance assertion has current-spec evidence on a frozen source run. PARTIAL means some relevant assertions passed, while the full story still has open requirements. FAIL means the latest mapped browser test failed and needs triage; it does not mean every aspect of that story was executed. NOT RUN means no matching actual frontend assertion is evidenced. Current production deployment and exhaustive persona/control inventory are not certified.
 
@@ -10,7 +10,7 @@ The companion [coverage-plan.csv](coverage-plan.csv) is the machine-readable cli
 
 <!-- final-run-summary:start -->
 
-The current frozen-source execution is **20260908-222640-169443000**: **176 browser scenarios, 174 passed and 2 failed**. The two known rendered failures are public Share creation (SESS-010) and Done from an existing Todo task (KAN-007); later sharing assertions do not execute past creation. Every mapped case in the matrix identifies its actual assertion scope. Browser-scenario counts and full-story acceptance counts have different denominators. The paired source fingerprints are WebUI `d42a8115938eb65f3239120d3c8d23f823ce1464656f4f3d65e4ccb34990f6a5` and engine `3783a0a86080480305aea5caee79cc9e25df1fc4b4bd9a509ea587cc0283a7cc`.
+The current frozen-source execution is **20260909-080212-676633000**: **192 browser scenarios, 192 passed and 0 failed**. No browser scenario failed in this run; uncovered historical acceptance criteria remain open. Every mapped case in the matrix identifies its actual assertion scope. Browser-scenario counts and full-story acceptance counts have different denominators. The original tested source fingerprints remain WebUI `97bbe4c5ebfb8d7c7a13db6dc2be5a806b0e219168b4cdb8f5a69d2edd26c85f` and engine `30a43dd57c77ec92b39fdf6c1d6da690fc25b0ac8a9560567f4a61cfbcbcbb6f`.
 
 <!-- final-run-summary:end -->
 
@@ -50,7 +50,7 @@ Whitelist/blacklist mode, role and approval flow are separate dimensions in the 
 
 Suggested evidence record per executed ID: candidate commit, engine commit, test path/name, command/run ID, fixture persona, viewport/browser, start/end time, assertions, actual result, screenshot/trace link, read-back evidence and finding ID. Coverage percentage uses the current reconciled inventory denominator; do not divide a smoke-suite pass count by this planning list and call it all-click coverage.
 
-The reconciled candidate heads are WebUI `820b4a8eecb2a223a8c133358e1dad7a10830211` and engine `77ce302a209a586096d0c52336f42f357722f3e0`. Exact tested file fingerprints, original run heads and run ID remain in [source-provenance.json](evidence/source-provenance.json). The authoritative scenario report is [executed-scenarios.csv](evidence/executed-scenarios.csv), with aggregate results in [execution-summary.json](evidence/execution-summary.json). Executable sources are under [test-kit](README.md). Production deployment is not certified by this local run. Provisional executable test IDs are mapped by reviewed assertion semantics, not ID equality.
+The reconciled candidate heads are WebUI `451acb916a33d9267713eaf57aba7f93e462993c` and engine `97fbbecd35984d5e28a3482d60a1165121333fc9`. Exact tested file fingerprints, original run heads and run ID remain in [source-provenance.json](evidence/source-provenance.json). Any permitted new manual operator helpers have separate `post_run_operator_scripts` path/SHA256 records and a separate delivered-source fingerprint; these additions are not certified by the browser run. The authoritative scenario report is [executed-scenarios.csv](evidence/executed-scenarios.csv), with aggregate results in [execution-summary.json](evidence/execution-summary.json). Executable sources are under [test-kit](README.md). Production deployment is not certified by this local run. Provisional executable test IDs are mapped by reviewed assertion semantics, not ID equality.
 
 ## Current governance contract and execution limits
 
@@ -83,24 +83,24 @@ Counts refer to complete story acceptance, passing subsets, actual failing asser
 |---|---:|---:|---:|---:|
 | Authentication and identity | 0 | 7 | 0 | 3 |
 | Composer, responses and runtime | 4 | 10 | 0 | 8 |
-| Conversation list and lifecycle | 0 | 8 | 1 | 8 |
+| Conversation list and lifecycle | 1 | 11 | 0 | 7 |
 | People, mentions and shared conversations | 0 | 3 | 0 | 9 |
 | Bot creation and editing | 0 | 8 | 0 | 6 |
 | Bot knowledge and shared memory | 0 | 3 | 0 | 7 |
 | Personal memory and external notes | 0 | 2 | 0 | 6 |
 | Projects and collaboration | 0 | 4 | 0 | 6 |
-| File tree, previews and transfers | 0 | 4 | 0 | 9 |
+| File tree, previews and transfers | 1 | 6 | 0 | 7 |
 | Workspaces and assignment | 0 | 4 | 0 | 4 |
 | Scheduled tasks and run history | 0 | 9 | 0 | 5 |
-| Kanban boards, tasks and orchestration | 0 | 4 | 1 | 12 |
+| Kanban boards, tasks and orchestration | 0 | 12 | 0 | 5 |
 | Session task list | 0 | 4 | 0 | 0 |
-| Skills library and management | 0 | 6 | 0 | 2 |
+| Skills library and management | 0 | 7 | 0 | 1 |
 | Connections catalog and account ownership | 0 | 1 | 0 | 9 |
 | Governance administration and existing approval flows | 1 | 15 | 0 | 6 |
 | Requested RBAC, whitelist/blacklist and automatic approval | 0 | 24 | 0 | 9 |
 | Insights, usage and health reporting | 0 | 1 | 0 | 5 |
-| Logs and diagnostics | 0 | 3 | 0 | 2 |
-| Settings and personal preferences | 0 | 29 | 0 | 11 |
+| Logs and diagnostics | 0 | 4 | 0 | 1 |
+| Settings and personal preferences | 0 | 30 | 0 | 10 |
 | Providers, models and budgets | 0 | 4 | 0 | 6 |
 | Plugins and extensions | 0 | 3 | 0 | 9 |
 | System, gateway, MCP and capacity controls | 0 | 4 | 0 | 9 |
@@ -109,6 +109,12 @@ Counts refer to complete story acceptance, passing subsets, actual failing asser
 | Whole-application control coverage and resilience | 0 | 7 | 0 | 4 |
 
 <!-- evidence-area-summary:end -->
+
+
+
+
+
+
 
 ## Test requirement legend
 
@@ -566,7 +572,7 @@ As a conversation owner, I want to create a public share.
 - **Persisted/read-back result:** Only the intended share snapshot is readable; private metadata/files are excluded.
 - **Permission negative:** Unshared sessions and underlying private endpoints remain protected.
 - **Required verification:** REAL_BROWSER; UNSIGNED_CONTEXT; PRIVACY_MARKERS; NEGATIVE_SERVER.
-- **Priority / current status:** P1 / **FAIL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P1 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 #### US-SP-SESS-011
 
@@ -576,7 +582,7 @@ As a conversation owner, I want to revoke a public share.
 - **Persisted/read-back result:** The old share is unreadable after reload.
 - **Permission negative:** A non-owner cannot create or revoke it.
 - **Required verification:** REAL_BROWSER; RELOAD; UNSIGNED_CONTEXT; NEGATIVE_SERVER.
-- **Priority / current status:** P1 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P1 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 #### US-SP-SESS-012
 
@@ -637,6 +643,26 @@ As a conversation owner, I want to retain unread and completion state.
 - **Permission negative:** An outsider cannot enumerate, mutate, export or share the conversation through UI, copied URLs or direct requests.
 - **Required verification:** REAL_BROWSER; RELOAD; TWO_USERS; NEGATIVE_SERVER.
 - **Priority / current status:** P1 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+
+#### US-SP-SESS-018
+
+As an authorized conversation owner, I want to import a JSON transcript through the visible file chooser.
+
+- **Frontend steps:** Open conversation settings; choose a valid JSON file through Import; reopen the created session; then choose malformed JSON.
+- **Persisted/read-back result:** A new session ID holds the exact title and user/assistant content after reload. Malformed JSON creates no import request or additional session and preserves the prior transcript.
+- **Permission negative:** An unpermitted importer cannot create a session or forge ownership/profile/workspace authority through JSON fields; the original session is not overwritten.
+- **Required verification:** REAL_BROWSER; FILE_CHOOSER; RELOAD; AUTHORITATIVE_READBACK; NEGATIVE_SERVER.
+- **Priority / current status:** P1 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
+
+#### US-SP-SESS-019
+
+As a conversation owner, I want to fork from a selected completed message and continue the exact copied prefix independently.
+
+- **Frontend steps:** Complete two fixture exchanges; click Fork from here on the first assistant reply; reload the new conversation; send a new child-only turn.
+- **Persisted/read-back result:** The new session ID initially contains exactly the selected first exchange, inherits the source workspace/profile, omits later parent messages, and retains that prefix after reload. Its new exchange persists while the original parent transcript remains byte-for-byte unchanged.
+- **Permission negative:** A different signed-in user receives404 when reading or forking either private parent or child and receives none of their transcript markers.
+- **Required verification:** REAL_BROWSER; PROVIDER_FIXTURE; RELOAD; AUTHORITATIVE_READBACK; NEGATIVE_SERVER.
+- **Priority / current status:** P1 / **PASS**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All stated acceptance assertions passed on a frozen source run with the current executable spec.
 
 ### GROUP — People, mentions and shared conversations
 
@@ -1266,11 +1292,11 @@ As an authorized workspace user, I want to edit and save a file.
 
 As an authorized workspace user, I want to cancel a file edit.
 
-- **Frontend steps:** Change an editable fixture; Cancel; reopen.
+- **Frontend steps:** Open an editable fixture; Edit; change text; press Escape to cancel; reopen and reload.
 - **Persisted/read-back result:** Original bytes remain unchanged.
 - **Permission negative:** Unpermitted roots, encoded traversal, symlinks and cross-session URLs cannot expose or overwrite protected files.
 - **Required verification:** REAL_BROWSER; FILE_BYTES; RELOAD; NEGATIVE_SERVER.
-- **Priority / current status:** P1 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P1 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 #### US-SP-FILE-008
 
@@ -1280,7 +1306,7 @@ As an authorized workspace user, I want to upload with the file picker.
 - **Persisted/read-back result:** The chosen directory receives exactly the intended file and bytes.
 - **Permission negative:** Unpermitted roots, encoded traversal, symlinks and cross-session URLs cannot expose or overwrite protected files.
 - **Required verification:** REAL_BROWSER; FILE_BYTES; RELOAD; NEGATIVE_SERVER.
-- **Priority / current status:** P1 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P1 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 #### US-SP-FILE-009
 
@@ -1331,6 +1357,16 @@ As an authorized workspace user, I want to recover from a denied or missing file
 - **Permission negative:** Unpermitted roots, encoded traversal, symlinks and cross-session URLs cannot expose or overwrite protected files.
 - **Required verification:** REAL_BROWSER; FILE_BYTES; RELOAD; NEGATIVE_SERVER.
 - **Priority / current status:** P1 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+
+#### US-SP-FILE-014
+
+As an authorized workspace member, I want to show or hide supported system files while keeping file-access restrictions enforced.
+
+- **Frontend steps:** Open workspace options; turn Show hidden files on; preview an allowed system-prefixed file; reload; reopen options and turn the toggle off.
+- **Persisted/read-back result:** The allowed system-prefixed file appears with the visible options dot when enabled, remains visible with the checkbox checked after reload, and disappears when disabled. Preview bytes match the permitted file.
+- **Permission negative:** A separate system-prefixed file denied through the administrator editor stays absent from the tree before and after toggling and reload; direct reads return403 without its marker and its stored bytes stay unchanged.
+- **Required verification:** REAL_BROWSER; RELOAD; FILE_BYTES; AUTHORITATIVE_READBACK; NEGATIVE_SERVER.
+- **Priority / current status:** P1 / **PASS**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All stated acceptance assertions passed on a frozen source run with the current executable spec.
 
 ### WS — Workspaces and assignment
 
@@ -1572,7 +1608,7 @@ As an authorized board user, I want to switch board and list views.
 - **Persisted/read-back result:** The same authorized tasks appear and view preference persists where documented.
 - **Permission negative:** Users without board/task permission cannot read or mutate the board, trigger dispatch or inherit another tenant/workspace authority.
 - **Required verification:** REAL_BROWSER; RELOAD; NEGATIVE_SERVER.
-- **Priority / current status:** P1 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P1 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 #### US-SP-KAN-002
 
@@ -1632,7 +1668,7 @@ As an authorized board user, I want to use quick card actions.
 - **Persisted/read-back result:** The authorized transition persists once with its event history.
 - **Permission negative:** Users without board/task permission cannot read or mutate the board, trigger dispatch or inherit another tenant/workspace authority.
 - **Required verification:** REAL_BROWSER; RELOAD; NEGATIVE_SERVER.
-- **Priority / current status:** P1 / **FAIL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P1 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 #### US-SP-KAN-008
 
@@ -1642,7 +1678,7 @@ As an authorized board user, I want to block and unblock a task.
 - **Persisted/read-back result:** Block state/reason and subsequent transition are durable and truthful.
 - **Permission negative:** Users without board/task permission cannot read or mutate the board, trigger dispatch or inherit another tenant/workspace authority.
 - **Required verification:** REAL_BROWSER; RELOAD; NEGATIVE_SERVER.
-- **Priority / current status:** P1 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P1 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 #### US-SP-KAN-009
 
@@ -1652,7 +1688,7 @@ As an authorized board user, I want to apply bulk updates.
 - **Persisted/read-back result:** Only selected permitted tasks change; per-item failures remain visible.
 - **Permission negative:** Users without board/task permission cannot read or mutate the board, trigger dispatch or inherit another tenant/workspace authority.
 - **Required verification:** REAL_BROWSER; RELOAD; NEGATIVE_SERVER.
-- **Priority / current status:** P1 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P1 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 #### US-SP-KAN-010
 
@@ -1672,7 +1708,7 @@ As an authorized board user, I want to add and remove dependencies.
 - **Persisted/read-back result:** Valid relationships persist; invalid cycles are refused; removal affects only the chosen edge.
 - **Permission negative:** Users without board/task permission cannot read or mutate the board, trigger dispatch or inherit another tenant/workspace authority.
 - **Required verification:** REAL_BROWSER; RELOAD; NEGATIVE_SERVER.
-- **Priority / current status:** P1 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P1 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 #### US-SP-KAN-012
 
@@ -1692,7 +1728,7 @@ As an authorized board user, I want to create and rename a board.
 - **Persisted/read-back result:** Board identity remains stable while the new name persists.
 - **Permission negative:** Users without board/task permission cannot read or mutate the board, trigger dispatch or inherit another tenant/workspace authority.
 - **Required verification:** REAL_BROWSER; RELOAD; NEGATIVE_SERVER.
-- **Priority / current status:** P1 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P1 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 #### US-SP-KAN-014
 
@@ -1702,7 +1738,7 @@ As an authorized board user, I want to archive a board.
 - **Persisted/read-back result:** The board is archived under the documented behavior without exposing or deleting unrelated tasks.
 - **Permission negative:** Users without board/task permission cannot read or mutate the board, trigger dispatch or inherit another tenant/workspace authority.
 - **Required verification:** REAL_BROWSER; RELOAD; NEGATIVE_SERVER.
-- **Priority / current status:** P1 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P1 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 #### US-SP-KAN-015
 
@@ -1712,7 +1748,7 @@ As an authorized board user, I want to run the dispatcher.
 - **Persisted/read-back result:** Eligible permitted work dispatches once and failures are accurately counted.
 - **Permission negative:** A non-elevated user cannot dispatch restricted jobs; board membership alone is insufficient.
 - **Required verification:** REAL_BROWSER; ISOLATED_SCHEDULER; DETERMINISTIC_PROVIDER; NEGATIVE_SERVER.
-- **Priority / current status:** P1 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P1 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 #### US-SP-KAN-016
 
@@ -1830,7 +1866,7 @@ As an authorized skill user or manager, I want to cancel a skill edit.
 - **Persisted/read-back result:** Original skill bytes are preserved.
 - **Permission negative:** Missing skill view/load/manage grants deny both UI operations and direct/runtime access; viewing a skill does not imply permission to load it.
 - **Required verification:** REAL_BROWSER; RELOAD; NEGATIVE_SERVER.
-- **Priority / current status:** P1 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P1 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 #### US-SP-SKILL-006
 
@@ -2630,7 +2666,7 @@ As an authorized log viewer, I want to copy log output.
 - **Persisted/read-back result:** Copied content matches the intended filtered/raw contract and contains no planted secret marker.
 - **Permission negative:** Users without logs access cannot list/read/copy log files; selected logs must exclude secrets and unauthorized private data.
 - **Required verification:** REAL_BROWSER; SEEDED_LOGS; NEGATIVE_SERVER.
-- **Priority / current status:** P1 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P1 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 #### US-SP-LOG-005
 
@@ -2684,7 +2720,7 @@ As a signed-in user, I want to control default workspace pane visibility.
 - **Persisted/read-back result:** The pane opens/closes by the persisted preference and manual controls still work.
 - **Permission negative:** Personal preferences cannot change another account or enable governance-forbidden functionality; privileged global options require their own server permission.
 - **Required verification:** REAL_BROWSER; RELOAD; TWO_USERS; NEGATIVE_SERVER.
-- **Priority / current status:** P1 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P1 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 #### US-SP-PREF-005
 

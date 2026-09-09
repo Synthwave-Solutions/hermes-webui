@@ -1,0 +1,293 @@
+{
+  "reviewed_commit": "451acb916a33d9267713eaf57aba7f93e462993c",
+  "repository": "https://github.com/Synthwave-Solutions/hermes-webui",
+  "global_ci_passed": false,
+  "successful_checks": [
+    {
+      "name": "live-to-final (normal, tests/browser_conversation_lifecycle.py, normal)",
+      "url": "https://github.com/Synthwave-Solutions/hermes-webui/actions/runs/34317301492/job/102356102721",
+      "conclusion": "SUCCESS"
+    },
+    {
+      "name": "docs-ci",
+      "url": "https://github.com/Synthwave-Solutions/hermes-webui/actions/runs/34317301531/job/102356103080",
+      "conclusion": "SUCCESS"
+    },
+    {
+      "name": "chat-privacy-and-controls",
+      "url": "https://github.com/Synthwave-Solutions/hermes-webui/actions/runs/34317301459/job/102356102677",
+      "conclusion": "SUCCESS"
+    },
+    {
+      "name": "live-to-final (terminal-error, tests/browser_conversation_lifecycle.py, terminal-error)",
+      "url": "https://github.com/Synthwave-Solutions/hermes-webui/actions/runs/34317301492/job/102356102643",
+      "conclusion": "SUCCESS"
+    },
+    {
+      "name": "live-to-final (historical-transcript-hydration, tests/browser_historical_transcript_hydration.py)",
+      "url": "https://github.com/Synthwave-Solutions/hermes-webui/actions/runs/34317301492/job/102356102468",
+      "conclusion": "SUCCESS"
+    },
+    {
+      "name": "browser-smoke",
+      "url": "https://github.com/Synthwave-Solutions/hermes-webui/actions/runs/34317301473/job/102356169138",
+      "conclusion": "SUCCESS"
+    },
+    {
+      "name": "lint",
+      "url": "https://github.com/Synthwave-Solutions/hermes-webui/actions/runs/34317301596/job/102356195026",
+      "conclusion": "SUCCESS"
+    }
+  ],
+  "failed_broad_shards": 15,
+  "reviewed_failure": {
+    "name": "test (3.11, 0)",
+    "url": "https://github.com/Synthwave-Solutions/hermes-webui/actions/runs/34317301596/job/102356195301",
+    "collection_error_count": 10,
+    "removed_new_engine_import_error": true,
+    "baseline_commit": "571c11f9cc184657b49abf93ad9bedf633a437fe",
+    "contracts": [
+      {
+        "test": "tests/test_atomic_settings_writes.py",
+        "module": "api/config.py",
+        "missing_symbol": "_atomic_write_settings_text",
+        "unchanged_test_sha256": "4fb0cf361b8bdff8d1f0bb372c978593701e16e9d9cef174fefe9a909116d4d5",
+        "test_bytes_identical": true,
+        "symbol_absent_at_baseline": true,
+        "symbol_absent_at_reviewed_commit": true
+      },
+      {
+        "test": "tests/test_auto_compression_card.py",
+        "module": "api/streaming.py",
+        "missing_symbol": "_POST_COMPRESSION_TOOL_RESULT_SUMMARY_FLAG",
+        "unchanged_test_sha256": "9497a7ef26d557e6df88b0f2e50d61af21f27923d873d2e12253e974d7cb65fb",
+        "test_bytes_identical": true,
+        "symbol_absent_at_baseline": true,
+        "symbol_absent_at_reviewed_commit": true
+      },
+      {
+        "test": "tests/test_cli_sessions_cache_cap.py",
+        "module": "api/models.py",
+        "missing_symbol": "_CLI_SESSIONS_CACHE_MAX_ENTRIES",
+        "unchanged_test_sha256": "5bc986675ce3484ce39da28822aa857cd033a3edc23bd881b4e901b8e3adb465",
+        "test_bytes_identical": true,
+        "symbol_absent_at_baseline": true,
+        "symbol_absent_at_reviewed_commit": true
+      },
+      {
+        "test": "tests/test_context_history_sanitization.py",
+        "module": "api/streaming.py",
+        "missing_symbol": "_compact_image_parts_for_persistence",
+        "unchanged_test_sha256": "c223a9c5c85de47044c0cb1fdb1772826329bf7fa434986d779ce9fab7ba4432",
+        "test_bytes_identical": true,
+        "symbol_absent_at_baseline": true,
+        "symbol_absent_at_reviewed_commit": true
+      },
+      {
+        "test": "tests/test_context_message_stable_ids.py",
+        "module": "api/streaming.py",
+        "missing_symbol": "_assign_stable_message_ids",
+        "unchanged_test_sha256": "f4d988d032fd0b09d88716fa4713c0392cb8bb8e15be953a44f8198066f4762d",
+        "test_bytes_identical": true,
+        "symbol_absent_at_baseline": true,
+        "symbol_absent_at_reviewed_commit": true
+      },
+      {
+        "test": "tests/test_cors_preflight_allowlist.py",
+        "module": "api/routes.py",
+        "missing_symbol": "apply_cors_preflight_headers",
+        "unchanged_test_sha256": "f5bffd20c8ad8ac1202dcc335edd6b85481c98af0613eb297d96418fcca160bd",
+        "test_bytes_identical": true,
+        "symbol_absent_at_baseline": true,
+        "symbol_absent_at_reviewed_commit": true
+      },
+      {
+        "test": "tests/test_gateway_read_idle_timeout.py",
+        "module": "api/gateway_chat.py",
+        "missing_symbol": "_GATEWAY_READ_TIMEOUT_DEFAULT",
+        "unchanged_test_sha256": "a538b6f928d3072a51cd8e102bc543fbc830fd64634767fe0150a568ea0ee6f6",
+        "test_bytes_identical": true,
+        "symbol_absent_at_baseline": true,
+        "symbol_absent_at_reviewed_commit": true
+      },
+      {
+        "test": "tests/test_issue3929_process_wakeup_pause.py",
+        "module": "api/models.py",
+        "missing_symbol": "PROCESS_WAKEUP_PAUSE_ERROR",
+        "unchanged_test_sha256": "07e3706c7ddcae8edc8643e44a7fee729323b91eab610ade41b9a5026d027909",
+        "test_bytes_identical": true,
+        "symbol_absent_at_baseline": true,
+        "symbol_absent_at_reviewed_commit": true
+      },
+      {
+        "test": "tests/test_session_msg_limit_ceiling.py",
+        "module": "api/routes.py",
+        "missing_symbol": "_MAX_MSG_LIMIT",
+        "unchanged_test_sha256": "8a3336acc8067bb32d2ea3bc1c68c46fee0bb091925d6c468d5571c01569d6d3",
+        "test_bytes_identical": true,
+        "symbol_absent_at_baseline": true,
+        "symbol_absent_at_reviewed_commit": true
+      },
+      {
+        "test": "tests/test_state_db_backstop_boundary_gate.py",
+        "module": "api/routes.py",
+        "missing_symbol": "_STATE_DB_DISPLAY_ROW_BACKSTOP",
+        "unchanged_test_sha256": "81151d72fca04021f741d2e8a4bdde10452641384b824ae859ca44e1fd6482f3",
+        "test_bytes_identical": true,
+        "symbol_absent_at_baseline": true,
+        "symbol_absent_at_reviewed_commit": true
+      }
+    ],
+    "log_path": "work/ci-review-451acb91/test-py311-shard0.log",
+    "log_sha256": "3fbec79369a907660a0e0fb4af3b688b186bda699eff1f2a531118ccc6ea75ac",
+    "verification": "Exact ten ImportError symbols/modules and ten collection-error test paths matched. Test bytes are identical to baseline and their prior SHA256 values; symbols are absent from parsed module names/definitions/imports at both commits."
+  },
+  "scope": "GitHub statuses are for exact commit451acb916a33d9267713eaf57aba7f93e462993c. Seven substantive successful checks are listed separately from two successful changes-routing jobs. Only the named Python3.11 shard0 failure log was re-triaged here: the same ten baseline missing-contract imports, with identical test bytes and absent symbols at baseline571c11f9 and reviewed commit. Other14 shard failures are status observations, not independently re-triaged logs. Global CI did not pass. This is separate from local frozen browser and canonical backend results; later heads are not automatically CI-certified.",
+  "reviewed_at_utc": "2026-09-09T06:08:22.088463+00:00",
+  "auxiliary_successful_checks": [
+    {
+      "name": "changes",
+      "url": "https://github.com/Synthwave-Solutions/hermes-webui/actions/runs/34317301596/job/102356103427",
+      "conclusion": "SUCCESS"
+    },
+    {
+      "name": "changes",
+      "url": "https://github.com/Synthwave-Solutions/hermes-webui/actions/runs/34317301473/job/102356102670",
+      "conclusion": "SUCCESS"
+    }
+  ],
+  "failed_broad_shard_checks": [
+    {
+      "name": "test (3.11, 0)",
+      "url": "https://github.com/Synthwave-Solutions/hermes-webui/actions/runs/34317301596/job/102356195301",
+      "conclusion": "FAILURE"
+    },
+    {
+      "name": "test (3.11, 1)",
+      "url": "https://github.com/Synthwave-Solutions/hermes-webui/actions/runs/34317301596/job/102356195347",
+      "conclusion": "FAILURE"
+    },
+    {
+      "name": "test (3.11, 2)",
+      "url": "https://github.com/Synthwave-Solutions/hermes-webui/actions/runs/34317301596/job/102356195436",
+      "conclusion": "FAILURE"
+    },
+    {
+      "name": "test (3.11, 3)",
+      "url": "https://github.com/Synthwave-Solutions/hermes-webui/actions/runs/34317301596/job/102356195375",
+      "conclusion": "FAILURE"
+    },
+    {
+      "name": "test (3.11, 4)",
+      "url": "https://github.com/Synthwave-Solutions/hermes-webui/actions/runs/34317301596/job/102356195299",
+      "conclusion": "FAILURE"
+    },
+    {
+      "name": "test (3.12, 0)",
+      "url": "https://github.com/Synthwave-Solutions/hermes-webui/actions/runs/34317301596/job/102356195346",
+      "conclusion": "FAILURE"
+    },
+    {
+      "name": "test (3.12, 1)",
+      "url": "https://github.com/Synthwave-Solutions/hermes-webui/actions/runs/34317301596/job/102356195380",
+      "conclusion": "FAILURE"
+    },
+    {
+      "name": "test (3.12, 2)",
+      "url": "https://github.com/Synthwave-Solutions/hermes-webui/actions/runs/34317301596/job/102356195397",
+      "conclusion": "FAILURE"
+    },
+    {
+      "name": "test (3.12, 3)",
+      "url": "https://github.com/Synthwave-Solutions/hermes-webui/actions/runs/34317301596/job/102356195326",
+      "conclusion": "FAILURE"
+    },
+    {
+      "name": "test (3.12, 4)",
+      "url": "https://github.com/Synthwave-Solutions/hermes-webui/actions/runs/34317301596/job/102356195417",
+      "conclusion": "FAILURE"
+    },
+    {
+      "name": "test (3.13, 0)",
+      "url": "https://github.com/Synthwave-Solutions/hermes-webui/actions/runs/34317301596/job/102356195479",
+      "conclusion": "FAILURE"
+    },
+    {
+      "name": "test (3.13, 1)",
+      "url": "https://github.com/Synthwave-Solutions/hermes-webui/actions/runs/34317301596/job/102356195338",
+      "conclusion": "FAILURE"
+    },
+    {
+      "name": "test (3.13, 2)",
+      "url": "https://github.com/Synthwave-Solutions/hermes-webui/actions/runs/34317301596/job/102356195371",
+      "conclusion": "FAILURE"
+    },
+    {
+      "name": "test (3.13, 3)",
+      "url": "https://github.com/Synthwave-Solutions/hermes-webui/actions/runs/34317301596/job/102356195368",
+      "conclusion": "FAILURE"
+    },
+    {
+      "name": "test (3.13, 4)",
+      "url": "https://github.com/Synthwave-Solutions/hermes-webui/actions/runs/34317301596/job/102356195364",
+      "conclusion": "FAILURE"
+    }
+  ],
+  "workflow_runs": [
+    {
+      "id": 34317301596,
+      "name": "Tests",
+      "html_url": "https://github.com/Synthwave-Solutions/hermes-webui/actions/runs/34317301596",
+      "head_sha": "451acb916a33d9267713eaf57aba7f93e462993c",
+      "status": "completed",
+      "conclusion": "failure",
+      "run_attempt": 1,
+      "created_at": "2026-09-09T06:02:08Z",
+      "updated_at": "2026-09-09T06:04:36Z"
+    },
+    {
+      "id": 34317301531,
+      "name": "Docs CI",
+      "html_url": "https://github.com/Synthwave-Solutions/hermes-webui/actions/runs/34317301531",
+      "head_sha": "451acb916a33d9267713eaf57aba7f93e462993c",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1,
+      "created_at": "2026-09-09T06:02:07Z",
+      "updated_at": "2026-09-09T06:03:17Z"
+    },
+    {
+      "id": 34317301473,
+      "name": "Browser smoke",
+      "html_url": "https://github.com/Synthwave-Solutions/hermes-webui/actions/runs/34317301473",
+      "head_sha": "451acb916a33d9267713eaf57aba7f93e462993c",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1,
+      "created_at": "2026-09-09T06:02:07Z",
+      "updated_at": "2026-09-09T06:03:19Z"
+    },
+    {
+      "id": 34317301492,
+      "name": "Conversation lifecycle (informational)",
+      "html_url": "https://github.com/Synthwave-Solutions/hermes-webui/actions/runs/34317301492",
+      "head_sha": "451acb916a33d9267713eaf57aba7f93e462993c",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1,
+      "created_at": "2026-09-09T06:02:07Z",
+      "updated_at": "2026-09-09T06:03:35Z"
+    },
+    {
+      "id": 34317301459,
+      "name": "SynPulse chat QA",
+      "html_url": "https://github.com/Synthwave-Solutions/hermes-webui/actions/runs/34317301459",
+      "head_sha": "451acb916a33d9267713eaf57aba7f93e462993c",
+      "status": "completed",
+      "conclusion": "success",
+      "run_attempt": 1,
+      "created_at": "2026-09-09T06:02:07Z",
+      "updated_at": "2026-09-09T06:04:06Z"
+    }
+  ]
+}

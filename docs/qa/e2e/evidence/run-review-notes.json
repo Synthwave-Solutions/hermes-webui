@@ -1,16 +1,20 @@
 {
-  "run": "20260908-222640-169443000",
+  "run": "20260909-080212-676633000",
   "report_global_errors": [],
   "runner_reporter_warnings": [
-    "Internal error: step id not found: fixture@492",
+    "Internal error: step id not found: fixture@345",
+    "Internal error: step id not found: fixture@364",
+    "Internal error: step id not found: fixture@491",
     "Internal error: step id not found: fixture@383",
     "Internal error: step id not found: fixture@649",
     "Internal error: step id not found: fixture@673Internal error: step id not found: fixture@673",
     "Internal error: step id not found: fixture@195",
-    "Internal error: step id not found: fixture@359",
-    "Internal error: step id not found: fixture@427",
+    "Internal error: step id not found: fixture@343",
+    "Internal error: step id not found: fixture@222",
+    "Internal error: step id not found: fixture@363",
+    "Internal error: step id not found: fixture@428",
     "Internal error: step id not found: fixture@272",
-    "Internal error: step id not found: fixture@554"
+    "Internal error: step id not found: fixture@543"
   ],
   "note": "Reporter fixture bookkeeping warnings are preserved separately from scenario failures and collected application page errors.",
   "prior_integrated_attempts": [
@@ -21,10 +25,21 @@
       "failed": 4,
       "source_unchanged": true,
       "findings": [
-        "Share creation404 remains open",
-        "Todo to Done404 remains open",
+        "Share creation404 was open in this historical run; resolved by the final 187-scenario run",
+        "Todo to Done404 was open in this historical run; resolved by the final 187-scenario run",
         "Terminal CDN assets blocked by the corrected loopback QA boundary; exact verified assets were bundled locally; focused same-origin asset and command/restart test passed",
         "Tool status case required compact activity mode but an earlier settings test left transparent stream selected; explicit UI precondition was added; preceding preference plus tool-status ordering regression passed"
+      ]
+    },
+    {
+      "run": "20260908-222640-169443000",
+      "scenarios": 176,
+      "passed": 174,
+      "failed": 2,
+      "source_unchanged": true,
+      "findings": [
+        "Share creation and manual Todo completion still returned404 in this historical run",
+        "The final 187-scenario run passes both regressions and adds Share ownership/privacy and manual Todo blocking coverage"
       ]
     }
   ]
