@@ -1,26 +1,4 @@
 {
-  "run": "20260909-184341-281192000",
-  "report_global_errors": [],
-  "runner_reporter_warnings": [
-    "Internal error: step id not found: fixture@346",
-    "Internal error: step id not found: fixture@364",
-    "Internal error: step id not found: fixture@494",
-    "Internal error: step id not found: fixture@385",
-    "Internal error: step id not found: fixture@653",
-    "Internal error: step id not found: fixture@671Internal error: step id not found: fixture@671",
-    "Internal error: step id not found: fixture@196",
-    "Internal error: step id not found: fixture@344",
-    "Internal error: step id not found: fixture@222",
-    "Internal error: step id not found: fixture@800Internal error: step id not found: fixture@800",
-    "Internal error: step id not found: fixture@571",
-    "Internal error: step id not found: fixture@365",
-    "Internal error: step id not found: fixture@378",
-    "Internal error: step id not found: fixture@358",
-    "Internal error: step id not found: fixture@428",
-    "Internal error: step id not found: fixture@273",
-    "Internal error: step id not found: fixture@521"
-  ],
-  "note": "Reporter fixture bookkeeping warnings are preserved separately from scenario failures and collected application page errors.",
   "prior_integrated_attempts": [
     {
       "run": "20260908-221421-292673000",

@@ -3,10 +3,10 @@
     "event": "action_approval",
     "extra": {
       "decision": "approve",
-      "operation_id": "a5f480a9e9134087a74af70caea1f680",
-      "policy_revision": "108abb010bf4dba6a99327d2549611392be9841142c5ebb8195ed34dd7059bd6",
-      "request_id": "339b636f61db4f08b2f585bb9937b8c1",
-      "session_id": "20ddc12ff8bb",
+      "operation_id": "5f1625eb4adb4c43a39e6f8c514d240d",
+      "policy_revision": "c8476f5fc657cc62d855758f14831607a5a70b2934ff1ac16dadbe4ae7c7454d",
+      "request_id": "db6caeea40f4419aaebb71ba1540d2a6",
+      "session_id": "dd66f81589e9",
       "source": "automatic",
       "tool": "write_file"
     },
@@ -17,16 +17,16 @@
     "report_only": false,
     "subject_email_hash": "38533e7ecf4361ced3de281c",
     "subject_user_id_hash": "",
-    "ts": "2026-09-08T20:28:48.114482+00:00"
+    "ts": "2026-09-09T16:46:02.854384+00:00"
   },
   {
     "event": "action_approval",
     "extra": {
       "decision": "deny",
-      "operation_id": "c38a2f5f072f4f6a879c0b30c78d8865",
-      "policy_revision": "108abb010bf4dba6a99327d2549611392be9841142c5ebb8195ed34dd7059bd6",
-      "request_id": "e7cca785e2c6401cbb979f032e3938ae",
-      "session_id": "f0870fcfb0f9",
+      "operation_id": "7f5f1240df764a34adfabcd1e8925958",
+      "policy_revision": "c8476f5fc657cc62d855758f14831607a5a70b2934ff1ac16dadbe4ae7c7454d",
+      "request_id": "f81e1c552ac04ae8aa5b6bdf476e9b5e",
+      "session_id": "ce9dd31b6629",
       "source": "automatic",
       "tool": "write_file"
     },
@@ -37,16 +37,16 @@
     "report_only": false,
     "subject_email_hash": "9fdd94a9ec7ff0b437d41d9c",
     "subject_user_id_hash": "",
-    "ts": "2026-09-08T20:28:49.762789+00:00"
+    "ts": "2026-09-09T16:46:03.934727+00:00"
   },
   {
     "event": "action_approval",
     "extra": {
       "decision": "approve",
-      "operation_id": "39f488991bef425b8922995df6141f6d",
-      "policy_revision": "108abb010bf4dba6a99327d2549611392be9841142c5ebb8195ed34dd7059bd6",
-      "request_id": "27da060030fa437e9939b862a868ee32",
-      "session_id": "0e1d13f974c8",
+      "operation_id": "472a74b8ca644da4afee3370477a7e9c",
+      "policy_revision": "c8476f5fc657cc62d855758f14831607a5a70b2934ff1ac16dadbe4ae7c7454d",
+      "request_id": "a5f317f6480a4b4497b414ba70ea8d97",
+      "session_id": "bc33a67b6cf0",
       "source": "manual",
       "tool": "write_file"
     },
@@ -57,16 +57,16 @@
     "report_only": false,
     "subject_email_hash": "c54f0b65f3ffdbfed628fac6",
     "subject_user_id_hash": "",
-    "ts": "2026-09-08T20:28:51.484408+00:00"
+    "ts": "2026-09-09T16:46:05.575149+00:00"
   },
   {
     "event": "action_approval",
     "extra": {
       "decision": "deny",
-      "operation_id": "07ca0d5271594407a5892cf05098b50e",
-      "policy_revision": "108abb010bf4dba6a99327d2549611392be9841142c5ebb8195ed34dd7059bd6",
-      "request_id": "02c69919684441c981cedf3de6ba876d",
-      "session_id": "3e72ece255ab",
+      "operation_id": "0354ebcfe0144e54a7e74608cfbc57f3",
+      "policy_revision": "c8476f5fc657cc62d855758f14831607a5a70b2934ff1ac16dadbe4ae7c7454d",
+      "request_id": "ff7c7b14de6f425ab14830cbfd91eb7c",
+      "session_id": "2a6d7c0b6e70",
       "source": "manual",
       "tool": "write_file"
     },
@@ -77,16 +77,16 @@
     "report_only": false,
     "subject_email_hash": "8499b6f4bab1cee783715694",
     "subject_user_id_hash": "",
-    "ts": "2026-09-08T20:28:53.433752+00:00"
+    "ts": "2026-09-09T16:46:07.326599+00:00"
   },
   {
     "event": "action_approval",
     "extra": {
       "decision": "approve",
-      "operation_id": "ff78bcf85b9e46c4875a37babd483748",
-      "policy_revision": "108abb010bf4dba6a99327d2549611392be9841142c5ebb8195ed34dd7059bd6",
-      "request_id": "55569f49f2074f69ae5425b5ba86af8a",
-      "session_id": "5263cecfb5d3",
+      "operation_id": "89d1b561c8354b5891202b89512f501f",
+      "policy_revision": "c8476f5fc657cc62d855758f14831607a5a70b2934ff1ac16dadbe4ae7c7454d",
+      "request_id": "28ec11f422b546e0939771f5c0f0acdc",
+      "session_id": "0e8ec4ea2f2f",
       "source": "manual",
       "tool": "write_file"
     },
@@ -97,6 +97,6 @@
     "report_only": false,
     "subject_email_hash": "d4c6a37ef0362e64de69188f",
     "subject_user_id_hash": "",
-    "ts": "2026-09-08T20:28:55.345129+00:00"
+    "ts": "2026-09-09T16:46:09.192671+00:00"
   }
 ]

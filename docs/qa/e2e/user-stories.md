@@ -1,8 +1,8 @@
 # SynthPulse frontend E2E user stories and acceptance catalog
 
-> **Final candidate evidence:** run `20260909-080212-676633000` uses private fixture state and loopback-only transports. The earlier 139-case run is historical behavior evidence; its original isolation claim was rejected and is not reused. This catalog distinguishes local synthetic-media acceptance from physical/live-provider evidence and does not claim exhaustive all-click coverage.
+> **Final candidate evidence:** run `20260909-184341-281192000` uses private fixture state and loopback-only transports. The earlier 139-case run is historical behavior evidence; its original isolation claim was rejected and is not reused. This catalog distinguishes local synthetic-media acceptance from physical/live-provider evidence and does not claim exhaustive all-click coverage.
 
-Prepared 2026-09-08. **365 acceptance stories across 26 feature areas. Execution reconciliation: 23 PASS; 191 PARTIAL; 0 FAIL; 151 NOT RUN. Passing stories certify only their stated acceptance scope; no all-features pass is claimed.**
+Prepared 2026-09-08. **365 acceptance stories across 26 feature areas. Execution reconciliation: 23 PASS; 220 PARTIAL; 0 FAIL; 122 NOT RUN. Passing stories certify only their stated acceptance scope; no all-features pass is claimed.**
 
 This acceptance catalog began from the September 2 source export, September 6 feature material and the requested governance behavior. Current isolated browser execution is now mapped conservatively to its actual assertions. PASS means every stated acceptance assertion has current-spec evidence on a frozen source run. PARTIAL means some relevant assertions passed, while the full story still has open requirements. FAIL means the latest mapped browser test failed and needs triage; it does not mean every aspect of that story was executed. NOT RUN means no matching actual frontend assertion is evidenced. Current production deployment and exhaustive persona/control inventory are not certified.
 
@@ -10,11 +10,11 @@ The companion [coverage-plan.csv](coverage-plan.csv) is the machine-readable cli
 
 <!-- final-run-summary:start -->
 
-The current frozen-source execution is **20260909-080212-676633000**: **192 browser scenarios, 192 passed and 0 failed**. No browser scenario failed in this run; uncovered historical acceptance criteria remain open. Every mapped case in the matrix identifies its actual assertion scope. Browser-scenario counts and full-story acceptance counts have different denominators. The original tested source fingerprints remain WebUI `97bbe4c5ebfb8d7c7a13db6dc2be5a806b0e219168b4cdb8f5a69d2edd26c85f` and engine `30a43dd57c77ec92b39fdf6c1d6da690fc25b0ac8a9560567f4a61cfbcbcbb6f`.
+The current frozen-source execution is **20260909-184341-281192000**: **235 browser scenarios, 235 passed and 0 failed**. No browser scenario failed in this run; uncovered historical acceptance criteria remain open. Every mapped case in the matrix identifies its actual assertion scope. Browser-scenario counts and full-story acceptance counts have different denominators. The original tested source fingerprints remain WebUI `eed1f8abfa2ce91ba042d056639ee81dc9248a9aa629cc3b59c13c8093c86bfe` and engine `653c3f66da11449a366b3ecaa5463306d0e5865456883d6fce205be738c82bf7`.
 
 <!-- final-run-summary:end -->
 
-The current control inventory contains **1,007 source/runtime entries: 448 recorded interactions in passing tests and 559 without such interaction evidence**. Entries include wrappers and repeated states; this is not a count of distinct fully verified user operations. All 176 scenarios attached uncaught-browser-error collections with zero errors. Nine recorded fixture bookkeeping log entries remain documented separately in [run-review-notes.json](evidence/run-review-notes.json).
+The current control inventory contains **1,265 source/runtime entries: 623 recorded interactions in passing tests and 642 without such interaction evidence**. Entries include wrappers and repeated states; this is not a count of distinct fully verified user operations. The selected run has 235 browser scenarios and 235 primary uncaught-browser-error collections with 0 errors. 17 recorded fixture bookkeeping log entries remain documented separately in [run-review-notes.json](evidence/run-review-notes.json).
 
 The remaining interactive inventory is reviewed in [remaining-clicks-priority.md](remaining-clicks-priority.md), with exact current control rows in [control-coverage.csv](evidence/control-coverage.csv) and review limitations in [run-review-notes.json](evidence/run-review-notes.json).
 
@@ -50,7 +50,7 @@ Whitelist/blacklist mode, role and approval flow are separate dimensions in the 
 
 Suggested evidence record per executed ID: candidate commit, engine commit, test path/name, command/run ID, fixture persona, viewport/browser, start/end time, assertions, actual result, screenshot/trace link, read-back evidence and finding ID. Coverage percentage uses the current reconciled inventory denominator; do not divide a smoke-suite pass count by this planning list and call it all-click coverage.
 
-The reconciled candidate heads are WebUI `451acb916a33d9267713eaf57aba7f93e462993c` and engine `97fbbecd35984d5e28a3482d60a1165121333fc9`. Exact tested file fingerprints, original run heads and run ID remain in [source-provenance.json](evidence/source-provenance.json). Any permitted new manual operator helpers have separate `post_run_operator_scripts` path/SHA256 records and a separate delivered-source fingerprint; these additions are not certified by the browser run. The authoritative scenario report is [executed-scenarios.csv](evidence/executed-scenarios.csv), with aggregate results in [execution-summary.json](evidence/execution-summary.json). Executable sources are under [test-kit](README.md). Production deployment is not certified by this local run. Provisional executable test IDs are mapped by reviewed assertion semantics, not ID equality.
+The reconciled candidate heads are WebUI `90cc10318788db857464663b1874d28eb1e50430` and engine `b0aaa74f9dcfe9e7caa4692656b4535ce04104e1`. Exact tested file fingerprints, original run heads and run ID remain in [source-provenance.json](evidence/source-provenance.json). Any permitted new manual operator helpers have separate `post_run_operator_scripts` path/SHA256 records and a separate delivered-source fingerprint; these additions are not certified by the browser run. The authoritative scenario report is [executed-scenarios.csv](evidence/executed-scenarios.csv), with aggregate results in [execution-summary.json](evidence/execution-summary.json). Executable sources are under [test-kit](test-kit/README.md). Production deployment is not certified by this local run. Provisional executable test IDs are mapped by reviewed assertion semantics, not ID equality.
 
 ## Current governance contract and execution limits
 
@@ -72,7 +72,7 @@ These are application and engine policy controls. This work does not establish a
 | External delivery, gateway and extension/plugin lifecycle | Fixture delivery is local and does not include real chat/mail sinks, live gateway deployment, or an installed disposable extension sidecar. | External roundtrips are unprovisioned; local disposable sink/extension cases are locally missing tests, not an external-access blocker. |
 | Other historical workflows without a matching executed assertion | Their story rows retain provenance and explicit NOT RUN status. | No claim that an untested historical feature is retired or absent. Verify current exposure and implement the local cases. |
 
-Remaining locally implementable gaps include cross-user conversation/project/knowledge isolation variants, failed-send recovery, rich-content and clipboard behavior, populated MCP and auxiliary-worker dispatch, further policy precedence/delegation timing, scheduler permission/delivery variants, board dependencies/bulk filtering, local extension lifecycle, remaining preference behavior and keyboard/offline recovery. Current requester status, retained skill/workspace revocation, owner/member assignment, role levels, System/Plugins/provider configuration and 16 local realtime voice workflows have concrete scenario evidence; each historical story still lists its own unasserted criteria. Unprovisioned external/device evidence includes real provider OAuth, physical microphone/WebRTC, physical authenticator compatibility and named real-model judgment. See [remaining-clicks-priority.md](remaining-clicks-priority.md) for bounded next cases.
+Remaining locally implementable gaps include additional conversation/project/knowledge authority and runtime retrieval variants, failed-send/offline recovery, message/terminal clipboard, unexecuted auxiliary slots, further delegated policy timing, scheduler delivery, advanced task fields, mobile composer/source-filter behavior and first-run/provider/connector contracts. Current populated MCP, CLI review and denial, retained project revocation, bot knowledge conflicts, local extension lifecycle, clarification/real Kanban dispatch, long-history navigation/Edit and draft/activation races have concrete assertion-scoped evidence. Each historical story still lists unasserted criteria. Real provider OAuth, physical microphone/authenticator compatibility and named real-model judgment require separate evidence. See [remaining-clicks-priority.md](remaining-clicks-priority.md) for bounded next cases.
 
 <!-- evidence-area-summary:start -->
 ## Acceptance coverage by feature area
@@ -82,33 +82,39 @@ Counts refer to complete story acceptance, passing subsets, actual failing asser
 | Feature area | PASS | PARTIAL | FAIL | NOT RUN |
 |---|---:|---:|---:|---:|
 | Authentication and identity | 0 | 7 | 0 | 3 |
-| Composer, responses and runtime | 4 | 10 | 0 | 8 |
+| Composer, responses and runtime | 4 | 12 | 0 | 6 |
 | Conversation list and lifecycle | 1 | 11 | 0 | 7 |
 | People, mentions and shared conversations | 0 | 3 | 0 | 9 |
 | Bot creation and editing | 0 | 8 | 0 | 6 |
-| Bot knowledge and shared memory | 0 | 3 | 0 | 7 |
+| Bot knowledge and shared memory | 0 | 8 | 0 | 2 |
 | Personal memory and external notes | 0 | 2 | 0 | 6 |
-| Projects and collaboration | 0 | 4 | 0 | 6 |
-| File tree, previews and transfers | 1 | 6 | 0 | 7 |
-| Workspaces and assignment | 0 | 4 | 0 | 4 |
-| Scheduled tasks and run history | 0 | 9 | 0 | 5 |
-| Kanban boards, tasks and orchestration | 0 | 12 | 0 | 5 |
+| Projects and collaboration | 0 | 6 | 0 | 4 |
+| File tree, previews and transfers | 1 | 9 | 0 | 4 |
+| Workspaces and assignment | 0 | 5 | 0 | 3 |
+| Scheduled tasks and run history | 0 | 11 | 0 | 3 |
+| Kanban boards, tasks and orchestration | 0 | 13 | 0 | 4 |
 | Session task list | 0 | 4 | 0 | 0 |
 | Skills library and management | 0 | 7 | 0 | 1 |
 | Connections catalog and account ownership | 0 | 1 | 0 | 9 |
-| Governance administration and existing approval flows | 1 | 15 | 0 | 6 |
-| Requested RBAC, whitelist/blacklist and automatic approval | 0 | 24 | 0 | 9 |
+| Governance administration and existing approval flows | 1 | 17 | 0 | 4 |
+| Requested RBAC, whitelist/blacklist and automatic approval | 0 | 25 | 0 | 8 |
 | Insights, usage and health reporting | 0 | 1 | 0 | 5 |
 | Logs and diagnostics | 0 | 4 | 0 | 1 |
-| Settings and personal preferences | 0 | 30 | 0 | 10 |
+| Settings and personal preferences | 0 | 31 | 0 | 9 |
 | Providers, models and budgets | 0 | 4 | 0 | 6 |
-| Plugins and extensions | 0 | 3 | 0 | 9 |
+| Plugins and extensions | 0 | 12 | 0 | 0 |
 | System, gateway, MCP and capacity controls | 0 | 4 | 0 | 9 |
 | Dictation, speech and realtime voice | 16 | 3 | 0 | 5 |
 | Interactive terminal | 0 | 5 | 0 | 4 |
 | Whole-application control coverage and resilience | 0 | 7 | 0 | 4 |
 
 <!-- evidence-area-summary:end -->
+
+
+
+
+
+
 
 
 
@@ -318,7 +324,7 @@ As an authorized chat user, I want to preserve model and provider together.
 - **Persisted/read-back result:** The exact pair remains in the UI and actual worker request.
 - **Permission negative:** Without chat, profile, model or tool access the server denies the action and no protected provider/tool dispatch occurs.
 - **Required verification:** REAL_BROWSER; DETERMINISTIC_PROVIDER; RELOAD; NEGATIVE_SERVER.
-- **Priority / current status:** P1 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P1 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 #### US-SP-CHAT-004
 
@@ -448,7 +454,7 @@ As an authorized chat user, I want to navigate a long transcript.
 - **Persisted/read-back result:** Correct messages are reached without missing/duplicate turns and settings govern scroll behavior.
 - **Permission negative:** Without chat, profile, model or tool access the server denies the action and no protected provider/tool dispatch occurs.
 - **Required verification:** REAL_BROWSER; DETERMINISTIC_PROVIDER; RELOAD; NEGATIVE_SERVER.
-- **Priority / current status:** P1 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P1 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 #### US-SP-CHAT-017
 
@@ -954,7 +960,7 @@ As a bot owner, I want to search the catalog.
 - **Persisted/read-back result:** Matching rows appear; hidden selections remain preserved.
 - **Permission negative:** Other owners/members cannot manage this catalog; selected knowledge does not bypass caller file/tool permissions.
 - **Required verification:** REAL_BROWSER; TWO_BOTS; FILE_BYTES; RELOAD; NEGATIVE_SERVER.
-- **Priority / current status:** P0 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P0 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 #### US-SP-KNOW-003
 
@@ -974,7 +980,7 @@ As a bot owner, I want to deselect knowledge.
 - **Persisted/read-back result:** The removed reference is absent from selected runtime knowledge.
 - **Permission negative:** Other owners/members cannot manage this catalog; selected knowledge does not bypass caller file/tool permissions.
 - **Required verification:** REAL_BROWSER; TWO_BOTS; FILE_BYTES; RELOAD; NEGATIVE_SERVER.
-- **Priority / current status:** P0 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P0 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 #### US-SP-KNOW-005
 
@@ -984,7 +990,7 @@ As a bot owner, I want to separate bot catalogs.
 - **Persisted/read-back result:** Bot B cannot enumerate or inherit Bot A's private catalog.
 - **Permission negative:** Other owners/members cannot manage this catalog; selected knowledge does not bypass caller file/tool permissions.
 - **Required verification:** REAL_BROWSER; TWO_BOTS; FILE_BYTES; RELOAD; NEGATIVE_SERVER.
-- **Priority / current status:** P0 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P0 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 #### US-SP-KNOW-006
 
@@ -994,7 +1000,7 @@ As a bot owner, I want to reject forged paths and selections.
 - **Persisted/read-back result:** Invalid references fail clearly and no cross-root file opens.
 - **Permission negative:** Other owners/members cannot manage this catalog; selected knowledge does not bypass caller file/tool permissions.
 - **Required verification:** REAL_BROWSER; TWO_BOTS; FILE_BYTES; RELOAD; NEGATIVE_SERVER.
-- **Priority / current status:** P0 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P0 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 #### US-SP-KNOW-007
 
@@ -1014,7 +1020,7 @@ As a bot owner, I want to handle stale knowledge revisions.
 - **Persisted/read-back result:** The newer selection survives with a visible conflict.
 - **Permission negative:** Other owners/members cannot manage this catalog; selected knowledge does not bypass caller file/tool permissions.
 - **Required verification:** REAL_BROWSER; TWO_BOTS; FILE_BYTES; RELOAD; NEGATIVE_SERVER.
-- **Priority / current status:** P0 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P0 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 #### US-SP-KNOW-009
 
@@ -1202,7 +1208,7 @@ As a project owner or member, I want to create a project conversation.
 - **Persisted/read-back result:** Project/workspace association and conversation ownership persist.
 - **Permission negative:** A non-member or revoked member cannot obtain project files, chats, metadata or existing streams; project membership does not grant extra bot/CLI rights.
 - **Required verification:** REAL_BROWSER; TWO_USERS; TWO_BOTS; RELOAD; NEGATIVE_SERVER.
-- **Priority / current status:** P1 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P1 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 #### US-SP-PROJ-009
 
@@ -1212,7 +1218,7 @@ As a project owner or member, I want to revoke a project member.
 - **Persisted/read-back result:** Access is immediately denied across all routes without requiring logout.
 - **Permission negative:** A non-member or revoked member cannot obtain project files, chats, metadata or existing streams; project membership does not grant extra bot/CLI rights.
 - **Required verification:** REAL_BROWSER; TWO_USERS; TWO_BOTS; RELOAD; NEGATIVE_SERVER.
-- **Priority / current status:** P1 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P1 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 #### US-SP-PROJ-010
 
@@ -1266,7 +1272,7 @@ As an authorized workspace user, I want to preview CSV and structured data.
 - **Persisted/read-back result:** The preview preserves the fixture structure without truncation disguised as completeness.
 - **Permission negative:** Unpermitted roots, encoded traversal, symlinks and cross-session URLs cannot expose or overwrite protected files.
 - **Required verification:** REAL_BROWSER; FILE_BYTES; RELOAD; NEGATIVE_SERVER.
-- **Priority / current status:** P1 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P1 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 #### US-SP-FILE-005
 
@@ -1276,7 +1282,7 @@ As an authorized workspace user, I want to handle large Markdown fallback.
 - **Persisted/read-back result:** The size warning is honest and explicit rendering does not freeze navigation.
 - **Permission negative:** Unpermitted roots, encoded traversal, symlinks and cross-session URLs cannot expose or overwrite protected files.
 - **Required verification:** REAL_BROWSER; FILE_BYTES; RELOAD; NEGATIVE_SERVER.
-- **Priority / current status:** P1 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P1 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 #### US-SP-FILE-006
 
@@ -1336,7 +1342,7 @@ As an authorized workspace user, I want to open an HTML artifact in the browser.
 - **Persisted/read-back result:** Only the intended artifact opens under the supported origin/sandbox behavior.
 - **Permission negative:** An unauthorized actor cannot read it via direct preview/media URL.
 - **Required verification:** REAL_BROWSER; HOSTILE_CONTENT; NEGATIVE_SERVER.
-- **Priority / current status:** P1 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P1 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 #### US-SP-FILE-012
 
@@ -1450,7 +1456,7 @@ As an authorized workspace administrator, I want to remove a workspace definitio
 - **Persisted/read-back result:** Only the definition is removed unless the UI explicitly promises file deletion; fixture bytes are inspected separately.
 - **Permission negative:** Workspace assignment does not grant outside-root access; non-admins cannot change other users or protected workspace definitions.
 - **Required verification:** REAL_BROWSER; RELOAD; TWO_USERS; NEGATIVE_SERVER.
-- **Priority / current status:** P1 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P1 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 ### CRON — Scheduled tasks and run history
 
@@ -1474,7 +1480,7 @@ As an authorized scheduling user, I want to create a one-time task.
 - **Persisted/read-back result:** The exact intended execution time and prompt persist with correct ownership.
 - **Permission negative:** Without cron permission users cannot inspect/mutate jobs or invoke their bot, tool, model or delivery targets; scheduled execution retains creator constraints.
 - **Required verification:** REAL_BROWSER; ISOLATED_SCHEDULER; DETERMINISTIC_PROVIDER; RELOAD; NEGATIVE_SERVER.
-- **Priority / current status:** P1 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P1 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 #### US-SP-CRON-003
 
@@ -1494,7 +1500,7 @@ As an authorized scheduling user, I want to validate custom schedule and time zo
 - **Persisted/read-back result:** Invalid schedules are refused and valid next-run times match the documented time-zone semantics.
 - **Permission negative:** Without cron permission users cannot inspect/mutate jobs or invoke their bot, tool, model or delivery targets; scheduled execution retains creator constraints.
 - **Required verification:** REAL_BROWSER; ISOLATED_SCHEDULER; DETERMINISTIC_PROVIDER; RELOAD; NEGATIVE_SERVER.
-- **Priority / current status:** P1 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P1 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 #### US-SP-CRON-005
 
@@ -1718,7 +1724,7 @@ As an authorized board user, I want to inspect task events and runs.
 - **Persisted/read-back result:** Events/results belong to that task and timestamps/status are coherent.
 - **Permission negative:** Users without board/task permission cannot read or mutate the board, trigger dispatch or inherit another tenant/workspace authority.
 - **Required verification:** REAL_BROWSER; RELOAD; NEGATIVE_SERVER.
-- **Priority / current status:** P1 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P1 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 #### US-SP-KAN-013
 
@@ -2204,7 +2210,7 @@ As a governance administrator, I want to handle policy conflicts and invalid fie
 - **Persisted/read-back result:** Conflict/validation is explicit and the last valid policy remains intact.
 - **Permission negative:** A user without governance administration cannot read private policy/audit data or create, change, approve, deny or delete another user policy through direct endpoints.
 - **Required verification:** REAL_BROWSER; ADMIN_AND_MEMBER; RELOAD; AUDIT_READBACK; NEGATIVE_SERVER.
-- **Priority / current status:** P0 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P0 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 #### US-SP-GOV-021
 
@@ -2224,7 +2230,7 @@ As a governance administrator, I want to enforce governed navigation.
 - **Persisted/read-back result:** Client preference cannot resurrect a denied capability; APIs still enforce the same denial.
 - **Permission negative:** A user without governance administration cannot read private policy/audit data or create, change, approve, deny or delete another user policy through direct endpoints.
 - **Required verification:** REAL_BROWSER; ADMIN_AND_MEMBER; RELOAD; AUDIT_READBACK; NEGATIVE_SERVER.
-- **Priority / current status:** P0 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P0 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 ### POL — Requested RBAC, whitelist/blacklist and automatic approval
 
@@ -2508,7 +2514,7 @@ As a governance administrator configuring a user, I want to bind an approval to 
 - **Persisted/read-back result:** Scope/identity/revision binding prevents a decision from authorizing changed work.
 - **Permission negative:** An unprivileged user or model-generated request cannot alter its role/mode/prompt, override explicit denial, self-elevate or manufacture approval.
 - **Required verification:** REAL_BROWSER; POLICY_FIXTURES; RELOAD; AUDIT_READBACK; NEGATIVE_SERVER.
-- **Priority / current status:** P0 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P0 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 #### US-SP-POL-029
 
@@ -2890,7 +2896,7 @@ As a signed-in user, I want to configure transcript virtualization.
 - **Persisted/read-back result:** Supported content remains reachable without lost/duplicate messages; limitations are honestly described.
 - **Permission negative:** Personal preferences cannot change another account or enable governance-forbidden functionality; privileged global options require their own server permission.
 - **Required verification:** REAL_BROWSER; RELOAD; TWO_USERS; NEGATIVE_SERVER.
-- **Priority / current status:** P1 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P1 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 #### US-SP-PREF-022
 
@@ -3228,7 +3234,7 @@ As an authorized extension administrator, I want to browse the extension gallery
 - **Persisted/read-back result:** Only supported safe URLs open and requested permissions are visible before installation.
 - **Permission negative:** Users without extension administration cannot install/enable code, change sidecar consent, clear shared storage or access privileged plugin pages.
 - **Required verification:** REAL_BROWSER; LOCAL_EXTENSION_FIXTURE; RELOAD; NEGATIVE_SERVER.
-- **Priority / current status:** P1 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P1 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 #### US-SP-EXT-005
 
@@ -3238,7 +3244,7 @@ As an authorized extension administrator, I want to install a disposable local e
 - **Persisted/read-back result:** The exact extension/version persists with truthful post-install activation requirements.
 - **Permission negative:** Users without extension administration cannot install/enable code, change sidecar consent, clear shared storage or access privileged plugin pages.
 - **Required verification:** REAL_BROWSER; LOCAL_EXTENSION_FIXTURE; RELOAD; NEGATIVE_SERVER.
-- **Priority / current status:** P1 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P1 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 #### US-SP-EXT-006
 
@@ -3248,7 +3254,7 @@ As an authorized extension administrator, I want to enable and disable an extens
 - **Persisted/read-back result:** Enabled state persists and disabled assets/hooks stop according to the documented lifecycle.
 - **Permission negative:** Users without extension administration cannot install/enable code, change sidecar consent, clear shared storage or access privileged plugin pages.
 - **Required verification:** REAL_BROWSER; LOCAL_EXTENSION_FIXTURE; RELOAD; NEGATIVE_SERVER.
-- **Priority / current status:** P1 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P1 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 #### US-SP-EXT-007
 
@@ -3258,7 +3264,7 @@ As an authorized extension administrator, I want to uninstall an extension.
 - **Persisted/read-back result:** Only that extension is removed and its feature no longer runs.
 - **Permission negative:** Users without extension administration cannot install/enable code, change sidecar consent, clear shared storage or access privileged plugin pages.
 - **Required verification:** REAL_BROWSER; LOCAL_EXTENSION_FIXTURE; RELOAD; NEGATIVE_SERVER.
-- **Priority / current status:** P1 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P1 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 #### US-SP-EXT-008
 
@@ -3268,7 +3274,7 @@ As an authorized extension administrator, I want to save and reset extension set
 - **Persisted/read-back result:** Validated values persist; reset returns documented defaults without affecting other extensions.
 - **Permission negative:** Users without extension administration cannot install/enable code, change sidecar consent, clear shared storage or access privileged plugin pages.
 - **Required verification:** REAL_BROWSER; LOCAL_EXTENSION_FIXTURE; RELOAD; NEGATIVE_SERVER.
-- **Priority / current status:** P1 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P1 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 #### US-SP-EXT-009
 
@@ -3278,7 +3284,7 @@ As an authorized extension administrator, I want to clear extension storage.
 - **Persisted/read-back result:** Only the intended extension/user scope is cleared.
 - **Permission negative:** Users without extension administration cannot install/enable code, change sidecar consent, clear shared storage or access privileged plugin pages.
 - **Required verification:** REAL_BROWSER; LOCAL_EXTENSION_FIXTURE; RELOAD; NEGATIVE_SERVER.
-- **Priority / current status:** P1 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P1 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 #### US-SP-EXT-010
 
@@ -3288,7 +3294,7 @@ As an authorized extension administrator, I want to decide sidecar proxy consent
 - **Persisted/read-back result:** Proxy availability follows explicit stored consent and extension permission constraints.
 - **Permission negative:** Users without extension administration cannot install/enable code, change sidecar consent, clear shared storage or access privileged plugin pages.
 - **Required verification:** REAL_BROWSER; LOCAL_EXTENSION_FIXTURE; RELOAD; NEGATIVE_SERVER.
-- **Priority / current status:** P1 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P1 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 #### US-SP-EXT-011
 
@@ -3298,7 +3304,7 @@ As an authorized extension administrator, I want to inspect extension health and
 - **Persisted/read-back result:** Health and origins are current or labeled unavailable and copied data excludes credentials.
 - **Permission negative:** Users without extension administration cannot install/enable code, change sidecar consent, clear shared storage or access privileged plugin pages.
 - **Required verification:** REAL_BROWSER; LOCAL_EXTENSION_FIXTURE; RELOAD; NEGATIVE_SERVER.
-- **Priority / current status:** P1 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P1 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 #### US-SP-EXT-012
 
@@ -3308,7 +3314,7 @@ As an authorized extension administrator, I want to handle extension install or 
 - **Persisted/read-back result:** Errors are visible, partial installation state is honest and no duplicate active extension remains.
 - **Permission negative:** Users without extension administration cannot install/enable code, change sidecar consent, clear shared storage or access privileged plugin pages.
 - **Required verification:** REAL_BROWSER; LOCAL_EXTENSION_FIXTURE; RELOAD; NEGATIVE_SERVER.
-- **Priority / current status:** P1 / **NOT RUN**. No matching actual frontend execution evidence yet. All unasserted acceptance and permission requirements remain open.
+- **Priority / current status:** P1 / **PARTIAL**. Actual assertion mapping and report references: see this story row in [coverage-plan.csv](coverage-plan.csv). All unasserted acceptance and permission requirements remain open.
 
 ### SYS — System, gateway, MCP and capacity controls
 

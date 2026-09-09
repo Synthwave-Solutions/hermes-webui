@@ -8,19 +8,19 @@ quality, uptime, OAuth credentials or behavior of an external provider.
 
 ## Verified release evidence
 
-Frozen run `20260909-080212-676633000` completed **192 browser scenarios: 192 passed, zero failed**, with zero uncaught application errors across all 192 collections and zero report-level errors. The runner retained **13 Playwright fixture-bookkeeping warning entries**. These harness warnings are recorded separately in the review notes.
+Frozen run `20260909-184341-281192000` completed **235 browser scenarios: 235 passed, zero failed**. Collected application errors: 0. Report-level errors: 0. Reporter bookkeeping warnings: 17, preserved separately.
 
-The inventory contains **1,053 entries: 514 interacted with in passing scenarios and 539 without interaction evidence**. The strict all-click gate remains incomplete. The separate catalog contains **365 acceptance stories: 23 fully demonstrated, 191 partial and 151 not run**. A passed browser scenario certifies its explicit assertions; it does not certify all criteria of every related story.
+The original runner manifest has no structured execution-host field; a platform is not inferred from the artifact path. Separate host and cleanup receipts retain their own scope.
 
-Canonical focused backend checks passed **482 WebUI tests across 34 files** at `451acb916a33d9267713eaf57aba7f93e462993c` and **357 engine tests across 29 files** at `97fbbecd35984d5e28a3482d60a1165121333fc9`. These are the paired code commits used by the frozen browser run. Exact test lists are in [backend verification](backend-verification.md). These checks do not certify global repository CI.
+Raw inventory: **1265 entries, 623 interacted with and 642 without interaction evidence**. The strict all-click gate remains incomplete. The 365-story catalog has 23 fully demonstrated, 220 partial, 122 not run. A passing scenario establishes its explicit assertions only. [Supplemental acceptance stories](supplement-user-stories.md) describe the added 43 executable cases and their precise setup and provider boundaries.
 
-Public Share creation, anonymous snapshot readback, explicit refresh, cancellation, revocation and owner/CSRF boundaries now pass. Manual Todo/Triage completion and Todo blocking pass with dependency checks, reload persistence, authorization denials, dependency-aware unblocking and repeated-block escalation. The earlier Share and Todo→Done 404 results remain historical findings, not current failing tests.
+Focused backend verification: **749 WebUI tests across 65 files** at `90cc10318788db857464663b1874d28eb1e50430` and **453 engine tests across 32 files** at `b0aaa74f9dcfe9e7caa4692656b4535ce04104e1`. Exact selectors, scope and baseline qualifications are in [backend verification](backend-verification.md). These results do not certify repository-wide CI.
 
-Production deployment is authorized by the user and pending a separately verified live result. These local results do not establish production deployment, physical audio quality or external-provider behavior.
+Share create/read/refresh/revoke and Todo-to-Done regressions pass. Supplemental coverage verifies CLI manual floors despite automatic review, per-tool MCP denial, project revocation, knowledge selection conflicts, long-history races, exact file previews, real clarification and Kanban worker completion, distinct main/auxiliary model routing, Cron execution and extension lifecycle. Knowledge document retrieval and real vendor gallery/OAuth delivery are not implied by catalog or transport-fixture tests.
 
-JSON import now rejects unauthorized workspace selection before creating a session. The browser also verifies exact allowed transcript/ownership after reload, editor Escape cancellation, hidden-file permission limits, linked-skill revocation and message-prefix forking. These cases retain their precise scope in the story matrix.
+Deployment is evidenced separately by `outputs/synthpulse-e2e/production-release-status.json` in the delivered artifact bundle. Browser tests do not prove live deployment.
 
-GitHub CI is qualified separately: seven substantive checks passed at the tested WebUI commit, while 15 broad shards failed. The reviewed shard reproduced10 unchanged baseline import failures; the other 14 latest logs were not re-triaged. See [CI qualification](backend-verification.md#current-github-ci-qualification).
+The separate voice handoff records initial-release production audio evidence. Its source pair and real-provider synthetic-audio scope are distinct from this isolated browser run. Physical Mac microphone/speaker capture remains unverified.
 
 ## Install and run
 
@@ -46,11 +46,10 @@ npm install --prefix ../e2e-tooling --no-audit --no-fund @playwright/test@1.55.1
 The runner creates a new private `e2e-runs/<timestamp>/e2e-state` directory,
 starts WebUI, the deterministic engine provider and a realtime protocol provider
 on distinct ephemeral loopback ports, runs `playwright.full.config.ts`, and stops
-all fixture process groups on success or failure. The operating-system home and credential config paths are private, the
+the three fixture process groups on success or failure. Detached native/PTY descendants need a separate ownership-verified census; process-group shutdown alone is not universal cleanup proof. The operating-system home and credential config paths are private, the
 environment excludes host secrets, and PATH excludes developer credential CLIs.
 A Python audit guard rejects non-loopback DNS/connections and direct invocation
-of listed credential CLIs in the server and its Python children; browser requests are limited to
-loopback too. These test guards are not an OS sandbox for arbitrary native code.
+of listed credential CLIs in the server and Python children that retain the bootstrap environment. The primary browser context blocks non-loopback HTTP/WebSocket requests. Additional contexts and APIRequestContext calls do not inherit those hooks; their current test URLs are explicitly local. The embedded native PTY keeps the private HOME but does not retain the Python bootstrap guard. These test guards are not an OS sandbox for arbitrary native code.
 The original run `20260908-202702-435893000` predates these guards: provider
 discovery found a host GitHub CLI credential and attempted a Copilot token
 exchange. Its blanket external-credential-isolation claim was incorrect. Keep
@@ -58,7 +57,7 @@ that run as historical evidence; use the subsequent isolated rerun for release
 validation. Safe exports contain no credential values.
 Scheduled test jobs deliver
 locally; explicit Run now uses the deterministic provider, while duplicate jobs
-are verified paused. Task-board fixtures exercise manual transitions and dry-run dispatch previews; they do not launch live board workers.
+are verified paused. Task-board fixtures also launch a real isolated Kanban worker, verify claim and completion, and use the deterministic local provider.
 Nango paths point to intentionally absent files inside private test state, so
 the mobile Connections test checks the visible unavailable-service response.
 Private browser cookies and the generated login password stay in the test-state
@@ -82,9 +81,15 @@ NODE_PATH=../e2e-tooling/node_modules \
 ../e2e-tooling/node_modules/.bin/playwright test -c playwright.full.config.ts
 ```
 
+Use clean application and engine checkouts without an engine-root `.env`, and a machine without an active `/etc/hermes` managed configuration. Private HOME does not disable those engine fallback sources. Both prerequisites were verified absent for this run. Dependency versions and native executables are not pinned by the source digest; review/install them separately.
+
 The configuration rejects non-loopback targets. Signed fixture sessions must
 match the target base URL. The suite intentionally does not run against live
 production data.
+
+Files named `scripts/e2e/production_*` are separately invoked operator tools for an explicitly authorized production operation. The isolated runner does not execute them; their presence in this kit is not evidence that they ran during the browser suite.
+
+`scripts/e2e/operator_vps_full.py` is a separately invoked supervisor for a dedicated disposable Linux QA unit, and `scripts/e2e/remote_evidence.py` separately exports/imports hash-verified allowlisted evidence. The normal browser suite does not invoke these operator entry points. Their source fingerprints and actual execution/transport receipts are separate from frontend acceptance; inclusion in the test kit alone does not prove they ran. Python bytecode writes are suppressed for fixture processes; this is not an OS sandbox or an enforced read-only filesystem boundary.
 
 ## Voice test boundary
 
@@ -95,7 +100,7 @@ Hermes engine, actual delegated children, file effects, decisions and audit
 records. It checks conversation continuity, dispatch deduplication, manual and
 automatic review, task completion, revocation and teardown. This is not a test
 of physical microphone capture, real WebRTC negotiation or OpenAI audio quality.
-The official provider needs its own user-gesture microphone check before enablement.
+Separate production receipts record actual WebRTC negotiation and two controlled audio turns. A physical Mac microphone check remains separate.
 
 ## Private continuation authority
 
@@ -188,17 +193,8 @@ assertions and keep partial coverage explicit.
 
 ## Areas requiring additional environment or scenarios
 
-External SSO/OAuth consent and physical-device authentication; actual
-Nango/provider connections; email/Chat/Slack delivery; microphone capture and
-real speech playback; real model quality; gateway scheduled ticks; real task
-dispatch; package/plugin install
-and removal; server restart/stop/update; larger virtualized history and races;
-all keyboard and accessibility combinations; all conditional controls and
-negative permission combinations remain distinct stories until their exact
-scenario is exercised. The comprehensive user-story matrix should retain
-NOT RUN or BLOCKED for these rows. Deterministic provider output must never be
-reported as live external integration proof.
+External SSO/OAuth consent, physical-device authentication, actual vendor/Nango connections, delivery to people, physical microphone/speaker acoustics, production-model judgment, real gateway scheduled ticks, service restart/update controls, and the remaining keyboard/accessibility/conditional permission combinations require their own evidence. Current supplements do exercise a real isolated Kanban worker, long-history navigation/races, and synthetic local extension installation/removal. Those specific paths must not remain labeled wholly unrun, and their local provider/archive boundaries must not be presented as external integration proof. Consult the current story matrix for each remaining clause.
 
 The terminal uses the committed xterm distribution files under `static/vendor`, with the existing versions and SRI hashes. The browser suite verifies that all four assets load from the application origin before checking actual shell command and restart effects. Activity-layout-specific scenarios select their required persisted layout explicitly through Settings; they cannot rely on the previous case leaving a particular preference.
 
-Review the [acceptance stories](user-stories.md), [coverage matrix](coverage-plan.csv), [remaining clicks](remaining-clicks-priority.md) and [focused backend verification](backend-verification.md). The [review notes](evidence/run-review-notes.json) retain earlier failures and reporter warnings.
+Review the [acceptance stories](user-stories.md), [coverage matrix](coverage-plan.csv), [remaining clicks](remaining-clicks-priority.md) and [focused backend verification](backend-verification.md). The [review notes](run-review-notes.json) retain earlier failures and reporter warnings.
