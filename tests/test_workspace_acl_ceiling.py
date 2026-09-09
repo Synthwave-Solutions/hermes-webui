@@ -68,6 +68,30 @@ def test_workspace_switch_denied_before_session_mutation(scope, monkeypatch):
     assert scope.session.workspace == str(scope.root)
 
 
+@pytest.mark.parametrize('explicit', [False, True])
+def test_import_workspace_denied_before_session_creation(scope, monkeypatch, explicit):
+    monkeypatch.setattr(routes, 'DEFAULT_WORKSPACE', str(scope.private))
+    monkeypatch.setattr(routes, 'Session', lambda **_: pytest.fail('unauthorized imported session creation'))
+    monkeypatch.setattr(routes, 'publish_session_list_changed', lambda *_: pytest.fail('unauthorized import event'))
+    before = list(routes.SESSIONS)
+    body = {'title': 'forbidden import', 'messages': [{'role': 'user', 'content': 'QA imported content'}]}
+    if explicit:
+        body['workspace'] = str(scope.private)
+    assert request('/api/session/import', body).status == 403
+    assert list(routes.SESSIONS) == before
+
+
+def test_import_workspace_resource_deny_applies_even_to_current_member(scope, monkeypatch):
+    scope.rows[1]['members'] = [scope.identity['email']]
+    scope.state.write_text(json.dumps(scope.rows))
+    policy = loader.parse_governance_policy({'mode': 'enforce', 'users': {scope.identity['email']: {
+        'grants': {'workspaces': ['*']}, 'deny': {'workspaces': ['Private']}}}})
+    monkeypatch.setattr(loader, 'get_policy', lambda: policy)
+    monkeypatch.setattr(routes, 'Session', lambda **_: pytest.fail('resource-denied imported session creation'))
+    response = request('/api/session/import', {'workspace': str(scope.private), 'messages': []})
+    assert response.status == 403
+
+
 @pytest.mark.parametrize('route,values', [('/api/file', {'path': 'private.txt'}),
     ('/api/list', {'path': '.'}), ('/api/file/save', {'path': 'private.txt', 'content': 'FORBIDDEN'}),
     ('/api/folder/download', {'path': '.'})])

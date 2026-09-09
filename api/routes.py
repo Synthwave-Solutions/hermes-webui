@@ -25606,6 +25606,12 @@ def _handle_session_import(handler, body):
         workspace = str(resolve_trusted_workspace(body.get("workspace", str(DEFAULT_WORKSPACE))))
     except (TypeError, ValueError) as e:
         return bad(handler, str(e))
+    from api.workspace_access import ensure_workspace_selection
+
+    try:
+        ensure_workspace_selection(handler, workspace)
+    except PermissionError as e:
+        return bad(handler, str(e), 403)
     model = body.get("model", DEFAULT_MODEL)
     from api.ownership import request_owner_email as _request_owner_email
 
