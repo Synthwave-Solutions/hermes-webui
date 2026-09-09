@@ -12,6 +12,8 @@ Each plugin may have:
       style.css     -- optional plugin stylesheet
     plugin_api.py   -- optional backend API (not used in WebUI MVP)
 """
+import base64
+import html
 import json
 import logging
 import os
@@ -153,6 +155,52 @@ def serve_plugin_static(plugin_name: str, rel_path: str) -> tuple[bytes, str] | 
     }.get(ext, "application/octet-stream")
 
     return data, content_type
+
+
+def authorize_plugin_request(handler) -> bool:
+    """Apply the catalog's plugin permission to the non-API plugin surface.
+
+    The page and built assets are aliases of GET /api/plugins for governance:
+    this keeps route grants, permission denials, report-only and policy errors
+    consistent with the panel instead of allowing every authenticated account.
+    """
+    from urllib.parse import urlsplit
+    from api.governance.enforce import enforce_request
+
+    return enforce_request(handler, urlsplit("/api/plugins"), "GET")
+
+
+def build_plugin_iife_page(plugin_name: str, manifest: dict) -> bytes | None:
+    """Build the documented self-contained IIFE page without authenticated fetches.
+
+    The page remains sandboxed with an opaque origin. An opaque frame does not
+    send the parent's SameSite session cookie for subresources, so ordinary
+    script URLs bounce to login. Embed only allowlisted built files already read
+    by the authenticated page request. Base64 data URLs preserve bundle bytes
+    (including HTML closing tags) without adding same-origin privileges.
+
+    This supports a self-contained dist/index.js and optional stylesheet; it
+    does not grant plugin code access to the parent session or WebUI APIs.
+    """
+    script = serve_plugin_static(plugin_name, "dist/index.js")
+    if script is None:
+        return None
+    script_url = "data:application/javascript;base64," + base64.b64encode(script[0]).decode("ascii")
+    css_path = manifest.get("css") or "dist/style.css"
+    stylesheet = None
+    if isinstance(css_path, str) and css_path.lower().endswith(".css"):
+        stylesheet = serve_plugin_static(plugin_name, css_path)
+    css_tag = ""
+    if stylesheet is not None:
+        css_url = "data:text/css;base64," + base64.b64encode(stylesheet[0]).decode("ascii")
+        css_tag = f'<link rel="stylesheet" href="{css_url}">'
+    label = html.escape(str(manifest.get("label") or plugin_name))
+    return (
+        '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
+        f'<title>{label}</title>\n{css_tag}\n</head>\n<body>\n'
+        '<div id="pluginPageContainer"></div>\n'
+        f'<script src="{script_url}"></script>\n</body>\n</html>\n'
+    ).encode("utf-8")
 
 
 def get_plugin_metadata() -> list[dict]:

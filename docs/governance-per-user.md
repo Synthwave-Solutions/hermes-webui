@@ -5,6 +5,15 @@ controls. Changes require `governance:write`; browser controls do not replace
 server authorization. User edits retain the policy's optimistic `If-Match`
 revision check and audit trail.
 
+Activate the global policy's `mode: enforce` to apply these restrictions and
+action reviews. `off` disables these policy decisions; `report_only` records
+them without policy blocking. Independent workspace, bot and project ACLs still
+apply. Resumed jobs retain their original hard ceilings; a continuation guarded
+by an enforced policy can fail closed if enforcement is later disabled.
+Saving per-user controls does not silently
+change this global operating mode. Upgrade the WebUI and engine together before
+activation, and retain an authenticated bootstrap recovery owner.
+
 ```yaml
 users:
   person@example.test:
@@ -55,7 +64,7 @@ from a bootstrap owner.
 
 ## Approval is for actions, not new privileges
 
-The AI never edits the policy, adds whitelist capabilities, removes blacklists,
+The AI action reviewer never edits the policy, adds whitelist capabilities, removes blacklists,
 installs shared resources, publishes skills, or approves another user's work.
 An action must pass current profile, bot/project, tool, argument and usage checks
 before review. Review happens on the final invocation after middleware argument
@@ -65,7 +74,8 @@ resource access are rechecked. A changed policy invalidates the old decision.
 Automatic decisions use the configured `approval_advice` auxiliary-model route,
 a 20-second provider timeout and a strict JSON decision/reason/confidence
 contract. Missing providers, malformed responses, confidence below 0.9,
-ambiguity, oversized arguments, and arbitrary-code actions go to manual review.
+ambiguity, oversized arguments, and `execute_code` invocations go to manual
+review. Otherwise eligible terminal invocations may receive an AI decision.
 The request is bounded and redacted; request text is untrusted data, separate
 from the administrator's prompt. There is no model tool access and no decision
 cache. The prompt must be nonempty for automatic mode and at most 8,000
@@ -109,12 +119,13 @@ carry deny, role ceiling, access mode and approval configuration. The WebUI
 refuses a governed turn if the engine cannot round-trip the new controls.
 The runtime evaluates current policy even when a generated profile's resources
 have not yet synchronized; a profile copy is not an authorization decision.
-In-process delegated agents inherit the live bot/project access checker and
+In-process delegated agents inherit the live bot/project/workspace access checkers and
 policy source through the existing context propagation. Their manual actions
 use the parent's connected review interface; unattended subagent autoapproval
 does not satisfy manual governance. External-process payloads retain resource
-ceilings but cannot carry live ACL callbacks. Bot/project actions in such a
-process remain blocked until that host supplies an authoritative checker.
+ceilings but cannot carry live ACL callbacks. Tool and model entry points
+that require bot/project/workspace checks remain blocked until that host
+supplies the authoritative checkers.
 
 ## API additions
 

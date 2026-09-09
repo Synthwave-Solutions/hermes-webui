@@ -966,7 +966,8 @@ def _start_async_delegation_wakeup_turn(
             resp = start_session_turn(
                 session_id,
                 wakeup_prompt,
-                source="process_wakeup",
+                source="async_delegation",
+                continuation_ref=evt.get("webui_continuation_ref"),
             )
             raw_status = (resp or {}).get("_status")
             if raw_status is None:

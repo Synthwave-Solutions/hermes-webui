@@ -1,0 +1,3 @@
+# Generated CSV preserves whitespace inside quoted, observed DOM labels.
+# Keep canonical evidence intact; source whitespace checks still apply elsewhere.
+docs/qa/e2e/evidence/control-coverage.csv -whitespace

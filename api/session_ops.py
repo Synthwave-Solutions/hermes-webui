@@ -20,8 +20,7 @@ AUTO_TITLE_LABELS = {'untitled', 'new chat'}
 
 
 def _live_active_stream_id(session) -> str | None:
-    """Return session.active_stream_id ONLY if that stream is live in THIS
-    process; else None.
+    """Return a session-owned stream that is live in this process, else None.
 
     After a restart/crash the persisted active_stream_id survives in the
     session JSON but the in-memory STREAMS / ACTIVE_RUNS that actually drive a
@@ -32,16 +31,25 @@ def _live_active_stream_id(session) -> str | None:
     channel) or ACTIVE_RUNS (worker bookkeeping).
     """
     stream_id = getattr(session, 'active_stream_id', None)
-    if not stream_id:
-        return None
+    session_id = str(getattr(session, 'session_id', '') or '')
     try:
         from api import config as _cfg
         with _cfg.STREAMS_LOCK:
-            if stream_id in _cfg.STREAMS:
+            live_streams = set(_cfg.STREAMS)
+            if stream_id and stream_id in live_streams:
                 return stream_id
         with _cfg.ACTIVE_RUNS_LOCK:
-            if stream_id in (_cfg.ACTIVE_RUNS or {}):
+            if stream_id and stream_id in (_cfg.ACTIVE_RUNS or {}):
                 return stream_id
+            # Final writeback clears the persisted stream id before recording
+            # `done`. The registered worker still owns that interval. Require
+            # its open stream as well so stale lifecycle rows cannot resurrect
+            # a dead run or attach a different session's renderer.
+            for key, run in (_cfg.ACTIVE_RUNS or {}).items():
+                if isinstance(run, dict) and run.get('session_id') == session_id:
+                    candidate = run.get('stream_id') or key
+                    if candidate in live_streams:
+                        return candidate
     except Exception:
         # On any introspection failure, fail SAFE (report no live stream) rather
         # than surfacing a possibly-stale id.
@@ -551,13 +559,29 @@ def session_progress(session, *, attention=None) -> dict | None:
     return None
 
 
+def _delegation_pending_count(session) -> int | None:
+    try:
+        from tools.async_delegation import pending_for_session
+        from api.profiles import get_hermes_home_for_profile
+        # A shared conversation may run its configured bots in different
+        # engine homes. Resolve only this stored session's execution profiles,
+        # never the caller's cookie or the current process environment.
+        profiles = {getattr(session, 'profile', None) or 'default'}
+        profiles.update(getattr(session, 'bot_participants', None) or [])
+        homes = [get_hermes_home_for_profile(profile) for profile in profiles]
+        return pending_for_session(session.session_id, homes=homes)
+    except Exception:
+        # Missing engine support or an unreadable ledger is unknown, not idle.
+        logger.debug("Could not inspect delegated work for session %s", session.session_id, exc_info=True)
+        return None
+
+
 def session_status(session_id: str) -> dict[str, Any]:
     """Return a snapshot of session state for /status.
 
     Webui equivalent of gateway/run.py:_handle_status_command. The agent's
     "agent_running" comes from `session_key in self._running_agents`; the
-    webui equivalent is whether the session has an active stream
-    (active_stream_id is set).
+    webui equivalent uses process-owned live streams, including final writeback.
     """
     s = get_session(session_id)
     from api.routes import _session_attention_summary
@@ -570,6 +594,7 @@ def session_status(session_id: str) -> dict[str, Any]:
         hermes_home = str(get_hermes_home_for_profile(profile))
     except Exception:
         hermes_home = ''
+    delegation_pending_count = _delegation_pending_count(s)
     return {
         'session_id': s.session_id,
         'progress': progress,
@@ -582,7 +607,9 @@ def session_status(session_id: str) -> dict[str, Any]:
         'message_count': len(s.messages or []),
         'created_at': s.created_at,
         'updated_at': s.updated_at,
-        'agent_running': bool(getattr(s, 'active_stream_id', None)),
+        'agent_running': bool(_live_active_stream_id(s)),
+        'delegation_pending': None if delegation_pending_count is None else delegation_pending_count > 0,
+        'delegation_pending_count': delegation_pending_count,
         # Expose the stream id itself (not just the agent_running bool) so a
         # hidden-tab poller can attach the live renderer to a server-initiated
         # turn (self-wake / cron / restart hook) without opening the persistent

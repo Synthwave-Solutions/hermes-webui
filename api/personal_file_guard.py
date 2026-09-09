@@ -24,6 +24,9 @@ def guard_request(handler, route, values):
     except KeyError:
         session = None  # Existing route returns its normal missing-session error.
     workspace = getattr(session, 'workspace', None)
+    if session:
+        from api.workspace_access import ensure_session_workspace_access
+        ensure_session_workspace_access(handler, session)
     candidates = []
     if route.startswith('/api/escape/') and workspace and values.get('token'):
         from api.workspace import resolve_authorized_escape_request

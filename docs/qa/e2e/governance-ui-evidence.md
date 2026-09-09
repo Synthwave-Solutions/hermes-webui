@@ -1,6 +1,6 @@
 # Per-user governance UI evidence
 
-Synthetic identities, actual Chromium frontend. Baseline 571c11f9; candidate source validated in run 20260908-202702-435893000. Responsive scenarios edit, save, reload and reopen the actual controls at 1440, 1024 and 390 pixels.
+Synthetic identities, actual Chromium frontend. Baseline 571c11f9; candidate source validated in run 20260908-222640-169443000. Responsive scenarios edit, save, reload and reopen the actual controls at 1440, 1024 and 390 pixels.
 
 | Before | After |
 |---|---|

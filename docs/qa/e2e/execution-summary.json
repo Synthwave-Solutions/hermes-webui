@@ -1,0 +1,37 @@
+{
+  "scenario_count": 187,
+  "outcomes": {
+    "passed": 187
+  },
+  "report_global_error_count": 0,
+  "all_features_certified": false,
+  "story_certification_note": "These outcomes certify only explicit scenario assertions. Navigation, observed controls, and interaction counts do not certify all acceptance criteria.",
+  "source_unchanged_during_run": true,
+  "test_exit_code": 0,
+  "webui_source_sha256": "463638cc8f8e4ea5c0468f056aa374d9f1b4605a3178a7693f16c896a22dacea",
+  "engine_source_sha256": "30a43dd57c77ec92b39fdf6c1d6da690fc25b0ac8a9560567f4a61cfbcbcbb6f",
+  "run_directory": "20260908-234115-847878000",
+  "boundary": "Real Chromium, backend persistence, Hermes engine, terminal and child agents; deterministic loopback model/reviewer. External credentials, provider quality, physical authenticators, audio and delivery are separate.",
+  "excluded_artifacts": [
+    "private test state",
+    "cookies and generated password",
+    "raw browser traces",
+    "raw network captures",
+    "session/auth databases"
+  ],
+  "browser_error_collection": {
+    "scenarios_with_error_collection": 187,
+    "uncaught_errors": 0
+  },
+  "isolation": {
+    "private_os_home": true,
+    "credential_cli_discovery_excluded": true,
+    "python_network": "loopback_only",
+    "browser_network": "loopback_only",
+    "os_sandbox": false,
+    "blocked_attempt_counts": {
+      "external_dns": 270
+    },
+    "raw_copilot_token_fallback_observed": false
+  }
+}

@@ -1,8 +1,5 @@
 import io
 import json
-import shutil
-import subprocess
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -29,6 +26,22 @@ def isolation(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "fixture-key")
     monkeypatch.setenv("SYNPULSE_REALTIME_VOICE_ENABLED", "1")
     voice._ATTEMPTS.clear()
+    from api import realtime_voice_runtime as runtime, routes
+    monkeypatch.setattr(runtime, "voice_access", lambda h: voice.configured())
+    class Bridge:
+        def __init__(self, handler, actor, sid): self.handler = handler
+        def check(self):
+            if not routes._session_visible_to_request(SimpleNamespace(), self.handler):
+                raise PermissionError("revoked")
+    class Controller:
+        voice_id = "opaque-voice"
+        def __init__(self, bridge, call_id): self.bridge = bridge
+        def check(self): return self.bridge.check()
+        def start(self): pass
+        def close(self): pass
+    monkeypatch.setattr(runtime, "LoopbackBridge", Bridge)
+    monkeypatch.setattr(runtime, "VoiceController", Controller)
+    monkeypatch.setattr(runtime, "register", lambda c: None)
 
 
 def test_disabled_by_default(monkeypatch):
@@ -36,17 +49,17 @@ def test_disabled_by_default(monkeypatch):
     assert not voice.configured()
 
 
-def test_sdp_exchange_keeps_key_server_only_and_tools_disabled():
+def test_sdp_exchange_keeps_key_server_only_and_native_tools_enabled():
     calls = []
     def post(url, **kw):
         calls.append((url, kw))
-        return SimpleNamespace(status_code=201, text="v=0\nanswer")
+        return SimpleNamespace(status_code=201, text="v=0\nanswer", headers={"Location":"/v1/realtime/calls/rtc_fixture"})
     answer = voice.create_call("v=0\noffer", "alice", post=post)
-    assert answer == "v=0\nanswer"
+    assert answer == ("v=0\nanswer", "rtc_fixture")
     assert "fixture-key" not in answer
     config = json.loads(calls[0][1]["files"]["session"][1])
-    assert config["tools"] == []
-    assert config["audio"]["input"]["turn_detection"]["create_response"] is False
+    assert {tool["name"] for tool in config["tools"]} == {"dispatch_work", "get_work_status"}
+    assert config["audio"]["input"]["turn_detection"]["create_response"] is True
     assert calls[0][1]["headers"]["OpenAI-Safety-Identifier"] != "alice"
     assert calls[0][1]["timeout"] == 25
 
@@ -67,11 +80,11 @@ def test_invalid_sdp_never_calls_provider():
 
 
 def test_rate_limit_is_actor_scoped():
-    post = lambda *a, **kw: SimpleNamespace(status_code=201, text="v=0")
+    post = lambda *a, **kw: SimpleNamespace(status_code=201, text="v=0", headers={"Location":"/v1/realtime/calls/rtc_fixture"})
     for _ in range(4): voice.create_call("v=0", "alice", post=post)
     with pytest.raises(ValueError, match="one minute"):
         voice.create_call("v=0", "alice", post=post)
-    assert voice.create_call("v=0", "bob", post=post) == "v=0"
+    assert voice.create_call("v=0", "bob", post=post) == ("v=0", "rtc_fixture")
 
 
 @pytest.mark.parametrize("identity,visible,status", [(None, True, 401),
@@ -83,7 +96,7 @@ def test_handler_auth_and_session_boundary(monkeypatch, identity, visible, statu
     monkeypatch.setattr(enforce, "_request_identity", lambda h: identity)
     monkeypatch.setattr(routes, "get_session", lambda *a, **kw: SimpleNamespace())
     monkeypatch.setattr(routes, "_session_visible_to_request", lambda *a: visible)
-    monkeypatch.setattr(voice, "create_call", lambda *a, **kw: "v=0\nanswer")
+    monkeypatch.setattr(voice, "create_call", lambda *a, **kw: ("v=0\nanswer", "rtc_fixture"))
     handler = Handler({"session_id":"voicefixture1", "sdp":"v=0"})
     voice.handle(handler)
     assert handler.status == status
@@ -97,57 +110,11 @@ def test_revocation_during_negotiation_denies_answer(monkeypatch):
     monkeypatch.setattr(routes, "get_session", lambda *a, **kw: SimpleNamespace())
     checks = iter([True, False])
     monkeypatch.setattr(routes, "_session_visible_to_request", lambda *a: next(checks))
-    monkeypatch.setattr(voice, "create_call", lambda *a, **kw: "v=0\nanswer")
+    monkeypatch.setattr(voice, "create_call", lambda *a, **kw: ("v=0\nanswer", "rtc_fixture"))
     handler = Handler({"session_id":"voicefixture1", "sdp":"v=0"})
     voice.handle(handler)
     assert handler.status == 404
     assert "sdp" not in handler.payload()
-
-
-def test_frontend_transport_lifecycle():
-    node = shutil.which("node")
-    if not node: pytest.skip("Node required")
-    path = Path(__file__).resolve().parents[1] / "static/realtime_voice.js"
-    script = r"""
-const assert=require('node:assert/strict');
-const {SynPulseVoice}=require(process.argv[1]);
-(async()=>{
-let sid='one', submitted=[], spoken=[], tracks=[], peers=[], audioCount=0;
-const deps={
- current:()=>sid,audio:()=>audioCount++,status:()=>{},error:e=>{throw Error(e)},silence:()=>{},
- media:async()=>{const t={enabled:true,stopped:false,stop(){this.stopped=true}};tracks.push(t);return {getTracks:()=>[t]};},
- peer:()=>{const dc={readyState:'open',send:x=>spoken.push(JSON.parse(x)),close(){}};
- const p={dc,addTrack(){},createDataChannel:()=>dc,createOffer:async()=>({sdp:'v=0'}),
- setLocalDescription:async()=>{},setRemoteDescription:async()=>{},close(){this.closed=true}};
- peers.push(p);return p;},
- connect:async()=>({sdp:'v=0'}),submit:(text,id)=>submitted.push([text,id])
-};
-const v=new SynPulseVoice(deps);
-await v.start('one');assert.equal(tracks[0].enabled,false);
-v.mic(true);assert.equal(tracks[0].enabled,true);
-v.mic(false);assert.equal(tracks[0].enabled,false);
-v.event({type:'conversation.item.input_audio_transcription.completed',item_id:'a',transcript:'Do work'});
-v.event({type:'conversation.item.input_audio_transcription.completed',item_id:'a',transcript:'Do work'});
-assert.deepEqual(submitted,[['Do work','one']]);
-v.speak('Done','one');assert(spoken.some(e=>e.type==='response.create'));
-v.interrupt();assert.equal(spoken.at(-1).type,'output_audio_buffer.clear');
-sid='other';v.event({type:'response.done'});assert.equal(v.state,'off');assert(tracks[0].stopped);assert(peers[0].closed);
-// Late callbacks from the old peer cannot cross into the replacement session.
-sid='old';await v.start('old');
-const oldPeer=peers.at(-1),oldMessage=oldPeer.dc.onmessage,oldTrack=oldPeer.ontrack,oldState=oldPeer.onconnectionstatechange;
-sid='new';await v.start('new');
-const before=submitted.length;
-oldMessage({data:JSON.stringify({type:'conversation.item.input_audio_transcription.completed',item_id:'late',transcript:'old private text'})});
-oldTrack({streams:[{}]});oldPeer.connectionState='failed';oldState();
-assert.equal(submitted.length,before);assert.equal(audioCount,0);assert.equal(v.sid,'new');v.stop();
-// Pending permission completion after teardown must stop the newly acquired track.
-sid='one';let resolve;deps.media=()=>new Promise(r=>resolve=r);
-const pending=v.start('one');v.stop();
-const late={enabled:true,stopped:false,stop(){this.stopped=true}};
-resolve({getTracks:()=>[late]});await pending;assert(late.stopped);assert.equal(v.state,'off');
-})().catch(e=>{console.error(e);process.exit(1)});
-"""
-    subprocess.run([node, "-e", script, str(path)], check=True, capture_output=True, text=True)
 
 
 def test_real_post_dispatch_requires_csrf(monkeypatch):

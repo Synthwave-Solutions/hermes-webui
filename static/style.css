@@ -1864,7 +1864,8 @@
   .app-dialog-btn.confirm.danger:hover{background:rgba(239,83,80,.2);border-color:var(--error);}
   .app-dialog-btn:focus-visible,.app-dialog-close:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
   .toast{pointer-events:none;position:fixed;top:24px;right:24px;left:auto;bottom:auto;transform:translateY(-6px);display:flex;align-items:center;gap:10px;background:color-mix(in srgb,var(--accent) 14%,var(--surface));border:1px solid color-mix(in srgb,var(--accent) 45%,var(--surface));color:var(--accent-text);font-size:13px;font-weight:500;padding:10px 12px 10px 16px;border-radius:10px;opacity:0;transition:opacity .2s,transform .2s;z-index:100;box-shadow:0 6px 24px rgba(0,0,0,.12);letter-spacing:.01em;max-width:min(520px,calc(100vw - 48px));}
-  .toast.show{opacity:1;transform:translateY(0);pointer-events:auto;}
+  .toast.show{opacity:1;transform:translateY(0);}
+  .toast.show.error{pointer-events:auto;}
   .toast.success{background:color-mix(in srgb,var(--success) 14%,var(--surface));border-color:color-mix(in srgb,var(--success) 45%,var(--surface));color:var(--success);}
   .toast.error{background:color-mix(in srgb,var(--error) 14%,var(--surface));border-color:color-mix(in srgb,var(--error) 45%,var(--surface));color:var(--error);}
   .toast-message{min-width:0;overflow-wrap:anywhere;white-space:pre-wrap;}
@@ -7826,6 +7827,15 @@ html[data-nav-audience="member"]:not([data-advanced-chat-controls="1"]) #compose
 #realtimeVoiceBar { flex-wrap:wrap; gap:8px; padding:8px; }
 #realtimeVoiceBar[hidden] { display:none; }
 #realtimeVoiceBar button { color:var(--text); background:var(--bg-secondary); border:1px solid var(--border); border-radius:8px; padding:6px 10px; }
+#realtimeVoiceBar button:disabled { opacity:.5;cursor:wait; }
+.realtime-voice-transcript,.realtime-voice-tasks,.realtime-voice-warning { flex-basis:100%;min-width:0;overflow-wrap:anywhere; }
+.realtime-voice-transcript { max-height:100px;overflow:auto;font-size:12px;line-height:1.5;color:var(--muted); }
+.realtime-voice-tasks { max-height:180px;overflow:auto; }
+.realtime-voice-task { padding:6px 0;border-top:1px solid var(--border);font-size:12px; }
+.realtime-voice-task summary { cursor:pointer;font-weight:600; }
+.realtime-voice-task p { margin:6px 0;white-space:pre-wrap; }
+.realtime-voice-approval { display:flex;gap:8px;margin-top:8px; }
+.realtime-voice-warning { font-size:12px;color:var(--muted); }
 #realtimeVoiceBar[data-state="listening"] #realtimeVoiceStatus,
 #realtimeVoiceBar[data-state="speaking"] #realtimeVoiceStatus { animation:voicePulse 1.2s ease-in-out infinite alternate; }
 @keyframes voicePulse { to { opacity:.5; } }

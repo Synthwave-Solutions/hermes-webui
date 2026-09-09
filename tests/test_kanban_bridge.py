@@ -185,7 +185,7 @@ class FakeKanbanDB:
         self._event(task_id, "assigned", {"assignee": assignee})
         return True
 
-    def complete_task(self, conn, task_id, result=None, summary=None):
+    def complete_task(self, conn, task_id, result=None, summary=None, allow_pending=False):
         task = self.get_task(conn, task_id)
         if not task:
             return False
@@ -193,7 +193,7 @@ class FakeKanbanDB:
         self._event(task_id, "completed", {"result": result, "summary": summary})
         return True
 
-    def block_task(self, conn, task_id, reason=None):
+    def block_task(self, conn, task_id, reason=None, allow_todo=False):
         task = self.get_task(conn, task_id)
         if not task:
             return False

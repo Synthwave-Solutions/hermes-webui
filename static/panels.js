@@ -436,7 +436,9 @@ async function switchPanel(name, opts = {}) {
   }
   if (opts.fromRailClick && typeof _isDesktopWidth === 'function' && !_isDesktopWidth()) {
     const sidebar = document.querySelector('.sidebar');
-    if (sidebar) {
+    if (['chat', 'governance', 'integrations', 'approvals'].includes(nextPanel)) {
+      _closeMobileSidebarAfterPanelSelection();
+    } else if (sidebar) {
       sidebar.classList.remove('mobile-session-page');
       sidebar.classList.add('mobile-panel-drawer', 'mobile-open');
     }
@@ -8892,7 +8894,7 @@ function _preferencesPayloadFromUi(){
   const pinnedLimitField=$('settingsPinnedSessionsLimit');
   if(pinnedLimitField) payload.pinned_sessions_limit=parseInt(pinnedLimitField.value,10);
   const autoTitleRefreshSel=$('settingsAutoTitleRefresh');
-  if(autoTitleRefreshSel) payload.auto_title_refresh_every=parseInt(autoTitleRefreshSel.value,10);
+  if(autoTitleRefreshSel) payload.auto_title_refresh_every=autoTitleRefreshSel.value;
   const defaultMessageModeSel=$('settingsDefaultMessageMode');
   if(defaultMessageModeSel) payload.default_message_mode=defaultMessageModeSel.value;
   const showBusyPlaceholderHintCb=$('settingsShowBusyPlaceholderHint');
@@ -9073,6 +9075,8 @@ function _syncSettingsMaxTokensPlaceholder(field, fallbackValue){
 }
 
 async function loadSettingsPanel(){
+  const settingsBody=document.querySelector('#mainSettings .settings-main');
+  if(settingsBody){settingsBody.inert=true;settingsBody.setAttribute('aria-busy','true');}
   try{
     const settings=await api('/api/settings');
     checkWebUIVersionSkew(settings);
@@ -9789,6 +9793,8 @@ async function loadSettingsPanel(){
     switchSettingsSection(_settingsSection);
   }catch(e){
     showToast(t('settings_load_failed')+e.message);
+  }finally{
+    if(settingsBody){settingsBody.inert=false;settingsBody.setAttribute('aria-busy','false');}
   }
 }
 

@@ -17,6 +17,7 @@ import mimetypes
 import os
 import re
 import secrets
+import stat
 import tempfile
 import threading
 import time
@@ -236,7 +237,7 @@ def _sanitize_svg_bytes(data: bytes) -> bytes:
     return buf.getvalue()
 
 
-def _embed_share_media(text: str, *, allowed_roots: tuple[Path, ...] = ()) -> str:
+def _embed_share_media(text: str, *, allowed_roots: tuple[Path, ...] = (), media_access_check=None) -> str:
     """Find local MEDIA: references and replace them with inline <img> tags.
 
     Only relative paths that resolve inside at least one of *allowed_roots*
@@ -298,6 +299,12 @@ def _embed_share_media(text: str, *, allowed_roots: tuple[Path, ...] = ()) -> st
         p = _resolve_against_roots(raw)
         if p is None:
             return _PLACEHOLDER
+        if media_access_check is not None:
+            try:
+                if media_access_check(p) is not True:
+                    return _PLACEHOLDER
+            except Exception:
+                return _PLACEHOLDER
 
         # --- Size guard -------------------------------------------------------
         try:
@@ -315,7 +322,15 @@ def _embed_share_media(text: str, *, allowed_roots: tuple[Path, ...] = ()) -> st
 
         # --- Embed as base64 <img> -------------------------------------------
         try:
-            data = p.read_bytes()
+            from api.workspace import open_anchored_fd
+            root = next(root for root in allowed if p.is_relative_to(root))
+            fd = open_anchored_fd(root, p, want_dir=False)
+            with os.fdopen(fd, "rb") as source:
+                if not stat.S_ISREG(os.fstat(source.fileno()).st_mode):
+                    return _PLACEHOLDER
+                data = source.read(_SHARE_EMBED_MAX_BYTES + 1)
+            if len(data) > _SHARE_EMBED_MAX_BYTES:
+                return _PLACEHOLDER
             # Content-based MIME validation: verify the actual file header
             # matches the claimed MIME type — catches extension-spoofed files
             # (e.g. a script renamed to .png).
@@ -336,13 +351,13 @@ def _embed_share_media(text: str, *, allowed_roots: tuple[Path, ...] = ()) -> st
                 f' class="msg-media-img" alt="{safe_name}"'
                 f' loading="lazy">'
             )
-        except (OSError, MemoryError):
+        except (OSError, ValueError, MemoryError):
             return _PLACEHOLDER
 
     return _SHARE_MEDIA_RE.sub(_replace_ref, text)
 
 
-def _sanitize_message(message: dict, *, redact_paths=(), allowed_roots: tuple[Path, ...] = ()) -> dict | None:
+def _sanitize_message(message: dict, *, redact_paths=(), allowed_roots: tuple[Path, ...] = (), media_access_check=None) -> dict | None:
     if not isinstance(message, dict):
         return None
     role = str(message.get("role") or "").strip().lower()
@@ -358,7 +373,7 @@ def _sanitize_message(message: dict, *, redact_paths=(), allowed_roots: tuple[Pa
     # Embed local media BEFORE path redaction so the concrete path is still
     # available for file reads.  MEDIA: references become self-contained data
     # URIs — or a static placeholder if the path is outside the allowed roots.
-    text = _embed_share_media(text, allowed_roots=allowed_roots)
+    text = _embed_share_media(text, allowed_roots=allowed_roots, media_access_check=media_access_check)
     text = _redact_share_paths(text, redact_paths)
     if not text.strip():
         return None
@@ -390,7 +405,7 @@ def _public_share_payload(payload: dict) -> dict:
     return public
 
 
-def build_share_snapshot(session) -> dict:
+def build_share_snapshot(session, *, media_access_check=None) -> dict:
     raw_dict = getattr(session, "__dict__", {}) or {}
     # redact_session_data respects the api_redact_enabled setting; keep it as a
     # first pass, but the per-message sanitizer below applies ALWAYS-ON credential
@@ -421,8 +436,8 @@ def build_share_snapshot(session) -> dict:
     if _ws and isinstance(_ws, str) and _ws.strip():
         _allowed_roots.append(Path(_ws.strip()))
     try:
-        from api.upload import _attachment_root
-        _allowed_roots.append(_attachment_root())
+        from api.upload import _session_attachment_dir
+        _allowed_roots.append(_session_attachment_dir(str(raw_dict.get("session_id") or "")))
     except Exception:
         pass
     _allowed_roots_tuple: tuple[Path, ...] = tuple(_allowed_roots)
@@ -430,6 +445,7 @@ def build_share_snapshot(session) -> dict:
     for raw in safe_session.get("messages") or []:
         sanitized = _sanitize_message(
             raw, redact_paths=redact_paths, allowed_roots=_allowed_roots_tuple,
+            media_access_check=media_access_check,
         )
         if sanitized:
             safe_messages.append(sanitized)
@@ -448,11 +464,23 @@ def build_share_snapshot(session) -> dict:
     }
 
 
-def create_or_refresh_share(session) -> dict:
-    snapshot = build_share_snapshot(session)
+def create_or_refresh_share(session, *, media_access_check=None) -> dict:
+    snapshot = build_share_snapshot(session, media_access_check=media_access_check)
     with _SHARE_LOCK:
         _ensure_share_dir()
         existing_token = str(getattr(session, "share_token", "") or "").strip()
+        if existing_token:
+            existing_path = _share_path(existing_token)
+            if existing_path.exists():
+                existing = json.loads(existing_path.read_text(encoding="utf-8"))
+                if not isinstance(existing, dict) or existing.get("source_session_id") != session.session_id:
+                    raise ValueError("Share token does not belong to this conversation")
+                # Revoked URLs never become public again, including when a stale
+                # session backup or import still carries the previous token.
+                if existing.get("revoked_at"):
+                    existing_token = ""
+            else:
+                existing_token = ""
         token = existing_token or secrets.token_urlsafe(18)
         now = time.time()
         payload = {
@@ -518,6 +546,8 @@ def revoke_share(session) -> bool:
                 payload = {}
             if not isinstance(payload, dict):
                 payload = {}
+            if payload.get("source_session_id") != session.session_id:
+                raise ValueError("Share token does not belong to this conversation")
             payload["revoked_at"] = time.time()
             _write_json_atomic(path, payload)
     return True

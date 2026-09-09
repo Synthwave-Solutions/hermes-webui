@@ -407,11 +407,24 @@ def _patch_task(conn, task_id: str, body: dict):
         return
     status = _validate_status(body.get("status"))
     if status == "done":
-        if not kb.complete_task(conn, task_id, result=body.get("result"), summary=body.get("summary")):
-            raise LookupError("task not found")
+        if not kb.complete_task(
+            conn, task_id, result=body.get("result"), summary=body.get("summary"),
+            allow_pending=True,
+        ):
+            if not kb.get_task(conn, task_id):
+                raise LookupError("task not found")
+            raise ValueError(
+                "Task cannot be completed: finish its dependencies and check its current status"
+            )
     elif status == "blocked":
-        if not kb.block_task(conn, task_id, reason=body.get("block_reason") or body.get("reason")):
-            raise LookupError("task not found")
+        if not kb.block_task(
+            conn, task_id,
+            reason=body.get("block_reason") or body.get("reason") or "blocked from WebUI",
+            allow_todo=True,
+        ):
+            if not kb.get_task(conn, task_id):
+                raise LookupError("task not found")
+            raise ValueError("Task cannot be blocked in its current status")
     elif status == "archived":
         if not kb.archive_task(conn, task_id):
             raise LookupError("task not found")
@@ -741,7 +754,11 @@ def _task_action_payload(task_id: str, body: dict, action: str, *, board=None):
         if not kb.get_task(conn, task_id):
             raise LookupError("task not found")
         if action == "block":
-            ok = kb.block_task(conn, task_id, reason=body.get("reason") or body.get("block_reason"))
+            ok = kb.block_task(
+                conn, task_id,
+                reason=body.get("reason") or body.get("block_reason") or "blocked from WebUI",
+                allow_todo=True,
+            )
         elif action == "unblock":
             if hasattr(kb, "unblock_task"):
                 ok = kb.unblock_task(conn, task_id)

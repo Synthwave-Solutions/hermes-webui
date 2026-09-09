@@ -1,0 +1,31 @@
+{
+  "run": "20260908-222640-169443000",
+  "report_global_errors": [],
+  "runner_reporter_warnings": [
+    "Internal error: step id not found: fixture@492",
+    "Internal error: step id not found: fixture@383",
+    "Internal error: step id not found: fixture@649",
+    "Internal error: step id not found: fixture@673Internal error: step id not found: fixture@673",
+    "Internal error: step id not found: fixture@195",
+    "Internal error: step id not found: fixture@359",
+    "Internal error: step id not found: fixture@427",
+    "Internal error: step id not found: fixture@272",
+    "Internal error: step id not found: fixture@554"
+  ],
+  "note": "Reporter fixture bookkeeping warnings are preserved separately from scenario failures and collected application page errors.",
+  "prior_integrated_attempts": [
+    {
+      "run": "20260908-221421-292673000",
+      "scenarios": 176,
+      "passed": 172,
+      "failed": 4,
+      "source_unchanged": true,
+      "findings": [
+        "Share creation404 remains open",
+        "Todo to Done404 remains open",
+        "Terminal CDN assets blocked by the corrected loopback QA boundary; exact verified assets were bundled locally; focused same-origin asset and command/restart test passed",
+        "Tool status case required compact activity mode but an earlier settings test left transparent stream selected; explicit UI precondition was added; preceding preference plus tool-status ordering regression passed"
+      ]
+    }
+  ]
+}
