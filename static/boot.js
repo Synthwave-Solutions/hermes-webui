@@ -2311,6 +2311,7 @@ $('modelSelect').onchange=async()=>{
   }
 };
 $('msg').addEventListener('input',()=>{
+  if(typeof _composerDraftInputGeneration==='number') ++_composerDraftInputGeneration;
   updateSendBtn();
   scheduleComposerAutoResize();
   // Persist composer draft to server (debounced in _saveComposerDraft).
@@ -3290,6 +3291,7 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
   // Boot restore has lower priority than navigation performed while its
   // settings/metadata requests are pending. Its own load updates this token.
   let _bootRestoreGeneration=typeof _loadSessionGeneration==='number'?_loadSessionGeneration:null;
+  const _bootDraftInputGeneration=typeof _composerDraftInputGeneration==='number'?_composerDraftInputGeneration:null;
   async function _finishBootAfterNewerSessionActivation(){
     if(_bootRestoreGeneration===null||_loadSessionGeneration===_bootRestoreGeneration) return false;
     if(typeof _newSessionInFlight!=='undefined'&&_newSessionInFlight){
@@ -3837,7 +3839,7 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
         await renderSessionList();await _finalizeComposerPrefillOnBoot(prefillIntent);if(typeof startGatewaySSE==='function')startGatewaySSE();
         return;
       }
-      const restorePromise=loadSession(saved, {preserveActiveInput:true});
+      const restorePromise=loadSession(saved, {preserveActiveInput:true, draftInputGeneration:_bootDraftInputGeneration});
       // loadSession claims its generation synchronously before its first await.
       _bootRestoreGeneration=typeof _loadSessionGeneration==='number'?_loadSessionGeneration:null;
       await restorePromise;

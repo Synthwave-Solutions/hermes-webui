@@ -185,6 +185,8 @@ async function _validateCachedSessionScene(sid, scene) {
 
 // Debounced save — prevents hammering the server on every keystroke.
 let _draftSaveTimer = null;
+// A real composer edit owns even an empty value over older draft responses.
+let _composerDraftInputGeneration = 0;
 const _DRAFT_SAVE_DELAY_MS = 400;
 const NEW_CHAT_DRAFT_SESSION_KEY = 'hermes-new-chat-draft-session';
 const _composerDraftKnownPayloadSessions = new Set();
@@ -437,6 +439,9 @@ function _restoreComposerDraft(draft, targetSid, opts={}) {
   const files = (draft && Array.isArray(draft.files)) ? draft.files : [];
   const current = ta.value || '';
   const preserveActiveInput = !!(opts && opts.preserveActiveInput);
+  const inputChanged = Number.isFinite(opts.inputGeneration)
+    && typeof _composerDraftInputGeneration==='number'
+    && opts.inputGeneration!==_composerDraftInputGeneration;
   const restoreSid = targetSid || (S.session && S.session.session_id);
   const hasServerDraftPayload = _composerDraftHasPayload(text, files);
 
@@ -448,6 +453,16 @@ function _restoreComposerDraft(draft, targetSid, opts={}) {
   // composer is the authoritative in-progress draft; never replace non-empty
   // local input with an older server draft. Cross-session switches still restore
   // normally so the previous session's composer contents do not leak forward.
+  if (preserveActiveInput && inputChanged) {
+    // Metadata may have arrived after the user typed and explicitly cleared
+    // the initially blank composer. Preserve that empty value and save it once
+    // the requested session is actually bound; never save into another chat.
+    if (restoreSid && S.session && S.session.session_id===restoreSid
+        && typeof _saveComposerDraftNow==='function') {
+      _saveComposerDraftNow(restoreSid, current, S.pendingFiles ? [...S.pendingFiles] : []);
+    }
+    return;
+  }
   if (preserveActiveInput && current && current !== text) return;
 
   // If there's no text and no files, clear the textarea (a previous session's
@@ -1839,6 +1854,9 @@ async function _switchProfileForSessionLoad(profile){
 
 async function loadSession(sid){
   const opts = arguments[1] || {};
+  const draftInputGeneration=Number.isFinite(opts.draftInputGeneration)
+    ? opts.draftInputGeneration
+    : (typeof _composerDraftInputGeneration==='number'?_composerDraftInputGeneration:null);
   // Resolve canonical lineage SID BEFORE both the direct and sidebar preload
   // notifications so extensions always see the canonical session id, not the
   // raw sidebar click id (which may differ after lineage folding).
@@ -2556,7 +2574,7 @@ async function loadSession(sid){
   // against stale writes from slow responses racing to restore the previous draft).
   const _draft = S.session && S.session.composer_draft;
   if (_draft && (typeof _restoreComposerDraft === 'function')) {
-    _restoreComposerDraft(_draft, sid, {preserveActiveInput:!!opts.preserveActiveInput || (currentSid===sid&&forceReload)});
+    _restoreComposerDraft(_draft, sid, {preserveActiveInput:!!opts.preserveActiveInput || (currentSid===sid&&forceReload), inputGeneration:draftInputGeneration});
   }
 
   // Clear the in-flight session marker now that this load has completed (#1060).
