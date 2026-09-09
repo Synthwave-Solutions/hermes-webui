@@ -19,7 +19,7 @@ const ICONS={
 // responses from in-flight requests when the user switches sessions again
 // before the first request completes (#1060).
 let _loadingSessionId = null;
-// Each loadSession() invocation gets a monotonically increasing generation.
+// Each loadSession() or newSession() activation gets a monotonically increasing generation.
 // `_loadingSessionId` only tracks destination session_id, so same-session
 // concurrent loads can still race and overwrite each other unless we compare
 // the generation token as well.
@@ -1530,6 +1530,11 @@ async function newSession(flash, options={}){
     if(typeof showToast==='function') showToast(_newSessionPendingText(),1500);
     return _newSessionInFlight;
   }
+  // New Chat is a navigation intent too: retire an older load before its
+  // metadata/error response can replace the new conversation or clear its URL.
+  const activationGeneration=typeof _loadSessionGeneration==='number'
+    ? ++_loadSessionGeneration : null;
+  if(typeof _loadingSessionId!=='undefined') _loadingSessionId=null;
   _setNewSessionPending(true);
   _newSessionInFlight=(async()=>{
     // Starting a brand-new chat must not carry named context blocks selected in
@@ -1639,6 +1644,12 @@ async function newSession(flash, options={}){
         ||null;
     }
     const data=await api('/api/session/new',{method:'POST',body:JSON.stringify(reqBody)});
+    // The record was created successfully, but a later sidebar/navigation
+    // choice owns the screen. Retain the record without activating it.
+    if(activationGeneration!==null&&_loadSessionGeneration!==activationGeneration){
+      if(typeof refreshSessionList==='function') Promise.resolve(refreshSessionList('new-session')).catch(()=>{});
+      return;
+    }
     if(consumedExplicitModelOverride&&typeof _clearEmptyComposerModelOverride==='function'){
       _clearEmptyComposerModelOverride();
     }
@@ -1862,6 +1873,8 @@ async function loadSession(sid){
   // failed loadSession killed; no-ops on real switches.
   _rearmActiveSessionStream();
   if(currentSid===sid && !forceReload && (!_loadingSessionId || _loadingSessionId===sid)){
+    // Staying on the current chat also supersedes a pending New Chat request.
+    if(typeof _newSessionInFlight!=='undefined'&&_newSessionInFlight) ++_loadSessionGeneration;
     // Re-selecting the already-open session is a no-op for transcript/scroll, but
     // it is still a *visit*: clear a stale sidebar unread dot (e.g. one a
     // background completion left on the open, unfocused pane) before returning.

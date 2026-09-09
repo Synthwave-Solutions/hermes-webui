@@ -94,3 +94,33 @@ def test_start_queued_frame_respects_new_session_navigation_or_turn_and_keeps_st
  assert.equal(f.el.scrollTop,0);
 })().catch(error=>{console.error(error);process.exitCode=1;});
 ''')
+
+
+def test_superseded_start_reconciles_loaded_indices_without_stealing_newer_viewport():
+    _run(r'''
+(async()=>{
+ const source=fs.readFileSync('static/sessions.js','utf8');
+ const from=source.indexOf('async function _ensureAllMessagesLoaded()'),to=source.indexOf('const SESSION_ARCHIVED_PAGE_SIZE',from);
+ assert.ok(from>=0&&to>from);
+ const f=setup(),c=f.ctx;let release;
+ const all=[{role:'user',content:'FIRST'},{role:'assistant',content:'FIRST ANSWER'},
+  {role:'user',content:'MIDDLE'},{role:'assistant',content:'MIDDLE ANSWER'},
+  {role:'user',content:'TAIL'},{role:'assistant',content:'TAIL ANSWER'}];
+ c.S.messages=all.slice(4);c._oldestIdx=4;c._messagesTruncated=true;c._loadingOlder=false;c._loadingSessionId=null;c._messagesGeneration=0;
+ c.window={};c._bumpMessagesGeneration=()=>++c._messagesGeneration;c._syncToolCallsForLoadedMessages=()=>{};
+ c.api=()=>new Promise(resolve=>{release=resolve;});
+ let domIndex=0;const renders=[];
+ c.renderMessages=options=>{renders.push(options);domIndex=c.S.messages.findIndex(message=>message.content==='TAIL');};
+ vm.runInContext(source.slice(from,to),c);
+ const pending=c.jumpToSessionStart();
+ // Actual newer same-session End/scroll intent arrives while the HTTP read is pending.
+ c._messageScrollInputGeneration++;f.el._top=1234;
+ release({session:{messages:all,message_count:all.length,tool_calls:[]}});await pending;
+ assert.equal(c.S.messages.length,6);assert.equal(c._oldestIdx,0);assert.equal(c._messagesTruncated,false);
+ assert.equal(renders.length,1,'full-array replacement requires one DOM reconciliation');
+ assert.equal(renders[0].preserveScroll,true);assert.equal(renders[0].scrollToStart,undefined);
+ assert.equal(domIndex+c._oldestIdx,4,'Edit must still target the displayed tail question');
+ assert.equal(f.el.scrollTop,1234,'reconciliation must not apply Start navigation');
+ assert.equal(f.writes.length,0);assert.equal(f.frames.length,0);
+})().catch(error=>{console.error(error);process.exitCode=1;});
+''')

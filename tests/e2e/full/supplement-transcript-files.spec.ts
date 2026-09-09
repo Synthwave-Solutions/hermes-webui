@@ -3,7 +3,7 @@ import path from 'node:path';
 import type {Page} from '@playwright/test';
 import {test, expect, open, session, api, auth} from './fixtures';
 
-declare const S: any, _oldestIdx: number, _messagesTruncated: boolean, _messagesGeneration: number, _scrollPinned: boolean, _messageUserUnpinned: boolean, _messageScrollInputGeneration: number;
+declare const S: any, _oldestIdx: number, _messagesTruncated: boolean, _messagesGeneration: number, _scrollPinned: boolean, _messageUserUnpinned: boolean, _messageScrollInputGeneration: number, _programmaticScroll: boolean, _loadingOlder: boolean, _loadingSessionId: string|null;
 
 const unique = (prefix: string) => `${prefix}-${Date.now()}`;
 
@@ -291,4 +291,82 @@ test('SUPPLEMENT TRANSCRIPT FILES delayed outline history cannot replace a newer
   await page.locator('#outlinePanel .outline-entry').filter({hasText: 'SUPPLEMENT_RACE_QUESTION_0'}).click();
   await expect(page.locator('#msg-user-0')).toContainText('SUPPLEMENT_RACE_QUESTION_0');
   await expect(page.locator('#msg-user-0')).toBeInViewport();
+});
+
+test('SUPPLEMENT TRANSCRIPT FILES newer manual scroll during history loading keeps correct message Edit indices and earlier persisted turns', async ({page}, info) => {
+  test.setTimeout(90000);
+  await open(page);
+  await preference(page, 'preferences', 'settingsVirtualizeTranscript', 'virtualize_transcript', true);
+  await preference(page, 'appearance', 'settingsSessionJumpButtons', 'session_jump_buttons', true);
+  const messages = Array.from({length: 40}, (_, index) => [
+    {role: 'user', content: `SUPPLEMENT_END_RACE_QUESTION_${index}`},
+    {role: 'assistant', content: `SUPPLEMENT_END_RACE_ANSWER_${index}\n\n${'Distinct history content stays attached to its message. '.repeat(5)}`},
+  ]).flat();
+  await page.locator('[data-settings-section="conversation"]').click();
+  const chooser = page.waitForEvent('filechooser');
+  await page.locator('#btnImportJSON').click();
+  const imported = page.waitForResponse(r => r.url().endsWith('/api/session/import') && r.request().method() === 'POST');
+  await (await chooser).setFiles({name:'qa-start-end-race.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify({title:unique('qa-start-end-race'),messages,workspace:auth.workspace}))});
+  const importedResponse = await imported;
+  expect(importedResponse.status()).toBe(200);
+  const sid = (await importedResponse.json()).session.session_id;
+  await expect(page).toHaveURL(new RegExp('/session/' + sid));
+  await page.waitForFunction('_loadingSessionId === null');
+  await expect(page.locator('#messages')).toContainText('SUPPLEMENT_END_RACE_ANSWER_39');
+  expect(await page.evaluate('({truncated:_messagesTruncated,oldest:_oldestIdx,count:S.messages.length})')).toEqual({truncated:true,oldest:50,count:30});
+  await page.waitForFunction(() => !_programmaticScroll);
+  let captured!:()=>void, release!:()=>void;
+  const responseCaptured = new Promise<void>(resolve=>{captured=resolve;});
+  const releaseResponse = new Promise<void>(resolve=>{release=resolve;});
+  let held = false;
+  await page.route('**/api/session?**', async route => {
+    const url = new URL(route.request().url());
+    if (!held && url.searchParams.get('session_id') === sid && url.searchParams.get('messages') === '1' && !url.searchParams.has('msg_limit')) {
+      held = true;
+      const response = await route.fetch();
+      expect(response.status()).toBe(200);
+      captured();
+      await releaseResponse;
+      await route.fulfill({response});
+    } else await route.continue();
+  });
+  try {
+    await page.locator('#jumpToSessionStartBtn').click();
+    await responseCaptured;
+    const startGeneration = await page.evaluate('_messageScrollInputGeneration');
+    await page.locator('#messages').hover();
+    await page.mouse.wheel(0,-700);
+    await page.waitForFunction(() => {const el=document.getElementById('messages')!;return el.scrollHeight-el.scrollTop-el.clientHeight>300;});
+    await page.mouse.wheel(0,1400);
+    await page.waitForFunction(() => {const el=document.getElementById('messages')!;return el.scrollHeight-el.scrollTop-el.clientHeight<2;});
+    expect(await page.evaluate('_messageScrollInputGeneration')).toBeGreaterThan(startGeneration);
+    release();
+    await page.waitForFunction(() => _loadingOlder === false && !_messagesTruncated && S.messages.length === 80);
+    // Pick the actual visible final question by content: an obsolete DOM index
+    // would still show the correct text yet truncate the wrong earlier turn.
+    const lastUser = page.locator('#messages .msg-row[data-session-msg-idx="78"]');
+    await expect(lastUser).toContainText('SUPPLEMENT_END_RACE_QUESTION_39');
+    await expect(lastUser).toBeInViewport();
+    await lastUser.hover();
+    await lastUser.getByRole('button',{name:'Edit message',exact:true}).click();
+    await expect(lastUser.locator('.msg-edit-area')).toHaveValue('SUPPLEMENT_END_RACE_QUESTION_39');
+    const marker = 'QA_END_NAVIGATION_EDIT_TARGET';
+    await lastUser.locator('.msg-edit-area').fill(marker);
+    const truncated = page.waitForResponse(r=>r.url().endsWith('/api/session/truncate')&&r.request().method()==='POST');
+    await lastUser.locator('.msg-edit-send').click();
+    const truncateResponse = await truncated;
+    expect(truncateResponse.status()).toBe(200);
+    await expect(page.locator('#messages')).toContainText('QA_REPLY: '+marker,{timeout:30000});
+    await expect(page.locator('#btnSend')).not.toHaveAttribute('aria-label','Stop generation');
+    const persisted=(await api(page,`/api/session?session_id=${sid}&messages=1`)).body.session.messages.map((m:any)=>({role:m.role,content:m.content}));
+    await info.attach('superseded-start-edit-target',{body:JSON.stringify({truncate:truncateResponse.request().postDataJSON(),persisted_count:persisted.length,preserved_prefix:persisted.slice(0,78)}),contentType:'application/json'});
+    expect(truncateResponse.request().postDataJSON()).toMatchObject({session_id:sid,keep_count:78});
+    expect(persisted.slice(0,78)).toEqual(messages.slice(0,78));
+    expect(persisted).toHaveLength(80);
+    expect(persisted[78]).toEqual({role:'user',content:marker});
+    expect(persisted[79].content).toContain('QA_REPLY: '+marker);
+    await page.reload();
+    await expect(page.locator('#messages')).toContainText('QA_REPLY: '+marker);
+    expect((await api(page,`/api/session?session_id=${sid}&messages=1`)).body.session.messages.slice(0,78).map((m:any)=>({role:m.role,content:m.content}))).toEqual(messages.slice(0,78));
+  } finally { release(); }
 });

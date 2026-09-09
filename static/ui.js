@@ -1895,6 +1895,7 @@ async function jumpToSessionStart(){
   if(!container||!S.session) return;
   const sid=S.session.session_id;
   const wasActive=!!(S.busy||S.activeStreamId);
+  const messagesBeforeLoad=S.messages;
   // Explicit navigation owns the viewport over queued tail-settle writes and
   // snapshots captured before this click, just like manual upward scrolling.
   _cancelBottomSettle();
@@ -1910,7 +1911,17 @@ async function jumpToSessionStart(){
     if(!wasActive){
       if(typeof _ensureAllMessagesLoaded==='function'&&await _ensureAllMessagesLoaded()===false) return;
     }
-    if(!ownsNavigation()||(!wasActive&&(S.busy||S.activeStreamId))) return;
+    if(!ownsNavigation()){
+      // A newer scroll/End action owns the viewport, but successful history
+      // expansion still changed raw indices. Reconcile the old tail DOM while
+      // preserving that newer viewport, otherwise message actions use stale IDs.
+      if(S.session&&S.session.session_id===sid&&!S.busy&&!S.activeStreamId&&
+          S.messages!==messagesBeforeLoad){
+        renderMessages({ preserveScroll:true });
+      }
+      return;
+    }
+    if(!wasActive&&(S.busy||S.activeStreamId)) return;
     // Metadata/resize renders may have captured the old tail while history was
     // loading. Supersede those snapshots before committing this explicit jump.
     _cancelBottomSettle();
