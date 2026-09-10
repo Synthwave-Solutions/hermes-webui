@@ -1236,6 +1236,48 @@ function applySessionTitleUpdate(sid, titleText, options={}){
 // BEFORE slash rewrites (/moa, bundles) mutate the payload and BEFORE
 // uploadPendingFiles() drains S.pendingFiles — so we restore what the user
 // actually typed, not the transformed send payload.
+// A rejected start has not persisted a new turn. Keep recovery separate from
+// assistant content, and bind every asynchronous action to the retained context.
+let _workspaceSendRecovery=null;
+function _isWorkspaceStartForbidden(error){
+  return !!(error&&Number(error.status)===403&&[
+    'Workspace membership required',
+    'Workspace membership unavailable',
+    "Workspace is outside the user's governed scope",
+    'Workspace explicitly denied by governance'
+  ].includes(String(error.message||'')));
+}
+function _workspaceRecoveryIsCurrent(recovery){
+  return !!(recovery&&S.session&&S.session.session_id===recovery.sid&&
+    String(S.activeProfile||S.session.profile||'default')===recovery.profile&&
+    String(S.session.workspace||'')===recovery.workspace);
+}
+function _renderWorkspaceSendRecovery(){
+  let notice=$('workspaceRecoveryNotice');
+  const recovery=_workspaceSendRecovery;
+  const current=_workspaceRecoveryIsCurrent(recovery);
+  const dropdown=$('composerWsDropdown');
+  if(dropdown&&dropdown._workspaceRecovery&&!_workspaceRecoveryIsCurrent(dropdown._workspaceRecovery)) closeWsDropdown();
+  if(!current){if(notice)notice.hidden=true;return;}
+  if(!notice){
+    const composer=$('composerBox');
+    if(!composer)return;
+    notice=document.createElement('div');
+    notice.id='workspaceRecoveryNotice';
+    notice.className='detail-alert';
+    notice.setAttribute('role','status');
+    const text=document.createElement('p');
+    text.textContent="This chat's workspace is unavailable. Your messages and draft are still here. Choose an available workspace before sending again.";
+    const action=document.createElement('button');
+    action.type='button';action.className='btn secondary';action.textContent='Choose workspace';
+    notice.append(text,action);composer.before(notice);
+  }
+  notice.hidden=false;
+  const button=notice.querySelector('button');
+  button.disabled=!!S.busy;
+  button.onclick=()=>{if(_workspaceRecoveryIsCurrent(recovery)&&!S.busy) void openWorkspaceRecoveryPicker(recovery,button);};
+}
+
 function _restoreComposerDraftAfterFailedSend(draftText, filesSnapshot, sid, clearPromise){
   const restore=String(draftText||'');
   const files=Array.isArray(filesSnapshot)?filesSnapshot.filter(Boolean):[];
@@ -1725,6 +1767,7 @@ async function send(){
   let postStartData;
   let modelStateForPostStart;
   let explicitPickForPostStart;
+  const startContext={sid:activeSid,profile:String(S.activeProfile||S.session.profile||'default'),workspace:String(S.session.workspace||'')};
   try{
     const _modelState=_chatPayloadModelState();
     modelStateForPostStart=_modelState;
@@ -1771,6 +1814,16 @@ async function send(){
     postStartData = startData;
   }catch(e){
     const errMsg=String((e&&e.message)||'');
+    const workspaceForbidden=_isWorkspaceStartForbidden(e);
+    if(workspaceForbidden&&!_workspaceRecoveryIsCurrent(startContext)){
+      // A late refusal belongs to the old chat, not the newly visible pane.
+      delete INFLIGHT[activeSid];
+      const queued=typeof _queueDrainEntryFailed==='function'&&_queueDrainEntryFailed(activeSid,errMsg);
+      const profileStillCurrent=String(S.activeProfile||(S.session&&S.session.profile)||'default')===startContext.profile;
+      if(!queued&&profileStillCurrent) _restoreComposerDraftAfterFailedSend(_failedSendDraftText,_failedSendFilesSnapshot,activeSid,_composerDraftClearPromise);
+      if(typeof clearOptimisticSessionStreaming==='function') clearOptimisticSessionStreaming(activeSid);
+      return;
+    }
     // If /api/chat/start returns 404, the session was deleted server-side
     // (its sidecar is gone) while GET kept returning a CLI stub (#2782). Strip
     // the stale /session/<id> URL and clear localStorage so a reload does not
@@ -1843,13 +1896,18 @@ async function send(){
     // Only hide approval card if it belongs to the session that just finished
     if(!_approvalSessionId || _approvalSessionId===activeSid) hideApprovalCard(true);removeThinking();
     if(!_clarifySessionId || _clarifySessionId===activeSid) hideClarifyCard(true, 'terminal');
-    S.messages.push({role:'assistant',content:`**Error:** ${errMsg}`});
+    if(workspaceForbidden){
+      _workspaceSendRecovery=startContext;
+      // Remove only this unaccepted optimistic turn; the server history stays intact.
+      S.messages=(S.messages||[]).filter(message=>message!==userMsg);
+    }else S.messages.push({role:'assistant',content:`**Error:** ${errMsg}`});
     // A drain-originated send keeps its queue entry, now marked 'failed' with
     // the error, visible in the queue card (never silently dropped); mark it
     // BEFORE setBusy(false) so the drain kicked there skips past it to the
     // next 'queued' entry instead of stalling the rest of the queue.
     const _drainSendFailed=typeof _queueDrainEntryFailed==='function'&&_queueDrainEntryFailed(activeSid,errMsg);
     _queueDrainSid=activeSid;renderMessages();setBusy(false);setComposerStatus(`Error: ${errMsg}`);
+    _renderWorkspaceSendRecovery();
     // #5472: the send was rejected before the turn was durably started, so the
     // composer text + attachments (cleared at send time) would otherwise be
     // lost. Put back the ORIGINAL captured draft (not the mutated /moa/bundle
@@ -1864,6 +1922,7 @@ async function send(){
     return;
   }
 
+  if(_workspaceSendRecovery&&_workspaceSendRecovery.sid===activeSid){_workspaceSendRecovery=null;_renderWorkspaceSendRecovery();}
   const startData = postStartData || {};
   streamId = postStartData ? postStartData.stream_id : null;
   S.activeStreamId = streamId;

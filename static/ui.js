@@ -6295,6 +6295,7 @@ window.openComposerContextMenu=openComposerContextMenu;
 
 document.addEventListener('click',function(e){
   if(
+    e.target.closest('#workspaceRecoveryNotice') ||
     e.target.closest('#composerMobileConfigBtn') ||
     e.target.closest('#composerMobileConfigPanel') ||
     e.target.closest('#composerWsDropdown') ||
@@ -16608,6 +16609,7 @@ function _scheduleSessionProgress() {
 }
 
 function renderMessages(options){
+  if(typeof _renderWorkspaceSendRecovery==='function') _renderWorkspaceSendRecovery();
   if(typeof refreshChatBots==='function') refreshChatBots();
   _scheduleSessionProgress();
   _lastMessageRenderAt=performance.now();

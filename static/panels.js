@@ -5919,7 +5919,7 @@ function _positionProfileDropdown(){
   }
 }
 
-function renderWorkspaceDropdownInto(dd, workspaces, currentWs){
+function renderWorkspaceDropdownInto(dd, workspaces, currentWs, options={}){
   if(!dd)return;
   dd.innerHTML='';
 
@@ -5966,7 +5966,7 @@ function renderWorkspaceDropdownInto(dd, workspaces, currentWs){
       opt.dataset.name=w.name||'';
       opt.dataset.path=w.path||'';
       opt.innerHTML=`<span class="ws-opt-name">${esc(w.name)}</span><span class="ws-opt-path">${esc(w.path)}</span>`;
-      opt.onclick=()=>switchToWorkspace(w.path,w.name);
+      opt.onclick=()=>options.onSelect?options.onSelect(w):switchToWorkspace(w.path,w.name);
       listContainer.appendChild(opt);
     }
     listContainer.appendChild(noResults);
@@ -5977,6 +5977,8 @@ function renderWorkspaceDropdownInto(dd, workspaces, currentWs){
 
   si.addEventListener('input',()=>{ filterWs(si.value); });
   sc.addEventListener('click',()=>{ si.value=''; filterWs(''); si.focus(); });
+
+  if(options.catalogOnly)return;
 
   // ── Footer actions ────────────────────────────────────────────────────────
   dd.appendChild(document.createElement('div')).className='ws-divider';
@@ -6027,6 +6029,38 @@ function toggleWsDropdown(){
   }
 }
 
+async function openWorkspaceRecoveryPicker(recovery,trigger){
+  if(!_workspaceRecoveryIsCurrent(recovery)||S.busy)return;
+  const dd=$('composerWsDropdown');
+  if(!dd)return;
+  closeWsDropdown();closeProfileDropdown();
+  if(typeof closeModelDropdown==='function')closeModelDropdown();
+  if(typeof closeReasoningDropdown==='function')closeReasoningDropdown();
+  dd._workspaceRecovery=recovery;
+  try{
+    // Read the same authorized catalog as the normal picker, but do not turn an
+    // unavailable registry into an apparently successful empty selection.
+    const data=await api('/api/workspaces');
+    if(dd._workspaceRecovery!==recovery||!_workspaceRecoveryIsCurrent(recovery)||S.busy)return;
+    renderWorkspaceDropdownInto(dd,data.workspaces||[],recovery.workspace,{
+      catalogOnly:true,
+      onSelect:workspace=>{
+        if(dd._workspaceRecovery===recovery&&_workspaceRecoveryIsCurrent(recovery)&&!S.busy)
+          void switchToWorkspace(workspace.path,workspace.name,{recovery});
+      }
+    });
+    _setWorkspaceDropdownOpenState(dd,true);
+    _positionComposerWsDropdown();
+    // The explicit recovery action also works when the workspace chip is hidden.
+    const search=dd.querySelector('input');if(search)search.focus();
+  }catch(error){
+    if(dd._workspaceRecovery===recovery&&_workspaceRecoveryIsCurrent(recovery)){
+      closeWsDropdown();showToast('Could not load available workspaces: '+error.message,5000);
+      if(trigger&&trigger.isConnected)trigger.focus();
+    }
+  }
+}
+
 function toggleComposerWsDropdown(){
   const dd=$('composerWsDropdown');
   const chip=$('composerWorkspaceChip');
@@ -6062,7 +6096,7 @@ function closeWsDropdown(){
   const composerChip=$('composerWorkspaceChip');
   const mobileAction=$('composerMobileWorkspaceAction');
   if(dd)_setWorkspaceDropdownOpenState(dd,false);
-  if(composerDd)_setWorkspaceDropdownOpenState(composerDd,false);
+  if(composerDd){_setWorkspaceDropdownOpenState(composerDd,false);composerDd._workspaceRecovery=null;}
   if(composerChip){
     composerChip.classList.remove('active');
     composerChip.setAttribute('aria-expanded','false');
@@ -6074,6 +6108,7 @@ function closeWsDropdown(){
 }
 document.addEventListener('click',e=>{
   if(
+    !e.target.closest('#workspaceRecoveryNotice') &&
     !e.target.closest('#composerWorkspaceChip') &&
     !e.target.closest('#composerMobileWorkspaceAction') &&
     !e.target.closest('#composerWsDropdown')
@@ -6531,7 +6566,11 @@ async function promptWorkspacePath(){
   }
 }
 
-async function switchToWorkspace(path,name){
+async function switchToWorkspace(path,name,options={}){
+  const recovery=options.recovery||null;
+  const recoveryCurrent=()=>!recovery||_workspaceRecoveryIsCurrent(recovery);
+  if(!recoveryCurrent())return;
+
   // Opus review Q6: if called from blank page, auto-create a session bound to
   // the requested workspace so the switch doesn't silently no-op.
   if(!S.session){
@@ -6558,7 +6597,7 @@ async function switchToWorkspace(path,name){
   // current one, and the current conversation has real messages worth keeping on
   // its original workspace. Same-workspace selection stays an in-place refresh.
   if(
-    window._newChatOnWorkspaceSwitch===true &&
+    !recovery && window._newChatOnWorkspaceSwitch===true &&
     S.session && S.session.workspace && path && path!==S.session.workspace &&
     Array.isArray(S.messages) && S.messages.length>0
   ){
@@ -6569,7 +6608,7 @@ async function switchToWorkspace(path,name){
         confirmLabel:t('discard'),
         danger:true
       });
-      if(!discard)return;
+      if(!discard||!recoveryCurrent())return;
       if(typeof cancelEditMode==='function')cancelEditMode();
       if(typeof clearPreview==='function')clearPreview();
     }
@@ -6587,10 +6626,14 @@ async function switchToWorkspace(path,name){
       confirmLabel:t('discard'),
       danger:true
     });
-    if(!discard)return;
+    if(!discard||!recoveryCurrent())return;
     if(typeof cancelEditMode==='function')cancelEditMode();
     if(typeof clearPreview==='function')clearPreview();
   }
+  if(!recoveryCurrent()||S.busy)return;
+  const switchSid=S.session.session_id;
+  let workspaceUpdated=false;
+  const selectionCurrent=()=>!recovery||(S.session&&S.session.session_id===switchSid&&S.session.workspace===path&&String(S.activeProfile||S.session.profile||'default')===recovery.profile);
   const composerDd=(typeof $==='function')?$('composerWsDropdown'):null;
   const restoreComposerFocusTarget=(composerDd&&composerDd.classList.contains('open')&&typeof _getComposerWorkspaceFocusTarget==='function')
     ? _getComposerWorkspaceFocusTarget()
@@ -6602,9 +6645,12 @@ async function switchToWorkspace(path,name){
     // overwrite the user's newer selection and reject this switch's fresh tree.
     if(typeof bumpWorkspaceTreeGen==='function')bumpWorkspaceTreeGen();
     await api('/api/session/update',{method:'POST',body:JSON.stringify({
-      session_id:S.session.session_id, workspace:path, model:S.session.model, model_provider:S.session.model_provider||null
+      session_id:switchSid, workspace:path, model:S.session.model, model_provider:S.session.model_provider||null
     })});
+    if(!recoveryCurrent())return;
     S.session.workspace=path;
+    workspaceUpdated=true;
+    if(recovery){_workspaceSendRecovery=null;_renderWorkspaceSendRecovery();}
     // Explicit workspace switch = user overriding any pending profile-switch default.
     // Clear the one-shot flag so a subsequent newSession() inherits this choice instead.
     S._profileSwitchWorkspace=null;
@@ -6618,9 +6664,14 @@ async function switchToWorkspace(path,name){
       typeof _focusComposerWorkspaceTarget==='function'
     ) _focusComposerWorkspaceTarget(restoreComposerFocusTarget);
     await loadDir('.');
+    if(!selectionCurrent())return;
     if (_currentPanel === 'memory') await loadMemory(true);
+    if(!selectionCurrent())return;
     showToast(t('workspace_switched_to',name||getWorkspaceFriendlyName(path)));
-  }catch(e){setStatus(t('switch_failed')+e.message);}
+  }catch(e){
+    const stillSelected=workspaceUpdated&&selectionCurrent();
+    if(recoveryCurrent()||stillSelected)setStatus(t('switch_failed')+e.message);
+  }
 }
 
 // ── Profile panel + dropdown ──

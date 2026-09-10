@@ -33,6 +33,7 @@ def load_acl_entries():
 def ensure_scope_access(scope, path, *, entries=None):
     if scope == 'all' or not path:
         return
+    membership_required = False
     try:
         target = Path(path).expanduser().resolve()
         for entry in load_acl_entries() if entries is None else entries:
@@ -41,9 +42,14 @@ def ensure_scope_access(scope, path, *, entries=None):
                 continue
             root = Path(entry['path']).expanduser().resolve()
             if target.is_relative_to(root) and scope not in emails:
-                raise PermissionError('Workspace membership required')
+                membership_required = True
+                break
     except (OSError, ValueError, RuntimeError):
         raise PermissionError('Workspace membership unavailable') from None
+    # PermissionError is also an OSError. Keep the intentional ACL refusal
+    # outside the metadata-error handler, which still hides filesystem errors.
+    if membership_required:
+        raise PermissionError('Workspace membership required')
 
 
 def ensure_workspace_access(handler, path, *, entries=None):
@@ -172,6 +178,39 @@ def runtime_workspace_scope(session, identity, *, workspace=None):
     return workspace_path, check
 
 
+def _audit_owned_workspace_denial(handler, parsed, session, error):
+    """Record only owned-session metadata; an unavailable sink never grants access."""
+    try:
+        from api.governance.audit import append_audit_event
+        from api.governance.enforce import _request_identity, subject_from_identity
+
+        identity = _request_identity(handler)
+        email = str((identity or {}).get('email') or '').strip().lower()
+        owner = str(getattr(session, 'owner_email', None) or '').strip().lower()
+        # The legacy accessor in this guard enforces profile, not ownership.
+        # Do not expose another user's session through this diagnostic path.
+        if not email or email != owner:
+            return
+        subject = subject_from_identity(identity)
+        reason = {
+            'Workspace membership required': 'workspace_membership_required',
+            'Workspace membership unavailable': 'workspace_membership_unavailable',
+            'Workspace explicitly denied by governance': 'workspace_explicitly_denied',
+            "Workspace is outside the user's governed scope": 'workspace_outside_governed_scope',
+            'Workspace governance unavailable': 'workspace_governance_unavailable',
+        }.get(str(error), 'workspace_access_denied')
+        append_audit_event(
+            'deny', subject_email=subject.email, subject_user_id=subject.user_id,
+            path=parsed.path, method=getattr(handler, 'command', ''),
+            reason=reason, mode='enforce',
+            extra={'session_id': session.session_id,
+                   'profile': getattr(session, 'profile', None) or 'default'},
+        )
+    except Exception:
+        # Best-effort diagnostics must not change the original HTTP refusal.
+        return
+
+
 def guard_session_request(handler, parsed, body=None):
     """Guard workspace execution on an existing session; cancellation stays usable."""
     from urllib.parse import parse_qs
@@ -187,11 +226,15 @@ def guard_session_request(handler, parsed, body=None):
         return True  # Existing endpoint validation handles missing context.
     from api.routes import get_session_for_file_ops
     from api.helpers import j
+    session = None
     try:
-        ensure_session_workspace_access(handler, get_session_for_file_ops(sid))
+        session = get_session_for_file_ops(sid)
+        ensure_session_workspace_access(handler, session)
     except KeyError:
         return True
     except PermissionError as exc:
+        if session is not None:
+            _audit_owned_workspace_denial(handler, parsed, session, exc)
         j(handler, {'error': str(exc)}, status=403)
         return False
     return True
