@@ -17,6 +17,7 @@ import datetime
 import logging
 import os
 import subprocess
+import sys
 import threading
 from pathlib import Path
 
@@ -24,13 +25,13 @@ logger = logging.getLogger("webui.governance")
 
 SYNC_SCRIPT = Path.home() / ".hermes" / "scripts" / "governance_profile_sync.py"
 SYNC_LOG = Path.home() / ".hermes" / "logs" / "governance-profile-sync.log"
-# The script imports hermes_cli; the agent venv always has its deps.
-_AGENT_PYTHON = Path.home() / ".hermes" / "hermes-agent" / "venv" / "bin" / "python"
 _TIMEOUT_S = 300
 
 
 def _python() -> str:
-    return str(_AGENT_PYTHON) if _AGENT_PYTHON.exists() else "python3"
+    # Match the running server's engine dependencies. A historical Hermes
+    # checkout can exist but carry an incompatible governance schema.
+    return sys.executable
 
 
 def _spawn(cmd: list[str], reason: str, email: str | None) -> None:

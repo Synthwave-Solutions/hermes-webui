@@ -347,6 +347,16 @@ def _mutate_policy(handler, parsed, subject: GovernanceSubject, *, op: str, targ
         if result is None:
             return True
         before, after = result
+        sync_needed = op != "user_delete"
+        if op == "group_create":
+            # A new unassigned group changes no provisioned user. The later
+            # user assignment schedules its own scoped sync. Keep full sync
+            # for dangling references or SSO mappings; creation can activate
+            # those immediately. Existing group mutations are unchanged.
+            sync_needed = bool(after.get("sso_groups")) or any(
+                target == str(name).strip()
+                for user in current_policy.users.values() for name in user.groups
+            )
         try:
             save_governance_policy(raw)
         except GovernancePolicyError as exc:
@@ -369,9 +379,9 @@ def _mutate_policy(handler, parsed, subject: GovernanceSubject, *, op: str, targ
         new_etag=new_etag,
     )
     # Re-provision Hermes profiles from the new policy in the background.
-    # User edits sync just that user; role/group edits fan out to everyone.
+    # User edits sync just that user; changes to assigned groups fan out.
     # Deletes keep the profile dir (data is never destroyed automatically).
-    if op != "user_delete":
+    if sync_needed:
         trigger_profile_sync(
             target if op in ("user_create", "user_update") else None,
             reason=op,

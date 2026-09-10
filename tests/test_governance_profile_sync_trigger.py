@@ -1,6 +1,8 @@
 """Auto profile-sync triggers: governance mutations and OIDC login kick the
 background per-user Hermes profile provisioning (fire-and-forget subprocess).
 """
+from copy import deepcopy
+
 import io
 import json
 import sys
@@ -226,3 +228,64 @@ def test_policy_replace_triggers_full_sync(policy_file, as_admin, sync_calls):
     handler = _call("/api/governance/policy", new_policy)
     assert handler.status == 200
     assert sync_calls == [(None, "policy_replace")]
+
+
+def test_unused_group_create_waits_for_user_assignment_before_sync(policy_file, as_admin, sync_calls):
+    # This unrelated user has no explicit profile grant. An ALL sync could
+    # repair that row as a side effect even though this group is not theirs.
+    path = policy_file()
+    before = deepcopy(dict(loader.get_policy().raw))
+    entry = {"roles": ["viewer"], "sso_groups": [], "grants": {"profiles": ["viewer"]}}
+    handler = _call("/api/governance/groups", {"name": "private_technical", "entry": entry})
+    assert handler.status == 200
+    assert sync_calls == []
+    stored = yaml.safe_load(path.read_text())
+    assert stored["groups"]["private_technical"] == entry
+    assert stored["users"] == before["users"]
+    assert handler.body["etag"] == loader.policy_etag(stored)
+    from api.governance.audit import read_audit_events
+    events = read_audit_events()
+    assert any(row.get("event") == "policy_change" and row.get("reason") == "group_create"
+               and row.get("extra", {}).get("target") == "private_technical" for row in events)
+    user = deepcopy(stored["users"]["viewer@example.test"])
+    user["groups"] = ["private_technical"]
+    assigned = _call("/api/governance/users/update", {"email": "viewer@example.test", "entry": user})
+    assert assigned.status == 200
+    assert sync_calls == [("viewer@example.test", "user_update")]
+    assert yaml.safe_load(path.read_text())["users"]["admin@example.test"] == before["users"]["admin@example.test"]
+
+
+@pytest.mark.parametrize("reference", ["private_technical", " private_technical "])
+def test_group_create_with_existing_user_reference_keeps_full_sync(policy_file, as_admin, sync_calls, reference):
+    policy = deepcopy(API_POLICY)
+    policy["users"]["viewer@example.test"]["groups"] = [reference]
+    path = policy_file(policy)
+    handler = _call("/api/governance/groups", {"name": "private_technical", "entry": {}})
+    assert handler.status == 200
+    assert sync_calls == [(None, "group_create")]
+    assert yaml.safe_load(path.read_text())["users"] == policy["users"]
+
+
+def test_group_create_with_sso_mapping_keeps_full_sync(policy_file, as_admin, sync_calls):
+    path = policy_file()
+    entry = {"sso_groups": ["technical@example.test"], "roles": ["viewer"]}
+    handler = _call("/api/governance/groups", {"name": "technical", "entry": entry})
+    assert handler.status == 200
+    assert sync_calls == [(None, "group_create")]
+    assert yaml.safe_load(path.read_text())["groups"]["technical"] == entry
+
+
+def test_trigger_uses_running_interpreter_even_when_legacy_venv_exists(monkeypatch, tmp_path):
+    calls = []
+    monkeypatch.setattr(profile_sync, "_spawn", lambda cmd, reason, email: calls.append(cmd))
+    monkeypatch.setattr(profile_sync.threading, "Thread", _ImmediateThread)
+    script = tmp_path / "sync.py"
+    script.write_text("")
+    legacy = tmp_path / "legacy-python"
+    legacy.write_text("")
+    monkeypatch.setattr(profile_sync, "SYNC_SCRIPT", script)
+    monkeypatch.setattr(profile_sync, "_AGENT_PYTHON", legacy, raising=False)
+    monkeypatch.setattr(sys, "executable", str(tmp_path / "active-engine-python"))
+    assert profile_sync.trigger_profile_sync("viewer@example.test", reason="user_update") is True
+    assert calls[0][0] == sys.executable
+    assert calls[0][-3:] == ["--apply", "--user", "viewer@example.test"]
