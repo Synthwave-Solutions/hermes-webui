@@ -106,3 +106,17 @@ def test_technical_storage_exception_cannot_override_specific_blacklist_denial(m
     for suffix in (".env", "bunq.json", "credentials/token.json"):
         assert a.configuration_denies_file(root + suffix) == (mode == "blacklist")
     assert a.configuration_denies_file("/home/test/.hermes/unassigned/source.py")
+
+@pytest.mark.parametrize("raw,canonical", [
+    ("/home/test/.hermes/profiles/technical/workspace/alias.txt", "/home/test/.hermes/profiles/private/notes.txt"),
+    ("/home/test/.hermes/profiles/technical/workspace/bunq.json", "/home/test/.hermes/profiles/technical/workspace/source.py"),
+])
+def test_raw_alias_and_canonical_target_require_independent_file_exceptions(raw, canonical):
+    data = policy()
+    data["users"][EMAIL]["grants"]["files"] = {
+        "denied_globs": ["**/.hermes/**", "*bunq*"],
+        "allow_globs": ["/home/test/.hermes/profiles/technical/workspace/**"],
+    }
+    rights = access(data)
+    assert rights.configuration_denies_file(raw, canonical)
+    assert rights.configuration_denies_file(canonical, raw)
