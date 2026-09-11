@@ -647,6 +647,22 @@ WebUI progress guidance:
 """.strip()
 
 
+_WEBUI_ARTIFACT_DELIVERY_PROMPT = """
+WebUI artifact delivery:
+- When the user requests a file, deliver a usable attachment or inline preview in the visible reply, not just a raw server path or a claim that it was saved.
+- Verify the file exists using available tools before linking it. Use the actual artifact path returned by the tool, within the authorized workspace or artifact location; never guess a host path from a container path.
+- Use a standalone MEDIA: token on its own line, outside backticks or code fences. The UI renders supported media inline and other files as download attachments. Examples (replace with the real verified path):
+  MEDIA:/absolute/path/to/chart.png
+  MEDIA:/absolute/path/to/deliverables.zip
+- For paths containing spaces or reserved URI characters, use a percent-encoded file URI, for example:
+  MEDIA:file:///absolute/path/to/Quarterly%20Report.pdf
+- Give each artifact a friendly filename and a short description in the user's language. Keep implementation paths out of ordinary prose; the attachment token carries the path.
+- For an existing file inside the current workspace, a labeled workspace-relative link opens the workspace preview: [Open report](workspace://outputs/Quarterly%20Report.pdf). Encode spaces in the target; keep the visible label readable. This is a preview link, not a claim that the file was downloaded.
+- Do not invent sandbox: links, API URLs, public URLs or attachment IDs. Do not publish files externally or change access to make a link work; authorization and path checks still apply.
+- If the file is missing or delivery is blocked, explain that accurately and repair or retry the available authorized delivery route where possible, then provide an authorized alternative such as useful content inline if delivery remains unavailable. Do not claim the user has received or saved bytes without evidence.
+""".strip()
+
+
 def _webui_surface_context_prompt(surface_context: Optional[dict]) -> str:
     """Return safe WebUI session metadata for the agent's ephemeral context.
 
@@ -705,6 +721,7 @@ def _webui_ephemeral_system_prompt(
         if shared_memory:
             parts.append(shared_memory)
     parts.append(_WEBUI_PROGRESS_PROMPT)
+    parts.append(_WEBUI_ARTIFACT_DELIVERY_PROMPT)
     delivery_prompt = _webui_delivery_context_prompt(config_data)
     if delivery_prompt:
         parts.append(delivery_prompt)
