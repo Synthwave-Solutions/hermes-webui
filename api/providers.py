@@ -1152,12 +1152,16 @@ def _write_env_file(env_path: Path, updates: dict[str, str | None]) -> None:
     Holds ``_ENV_LOCK`` from ``api.streaming`` for the entire load → modify →
     write cycle to prevent TOCTOU races between concurrent POST /api/providers
     calls (each reading the same file baseline and overwriting the other's key).
-    Also serialises os.environ mutations with streaming sessions.
+    Only the root profile updates the process environment. Named profiles are
+    read through their request/turn-scoped .env; publishing their credentials
+    globally would replace another user's fallback key on a shared server.
     """
     from api.streaming import _ENV_LOCK
+    from api.profiles import _DEFAULT_HERMES_HOME
     import stat as _stat
 
     with _ENV_LOCK:
+        publish_process_env = env_path.parent.resolve() == _DEFAULT_HERMES_HOME.resolve()
         # ── Read existing lines (preserving comments and blank lines) ──
         existing_lines: list[str] = []
         if env_path.exists():
@@ -1180,7 +1184,8 @@ def _write_env_file(env_path: Path, updates: dict[str, str | None]) -> None:
         for key, value in updates.items():
             if value is None:
                 # Mark the line for removal (None sentinel) and clear env.
-                os.environ.pop(key, None)
+                if publish_process_env:
+                    os.environ.pop(key, None)
                 if key in existing_key_indices:
                     output_lines[existing_key_indices[key]] = None  # type: ignore[assignment]
                 continue
@@ -1190,7 +1195,8 @@ def _write_env_file(env_path: Path, updates: dict[str, str | None]) -> None:
             # Reject embedded newlines/carriage returns to prevent .env injection
             if "\n" in clean or "\r" in clean:
                 raise ValueError("API key must not contain newline characters.")
-            os.environ[key] = clean
+            if publish_process_env:
+                os.environ[key] = clean
 
             if key in existing_key_indices:
                 output_lines[existing_key_indices[key]] = f"{key}={clean}"
