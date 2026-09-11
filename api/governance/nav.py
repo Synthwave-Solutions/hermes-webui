@@ -76,7 +76,7 @@ def administrative_access(access) -> bool:
     roles = set(getattr(access, "roles", ()) or ())
     sources = set(getattr(access, "grant_sources", ()) or ())
     subject = getattr(access, "subject", None)
-    if getattr(access, "access_level", ""):
+    if getattr(access, "access_level", "") or getattr(access, "access_mode", ""):
         return ("bootstrap_admin" in sources or
                 (access.access_level == "admin" and access.has_permission("governance:write")))
     return (getattr(subject, "provider", "") == "auth_disabled"
@@ -90,6 +90,19 @@ def navigation_audience(access, policy=None) -> str:
     return "admin" if administrative_access(access) else "member"
 
 
+def feature_permissions(access) -> dict[str, bool]:
+    """Concrete UI decisions use the same deny/ceiling checks as HTTP routes."""
+    from .catalog import ROUTE_CATALOG
+
+    known = set(PANEL_PERMISSIONS.values()) | {"profiles:admin", "gateway:read"}
+    known.update(permission for rule in ROUTE_CATALOG
+                 for permission in (rule.read_permission, rule.write_permission) if permission)
+    check = getattr(access, "has_permission", None)
+    permissions = _permissions(access) or frozenset()
+    return {permission: bool(check(permission) if callable(check) else _has(permissions, permission))
+            for permission in sorted(known)}
+
+
 def hidden_panels(access, policy=None) -> list:
     """Daily work navigation for members; complete navigation for administrators.
 
@@ -98,12 +111,18 @@ def hidden_panels(access, policy=None) -> list:
     backend endpoint continues to authorize the request independently.
     Unreadable policy state fails to the member surface with no feature grants.
     """
-    if navigation_audience(access, policy) == "admin":
+    capability_navigation = getattr(access, "access_mode", "") == "blacklist"
+    if not capability_navigation and navigation_audience(access, policy) == "admin":
         return []
     permissions = _permissions(access) or frozenset()
-    return sorted(panel for panel, permission in PANEL_PERMISSIONS.items()
+    panel_permissions = dict(PANEL_PERMISSIONS)
+    if capability_navigation:
+        # Kanban routes and the session-backed todo state both use session read.
+        # Keep the legacy daily-navigation presentation contract unchanged.
+        panel_permissions.update(kanban="sessions:read", todos="sessions:read")
+    return sorted(panel for panel, permission in panel_permissions.items()
                   if panel not in ESSENTIAL_PANELS
-                  and (panel not in MEMBER_PANELS or not
+                  and ((not capability_navigation and panel not in MEMBER_PANELS) or not
                        (access.has_permission(permission) if callable(getattr(access, "has_permission", None))
                         else _has(permissions, permission))))
 

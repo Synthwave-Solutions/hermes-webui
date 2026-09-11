@@ -43,7 +43,8 @@ def ensure_file_access(identity, path, *, write=False):
                       or grant_matches(access.grants.file_denied_globs, Path(target).name))
     exception = (grant_matches(access.grants.file_allow_globs, target)
                  or grant_matches(access.grants.file_allow_globs, Path(target).name))
-    if denied or (configured_deny and not exception):
+    if denied or (access.configuration_denies_file(target) if access.access_mode == "blacklist"
+                  else (configured_deny and not exception)):
         raise PermissionError("File access explicitly denied by governance")
     if access.access_mode or access.access_level:
         if not access.allows(dimension, target, path=True):

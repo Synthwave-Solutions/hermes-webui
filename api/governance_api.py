@@ -394,6 +394,8 @@ def _mutate_policy(handler, parsed, subject: GovernanceSubject, *, op: str, targ
 
 def _handle_me(handler, parsed, policy, subject, access) -> bool:
     """Self route: any authenticated caller. Never includes claims or tokens."""
+    from api.governance.nav import feature_permissions
+
     j(
         handler,
         {
@@ -405,6 +407,7 @@ def _handle_me(handler, parsed, policy, subject, access) -> bool:
             "roles": sorted(access.roles),
             "groups": sorted(access.groups),
             "permissions": sorted(access.permissions),
+            "feature_permissions": feature_permissions(access),
             "profiles": sorted(access.profiles),
             "access_level": access.access_level or "legacy",
             "access_mode": access.access_mode or "legacy",
@@ -878,7 +881,7 @@ def _may_read_skills(access) -> bool:
         return False
 
 
-def _approval_row(entry: dict, *, explain: bool = False, access=None) -> dict:
+def _approval_row(entry: dict, *, explain: bool = False, access=None, allow_model_advice=True) -> dict:
     """Serialize a registry entry for the approvals API.
 
     The four fields the skills UI already binds to (key, name, category,
@@ -941,7 +944,9 @@ def _approval_row(entry: dict, *, explain: bool = False, access=None) -> dict:
             try:
                 from api import approval_advice
 
-                row["advice"] = approval_advice.advise(entry, row.get("explanation"))
+                row["advice"] = approval_advice.advise(
+                    entry, row.get("explanation"), allow_model=allow_model_advice
+                )
             except Exception:
                 row["advice"] = {}
             if not isinstance(row.get("advice"), dict) or not row["advice"].get("recommendation"):
@@ -977,7 +982,7 @@ def _handle_approvals_get(handler, parsed, policy, subject, access) -> bool:
     grant_requests.ingest_spool()
     kinds = _approval_kinds_param(parsed)
     pending = [
-        _approval_row(entry, explain=True, access=access)
+        _approval_row(entry, explain=True, access=access, allow_model_advice=False)
         for entry in approvals.list_pending(kinds=kinds)
     ]
     j(handler, {"pending": pending})

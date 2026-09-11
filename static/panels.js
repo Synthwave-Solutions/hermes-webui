@@ -7898,11 +7898,14 @@ function _applyTabOrder(order){
 // presentation only, and it can never REVEAL a panel, only hide one.
 window._govHiddenNav = window._govHiddenNav || [];
 window._navAudience = 'member';
+window._capabilityNavigation = false;
 const _MEMBER_NAV_ORDER = ['profiles','projects','tasks','skills','integrations','approvals','memory'];
 function _canUseFeature(permission){
   const me=window.__GOV_ME__;
   if(!me)return false;
   if(me.method==='auth_disabled')return true;
+  if(me.feature_permissions&&Object.prototype.hasOwnProperty.call(me.feature_permissions,permission))
+    return me.feature_permissions[permission]===true;
   const permissions=Array.isArray(me.permissions)?me.permissions:[];
   return permissions.includes('*')||permissions.includes(permission)||permissions.includes(permission.split(':')[0]+':admin');
 }
@@ -7924,7 +7927,10 @@ function restoreAdvancedChatControls(){
 }
 function _applyNavigationAudience(me){
   window._navAudience=me&&me.nav_audience==='admin'?'admin':'member';
+  window._capabilityNavigation=!!(me&&me.access_mode==='blacklist');
   document.documentElement.dataset.navAudience=window._navAudience;
+  document.documentElement.dataset.governanceNavigation=window._capabilityNavigation?'capabilities':'daily';
+  _applyCapabilitySettingsVisibility();
   restoreAdvancedChatControls();
   if(window._navAudience==='member'){
     if(typeof _sessionSourceFilter!=='undefined'&&_sessionSourceFilter==='cli'&&typeof _setSessionSourceFilter==='function')_setSessionSourceFilter('webui');
@@ -7951,13 +7957,13 @@ function _applyTabVisibility(hidden){
   hidden=_sanitizeTabPanelList(hidden);
   const govHidden=Array.isArray(window._govHiddenNav)?window._govHiddenNav:[];
   if(govHidden.length) hidden=hidden.concat(govHidden.filter(p=>hidden.indexOf(p)===-1));
-  _applyTabOrder(window._navAudience==='member'?_MEMBER_NAV_ORDER:_getTabOrder());
+  _applyTabOrder(window._navAudience==='member'&&!window._capabilityNavigation?_MEMBER_NAV_ORDER:_getTabOrder());
   // Hide/unhide all [data-panel] elements (sidebar-nav buttons + rail buttons)
   document.querySelectorAll('[data-panel]').forEach(function(el){
     var panel=el.dataset.panel;
     if(!panel)return;
     var shouldHide=hidden.indexOf(panel)!==-1;
-    if(window._navAudience==='member'&&!['chat','settings',..._MEMBER_NAV_ORDER].includes(panel)) shouldHide=true;
+    if(window._navAudience==='member'&&!window._capabilityNavigation&&!['chat','settings',..._MEMBER_NAV_ORDER].includes(panel)) shouldHide=true;
     // Never hide always-visible panels (chat, settings) even if present in hidden_tabs
     if(_ALWAYS_VISIBLE_TABS.has(panel)) shouldHide=false;
     el.classList.toggle('nav-tab-hidden',shouldHide);
@@ -8265,7 +8271,22 @@ function _renderComposerSituationalControlChips(){
   });
 }
 
+const _CAPABILITY_SETTINGS_PERMISSIONS={providers:'config:read',plugins:'plugins:read',extensions:'plugins:read',system:'system:read'};
+function _capabilitySettingsSectionAllowed(name){
+  const permission=_CAPABILITY_SETTINGS_PERMISSIONS[name];
+  return !window._capabilityNavigation||!permission||_canUseFeature(permission);
+}
+function _applyCapabilitySettingsVisibility(){
+  for(const name of Object.keys(_CAPABILITY_SETTINGS_PERMISSIONS)){
+    const hidden=!_capabilitySettingsSectionAllowed(name);
+    document.querySelectorAll('[data-settings-section="'+name+'"]').forEach(item=>item.classList.toggle('nav-tab-hidden',hidden));
+    const option=document.querySelector('#settingsSectionDropdown option[value="'+name+'"]');
+    if(option)option.hidden=hidden;
+  }
+}
+
 function switchSettingsSection(name,opts){
+  if(!_capabilitySettingsSectionAllowed(name))name='conversation';
   // If the main content is not showing settings, just remember the section
   // without force-switching the panel. The section will be applied when the
   // user next opens settings via switchPanel(). (#appearance-auto-reopen)

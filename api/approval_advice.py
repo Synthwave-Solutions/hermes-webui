@@ -243,7 +243,7 @@ def _ask_model(entry: dict, explanation: dict) -> dict | None:
         return None
     try:
         response = call_llm(
-            task="approval_advice",
+            task="approval",
             messages=[
                 {"role": "system", "content": _SYSTEM_PROMPT},
                 {"role": "user", "content": _prompt_payload(entry, explanation)},
@@ -268,7 +268,7 @@ def _ask_model(entry: dict, explanation: dict) -> dict | None:
     return _parse_model_reply(content)
 
 
-def advise(entry, explanation=None) -> dict:
+def advise(entry, explanation=None, *, allow_model=True) -> dict:
     """Return the advice block for one approvals row. Never raises.
 
     Always returns a usable block: from the model when it answers, from the
@@ -283,6 +283,16 @@ def advise(entry, explanation=None) -> dict:
         cached = _cache_get(key)
         if cached is not None:
             return cached
+        if not allow_model:
+            # Listing requests must not wait for one provider call per row.
+            # Do not cache this fallback: an explicit detail request may still
+            # obtain model advice later. Advice never decides the request.
+            result = _rules_advice(
+                entry, explanation,
+                "Written from the platform's risk catalogue; loading the queue does not wait for AI advice.",
+            )
+            result["requester_ask"] = _requester_ask(entry)
+            return result
         result = None
         if advice_enabled():
             result = _ask_model(entry, explanation)

@@ -7774,18 +7774,18 @@ html[data-nav-audience="member"] [data-dashboard-link]{display:none!important;}
   #mainApprovals .main-view-title{white-space:normal;font-size:16px;}
 }
 
-html[data-nav-audience="member"] [data-panel="kanban"],
-html[data-nav-audience="member"] [data-panel="workspaces"],
-html[data-nav-audience="member"] [data-panel="files"],
-html[data-nav-audience="member"] [data-panel="todos"],
-html[data-nav-audience="member"] [data-panel="insights"],
-html[data-nav-audience="member"] [data-panel="logs"],
-html[data-nav-audience="member"] [data-panel="governance"]{display:none!important;}
+html[data-nav-audience="member"]:not([data-governance-navigation="capabilities"]) [data-panel="kanban"],
+html[data-nav-audience="member"]:not([data-governance-navigation="capabilities"]) [data-panel="workspaces"],
+html[data-nav-audience="member"]:not([data-governance-navigation="capabilities"]) [data-panel="files"],
+html[data-nav-audience="member"]:not([data-governance-navigation="capabilities"]) [data-panel="todos"],
+html[data-nav-audience="member"]:not([data-governance-navigation="capabilities"]) [data-panel="insights"],
+html[data-nav-audience="member"]:not([data-governance-navigation="capabilities"]) [data-panel="logs"],
+html[data-nav-audience="member"]:not([data-governance-navigation="capabilities"]) [data-panel="governance"]{display:none!important;}
 
-html[data-nav-audience="member"] .settings-menu-items [data-settings-section="providers"],
-html[data-nav-audience="member"] .settings-menu-items [data-settings-section="plugins"],
-html[data-nav-audience="member"] .settings-menu-items [data-settings-section="extensions"],
-html[data-nav-audience="member"] .settings-menu-items [data-settings-section="system"]{display:none;}
+html[data-nav-audience="member"]:not([data-governance-navigation="capabilities"]) .settings-menu-items [data-settings-section="providers"],
+html[data-nav-audience="member"]:not([data-governance-navigation="capabilities"]) .settings-menu-items [data-settings-section="plugins"],
+html[data-nav-audience="member"]:not([data-governance-navigation="capabilities"]) .settings-menu-items [data-settings-section="extensions"],
+html[data-nav-audience="member"]:not([data-governance-navigation="capabilities"]) .settings-menu-items [data-settings-section="system"]{display:none;}
 
 @media(max-width:640px){
 html[data-nav-audience="member"] .sidebar-nav{width:76px;}
