@@ -13835,6 +13835,11 @@ function _rehydrateTransparentLiveRow(existing, node, preservedState){
   if(node && Object.prototype.hasOwnProperty.call(node, '_tcData')) existing._tcData = node._tcData;
   else if(Object.prototype.hasOwnProperty.call(existing, '_tcData')) delete existing._tcData;
   try{ delete node._tcData; }catch(_){}
+  // Deferred detail is another render snapshot: transfer it before an open
+  // card materializes, or an earlier pending snapshot can hide completed output.
+  if(node && Object.prototype.hasOwnProperty.call(node, '_deferredToolCall')) existing._deferredToolCall = node._deferredToolCall;
+  else if(Object.prototype.hasOwnProperty.call(existing, '_deferredToolCall')) delete existing._deferredToolCall;
+  try{ delete node._deferredToolCall; }catch(_){}
   const header = existing.querySelector ? existing.querySelector('.tool-card-header,.thinking-card-header') : null;
   if(header){
     if(typeof _wireTransparentHeaderToggle === 'function') _wireTransparentHeaderToggle(header);
