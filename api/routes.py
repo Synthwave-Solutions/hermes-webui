@@ -2661,17 +2661,18 @@ def _build_session_list_cache_payload(
     # 'all' (admins/identity-less/isolation-off) keeps every row; any other
     # scope keeps only rows stamped with that owner email. Unowned rows
     # (legacy chats, cron/CLI imports) are admin-only by construction.
+    from api.project_collaboration import session_access_checker, visible_with_project_access
+    _project_row_access = session_access_checker(owner_scope)
     if owner_scope is not None and str(owner_scope) != "all":
         diag_stage("ownership_scope")
         normalized_owner_scope = str(owner_scope).strip().lower()
         # Group conversations (29 Aug 2026): a row is also kept when this
         # person was named in it. Ownership itself is unchanged, so a chat
         # nobody was named in behaves exactly as before.
-        from api.project_collaboration import session_visible as _project_row_visible
         merged = [
             s for s in merged
             if isinstance(s, dict)
-            and _project_row_visible(s, normalized_owner_scope)
+            and visible_with_project_access(s, normalized_owner_scope, _project_row_access(s))
         ]
     # ── Profile scoping (#1611) ────────────────────────────────────────
     # Default: filter to the active profile. ?all_profiles=1 opts into
@@ -2693,10 +2694,9 @@ def _build_session_list_cache_payload(
         other_profile_count = 0
     else:
         from api.group_chat import shared_profile_visible
-        from api.project_collaboration import session_access as _project_row_access
         scoped = [s for s in merged if _profiles_match(s.get("profile"), active_profile)
                   or (not _is_isolated_profile_mode() and owner_scope not in (None, 'all')
-                      and (shared_profile_visible(s, owner_scope) or _project_row_access(s, owner_scope) is True))]
+                      and (shared_profile_visible(s, owner_scope) or _project_row_access(s) is True))]
         other_profile_count = 0 if _is_isolated_profile_mode() else len(merged) - len(scoped)
     diag_stage("messaging_dedupe")
     archived_scoped = _keep_latest_messaging_session_per_source(
@@ -12960,14 +12960,18 @@ def handle_get(handler, parsed) -> bool:
                 diag=diag,
             )
             diag.stage("response_write")
-            from api.project_collaboration import session_access as _cached_project_access
+            from api.project_collaboration import session_access_checker
             from api.governance.enforce import _request_identity as _cached_project_actor
-            _safe_project_response = _session_list_payload_to_response(payload)
+            # Recheck current membership on the internal rows: the public row
+            # allowlist omits project_shared and cannot authorize shared chats.
+            # This fresh request-local snapshot is never stored in the cache.
+            _cached_project_access = session_access_checker(_cached_project_actor(handler))
+            _safe_project_payload = dict(payload)
             for _project_rows_key in ('sessions', 'sidebar_reference_sessions'):
-                if _project_rows_key in _safe_project_response:
-                    _safe_project_response[_project_rows_key] = [row for row in _safe_project_response[_project_rows_key]
-                        if _cached_project_access(row, _cached_project_actor(handler)) is not False]
-            return j(handler, _safe_project_response, pretty=False)
+                if _project_rows_key in _safe_project_payload:
+                    _safe_project_payload[_project_rows_key] = [row for row in _safe_project_payload[_project_rows_key]
+                        if _cached_project_access(row) is not False]
+            return j(handler, _session_list_payload_to_response(_safe_project_payload), pretty=False)
         finally:
             diag.finish()
 

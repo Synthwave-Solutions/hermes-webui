@@ -53,15 +53,47 @@ def member(project, email):
 
 def session_access(session, email):
     """None for legacy personal chats; bool for authoritative project scope."""
+    if not _value(session, 'project_shared', False):
+        return None
     pid = _value(session, 'project_id')
     project = project_for(pid) if pid else None
-    if _value(session, 'project_shared', False):
-        return member(project, email)
-    return None
+    return member(project, email)
+
+
+def session_access_checker(email):
+    """One lazy project snapshot for one synchronous list projection.
+
+    The caller owns this closure; never retain it in a response/cache or reuse
+    it across requests. A cached sidebar response must create a fresh checker
+    after retrieving its rows, independently of the cache builder's snapshot.
+    Personal project organization does not require any project-store I/O.
+    """
+    projects = None
+
+    def check(session):
+        nonlocal projects
+        if not _value(session, 'project_shared', False):
+            return None
+        pid = _value(session, 'project_id')
+        if not pid:
+            return False
+        if projects is None:
+            from api.models import load_projects
+            projects = {}
+            for project in load_projects(_migrate=False):
+                # Match project_for's first-row selection on duplicate IDs.
+                projects.setdefault(project.get('project_id'), project)
+        return member(projects.get(pid), email)
+
+    return check
 
 
 def session_visible(session, scope):
-    access = session_access(session, scope)
+    return visible_with_project_access(session, scope, session_access(session, scope))
+
+
+def visible_with_project_access(session, scope, access):
+    """Apply unchanged personal/group visibility after an internal scope check."""
     if access is not None:
         # Shared project membership is explicit, including administrators.
         return access
