@@ -16612,6 +16612,7 @@ function _scheduleSessionProgress() {
 }
 
 function renderMessages(options){
+  if(window.SynthPulseSkillActivity) window.SynthPulseSkillActivity.sync(true);
   if(typeof _renderWorkspaceSendRecovery==='function') _renderWorkspaceSendRecovery();
   if(typeof refreshChatBots==='function') refreshChatBots();
   _scheduleSessionProgress();

@@ -6956,6 +6956,7 @@ def _run_agent_streaming(
     _streaming_cron_profile_home_token = None
     _personal_memory_token = None
     _profile_home_context = None
+    _skill_learning_context = None
     _worker_ownership_token = None
     def _drain_after_worker_retirement():
         # Worker finally may precede a leased cancellation callback. Wakeups
@@ -7134,6 +7135,11 @@ def _run_agent_streaming(
             _home_scope = agent_profile_home_context(_profile_home_path)
             _home_scope.__enter__()
             _profile_home_context = _home_scope
+            from api.skill_learning_activity import turn_scope as _skill_learning_scope
+            _learning_scope = _skill_learning_scope(
+                sender_email, stream_id, _profile_home, session_id)
+            _learning_scope.__enter__()
+            _skill_learning_context = _learning_scope
             _streaming_cron_profile_home_token = _STREAMING_CRON_PROFILE_HOME.set(_profile_home)
             _profile_runtime_env = get_profile_runtime_env(_profile_home_path)
             _safe_profile_runtime_env = filter_runtime_env_for_gateway_parity(_profile_runtime_env)
@@ -10200,8 +10206,12 @@ def _run_agent_streaming(
         finally:
             from api.worker_ownership import release as release_worker
             try:
-                if _profile_home_context is not None:
-                    _profile_home_context.__exit__(None, None, None)
+                try:
+                    if _skill_learning_context is not None:
+                        _skill_learning_context.__exit__(None, None, None)
+                finally:
+                    if _profile_home_context is not None:
+                        _profile_home_context.__exit__(None, None, None)
             finally:
                 release_worker(_worker_ownership_token)
 

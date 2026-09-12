@@ -1,0 +1,3 @@
+.skill-learning-notice{align-self:stretch;margin:10px 0;padding:10px 14px;border:1px solid var(--border,#344155);border-radius:10px;background:var(--surface,#152030);color:var(--text,#e7edf7);font-size:13px;line-height:1.5;overflow-wrap:anywhere}
+.skill-learning-notice small{display:block;color:var(--muted,#a4b2c6);font-size:11px;margin-top:3px}
+.skill-learning-notice button{margin-left:10px;font-size:12px}

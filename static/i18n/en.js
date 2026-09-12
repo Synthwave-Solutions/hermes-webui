@@ -1,5 +1,10 @@
 // Locale bundle; loaded on demand by static/i18n.js.
 window.__registerHermesLocale('en', {
+  skill_learning_created: 'Skill automatically created',
+  skill_learning_patched: 'Skill automatically patched',
+  skill_learning_updated: 'Skill automatically updated',
+  skill_learning_private: 'Automatic · Visible only to you',
+  skill_learning_unavailable: 'Skill update notices are unavailable.',
   project_chat_conflict: 'The previous creation request changed or was deleted. Review the project, then click New conversation again to start a separate conversation.',
   project_chat_reload: 'Reload the project before creating a conversation.',
   project_chat_no_bot: 'No project bot is available to your account. Ask the project owner to assign an available bot.',

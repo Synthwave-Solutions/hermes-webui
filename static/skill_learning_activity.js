@@ -1,0 +1,124 @@
+// Personal background-learning notices: separate from shared/model messages.
+(function () {
+  'use strict';
+  let session = '', rows = [], failed = false, timer = null, controller = null;
+  let generation = 0, lastFetch = 0, pending = false;
+  let renderedSession = '';
+  const interval = 10000;
+  const tr = (key, fallback) => {
+    const value = typeof t === 'function' ? t(key) : '';
+    return value && value !== key ? value : fallback;
+  };
+  function current() {
+    if (document.hidden || typeof S === 'undefined' || !S.session) return '';
+    if (typeof _currentPanel !== 'undefined' && !['chat', 'sessions'].includes(_currentPanel)) return '';
+    if (typeof _loadingSessionId !== 'undefined' && _loadingSessionId &&
+        (_loadingSessionId !== S.session.session_id || !S.messages?.length)) return '';
+    if (renderedSession !== S.session.session_id) return '';
+    return String(S.session.session_id || '');
+  }
+  function clear() {
+    document.querySelectorAll('[data-skill-learning-notice]').forEach(node => node.remove());
+  }
+  function insertByTime(host, card, timestamp) {
+    for (const marker of host.querySelectorAll('[data-msg-idx]')) {
+      const message = S.messages?.[Number(marker.dataset.msgIdx)];
+      const value = message?.timestamp || message?.created_at;
+      const seconds = typeof value === 'number' ? value : Date.parse(value || '') / 1000;
+      if (!Number.isFinite(seconds) || seconds <= timestamp) continue;
+      let row = marker;
+      while (row.parentElement && row.parentElement !== host) row = row.parentElement;
+      if (row.parentElement === host) { host.insertBefore(card, row); return; }
+    }
+    host.append(card);
+  }
+  function draw() {
+    clear();
+    const host = document.getElementById('msgInner');
+    if (!host || current() !== session || !session) return;
+    for (const row of rows.slice().reverse()) {
+      const card = document.createElement('div');
+      card.dataset.skillLearningNotice = row.id;
+      card.className = 'skill-learning-notice';
+      const copy = document.createElement('div');
+      const labels = [
+        ['created', tr('skill_learning_created', 'Skill automatically created')],
+        ['patched', tr('skill_learning_patched', 'Skill automatically patched')],
+        ['updated', tr('skill_learning_updated', 'Skill automatically updated')],
+      ];
+      copy.textContent = labels.filter(([key]) => row.counts[key] > 0)
+        .map(([key, label]) => label + (row.counts[key] > 1 ? ' × ' + row.counts[key] : '')).join(' · ');
+      const meta = document.createElement('small');
+      const time = document.createElement('time');
+      const date = new Date(row.created_at * 1000);
+      time.dateTime = date.toISOString();
+      time.textContent = date.toLocaleString();
+      meta.append(document.createTextNode(tr('skill_learning_private', 'Automatic · Visible only to you') + ' · '), time);
+      card.append(copy, meta);
+      insertByTime(host, card, row.created_at);
+    }
+    if (failed) {
+      const card = document.createElement('div');
+      card.dataset.skillLearningNotice = 'unavailable';
+      card.className = 'skill-learning-notice';
+      card.append(document.createTextNode(tr('skill_learning_unavailable', 'Skill update notices are unavailable.')));
+      const retry = document.createElement('button');
+      retry.type = 'button'; retry.className = 'btn secondary';
+      retry.textContent = tr('retry', 'Retry');
+      retry.addEventListener('click', () => refresh(true));
+      card.append(retry); host.append(card);
+    }
+  }
+  function valid(row) {
+    return row && /^[a-f0-9]{64}$/.test(row.id) && Number.isSafeInteger(row.created_at)
+      && row.created_at >= 0 && row.created_at < 8640000000000
+      && row.counts && ['created', 'patched', 'updated'].every(key =>
+        Number.isSafeInteger(row.counts[key]) && row.counts[key] >= 0 && row.counts[key] <= 10000)
+      && Object.values(row.counts).some(value => value > 0);
+  }
+  function schedule() {
+    clearTimeout(timer); timer = null;
+    if (current()) timer = setTimeout(() => { timer = null; sync(); }, interval);
+  }
+  async function refresh(force = false) {
+    const sid = current();
+    if (!sid || sid !== session || pending || (!force && Date.now() - lastFetch < interval)) return;
+    const stamp = generation;
+    pending = true; lastFetch = Date.now(); controller = new AbortController();
+    try {
+      const data = await api('/api/skills/learning-activity?session_id=' + encodeURIComponent(sid), {
+        signal: controller.signal, cache: 'no-store', timeoutMs: 5000,
+        timeoutToast: false, retries: 0, redirect401: false,
+      });
+      if (stamp !== generation || current() !== sid) return;
+      if (!data || !Array.isArray(data.events) || data.events.length > 100 || !data.events.every(valid)) throw new Error('Invalid activity');
+      rows = data.events; failed = false;
+    } catch (_) {
+      if (stamp !== generation || current() !== sid) return;
+      rows = []; failed = true;
+    } finally {
+      if (stamp === generation) {
+        pending = false; controller = null; draw(); schedule();
+      }
+    }
+  }
+  function sync(rendered = false) {
+    if (rendered === true) renderedSession = String(S.session?.session_id || '');
+    const sid = current();
+    if (sid !== session) {
+      generation++; controller?.abort(); controller = null; pending = false;
+      session = sid; rows = []; failed = false; lastFetch = 0; clear();
+    }
+    // renderMessages can rebuild the DOM synchronously after this hook.
+    queueMicrotask(draw);
+    if (sid) void refresh();
+    schedule();
+  }
+  function invalidate() { renderedSession = ''; sync(); }
+  window.SynthPulseSkillActivity = {sync, invalidate};
+  document.addEventListener('visibilitychange', sync);
+  window.addEventListener('pagehide', () => {
+    generation++; controller?.abort(); clearTimeout(timer); session = ''; rows = []; clear();
+  });
+  window.addEventListener('pageshow', sync);
+})();

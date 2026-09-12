@@ -1,0 +1,19 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SynthPulse automatic skill chat fixture</title>
+<link rel="stylesheet" href="/static/skill_learning_activity.css">
+<style>body{margin:0;background:#0b1322;color:#e7edf7;font:15px system-ui}main{max-width:850px;margin:30px auto;padding:16px}nav{display:flex;gap:8px;flex-wrap:wrap}button{padding:9px;background:#233956;color:inherit;border:1px solid #56718d;border-radius:7px;cursor:pointer}.message{padding:20px;margin:14px 0;background:#15243b;border-radius:12px}#msgInner{margin-top:20px}small{color:#a4b2c6}</style>
+<main><h1>SynthPulse</h1><p>Isolated chat fixture · no provider calls or user data.</p>
+<nav><button onclick="choose('chat-a')">Conversation A</button><button onclick="choose('chat-b')">Conversation B</button><button onclick="failOnce()">Simulate temporary error</button><button onclick="delayedSwitch()">Delayed A response → B</button><button onclick="loadingSwitch()">Delayed A → loading B</button><button onclick="rerender()">Rebuild chat</button></nav>
+<p id="current">Conversation A</p><div id="msgInner"></div><small id="fixture-status"></small></main>
+<script>
+const S={session:{session_id:'chat-a'},messages:[]};let _currentPanel='chat', _loadingSessionId=null, fail=false, delay=false;
+const eventTime=Math.floor(Date.now()/1000)-60;
+const counts={created:1,patched:2,updated:0};
+const payload={events:[{id:'a'.repeat(64),created_at:eventTime,counts}],coverage:'observed_changes_only'};
+async function api(url,opts){const requested=new URL(url,location.href).searchParams.get('session_id');document.getElementById('fixture-status').textContent='Fetched '+requested;if(delay){delay=false;await new Promise(r=>setTimeout(r,1500));}if(fail){fail=false;throw new Error('Synthetic temporary failure');}return requested==='chat-a'?JSON.parse(JSON.stringify(payload)):{events:[]};}
+function rerender(){S.messages=[{role:'user',timestamp:eventTime-120,content:'Improve this workflow.'},{role:'assistant',timestamp:eventTime-100,content:'The requested task is completed.'},{role:'user',timestamp:eventTime+30,content:'Continue with the next task.'}];document.getElementById('msgInner').innerHTML=S.messages.map((m,i)=>'<div class="message" data-msg-idx="'+i+'">'+m.content+'</div>').join('');window.SynthPulseSkillActivity?.sync(true);}
+function choose(sid){_loadingSessionId=null;S.session={session_id:sid};document.getElementById('current').textContent=sid==='chat-a'?'Conversation A':'Conversation B';rerender();}
+function failOnce(){choose('chat-b');fail=true;choose('chat-a');}
+function delayedSwitch(){choose('chat-b');delay=true;choose('chat-a');choose('chat-b');}
+function loadingSwitch(){choose('chat-b');delay=true;choose('chat-a');_loadingSessionId='chat-b';window.SynthPulseSkillActivity.invalidate();S.messages=[];document.getElementById('msgInner').textContent='Loading conversation B…';setTimeout(()=>{_loadingSessionId=null;document.getElementById('msgInner').textContent='Conversation B could not load.';},2000);}
+</script><script src="/static/skill_learning_activity.js"></script><script>rerender();</script></html>

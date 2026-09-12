@@ -194,6 +194,9 @@ ROUTE_CATALOG: tuple[RouteRule, ...] = (
     RouteRule("/api/client-events/log",   "status:read", "status:read", match="exact"),
 
     # skills, mcp, plugins, extensions
+    # The read-only activity handler returns this actor's counts for one
+    # currently accessible conversation, never the skill catalogue or content.
+    RouteRule("/api/skills/learning-activity", "chat:use", "skills:write", match="exact"),
     RouteRule("/api/skills",              "skills:read", "skills:write"),
     RouteRule("/api/mcp",                 "mcp:read", "mcp:write"),
     RouteRule("/api/plugins",             "plugins:read", match="exact"),
