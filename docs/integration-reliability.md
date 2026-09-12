@@ -18,6 +18,12 @@ without invoking a model. Delivery is confirmed only for an explicit boolean
 `success: true`; malformed responses and transport failures stay failures.
 The administrator must configure a destination and its platform credentials.
 The in-app alert and the external delivery are separate outcomes.
+An in-app alert counts only after its store write succeeds. If both storage
+and external delivery fail, chat does not claim an administrator was notified.
+The incident result exposes `recorded` and `dispatched` separately while
+preserving `notified` for existing callers. Repeats within the cooldown do not
+claim a new notification. Acknowledging an alert reports success only after the
+acknowledgement is saved, so a failed write leaves it available for retry.
 
 Verification:
 

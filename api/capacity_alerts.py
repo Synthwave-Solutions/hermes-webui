@@ -77,7 +77,8 @@ def _load() -> dict:
     return {"events": []}
 
 
-def _save(data: dict) -> None:
+def _save(data: dict) -> bool:
+    """Return True only after the updated alert store has been replaced."""
     try:
         events = data.get("events") or []
         data["events"] = events[-_MAX_EVENTS:]
@@ -86,8 +87,10 @@ def _save(data: dict) -> None:
         tmp = path.with_suffix(".tmp")
         tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
         tmp.replace(path)
+        return True
     except OSError:
         logger.warning("capacity alert store write failed", exc_info=True)
+        return False
 
 
 def effective_config() -> dict:
@@ -185,15 +188,20 @@ def user_facing_message(kind, notified: bool = False) -> str:
 def record_capacity_event(kind, provider=None, model=None, detail="", source="") -> dict:
     """Record one capacity incident and report whether an admin was alerted.
 
-    Returns ``{"notified": bool, "deduplicated": bool, "event_id": str}``.
+    Returns the compatible ``notified``, ``deduplicated`` and ``event_id``
+    fields, plus separate ``recorded`` and ``dispatched`` outcomes.
     ``notified`` is True when this call produced an alert an administrator can
     see (a fresh event, or an external dispatch that succeeded), and False when
-    the event was folded into a still-warm alert or could not be stored: the
+    the event was folded into a still-warm alert or neither channel succeeded: the
     caller must not tell the user an admin was notified in that case, because
     an alert already standing is not a new notification for this incident.
+    ``recorded`` means this call persisted the event or repeat count;
+    ``dispatched`` means the external transport confirmed delivery. A repeat
+    may be deduplicated even when its counter update could not be stored.
     Never raises; capacity handling must not add a second failure.
     """
-    result = {"notified": False, "deduplicated": False, "event_id": ""}
+    result = {"notified": False, "deduplicated": False, "event_id": "",
+              "recorded": False, "dispatched": False}
     try:
         if not is_capacity_kind(kind):
             return result
@@ -215,7 +223,7 @@ def record_capacity_event(kind, provider=None, model=None, detail="", source="")
                 existing["last_ts"] = now
                 if detail:
                     existing["detail"] = str(detail)[:500]
-                _save(data)
+                result["recorded"] = _save(data)
                 result["deduplicated"] = True
                 result["notified"] = False
                 result["event_id"] = str(existing.get("id") or "")
@@ -235,25 +243,27 @@ def record_capacity_event(kind, provider=None, model=None, detail="", source="")
                 "last_ts": now,
                 "count": 1,
                 "acknowledged": False,
+                "dispatched": False,
             }
             events.append(event)
             data["events"] = events
-            _save(data)
-        # The in-app admin list IS a delivered notification: it is the screen
-        # admins already watch for approvals. An additional external dispatch
-        # is best effort and never downgrades that.
+            result["recorded"] = _save(data)
+        result["notified"] = result["recorded"]
+        result["event_id"] = event_id
+        # A successfully stored in-app alert counts as a notification.
+        # The independent external dispatch can still succeed if storage fails.
         dispatched, dispatch_error = _dispatch_external(event)
-        if dispatch_error:
+        result["dispatched"] = bool(dispatched)
+        result["notified"] = result["recorded"] or result["dispatched"]
+        if dispatched or dispatch_error:
             with _LOCK:
                 data = _load()
                 for stored in data.get("events") or []:
                     if isinstance(stored, dict) and stored.get("id") == event_id:
                         stored["dispatch_error"] = str(dispatch_error)[:300]
                         stored["dispatched"] = bool(dispatched)
+                        _save(data)
                         break
-                _save(data)
-        result["notified"] = True
-        result["event_id"] = event_id
         return result
     except Exception:
         logger.warning("capacity alert record failed", exc_info=True)
@@ -324,8 +334,7 @@ def acknowledge(event_id) -> bool:
                     return False
                 event["acknowledged"] = True
                 event["acknowledged_ts"] = time.time()
-                _save(data)
-                return True
+                return _save(data)
     return False
 
 

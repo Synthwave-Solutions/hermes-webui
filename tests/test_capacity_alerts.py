@@ -30,6 +30,7 @@ def ca(tmp_path, monkeypatch):
     import api.capacity_alerts as module
 
     monkeypatch.setattr(module, "effective_config", lambda: dict(module.DEFAULT_CONFIG))
+    monkeypatch.setattr(module, "_dispatch_external", lambda event: (False, ""))
     return module
 
 
@@ -105,6 +106,136 @@ def test_acknowledge_is_idempotent_and_filters(ca):
     assert ca.acknowledge(event_id) is False, "already acknowledged is not a change"
     assert ca.list_events(include_acknowledged=False) == []
     assert len(ca.list_events(include_acknowledged=True)) == 1
+
+
+@pytest.mark.parametrize("failure", ["mkdir", "write_text", "replace"])
+@pytest.mark.parametrize("dispatch_error", ["", "synthetic transport failure"])
+def test_failed_storage_and_no_delivery_never_claim_notification(
+    ca, monkeypatch, failure, dispatch_error
+):
+    def fail_write(*args, **kwargs):
+        raise OSError("synthetic storage failure")
+
+    monkeypatch.setattr(pathlib.Path, failure, fail_write)
+    monkeypatch.setattr(ca, "_dispatch_external", lambda event: (False, dispatch_error))
+    outcome = ca.record_capacity_event("quota_exhausted", provider="fixture")
+
+    assert outcome["notified"] is False
+    assert outcome["recorded"] is False
+    assert outcome["dispatched"] is False
+    assert ca.list_events() == []
+    assert "administrator has been notified" not in ca.user_facing_message(
+        "quota_exhausted", notified=outcome["notified"]
+    )
+
+
+def test_external_delivery_can_confirm_notification_when_storage_fails(ca, monkeypatch):
+    def fail_replace(*args, **kwargs):
+        raise OSError("synthetic storage failure")
+
+    monkeypatch.setattr(pathlib.Path, "replace", fail_replace)
+    monkeypatch.setattr(ca, "_dispatch_external", lambda event: (True, ""))
+    outcome = ca.record_capacity_event("quota_exhausted", provider="fixture")
+
+    assert outcome["notified"] is True
+    assert outcome["recorded"] is False
+    assert outcome["dispatched"] is True
+    assert ca.list_events() == []
+
+
+def test_in_app_record_survives_external_delivery_failure(ca, monkeypatch):
+    monkeypatch.setattr(ca, "_dispatch_external", lambda event: (False, "synthetic failure"))
+    outcome = ca.record_capacity_event("quota_exhausted", provider="fixture")
+
+    assert outcome["notified"] is True
+    assert outcome["recorded"] is True
+    assert outcome["dispatched"] is False
+    event = ca.list_events()[0]
+    assert event["dispatch_error"] == "synthetic failure"
+    assert event["dispatched"] is False
+
+
+def test_successful_external_delivery_is_recorded_separately(ca, monkeypatch):
+    monkeypatch.setattr(ca, "_dispatch_external", lambda event: (True, ""))
+    outcome = ca.record_capacity_event("quota_exhausted", provider="fixture")
+
+    assert outcome["recorded"] is True
+    assert outcome["dispatched"] is True
+    assert ca.list_events()[0]["dispatched"] is True
+
+
+def test_acknowledge_reports_failed_persistence_and_preserves_row(ca, monkeypatch):
+    outcome = ca.record_capacity_event("quota_exhausted", provider="fixture")
+    before = ca.list_events()
+
+    def fail_replace(*args, **kwargs):
+        raise OSError("synthetic storage failure")
+
+    monkeypatch.setattr(pathlib.Path, "replace", fail_replace)
+    assert ca.acknowledge(outcome["event_id"]) is False
+    assert ca.list_events() == before
+
+
+def test_failed_deduplication_write_does_not_claim_new_notification(ca, monkeypatch):
+    ca.record_capacity_event("quota_exhausted", provider="fixture")
+
+    def fail_replace(*args, **kwargs):
+        raise OSError("synthetic storage failure")
+
+    monkeypatch.setattr(pathlib.Path, "replace", fail_replace)
+    outcome = ca.record_capacity_event("quota_exhausted", provider="fixture")
+
+    assert outcome["notified"] is False
+    assert outcome["recorded"] is False
+    assert outcome["deduplicated"] is True
+    assert ca.list_events()[0]["count"] == 1
+
+
+@pytest.mark.parametrize("surface", ["chat", "scheduled"])
+def test_capacity_callers_omit_notification_claim_after_storage_failure(ca, monkeypatch, surface):
+    def fail_replace(*args, **kwargs):
+        raise OSError("synthetic storage failure")
+
+    monkeypatch.setattr(pathlib.Path, "replace", fail_replace)
+    if surface == "chat":
+        from api.streaming import _classify_provider_error, _report_capacity_incident
+
+        classification = _classify_provider_error("429 rate limit exceeded")
+        result = _report_capacity_incident(classification, provider="fixture")
+        assert result["admin_notified"] is False
+        text = result["hint"]
+    else:
+        from api.cron_webui_delivery import build_update_text
+
+        text = build_update_text(
+            {"id": "fixture", "name": "Fixture task"}, body=None,
+            run_ok=False, run_error="429 rate limit exceeded",
+        )
+
+    assert "administrator has been notified" not in text
+    assert "429" not in text
+    assert "try again" in text.lower()
+
+
+def test_dispatch_metadata_failure_does_not_erase_confirmed_outcomes(ca, monkeypatch):
+    original_replace = pathlib.Path.replace
+    calls = 0
+
+    def fail_second_replace(path, target):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise OSError("synthetic metadata failure")
+        return original_replace(path, target)
+
+    monkeypatch.setattr(pathlib.Path, "replace", fail_second_replace)
+    monkeypatch.setattr(ca, "_dispatch_external", lambda event: (True, ""))
+    outcome = ca.record_capacity_event("quota_exhausted", provider="fixture")
+
+    assert outcome["notified"] is True
+    assert outcome["recorded"] is True
+    assert outcome["dispatched"] is True
+    assert len(ca.list_events()) == 1
 
 
 def test_alert_route_is_admin_gated():
