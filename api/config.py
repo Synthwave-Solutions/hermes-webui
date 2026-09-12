@@ -3013,6 +3013,12 @@ def model_with_provider_context(model_id: str, model_provider: str | None = None
     if isinstance(providers_cfg, dict) and provider in providers_cfg:
         return f"@{provider}:{model}"
 
+    # Named gateways declared in custom_providers carry the same explicit
+    # route choice as providers entries. Keep their hint even for slash IDs;
+    # otherwise the native default can receive the gateway's namespaced model.
+    if provider in _named_custom_provider_slugs():
+        return f"@{provider}:{model}"
+
     # For non-OpenRouter slash IDs without an explicit configured provider,
     # keep the ID intact so existing custom/proxy base_url routing and
     # portal-provider handling remain in charge.
