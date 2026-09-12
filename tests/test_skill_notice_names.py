@@ -15,7 +15,10 @@ def test_native_review_keeps_confirmed_names_actions_and_original_chat(activity,
     from agent import background_review as native
     activity.install_adapter()
     def review(*args, **kwargs):
-        native.summarize_background_review_actions(messages('create') + messages('patch', call_id='patch')
+        patch=messages('patch', call_id='patch')
+        args=json.loads(patch[0]['tool_calls'][0]['function']['arguments']);args['name']='category/PRIVATE-SKILL'
+        patch[0]['tool_calls'][0]['function']['arguments']=json.dumps(args)
+        native.summarize_background_review_actions(messages('create') + patch
           + messages('patch', call_id='failed', success=False), [], notification_mode='off')
     monkeypatch.setattr(native, '_run_review_in_thread', review)
     with activity.turn_scope('a@example.test', 'run-a', 'profile-a', 'chat-a'):
@@ -47,7 +50,7 @@ def test_session_notice_alias_keeps_exact_chat_permission(method):
     assert route_permission('/api/session/skill-updates', method) == 'chat:use'
 
 @pytest.mark.parametrize('name,expected', [
-    ('category/build-workflow','build-workflow'), ('/private/key',''),
+    ('category/build-workflow',''), ('/private/key',''),
     ('../secret',''), ('<script>alert(1)</script>',''), ('notes\nprivate',''), ('a'*65,''),
 ])
 def test_display_metadata_never_exposes_paths_or_arbitrary_content(activity, name, expected):
@@ -59,11 +62,11 @@ def test_display_metadata_never_exposes_paths_or_arbitrary_content(activity, nam
 
 
 def test_atomic_batch_keeps_default_name_and_ignores_unconfirmed_results(activity):
-    operations=[{'action':'patch','old_string':'a','new_string':'b'}, {'action':'create','name':'second'}]
+    operations=[{'action':'create'}, {'action':'create','name':'second'}]
     rows=messages(); rows[0]['tool_calls'][0]['function']['arguments']=json.dumps({'action':'batch','name':'first','operations':operations})
-    result={'success':True,'operations_applied':2,'results':[{'action':'patch','name':'first','success':True},{'action':'create','name':'second','success':True}]}
+    result={'success':True,'operations_applied':2,'results':[{'action':'create','name':'first','success':True},{'action':'create','name':'second','success':True}]}
     rows[1]['content']=json.dumps(result)
-    assert activity.successful_skill_changes(rows,[])[1]==[{'name':'first','resource':'first','kind':'patched','count':1},{'name':'second','resource':'second','kind':'created','count':1}]
+    assert activity.successful_skill_changes(rows,[])[1]==[{'name':'first','resource':'first','kind':'created','count':1},{'name':'second','resource':'second','kind':'created','count':1}]
     result['results'][1]['staged']=True;rows[1]['content']=json.dumps(result)
     assert activity.successful_skill_changes(rows,[])[1]==[]
 
@@ -179,3 +182,85 @@ def test_policy_failure_returns_unavailable_without_stored_names(activity,monkey
     monkeypatch.setattr(resource_scope,'access_for',fail)
     status,data=activity.handle_get(None,'session_id=chat-a')
     assert status==503 and 'hidden' not in json.dumps(data) and 'PRIVATE' not in json.dumps(data)
+
+
+def test_native_create_category_and_conflicting_result_are_not_treated_as_root(activity):
+    rows=messages(); args=json.loads(rows[0]['tool_calls'][0]['function']['arguments'])
+    args.update(name='deploy',category='private');rows[0]['tool_calls'][0]['function']['arguments']=json.dumps(args)
+    rows[1]['content']=json.dumps({'success':True,'path':'private/deploy'})
+    counts,skills=activity.successful_skill_changes(rows,[])
+    assert skills==[{'name':'deploy','resource':'private/deploy','kind':'created','count':1}]
+    rows[1]['content']=json.dumps({'success':True,'path':'somewhere-else/deploy'})
+    assert activity.successful_skill_changes(rows,[])[1]==[]
+    assert counts['created']==1
+
+
+def test_bare_patch_without_resolution_keeps_only_honest_generic_counts(activity):
+    counts,skills=activity.successful_skill_changes(messages('patch'),[])
+    assert counts=={'created':0,'patched':1,'updated':0} and skills==[]
+
+
+def test_lookup_observer_preserves_results_errors_and_resets_between_reviews(activity,monkeypatch,tmp_path):
+    from tools import skill_manager_tool as manager
+    from agent import background_review as native
+    home=tmp_path/'profile'; (home/'skills/private/deploy').mkdir(parents=True)
+    result={'path':home/'skills/private/deploy'}; calls=[]
+    def find(name):
+        calls.append(name)
+        if name=='error':raise RuntimeError('native-error')
+        return result
+    monkeypatch.setattr(manager,'_find_skill',find)
+    activity.install_adapter()
+    assert manager._find_skill('deploy') is result  # foreground never captured
+    def review(*args,**kwargs):
+        assert manager._find_skill(name='deploy') is result
+        assert activity._RESOLUTIONS.get().get('deploy')=='private/deploy'
+        with pytest.raises(RuntimeError,match='native-error'):manager._find_skill('error')
+    monkeypatch.setattr(native,'_run_review_in_thread',review)
+    with activity.turn_scope('a@example.test','r',str(home),'chat-a'):
+        target,_=native.spawn_background_review_thread(SimpleNamespace(),[],task_cfg={});target()
+    assert calls==['deploy','deploy','error']
+    assert activity._RESOLUTIONS.get() is None and activity._REVIEW.get() is None
+
+
+def test_ambiguous_or_external_native_lookup_never_guesses_category(activity,tmp_path):
+    home=tmp_path/'profile';(home/'skills/one/deploy').mkdir(parents=True);(home/'skills/two/deploy').mkdir(parents=True)
+    capture=activity._ResolvedSkills(str(home))
+    capture.observe('deploy',{'path':home/'skills/one/deploy'})
+    capture.observe('deploy',{'path':home/'skills/two/deploy'})
+    assert capture.get('deploy') is None
+    capture.observe('outside',{'path':tmp_path/'external/outside'})
+    assert capture.get('outside') is None
+
+
+def test_concurrent_review_lookups_keep_canonical_ids_in_original_profile(activity,monkeypatch,tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    import threading
+    from tools import skill_manager_tool as manager
+    from agent import background_review as native
+    local=threading.local(); barrier=threading.Barrier(2)
+    homes=[tmp_path/'profile-a',tmp_path/'profile-b']
+    for index,home in enumerate(homes):(home/f'skills/category-{index}/PRIVATE-SKILL').mkdir(parents=True)
+    def find(name):return {'path':local.path}
+    monkeypatch.setattr(manager,'_find_skill',find)
+    activity.install_adapter()
+    def review(parent,*args,**kwargs):
+        local.path=parent.path
+        assert manager._find_skill('PRIVATE-SKILL')['path']==parent.path
+        barrier.wait(timeout=5)
+        native.summarize_background_review_actions(messages('patch'),[],notification_mode='off')
+    monkeypatch.setattr(native,'_run_review_in_thread',review)
+    targets=[]
+    for index,home in enumerate(homes):
+        with activity.turn_scope(f'{index}@example.test',f'run-{index}',str(home),f'chat-{index}'):
+            target,_=native.spawn_background_review_thread(SimpleNamespace(path=home/f'skills/category-{index}/PRIVATE-SKILL'),[],task_cfg={})
+            targets.append(target)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        for future in [pool.submit(t) for t in targets]:future.result(timeout=8)
+    for index in range(2):
+        row=activity.read_activity(f'{index}@example.test',f'chat-{index}')['events'][0]
+        assert row['skills']==[{'name':'PRIVATE-SKILL','kind':'patched','count':1}]
+        path,_=activity._paths(f'{index}@example.test')
+        assert json.loads(path.read_text())[0]['skills'][0]['resource']==f'category-{index}/PRIVATE-SKILL'
+        assert activity.read_activity(f'{index}@example.test',f'chat-{1-index}')['events']==[]
+    assert activity._RESOLUTIONS.get() is None

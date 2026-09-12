@@ -54,7 +54,7 @@ def main():
         def confirm(kind):
             state['counter']+=1
             action='patch' if kind=='failed' else kind
-            name='release-check' if action=='patch' else 'deployment-workflow'
+            name='fixture/release-check' if action=='patch' else 'deployment-workflow'
             messages=[{'role':'assistant','tool_calls':[{'id':str(state['counter']),'function':{'name':'skill_manage','arguments':json.dumps({'action':action,'name':name,'old_string':'a','new_string':'b'})}}]},
                       {'role':'tool','tool_call_id':str(state['counter']),'content':json.dumps({'success':kind!='failed'})}]
             counts,skills=activity.successful_skill_changes(messages,[])

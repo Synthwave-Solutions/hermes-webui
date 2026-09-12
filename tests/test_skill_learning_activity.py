@@ -206,29 +206,43 @@ def test_actual_native_create_patch_batch_and_failure_observed_without_provider(
             {"action": "batch", "name": "fixture-learning", "operations": [
                 {"action": "patch", "name": "fixture-learning", "old_string": "Improved step.", "new_string": "Final step."}]},
         ]
-        for i, call in enumerate(calls):
-            if call["action"] in ("patch", "batch"):
-                skills_tool.skill_view("fixture-learning")
-            result = manager.skill_manage(**call)
-            results.extend([{"role": "assistant", "tool_calls": [{"id": str(i), "function": {
-                "name": "skill_manage", "arguments": json.dumps(call)}}]},
-                {"role": "tool", "tool_call_id": str(i), "content": result}])
-        assert json.loads(results[1]["content"])["success"] is True
-        assert json.loads(results[3]["content"])["success"] is True, results[3]["content"]
-        assert json.loads(results[5]["content"])["success"] is False
-        assert json.loads(results[9]["content"])["success"] is True, results[9]["content"]
-        assert "Final step." in (home / "skills/fixture-learning/SKILL.md").read_text()
+        calls[0]["category"] = "private"
         def run_review(*args, **kwargs):
+            for i, call in enumerate(calls):
+                if call["action"] in ("patch", "batch"):
+                    skills_tool.skill_view("fixture-learning")
+                result = manager.skill_manage(**call)
+                results.extend([{"role": "assistant", "tool_calls": [{"id": str(i), "function": {
+                    "name": "skill_manage", "arguments": json.dumps(call)}}]},
+                    {"role": "tool", "tool_call_id": str(i), "content": result}])
             native.summarize_background_review_actions(results, [], notification_mode="off")
         monkeypatch.setattr(native, "_run_review_in_thread", run_review)
         with activity.turn_scope("a@example.test", "real-tools", str(home), "chat-a"):
             target, _ = native.spawn_background_review_thread(SimpleNamespace(), [], task_cfg={})
             target()
-        assert activity.read_activity("a@example.test", "chat-a")["events"][0]["counts"] == {
-            "created": 1, "patched": 2, "updated": 0}
-        assert activity.read_activity("a@example.test", "chat-a")["events"][0]["skills"] == [
+        assert json.loads(results[1]["content"])["success"] is True
+        assert json.loads(results[1]["content"])["path"] == "private/fixture-learning"
+        assert json.loads(results[3]["content"])["success"] is True, results[3]["content"]
+        assert json.loads(results[5]["content"])["success"] is False
+        assert json.loads(results[9]["content"])["success"] is True, results[9]["content"]
+        assert "Final step." in (home / "skills/private/fixture-learning/SKILL.md").read_text()
+        row = activity.read_activity("a@example.test", "chat-a")["events"][0]
+        assert row["counts"] == {"created": 1, "patched": 2, "updated": 0}
+        assert row["skills"] == [
             {"name": "fixture-learning", "kind": "created", "count": 1},
             {"name": "fixture-learning", "kind": "patched", "count": 2}]
+        path, _ = activity._paths("a@example.test")
+        stored = json.loads(path.read_text())
+        assert {s["resource"] for s in stored[0]["skills"]} == {"private/fixture-learning"}
+        from api.governance.loader import parse_governance_policy
+        from api.governance.models import GovernanceSubject
+        from api.governance.resolver import resolve_effective_access
+        policy = parse_governance_policy({"mode": "enforce", "roles": {"member": {"grants": {
+            "skills": {"view": ["*"]}}}}, "users": {"a@example.test": {"roles": ["member"],
+            "deny": {"skills": {"view": ["private/*"]}}}}})
+        access = resolve_effective_access(policy, GovernanceSubject(email="a@example.test"))
+        assert activity.read_activity("a@example.test", "chat-a", access=access)["events"] == []
+        assert activity._RESOLUTIONS.get() is None
     finally:
         skill_provenance.reset_current_write_origin(origin)
         hermes_constants.reset_hermes_home_override(token)

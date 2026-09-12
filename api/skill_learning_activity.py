@@ -26,6 +26,7 @@ from api.helpers import j
 logger = logging.getLogger(__name__)
 _TURN = ContextVar("webui_skill_learning_turn", default=None)
 _REVIEW = ContextVar("webui_skill_learning_review", default=None)
+_RESOLUTIONS = ContextVar("webui_skill_learning_resolutions", default=None)
 _INSTALL_LOCK = threading.Lock()
 _MAX_BYTES = 128 * 1024
 _MAX_EVENTS = 100
@@ -56,6 +57,61 @@ class ReviewScope:
     session_id: str
 
 
+class _ResolvedSkills:
+    """Observe existing native lookups; never perform a second skill lookup."""
+    def __init__(self, profile_home):
+        self.profile_home = profile_home
+        self.lock = threading.Lock()
+        self.names = {}
+
+    def observe(self, name, result):
+        if not _skill_identifier(name) or not isinstance(result, dict) or not result.get("path"):
+            return
+        resource = None
+        try:
+            root = _safe(Path(self.profile_home).absolute() / "skills").resolve()
+            target = _safe(Path(result["path"]).absolute()).resolve()
+            resource = _skill_identifier(target.relative_to(root).as_posix())
+        except (OSError, TypeError, ValueError):
+            pass
+        with self.lock:
+            if name in self.names or len(self.names) < 256:
+                choices = self.names.setdefault(name, set())
+                # Two distinct choices are enough to keep this name ambiguous.
+                if len(choices) < 2:
+                    choices.add(resource)
+
+    def get(self, name):
+        with self.lock:
+            choices = self.names.get(name, ())
+            return next(iter(choices)) if len(choices) == 1 else None
+
+
+def _operation_resource(operation, arguments, result, resolutions):
+    name = _skill_identifier(operation.get("name") or arguments.get("name"))
+    if not name:
+        return None
+    if operation.get("action") == "create":
+        # Native create takes category separately; its name must be a basename.
+        if "/" in name:
+            return None
+        category = operation.get("category")
+        if category:
+            if not _skill_identifier(category) or "/" in category:
+                return None
+            name = category + "/" + name
+        # Flat native create returns this relative path; batch results omit it.
+        if "path" in result and result["path"] != name:
+            return None
+        return name
+    # Explicit native category/name lookups have exact relative-path semantics.
+    if "/" in name:
+        return name
+    # Bare-name patch/edit can target any category or external root. A name
+    # without an observed unique native resolution is deliberately not exposed.
+    return resolutions.get(name) if resolutions is not None else None
+
+
 def _actor(value):
     value = str(value or "").strip().lower()
     if not re.fullmatch(r"[^\s@<>/\\]{1,160}@[^\s@<>/\\]{1,160}", value):
@@ -63,7 +119,7 @@ def _actor(value):
     return value
 
 
-def successful_skill_changes(messages, prior):
+def successful_skill_changes(messages, prior, *, resolutions=None):
     """Join native structured calls/results. Ambiguous evidence is ignored."""
     counts = dict.fromkeys(_KINDS, 0)
     skills = {}
@@ -125,7 +181,7 @@ def successful_skill_changes(messages, prior):
                     continue
             else:
                 operations = [arguments]
-            for operation in operations:
+            for index, operation in enumerate(operations):
                 action = operation.get("action")
                 if action == "patch" and operation.get("old_string") == operation.get("new_string"):
                     continue
@@ -133,7 +189,8 @@ def successful_skill_changes(messages, prior):
                         "write_file": "updated", "remove_file": "updated"}.get(action)
                 if kind:
                     counts[kind] += 1
-                    resource = _skill_identifier(operation.get("name") or arguments.get("name"))
+                    outcome = result["results"][index] if "results" in result and arguments.get("operations") is not None else result
+                    resource = _operation_resource(operation, arguments, outcome, resolutions)
                     if resource:
                         key = (resource, kind)
                         if key in skills or len(skills) < _MAX_SKILLS:
@@ -316,7 +373,22 @@ def install_adapter():
     """Observe native structured results without changing engine outcomes."""
     try:
         from agent import background_review as native
+        from tools import skill_manager_tool as manager
         with _INSTALL_LOCK:
+            finder = manager._find_skill
+            if not getattr(finder, "_webui_skill_resolution", False):
+                @functools.wraps(finder)
+                def observed_find(*args, **kwargs):
+                    result = finder(*args, **kwargs)
+                    capture = _RESOLUTIONS.get()
+                    if capture is not None:
+                        try:
+                            capture.observe(args[0] if args else kwargs.get("name"), result)
+                        except Exception:
+                            pass  # Optional metadata never changes a tool result.
+                    return result
+                observed_find._webui_skill_resolution = True
+                manager._find_skill = observed_find
             original_spawn = native.spawn_background_review_thread
             original_summary = native.summarize_background_review_actions
             if getattr(original_spawn, "_webui_skill_activity", False):
@@ -335,9 +407,11 @@ def install_adapter():
 
                 def observed_target():
                     token = _REVIEW.set(captured)
+                    resolution_token = _RESOLUTIONS.set(_ResolvedSkills(captured.profile_home))
                     try:
                         return target()
                     finally:
+                        _RESOLUTIONS.reset(resolution_token)
                         _REVIEW.reset(token)
                 return observed_target, prompt
 
@@ -349,7 +423,7 @@ def install_adapter():
                     scope = _REVIEW.get()
                     if scope is not None:
                         try:
-                            counts, skills = successful_skill_changes(review_messages, prior_snapshot or [])
+                            counts, skills = successful_skill_changes(review_messages, prior_snapshot or [], resolutions=_RESOLUTIONS.get())
                             record(scope, counts, skills=skills)
                         except Exception:
                             logger.warning("Could not observe private skill learning activity")

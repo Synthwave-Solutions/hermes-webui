@@ -51,6 +51,13 @@ short name. A known denied operation is removed together with its count; a fully
 denied named event disappears. Older unknown-name counts remain generic. Policy
 errors return 503 without any stored names; the client shows its retry state.
 No skill file is read to produce the notice.
+For native creation the separate category and returned relative path establish
+the logical identifier. A bare-name patch can resolve to any category, so a
+review-local observer records the result of the native lookup that already
+happened. It does not repeat lookup or read skill content. Captures are bounded,
+thread-safe and reset when the review exits. Multiple candidates, external roots
+or unavailable resolution suppress the name and retain only generic confirmed
+counts; the adapter never guesses a category from a short name.
 The previous `/api/skills/learning-activity` route remains an exact alias. The
 frontend uses the session route to mitigate an observed client-side block of the
 old URL. No specific browser filter rule has been established, and no browser
