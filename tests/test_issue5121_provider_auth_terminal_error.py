@@ -208,6 +208,66 @@ def _run_stream(monkeypatch, session, stream_id, agent_cls, *, workspace):
     return fake_queue
 
 
+@pytest.mark.parametrize('terminal', [True, False], ids=['terminal-401', 'recovered-fallback'])
+def test_lifecycle_only_failure_never_replays_turn(tmp_path, monkeypatch, terminal):
+    session = _prepare_session('lifecycle_bridge', 'stream_lifecycle_bridge', pending_user_message='Synthetic check')
+    healer = mock.Mock(side_effect=AssertionError('Must not replay a lifecycle-only failure'))
+    monkeypatch.setattr(streaming, '_attempt_credential_self_heal', healer)
+    phases = []
+    append = streaming.RunJournalWriter.append_sse_event
+
+    def record_phase(writer, name, payload=None):
+        if name == 'preparation':
+            phases.append(payload)
+        return append(writer, name, payload)
+
+    monkeypatch.setattr(streaming.RunJournalWriter, 'append_sse_event', record_phase)
+
+    class LifecycleAgent(MockAgent):
+        runs = 0
+
+        def __init__(self, status_callback=None, **kwargs):
+            super().__init__(**kwargs)
+            self.status_callback = status_callback
+
+        def run_conversation(self, **kwargs):
+            type(self).runs += 1
+            history = list(kwargs.get('conversation_history') or [])
+            if terminal:
+                self.status_callback('lifecycle', '❌ Non-retryable error (HTTP 401): invalid api key')
+                return {'failed': True, 'completed': False, 'final_response': '(empty)', 'messages': history}
+            self.status_callback('lifecycle', '⚠️ Non-retryable error (HTTP 400) — trying fallback...')
+            return {'completed': True, 'final_response': 'Recovered answer',
+                    'messages': history + [
+                        {'role': 'user', 'content': kwargs['persist_user_message']},
+                        {'role': 'assistant', 'content': 'Recovered answer'},
+                    ]}
+
+    queue = _run_stream(monkeypatch, session, 'stream_lifecycle_bridge', LifecycleAgent, workspace=str(tmp_path))
+    events = _queue_events(queue)
+    saved = Session.load('lifecycle_bridge')
+    assert LifecycleAgent.runs == 1
+    assert [p['phase'] for p in phases] == [
+        'identity_ready', 'mcp_ready', 'provider_config_ready', 'toolsets_ready',
+        'agent_ready', 'conversation_ready',
+    ]
+    assert all(set(p) == {'phase', 'elapsed_ms'} for p in phases)
+    assert [p['elapsed_ms'] for p in phases] == sorted(p['elapsed_ms'] for p in phases)
+    healer.assert_not_called()
+    assert saved.active_stream_id is None
+    errors = [data for event, data in events if event == 'apperror']
+    if terminal:
+        assert len(errors) == 1
+        assert errors[0]['type'] == 'auth_mismatch'
+        assert 'invalid api key' in saved.messages[-1]['provider_details']
+        assert saved.messages[-1]['_error'] is True
+        assert not any(event == 'done' for event, _ in events)
+    else:
+        assert not errors
+        assert any(event == 'done' for event, _ in events)
+        assert saved.messages[-1]['content'] == 'Recovered answer'
+
+
 def test_auth_401_without_delivery_persists_error_turn(tmp_path, monkeypatch):
     session = _prepare_session("auth_no_delivery", "stream_auth_no_delivery", pending_user_message="Please respond")
     agent_cls = _build_auth_failure_agent(token_text=None)

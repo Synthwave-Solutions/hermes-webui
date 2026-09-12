@@ -68,8 +68,8 @@ def test_status_callback_captures_terminal_error():
         "the turn-local capture container must be declared before _agent_status_callback"
     )
     # capture condition matches the Agent's emitted 'non-retryable error (HTTP ...)' shape
-    assert "'non-retryable error' in _lower" in STREAMING_PY
-    assert "_captured_terminal_error[0] = _message" in STREAMING_PY
+    assert "'❌ non-retryable error ('" in STREAMING_PY
+    assert "_captured_terminal_error[0] = _redact_text(_message)[:4000]" in STREAMING_PY
 
 
 def test_captured_terminal_error_seeds_last_err_on_completion():

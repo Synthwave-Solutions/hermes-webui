@@ -69,7 +69,7 @@ class TestCancelledTurnClassification:
 
         assert result["type"] == "no_response"
         assert result["label"] == "No response from provider"
-        assert "provider returned no content" in result.get("hint", "").lower()
+        assert "no final answer" in result.get("hint", "").lower()
 
 
 class TestCancelledTurnFinalizer:

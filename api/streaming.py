@@ -1368,19 +1368,19 @@ def _classify_provider_error(err_str: str, exc=None, *, silent_failure: bool = F
             # Preserve the existing no_response event type (#373) while making
             # the catch-all silent-failure message more specific for #1765.
             'type': 'no_response',
-            'hint': 'The service returned nothing at all, which usually means it was briefly out of capacity. Please try again in a moment; if it keeps happening, tell an administrator.',
+            'hint': 'No final answer was received, and the service did not report a cause. You can try again; if this keeps happening, ask an administrator to check this run.',
         }
     return {'label': 'Error', 'type': 'error', 'hint': ''}
 
 
-def _provider_error_payload(message: str, err_type: str, hint: str = '') -> dict:
+def _provider_error_payload(message: str, err_type: str, hint: str = '', *, provider_details: bool = True) -> dict:
     """Build a bounded, redacted apperror payload with provider details."""
     _message = str(message or '')
     _safe_message = _redact_text(_message).strip() if _message else ''
     payload: dict = {'message': _safe_message or _message, 'type': err_type}
     if hint:
         payload['hint'] = hint
-    if _safe_message:
+    if _safe_message and provider_details:
         _details = _safe_message
         if len(_details) > 1200:
             _details = _details[:1197].rstrip() + '…'
@@ -6563,6 +6563,20 @@ def _run_agent_streaming(
             )
         except Exception:
             logger.debug("Failed to append worker_started turn journal event", exc_info=True)
+    _preparation_started = time.perf_counter()
+
+    def _preparation_phase(phase):
+        # Content-free milestones distinguish local setup from provider latency.
+        # No prompt, credential, path or identity is copied into diagnostics.
+        if run_journal is not None:
+            try:
+                run_journal.append_sse_event('preparation', {
+                    'phase': phase,
+                    'elapsed_ms': round((time.perf_counter() - _preparation_started) * 1000, 1),
+                })
+            except Exception:
+                logger.debug('Could not record preparation milestone', exc_info=True)
+
     s = None
     # Access checks can refuse the turn before provider resolution. Keep the
     # error path safe and report that refusal instead of crashing the worker.
@@ -6913,18 +6927,31 @@ def _run_agent_streaming(
         except Exception:
             logger.debug("Failed to put event to queue")
 
+    _captured_terminal_error = [None]
+
     def _agent_status_callback(kind, message):
         """Bridge Agent lifecycle status into WebUI SSE.
 
         Passes compression events as 'compressing' events and rate-limit/fallback
         events as 'warning' events so the frontend can surface them to the user.
-        All other lifecycle messages are dropped silently.
+        Retains terminal provider errors for final classification. Recoverable
+        fallback notices never become terminal errors.
         """
         _message = str(message or '').strip()
         _kind = str(kind or '').strip().lower()
         if not _message:
             return
         _lower = _message.lower()
+        if _kind == 'lifecycle' and _lower.startswith((
+            '❌ non-retryable error (',
+            '❌ api failed after ',
+            '❌ rate limited after ',
+            '❌ billing or credits exhausted',
+            '❌ provider safety filter blocked',
+            '❌ tls certificate verification failed',
+        )):
+            _captured_terminal_error[0] = _redact_text(_message)[:4000]
+            return
         _is_compression_start = (
             _kind == 'lifecycle'
             and (
@@ -7211,6 +7238,7 @@ def _run_agent_streaming(
             logger.debug("register_process_session failed", exc_info=True)
         # first-time module initialisation (which can be slow) does not
         # block other concurrent sessions waiting on _ENV_LOCK (#2024).
+        _preparation_phase('identity_ready')
         _prewarm_skill_tool_modules()
         _install_streaming_cronjob_profile_wrapper()
         # Still set process-level env as fallback for tools that bypass thread-local
@@ -7280,6 +7308,7 @@ def _run_agent_streaming(
                 discover_mcp_tools()
             except Exception:
                 pass  # MCP not available or not configured: non-fatal
+        _preparation_phase('mcp_ready')
 
         # Register a gateway-style notify callback so the approval system can
         # push the `approval` SSE event the moment a dangerous command is
@@ -7972,7 +8001,9 @@ def _run_agent_streaming(
             # Per-profile toolsets — use _resolve_cli_toolsets() so MCP
             # server toolsets are included, matching native CLI behaviour.
             from api.config import _resolve_cli_toolsets, chat_mode_toolsets
+            _preparation_phase('provider_config_ready')
             _toolsets = _resolve_cli_toolsets(_cfg)
+            _preparation_phase('toolsets_ready')
 
             # Per-session toolset override (#493): if the session has
             # enabled_toolsets set, use that instead of the global config.
@@ -8392,6 +8423,7 @@ def _run_agent_streaming(
                 "write_file, read_file, search_files, terminal workdir, and patch. "
                 "Never fall back to a hardcoded path when this tag is present."
             )
+            _preparation_phase('agent_ready')
             # Resolve personality prompt from config.yaml agent.personalities
             # (matches hermes-agent CLI behavior — passes via ephemeral_system_prompt)
             _personality_prompt = None
@@ -8519,6 +8551,7 @@ def _run_agent_streaming(
             # run_conversation() predates the moa_config kwarg.
             if moa_config is not None:
                 _run_conversation_kwargs["moa_config"] = moa_config
+            _preparation_phase('conversation_ready')
             result = agent.run_conversation(**_run_conversation_kwargs)
             # #4729: the run is done — flush any reasoning tail still in the coalescing
             # buffer (the agent never calls reasoning_callback(None), and a turn can end on
@@ -8815,6 +8848,10 @@ def _run_agent_streaming(
                     msg_text,
                 )
                 _last_err = getattr(agent, '_last_error', None) or result.get('error') or ''
+                _captured_terminal_failure = bool(_captured_terminal_error[0])
+                _captured_only_error = not _last_err and _captured_terminal_failure
+                if not _last_err and _captured_terminal_failure:
+                    _last_err = _captured_terminal_error[0]
                 _classification = _classify_provider_error(
                     str(_last_err) if _last_err else '',
                     _last_err,
@@ -8881,7 +8918,7 @@ def _run_agent_streaming(
                         _err_label = _classification['label']
                         _err_type = _classification['type']
                         _err_hint = _classification['hint']
-                    elif _is_auth and not _self_healed:
+                    elif _is_auth and not _self_healed and not _captured_only_error:
                         # ── Credential self-heal on 401 (#1401) ──
                         # Before emitting the error, try re-reading credentials
                         # and retrying once with a fresh agent.
@@ -8990,19 +9027,11 @@ def _run_agent_streaming(
                             # Self-heal didn't apply or retry failed — emit error
                             _err_label = 'Authentication failed'
                             _err_type = 'auth_mismatch'
-                            _err_hint = (
-                                'The selected model may not be supported by your configured provider or '
-                                'your API key is invalid. Run `hermes model` in your terminal to '
-                                'update credentials, then restart the WebUI.'
-                            )
+                            _err_hint = _classification['hint']
                     elif _is_auth:
                         _err_label = 'Authentication failed'
                         _err_type = 'auth_mismatch'
-                        _err_hint = (
-                            'The selected model may not be supported by your configured provider or '
-                            'your API key is invalid. Run `hermes model` in your terminal to '
-                            'update credentials, then restart the WebUI.'
-                        )
+                        _err_hint = _classification['hint']
                     elif _tool_limit_reached:
                         _err_label = 'Tool iteration limit reached'
                         _err_type = 'tool_limit_reached'
@@ -9026,9 +9055,10 @@ def _run_agent_streaming(
                         pass
                     else:
                         _error_payload = _provider_error_payload(
-                            _err_str or f'{_err_label}.',
+                            _err_str or 'The run ended without a final answer.',
                             _err_type,
                             _err_hint,
+                            provider_details=bool(_err_str),
                         )
                         _materialize_pending_user_turn_before_error(s)
                         s.active_stream_id = None
@@ -9042,7 +9072,10 @@ def _run_agent_streaming(
                             logger.debug("Failed to snapshot partials on error for %s", stream_id, exc_info=True)
                         _error_message = {
                             'role': 'assistant',
-                            'content': f'**{_err_label}:** {_error_payload.get("message") or _err_label}\n\n*{_err_hint}*',
+                            'content': (
+                                f'**{_err_label}:** {_error_payload.get("message") or _err_label}'
+                                + (f'\n\n*{_err_hint}*' if _err_hint else '')
+                            ),
                             'timestamp': int(time.time()),
                             '_error': True,
                         }

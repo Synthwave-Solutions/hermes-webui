@@ -35,7 +35,8 @@ def test_silent_provider_failure_gets_specific_catch_all_error():
     # Same ticket: the silent-failure hint no longer explains provider
     # internals or points at a terminal the user does not have.
     _hint = classified['hint'].lower()
-    assert 'returned nothing at all' in _hint and 'try again' in _hint
+    assert 'no final answer' in _hint and 'try again' in _hint
+    assert 'capacity' not in _hint
     assert 'hermes model' not in _hint
 
 
