@@ -1258,11 +1258,15 @@ async function downloadArtifact(url, filename){
       credentials:'same-origin',cache:'no-store',redirect:'error',signal:controller.signal
     });
     if(!response.ok) throw new Error(String(response.status));
+    // These same-origin endpoints return attachment disposition for download=1.
+    // A 200 login/proxy error page is not an artifact, even when it is HTML.
+    const disposition=response.headers.get('Content-Disposition')||'';
+    if(!/^attachment(?:\s*;|\s*$)/i.test(disposition)) throw new Error('invalid');
     const blob=await response.blob();
     objectUrl=URL.createObjectURL(blob);
     anchor=document.createElement('a');
     anchor.href=objectUrl;
-    anchor.download=String(filename||'download').split(/[\\/]/).pop();
+    anchor.download=_artifactDownloadFilename(disposition,filename);
     document.body.appendChild(anchor);
     anchor.click();
     showToast(t('downloading',anchor.download),2000);
@@ -1272,7 +1276,9 @@ async function downloadArtifact(url, filename){
     objectUrl=null;
     return true;
   }catch(error){
-    const key=error.message==='401'||error.message==='403'?'artifact_download_denied':'artifact_download_failed';
+    const key=error.message==='401'||error.message==='403'?'artifact_download_denied'
+      :error.message==='404'?'artifact_download_missing'
+      :error.message==='invalid'?'artifact_download_invalid':'artifact_download_failed';
     showToast(t(key),8000,'error');
     return false;
   }finally{
@@ -1280,6 +1286,19 @@ async function downloadArtifact(url, filename){
     if(anchor) anchor.remove();
     if(objectUrl) URL.revokeObjectURL(objectUrl);
   }
+}
+
+function _artifactDownloadFilename(disposition, fallback){
+  // Prefer the server's real filename over a chat image caption. The server
+  // emits UTF-8 filename* plus an ASCII fallback; malformed encoding uses the
+  // fallback without blocking otherwise valid bytes.
+  const extended=disposition.match(/(?:^|;)\s*filename\*\s*=\s*(?:"?UTF-8'[^']*')([^";]*)/i);
+  const plain=disposition.match(/(?:^|;)\s*filename\s*=\s*(?:"((?:[^"\\]|\\.)*)"|([^;]*))/i);
+  let name=plain?(plain[1]!==undefined?plain[1].replace(/\\(.)/g,'$1'):plain[2].trim()):fallback;
+  if(extended){
+    try{name=decodeURIComponent(extended[1])||name;}catch(_){}
+  }
+  return String(name||fallback||'download').split(/[\\/]/).pop().replace(/[\x00-\x1f\x7f]/g,'').trim()||'download';
 }
 
 function downloadFile(path){

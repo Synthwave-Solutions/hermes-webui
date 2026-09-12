@@ -696,6 +696,8 @@ window.__registerHermesLocale('en', {
     file_open_failed: 'Could not open file',
     artifact_download_failed: 'The file could not be downloaded. Retry the download; if it remains unavailable, ask the agent to regenerate the file.',
     artifact_download_denied: 'Access to this file could not be verified. Sign in again or request access, then retry the download.',
+    artifact_download_missing: 'This file is no longer available. Ask the agent to regenerate and attach it, then download the new attachment.',
+    artifact_download_invalid: 'The server did not return a downloadable file. Sign in again and retry; if this continues, contact your administrator.',
     downloading: (name) => `Downloading ${name}\u2026`,
     double_click_rename: 'Double-click to rename',
     symlink_link_to: 'Symlink → {target}',
