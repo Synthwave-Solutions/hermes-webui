@@ -38,10 +38,7 @@ def transaction(function):
     from functools import wraps
     @wraps(function)
     def wrapped(handler, parsed, *args, **kwargs):
-        path = str(getattr(parsed, 'path', ''))
-        # Deletion must not run between a creation retry's tombstone check and
-        # its atomic save. Lock order remains projects, then session cache.
-        if path.startswith('/api/projects/') or path == '/api/session/delete':
+        if str(getattr(parsed, 'path', '')).startswith('/api/projects/'):
             with _LOCK:
                 return function(handler, parsed, *args, **kwargs)
         return function(handler, parsed, *args, **kwargs)

@@ -168,11 +168,12 @@ def test_delete_cannot_interleave_between_retry_snapshot_and_persistence(client,
         return found
     monkeypatch.setattr(models, '_load_webui_deleted_session_tombstone', held_snapshot)
     monkeypatch.setattr(routes, 'SESSION_DIR', models.SESSION_DIR)
-    original_lookup = routes._lookup_cli_session_metadata
-    def lookup(*args, **kwargs):
-        delete_entered.set()
-        return original_lookup(*args, **kwargs)
-    monkeypatch.setattr(routes, '_lookup_cli_session_metadata', lookup)
+    original_cache = models.SESSIONS
+    class ObservedCache(dict):
+        def pop(self, *args, **kwargs):
+            delete_entered.set()
+            return original_cache.pop(*args, **kwargs)
+    monkeypatch.setattr(routes, 'SESSIONS', ObservedCache(original_cache))
     with ThreadPoolExecutor(max_workers=1, thread_name_prefix='retry') as retrier, ThreadPoolExecutor(max_workers=1) as deleter:
         pending = retrier.submit(project_collaboration.handle, SimpleNamespace(headers={'Cookie':OWNER}), '/api/projects/chat', body)
         assert snapshot.wait(5)
@@ -232,3 +233,28 @@ def test_explicit_session_registration_is_atomic(client, monkeypatch):
     successes=[s for s in outcomes if s is not None]
     assert len(successes) == 1
     assert models.SESSIONS['reserved-server-id'] is successes[0]
+
+
+def test_slow_agent_eviction_does_not_block_other_project_work(client, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
+    from types import SimpleNamespace
+    from api import config, models, routes, project_collaboration
+    p=create(client)
+    sid=client(OWNER, '/api/projects/chat', {'project_id':p['project_id'], 'request_id':KEY})[1]['session']['session_id']
+    started, release=Event(), Event()
+    def stalled_eviction(*args, **kwargs):
+        started.set()
+        assert release.wait(5)
+    monkeypatch.setattr(config, '_evict_session_agent', stalled_eviction)
+    monkeypatch.setattr(routes, 'SESSION_DIR', models.SESSION_DIR)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        deleting=pool.submit(client, OWNER, '/api/session/delete', {'session_id':sid})
+        assert started.wait(5)
+        reading=pool.submit(project_collaboration.handle, SimpleNamespace(headers={'Cookie':OWNER}), '/api/projects/files', None, {'project_id':[p['project_id']]})
+        try:
+            assert reading.result(timeout=1) == {'files':[]}
+        finally:
+            release.set()
+        assert deleting.result(timeout=5)[0] == 200
+    assert not (models.SESSION_DIR / (sid + '.json')).exists()
