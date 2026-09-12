@@ -15605,6 +15605,10 @@ def handle_post(handler, parsed) -> bool:
             # process_wide=False: don't mutate the process-global _active_profile.
             # Per-client profile is managed via cookie + thread-local (#798).
             result = switch_profile(name, process_wide=False)
+            # Match GET /api/profiles: selecting an allowed bot must not expose
+            # the metadata of other users' private or revoked bots.
+            result['profiles'] = [p for p in result.get('profiles', [])
+                                  if _chat_profile_target_allowed(handler, p['name'])]
             # The response becomes the next New Chat workspace. The target's
             # remembered hint is shared, so resolve it under the target profile's
             # registry and this actor's current access before returning it. Keep

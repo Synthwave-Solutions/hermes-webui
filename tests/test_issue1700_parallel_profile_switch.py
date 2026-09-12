@@ -44,7 +44,7 @@ def _prepare_profile_tree(tmp_path, monkeypatch):
 
     monkeypatch.setattr(profiles, "_DEFAULT_HERMES_HOME", default_home)
     monkeypatch.setattr(profiles, "_active_profile", "default")
-    monkeypatch.setattr(profiles, "list_profiles_api", lambda: [{"name": "default"}, {"name": "writer"}])
+    monkeypatch.setattr(profiles, "list_profiles_api", lambda **kw: [{"name": "default"}, {"name": "writer"}])
     profiles._tls.profile = None
     return profiles
 

@@ -1,0 +1,42 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SynthPulse default profile recovery QA</title>
+<link rel="stylesheet" href="/static/style.css">
+<style>
+body{display:block;overflow:auto;padding:24px;max-width:1000px;margin:auto}
+button,select{padding:10px;margin:4px}#profileDropdown{position:static;width:min(100%,420px);margin:12px 0}
+#sessionList{position:static;max-height:none;overflow:visible}#evidence,#transcript{white-space:pre-wrap;overflow-wrap:anywhere;padding:12px}
+#sessionList button{display:block}#feedback{min-height:32px}h1{font-size:26px}
+</style>
+<h1>SynthPulse default profile recovery</h1>
+<p>Isolated fixture: real bot picker and profile-switch functions; synthetic API, session list and session creation adapters. No provider or real account state.</p>
+<label>Server response <select id="mode"><option value="success">Success</option><option value="slow">Slow switch</option><option value="denied">Denied switch</option></select></label>
+<button id="release" onclick="window.finishSwitch&&window.finishSwitch()">Complete pending switch</button>
+<div id="profileChipWrap"><button id="profileChip" onclick="openFixturePicker()">Bot: <span id="profileChipLabel">own-bot</span></button></div>
+<div id="profileDropdown" class="profile-dropdown"></div><div id="feedback" role="status"></div>
+<h2>Conversations</h2><div id="sessionList"></div><article id="transcript"></article><pre id="evidence"></pre>
+<script>
+window.$=id=>document.getElementById(id);window.S={activeProfile:'own-bot',activeProfileIsDefault:false,session:null,messages:[]};
+window.fixtureRows=[{session_id:'morning',profile:'default',title:'Morning conversation',messages:[{role:'user',content:'My morning notes'}]},
+ {session_id:'own-chat',profile:'own-bot',title:'Own bot conversation',messages:[{role:'user',content:'My own bot notes'}]}];
+window.fixtureProfiles=[{name:'default',is_default:true,bot:{title:'SynthPulse'}},{name:'own-bot',is_default:false,bot:{title:'Own bot'}}];
+window.calls=[];window._profileSwitchGeneration=0;window._profileDropdownOpenGeneration=0;window._sessionListSkeletonActive=false;window._skillsData=null;window._workspaceList=null;
+window.esc=value=>String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');window.li=()=>'';
+window.t=(key,name)=>({profile_default_label:'Default',manage_profiles:'Manage bots',profile_switched:'Switched to '+name,profile_switched_new_conversation:'Switched to '+name+'; old conversations preserved',switch_failed:'Switch failed: '}[key]||key);
+window.showToast=message=>{$('feedback').textContent=message;renderEvidence()};window.syncTopbar=()=>{$('profileChipLabel').textContent=S.activeProfile;renderEvidence()};
+window.renderEvidence=()=>{$('evidence').textContent=JSON.stringify({active:S.activeProfile,calls,originals:fixtureRows,current:S.session},null,2)};
+window.renderSessionListFromCache=()=>{ $('sessionList').replaceChildren();for(const row of fixtureRows.filter(r=>r.profile===S.activeProfile)){const button=document.createElement('button');button.textContent=row.title;button.onclick=()=>{S.session=structuredClone(row);S.messages=S.session.messages;$('transcript').textContent=S.messages.map(m=>m.content).join('\n');renderEvidence()};$('sessionList').appendChild(button)}};
+window.renderSessionList=async()=>{calls.push({url:'/api/sessions',profile:S.activeProfile});_sessionListSkeletonActive=false;renderSessionListFromCache();renderEvidence()};
+window.showSessionListSkeleton=()=>{_sessionListSkeletonActive=true;$('sessionList').textContent='Loading conversations…'};
+window._setProfileSwitchListEmbargo=()=>{};window._invalidateSessionListRenders=()=>{};window._profileSwitchPanelLoad=async()=>{};window._refreshProfileSwitchBackground=()=>{};window.applyBotName=syncTopbar;
+window.newSession=async()=>{calls.push({url:'/api/session/new',profile:S.activeProfile});S.session={session_id:'empty-'+S.activeProfile,profile:S.activeProfile,messages:[]};S.messages=[];$('transcript').textContent='';renderEvidence()};
+window.api=async(url,options)=>{const body=JSON.parse(options.body);calls.push({url,body});renderEvidence();if(url!=='/api/profile/switch')throw new Error('Unexpected endpoint');
+ if($('mode').value==='slow')await new Promise(resolve=>window.finishSwitch=resolve);
+ if($('mode').value==='denied')throw Object.assign(new Error('profile_not_allowed'),{status:403});
+ return {active:body.name,is_default:body.name==='default',profiles:fixtureProfiles,default_workspace:null};};
+window.openFixturePicker=()=>{renderProfileDropdown({profiles:fixtureProfiles,active:S.activeProfile,single_profile_mode:true});$('profileDropdown').classList.add('open')};
+fetch('/static/panels.js').then(r=>r.text()).then(source=>{
+ const extract=name=>{const marker=new RegExp('(?:async )?function '+name+'\\(');const start=source.search(marker);if(start<0)throw new Error('Missing '+name);const next=source.slice(start+1).search(/\n(?:async )?function /);return source.slice(start,next<0?undefined:start+1+next)};
+ for(const name of ['botDisplayName','botAvatarHtml','renderProfileDropdown','closeProfileDropdown','switchToProfile'])(0,eval)(extract(name));
+ renderSessionListFromCache();renderEvidence();window.fixtureReady=true;
+});
+</script>

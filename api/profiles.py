@@ -1765,7 +1765,10 @@ def switch_profile(name: str, *, process_wide: bool = True) -> dict:
             default_workspace = str(Path.home())
 
     return {
-        'profiles': list_profiles_api(),
+        # A browser switch must not wait for unrelated bots' cold skill scans.
+        # The target config above supplies its defaults; picker counts can load
+        # separately through the normal fast catalogue path.
+        'profiles': list_profiles_api(fast=True) if not process_wide else list_profiles_api(),
         'active': name,
         'is_default': _is_root_profile(name),
         'default_model': default_model,
