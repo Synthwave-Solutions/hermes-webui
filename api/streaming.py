@@ -597,6 +597,7 @@ def _is_quota_error_text(err_text: str) -> bool:
     _err_lower = str(err_text or '').lower()
     return (
         'insufficient credit' in _err_lower
+        or 'insufficient balance' in _err_lower
         or 'credit balance' in _err_lower
         or 'credits exhausted' in _err_lower
         or 'more credits' in _err_lower
@@ -1304,12 +1305,12 @@ def _classify_provider_error(err_str: str, exc=None, *, silent_failure: bool = F
         )
     )
     _is_not_found = (
-        # model_not_found hints mention Settings / `hermes model` below.
+        # model_not_found hints point to Settings below.
         '404' in err_str
         or 'not found' in _err_lower
         or 'does not exist' in _err_lower
         or 'model not found' in _err_lower
-        or 'model_not_found' in _err_lower  # hint below points to Settings / `hermes model`
+        or 'model_not_found' in _err_lower
         or 'invalid model' in _err_lower
         or 'does not match any known model' in _err_lower
         or 'unknown model' in _err_lower
@@ -1317,6 +1318,19 @@ def _classify_provider_error(err_str: str, exc=None, *, silent_failure: bool = F
     _is_rate_limit = (not _is_quota) and (
         'rate limit' in _err_lower or 'rate_limit_exceeded' in _err_lower
         or '429' in err_str or (exc is not None and 'RateLimitError' in _exc_name)
+    )
+    _is_overloaded = bool(re.search(
+        r'\b(?:overloaded_error|(?:server|service|upstream|provider|model)\s+(?:is\s+)?overloaded)\b',
+        _err_lower,
+    ))
+    _is_service_unavailable = (
+        _probe_status_code == 503
+        or bool(re.search(
+            r'\b(?:(?:http(?:\s+error)?|status(?:[_ ]code)?|error code)\s*[:=(]?\s*503\b'
+            r'|503\s+service\s+unavailable\b|serviceunavailableerror\b)',
+            _err_lower,
+        ))
+        or _exc_name == 'ServiceUnavailableError'
     )
     _is_compression_exhausted = (
         'compression_exhausted' in _err_lower
@@ -1349,13 +1363,28 @@ def _classify_provider_error(err_str: str, exc=None, *, silent_failure: bool = F
         return {
             'label': 'Authentication failed',
             'type': 'auth_mismatch',
-            'hint': 'This assistant could not sign in to the service it needs. An administrator has to check the account settings; nothing you can change yourself.',
+            'hint': 'If you manage this connection, check it in Settings > Providers and try again. Otherwise, ask an administrator to reconnect it.',
         }
     if _is_not_found:
         return {
             'label': 'Model not found',
             'type': 'model_not_found',
             'hint': 'The selected model is not available. Pick another model in Settings, or ask an administrator to make this one available.',
+        }
+    if _is_overloaded:
+        return {
+            'label': 'Service busy',
+            'type': 'overloaded',
+            'category': 'capacity',
+            'hint': _capacity_hint('overloaded'),
+        }
+    if _is_service_unavailable:
+        # A 503 establishes temporary unavailability, not the underlying cause.
+        # Only the explicit overload signal above creates a capacity incident.
+        return {
+            'label': 'Service unavailable',
+            'type': 'service_unavailable',
+            'hint': 'Please try again in a moment. If this keeps happening, ask an administrator to check the service.',
         }
     if _is_compression_exhausted:
         return {
@@ -1375,10 +1404,26 @@ def _classify_provider_error(err_str: str, exc=None, *, silent_failure: bool = F
 
 
 def _provider_error_payload(message: str, err_type: str, hint: str = '', *, provider_details: bool = True) -> dict:
-    """Build a bounded, redacted apperror payload with provider details."""
+    """Keep known provider diagnostics in details, not the ordinary chat copy.
+
+    The same payload supplies live SSE and the persisted error turn. Preserve
+    other failure messages, including governance refusals and cancellation,
+    instead of guessing that every failure is an upstream capacity problem.
+    """
     _message = str(message or '')
     _safe_message = _redact_text(_message).strip() if _message else ''
-    payload: dict = {'message': _safe_message or _message, 'type': err_type}
+    _friendly_messages = {
+        'quota_exhausted': 'The service has no available capacity right now.',
+        'rate_limit': 'The service is receiving too many requests right now.',
+        'auth_mismatch': 'The assistant could not sign in to the selected service.',
+        'model_not_found': 'The selected model is not available.',
+        'overloaded': 'The service is very busy right now.',
+        'service_unavailable': 'The service is temporarily unavailable.',
+    }
+    payload: dict = {
+        'message': _friendly_messages.get(err_type) or _safe_message or 'The request could not be completed.',
+        'type': err_type,
+    }
     if hint:
         payload['hint'] = hint
     if _safe_message and provider_details:
@@ -10002,10 +10047,11 @@ def _run_agent_streaming(
             return
         # Capacity failure on the exception path: same admin alert and same
         # plain-language rewrite as the result path (27 Aug 2026 ticket).
-        _report_capacity_incident(
-            _classification, provider=resolved_provider, model=resolved_model,
-            detail=str(err_str or '')[:500], source='chat',
-        )
+        if not isinstance(e, (GovernanceBindingError, PermissionError)):
+            _report_capacity_incident(
+                _classification, provider=resolved_provider, model=resolved_model,
+                detail=str(err_str or '')[:500], source='chat',
+            )
         _exc_is_quota = _classification['type'] == 'quota_exhausted'
         # Exception quota text still includes: 'more credits' in _exc_lower, 'can only afford' in _exc_lower, 'fewer max_tokens' in _exc_lower.
         # Rate-limit detection remains guarded as: (not _exc_is_quota).
@@ -10015,7 +10061,7 @@ def _run_agent_streaming(
         _exc_is_cancelled = _classification['type'] == 'cancelled'
         _exc_is_interrupted = _classification['type'] == 'interrupted'
 
-        # The user hint still points to Settings / `hermes model` from _classify_provider_error().
+        # Reuse the classifier's UI guidance on both error paths.
         if isinstance(e, (GovernanceBindingError, PermissionError)):
             # Track A fail-closed refusal (non-admin under mode enforce whose
             # governance context could not be built/bound): surface the safe
@@ -10030,6 +10076,10 @@ def _run_agent_streaming(
                 _classification['label'], _classification['type'], _classification['hint'],
             )
         elif _exc_is_rate_limit:
+            _exc_label, _exc_type, _exc_hint = (
+                _classification['label'], _classification['type'], _classification['hint'],
+            )
+        elif _classification['type'] in {'overloaded', 'service_unavailable'}:
             _exc_label, _exc_type, _exc_hint = (
                 _classification['label'], _classification['type'], _classification['hint'],
             )
@@ -10133,9 +10183,7 @@ def _run_agent_streaming(
                         # Fall through to emit the original error
             # Self-heal didn't apply or retry failed — emit the auth error
             _exc_label, _exc_type, _exc_hint = (
-                'Authentication error', 'auth_mismatch',
-                'The selected model may not be supported by your configured provider. '
-                'Run `hermes model` in your terminal to switch providers, then restart the WebUI.',
+                _classification['label'], _classification['type'], _classification['hint'],
             )
         elif _exc_is_not_found:
             _exc_label, _exc_type, _exc_hint = (

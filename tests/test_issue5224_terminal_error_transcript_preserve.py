@@ -150,6 +150,46 @@ function buildRuntime() {
 (async () => {
   installRuntimeHelpers();
   const calls = buildRuntime();
+  if (scenario.action === 'provider_error_then_restore') {
+    // Register and deliver to the actual production EventSource handler.
+    // Unrelated animation/anchor hooks use the same runtime fixture above.
+    globalThis.window = {};
+    globalThis._terminalStateReached = false;
+    globalThis._bailOutOfTerminalEventsFromStaleStream = () => false;
+    globalThis._clearStreamHidden = () => {};
+    globalThis._clearStreamNotificationBackground = () => {};
+    globalThis._anchorRegistry = {};
+    globalThis._settledAnchorRetryOwnerKey = () => 'synthetic-owner';
+    globalThis._retrySettledAnchorScene = () => {};
+    globalThis._isAttachmentCurrent = () => true;
+    let listener;
+    globalThis.source = {
+      readyState: 1,
+      addEventListener(name, callback) {
+        if (name !== 'apperror') throw new Error('unexpected event');
+        listener = callback;
+      },
+      close() { this.readyState = 2; },
+    };
+    const start = src.indexOf("source.addEventListener('apperror',");
+    const end = src.indexOf("source.addEventListener('warning',", start);
+    if (start < 0 || end <= start) throw new Error('missing apperror handler');
+    new Function(src.slice(start, end))();
+    listener({data: JSON.stringify(scenario.event)});
+    const liveMessages = JSON.parse(JSON.stringify(S.messages));
+    const closed = source.readyState === 2;
+    const liveRenderCount = calls.filter(call => call === 'renderMessages').length;
+
+    // A fresh attachment restores the persisted backend session through the
+    // real restore helper, independent of the live event's locally built row.
+    S.messages = [];
+    S.activeStreamId = streamId;
+    _streamFinalized = false;
+    const restoreStatus = await _restoreSettledSession(source, {status: true});
+    console.log(JSON.stringify({liveMessages, restoredMessages: S.messages,
+      restoreStatus, closed, liveRenderCount, calls}));
+    return;
+  }
   if (scenario.action === 'restore_shorter_terminal') {
     const status = await _restoreSettledSession({}, {
       status: true,
@@ -226,6 +266,38 @@ def _run_scenario(driver_path: str, scenario: dict) -> dict:
     if result.returncode != 0:
         raise RuntimeError(f"node driver failed: {result.stderr}")
     return json.loads(result.stdout.strip())
+
+
+@pytest.mark.parametrize("raw_error", [
+    "HTTP 503 Service Unavailable", "HTTP 529: overloaded_error: server overloaded",
+])
+def test_provider_error_event_heading_matches_restored_history(driver_path, raw_error):
+    from api.streaming import _classify_provider_error, _provider_error_payload
+
+    classified = _classify_provider_error(raw_error)
+    payload = _provider_error_payload(raw_error, classified["type"], classified["hint"])
+    payload["session_id"] = "session-5224"
+    user = {"role": "user", "content": "Synthetic question"}
+    saved_error = {
+        "role": "assistant", "_error": True,
+        "content": f'**{classified["label"]}:** {payload["message"]}\n\n*{payload["hint"]}*',
+        "provider_details": payload["details"],
+    }
+    result = _run_scenario(driver_path, {
+        "action": "provider_error_then_restore",
+        "state": {"messages": [user]},
+        "event": payload,
+        "apiPayload": {"session": {"session_id": "session-5224", "messages": [user, saved_error]}},
+    })
+    assert result["closed"] is True
+    assert result["liveRenderCount"] == 1
+    assert result["liveMessages"][0] == user
+    assert result["liveMessages"][-1]["content"] == saved_error["content"]
+    assert result["liveMessages"][-1]["provider_details"] == payload["details"]
+    assert result["restoreStatus"] == "restored"
+    assert result["restoredMessages"][-1]["content"] == result["liveMessages"][-1]["content"]
+    assert result["restoredMessages"][-1]["provider_details"] == result["liveMessages"][-1]["provider_details"]
+    assert raw_error not in result["liveMessages"][-1]["content"]
 
 
 def test_terminal_error_restore_preserves_visible_transcript_when_server_snapshot_shorter(driver_path):

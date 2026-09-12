@@ -208,6 +208,114 @@ def _run_stream(monkeypatch, session, stream_id, agent_cls, *, workspace):
     return fake_queue
 
 
+@pytest.mark.parametrize("failure_path", ["result", "exception"])
+@pytest.mark.parametrize("raw_error,expected_type", [
+    ("Lyceum HTTP 402: insufficient credits", "quota_exhausted"),
+    ("Cortecs HTTP 401 AuthenticationError: Insufficient Balance", "quota_exhausted"),
+    ("HTTP 401 AuthenticationError: invalid api key", "auth_mismatch"),
+    ("HTTP 429: rate_limit_exceeded", "rate_limit"),
+    ("HTTP 404: model_not_found", "model_not_found"),
+    ("HTTP 503 Service Unavailable", "service_unavailable"),
+    ("HTTP 529: overloaded_error: server overloaded", "overloaded"),
+])
+def test_provider_failure_has_plain_copy_in_stream_and_saved_history(
+    tmp_path, monkeypatch, failure_path, raw_error, expected_type,
+):
+    """Exercise both real stream exits, including reload and partial-turn retention."""
+    from api import capacity_alerts
+
+    incident = mock.Mock(return_value={"notified": False})
+    monkeypatch.setattr(capacity_alerts, "record_capacity_event", incident)
+    healer = mock.Mock(return_value=None)
+    monkeypatch.setattr(streaming, "_attempt_credential_self_heal", healer)
+    secret = "synthetic-provider-secret-for-copy-test"
+    monkeypatch.setattr(streaming, "_redact_text", lambda text: text.replace(secret, "[REDACTED]"))
+    diagnostic = raw_error + " credential=" + secret
+    session = _prepare_session("friendly_provider", "friendly_stream", pending_user_message="Continue the analysis")
+    _seed_prior_turn(session, prior_user="Earlier question", prior_assistant="Earlier answer")
+
+    class ProviderFailureAgent(MockAgent):
+        def run_conversation(self, **kwargs):
+            self.stream_delta_callback("Useful partial analysis")
+            if failure_path == "exception":
+                raise RuntimeError(diagnostic)
+            return {"failed": True, "error": diagnostic,
+                    "messages": list(kwargs.get("conversation_history") or [])}
+
+    result_queue = _run_stream(monkeypatch, session, "friendly_stream", ProviderFailureAgent, workspace=str(tmp_path))
+    events = _queue_events(result_queue)
+    errors = [data for event, data in events if event == "apperror"]
+    assert len(errors) == 1
+    error = errors[0]
+    assert error["type"] == expected_type
+    normal_copy = error["message"] + " " + error.get("hint", "")
+    for diagnostic_term in ("HTTP", "AuthenticationError", "insufficient credits", "Insufficient Balance", "credential=", "hermes model", "restart the WebUI"):
+        assert diagnostic_term not in normal_copy
+    assert "administrator has been notified" not in normal_copy
+    assert error["message"]
+    assert raw_error in error["details"]
+    assert "[REDACTED]" in error["details"]
+    assert secret not in str(error)
+    if expected_type == "auth_mismatch":
+        assert "Settings" in normal_copy
+        assert "nothing you can change" not in normal_copy
+        healer.assert_called_once()
+    else:
+        healer.assert_not_called()
+    if expected_type == "service_unavailable":
+        assert "capacity" not in normal_copy.lower()
+        assert "try again" in normal_copy.lower()
+    if expected_type in ("quota_exhausted", "rate_limit", "overloaded"):
+        incident.assert_called_once()
+        assert incident.call_args.args[0] == expected_type
+    else:
+        incident.assert_not_called()
+    assert not any(event == "done" for event, _ in events)
+
+    saved = Session.load("friendly_provider")
+    assert saved.active_stream_id is None
+    assert saved.pending_user_message is None
+    assert any(m.get("content") == "Earlier answer" for m in saved.messages)
+    assert any(m.get("content") == "Continue the analysis" for m in saved.messages)
+    assert any(m.get("_partial") and m.get("content") == "Useful partial analysis" for m in saved.messages)
+    last = saved.messages[-1]
+    assert last["_error"] is True
+    assert error["message"] in last["content"]
+    assert error["details"] == last["provider_details"]
+    assert raw_error not in last["content"]
+    assert secret not in str(saved.messages)
+    for cli_instruction in ("hermes model", "restart the WebUI"):
+        assert cli_instruction not in last["content"]
+
+
+@pytest.mark.parametrize("diagnostic", ["HTTP 503 Service Unavailable", "upstream overloaded"])
+def test_permission_failure_is_not_reported_as_provider_capacity(tmp_path, monkeypatch, diagnostic):
+    from api import capacity_alerts
+
+    incident = mock.Mock(return_value={"notified": True})
+    monkeypatch.setattr(capacity_alerts, "record_capacity_event", incident)
+    healer = mock.Mock(return_value=None)
+    monkeypatch.setattr(streaming, "_attempt_credential_self_heal", healer)
+    session = _prepare_session("permission_failure", "permission_stream", pending_user_message="Open a restricted workspace")
+    safe_message = "The workspace is not assigned to you. Diagnostic: " + diagnostic
+
+    class PermissionFailureAgent(MockAgent):
+        def run_conversation(self, **kwargs):
+            raise PermissionError("Access restricted: " + safe_message)
+
+    result_queue = _run_stream(monkeypatch, session, "permission_stream", PermissionFailureAgent, workspace=str(tmp_path))
+    errors = [data for event, data in _queue_events(result_queue) if event == "apperror"]
+    assert len(errors) == 1
+    assert errors[0]["type"] == "governance_denied"
+    assert errors[0]["message"] == safe_message
+    assert "hint" not in errors[0]
+    saved = Session.load("permission_failure")
+    assert saved.messages[-1]["content"] == "**Access restricted:** " + safe_message
+    assert saved.messages[-1]["_error"] is True
+    incident.assert_not_called()
+    healer.assert_not_called()
+
+
 @pytest.mark.parametrize("failed", [False, True], ids=["healthy-repeat", "failed-repeat"])
 def test_identical_followup_settles_only_when_result_is_healthy(tmp_path, monkeypatch, failed):
     prompt = "Reply with exactly: SynthPulse chatcontrole geslaagd."

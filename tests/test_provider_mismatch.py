@@ -76,16 +76,16 @@ class TestStreamingAuthErrorDetection:
             "'unauthorized' not in auth error detection block"
         )
 
-    def test_auth_error_hint_mentions_hermes_model(self):
-        """The auth_mismatch hint must mention 'hermes model' command."""
-        src = _read("api/streaming.py")
-        # Find the auth_mismatch apperror block
-        idx = src.find("auth_mismatch")
-        block = src[idx:idx + 500]
-        assert "hermes model" in block, (
-            "auth_mismatch hint must mention 'hermes model' command "
-            "so users know how to fix provider mismatch"
-        )
+    def test_auth_error_hint_points_to_available_web_settings(self):
+        """A WebUI user gets connection guidance without requiring a terminal."""
+        from api.streaming import _classify_provider_error
+
+        error = _classify_provider_error("HTTP 401: unauthorized")
+        assert error["type"] == "auth_mismatch"
+        assert "Settings > Providers" in error["hint"]
+        assert "administrator" in error["hint"]
+        assert "hermes model" not in error["hint"]
+        assert "restart" not in error["hint"].lower()
 
     def test_auth_error_does_not_catch_rate_limit(self):
         """Rate limit errors must not be reclassified as auth_mismatch."""
