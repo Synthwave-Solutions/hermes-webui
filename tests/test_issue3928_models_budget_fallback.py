@@ -4,12 +4,211 @@ from __future__ import annotations
 
 import copy
 import json
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
 import api.config as cfg
 import api.profiles as profiles
+
+
+@pytest.fixture
+def gated_catalog_rebuild(monkeypatch):
+    """A real detached rebuild, released even when a foreground assertion fails."""
+    entered = threading.Event()
+    release = threading.Event()
+    published = threading.Event()
+    calls = []
+    live = {"active_provider": "openai-api", "default_model": "live", "configured_model_badges": {},
+            "groups": [{"provider": "OpenAI", "provider_id": "openai-api",
+                        "models": [{"id": "live", "label": "Live"}]}], "aliases": {}}
+    fallback = {**live, "default_model": "fallback"}
+
+    def rebuild(_builder):
+        calls.append(threading.get_ident())
+        entered.set()
+        assert release.wait(5), "test did not release synthetic provider"
+        return copy.deepcopy(live)
+
+    monkeypatch.setattr(cfg, "_invoke_models_rebuild", rebuild)
+    monkeypatch.setattr(cfg, "_static_models_catalog_without_live_probes", lambda: fallback)
+    monkeypatch.setattr(cfg, "_minimal_static_models_catalog", lambda: fallback)
+    monkeypatch.setattr(cfg, "_save_models_cache_to_disk", lambda _result: published.set())
+    pool = ThreadPoolExecutor(max_workers=8)
+    yield pool, entered, release, published, calls, live, fallback
+    release.set()
+    pool.shutdown(wait=True)
+    if entered.is_set():
+        assert published.wait(2), "detached provider result was not published"
+        with cfg._cache_build_cv:
+            assert cfg._cache_build_cv.wait_for(lambda: not cfg._cache_build_in_progress, 2)
+
+
+@pytest.mark.parametrize("cache_only", [False, True])
+def test_catalog_follower_returns_within_own_budget_while_provider_stays_blocked(
+    monkeypatch, gated_catalog_rebuild, cache_only,
+):
+    pool, entered, release, published, calls, live, fallback = gated_catalog_rebuild
+    monkeypatch.setattr(cfg, "_LIVE_REBUILD_BUDGET_SECONDS", 0.08)
+    leader = pool.submit(cfg.get_available_models)
+    assert entered.wait(1)
+    assert leader.result(timeout=0.5) == fallback
+    follower = pool.submit(cfg.get_available_models, prefer_cache=cache_only)
+    assert follower.result(timeout=0.3) == fallback
+    assert not release.is_set()
+    assert cfg._cache_build_in_progress  # caller timeout must not cancel shared work
+    assert len(calls) == 1
+    release.set()
+    assert published.wait(1)
+    assert cfg.get_available_models() == live
+    assert len(calls) == 1
+
+
+def test_cache_only_follower_does_not_wait_for_foreground_leader_budget(
+    monkeypatch, gated_catalog_rebuild,
+):
+    pool, entered, _release, _published, calls, _live, fallback = gated_catalog_rebuild
+    monkeypatch.setattr(cfg, "_LIVE_REBUILD_BUDGET_SECONDS", 1.0)
+    leader = pool.submit(cfg.get_available_models)
+    assert entered.wait(1)
+    follower = pool.submit(cfg.get_available_models, prefer_cache=True)
+    assert follower.result(timeout=0.25) == fallback
+    assert not leader.done()
+    assert len(calls) == 1
+
+
+def test_simultaneous_cold_catalog_callers_share_one_detached_rebuild(
+    monkeypatch, gated_catalog_rebuild,
+):
+    pool, entered, _release, _published, calls, _live, fallback = gated_catalog_rebuild
+    monkeypatch.setattr(cfg, "_LIVE_REBUILD_BUDGET_SECONDS", 0.08)
+    # All six callers reach disk lookup before anyone takes the cold-path lock.
+    disk_gate = threading.Barrier(6)
+
+    def load_disk():
+        disk_gate.wait(timeout=2)
+        return None
+
+    monkeypatch.setattr(cfg, "_load_models_cache_from_disk", load_disk)
+    futures = [pool.submit(cfg.get_available_models) for _ in range(6)]
+    assert entered.wait(1)
+    assert [future.result(timeout=0.4) for future in futures] == [fallback] * 6
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize("force_refresh", [False, True])
+def test_catalog_follower_wait_uses_remaining_request_budget(monkeypatch, force_refresh):
+    monkeypatch.setattr(cfg, "_LIVE_REBUILD_BUDGET_SECONDS", 0.3)
+    monkeypatch.setattr(cfg, "_cache_build_in_progress", True)
+    monkeypatch.setattr(cfg, "_static_models_catalog_without_live_probes", lambda: {"groups": []})
+    def unexpected_rebuild(_builder):
+        raise AssertionError("follower must not start a second provider probe")
+
+    monkeypatch.setattr(cfg, "_invoke_models_rebuild", unexpected_rebuild)
+    original_path = cfg._get_config_path
+    path_calls = []
+
+    def delayed_local_lookup():
+        if not path_calls:
+            time.sleep(0.12)
+        path_calls.append(True)
+        return original_path()
+
+    waits = []
+    original_wait = threading.Condition.wait_for
+
+    def record_wait(condition, predicate, timeout=None):
+        if condition is cfg._cache_build_cv:
+            waits.append(timeout)
+            return False
+        return original_wait(condition, predicate, timeout)
+
+    monkeypatch.setattr(cfg, "_get_config_path", delayed_local_lookup)
+    monkeypatch.setattr(threading.Condition, "wait_for", record_wait)
+    cfg.get_available_models(force_refresh=force_refresh)
+    assert len(waits) == 1
+    assert 0 <= waits[0] < 0.22
+    assert cfg._cache_build_in_progress
+
+
+@pytest.mark.parametrize("interrupt_leader", [False, True])
+def test_interrupted_catalog_caller_does_not_orphan_shared_worker(
+    monkeypatch, gated_catalog_rebuild, interrupt_leader,
+):
+    pool, entered, release, published, calls, live, _fallback = gated_catalog_rebuild
+    monkeypatch.setattr(cfg, "_LIVE_REBUILD_BUDGET_SECONDS", 0.5)
+    original_wait = threading.Condition.wait_for
+
+    def interrupted_wait(condition, predicate, timeout=None):
+        is_leader = getattr(predicate, "__name__", "") == "is_set"
+        if condition is cfg._cache_build_cv and is_leader == interrupt_leader:
+            raise RuntimeError("synthetic cancelled foreground")
+        return original_wait(condition, predicate, timeout)
+
+    monkeypatch.setattr(threading.Condition, "wait_for", interrupted_wait)
+    leader = pool.submit(cfg.get_available_models)
+    assert entered.wait(1)
+    cancelled = leader if interrupt_leader else pool.submit(cfg.get_available_models)
+    with pytest.raises(RuntimeError, match="cancelled foreground"):
+        cancelled.result(timeout=1)
+    # Restore before teardown and keep the independent live build running.
+    monkeypatch.setattr(threading.Condition, "wait_for", original_wait)
+    assert cfg._cache_build_in_progress
+    assert len(calls) == 1
+    release.set()
+    assert published.wait(1)
+    assert cfg.get_available_models() == live
+    assert len(calls) == 1
+
+
+def test_cache_only_follower_rejects_other_profile_memory(monkeypatch):
+    foreign = {
+        "active_provider": "openai-api", "default_model": "other-profile",
+        "groups": [{"provider": "OpenAI", "provider_id": "openai-api",
+                    "models": [{"id": "other-profile", "label": "Other profile"}]}],
+        "aliases": {}, "configured_model_badges": {},
+    }
+    assert cfg._is_valid_models_cache(foreign)
+    local = {"groups": [], "default_model": "local-profile"}
+    monkeypatch.setattr(cfg, "_cache_build_in_progress", True)
+    monkeypatch.setattr(cfg, "_available_models_cache", foreign)
+    monkeypatch.setattr(cfg, "_available_models_cache_ts", time.monotonic())
+    monkeypatch.setattr(cfg, "_available_models_cache_source_fingerprint", "different-profile")
+    monkeypatch.setattr(cfg, "_minimal_static_models_catalog", lambda: local)
+    original_wait = threading.Condition.wait_for
+
+    def unexpected_wait(condition, predicate, timeout=None):
+        if condition is cfg._cache_build_cv:
+            pytest.fail("cache-only must not wait")
+        return original_wait(condition, predicate, timeout)
+
+    monkeypatch.setattr(threading.Condition, "wait_for", unexpected_wait)
+    assert cfg.get_available_models(prefer_cache=True) == local
+    assert cfg._cache_build_in_progress
+
+
+def test_provider_failure_at_budget_boundary_releases_build_ownership(monkeypatch):
+    monkeypatch.setattr(cfg, "_LIVE_REBUILD_BUDGET_SECONDS", 0.1)
+    fallback = {"groups": []}
+    monkeypatch.setattr(cfg, "_static_models_catalog_without_live_probes", lambda: fallback)
+
+    def failed_rebuild(_builder):
+        raise RuntimeError("synthetic provider failure")
+
+    original_wait = threading.Condition.wait_for
+
+    def deadline_boundary(condition, predicate, timeout=None):
+        if condition is cfg._cache_build_cv and getattr(predicate, "__name__", "") == "is_set":
+            assert original_wait(condition, predicate, 1)
+            return False  # Worker completed just as the foreground deadline expired.
+        return original_wait(condition, predicate, timeout)
+
+    monkeypatch.setattr(cfg, "_invoke_models_rebuild", failed_rebuild)
+    monkeypatch.setattr(threading.Condition, "wait_for", deadline_boundary)
+    assert cfg.get_available_models() == fallback
+    assert not cfg._cache_build_in_progress
 
 
 @pytest.fixture(autouse=True)

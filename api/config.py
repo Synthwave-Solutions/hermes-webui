@@ -5819,6 +5819,8 @@ def get_available_models(*, prefer_cache: bool = False, force_refresh: bool = Fa
     """
     global _cache_build_in_progress, _available_models_cache, _available_models_cache_ts
     global _available_models_live_rebuild_ts, _available_models_cache_source_fingerprint, _cache_build_cv
+    request_started_at = time.monotonic()
+    force_refresh_started_at = request_started_at if force_refresh else None
     # Config mtime check — must come before any config reads.
     # (Test #585 verifies _current_mtime appears before active_provider = None)
     try:
@@ -7271,12 +7273,6 @@ def get_available_models(*, prefer_cache: bool = False, force_refresh: bool = Fa
         }
 
     # ── FAST PATH ─────────────────────────────────────────────────────────────
-    # Mark that a build may be in progress BEFORE acquiring the lock.
-    # If another thread has already started the cold path, we will wait for
-    # its result rather than running the cold path concurrently.
-    should_wait = _cache_build_in_progress
-    force_refresh_started_at = time.monotonic() if force_refresh else None
-
     # Check config mtime OUTSIDE the lock so this cheap check doesn't serialize
     # concurrent requests.  Must come before any config reads in the cold path.
     try:
@@ -7286,8 +7282,8 @@ def get_available_models(*, prefer_cache: bool = False, force_refresh: bool = Fa
     _cfg_changed = _current_mtime != _cfg_mtime
 
     # Disk load BEFORE lock: ~0.1ms, lets concurrent requests skip entirely.
-    # Then acquire lock and check memory cache.  Cold path runs inside the lock
-    # so only one thread rebuilds while others wait.
+    # Then acquire the lock and check memory cache/build ownership. Provider
+    # waits release this lock so cache-only callers can keep moving.
     disk_groups = None
     stale_disk_groups = None
     if _available_models_cache is None and not force_refresh:
@@ -7300,20 +7296,15 @@ def get_available_models(*, prefer_cache: bool = False, force_refresh: bool = Fa
     with _available_models_cache_lock:
         # If another thread is already building, wait for its result instead
         # of re-entering the cold path (avoids duplicate 10s zai load_pool calls).
-        if should_wait:
-            wait_timeout = 60.0
-            if force_refresh and force_refresh_started_at is not None:
-                if _LIVE_REBUILD_BUDGET_SECONDS <= 0:
-                    # The legacy synchronous path is explicitly unbounded. A
-                    # forced refresh follower should keep coalescing behind
-                    # that live rebuild instead of giving up after 60s and
-                    # duplicating it.
-                    wait_timeout = None
-                else:
-                    wait_timeout = max(
-                        0.0,
-                        _LIVE_REBUILD_BUDGET_SECONDS - (time.monotonic() - force_refresh_started_at),
-                    )
+        # Check ownership UNDER the lock: pre-lock snapshots let simultaneous
+        # cold callers each start a worker after the first caller times out.
+        if _cache_build_in_progress and not prefer_cache:
+            wait_timeout = None
+            if _LIVE_REBUILD_BUDGET_SECONDS > 0:
+                wait_timeout = max(
+                    0.0,
+                    _LIVE_REBUILD_BUDGET_SECONDS - (time.monotonic() - request_started_at),
+                )
             _cache_build_cv.wait_for(
                 lambda: not _cache_build_in_progress,
                 timeout=wait_timeout
@@ -7330,7 +7321,7 @@ def get_available_models(*, prefer_cache: bool = False, force_refresh: bool = Fa
                 )
             ):
                 return cached
-            if force_refresh and _LIVE_REBUILD_BUDGET_SECONDS > 0 and _cache_build_in_progress:
+            if _cache_build_in_progress:
                 if stale_disk_groups is not None:
                     return copy.deepcopy(stale_disk_groups)
                 return copy.deepcopy(_static_models_catalog_without_live_probes())
@@ -7357,36 +7348,6 @@ def get_available_models(*, prefer_cache: bool = False, force_refresh: bool = Fa
             ):
                 return cached
 
-        # A concurrent forced refresh may have started after this caller sampled
-        # should_wait but before it acquired the lock. Reuse that in-flight build
-        # instead of launching another one, and preserve this caller's budget.
-        if (
-            force_refresh
-            and force_refresh_started_at is not None
-            and _cache_build_in_progress
-        ):
-            remaining_budget = None
-            if _LIVE_REBUILD_BUDGET_SECONDS > 0:
-                remaining_budget = max(
-                    0.0,
-                    _LIVE_REBUILD_BUDGET_SECONDS - (time.monotonic() - force_refresh_started_at),
-                )
-            if remaining_budget is None or remaining_budget > 0:
-                _cache_build_cv.wait_for(
-                    lambda: not _cache_build_in_progress,
-                    timeout=remaining_budget,
-                )
-                cached = _get_fresh_memory_models_cache(time.monotonic())
-                if (
-                    cached is not None
-                    and _available_models_live_rebuild_ts >= force_refresh_started_at
-                ):
-                    return cached
-            if _cache_build_in_progress and _LIVE_REBUILD_BUDGET_SECONDS > 0:
-                if stale_disk_groups is not None:
-                    return copy.deepcopy(stale_disk_groups)
-                return copy.deepcopy(_static_models_catalog_without_live_probes())
-
         # Cold path: disk cache hit — use it (fast, no lock contention)
         if disk_groups is not None and not force_refresh:
             _available_models_cache = disk_groups
@@ -7407,13 +7368,8 @@ def get_available_models(*, prefer_cache: bool = False, force_refresh: bool = Fa
         # human request do the real live rebuild.
         if prefer_cache:
             # NOTE (Greptile P1): do NOT touch _cache_build_in_progress here.
-            # This branch never set the flag (only the cold path below does),
-            # and `should_wait` is sampled outside the lock (line ~4964). A
-            # concurrent cold-path caller can flip the flag to True after our
-            # sample but before we acquire the lock; clearing it here would
-            # prematurely release that rebuild's serialization, waking waiters
-            # to an empty cache and triggering a second live rebuild. Just
-            # serve the network-free minimal catalog and leave the flag alone.
+            # This branch never owns the live worker. Clearing the flag here
+            # would release its serialization and trigger duplicate rebuilds.
             return copy.deepcopy(_minimal_static_models_catalog())
 
         # Cold path: full rebuild — only one thread reaches here at a time
@@ -7498,8 +7454,8 @@ def get_available_models(*, prefer_cache: bool = False, force_refresh: bool = Fa
         #
         # ``_publish_models_result`` / ``box["published"]`` ensure exactly one
         # publisher even at the budget boundary (no double write, no lost
-        # refresh). The worker only touches _cache_build_cv after the
-        # foreground releases the RLock by returning, so no lock inversion.
+        # refresh). Condition waits release the catalog lock while providers
+        # are running; publication still takes the same lock.
         build_done = threading.Event()
         budget_exceeded = threading.Event()
         publish_lock = threading.Lock()
@@ -7558,6 +7514,8 @@ def get_available_models(*, prefer_cache: bool = False, force_refresh: bool = Fa
                     box["error"] = exc
                 finally:
                     build_done.set()
+                    with _cache_build_cv:
+                        _cache_build_cv.notify_all()
                     # Only publish out-of-band if the foreground already gave up
                     # (over budget). Within budget the foreground publishes
                     # synchronously, so the worker must NOT touch the cache.
@@ -7577,7 +7535,26 @@ def get_available_models(*, prefer_cache: bool = False, force_refresh: bool = Fa
         )
         _worker.start()
 
-        if build_done.wait(timeout=_LIVE_REBUILD_BUDGET_SECONDS):
+        try:
+            done_in_budget = _cache_build_cv.wait_for(
+                build_done.is_set,
+                timeout=max(
+                    0.0,
+                    _LIVE_REBUILD_BUDGET_SECONDS - (time.monotonic() - request_started_at),
+                ),
+            )
+        except BaseException:
+            # An interrupted caller must not orphan the detached build. Hand
+            # publication to the worker, including a completion at this boundary.
+            budget_exceeded.set()
+            if build_done.is_set() and _claim_publish():
+                if "result" in box:
+                    _publish_models_result(box["result"])
+                else:
+                    _clear_build_in_progress()
+            raise
+
+        if done_in_budget:
             # Build finished within budget — foreground publishes
             # synchronously, exactly like the legacy path.
             if "error" in box:
@@ -7592,10 +7569,14 @@ def get_available_models(*, prefer_cache: bool = False, force_refresh: bool = Fa
         # wait() returning False and here: if so, still publish synchronously
         # so this caller honours the cache contract.
         budget_exceeded.set()
-        if build_done.is_set() and "error" not in box and "result" in box:
+        if build_done.is_set():
             if _claim_publish():
-                _publish_models_result(box["result"])
-            return copy.deepcopy(box["result"])
+                if "result" in box:
+                    _publish_models_result(box["result"])
+                else:
+                    _clear_build_in_progress()
+            if "result" in box:
+                return copy.deepcopy(box["result"])
 
         # Genuinely slow/hung probe: serve the best fallback now; the worker
         # keeps going and refreshes the cache for the next caller.

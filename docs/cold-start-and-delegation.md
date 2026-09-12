@@ -24,3 +24,24 @@ Read-only isolated process measurement on this VPS, 20 actual profiles: default 
 single worker completed, fast list 0.873s with zero pending counts. These are backend projection
 measurements, not browser end-to-end latency. Synthetic 200 transcript files/100,000 messages:
 first build 0.398s, persistent-index projection 0.015s, equal sidebar rows (27.3x).
+
+## Concurrent model discovery
+
+The positive model-rebuild budget applies to both the initiating request and
+concurrent followers, including time already spent in local catalog lookup.
+Provider waits release the catalog lock. Cache-only requests use validated memory,
+disk, or the minimal local fallback without waiting for an active provider probe.
+Normal and forced callers coalesce behind one worker and return the existing
+fallback when their remaining budget expires. A timeout or interrupted caller does
+not cancel another caller's shared rebuild; its eventual result still warms the
+cache. Budget <= 0 retains the explicit legacy synchronous behavior.
+
+This changes derived catalog/wait state only. Profile fingerprints, cache schema
+checks and per-request model permission filtering remain authoritative. It does
+not establish the cause of any individual slow chat or a production latency gain.
+
+Regression coverage in `tests/test_issue3928_models_budget_fallback.py` uses a
+gated synthetic provider to exercise follower deadlines, cache-only access while
+the initiating request waits, simultaneous cold callers, interruption recovery
+and rejection of another profile's memory cache. Run with `./scripts/test.sh`,
+alongside session-visit freshness and profile-provider catalog tests.
