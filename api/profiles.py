@@ -143,13 +143,35 @@ def _skill_modules_support_profile_home(profile_home: Path) -> bool:
     return True
 
 
+def _normalize_dynamic_skill_home_modules() -> None:
+    """Retire legacy overrides before modern capability checks or snapshots."""
+    if _resolve_hermes_home_override() is None:
+        return
+    for module_name in _SKILL_HOME_MODULES:
+        module = sys.modules.get(module_name)
+        if (module is not None and hasattr(module, '_SKILLS_DIR_AT_IMPORT')
+                and callable(getattr(module, '_skills_dir', None))):
+            module.SKILLS_DIR = module._SKILLS_DIR_AT_IMPORT
+
+
 def patch_skill_home_modules(home: Path) -> None:
-    """Patch imported skill modules that cache HERMES_HOME at import time."""
+    """Keep modern resolvers dynamic; patch only legacy import-time paths.
+
+    A global SKILLS_DIR override wins over the engine's context-local home.
+    Leaving one behind lets a delayed review for profile A resolve profile B's
+    skill directory. Modern modules must retain their import baseline so their
+    own per-call resolver can follow the current worker's home instead.
+    """
+    context_home_available = _resolve_hermes_home_override() is not None
+    _normalize_dynamic_skill_home_modules()
     for module_name in _SKILL_HOME_MODULES:
         module = sys.modules.get(module_name)
         if module is None:
             continue
         try:
+            if (context_home_available and hasattr(module, '_SKILLS_DIR_AT_IMPORT')
+                    and callable(getattr(module, '_skills_dir', None))):
+                continue
             module.HERMES_HOME = home
             module.SKILLS_DIR = home / "skills"
         except AttributeError:
@@ -1184,6 +1206,21 @@ def _resolve_hermes_home_override():
 
 
 @contextmanager
+def agent_profile_home_context(home: Path):
+    """Pin engine config/skill paths across tool and background-review threads."""
+    module = _resolve_hermes_home_override()
+    if module is None:
+        # Older engines retain the existing process-env/legacy-module path.
+        yield
+        return
+    token = module.set_hermes_home_override(str(home))
+    try:
+        yield
+    finally:
+        module.reset_hermes_home_override(token)
+
+
+@contextmanager
 def profile_env_for_background_worker(
     session,
     purpose: str = "background worker",
@@ -1283,6 +1320,10 @@ def profile_env_for_background_worker(
         if scope_skill_modules:
             if _home_override_mod is not None and _home_override_installed:
                 try:
+                    # A stale legacy override must not force a modern worker
+                    # into snapshot/restore, which would reinstate that global
+                    # override while another profile's review is still alive.
+                    _normalize_dynamic_skill_home_modules()
                     has_profile_skill_home = _skill_modules_support_profile_home(
                         profile_home_path
                     )

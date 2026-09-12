@@ -6955,6 +6955,7 @@ def _run_agent_streaming(
     _continuation_turn_tokens = None
     _streaming_cron_profile_home_token = None
     _personal_memory_token = None
+    _profile_home_context = None
     _worker_ownership_token = None
     def _drain_after_worker_retirement():
         # Worker finally may precede a leased cancellation callback. Wakeups
@@ -7119,6 +7120,7 @@ def _run_agent_streaming(
         # process-level active-profile global.  Falls back gracefully.
         try:
             from api.profiles import (
+                agent_profile_home_context,
                 filter_runtime_env_for_gateway_parity,
                 patch_skill_home_modules,
                 get_hermes_home_for_profile,
@@ -7126,6 +7128,12 @@ def _run_agent_streaming(
             )
             _profile_home_path = get_hermes_home_for_profile(execution_profile or getattr(s, 'profile', None))
             _profile_home = str(_profile_home_path)
+            # The engine propagates ContextVars into tool/review threads, not
+            # WebUI threading.local state or process environment snapshots.
+            # Bind before config reads and keep the scope until worker cleanup.
+            _home_scope = agent_profile_home_context(_profile_home_path)
+            _home_scope.__enter__()
+            _profile_home_context = _home_scope
             _streaming_cron_profile_home_token = _STREAMING_CRON_PROFILE_HOME.set(_profile_home)
             _profile_runtime_env = get_profile_runtime_env(_profile_home_path)
             _safe_profile_runtime_env = filter_runtime_env_for_gateway_parity(_profile_runtime_env)
@@ -10191,7 +10199,11 @@ def _run_agent_streaming(
 
         finally:
             from api.worker_ownership import release as release_worker
-            release_worker(_worker_ownership_token)
+            try:
+                if _profile_home_context is not None:
+                    _profile_home_context.__exit__(None, None, None)
+            finally:
+                release_worker(_worker_ownership_token)
 
 # ============================================================
 # SECTION: HTTP Request Handler

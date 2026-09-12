@@ -732,8 +732,8 @@ def test_profile_env_for_background_worker_serializes_static_module_scope_with_l
     not HAS_OVERRIDE,
     reason="requires v0.18.0 context-local home override support",
 )
-def test_profile_env_for_background_worker_uses_real_modules_and_serializes_overlap(tmp_path, monkeypatch):
-    """Real skill modules should serialize static fallback scopes across profiles."""
+def test_profile_env_for_background_worker_uses_dynamic_modules_despite_stale_override(tmp_path, monkeypatch):
+    """Modern workers retire stale globals and resolve skills concurrently."""
 
     try:
         import tools.skills_tool as skills_tool
@@ -869,9 +869,9 @@ def test_profile_env_for_background_worker_uses_real_modules_and_serializes_over
 
         thread_beta.start()
         assert beta_started.wait(timeout=5), "beta worker should attempt to start"
-        assert not beta_entered.wait(0.25), "beta must block on fallback scope lock while alpha holds it"
+        assert beta_entered.wait(5), "modern beta scope should not wait for alpha"
 
-        assert alpha_listed.wait(timeout=5), "alpha must list skills while beta is waiting"
+        assert alpha_listed.wait(timeout=5), "alpha must retain its own skills during beta"
 
         release_alpha.set()
         assert beta_entered.wait(timeout=5), "beta should enter after alpha exits"
@@ -891,9 +891,9 @@ def test_profile_env_for_background_worker_uses_real_modules_and_serializes_over
 
         assert hermes_constants.get_hermes_home_override() == baseline_override
         assert skills_tool.HERMES_HOME == str(alpha_home)
-        assert skills_tool.SKILLS_DIR == alpha_skills_dir
+        assert skills_tool.SKILLS_DIR == skills_tool._SKILLS_DIR_AT_IMPORT
         assert skill_manager_tool.HERMES_HOME == str(alpha_home)
-        assert skill_manager_tool.SKILLS_DIR == alpha_skills_dir
+        assert skill_manager_tool.SKILLS_DIR == skill_manager_tool._SKILLS_DIR_AT_IMPORT
         assert os.environ.get("HERMES_HOME") == str(alpha_home)
     finally:
         thread_alpha.join(timeout=1)
