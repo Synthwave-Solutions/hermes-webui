@@ -9,7 +9,7 @@
 const S={session:{session_id:'chat-a'},messages:[]};let _currentPanel='chat', _loadingSessionId=null, fail=false, delay=false;
 const eventTime=Math.floor(Date.now()/1000)-60;
 const counts={created:1,patched:2,updated:0};
-const payload={events:[{id:'a'.repeat(64),created_at:eventTime,counts}],coverage:'observed_changes_only'};
+const payload={events:[{id:'a'.repeat(64),created_at:eventTime,counts,skills:[{name:'fixture-learning',kind:'created',count:1},{name:'cloud-check',kind:'patched',count:2}]}],coverage:'observed_changes_only'};
 async function api(url,opts){const requested=new URL(url,location.href).searchParams.get('session_id');document.getElementById('fixture-status').textContent='Fetched '+requested;if(delay){delay=false;await new Promise(r=>setTimeout(r,1500));}if(fail){fail=false;throw new Error('Synthetic temporary failure');}return requested==='chat-a'?JSON.parse(JSON.stringify(payload)):{events:[]};}
 function rerender(){S.messages=[{role:'user',timestamp:eventTime-120,content:'Improve this workflow.'},{role:'assistant',timestamp:eventTime-100,content:'The requested task is completed.'},{role:'user',timestamp:eventTime+30,content:'Continue with the next task.'}];document.getElementById('msgInner').innerHTML=S.messages.map((m,i)=>'<div class="message" data-msg-idx="'+i+'">'+m.content+'</div>').join('');window.SynthPulseSkillActivity?.sync(true);}
 function choose(sid){_loadingSessionId=null;S.session={session_id:sid};document.getElementById('current').textContent=sid==='chat-a'?'Conversation A':'Conversation B';rerender();}

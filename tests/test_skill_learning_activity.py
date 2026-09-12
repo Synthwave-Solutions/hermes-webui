@@ -226,6 +226,9 @@ def test_actual_native_create_patch_batch_and_failure_observed_without_provider(
             target()
         assert activity.read_activity("a@example.test", "chat-a")["events"][0]["counts"] == {
             "created": 1, "patched": 2, "updated": 0}
+        assert activity.read_activity("a@example.test", "chat-a")["events"][0]["skills"] == [
+            {"name": "fixture-learning", "kind": "created", "count": 1},
+            {"name": "fixture-learning", "kind": "patched", "count": 2}]
     finally:
         skill_provenance.reset_current_write_origin(origin)
         hermes_constants.reset_hermes_home_override(token)

@@ -46,8 +46,21 @@
         ['patched', tr('skill_learning_patched', 'Skill automatically patched')],
         ['updated', tr('skill_learning_updated', 'Skill automatically updated')],
       ];
-      copy.textContent = labels.filter(([key]) => row.counts[key] > 0)
-        .map(([key, label]) => label + (row.counts[key] > 1 ? ' × ' + row.counts[key] : '')).join(' · ');
+      const named = {created: 0, patched: 0, updated: 0};
+      for (const skill of row.skills || []) {
+        const line = document.createElement('div');
+        const label = labels.find(([key]) => key === skill.kind)[1];
+        line.textContent = label + ': ' + skill.name + (skill.count > 1 ? ' × ' + skill.count : '');
+        copy.append(line); named[skill.kind] += skill.count;
+      }
+      for (const [key, label] of labels) {
+        const missing = row.counts[key] - named[key];
+        if (missing <= 0) continue;
+        const line = document.createElement('div');
+        line.textContent = label + (missing > 1 ? ' × ' + missing : '') + ' · ' +
+          tr('skill_learning_name_unknown', 'Skill name was not recorded');
+        copy.append(line);
+      }
       const meta = document.createElement('small');
       const time = document.createElement('time');
       const date = new Date(row.created_at * 1000);
@@ -70,11 +83,23 @@
     }
   }
   function valid(row) {
-    return row && /^[a-f0-9]{64}$/.test(row.id) && Number.isSafeInteger(row.created_at)
+    if (!(row && /^[a-f0-9]{64}$/.test(row.id) && Number.isSafeInteger(row.created_at)
       && row.created_at >= 0 && row.created_at < 8640000000000
       && row.counts && ['created', 'patched', 'updated'].every(key =>
         Number.isSafeInteger(row.counts[key]) && row.counts[key] >= 0 && row.counts[key] <= 10000)
-      && Object.values(row.counts).some(value => value > 0);
+      && Object.values(row.counts).some(value => value > 0))) return false;
+    const skills = row.skills === undefined ? [] : row.skills;
+    if (!Array.isArray(skills) || skills.length > 50) return false;
+    const totals = {created: 0, patched: 0, updated: 0}, seen = new Set();
+    for (const skill of skills) {
+      if (!skill || typeof skill.name !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(skill.name) ||
+          !Object.hasOwn(totals, skill.kind) || !Number.isSafeInteger(skill.count) ||
+          skill.count < 1 || skill.count > 10000) return false;
+      const key = skill.kind + ':' + skill.name;
+      if (seen.has(key)) return false;
+      seen.add(key); totals[skill.kind] += skill.count;
+    }
+    return Object.keys(totals).every(key => totals[key] <= row.counts[key]);
   }
   function schedule() {
     clearTimeout(timer); timer = null;
@@ -86,7 +111,7 @@
     const stamp = generation;
     pending = true; lastFetch = Date.now(); controller = new AbortController();
     try {
-      const data = await api('/api/skills/learning-activity?session_id=' + encodeURIComponent(sid), {
+      const data = await api('/api/session/skill-updates?session_id=' + encodeURIComponent(sid), {
         signal: controller.signal, cache: 'no-store', timeoutMs: 5000,
         timeoutToast: false, retries: 0, redirect401: false,
       });

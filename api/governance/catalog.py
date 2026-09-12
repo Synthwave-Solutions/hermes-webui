@@ -111,6 +111,7 @@ ROUTE_CATALOG: tuple[RouteRule, ...] = (
     RouteRule("/api/profile",             "profiles:read", "profiles:admin"),
 
     # sessions, projects, background
+    RouteRule("/api/session/skill-updates", "chat:use", "skills:write", match="exact"),
     RouteRule("/api/session/yolo",        "sessions:read", "sessions:write", match="exact"),
     RouteRule("/api/session",             "sessions:read", "sessions:write"),
     RouteRule("/api/sessions",            "sessions:read", "sessions:write"),

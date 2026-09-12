@@ -13435,7 +13435,7 @@ def handle_get(handler, parsed) -> bool:
             return _handle_cron_delivery_options(handler)
 
     # ── Skills API (GET) ──
-    if parsed.path == "/api/skills/learning-activity":
+    if parsed.path in ("/api/skills/learning-activity", "/api/session/skill-updates"):
         from api.skill_learning_activity import handle_get
         return handle_get(handler, parsed.query)
 

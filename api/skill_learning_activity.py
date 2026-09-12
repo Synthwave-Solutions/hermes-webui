@@ -31,6 +31,21 @@ _MAX_BYTES = 128 * 1024
 _MAX_EVENTS = 100
 _RETENTION = 30 * 86400
 _KINDS = ("created", "patched", "updated")
+_MAX_SKILLS = 50
+
+
+def _skill_identifier(value):
+    # Native skill identifiers may have one category. Never retain a path,
+    # description, tool output, or arbitrary model prose as the display name.
+    if not isinstance(value, str) or not re.fullmatch(
+            r"(?:[A-Za-z0-9][A-Za-z0-9._-]{0,63}/)?[A-Za-z0-9][A-Za-z0-9._-]{0,63}", value):
+        return None
+    return value
+
+
+def _display_name(value):
+    identifier = _skill_identifier(value)
+    return identifier.rsplit("/", 1)[-1] if identifier else None
 
 
 @dataclass(frozen=True)
@@ -48,11 +63,12 @@ def _actor(value):
     return value
 
 
-def successful_skill_counts(messages, prior):
+def successful_skill_changes(messages, prior):
     """Join native structured calls/results. Ambiguous evidence is ignored."""
     counts = dict.fromkeys(_KINDS, 0)
+    skills = {}
     if not isinstance(messages, list) or not isinstance(prior, list):
-        return counts
+        return counts, []
     old = {m.get("tool_call_id") for m in prior if isinstance(m, dict)
            and isinstance(m.get("tool_call_id"), str)}
     for msg in prior:
@@ -102,7 +118,9 @@ def successful_skill_counts(messages, prior):
                         or result["operations_applied"] != len(operations)):
                     continue
                 if not all(isinstance(op, dict) and isinstance(out, dict)
-                           and out.get("success") is True and out.get("action") == op.get("action")
+                           and out.get("success") is True and not out.get("error")
+                           and not out.get("staged") and not out.get("pending_id")
+                           and out.get("action") == op.get("action")
                            for op, out in zip(operations, results, strict=True)):
                     continue
             else:
@@ -115,9 +133,19 @@ def successful_skill_counts(messages, prior):
                         "write_file": "updated", "remove_file": "updated"}.get(action)
                 if kind:
                     counts[kind] += 1
+                    resource = _skill_identifier(operation.get("name") or arguments.get("name"))
+                    if resource:
+                        key = (resource, kind)
+                        if key in skills or len(skills) < _MAX_SKILLS:
+                            skills[key] = skills.get(key, 0) + 1
         except (ValueError, TypeError):
             continue
-    return counts
+    return counts, [{"name": _display_name(resource), "resource": resource, "kind": kind, "count": count}
+                    for (resource, kind), count in skills.items()]
+
+
+def successful_skill_counts(messages, prior):
+    return successful_skill_changes(messages, prior)[0]
 
 
 def _safe(path):
@@ -173,6 +201,27 @@ def _counts(value):
             and any(value.values()))
 
 
+def _skills(value, counts):
+    if not isinstance(value, list) or len(value) > _MAX_SKILLS:
+        return False
+    totals, seen = dict.fromkeys(_KINDS, 0), set()
+    for row in value:
+        if (not isinstance(row, dict) or set(row) not in (
+                {"name", "kind", "count"}, {"name", "resource", "kind", "count"})
+                or _display_name(row.get("name")) != row.get("name")
+                or not isinstance(row.get("name"), str) or "/" in row["name"]
+                or row.get("kind") not in _KINDS or type(row.get("count")) is not int
+                or not 1 <= row["count"] <= 10000
+                or _display_name(row.get("resource", row["name"])) != row["name"]):
+            return False
+        key = (row.get("resource", row["name"]), row["kind"])
+        if key in seen:
+            return False
+        seen.add(key)
+        totals[row["kind"]] += row["count"]
+    return all(totals[k] <= counts[k] for k in _KINDS)
+
+
 def _load(path, now):
     try:
         fd = _open_regular(path, os.O_RDONLY)
@@ -186,18 +235,21 @@ def _load(path, now):
     if not isinstance(data, list) or len(data) > _MAX_EVENTS:
         raise ValueError("Invalid activity storage")
     for row in data:
-        if (not isinstance(row, dict) or set(row) != {"id", "session", "created_at", "counts"}
+        if (not isinstance(row, dict) or set(row) not in (
+                {"id", "session", "created_at", "counts"},
+                {"id", "session", "created_at", "counts", "skills"})
                 or not re.fullmatch(r"[0-9a-f]{64}", str(row.get("id", "")))
                 or not re.fullmatch(r"[0-9a-f]{64}", str(row.get("session", "")))
                 or type(row.get("created_at")) is not int
-                or row["created_at"] < 0 or not _counts(row.get("counts"))):
+                or row["created_at"] < 0 or not _counts(row.get("counts"))
+                or not _skills(row.get("skills", []), row["counts"])):
             raise ValueError("Invalid activity storage")
     return [row for row in data if now - _RETENTION <= row["created_at"] <= now + 300]
 
 
-def record(scope, counts, *, now=None):
+def record(scope, counts, *, skills=None, now=None):
     """Best effort; persistence failure must never change a review outcome."""
-    if not _counts(counts):
+    if not _counts(counts) or not _skills([] if skills is None else skills, counts):
         return False
     now = int(time.time() if now is None else now)
     try:
@@ -208,12 +260,18 @@ def record(scope, counts, *, now=None):
             if any(row["id"] == ident for row in rows):
                 return True
             rows.append({"id": ident, "session": hashlib.sha256(scope.session_id.encode()).hexdigest(),
-                         "created_at": now, "counts": dict(counts)})
+                         "created_at": now, "counts": dict(counts),
+                         "skills": [{**skill, "resource": skill.get("resource", skill["name"])} for skill in skills or []]})
             rows = sorted(rows, key=lambda row: row["created_at"])[-_MAX_EVENTS:]
+            # Name metadata must not make a valid store unreadable at its byte cap.
+            encoded = json.dumps(rows, separators=(",", ":")).encode("utf-8")
+            while len(encoded) > _MAX_BYTES:
+                rows.pop(0)
+                encoded = json.dumps(rows, separators=(",", ":")).encode("utf-8")
             fd, temp = tempfile.mkstemp(prefix=".activity-", dir=path.parent)
             try:
-                with os.fdopen(fd, "w", encoding="utf-8") as stream:
-                    json.dump(rows, stream, separators=(",", ":"))
+                with os.fdopen(fd, "wb") as stream:
+                    stream.write(encoded)
                     stream.flush()
                     os.fsync(stream.fileno())
                 _safe(path)
@@ -227,13 +285,29 @@ def record(scope, counts, *, now=None):
         return False
 
 
-def read_activity(actor, session_id, *, now=None):
+def read_activity(actor, session_id, *, now=None, access=None):
+    from api.governance.resource_scope import allowed
     path, lock = _paths(_actor(actor))
     with _locked(lock):
         rows = _load(path, int(time.time() if now is None else now))
     session_key = hashlib.sha256(session_id.encode()).hexdigest()
-    events = [{k: row[k] for k in ("id", "created_at", "counts")}
-              for row in reversed(rows) if row["session"] == session_key]
+    events = []
+    for row in reversed(rows):
+        if row["session"] != session_key:
+            continue
+        counts, names = dict(row["counts"]), {}
+        for skill in row.get("skills", []):
+            name, kind = skill["name"], skill["kind"]
+            if not allowed(access, "skills_view", skill.get("resource", name), (name,)):
+                counts[kind] -= skill["count"]
+                continue
+            key = (name, kind)
+            names[key] = names.get(key, 0) + skill["count"]
+        if not any(counts.values()):
+            continue
+        events.append({"id": row["id"], "created_at": row["created_at"], "counts": counts,
+                       "skills": [{"name": name, "kind": kind, "count": count}
+                                  for (name, kind), count in names.items()]})
     return {"events": events, "coverage": "observed_changes_only",
             "retention_days": 30}
 
@@ -275,7 +349,8 @@ def install_adapter():
                     scope = _REVIEW.get()
                     if scope is not None:
                         try:
-                            record(scope, successful_skill_counts(review_messages, prior_snapshot or []))
+                            counts, skills = successful_skill_changes(review_messages, prior_snapshot or [])
+                            record(scope, counts, skills=skills)
                         except Exception:
                             logger.warning("Could not observe private skill learning activity")
             spawn._webui_skill_activity = True
@@ -319,6 +394,8 @@ def handle_get(handler, query):
     except (KeyError, PermissionError):
         return j(handler, {"error": "Conversation unavailable"}, status=404, extra_headers=headers)
     try:
-        return j(handler, read_activity(actor, ids[0]), extra_headers=headers)
-    except (OSError, ValueError, TypeError):
+        from api.governance.resource_scope import access_for
+        data = read_activity(actor, ids[0], access=access_for(handler))
+    except Exception:
         return j(handler, {"error": "Skill activity is unavailable. Please try again."}, status=503, extra_headers=headers)
+    return j(handler, data, extra_headers=headers)
