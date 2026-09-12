@@ -363,6 +363,7 @@ function _setTerminalChromeState(state){
 }
 
 function syncTerminalBackendState(data){
+  S.terminalBackendKnown=true;
   S.terminalRemoteBackend=!!(data&&data.terminal_remote_backend);
   return S.terminalRemoteBackend;
 }
@@ -398,10 +399,11 @@ function syncTerminalButton(){
   if(!toggle)return;
   const hasWorkspace=!!(S.session&&S.session.workspace);
   const remoteBackend=!!S.terminalRemoteBackend;
-  toggle.disabled=!hasWorkspace||remoteBackend;
+  const backendPending=S.terminalBackendKnown===false;
+  toggle.disabled=!hasWorkspace||backendPending||remoteBackend;
   toggle.classList.toggle('active',TERMINAL_UI.open);
   toggle.setAttribute('aria-pressed',TERMINAL_UI.open?'true':'false');
-  toggle.title=!hasWorkspace
+  toggle.title=backendPending ? t('loading') : !hasWorkspace
     ? t('terminal_no_workspace_title')
     : (remoteBackend
       ? _terminalRemoteBackendUnsupportedMessage()
@@ -478,6 +480,11 @@ function _connectTerminalOutput(){
 }
 
 async function _startComposerTerminal(restart=false){
+  if(S.terminalBackendKnown===false){
+    showToast(t('loading'),2600,'warning');
+    syncTerminalButton();
+    return;
+  }
   const sid=_terminalSessionId();
   if(!sid||!(S.session&&S.session.workspace)){
     showToast(t('terminal_no_workspace_title'),2600,'warning');
@@ -489,7 +496,13 @@ async function _startComposerTerminal(restart=false){
     syncTerminalButton();
     return;
   }
+  const profile=S.activeProfile;
+  const profileGeneration=_profileSwitchGeneration;
+  const workspace=S.session.workspace;
   await _loadXterm();
+  if(S.terminalBackendKnown===false || S.terminalRemoteBackend
+    || sid!==_terminalSessionId() || workspace!==(S.session&&S.session.workspace)
+    || profile!==S.activeProfile || profileGeneration!==_profileSwitchGeneration) return;
   const term=_ensureXterm();
   if(!term)return;
   _fitTerminal();

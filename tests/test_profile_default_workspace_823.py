@@ -76,15 +76,20 @@ class TestProfileSwitchWorkspaceSetter:
 
     def test_panels_still_sets_profile_default_workspace(self):
         src = read('static/panels.js')
-        assert 'S._profileDefaultWorkspace = data.default_workspace' in src, (
+        reset = src.split('function _resetWorkspaceListState(profileData)', 1)[1].split('async function loadWorkspaceList', 1)[0]
+        switch = src.split('async function switchToProfile(name)', 1)[1].split('function openProfileCreate', 1)[0]
+        assert '_resetWorkspaceListState(data)' in switch
+        assert "typeof profileData.default_workspace==='string'?profileData.default_workspace:''" in reset
+        assert 'S._profileDefaultWorkspace=workspace' in reset, (
             "panels.js must still set S._profileDefaultWorkspace (persistent default) "
             "alongside S._profileSwitchWorkspace"
         )
 
     def test_both_set_together_in_same_block(self):
         src = read('static/panels.js')
-        default_pos = src.find('S._profileDefaultWorkspace = data.default_workspace')
-        switch_pos = src.find('S._profileSwitchWorkspace = data.default_workspace')
+        reset = src.split('function _resetWorkspaceListState(profileData)', 1)[1].split('async function loadWorkspaceList', 1)[0]
+        default_pos = reset.find('S._profileDefaultWorkspace=workspace')
+        switch_pos = reset.find('S._profileSwitchWorkspace=workspace')
         assert default_pos != -1, "S._profileDefaultWorkspace setter not found"
         assert switch_pos != -1, "S._profileSwitchWorkspace setter not found"
         # Both must be set within 200 chars of each other (same block)

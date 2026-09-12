@@ -3784,7 +3784,9 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
   // Render the session list before restoring the saved conversation so a stale
   // saved-session/client-side boot error cannot leave the sidebar empty forever.
   await renderSessionList();
-  await _workspaceListReady;
+  // Existing conversations authorize their own workspace through loadSession.
+  // Keep setup gated; optional picker metadata may settle after a saved chat.
+  if(_bootSettings.onboarding_completed!==true) await _workspaceListReady;
   await _onboardingReady;
   _initResizePanels();
   // Workspace panel restore happens AFTER loadSession so we know if
@@ -3803,6 +3805,8 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
     : null;
   if(_shouldStartFreshPwaChat(pwaLaunchAction,urlSession)){
     try{
+      await _workspaceListReady;
+      if(await _finishBootAfterNewerSessionActivation()) return;
       await newSession(true);
       // New-chat PWA launches need the empty conversation visible immediately.
       // Boot model hydration can take several seconds when /api/models falls
@@ -3833,6 +3837,8 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
         : null;
       if(await _finishBootAfterNewerSessionActivation()) return;
       if(savedSidebarOnlyState&&savedSidebarOnlyState.sidebarOnly){
+        await _workspaceListReady;
+        if(await _finishBootAfterNewerSessionActivation()) return;
         if(savedSidebarOnlyState.archived){
           try{localStorage.removeItem('hermes-webui-session');}catch(_){}
         }
@@ -3844,6 +3850,8 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
         return;
       }
       if(_rootPrefillNeedsFreshComposer(urlSession, savedLocal, prefillIntent)){
+        await _workspaceListReady;
+        if(await _finishBootAfterNewerSessionActivation()) return;
         S.session=null; S.messages=[]; S.activeStreamId=null; S.busy=false;
         S._bootReady=true;window.dispatchEvent(new Event("synpulse:boot-ready"));
         const _ephPanelPref=localStorage.getItem('hermes-webui-workspace-panel-pref')==='open'
@@ -3887,6 +3895,8 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
         : [];
       const _restoredHasDraft = !!(_restoredDraftText || _restoredDraftFiles.length);
       if(_isRestoredPersonalScratchSession(S.session, urlSession) && (S.session.message_count||0) === 0 && !_restoredInFlight && !_restoredHasDraft){
+        await _workspaceListReady;
+        if(await _finishBootAfterNewerSessionActivation()) return;
         S.session=null; S.messages=[];
         S._bootReady=true;window.dispatchEvent(new Event("synpulse:boot-ready"));
         // Restore panel pref before syncing so the workspace panel stays visible
@@ -3916,6 +3926,8 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
     }
   }
   // no saved session - show empty state, wait for user to hit +
+  await _workspaceListReady;
+  if(await _finishBootAfterNewerSessionActivation()) return;
   S._bootReady=true;window.dispatchEvent(new Event("synpulse:boot-ready"));
   syncTopbar();
   // Restore panel pref so the workspace panel stays visible on a fresh load if the

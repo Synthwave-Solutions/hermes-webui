@@ -5684,6 +5684,7 @@ async function submitMemorySave() {
 
 // ── Workspace management ──
 let _workspaceList = [];  // cached from /api/workspaces
+let _workspaceListRequestGeneration = 0;
 let _workspaceViewerIsAdmin = false;  // server-provided viewer_is_admin from /api/workspaces
 let _wsSuggestTimer = null;
 let _wsSuggestReq = 0;
@@ -5823,9 +5824,33 @@ function syncWorkspaceDisplays(){
   }
 }
 
+function _resetWorkspaceListState(profileData){
+  ++_workspaceListRequestGeneration;
+  _workspaceList=null;
+  _workspaceViewerIsAdmin=false;
+  S.terminalBackendKnown=false;
+  if(profileData){
+    const workspace=typeof profileData.default_workspace==='string'?profileData.default_workspace:'';
+    S._profileDefaultWorkspace=workspace;
+    S._profileSwitchWorkspace=workspace;
+  }
+  syncWorkspaceDisplays();
+  if(typeof syncTerminalButton==='function') syncTerminalButton();
+  return _workspaceListRequestGeneration;
+}
+
 async function loadWorkspaceList(){
+  const requestGeneration=_resetWorkspaceListState();
+  const profile=S.activeProfile||'default';
+  const profileGeneration=_profileSwitchGeneration;
   try{
     const data = await api('/api/workspaces');
+    if(requestGeneration!==_workspaceListRequestGeneration
+      || profile!==(S.activeProfile||'default')
+      || profileGeneration!==_profileSwitchGeneration) return {workspaces:[],last:''};
+    if(!data || !Array.isArray(data.workspaces)
+      || typeof data.terminal_remote_backend!=='boolean'
+      || typeof data.viewer_is_admin!=='boolean') return {workspaces:[],last:''};
     if(typeof syncTerminalBackendState==='function') syncTerminalBackendState(data);
     _workspaceList = data.workspaces || [];
     _workspaceViewerIsAdmin = !!data.viewer_is_admin;
@@ -7340,6 +7365,7 @@ async function switchToProfile(name) {
     if (_switchGen !== _profileSwitchGeneration) return false;
     S.activeProfile = data.active || name;
     S.activeProfileIsDefault = !!data.is_default;
+    _resetWorkspaceListState(data);
     // Scenes are per-profile state; never let one leak across a switch.
     if (typeof _clearSessionSceneCache === 'function') _clearSessionSceneCache();
     if (typeof _resetCronUnreadForProfileSwitch === 'function') {
@@ -7377,7 +7403,6 @@ async function switchToProfile(name) {
     if(typeof _clearPersistedModelState==='function') _clearPersistedModelState();
     else localStorage.removeItem('hermes-webui-model');
     _skillsData = null;
-    _workspaceList = null;
     if (data.default_model) window._defaultModel = data.default_model;
     if (data.default_model_provider) window._activeProvider = data.default_model_provider;
 
@@ -7427,13 +7452,6 @@ async function switchToProfile(name) {
 
     // ── Apply workspace ────────────────────────────────────────────────────
     if (data.default_workspace) {
-      // Always store the persistent profile default — used for blank-page display
-      // and workspace auto-bind throughout the session lifecycle (#804, #823).
-      S._profileDefaultWorkspace = data.default_workspace;
-      // Also set the one-shot flag consumed by newSession() so the first new
-      // session after a profile switch inherits this workspace (#424).
-      S._profileSwitchWorkspace = data.default_workspace;
-
       if (S.session && !sessionInProgress) {
         // Empty session (no messages yet) — safe to update it in place
         try {

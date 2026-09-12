@@ -1826,13 +1826,18 @@ async function _switchProfileForSessionLoad(profile){
   const name=String(profile||'').trim();
   if(!name) throw new Error('missing profile');
   if(name===S.activeProfile) return;
-  if(typeof _invalidateSessionListRenders==='function') _invalidateSessionListRenders();
-  if(typeof _setProfileSwitchListEmbargo==='function') _setProfileSwitchListEmbargo(true);
-  if(typeof showSessionListSkeleton==='function') showSessionListSkeleton(name);
+  const switchGeneration=++_profileSwitchGeneration;
   try{
+    if(typeof _invalidateSessionListRenders==='function') _invalidateSessionListRenders();
+    if(typeof _setProfileSwitchListEmbargo==='function') _setProfileSwitchListEmbargo(true);
+    if(typeof showSessionListSkeleton==='function') showSessionListSkeleton(name);
     const data=await api('/api/profile/switch',{method:'POST',body:JSON.stringify({name}),timeoutToast:false});
+    if(switchGeneration!==_profileSwitchGeneration) return false;
     S.activeProfile=data.active||name;
     S.activeProfileIsDefault=!!data.is_default;
+    // Invalidate old-profile metadata even for the automatic sidebar switch.
+    _resetWorkspaceListState(data);
+    loadWorkspaceList().catch(()=>{});
     // Scenes are per-profile state; never let one leak across a switch.
     _clearSessionSceneCache();
     if(typeof _resetCronUnreadForProfileSwitch==='function'){
@@ -1849,7 +1854,9 @@ async function _switchProfileForSessionLoad(profile){
     if(typeof syncTopbar==='function') syncTopbar();
     if(typeof _setProfileSwitchListEmbargo==='function') _setProfileSwitchListEmbargo(false);
     if(typeof renderSessionList==='function') await renderSessionList();
+    if(switchGeneration!==_profileSwitchGeneration) return false;
   }catch(switchErr){
+    if(switchGeneration!==_profileSwitchGeneration) return false;
     // The switch POST failed, so we're still on the previous profile and its
     // caches are intact. Clear the up-front skeleton and re-render the real
     // list so the sidebar doesn't strand on the skeleton (the #4671 strand bug
@@ -1860,7 +1867,18 @@ async function _switchProfileForSessionLoad(profile){
     if(typeof _setProfileSwitchListEmbargo==='function') _setProfileSwitchListEmbargo(false);
     _sessionListSkeletonActive=false;
     if(typeof renderSessionListFromCache==='function') renderSessionListFromCache();
+    if(typeof syncTopbar==='function') syncTopbar();
     throw switchErr;
+  }finally{
+    if(switchGeneration===_profileSwitchGeneration){
+      // An automatic sidebar switch may supersede a manual switch whose
+      // disabled profile controls now belong to this newer intent.
+      for(const id of ['profileChip','titlebarProfileBtn']){
+        const control=$(id);
+        if(control){control.classList.remove('switching');control.disabled=false;}
+      }
+      if(typeof _setProfileSwitchListEmbargo==='function') _setProfileSwitchListEmbargo(false);
+    }
   }
 }
 
@@ -2066,13 +2084,13 @@ async function loadSession(sid){
       }
       try{
         if(typeof showToast==='function') showToast(`Switching to ${profileMismatch.profile} profile for this session…`,2200);
-        await _switchProfileForSessionLoad(profileMismatch.profile);
+        const profileSwitched=await _switchProfileForSessionLoad(profileMismatch.profile);
         // Post-await stale-load guard (Codex): the profile switch above does a
         // network POST + session-list re-render, during which the user may have
         // navigated to a different session. If we no longer own the load, bail
         // before clearing _loadingSessionId or retrying so the stale
         // continuation can't hijack the UI back to the old target.
-        if (!_isCurrentLoad()) {
+        if (profileSwitched===false || !_isCurrentLoad()) {
           _rearmActiveSessionStream();
           return;
         }

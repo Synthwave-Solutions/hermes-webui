@@ -166,8 +166,12 @@ def test_terminal_slash_command_preflights_remote_backend_before_session_create(
     commands_js = _read("static/commands.js")
 
     cmd_block = commands_js.split("async function cmdTerminal", 1)[1].split("async function cmdNew", 1)[0]
-    assert "api('/api/workspaces')" in cmd_block
-    assert "syncTerminalBackendState(data)" in cmd_block
+    assert "await loadWorkspaceList()" in cmd_block
+    assert "S.terminalBackendKnown!==true" in cmd_block
+    panels_js = _read("static/panels.js")
+    loader_block = panels_js.split("async function loadWorkspaceList()", 1)[1].split("function _setWorkspaceDropdownOpenState", 1)[0]
+    assert "api('/api/workspaces')" in loader_block
+    assert "syncTerminalBackendState(data)" in loader_block
     assert "data&&data.terminal_remote_backend" in cmd_block
     assert "_terminalRemoteBackendUnsupportedMessage" in cmd_block
     # #6022: the auto-mint passes explicit worktree:false so the config
@@ -260,7 +264,9 @@ def test_terminal_button_and_start_path_respect_remote_backend_guard():
     start_block = terminal_js.split("async function _startComposerTerminal", 1)[1].split("async function toggleComposerTerminal", 1)[0]
     assert "function syncTerminalBackendState" in terminal_js
     assert "function _terminalRemoteBackendUnsupportedMessage" in terminal_js
-    assert "toggle.disabled=!hasWorkspace||remoteBackend;" in sync_block
+    assert "toggle.disabled=!hasWorkspace||backendPending||remoteBackend;" in sync_block
+    assert "S.terminalBackendKnown===false" in sync_block
+    assert "if(S.terminalBackendKnown===false)" in start_block
     assert "_terminalRemoteBackendUnsupportedMessage()" in sync_block
     assert "if(S.terminalRemoteBackend)" in start_block
     assert "showToast(_terminalRemoteBackendUnsupportedMessage(),3200,'warning');" in start_block

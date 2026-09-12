@@ -783,10 +783,14 @@ async function cmdWorkspace(args){
 }
 
 async function cmdTerminal(){
+  const profile=S.activeProfile;
+  const profileGeneration=_profileSwitchGeneration;
+  const sessionId=S.session&&S.session.session_id;
   let data=null;
   try{
-    data=await api('/api/workspaces');
-    if(typeof syncTerminalBackendState==='function') syncTerminalBackendState(data);
+    data=await loadWorkspaceList();
+    if(profile!==S.activeProfile || profileGeneration!==_profileSwitchGeneration
+      || sessionId!==(S.session&&S.session.session_id) || S.terminalBackendKnown!==true) return;
     if(data&&data.terminal_remote_backend){
       const msg=typeof _terminalRemoteBackendUnsupportedMessage==='function'
         ? _terminalRemoteBackendUnsupportedMessage()
@@ -795,7 +799,7 @@ async function cmdTerminal(){
       if(typeof syncTerminalButton==='function') syncTerminalButton();
       return;
     }
-  }catch(_){}
+  }catch(_){return;}
   if(!S.session&&typeof newSession==='function'){
     if(!S._profileSwitchWorkspace&&!S._profileDefaultWorkspace){
       const first=(data&&data.workspaces||[])[0];

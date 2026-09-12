@@ -700,7 +700,10 @@ global.t = value => value;
 global.assistantDisplayName = () => 'Hermes';
 global._profileSwitchPanelLoad = async () => {{}};
 global._refreshProfileSwitchBackground = () => {{}};
+global._clearSessionSceneCache = () => {{}};
+global.syncWorkspaceDisplays = () => {{}};
 var _profileSwitchGeneration = 0;
+var _workspaceListRequestGeneration = 0, _workspaceViewerIsAdmin = false;
 var _skillsData = null, _workspaceList = null;
 var _currentReasoningEffort = 'low';
 var _currentReasoningEffortsSupported = ['low', 'high'];
@@ -715,12 +718,15 @@ eval(extractFunc(uiSrc, '_applyReasoningChip'));
 eval(extractFunc(uiSrc, 'fetchReasoningChip'));
 eval(extractFunc(uiSrc, 'refreshProfileTransitionReasoningChip'));
 eval(extractFunc(uiSrc, 'syncTopbar'));
+eval(extractFunc(panelsSrc, '_resetWorkspaceListState'));
+eval(extractFunc(panelsSrc, 'loadWorkspaceList'));
 eval(extractFunc(panelsSrc, 'switchToProfile'));
 eval(extractFunc(sessionsSrc, '_switchProfileForSessionLoad'));
 const pending = [];
 const reasoningUrls = [];
 global.api = (url) => {{
   if (url === '/api/profile/switch') return Promise.resolve({{ active: 'vops', is_default: false, default_model: 'gpt-high', default_model_provider: 'openai' }});
+  if (url === '/api/workspaces') return Promise.resolve({{ workspaces: [], viewer_is_admin: false, terminal_remote_backend: false }});
   if (url.startsWith('/api/reasoning')) {{
     reasoningUrls.push(url);
     return {{ then(ok) {{ pending.push(ok); return {{ catch() {{}} }}; }} }};
