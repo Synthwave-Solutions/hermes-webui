@@ -3238,9 +3238,19 @@ def generate_title_raw_via_agent(agent, user_text: str, assistant_text: str) -> 
         getattr(agent, 'base_url', ''),
     )
     disabled_reasoning = {"enabled": False}
-    prev_reasoning = getattr(agent, 'reasoning_config', None)
     try:
-        agent.reasoning_config = disabled_reasoning
+        # Title generation can overlap the next turn on this cached agent.
+        # Build kwargs on a request-only view; never change/restore its live
+        # reasoning setting or consume its ephemeral output-token override.
+        # Native Anthropic already accepts an explicit request-local setting.
+        title_request_agent = agent
+        if getattr(agent, 'api_mode', '') != 'anthropic_messages':
+            title_request_agent = copy.copy(agent)
+            title_request_agent.reasoning_config = disabled_reasoning
+            title_request_agent.tools = []
+            # Native builders reset transport-local tool alias metadata.
+            # A fresh lightweight transport cache keeps that off the live turn.
+            title_request_agent._transport_cache = {}
         for idx, prompt in enumerate(prompts):
             api_messages = [
                 {"role": "system", "content": prompt},
@@ -3253,7 +3263,7 @@ def generate_title_raw_via_agent(agent, user_text: str, assistant_text: str) -> 
                     raw = ""
                     empty_status = ''
                     if getattr(agent, 'api_mode', '') == 'codex_responses':
-                        codex_kwargs = agent._build_api_kwargs(api_messages)
+                        codex_kwargs = title_request_agent._build_api_kwargs(api_messages)
                         codex_kwargs.pop('tools', None)
                         if 'max_output_tokens' in codex_kwargs:
                             codex_kwargs['max_output_tokens'] = max_tokens
@@ -3263,7 +3273,8 @@ def generate_title_raw_via_agent(agent, user_text: str, assistant_text: str) -> 
                         if not raw:
                             empty_status = 'llm_empty'
                     elif getattr(agent, 'api_mode', '') == 'anthropic_messages':
-                        from agent.anthropic_adapter import build_anthropic_kwargs, normalize_anthropic_response
+                        from agent.anthropic_adapter import build_anthropic_kwargs
+                        from agent.transports import get_transport
                         ant_kwargs = build_anthropic_kwargs(
                             model=agent.model,
                             messages=api_messages,
@@ -3275,20 +3286,20 @@ def generate_title_raw_via_agent(agent, user_text: str, assistant_text: str) -> 
                             base_url=getattr(agent, '_anthropic_base_url', None),
                         )
                         resp = agent._anthropic_messages_create(ant_kwargs)
-                        assistant_message, _ = normalize_anthropic_response(
+                        assistant_message = get_transport('anthropic_messages').normalize_response(
                             resp, strip_tool_prefix=getattr(agent, '_is_anthropic_oauth', False)
                         )
                         raw = (assistant_message.content or '') if assistant_message else ''
                         if not raw:
                             empty_status = 'llm_empty'
                     else:
-                        api_kwargs = agent._build_api_kwargs(api_messages)
+                        api_kwargs = title_request_agent._build_api_kwargs(api_messages)
                         api_kwargs.pop('tools', None)
                         api_kwargs['temperature'] = 0.1
                         api_kwargs['timeout'] = 15.0
                         # Reasoning suppression for title gen is already handled
                         # route-correctly by `_build_api_kwargs()` from the
-                        # `agent.reasoning_config = {"enabled": False}` set above —
+                        # request-only reasoning setting above —
                         # each provider profile applies (or deliberately omits) the
                         # disable in the form its endpoint accepts (OpenAI/Nous omit
                         # the field; LM Studio uses top-level reasoning_effort;
@@ -3342,8 +3353,6 @@ def generate_title_raw_via_agent(agent, user_text: str, assistant_text: str) -> 
     except Exception as e:
         logger.debug("Agent title generation failed: %s", e)
         return None, 'llm_error'
-    finally:
-        agent.reasoning_config = prev_reasoning
 
 
 def _generate_llm_session_title_for_agent(agent, user_text: str, assistant_text: str) -> tuple[Optional[str], str, str]:
