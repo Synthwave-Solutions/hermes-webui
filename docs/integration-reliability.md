@@ -24,6 +24,8 @@ The incident result exposes `recorded` and `dispatched` separately while
 preserving `notified` for existing callers. Repeats within the cooldown do not
 claim a new notification. Acknowledging an alert reports success only after the
 acknowledgement is saved, so a failed write leaves it available for retry.
+New alerts use unique IDs so incidents created in the same millisecond keep
+their own delivery and acknowledgement state. Existing alert IDs are preserved.
 
 Verification:
 

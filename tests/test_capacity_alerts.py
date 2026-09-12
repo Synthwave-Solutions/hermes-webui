@@ -164,6 +164,38 @@ def test_successful_external_delivery_is_recorded_separately(ca, monkeypatch):
     assert ca.list_events()[0]["dispatched"] is True
 
 
+def test_same_millisecond_incidents_keep_independent_delivery_and_acknowledgement(ca, monkeypatch):
+    monkeypatch.setattr(ca.time, "time", lambda: 123456.0)
+    monkeypatch.setattr(ca, "_dispatch_external", lambda event: (
+        (False, "synthetic first failure") if event["provider"] == "first" else (True, "")
+    ))
+    first = ca.record_capacity_event("quota_exhausted", provider="first")
+    second = ca.record_capacity_event("quota_exhausted", provider="second")
+    events = {event["provider"]: event for event in ca.list_events()}
+
+    assert events["first"]["dispatched"] is False
+    assert events["first"]["dispatch_error"] == "synthetic first failure"
+    assert events["second"]["dispatched"] is True
+    assert events["second"]["dispatch_error"] == ""
+    assert first["event_id"] != second["event_id"]
+    assert ca.acknowledge(second["event_id"]) is True
+    after = {event["provider"]: event for event in ca.list_events()}
+    assert after["first"]["acknowledged"] is False
+    assert after["second"]["acknowledged"] is True
+
+
+def test_new_unique_ids_preserve_existing_legacy_alerts(ca, monkeypatch):
+    legacy = {"id": "75bca00", "provider": "legacy", "acknowledged": False}
+    ca._store_path().write_text(json.dumps({"events": [legacy]}), encoding="utf-8")
+    monkeypatch.setattr(ca.time, "time", lambda: 123456.0)
+
+    outcome = ca.record_capacity_event("quota_exhausted", provider="new")
+    assert outcome["event_id"] != legacy["id"]
+    assert next(event for event in ca.list_events() if event["id"] == legacy["id"]) == legacy
+    assert ca.acknowledge(legacy["id"]) is True
+    assert next(event for event in ca.list_events() if event["id"] == legacy["id"])["acknowledged"] is True
+
+
 def test_acknowledge_reports_failed_persistence_and_preserves_row(ca, monkeypatch):
     outcome = ca.record_capacity_event("quota_exhausted", provider="fixture")
     before = ca.list_events()

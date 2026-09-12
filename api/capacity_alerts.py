@@ -29,6 +29,7 @@ import json
 import logging
 import threading
 import time
+import uuid
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -228,7 +229,7 @@ def record_capacity_event(kind, provider=None, model=None, detail="", source="")
                 result["notified"] = False
                 result["event_id"] = str(existing.get("id") or "")
                 return result
-            event_id = f"{int(now * 1000):x}"
+            event_id = uuid.uuid4().hex
             event = {
                 "id": event_id,
                 "key": key,
