@@ -11,3 +11,40 @@ The agent receives only an in-memory project workspace and authorization callbac
 Tests exercise actual GET/POST dispatch using separate authenticated identities and isolated state. They cover owner/member/outsider, immediate revocation and deleted-project tombstones, revision conflicts, scoped file uploads/downloads, path attacks, absent capabilities, both create entrypoints and private legacy adoption. A separate integration test binds the real engine context and checks read/write policy inside, private paths outside, symlinks, and post-bind membership revocation. No real colleague is added or messaged by this verification.
 
 Authenticated SSO group claims travel with the original actor into the worker and invocation callback. Connected SSE consumers recheck access before live events and each journal replay event. All project read-modify-write paths, including legacy routes, cron and webhook creation, share one transaction lock so stale writes cannot restore removed members. New empty groups persist owner and both rosters before returning their creation response.
+
+## Reliable creation and existing conversations
+
+SynthPulse's sidebar project shortcut and the Projects team panel now use the
+same shared-conversation creation flow. The flow refreshes the selected project,
+checks its available bot choices, shows progress, and uses `/api/projects/chat`.
+The personal `/api/session/new` endpoint keeps rejecting shared projects.
+
+A per-tab request reference survives a refresh or a lost response. The server
+maps that reference together with the current actor and project to a reserved
+session ID; the session is saved atomically before success. A retry rechecks
+current membership and bot permissions and returns the same session without
+rewriting its messages. Concurrent project creates and session deletes use the
+same project transaction lock, then the session cache lock. Explicit IDs are
+checked again at cache registration, so they cannot overwrite another record.
+Deleted or changed creation scopes return a specific conflict code. Only that
+confirmed outcome allows the UI to start a new intent after explaining that the
+next click creates a separate conversation; uncertain outcomes keep their key.
+
+Choosing a shared project in an existing conversation's project picker offers
+**Create a separate project conversation**. The confirmation explains its audience
+and that the existing transcript, attachments and access remain unchanged. No
+messages, attachment links, credentials or hidden context are copied. Bulk moves
+to a shared project open that project with the same explanation. This is an
+actionable alternative; a private organisational association with a shared project
+is still not implemented. Shared conversations still cannot be moved out of their
+project. These server guards have not been relaxed.
+
+Local validation uses `tests/test_project_conversation_creation.py` for real
+request dispatch and `tests/project_conversation_logic.cjs` for navigation,
+duplicate calls and retry state. The rendered fixture and durable script are
+`tests/fixtures/project-conversation.html` and
+`tests/project_conversation_browser.cjs`. Serve this repository on a loopback-only
+port and set `PROJECT_QA_ORIGIN` to that origin when running the browser script.
+The fixture executes production frontend functions with synthetic API responses;
+it proves rendered controls, not production membership, provider execution or
+successful live delivery. Keep those live checks separate.

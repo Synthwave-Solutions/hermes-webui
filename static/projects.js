@@ -280,6 +280,89 @@ async function _projCreateSharedAction() {
   } catch (error) { showToast(String(error.message || error)); }
 }
 
+// One creation intent survives retries and page refreshes in this tab. The
+// server scopes its reference to the authenticated actor and selected project.
+const _projConversationRequests = new Map();
+function _projStartSharedConversation(projectId) {
+  const pid = String(projectId || '');
+  if (_projConversationRequests.has(pid)) return _projConversationRequests.get(pid);
+  const generation = typeof _loadSessionGeneration === 'number' ? ++_loadSessionGeneration : null;
+  const panel = typeof _currentPanel === 'string' ? _currentPanel : null;
+  const stillInPanel = () => panel === null || _currentPanel === panel;
+  const operation = (async () => {
+    const detail = await api('/api/projects/hub/detail?project_id=' + encodeURIComponent(pid));
+    const project = detail.project;
+    if (!project || project.project_id !== pid || !project.collaboration) {
+      throw new Error(_projT('project_chat_reload', 'Reload the project before creating a conversation.'));
+    }
+    const usable = (project.bot_participants || []).filter(id => !(project.unavailable_bots || []).includes(id));
+    if (!usable.length) throw new Error(_projT('project_chat_no_bot', 'No project bot is available to your account. Ask the project owner to assign an available bot.'));
+    const storageKey = 'synthpulse-project-conversation:' + pid;
+    let requestId;
+    try {
+      requestId = sessionStorage.getItem(storageKey);
+      if (!requestId) {
+        requestId = crypto.randomUUID();
+        sessionStorage.setItem(storageKey, requestId);
+      }
+    } catch (_) {
+      throw new Error(_projT('project_chat_storage', 'Allow browser storage and retry so conversation creation can be recovered safely.'));
+    }
+    let result;
+    try {
+      result = await api('/api/projects/chat', {method:'POST', body:JSON.stringify({
+        project_id:pid, bot_participants:usable, request_id:requestId
+      })});
+    } catch (error) {
+      let conflict = false;
+      if (error && error.status === 409) {
+        try { conflict = JSON.parse(error.body).code === 'project_creation_conflict'; } catch (_) {}
+      }
+      if (conflict) {
+        sessionStorage.removeItem(storageKey);
+        throw new Error(_projT('project_chat_conflict', 'The previous creation request changed or was deleted. Review the project, then click New conversation again to start a separate conversation.') + ' ' + _projT('project_chat_reference', 'Reference: ') + requestId);
+      }
+      const guidance = error && (error.status === 403 || error.status === 404)
+        ? _projT('project_chat_no_access', 'Project access is unavailable. Reload the project or ask its owner to check your membership and bot access.')
+        : _projT('project_chat_retry', 'Could not confirm conversation creation. Reload the project and retry.');
+      throw new Error(guidance + ' ' + _projT('project_chat_reference', 'Reference: ') + requestId);
+    }
+    const sid = result && result.session && result.session.session_id;
+    if (!sid) throw new Error(_projT('project_chat_retry', 'Could not confirm conversation creation. Reload the project and retry.') + ' ' + _projT('project_chat_reference', 'Reference: ') + requestId);
+    // A later navigation owns the screen. Creation still succeeded and the
+    // server record remains discoverable in the project after a refresh.
+    if (stillInPanel() && (generation === null || generation === _loadSessionGeneration)) {
+      const loading = loadSession(sid);
+      const loadGeneration = typeof _loadSessionGeneration === 'number' ? _loadSessionGeneration : null;
+      await loading;
+      if (stillInPanel() && (loadGeneration === null || loadGeneration === _loadSessionGeneration)) switchPanel('chat');
+    }
+    sessionStorage.removeItem(storageKey);
+    if (typeof refreshSessionList === 'function') Promise.resolve(refreshSessionList('project-create')).catch(() => {});
+    if (_projSelectedId === pid) Promise.resolve(_projOpen(pid)).catch(() => {});
+    return result.session;
+  })();
+  _projConversationRequests.set(pid, operation);
+  operation.finally(() => _projConversationRequests.delete(pid)).catch(() => {});
+  return operation;
+}
+
+async function _projOfferNewSharedConversation(project) {
+  const accepted = await showConfirmDialog({
+    title:_projT('project_chat_separate_title', 'Create a separate project conversation?'),
+    message:_projT('project_chat_separate_notice', 'The new conversation will be visible to the current members of "{name}". Your existing conversation, messages and attachments keep their current access. Nothing will be copied. You can choose authorised context to share in the new conversation afterwards.').replace('{name}', project.name),
+    confirmLabel:_projT('project_chat_separate_confirm', 'Create project conversation'), cancelLabel:_projT('project_chat_separate_cancel', 'Keep existing conversation')
+  });
+  if (!accepted) return false;
+  try {
+    await _projStartSharedConversation(project.project_id);
+    return true;
+  } catch (error) {
+    showToast(String(error.message || error));
+    return false;
+  }
+}
+
 async function _projLoadTeamControls(project) {
   const host = $('projTeamControls');
   if (!host) return;
@@ -335,10 +418,7 @@ async function _projLoadTeamControls(project) {
     };
     $('projStartChat').onclick=async()=>{
       try {
-        const usable=(project.bot_participants||[]).filter(id=>!(project.unavailable_bots||[]).includes(id));
-        if(!usable.length){showToast('No project bot is available to your account. Ask the project owner or administrator.');return;}
-        const result=await api('/api/projects/chat',{method:'POST',body:JSON.stringify({project_id:project.project_id,bot_participants:usable})});
-        await loadSession(result.session.session_id);switchPanel('chat');
+        await _projStartSharedConversation(project.project_id);
       } catch(error){showToast(String(error.message||error));}
     };
     for(const [id,label] of [['projSaveTeam','Saving…'],['projStartChat','Opening…'],['projArchiveTeam','Archiving…']]){

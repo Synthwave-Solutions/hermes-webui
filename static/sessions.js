@@ -1545,6 +1545,18 @@ async function newSession(flash, options={}){
     if(typeof showToast==='function') showToast(_newSessionPendingText(),1500);
     return _newSessionInFlight;
   }
+  const requestedProject=Object.prototype.hasOwnProperty.call(options,'project_id')
+    ? options.project_id : (_activeProject!==NO_PROJECT_FILTER ? _activeProject : null);
+  const sharedProject=typeof _allProjects!=='undefined' && _allProjects.find(p=>p.project_id===requestedProject && p.collaboration);
+  if(sharedProject && typeof _projStartSharedConversation==='function'){
+    _setNewSessionPending(true);
+    _newSessionInFlight=_projStartSharedConversation(sharedProject.project_id);
+    try { return await _newSessionInFlight; }
+    catch(error){
+      if(typeof showToast==='function') showToast(String(error.message||error));
+      throw error;
+    } finally { _newSessionInFlight=null;_setNewSessionPending(false); }
+  }
   // New Chat is a navigation intent too: retire an older load before its
   // metadata/error response can replace the new conversation or clear its URL.
   const activationGeneration=typeof _loadSessionGeneration==='number'
@@ -4582,6 +4594,11 @@ function _showBatchProjectPicker(){
       dot.style.cssText='width:6px;height:6px;border-radius:50%;background:'+p.color+';flex-shrink:0;';item.appendChild(dot);}
     const name=document.createElement('span');name.textContent=p.name;item.appendChild(name);
     item.onclick=async()=>{picker.remove();
+      if(p.collaboration){
+        showToast('Existing conversations keep their current access. Open the project to start a separate shared conversation.');
+        if(typeof _projOpen==='function'){switchPanel('projects');await _projOpen(p.project_id);}
+        return;
+      }
       try{await Promise.all(ids.map(sid=>api('/api/session/move',{method:'POST',body:JSON.stringify({session_id:sid,project_id:p.project_id})})));
         showToast('Moved to '+p.name);exitSessionSelectMode();await renderSessionList();
       }catch(e){showToast('Move failed: '+(e.message||e));}
@@ -9427,7 +9444,7 @@ function _showProjectPicker(session, anchorEl){
     return true;
   };
   for(const p of _allProjects){
-    if (_profileHidesProject(p.profile)) continue;
+    if (!p.collaboration && _profileHidesProject(p.profile)) continue;
     const item=document.createElement('div');
     item.className='project-picker-item'+(session.project_id===p.project_id?' active':'');
     if(p.color){
@@ -9442,6 +9459,10 @@ function _showProjectPicker(session, anchorEl){
     item.onclick=async()=>{
       picker.remove();
       document.removeEventListener('click',close);
+      if(p.collaboration){
+        await _projOfferNewSharedConversation(p);
+        return;
+      }
       try{
         await api('/api/session/move',{method:'POST',body:JSON.stringify({session_id:session.session_id,project_id:p.project_id})});
         // See #2551 — write to _allSessions, not the shallow sidebar copy.
@@ -9471,6 +9492,11 @@ function _showProjectPicker(session, anchorEl){
     const res=await api('/api/projects/create',{method:'POST',body:JSON.stringify({name:name.trim(),color,profile})});
     if(res.project){
       _allProjects.push(res.project);
+      if(res.project.collaboration){
+        await renderSessionList();
+        await _projOfferNewSharedConversation(res.project);
+        return;
+      }
       // Guard the move so a 503 (session busy/streaming, #3746) shows a toast
       // instead of an unhandled rejection. Keep the authoritative refetch (#2551).
       try{

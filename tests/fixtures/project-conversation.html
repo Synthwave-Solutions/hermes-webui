@@ -1,0 +1,49 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SynthPulse project conversation QA fixture</title>
+<link rel="stylesheet" href="/static/style.css">
+<style>body{display:block;padding:24px;max-width:1000px;margin:auto;overflow:auto}button,select{padding:10px;margin:4px}#feedback,#evidence{white-space:pre-wrap;overflow-wrap:anywhere;padding:12px}.project-picker{color:var(--text-primary);background:var(--bg-secondary)}#confirmPanel{padding:16px;border:1px solid currentColor}#projTeamControls{max-width:720px}</style>
+<h1>SynthPulse project conversation QA</h1>
+<p>Isolated browser fixture: actual frontend functions with synthetic API responses. No provider or real user state.</p>
+<label>Response <select id="mode"><option>success</option><option>slow</option><option>offline</option><option>revoked</option><option>no bots</option></select></label>
+<button id="new" onclick="newSession(false,{project_id:'team'}).catch(e=>showToast(e.message))">New conversation in project</button>
+<button id="release" onclick="window.resolveCreate&&window.resolveCreate()">Complete slow request</button>
+<button id="existing" onclick="_showProjectPicker(window.original,this)">Link existing conversation</button>
+<button id="team" onclick="_projLoadTeamControls(window.project)">Load project team</button>
+<div id="confirmPanel" hidden><p id="confirmText"></p><button id="accept">Create project conversation</button><button id="cancel">Keep existing conversation</button></div>
+<div id="projTeamControls"></div><div id="feedback" role="status"></div><pre id="evidence"></pre>
+<script src="/static/projects.js"></script>
+<script>
+window.$=id=>document.getElementById(id);window.t=key=>key;
+window.project={project_id:'team',name:'Test project',collaboration:true,owner_email:'owner@example.test',members:['member@example.test'],bot_participants:['writer'],unavailable_bots:[],can_manage:false};
+_projDetail={project:window.project};
+window.original={session_id:'private-before-project',profile:'writer',owner_email:'owner@example.test',participants:[],messages:[{role:'user',content:'Private original'}],attachments:['private-report.pdf'],project_id:null};
+window.calls=[];window.loads=[];window._allProjects=[project];window._allSessions=[original];window._activeProject='team';window.NO_PROJECT_FILTER='__none__';window._newSessionInFlight=null;window._loadSessionGeneration=0;
+window.S={session:original,activeProfile:'writer'};window.INFLIGHT={};window._sessionSourceFilter='webui';window._messagesTruncated=false;window._oldestIdx=0;
+window.updateQueueBadge=window.clearLiveToolCards=()=>{};window._setNewSessionPending=busy=>{$('new').disabled=busy;$('new').textContent=busy?'Creating…':'New conversation in project';};
+window._readEmptyComposerModelOverride=()=>null;window._readPersistedModelState=()=>null;
+window.showToast=text=>{$('feedback').textContent=text;};window.renderSessionListFromCache=()=>{};window.renderSessionList=async()=>{};window.refreshSessionList=async()=>{};
+window.loadSession=async sid=>{loads.push(sid);showToast('Opened project conversation '+sid);renderEvidence();};window.switchPanel=()=>{};
+window.showPromptDialog=async()=>null;
+window.showConfirmDialog=options=>{ $('confirmPanel').hidden=false;$('confirmText').textContent=options.message;return new Promise(resolve=>{$('accept').onclick=()=>{$('confirmPanel').hidden=true;resolve(true)};$('cancel').onclick=()=>{$('confirmPanel').hidden=true;resolve(false)}});};
+window.renderEvidence=()=>{$('evidence').textContent=JSON.stringify({calls,loads,original},null,2)};
+window.api=async(url,options={})=>{
+ const body=options.body?JSON.parse(options.body):null;calls.push({url,body});renderEvidence();
+ const mode=$('mode').value;
+ if(url.startsWith('/api/projects/hub/detail')){if(mode==='revoked')throw new Error('Project not found');return {project:{...project,bot_participants:mode==='no bots'?[]:['writer']}};}
+ if(url==='/api/projects/chat'){
+  if(mode==='offline')throw new Error('Network failed');
+  if(mode==='slow')await new Promise(resolve=>window.resolveCreate=resolve);
+  return {session:{session_id:'shared-'+body.request_id,project_shared:true,project_id:'team'}};
+ }
+ if(url==='/api/people')return {people:[],me:'owner@example.test'};
+ if(url==='/api/profiles?fast=1')return {profiles:[{name:'writer'}]};
+ if(url.startsWith('/api/projects/files'))return {files:[]};
+ throw new Error('Unexpected endpoint '+url);
+};
+fetch('/static/sessions.js').then(r=>r.text()).then(source=>{
+ const extract=name=>{const re=new RegExp('(?:async )?function '+name+'\\(');const start=source.search(re);const next=source.slice(start+1).search(/\n(?:async )?function /);return source.slice(start,next<0?undefined:start+1+next)};
+ (0,eval)(extract('newSession'));
+ (0,eval)(extract('_showProjectPicker'));
+ window.PROJECT_COLORS=['#7cb9ff'];window.fixtureReady=true;renderEvidence();
+});
+</script>

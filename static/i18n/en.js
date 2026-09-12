@@ -1,5 +1,16 @@
 // Locale bundle; loaded on demand by static/i18n.js.
 window.__registerHermesLocale('en', {
+  project_chat_conflict: 'The previous creation request changed or was deleted. Review the project, then click New conversation again to start a separate conversation.',
+  project_chat_reload: 'Reload the project before creating a conversation.',
+  project_chat_no_bot: 'No project bot is available to your account. Ask the project owner to assign an available bot.',
+  project_chat_storage: 'Allow browser storage and retry so conversation creation can be recovered safely.',
+  project_chat_no_access: 'Project access is unavailable. Reload the project or ask its owner to check your membership and bot access.',
+  project_chat_retry: 'Could not confirm conversation creation. Reload the project and retry.',
+  project_chat_reference: 'Reference: ',
+  project_chat_separate_title: 'Create a separate project conversation?',
+  project_chat_separate_confirm: 'Create project conversation',
+  project_chat_separate_cancel: 'Keep existing conversation',
+  project_chat_separate_notice: 'The new conversation will be visible to the current members of "{name}". Your existing conversation, messages and attachments keep their current access. Nothing will be copied. You can choose authorised context to share in the new conversation afterwards.',
   governance_user_policy: 'User policy',
   governance_legacy_approval: 'Keep existing approval behavior',
   governance_legacy_approval_hint: 'Keeps the existing approval behavior until you choose a flow.',

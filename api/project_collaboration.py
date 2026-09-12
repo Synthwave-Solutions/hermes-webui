@@ -4,6 +4,7 @@ Project membership grants transcript and scoped file access only. Bot execution
 continues to resolve each original human's existing profile/tool permissions.
 """
 import base64
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -13,6 +14,10 @@ import time
 import uuid
 
 from api.models import PROJECTS_LOCK as _LOCK
+
+
+class ProjectCreationConflict(RuntimeError):
+    """A retry cannot reuse a definitively deleted or changed creation scope."""
 
 
 def _value(row, key, default=None):
@@ -33,7 +38,10 @@ def transaction(function):
     from functools import wraps
     @wraps(function)
     def wrapped(handler, parsed, *args, **kwargs):
-        if str(getattr(parsed, 'path', '')).startswith('/api/projects/'):
+        path = str(getattr(parsed, 'path', ''))
+        # Deletion must not run between a creation retry's tombstone check and
+        # its atomic save. Lock order remains projects, then session cache.
+        if path.startswith('/api/projects/') or path == '/api/session/delete':
             with _LOCK:
                 return function(handler, parsed, *args, **kwargs)
         return function(handler, parsed, *args, **kwargs)
@@ -208,7 +216,37 @@ def handle(handler, path, body=None, query=None):
             if not isinstance(bots, list) or not bots or any(b not in project.get('bot_participants', []) for b in bots):
                 raise ValueError('Select at least one bot assigned to this project')
             bots = group_chat.validate_bots(bots, actor_identity)
-            session = models.new_session(workspace=project['workspace'], profile=project.get('profile'), project_id=pid)
+            # A client retry is scoped to this actor and project. The stable ID
+            # survives a lost HTTP response or process restart without a second
+            # ledger that could commit separately from the session's atomic save.
+            request_id = body.get('request_id')
+            reserved_id = None
+            if request_id is not None:
+                if not isinstance(request_id, str) or not re.fullmatch(r'[a-zA-Z0-9_-]{16,80}', request_id):
+                    raise ValueError('Invalid conversation request reference')
+                reserved_id = 'project-' + hashlib.sha256(
+                    json.dumps([actor, pid, request_id], separators=(',', ':')).encode()
+                ).hexdigest()[:32]
+                if reserved_id in models._load_webui_deleted_session_tombstone():
+                    raise ProjectCreationConflict('This conversation was deleted; start a new creation request')
+                with models.LOCK:
+                    existing = models.SESSIONS.get(reserved_id)
+                if existing is None:
+                    existing = models.Session.load(reserved_id)
+                if existing is not None:
+                    # Membership and current bot grants have already been checked
+                    # above, including on replay. Never adopt or overwrite a row
+                    # that does not exactly belong to this creation scope.
+                    if (existing.owner_email != actor or existing.project_id != pid
+                            or not existing.project_shared
+                            or existing.workspace != project['workspace']
+                            or existing.bot_participants != bots):
+                        raise ProjectCreationConflict('Conversation changed; reload the project before trying again')
+                    if not existing.path.exists():
+                        existing.save()  # Retry a first save that failed before commit.
+                    return {'ok': True, 'replayed': True, 'session': existing.compact()}
+            session = models.new_session(workspace=project['workspace'], profile=project.get('profile'),
+                                         project_id=pid, session_id=reserved_id)
             session.owner_email = actor; session.project_shared = True
             session.bot_participants = bots
             session.title = str(body.get('title') or project['name'])[:128]

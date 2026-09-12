@@ -3392,7 +3392,7 @@ def _profile_default_model_state(profile=None):
     return default_model or get_effective_default_model(), default_provider
 
 
-def new_session(workspace=None, model=None, profile=None, model_provider=None, project_id=None, worktree_info=None, enabled_toolsets=None, chat_mode=None):
+def new_session(workspace=None, model=None, profile=None, model_provider=None, project_id=None, worktree_info=None, enabled_toolsets=None, chat_mode=None, *, session_id=None):
     """Create a new in-memory session.
 
     The session lives in the SESSIONS dict only — no disk write happens until
@@ -3434,7 +3434,11 @@ def new_session(workspace=None, model=None, profile=None, model_provider=None, p
 
     wt = worktree_info if isinstance(worktree_info, dict) else None
     workspace_path = (wt.get('path') if wt and wt.get('path') else workspace) if wt else workspace
+    if session_id is not None:
+        if not is_safe_session_id(session_id):
+            raise ValueError('Invalid reserved session ID')
     s = Session(
+        session_id=session_id,
         workspace=workspace_path or get_last_workspace(),
         model=effective_model,
         model_provider=effective_model_provider,
@@ -3459,8 +3463,9 @@ def new_session(workspace=None, model=None, profile=None, model_provider=None, p
     # shadowed on the next poll. Wrapped because a tombstone failure
     # must never block new-session creation.
     try:
-        _clear_webui_zero_message_orphan_tombstone(s.session_id)
-        _clear_webui_deleted_session_tombstone(s.session_id)
+        if session_id is None:
+            _clear_webui_zero_message_orphan_tombstone(s.session_id)
+            _clear_webui_deleted_session_tombstone(s.session_id)
     except Exception:
         logger.debug(
             "Failed to clear webui tombstone for %s",
@@ -3468,6 +3473,10 @@ def new_session(workspace=None, model=None, profile=None, model_provider=None, p
             exc_info=True,
         )
     with LOCK:
+        # Explicit server-derived IDs must be checked at registration, not
+        # before construction, so two callers can never replace each other.
+        if session_id is not None and (session_id in SESSIONS or (SESSION_DIR / f'{session_id}.json').exists()):
+            raise FileExistsError('Reserved session already exists')
         SESSIONS[s.session_id] = s
         SESSIONS.move_to_end(s.session_id)
         _evict_sessions_over_cap()  # #4765: safe LRU eviction (never active/unsaved)

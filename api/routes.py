@@ -11648,19 +11648,39 @@ def _handle_people_directory(handler) -> bool:
 
 
 def _handle_project_collaboration(handler, parsed, body=None):
-    from api.project_collaboration import handle
+    from api.project_collaboration import handle, ProjectCreationConflict
+
+    def failure(message, status, category):
+        if parsed.path != '/api/projects/chat':
+            return bad(handler, message, status)
+        import re
+        reference = str((body or {}).get('request_id') or '')
+        if not re.fullmatch(r'[a-zA-Z0-9_-]{16,80}', reference):
+            reference = uuid.uuid4().hex
+        project_id = str((body or {}).get('project_id') or '')
+        if not re.fullmatch(r'[a-zA-Z0-9_-]{1,64}', project_id):
+            project_id = 'invalid'
+        logger.warning('project_conversation_failed reference=%s project=%s actor=%s category=%s',
+                       reference, project_id, _request_owner_email_for_new_session(handler), category)
+        return j(handler, {'error': message, 'reference': reference,
+                           'code': 'project_creation_conflict' if category == 'creation_conflict' else 'project_creation_' + category}, status=status)
+
     try:
         return j(handler, handle(handler, parsed.path, body, parse_qs(parsed.query)))
     except FileNotFoundError:
-        return bad(handler, "Project or file not found", 404)
+        return failure('Project or file not found', 404, 'not_found')
     except FileExistsError:
-        return bad(handler, "A file with this name already exists", 409)
+        return failure('A file with this name already exists', 409, 'already_exists')
     except PermissionError as exc:
-        return bad(handler, str(exc), 403)
+        return failure(str(exc), 403, 'not_allowed')
+    except ProjectCreationConflict as exc:
+        return failure(str(exc), 409, 'creation_conflict')
     except RuntimeError as exc:
-        return bad(handler, str(exc), 409)
-    except (ValueError, OSError) as exc:
-        return bad(handler, str(exc), 400)
+        return failure('Could not confirm the project change. Retry with the same reference.' if parsed.path == '/api/projects/chat' else str(exc), 409, 'unconfirmed')
+    except ValueError as exc:
+        return failure(str(exc), 400, 'invalid_request')
+    except OSError:
+        return failure('Could not save the project change. Please retry.', 400, 'storage_failed')
 
 
 def _handle_projects_hub(handler) -> bool:
