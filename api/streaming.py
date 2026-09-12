@@ -46,6 +46,7 @@ from api.config import (
     normalize_chat_mode,
 )
 from api.helpers import redact_session_data, _redact_text
+from api.interaction_context import INTERACTION_GUIDANCE, actor_identity_prompt, interaction_preference_prompt
 from api.governance.agent_context import (
     GovernanceBindingError,
     bind_governed_agent_turn,
@@ -641,6 +642,7 @@ WebUI progress guidance:
 - Each update should say what you are about to check, what you just confirmed, or why the next tool call is needed.
 - Keep updates concise, factual, and in the user's language. One or two short sentences are enough.
 - Do not reveal hidden reasoning, chain-of-thought, private scratchpads, secrets, raw logs, or long tool output.
+- Password, API-key, token, and secret fields may be automatically redacted by SynthPulse. Treat masked values as intentional redaction, not placeholder text or user input errors; do not tell the user a stored credential is wrong from the masked value alone. Use the supported connection check to confirm actual authentication status.
 - Final visible assistant replies must be clear, user-facing, and in the user's language, not private planning notes.
 - Do not include terse planning fragments or scratchpad shorthand in visible assistant text. Avoid fragments like "Need script", "Need check logs", "Need inspect email", or "maybe invite"; either omit them or rewrite them as clear user-facing progress.
 - For direct answers or very short tasks, skip progress updates and answer normally.
@@ -725,20 +727,17 @@ def _webui_ephemeral_system_prompt(
     delivery_prompt = _webui_delivery_context_prompt(config_data)
     if delivery_prompt:
         parts.append(delivery_prompt)
+    parts.append(INTERACTION_GUIDANCE)
+    preference_prompt = interaction_preference_prompt(
+        actor_email, surface_context.get('session_id') if isinstance(surface_context, dict) else None,
+    )
+    if preference_prompt:
+        parts.append(preference_prompt)
     # Identity comes from the authenticated turn sender, never personality,
     # recalled memory or the selected (possibly shared) execution profile.
-    actor = str(actor_email or "").strip().lower()
-    if re.fullmatch(r"[^\s@<>]+@[^\s@<>]+", actor):
-        parts.append(
-            "Active user identity for this turn (authoritative):\n"
-            f"Active user: {actor}\n"
-            "This is the human sender, not the assistant or the shared profile owner. "
-            "Use this identity over names in shared instructions, examples and recalled memory. "
-            "For Gmail and Google Workspace, resolve this user's connected account explicitly "
-            "and verify its account identity before use. Never fall back to the profile owner's "
-            "mailbox. This identity does not grant access: existing authorization and approval "
-            "rules still apply. If the matching connection is absent, explain what is missing."
-        )
+    identity_prompt = actor_identity_prompt(actor_email)
+    if identity_prompt:
+        parts.append(identity_prompt)
     return "\n\n".join(part for part in parts if part)
 
 
