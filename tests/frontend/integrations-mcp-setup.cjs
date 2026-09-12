@@ -9,6 +9,11 @@ const source = fs.readFileSync(process.env.SYNTHPULSE_JS_OVERRIDE || path.join(r
 const fixture = {
   nango: {available: true},
   providers: [
+    {key:'unsafe-docs-fixture', display_name:'Unsafe docs fixture', auth_mode:'MCP_OAUTH2', configured:false,
+     credential_fields:[], setup_required:true, approval:'none', docs:'javascript:alert(1)', setup_guide_url:''},
+    {key:'unsafe-guide-fixture', display_name:'Unsafe guide fixture', auth_mode:'MCP_OAUTH2', configured:true,
+     unique_key:'unsafe-guide-fixture', credential_fields:[], approval:'approved',
+     docs:'https://user:password@example.test/docs', setup_guide_url:'https://user:password@example.test/docs'},
     {key:'attio-mcp', display_name:'Attio (MCP)', auth_mode:'MCP_OAUTH2', configured:false,
      credential_fields:[], setup_required:true, approval:'approved',
      setup_message:"Finish Attio (MCP)'s OAuth setup in Nango, then refresh SynthPulse. Nango must complete the provider's client registration before a new integration can connect.",
@@ -52,10 +57,13 @@ const fixture = {
       const attio=page.locator('.intg-card').filter({hasText:'Attio (MCP)'});
       assert.equal(await attio.getByRole('button',{name:'Enable',exact:true}).count(),0,'no creation of an unregistered MCP row');
       assert.equal(await attio.locator('.intg-setup-message').count(),1);
-      assert.equal(await attio.getByRole('link',{name:'Setup guide'}).getAttribute('href'),fixture.providers[0].setup_guide_url);
+      assert.equal(await attio.getByRole('link',{name:'Setup guide'}).getAttribute('href'),fixture.providers.find(p=>p.key==='attio-mcp').setup_guide_url);
+      for (const label of ['Unsafe docs fixture','Unsafe guide fixture']) {
+        assert.equal(await page.locator('.intg-card').filter({hasText:label}).getByRole('link').count(),0);
+      }
       const work=page.locator('.intg-card').filter({hasText:'granola-work'});
       assert.equal(await work.getByRole('button',{name:'Connect',exact:true}).isEnabled(),true);
-      assert.equal(await work.getByRole('link',{name:'Setup guide'}).getAttribute('href'),fixture.providers[1].setup_guide_url);
+      assert.equal(await work.getByRole('link',{name:'Setup guide'}).getAttribute('href'),fixture.providers.find(p=>p.unique_key==='granola-work').setup_guide_url);
       // A normal link click opens the provider's exact guide; network is aborted.
       const popupPromise=page.waitForEvent('popup');
       await work.getByRole('link',{name:'Setup guide'}).click();
@@ -79,8 +87,8 @@ const fixture = {
       assert.equal(await page.locator('dialog').count(),0);
       await page.evaluate(()=>{
         _intgMe={email:'member@example.test',roles:['member']};
-        _intgCatalog.providers[0].approval='none';
-        _intgCatalog.providers[1].approval='pending';
+        _intgCatalog.providers.find(p=>p.key==='attio-mcp').approval='none';
+        _intgCatalog.providers.find(p=>p.unique_key==='granola-work').approval='pending';
         _intgRenderGrid();
       });
       assert.equal(await attio.getByRole('button',{name:'Request access',exact:true}).isEnabled(),true);

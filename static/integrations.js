@@ -48,6 +48,15 @@ function _intgT(key, fallback) {
   return (val && val !== key) ? val : fallback;
 }
 
+function _intgSafeDocsUrl(value) {
+  const raw = String(value || '').trim();
+  try {
+    const url = new URL(raw);
+    if (!['http:', 'https:'].includes(url.protocol) || !url.hostname || url.username || url.password) return '';
+    return raw;
+  } catch (_) { return ''; }
+}
+
 // Mirror of api/integrations.py slug_email(): lowercase, non [a-z0-9] -> '-',
 // collapsed and trimmed. Used to compute the caller's own end_user id.
 function _intgSlugEmail(email) {
@@ -414,8 +423,8 @@ function _intgRenderGrid() {
       action = '<button type="button" class="intg-btn" data-intg-action="request" data-key="' + _intgEsc(p.key) + '">'
         + _intgEsc(_intgT('integrations_request_access', 'Request access')) + '</button>';
     }
-    const setupGuide = isAdminUser && p.auth_mode === 'MCP_OAUTH2' && p.setup_guide_url;
-    const docsUrl = setupGuide || (!p.configured && p.docs);
+    const setupGuide = isAdminUser && p.auth_mode === 'MCP_OAUTH2' && _intgSafeDocsUrl(p.setup_guide_url);
+    const docsUrl = setupGuide || (!p.configured && _intgSafeDocsUrl(p.docs));
     const docs = docsUrl
       ? '<a class="intg-docs-link" href="' + _intgEsc(docsUrl) + '" target="_blank" rel="noopener noreferrer">' + _intgEsc(setupGuide ? _intgT('integrations_setup_guide', 'Setup guide') : _intgT('integrations_docs', 'Docs')) + '</a>'
       : '';

@@ -518,7 +518,7 @@ def _catalog_item(key: str, entry: dict) -> dict:
         "auth_mode": str(entry.get("auth_mode") or ""),
         "credential_fields": list(_OAUTH_CREDENTIAL_FIELDS.get(str(entry.get("auth_mode") or "").upper(), ())),
         "categories": [str(c) for c in categories] if isinstance(categories, list) else [],
-        "docs": str(entry.get("docs") or ""),
+        "docs": _safe_docs_url(entry.get("docs")),
         "configured": False,
         "unique_key": None,
         "setup_required": mcp_setup,
@@ -703,16 +703,22 @@ _OAUTH_OPTIONAL_FIELDS: dict[str, tuple[str, ...]] = {
 }
 
 
-def _setup_guide_url(entry: dict) -> str:
-    """Only expose HTTP(S) provider documentation, never credential URLs."""
-    raw = str(entry.get("setup_guide_url") or entry.get("docs") or "").strip()
+def _safe_docs_url(value: object) -> str:
+    """Only expose absolute HTTP(S) documentation without URL credentials."""
+    raw = str(value or "").strip()
     try:
         parsed = urllib.parse.urlsplit(raw)
         if parsed.scheme not in ("https", "http") or not parsed.hostname or parsed.username or parsed.password:
             return ""
+        # Accessing port also validates invalid values such as ':not-a-port'.
+        _ = parsed.port
     except ValueError:
         return ""
     return raw
+
+
+def _setup_guide_url(entry: dict) -> str:
+    return _safe_docs_url(entry.get("setup_guide_url") or entry.get("docs"))
 
 
 def _mcp_setup_message(entry: dict) -> str:

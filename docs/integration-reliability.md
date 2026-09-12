@@ -64,6 +64,11 @@ the public integration API omits MCP credentials, and omission must not be
 mistaken for missing configuration. Administrators also get the setup guide on
 existing MCP cards for troubleshooting.
 
+Both the catalog and renderer validate documentation links, including the
+ordinary Docs fallback. They expose only absolute HTTP(S) links without an
+embedded username or password; rejecting a setup guide cannot revive the same
+unsafe URL through the fallback.
+
 This is prevention and recovery guidance, not an automatic repair of existing
 unregistered rows or proof of a completed user login. Repair existing provider
 registration through a supported Nango management flow while preserving its
