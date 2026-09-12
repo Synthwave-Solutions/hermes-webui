@@ -23,6 +23,7 @@ def bridge():
     ('❌ Non-retryable error (HTTP 400): invalid model', 'model_not_found'),
     ('❌ Non-retryable error (HTTP 401): invalid api key', 'auth_mismatch'),
     ('❌ Rate limited after 3 retries — HTTP 429', 'rate_limit'),
+    ('❌ API failed after 3 retries — rate_limit_exceeded: Slow down', 'rate_limit'),
     ('❌ API failed after 3 retries — connection reset', 'error'),
 ])
 def test_terminal_cause_survives_actual_bridge(message, expected):

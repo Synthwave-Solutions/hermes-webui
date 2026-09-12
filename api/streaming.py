@@ -1315,7 +1315,8 @@ def _classify_provider_error(err_str: str, exc=None, *, silent_failure: bool = F
         or 'unknown model' in _err_lower
     )
     _is_rate_limit = (not _is_quota) and (
-        'rate limit' in _err_lower or '429' in err_str or (exc is not None and 'RateLimitError' in _exc_name)
+        'rate limit' in _err_lower or 'rate_limit_exceeded' in _err_lower
+        or '429' in err_str or (exc is not None and 'RateLimitError' in _exc_name)
     )
     _is_compression_exhausted = (
         'compression_exhausted' in _err_lower
