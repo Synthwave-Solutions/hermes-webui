@@ -22,11 +22,38 @@ The in-app alert and the external delivery are separate outcomes.
 An in-app alert counts only after its store write succeeds. If both storage
 and external delivery fail, chat does not claim an administrator was notified.
 The incident result exposes `recorded` and `dispatched` separately while
-preserving `notified` for existing callers. Repeats within the cooldown do not
-claim a new notification. Acknowledging an alert reports success only after the
+preserving `notified` for existing callers. A repeated incident count alone does
+not claim a new notification; a confirmed external retry does. Acknowledging an alert reports success only after the
 acknowledgement is saved, so a failed write leaves it available for retry.
 New alerts use unique IDs so incidents created in the same millisecond keep
 their own delivery and acknowledgement state. Existing alert IDs are preserved.
+
+Failed external capacity alerts can retry when a later incident arrives after
+the configured cooldown from `dispatch_attempt_ts`. Updating the incident's
+`last_ts` and count does not move that retry deadline. Confirmed delivery stays
+deduplicated throughout the incident; a quiet interval still starts a new alert.
+Legacy failed rows use their original `first_ts` until an attempt is recorded.
+
+Each attempt is claimed under the existing store lock, then transport runs
+outside that lock. A bounded process-local registry prevents overlapping sends
+and limits retries when storage is unavailable. It is keyed by the captured
+profile store path and incident kind/provider. Recent or active claims cannot be
+evicted to make room; when the registry is full, the in-app incident can still be
+recorded but external delivery waits for a later incident. Confirmed delivery
+whose status write failed is retained locally and repaired by the next repeat.
+Completion updates the originally captured store and incident only.
+
+The persisted attempt timestamp survives a process restart and prevents an
+immediate retry. This adds no background poller, destination or fallback. A crash
+after transport succeeds but before its confirmation is saved leaves delivery
+uncertain; transport idempotency would be needed to promise exactly-once delivery
+across that boundary. A real Telegram send and receipt remain separate acceptance.
+
+Retry regression checks use a controlled clock and transport fixtures:
+
+```sh
+./scripts/test.sh -q tests/test_capacity_alert_retries.py tests/test_capacity_alerts.py tests/test_cron_webui_delivery.py tests/test_integration_delivery_repairs.py
+```
 
 Verification:
 
