@@ -4,8 +4,8 @@ Nango refuses POST /integrations for OAUTH1/OAUTH2/TBA/APP/CUSTOM without a
 credentials object, so the enable call came back as the opaque upstream text
 "Nango API error (400): Missing credentials" and there was no place in the
 product to supply them (reported 01-09-2026, alongside "still not possible to
-connect them" from the admin side). MCP_OAUTH2 providers register a client
-dynamically and must keep enabling with no credentials at all.
+connect them" from the admin side). MCP_OAUTH2 registration belongs to
+Nango setup, never a guessed static-credential dialog.
 """
 from __future__ import annotations
 
@@ -85,15 +85,14 @@ class TestOAuthCredentialsRequired:
 
 
 class TestProvidersThatNeedNoCredentials:
-    def test_mcp_oauth2_enables_with_nothing(self, catalog, sent):
-        result = _enable("slack-mcp")
-        assert sent[0][2] == {"provider": "slack-mcp", "unique_key": "slack-mcp"}
-        assert "credentials" not in sent[0][2]
-        assert result["status"] == "enabled"
+    def test_mcp_oauth2_requires_nango_setup_without_requesting_credentials(self, catalog, sent):
+        with pytest.raises(ValueError, match="Nango"):
+            _enable("slack-mcp")
+        assert sent == []
 
     def test_api_key_enables_with_nothing(self, catalog, sent):
         _enable("productive")
         assert "credentials" not in sent[0][2]
 
     def test_mcp_oauth2_does_not_claim_to_need_credentials(self, catalog, sent):
-        assert _enable("slack-mcp")["needs_credentials"] is False
+        assert integrations._catalog_item("slack-mcp", catalog["slack-mcp"])["credential_fields"] == []

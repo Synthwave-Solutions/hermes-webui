@@ -511,6 +511,7 @@ def request_provider_approval(owner_email: str | None, provider_config_key: str)
 
 def _catalog_item(key: str, entry: dict) -> dict:
     categories = entry.get("categories")
+    mcp_setup = str(entry.get("auth_mode") or "").upper() == "MCP_OAUTH2"
     return {
         "key": key,
         "display_name": str(entry.get("display_name") or key),
@@ -520,6 +521,9 @@ def _catalog_item(key: str, entry: dict) -> dict:
         "docs": str(entry.get("docs") or ""),
         "configured": False,
         "unique_key": None,
+        "setup_required": mcp_setup,
+        "setup_message": _mcp_setup_message(entry) if mcp_setup else "",
+        "setup_guide_url": _setup_guide_url(entry),
         # Served through our own backend rather than linking straight at the
         # Nango host: the browser then needs no route to the Nango port, and
         # the URL stays same-origin so the dashboard CSP never blocks it.
@@ -610,6 +614,10 @@ def get_catalog(owner_email: str | None = None, *, is_admin: bool = False) -> di
             item = dict(item)
             item["configured"] = True
             item["unique_key"] = unique_key
+            # Existence is not proof of successful OAuth registration. The
+            # public API hides MCP credentials, so do not infer failure from
+            # their absence or disable existing working connections.
+            item["setup_required"] = False
             configured_items.append(item)
             configured_providers.add(provider)
     except NangoError as exc:
@@ -677,8 +685,9 @@ def list_connections(owner_email: str | None, *, is_admin: bool = False) -> list
 # create the integration. Nango 0.71 refuses POST /integrations with 400
 # "Missing credentials" for these auth modes, so the credentials belong in the
 # enable call: creating first and adding them later is not a path that exists.
-# MCP_OAUTH2 is deliberately absent; those providers register a client
-# dynamically at connect time and take no credentials here.
+# MCP_OAUTH2 is deliberately absent: Nango owns dynamic/CIMD registration.
+# Its public create API does not run that setup lifecycle; see the guard in
+# enable_integration. Never request made-up static credentials for these modes.
 _OAUTH_CREDENTIAL_FIELDS: dict[str, tuple[str, ...]] = {
     "OAUTH1": ("client_id", "client_secret"),
     "OAUTH2": ("client_id", "client_secret"),
@@ -692,6 +701,24 @@ _OAUTH_OPTIONAL_FIELDS: dict[str, tuple[str, ...]] = {
     "OAUTH2": ("scopes", "webhook_secret"),
     "TBA": ("scopes", "webhook_secret"),
 }
+
+
+def _setup_guide_url(entry: dict) -> str:
+    """Only expose HTTP(S) provider documentation, never credential URLs."""
+    raw = str(entry.get("setup_guide_url") or entry.get("docs") or "").strip()
+    try:
+        parsed = urllib.parse.urlsplit(raw)
+        if parsed.scheme not in ("https", "http") or not parsed.hostname or parsed.username or parsed.password:
+            return ""
+    except ValueError:
+        return ""
+    return raw
+
+
+def _mcp_setup_message(entry: dict) -> str:
+    label = str(entry.get("display_name") or "This MCP provider")
+    return (f"Finish {label}'s OAuth setup in Nango, then refresh SynthPulse. "
+            "Nango must complete the provider's client registration before a new integration can connect.")
 
 
 def _credentials_payload(auth_mode: str, entry: dict, credentials: dict | None) -> dict | None:
@@ -755,6 +782,13 @@ def enable_integration(
     auth_mode = str(entry.get("auth_mode") or "").upper()
     configured = {str(row.get("unique_key") or "") for row in _list_integrations()}
     if key not in configured:
+        if auth_mode == "MCP_OAUTH2":
+            # Nango's public POST /integrations accepts MCP entries but skips
+            # the dashboard's DCR/CIMD registration. It creates unusable rows
+            # that later fail with "missing client ID, secret and/or scopes".
+            # Existing configurations remain idempotent and connectable above.
+            guide = _setup_guide_url(entry)
+            raise ValueError(_mcp_setup_message(entry) + (f" Setup guide: {guide}" if guide else ""))
         payload: dict[str, Any] = {"provider": key, "unique_key": key}
         creds = _credentials_payload(auth_mode, {**entry, "_key": key}, credentials)
         if creds:

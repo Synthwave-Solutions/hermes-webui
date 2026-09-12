@@ -394,6 +394,8 @@ function _intgRenderGrid() {
       action = '<button type="button" class="intg-btn primary" data-intg-action="connect" data-key="' + _intgEsc(p.unique_key) + '"'
         + (nangoUp ? '' : ' disabled')
         + '>' + _intgEsc(label) + '</button>';
+    } else if (isAdminUser && p.setup_required) {
+      action = '<span class="intg-muted">' + _intgEsc(_intgT('integrations_setup_needed', 'Setup needed')) + '</span>';
     } else if (isAdminUser) {
       // An admin does not request: enabling creates the Nango integration
       // directly (and implicitly approves it for everyone).
@@ -412,8 +414,10 @@ function _intgRenderGrid() {
       action = '<button type="button" class="intg-btn" data-intg-action="request" data-key="' + _intgEsc(p.key) + '">'
         + _intgEsc(_intgT('integrations_request_access', 'Request access')) + '</button>';
     }
-    const docs = (!p.configured && p.docs)
-      ? '<a class="intg-docs-link" href="' + _intgEsc(p.docs) + '" target="_blank" rel="noopener noreferrer">' + _intgEsc(_intgT('integrations_docs', 'Docs')) + '</a>'
+    const setupGuide = isAdminUser && p.auth_mode === 'MCP_OAUTH2' && p.setup_guide_url;
+    const docsUrl = setupGuide || (!p.configured && p.docs);
+    const docs = docsUrl
+      ? '<a class="intg-docs-link" href="' + _intgEsc(docsUrl) + '" target="_blank" rel="noopener noreferrer">' + _intgEsc(setupGuide ? _intgT('integrations_setup_guide', 'Setup guide') : _intgT('integrations_docs', 'Docs')) + '</a>'
       : '';
     // Same-origin logo proxied by our backend; hide the img on a 404 so
     // providers without a logo fall back to the plain text card.
@@ -426,6 +430,7 @@ function _intgRenderGrid() {
       + (p.unique_key && p.unique_key !== p.key ? ' · ' + _intgEsc(p.unique_key) : '') + '</div></div>'
       + '<div class="intg-card-key">' + _intgEsc(p.key) + '</div>'
       + '<div class="intg-card-badges">' + badges + '</div>'
+      + (isAdminUser && p.setup_required ? '<div class="intg-muted intg-setup-message">' + _intgEsc(p.setup_message || 'Finish OAuth setup in Nango, then refresh SynthPulse.') + '</div>' : '')
       + '<div class="intg-card-actions">' + action + docs + '</div>'
       + '</div>';
   }).join('');
@@ -475,6 +480,9 @@ async function _intgEnablePayload(providerKey) {
   const catalog = await api('/api/integrations/catalog', { redirect401: false });
   const provider = (catalog.providers || []).find(p => p.key === providerKey);
   if (!provider) throw new Error('Provider is no longer available. Refresh the catalog.');
+  // Shared by the Connections and Governance Enable actions. Keep the
+  // provider-managed MCP setup explanation visible before any POST or dialog.
+  if (provider.setup_required) throw new Error(provider.setup_message || 'Finish OAuth setup in Nango, then refresh SynthPulse.');
   const payload = { provider_config_key: providerKey };
   const fields = provider.configured && provider.unique_key === providerKey ? [] : (provider.credential_fields || []);
   if (!fields.length) return payload;
