@@ -25,7 +25,7 @@ def session_config():
     return {
         "type": "realtime", "model": MODEL,
         "instructions": (
-            "You are SynPulse's live voice assistant. Answer conversational questions directly and naturally. "
+            "You are SynthPulse's live voice assistant. Answer conversational questions directly and naturally. "
             "Keep the conversation open while work runs. For requested application actions, research, files, "
             "tools or longer work, call dispatch_work with the user's concrete request and relevant context. "
             "Use chat normally, background when requested, and subagents for requested parallel delegation. "

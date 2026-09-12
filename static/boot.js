@@ -743,7 +743,7 @@ function _micToastKeyForRecognitionError(error){
   // Persist SR failure across reloads (e.g. Tailscale/network error)
   const _micForceMediaRecorderKey='mic_force_mediarecorder';
   const _micForceMediaRecorderStored=localStorage.getItem(_micForceMediaRecorderKey);
-  // Prefer SynPulse server-side STT (MediaRecorder -> /api/transcribe) only
+  // Prefer SynthPulse server-side STT (MediaRecorder -> /api/transcribe) only
   // after the server confirms an STT provider is available. No stored key must
   // keep browser SpeechRecognition as the first-click default until then; that
   // avoids dropping the first dictation on installs without server STT.
@@ -2304,7 +2304,7 @@ $('modelSelect').onchange=async()=>{
   // re-reverts a cross-family pick (the #3737 bug, Codex catch). send() clears it
   // after reading a matching pending pick. (#3739/#3737)
   _applySessionContextMetadataUpdate(data);
-  // Warn if selected model belongs to a different provider than what SynPulse is configured for
+  // Warn if selected model belongs to a different provider than what SynthPulse is configured for
   if(typeof _checkProviderMismatch==='function'){
     const warn=_checkProviderMismatch(selectedModel);
     if(warn&&typeof showToast==='function') showToast(warn,4000);
@@ -2717,7 +2717,7 @@ const _SKINS=[
   {name:'Catppuccin',colors:['#CBA6F7','#B4BEFE','#8839EF']},
   {name:'Hepburn',   colors:['#c6246a','#ec5597','#f2abca']},
   {name:'Steel',    value:'nous', colors:['#4682B4','#3A6E9A','#2C5F88']},
-  {name:'SynPulse', value:'synthpulse', colors:['#009DFF','#0F172A','#39D98A']},
+  {name:'SynthPulse', value:'synthpulse', colors:['#009DFF','#0F172A','#39D98A']},
   {name:'Neon',     colors:['#B347FF','#C76BFF','#00DDFF']},
   {name:'Neon Soft', value:'neon-soft', colors:['#B347FF','#C76BFF','#00DDFF']},
   {name:'Neon Paint', value:'neon-paint', colors:['#FF2D95','#00E5FF','#FFB800']},
@@ -3396,7 +3396,7 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
     _applyComposerControlOrder(window._composerControlOrder);
     window._showTitlebarProfile=!!s.show_titlebar_profile;
     _applyTitlebarProfileVisibility();
-    window._botName=s.bot_name||'SynPulse';
+    window._botName=s.bot_name||'SynthPulse';
     if(s.default_model_provider) window._activeProvider=s.default_model_provider;
     if(s.default_model){
       window._defaultModel=s.default_model;
@@ -3543,7 +3543,7 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
     window._composerControlVisibility=_composerControlVisibilityFromSettings(null);
     window._composerControlOrder=[];
     _applyComposerControlOrder(window._composerControlOrder);
-    window._botName='SynPulse';
+    window._botName='SynthPulse';
     _bootSettings={check_for_updates:false};
     if(typeof setLocale==='function'){
       const _lang=typeof resolvePreferredLocale==='function'
@@ -3974,8 +3974,8 @@ window.addEventListener('pageshow', async (event) => {
 
 async function shutdownServer() {
   const ok = await showConfirmDialog({
-    title: (typeof t === 'function' ? t('settings_shutdown_confirm_title') : 'Stop SynPulse WebUI'),
-    message: (typeof t === 'function' ? t('settings_shutdown_confirm_message') : 'Stop the SynPulse WebUI server?'),
+    title: (typeof t === 'function' ? t('settings_shutdown_confirm_title') : 'Stop SynthPulse WebUI'),
+    message: (typeof t === 'function' ? t('settings_shutdown_confirm_message') : 'Stop the SynthPulse WebUI server?'),
     confirmLabel: (typeof t === 'function' ? t('settings_shutdown_confirm_btn') : 'Stop'),
     danger: true,
   });

@@ -137,7 +137,7 @@ def test_share_page_serves_public_html():
         href = created["share"]["url"]
         body, status, headers = get(href)
         assert status == 200
-        assert "SynPulse Shared Conversation" in body
+        assert "SynthPulse Shared Conversation" in body
         assert "static/share.js" in body
         assert headers["Cache-Control"] == "no-store"
         assert headers["Referrer-Policy"] == "no-referrer"

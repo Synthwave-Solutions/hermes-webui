@@ -20,7 +20,7 @@ import requests
 
 TOOLS = [
     {"type": "function", "name": "dispatch_work",
-     "description": "Start requested work in a visible SynPulse chat without ending voice. Use subagents only when the user wants delegated parallel work. Starting a chat does not prove any subagent or action executed; inspect its status/result.",
+     "description": "Start requested work in a visible SynthPulse chat without ending voice. Use subagents only when the user wants delegated parallel work. Starting a chat does not prove any subagent or action executed; inspect its status/result.",
      "parameters": {"type": "object", "properties": {
          "request": {"type": "string", "description": "The user's concrete requested work, including relevant context from this conversation."},
          "mode": {"type": "string", "enum": ["chat", "background", "subagents"]}},

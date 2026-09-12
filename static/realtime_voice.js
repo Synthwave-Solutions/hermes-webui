@@ -168,7 +168,7 @@ if(typeof document!=='undefined') (function(){
       if(!captions)return;captions.replaceChildren();captions.hidden=!entries.length;
       for(const entry of entries.slice(-4)){
         const row=document.createElement('div');row.className='realtime-voice-transcript-row';row.dataset.role=entry.role;
-        const speaker=document.createElement('strong');speaker.textContent=entry.role==='user'?'You: ':'SynPulse: ';
+        const speaker=document.createElement('strong');speaker.textContent=entry.role==='user'?'You: ':'SynthPulse: ';
         row.append(speaker,document.createTextNode(entry.text));captions.append(row);
       }
     },

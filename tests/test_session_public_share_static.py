@@ -55,7 +55,7 @@ def test_share_i18n_keys_exist_in_english_locale():
 
 
 def test_public_share_page_assets_exist():
-    assert "SynPulse Shared Conversation" in SHARE_HTML
+    assert "SynthPulse Shared Conversation" in SHARE_HTML
     assert "/static/style.css" in SHARE_HTML
     assert "/static/share.js" in SHARE_HTML
     assert "function _shareLoad()" in SHARE_JS

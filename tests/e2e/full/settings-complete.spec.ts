@@ -90,7 +90,7 @@ test('US-SP-PREF-NUMBERS pinned limit and assistant display name save and reload
  await page.locator('#settingsPinnedSessionsLimit').fill('9');await page.locator('#settingsPinnedSessionsLimit').press('Tab');await expect.poll(async()=>(await api(page,'/api/settings')).body.pinned_sessions_limit).toBe(9);
  await page.locator('#settingsBotName').fill('QA Assistant');await page.locator('#settingsBotName').press('Tab');await expect.poll(async()=>(await api(page,'/api/settings')).body.bot_name).toBe('QA Assistant');
  await page.reload();await page.locator('.rail-btn[data-panel="settings"]').click();await page.locator('[data-settings-section="preferences"]').click();await expect(page.locator('#settingsPinnedSessionsLimit')).toHaveValue('9');await expect(page.locator('#settingsBotName')).toHaveValue('QA Assistant');
- await page.locator('#settingsBotName').fill('SynPulse');await page.locator('#settingsBotName').press('Tab');await expect.poll(async()=>(await api(page,'/api/settings')).body.bot_name).toBe('SynPulse');
+ await page.locator('#settingsBotName').fill('SynthPulse');await page.locator('#settingsBotName').press('Tab');await expect.poll(async()=>(await api(page,'/api/settings')).body.bot_name).toBe('SynthPulse');
 });
 
 test('US-SP-PREF-TAB-CHIPS each configurable navigation chip hides and restores its panel',async({page})=>{

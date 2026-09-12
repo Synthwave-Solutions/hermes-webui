@@ -986,12 +986,12 @@ function _cronGatewayNoticeHtml(status) {
         ? 'Gateway endpoint not reachable'
         : 'Gateway not running';
   const body = notConfigured
-    ? 'In SynPulse Control, scheduled jobs require the agent gateway daemon. If this is a single-container Docker install, jobs can be created and run manually here, but scheduled ticks need a separate gateway service running outside the WebUI.'
+    ? 'In SynthPulse Control, scheduled jobs require the agent gateway daemon. If this is a single-container Docker install, jobs can be created and run manually here, but scheduled ticks need a separate gateway service running outside the WebUI.'
     : isStaleMetadata
       ? 'The gateway is marked as configured, but its health metadata has gone stale. In Docker, scheduled jobs require a live gateway daemon that refreshes runtime metadata while ticking cron.'
       : isRemoteUnreachable
         ? 'The gateway health endpoint is not reachable from WebUI. Verify the configured gateway URL environment variable points to a reachable gateway service and network path before relying on cron ticking.'
-        : 'In SynPulse Control, scheduled jobs require the agent gateway daemon to be running. Start the gateway service before relying on offline scheduled runs.';
+        : 'In SynthPulse Control, scheduled jobs require the agent gateway daemon to be running. Start the gateway service before relying on offline scheduled runs.';
   const docsHref = 'https://synthwave.solutions/';
   const helpLink = notConfigured || isRemoteUnreachable || isStaleMetadata
     ? `<p><a href="${docsHref}" target="_blank" rel="noopener">How to enable scheduled jobs in Docker ↗</a></p>`
@@ -3236,7 +3236,7 @@ async function createKanbanTask(){
 // click-on-backdrop closes). The modal markup lives in static/index.html as
 // #kanbanTaskModal — see the section just above </body>.
 //
-// The assignee field auto-completes against the union of (a) live SynPulse
+// The assignee field auto-completes against the union of (a) live SynthPulse
 // profile names from /api/profiles and (b) historical assignees on the
 // active board, with an inline hint that explains the dispatcher claim
 // contract — most users will pick a profile name from the dropdown rather
@@ -9934,7 +9934,7 @@ async function loadSettingsPanel(){
     // Bot name — debounced autosave (text input)
     const botNameField=$('settingsBotName');
     if(botNameField){
-      botNameField.value=settings.bot_name||'SynPulse';
+      botNameField.value=defaultAssistantDisplayName(settings.bot_name);
       let botNameTimer=null;
       botNameField.addEventListener('input',()=>{
         if(botNameTimer) clearTimeout(botNameTimer);
@@ -12271,7 +12271,7 @@ function _applySavedSettingsUi(saved, body, opts){
   if(Object.prototype.hasOwnProperty.call(body,'structured_code_default_view')){
     _applyStructuredCodeViewSettings(body.structured_code_default_view,body.structured_code_auto_tree_lines,false);
   }
-  window._botName=body.bot_name||'SynPulse';
+  window._botName=body.bot_name||'SynthPulse';
   if(typeof applyBotName==='function') applyBotName();
   else if(typeof _applyBusyComposerPlaceholder==='function') _applyBusyComposerPlaceholder();
   if(typeof setLocale==='function') setLocale(language);
@@ -12954,7 +12954,7 @@ async function saveSettings(andClose){
   body.default_message_mode=defaultMessageMode;
   body.auto_title_refresh_every=(($('settingsAutoTitleRefresh')||{}).value||'0');
   const botName=(($('settingsBotName')||{}).value||'').trim();
-  body.bot_name=botName||'SynPulse';
+  body.bot_name=botName||'SynthPulse';
   // Password: only act if the field has content; blank = leave auth unchanged
   if(pw && pw.trim()){
     const currentPwField=$('settingsCurrentPassword');
