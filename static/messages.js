@@ -3704,6 +3704,9 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
     const hasSettledThinking=_anchorSceneMessageRowsHaveThinking(messageRows);
     const rows=[];
     const seen=new Set();
+    const toolCompletionRanks=new Map();
+    const completionRank=row=>(row.kind==='tool_completed'||row.source_event_type==='tool_complete')
+      ?(_anchorSceneRowHasLiveIdentity(row)?2:1):0;
     const seenTextKeys=[];
     const projectedRows=Array.isArray(base.activity_rows)?base.activity_rows:[];
     const orderedRows=[];
@@ -3745,13 +3748,36 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
       if(isTextual&&_anchorSceneRowTextOverlapsExisting(textKey,seenTextKeys)) return;
       const key=_anchorSceneExistingRowKey(row);
       if(key&&seen.has(key)){
-        if(row.tool?.name==='subagent_progress'){
+        if(row.role==='tool'){
           const index=rows.findIndex(existing=>_anchorSceneExistingRowKey(existing)===key);
-          if(index>=0) rows[index]=_mergeSubagentActivityRow(rows[index],row);
+          const existing=rows[index];
+          if(existing&&row.tool?.name==='subagent_progress'){
+            rows[index]=_mergeSubagentActivityRow(existing,row);
+          }else if(existing){
+            // Start and completion are separate registry events for one call.
+            // Sealing a running row above is presentation-only; it must not
+            // make that empty start outrank the observed completion payload.
+            const explicitId=r=>r.tool_call_id||r.tool?.id||r.tool?.tid||r.tool?.tool_call_id||r.tool?.tool_use_id||r.tool?.call_id||'';
+            const incomingRank=completionRank(row);
+            if(explicitId(row)&&explicitId(row)===explicitId(existing)&&incomingRank&&incomingRank>=(toolCompletionRanks.get(key)||0)){
+              // A live completion is authoritative over a later derived
+              // transcript duplicate. Replace result fields together (also
+              // when empty/redacted); never revive an earlier preview/output.
+              const tool={...(row.tool||{})};
+              const payload={...(row.payload||{})};
+              if(!Object.prototype.hasOwnProperty.call(payload,'args')&&!Object.prototype.hasOwnProperty.call(payload,'arguments')&&!Object.prototype.hasOwnProperty.call(payload,'input')){
+                tool.args=existing.tool?.args||{};
+              }
+              rows[index]={...existing,kind:row.kind,status:row.status,
+                source_event_type:row.source_event_type,text:row.text||'',tool,payload};
+              toolCompletionRanks.set(key,incomingRank);
+            }
+          }
         }
         return;
       }
       if(key) seen.add(key);
+      if(row.role==='tool'&&key) toolCompletionRanks.set(key,completionRank(row));
       if(isTextual&&textKey) seenTextKeys.push(textKey);
       rows.push({
         ...row,
