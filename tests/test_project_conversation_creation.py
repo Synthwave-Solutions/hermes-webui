@@ -1,5 +1,9 @@
 """Project creation retry contract through the real authenticated dispatcher."""
-from tests.test_project_collaboration import client, create, OWNER, MEMBER, OUTSIDER  # noqa: F401
+from tests import test_project_collaboration
+from tests.test_project_collaboration import create, OWNER, MEMBER, OUTSIDER
+
+# Reuse the isolated fixture without shadowing an imported name in test signatures.
+client = test_project_collaboration.client
 
 KEY = 'e478cb80-6744-40de-804c-3247a6a08a45'
 
