@@ -1301,6 +1301,27 @@
                 <div class="settings-section-meta" data-i18n="settings_section_preferences_meta">Defaults and UI behavior for SynthPulse Control.</div>
               </div>
             </div>
+            <div class="settings-field" id="interactionPreferences" style="border:1px solid var(--border2);border-radius:8px;padding:14px">
+              <strong>Clarification style</strong>
+              <p style="font-size:12px;color:var(--muted)">Choose how often SynthPulse asks about routine details. Previous answers are respected. Access rules and required approvals still apply.</p>
+              <label for="interactionUserMode">My default</label>
+              <select id="interactionUserMode" disabled>
+                <option value="balanced">Balanced — ask when a choice matters</option>
+                <option value="minimal">Fewer questions — use sensible defaults</option>
+              </select>
+              <label for="interactionTaskMode" style="margin-top:12px">This conversation</label>
+              <select id="interactionTaskMode" disabled>
+                <option value="">Use my default</option>
+                <option value="balanced">Balanced — ask when a choice matters</option>
+                <option value="minimal">Fewer questions — use sensible defaults</option>
+              </select>
+              <p id="interactionScope" style="font-size:12px;color:var(--muted)"></p>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button type="button" class="settings-btn" id="interactionSave" disabled>Save clarification preferences</button>
+                <button type="button" class="settings-btn" id="interactionReload">Reload saved preferences</button>
+              </div>
+              <p id="interactionStatus" role="status" aria-live="polite" style="font-size:12px"></p>
+            </div>
             <div class="settings-field">
               <label for="settingsModelChip" data-i18n="settings_label_model">Default Model</label>
               <div class="model-advanced-row">
@@ -1956,6 +1977,7 @@
 <script src="static/messages.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/extension_settings.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/panels.js?v=__WEBUI_VERSION__" defer></script>
+<script src="static/interaction_preferences.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/chat-bots.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/bot-knowledge.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/bot-builder.js?v=__WEBUI_VERSION__" defer></script>

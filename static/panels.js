@@ -8328,6 +8328,7 @@ function switchSettingsSection(name,opts){
     if(section==='plugins') loadPluginsPanel();
     if(section==='extensions') loadExtensionsPanel();
     if(section==='access'&&typeof loadMyAccessRequests==='function') loadMyAccessRequests();
+    if(section==='preferences'&&typeof loadInteractionPreferences==='function') loadInteractionPreferences();
     if(section==='system'&&typeof loadCapacityAlerts==='function') loadCapacityAlerts();
   }
   if(opts&&opts.fromSidebarItem)_closeMobileSidebarAfterPanelSelection();

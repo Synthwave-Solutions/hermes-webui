@@ -128,6 +128,8 @@ ROUTE_CATALOG: tuple[RouteRule, ...] = (
     RouteRule("/api/goal",                "chat:use", "chat:use", match="exact"),
     RouteRule("/api/approval",            "chat:use", "chat:use"),
     RouteRule("/api/clarify",             "chat:use", "chat:use"),
+    # Bounded personal clarification preferences; no governance decisions.
+    RouteRule("/api/interaction/preferences", "chat:use", "chat:use", match="exact"),
     RouteRule("/api/voice/realtime/",      "chat:use", "chat:use"),
     RouteRule("/api/transcribe/capability", "model:read", match="exact"),
     RouteRule("/api/transcribe",          "chat:use", "chat:use", match="exact"),

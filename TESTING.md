@@ -1780,6 +1780,16 @@ Manual-only for Sprint 8:
 *Regression gate: tests/test_regressions.py (10 tests, one per introduced bug)*
 *Run: ./scripts/test.sh tests/ -v*
 *Source: <repo>/*
+
+## Clarification preference regression fixture
+
+Run `./scripts/test.sh -q tests/test_interaction_preferences.py tests/test_webui_interaction_context.py`
+for actor/membership isolation, revision conflicts, corrupt storage, and prompt
+assembly. The loopback-only `tests/interaction_preferences_fixture.py` serves the
+production preference form/JS with synthetic identities and real temporary
+storage. `tests/interaction_preferences_browser.cjs` covers desktop/mobile
+persistence, reset, stale navigation, response loss, and two-tab conflicts.
+See [the fixture instructions and coverage limits](docs/interaction-preferences.md#verification).
 *Modules: ui.js, workspace.js, sessions.js, messages.js, panels.js, boot.js (app.js deleted)*
 
 ---

@@ -1660,3 +1660,12 @@ an existing workspace. Strict: path must be under home, in the saved workspace l
 
 The distinction matters because add uses permissive validation to avoid the circular
 dependency: you cannot get a path into the saved list if you need the saved list to add it.
+
+## Personal clarification preferences
+
+`api/interaction_preferences.py` stores bounded, actor-scoped clarification modes
+with optional conversation overrides and revision-checked atomic writes. It uses
+current conversation membership and emits only fixed prompt guidance through
+`api/interaction_context.py`; this state never grants access or changes approvals,
+profile configuration, or chat ownership. See
+[the scope and persistence contract](docs/interaction-preferences.md).

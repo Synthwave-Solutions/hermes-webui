@@ -13528,6 +13528,10 @@ def handle_get(handler, parsed) -> bool:
         return j(handler, data)
 
     # ── Memory API (GET) ──
+    if parsed.path == "/api/interaction/preferences":
+        from api.interaction_preferences import handle
+        return handle(handler, query=parsed.query)
+
     if parsed.path == "/api/memory":
         return _handle_memory_read(handler, parsed)
 
@@ -15564,6 +15568,10 @@ def handle_post(handler, parsed) -> bool:
         return _handle_skill_toggle(handler, body)
 
     # ── Memory (POST) ──
+    if parsed.path == "/api/interaction/preferences":
+        from api.interaction_preferences import handle
+        return handle(handler, body=body)
+
     if parsed.path == "/api/memory/write":
         return _handle_memory_write(handler, body)
 
