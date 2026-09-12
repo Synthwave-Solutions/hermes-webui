@@ -77,6 +77,13 @@ def test_preview_action_keeps_origin_session_across_success_fallback_and_chat_sw
     monkeypatch.setenv("MEDIA_ALLOWED_ROOTS", "")
     monkeypatch.setattr("api.auth.is_auth_enabled", lambda: False)
     monkeypatch.setattr("api.workspace.get_last_workspace", lambda: str(workspace))
+    # Model an artifact outside the ambient roots while keeping fixture bytes
+    # in pytest's safe temp directory. Linux tmp_path is itself under /tmp,
+    # unlike macOS; that unrelated broad allowance must not mask the ID loss.
+    within_root = routes._path_is_within_root
+    global_tmp = Path("/tmp").resolve()
+    monkeypatch.setattr(routes, "_path_is_within_root",
+                        lambda child, root: root != global_tmp and within_root(child, root))
     def get_session(sid):
         if sid != session_id:
             raise ValueError("synthetic unavailable session")
