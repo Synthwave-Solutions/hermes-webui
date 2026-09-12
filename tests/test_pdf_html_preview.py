@@ -199,7 +199,7 @@ class TestLoadHtmlInlineFunction:
         assert "'&session_id='+encodeURIComponent(mediaSessionId)" in body
         assert 'fetch(mediaUrl)' in body
         assert "const publicMediaUrl='api/media?path='+encodeURIComponent(path);" in body
-        assert "const openUrl=publicMediaUrl+'&inline=1';" in body
+        assert "const openUrl=mediaUrl+'&inline=1';" in body
 
     def test_pdf_fetch_url_includes_session_id_for_session_media_artifacts(self):
         ui = _read_js('ui.js')
@@ -209,7 +209,7 @@ class TestLoadHtmlInlineFunction:
         assert "'&session_id='+encodeURIComponent(mediaSessionId)" in body
         assert 'fetch(mediaUrl)' in body
         assert "const publicMediaUrl='api/media?path='+encodeURIComponent(path);" in body
-        assert "const dlUrl=publicMediaUrl+'&download=1';" in body
+        assert "const dlUrl=mediaUrl+'&download=1';" in body
 
 
 # ── requestAnimationFrame integration ──────────────────────────────────────

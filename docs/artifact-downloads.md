@@ -6,6 +6,32 @@ All three authenticated download endpoints (`/api/media`, `/api/file/raw` and `/
 
 An explicit `download=1` takes precedence over inline preview for media and raw HTML endpoints. Existing file authorization and containment checks still apply. This does not recover deleted historical artifacts, provide durable server-side artifact versioning, or prove the browser saved the file to disk. A successful response only proves that bytes were handed to the browser.
 
+PDF download links and HTML open/download links retain the originating session
+context captured by their preview fetch, including size/error/CDN fallbacks.
+Previously the preview could succeed for a session-mentioned artifact outside
+the general media roots, then its action returned 403 because the link dropped
+`session_id`. A foreground chat switch during loading must not replace this
+captured context. The ID is routing context, not an authorization grant: the
+unchanged server still checks the current caller, path and session visibility.
+
+`tests/test_artifact_preview_session_context.py` runs the production preview
+helpers and real media decision with synthetic files. It covers normal and
+fallback links, a chat switch while promises settle, Unicode/encoded paths,
+absent/unknown sessions and an unmentioned artifact. Run it with the existing
+artifact delivery, media access and PDF/HTML preview tests through
+`./scripts/test.sh`.
+
+For a rendered browser check, run
+`python tests/artifact_preview_session_fixture.py 0` using the test interpreter,
+then open its printed loopback URL. Test PDF/HTML preview and actions, delayed
+preview followed by chat switch, large/error fallbacks, and explicit wrong or
+missing session denials. The fixture serves valid synthetic PDF/HTML files and
+the actual preview/download JavaScript. Its HTTP session authorization is a
+deliberate fixture boundary; the Python tests separately exercise the real
+media handler. PDF.js uses the production CDN loader because this checkout has
+no bundled PDF.js asset. Browser saving and live account acceptance must be
+reported separately from these isolated tests.
+
 Manual verification: download generated HTML and PNG through chat and workspace at desktop and narrow widths; verify saved filename and bytes. Repeat after removing the fixture and while signed out: no browser download should start, and the app must explain recovery. Repeat the successful save in supported browsers.
 
 ## Isolated download regression fixture
