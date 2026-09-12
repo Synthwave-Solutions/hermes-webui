@@ -3698,6 +3698,22 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
     }
     return true;
   };
+  const _primeRestoredSessionModelForBoot=()=>{
+    const session=S.session;
+    const model=String(session&&session.model||'').trim();
+    const provider=String(session&&session.model_provider||'').trim();
+    const select=$('modelSelect');
+    if(!model||model.toLowerCase()==='unknown'||!provider||!select
+      ||typeof _ensureModelOptionInDropdown!=='function'||typeof _modelStateForSelect!=='function') return false;
+    // A restored, explicit route is sufficient to show its picker immediately;
+    // this option is display metadata, never a provider authorization decision.
+    const value=_ensureModelOptionInDropdown(model,select,provider);
+    const state=value?_modelStateForSelect(select,value):null;
+    const prefix=`@${provider}:`;
+    const bareModel=model.toLowerCase().startsWith(prefix.toLowerCase())?model.slice(prefix.length):model;
+    return !!state&&state.model===bareModel
+      &&String(state.model_provider||'').toLowerCase()===provider.toLowerCase();
+  };
   const _hydrateModelDropdown=({redirectIfUnauth=null}={})=>populateModelDropdown({
     preferProfileDefaultOnFreshBoot:true,
     ...(redirectIfUnauth?{redirectIfUnauth}:{}),
@@ -3844,12 +3860,14 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
       _bootRestoreGeneration=typeof _loadSessionGeneration==='number'?_loadSessionGeneration:null;
       await restorePromise;
       if(await _finishBootAfterNewerSessionActivation()) return;
-      // Hard refresh starts from the static HTML model list. Hydrate the live
-      // catalog after the saved session is known, then re-apply that session's
-      // model before S._bootReady lets syncModelChip reveal the composer label.
-      // Otherwise the chip can display the static default (e.g. GPT-5.4 Mini)
-      // even though S.session already points at the Codex/current model.
-      if(S.session) await _startBootModelDropdown();
+      // Show the authoritative saved route before revealing the composer. A
+      // slow catalog may enrich the picker later without delaying this chat.
+      // Unresolved routes still wait for the existing catalog reconciliation.
+      if(S.session){
+        if(_primeRestoredSessionModelForBoot()){
+          try{Promise.resolve(_startBootModelDropdown()).catch(()=>{});}catch(_){}
+        }else await _startBootModelDropdown();
+      }
       if(await _finishBootAfterNewerSessionActivation()) return;
       // If the restored session has no messages it is an ephemeral scratch pad —
       // treat the page as a fresh start rather than resuming a blank conversation.
