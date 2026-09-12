@@ -208,6 +208,48 @@ def _run_stream(monkeypatch, session, stream_id, agent_cls, *, workspace):
     return fake_queue
 
 
+@pytest.mark.parametrize("failed", [False, True], ids=["healthy-repeat", "failed-repeat"])
+def test_identical_followup_settles_only_when_result_is_healthy(tmp_path, monkeypatch, failed):
+    prompt = "Reply with exactly: SynthPulse chatcontrole geslaagd."
+    answer = "SynthPulse chatcontrole geslaagd."
+    session = _prepare_session("identical_followup", "repeat_stream", pending_user_message=prompt)
+    session.pending_attachments = []
+    _seed_prior_turn(session, prior_user=prompt, prior_assistant=answer)
+
+    class RepeatedAnswerAgent(MockAgent):
+        runs = 0
+
+        def run_conversation(self, **kwargs):
+            type(self).runs += 1
+            self.stream_delta_callback(answer)
+            return {
+                "failed": failed, "completed": not failed,
+                "final_response": answer,
+                "turn_exit_reason": "text_response(finish_reason=stop)",
+                "messages": list(kwargs.get("conversation_history") or []) + [
+                    {"role": "user", "content": kwargs["persist_user_message"]},
+                    {"role": "assistant", "content": answer},
+                ],
+            }
+
+    result_queue = _run_stream(monkeypatch, session, "repeat_stream", RepeatedAnswerAgent, workspace=str(tmp_path))
+    events = _queue_events(result_queue)
+    assert RepeatedAnswerAgent.runs == 1
+    assert any(event == "token" for event, _ in events)
+    assert any(event == "done" for event, _ in events) is (not failed)
+    assert any(event == "apperror" for event, _ in events) is failed
+    if not failed:
+        saved = Session.load("identical_followup")
+        assert [(row["role"], row["content"]) for row in saved.messages] == [
+            ("user", prompt), ("assistant", answer),
+            ("user", prompt), ("assistant", answer),
+        ]
+        assert [(row["role"], row["content"]) for row in saved.context_messages] == [
+            ("user", prompt), ("assistant", answer),
+            ("user", prompt), ("assistant", answer),
+        ]
+
+
 @pytest.mark.parametrize('terminal', [True, False], ids=['terminal-401', 'recovered-fallback'])
 def test_lifecycle_only_failure_never_replays_turn(tmp_path, monkeypatch, terminal):
     session = _prepare_session('lifecycle_bridge', 'stream_lifecycle_bridge', pending_user_message='Synthetic check')

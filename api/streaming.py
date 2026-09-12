@@ -4265,7 +4265,7 @@ def _api_safe_message_positions(messages):
 
 
 def _deduplicate_context_messages(messages):
-    """Remove duplicate messages from context by identity, keeping first occurrence.
+    """Remove duplicate messages within a turn, keeping its first occurrence.
 
     Prevents the agent from seeing the same message twice in conversation_history
     when result_messages contain duplicates that weren't caught by display-merge.
@@ -4276,6 +4276,7 @@ def _deduplicate_context_messages(messages):
     if not messages:
         return messages
     seen = set()
+    reference_seen = set()
     deduped = []
     for msg in messages:
         if _is_context_compression_marker(msg):
@@ -4283,15 +4284,21 @@ def _deduplicate_context_messages(messages):
                 '__context_compression_marker__',
                 " ".join(_message_text(msg.get('content', '')).split())[:500],
             )
-            if marker_key in seen:
+            if marker_key in reference_seen:
                 continue
-            seen.add(marker_key)
+            reference_seen.add(marker_key)
             if isinstance(msg, dict) and msg.get('role') != 'assistant':
                 msg = copy.deepcopy(msg)
                 msg['role'] = 'assistant'
             deduped.append(msg)
             continue
         key = _message_identity(msg)
+        if isinstance(msg, dict) and msg.get('role') == 'user':
+            # Content equality is not turn identity. A new user boundary owns
+            # its own answer, even when both repeat an earlier exchange.
+            # Adjacent copies of the same checkpointed user row remain duplicates.
+            if not (deduped and _message_identity(deduped[-1]) == key):
+                seen.clear()
         if key is not None and key in seen:
             continue
         if key is not None:
@@ -4488,6 +4495,19 @@ def _strip_replayed_prefix(existing_messages, candidates):
     return candidates
 
 
+def _split_current_turn_from_replay(candidates, msg_text):
+    """Protect the current turn inside an already-established result suffix.
+
+    The caller has removed the known prior context prefix. Only rows before
+    the last exact current-user match can be historical replay; matching text
+    in the current exchange is not proof it was already committed.
+    """
+    for idx in range(len(candidates) - 1, -1, -1):
+        if _looks_like_current_user_turn(candidates[idx], msg_text):
+            return candidates[:idx], candidates[idx:]
+    return candidates, []
+
+
 def _looks_like_replayed_session_arc_summary(previous_msg, candidate_msg):
     """Return True for repeated LCM/session summaries with refreshed hints.
 
@@ -4602,10 +4622,11 @@ def _dedupe_replayed_context_messages(previous_context, result_messages, msg_tex
             previous_user_tail,
             previous_context=previous_context,
         )
+    candidates, current_turn = _split_current_turn_from_replay(candidates, msg_text)
     candidates = _strip_replayed_prefix(previous_context, candidates)
     if candidates:
         candidates = _strip_replayed_context_items(previous_context, candidates)
-    return previous_context + candidates
+    return previous_context + candidates + current_turn
 
 
 def _dedupe_replayed_active_context(previous_context, result_messages, msg_text=None):
@@ -5325,8 +5346,10 @@ def _merge_display_messages_after_agent_result(previous_display, previous_contex
             for m in candidates
         )
         if not (assistant_or_tool_only_candidates and not current_user_in_candidates):
+            candidates, current_turn = _split_current_turn_from_replay(candidates, msg_text)
             candidates = _strip_replayed_prefix(previous_display, candidates)
             candidates = _strip_replayed_prefix(previous_context, candidates)
+            candidates += current_turn
     else:
         current_user_idx = _find_current_user_turn(result_messages, msg_text)
         turn_candidates = result_messages[current_user_idx:] if current_user_idx is not None else []
