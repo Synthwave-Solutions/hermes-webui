@@ -8045,6 +8045,9 @@ def _run_agent_streaming(
             # Named custom providers (custom:slug) may not be resolvable by
             # hermes_cli.runtime_provider directly. Fall back to config.yaml
             # custom_providers[] so WebUI can pass explicit creds/base_url.
+            # Keep the resolved routing identity when the transport below
+            # becomes generic "custom". Engine policy still needs the name.
+            resolved_requested_provider = resolved_provider
             resolved_provider, resolved_api_key, resolved_base_url = _resolve_custom_provider_runtime_overrides(
                 resolved_provider, resolved_api_key, resolved_base_url
             )
@@ -8246,6 +8249,8 @@ def _run_agent_streaming(
                     )
                 ),
             )
+            if 'requested_provider' in _agent_params:
+                _agent_kwargs['requested_provider'] = resolved_requested_provider
             # reasoning_config has been an AIAgent param for several releases,
             # but guard defensively to avoid TypeError on an older agent build.
             if 'reasoning_config' in _agent_params and _reasoning_config is not None:
@@ -8298,6 +8303,7 @@ def _run_agent_streaming(
                     _agent_cache_api_key_sig(resolved_api_key, _credential_pool),
                     resolved_base_url or '',
                     resolved_provider or '',
+                    resolved_requested_provider or '',
                     _rt.get('api_mode') or '',
                     _rt.get('command') or '',
                     _rt.get('args') or [],
