@@ -54,9 +54,9 @@ def test_catalog_follower_returns_within_own_budget_while_provider_stays_blocked
     monkeypatch.setattr(cfg, "_LIVE_REBUILD_BUDGET_SECONDS", 0.08)
     leader = pool.submit(cfg.get_available_models)
     assert entered.wait(1)
-    assert leader.result(timeout=0.5) == fallback
+    assert leader.result(timeout=0.5) == {**fallback, "refresh_pending": True}
     follower = pool.submit(cfg.get_available_models, prefer_cache=cache_only)
-    assert follower.result(timeout=0.3) == fallback
+    assert follower.result(timeout=0.3) == (fallback if cache_only else {**fallback, "refresh_pending": True})
     assert not release.is_set()
     assert cfg._cache_build_in_progress  # caller timeout must not cancel shared work
     assert len(calls) == 1
@@ -94,7 +94,7 @@ def test_simultaneous_cold_catalog_callers_share_one_detached_rebuild(
     monkeypatch.setattr(cfg, "_load_models_cache_from_disk", load_disk)
     futures = [pool.submit(cfg.get_available_models) for _ in range(6)]
     assert entered.wait(1)
-    assert [future.result(timeout=0.4) for future in futures] == [fallback] * 6
+    assert [future.result(timeout=0.4) for future in futures] == [{**fallback, "refresh_pending": True}] * 6
     assert len(calls) == 1
 
 
@@ -421,7 +421,7 @@ def test_budget_exceeded_foreground_uses_richer_static_catalog_and_refreshes_out
     expected_fallback = cfg._static_models_catalog_without_live_probes()
     result = cfg.get_available_models()
 
-    assert result == expected_fallback
+    assert result == {**expected_fallback, "refresh_pending": True}
     assert not (
         len(result["groups"]) == 1 and result["groups"][0]["provider"] == "Default"
     )
@@ -489,7 +489,7 @@ def test_budget_exceeded_uses_shape_only_stale_cache_before_static_fallback(
     assert any(
         g["provider_id"] == "ollama-cloud" for g in result["groups"]
     )
-    assert result == expected_fallback
+    assert result == {**expected_fallback, "refresh_pending": True}
     assert "ollama-cloud" not in {
         g["provider_id"] for g in cfg._static_models_catalog_without_live_probes()["groups"]
     }
@@ -556,7 +556,7 @@ def test_budget_exceeded_fallback_uses_static_when_stale_disk_cache_invalid(
     expected_static = cfg._static_models_catalog_without_live_probes()
     result = cfg.get_available_models()
 
-    assert result == expected_static
+    assert result == {**expected_static, "refresh_pending": True}
     assert all(g["provider_id"] != "ollama-cloud" for g in result["groups"])
 
     deadline = time.monotonic() + 3.0

@@ -3759,24 +3759,66 @@ function _applySessionModelFallback(sel){
 
 async function populateModelDropdown(opts={}){
   const sel=$('modelSelect');
-  if(!sel) return;
+  if(!sel){
+    if(populateModelDropdown._cancelRecovery) populateModelDropdown._cancelRecovery();
+    return;
+  }
   // `_activeProvider` is refreshed from the /api/models response below.
   if(typeof _modelDropdownRequestSeq!=='number') _modelDropdownRequestSeq=0;
   if(typeof _modelCatalogFallbackRetried!=='boolean') _modelCatalogFallbackRetried=false;
   const requestSeq=++_modelDropdownRequestSeq;
+  // One recovery owner per picker. Replacement cancels its timer/request;
+  // generation + profile checks also reject A -> B -> A responses before the
+  // newer profile has had a chance to start its own catalog request.
+  if(populateModelDropdown._cancelRecovery) populateModelDropdown._cancelRecovery();
+  const profile=typeof S!=='undefined'?S.activeProfile:null;
+  const profileGeneration=typeof _profileSwitchGeneration==='number'?_profileSwitchGeneration:null;
+  const controller=new AbortController();
+  let retryTimer=null, deadlineTimer=null;
+  const recovery=opts._catalogRecovery||{attempt:0,deadline:0};
+  const current=()=>requestSeq===_modelDropdownRequestSeq && $('modelSelect')===sel && !controller.signal.aborted && !(opts.signal&&opts.signal.aborted)
+    && (typeof S==='undefined'||S.activeProfile===profile)
+    && (typeof _profileSwitchGeneration!=='number'||_profileSwitchGeneration===profileGeneration);
+  const cancel=()=>{
+    clearTimeout(retryTimer); clearTimeout(deadlineTimer); controller.abort();
+    if(opts.signal) opts.signal.removeEventListener('abort',cancel);
+    if(populateModelDropdown._cancelRecovery===cancel) populateModelDropdown._cancelRecovery=null;
+  };
+  populateModelDropdown._cancelRecovery=cancel;
+  if(opts.signal){
+    opts.signal.addEventListener('abort',cancel,{once:true});
+    if(opts.signal.aborted){ cancel(); return; }
+  }
+  // Ordinary GETs reuse the in-progress server rebuild. Do not force another
+  // rebuild or probe every named provider. The entire continuation is bounded.
+  if(recovery.deadline){
+    if(Date.now()>=recovery.deadline){ cancel(); return; }
+    deadlineTimer=setTimeout(cancel,recovery.deadline-Date.now());
+  }
+  const scheduleRecovery=()=>{
+    if(!current()||recovery.attempt>=3) return;
+    const deadline=recovery.deadline||Date.now()+20000;
+    if(Date.now()+1000>=deadline) return;
+    retryTimer=setTimeout(()=>{
+      if(!current()){ cancel(); return; }
+      populateModelDropdown({...opts,freshness:'',preferProfileDefaultOnFreshBoot:false,
+        _catalogRecovery:{attempt:recovery.attempt+1,deadline}}).catch(()=>{});
+    },1000);
+  };
   try{
     const modelsUrl=new URL('api/models',document.baseURI||location.href);
     const requestedFreshness=opts&&opts.freshness?String(opts.freshness):'';
     if(opts&&opts.freshness) modelsUrl.searchParams.set('freshness',opts.freshness);
-    const _modelsRes=await fetch(modelsUrl.href,{credentials:'include'});
-    if(requestSeq!==_modelDropdownRequestSeq) return;
+    const _modelsRes=await fetch(modelsUrl.href,{credentials:'include',signal:controller.signal});
+    if(!current()) return;
     const customRedirectIfUnauth=opts&&typeof opts.redirectIfUnauth==='function'?opts.redirectIfUnauth:null;
     if(customRedirectIfUnauth){
       if(customRedirectIfUnauth(_modelsRes)) return;
     }else if(_redirectIfUnauth(_modelsRes)) return;
+    if(_modelsRes.ok===false) return;
     // `_activeProvider` is populated from the /api/models payload below.
     const data=await _modelsRes.json();
-    if(requestSeq!==_modelDropdownRequestSeq) return;
+    if(!current()) return;
     window._activeProvider=data.active_provider||null;
     window._defaultModel=data.default_model||null;
     window._configuredModelBadges=data.configured_model_badges||{};
@@ -3823,9 +3865,11 @@ async function populateModelDropdown(opts={}){
     const groups=usedConfiguredFallback
       ? _synthGroupsFromConfigured()
       : data.groups;
-    const willRetry=usedConfiguredFallback && requestedFreshness!=='session_visit' && !_modelCatalogFallbackRetried;
+    const refreshPending=data.refresh_pending===true;
+    const willRetry=!refreshPending && usedConfiguredFallback && requestedFreshness!=='session_visit' && !_modelCatalogFallbackRetried;
 
     if(!groups.length){
+      if(refreshPending) scheduleRecovery();
       if(willRetry){
         _modelCatalogFallbackRetried=true;
         populateModelDropdown({...opts,freshness:'session_visit'}).catch(()=>{});
@@ -3883,16 +3927,23 @@ async function populateModelDropdown(opts={}){
     }
     // Kick off a background live-model fetch for the active provider.
     // This runs after the static list is already shown (no blocking flicker).
-    if(data.active_provider && !willRetry) _fetchLiveModels(data.active_provider, sel, requestSeq);
+    if(data.active_provider && !willRetry && !refreshPending) _fetchLiveModels(data.active_provider, sel, requestSeq, current);
+    if(refreshPending) scheduleRecovery();
     if(willRetry){
       _modelCatalogFallbackRetried=true;
       populateModelDropdown({...opts,freshness:'session_visit'}).catch(()=>{});
     }
   }catch(e){
-    if(requestSeq!==_modelDropdownRequestSeq) return;
+    if(!current()) return;
     // API unavailable -- keep the hardcoded HTML options as fallback
-    console.warn('Failed to load models from server:',e.message);
+    if(e.name!=='AbortError') console.warn('Failed to load models from server:',e.message);
     if(typeof syncModelChip==='function') syncModelChip();
+  }finally{
+    clearTimeout(deadlineTimer);
+    if(retryTimer===null){
+      if(opts.signal) opts.signal.removeEventListener('abort',cancel);
+      if(populateModelDropdown._cancelRecovery===cancel) populateModelDropdown._cancelRecovery=null;
+    }
   }
 }
 
@@ -4002,12 +4053,12 @@ function _addLiveModelsToSelect(provider, models, sel){
   return added;
 }
 
-async function _fetchLiveModels(provider, sel, requestSeq=null){
+async function _fetchLiveModels(provider, sel, requestSeq=null, isCurrent=()=>true){
   if(!provider||!sel) return;
-  if(requestSeq!==null&&requestSeq!==_modelDropdownRequestSeq) return;
+  if(!isCurrent()||(requestSeq!==null&&requestSeq!==_modelDropdownRequestSeq)) return;
   // Already fetched — apply cached models to this select element (#872)
   if(_liveModelCache[provider]){
-    if(requestSeq!==null&&requestSeq!==_modelDropdownRequestSeq) return;
+    if(!isCurrent()||(requestSeq!==null&&requestSeq!==_modelDropdownRequestSeq)) return;
     const added=_addLiveModelsToSelect(provider,_liveModelCache[provider],sel);
     if(added>0 && typeof syncModelChip==='function') syncModelChip();
     return;
@@ -4017,13 +4068,13 @@ async function _fetchLiveModels(provider, sel, requestSeq=null){
     const url=new URL('api/models/live',document.baseURI||location.href);
     url.searchParams.set('provider',provider);
     const _liveRes=await fetch(url.href,{credentials:'include'});
-    if(requestSeq!==null&&requestSeq!==_modelDropdownRequestSeq) return;
+    if(!isCurrent()||(requestSeq!==null&&requestSeq!==_modelDropdownRequestSeq)) return;
     if(_redirectIfUnauth(_liveRes)) return;
     const data=await _liveRes.json();
-    if(requestSeq!==null&&requestSeq!==_modelDropdownRequestSeq) return;
+    if(!isCurrent()||(requestSeq!==null&&requestSeq!==_modelDropdownRequestSeq)) return;
     if(!data.models||!data.models.length) return;
     _liveModelCache[provider]=data.models;
-    if(requestSeq!==null&&requestSeq!==_modelDropdownRequestSeq) return;
+    if(!isCurrent()||(requestSeq!==null&&requestSeq!==_modelDropdownRequestSeq)) return;
     const added=_addLiveModelsToSelect(provider,data.models,sel);
     if(added>0){
       if(typeof syncModelChip==='function') syncModelChip();

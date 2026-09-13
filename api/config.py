@@ -7328,9 +7328,11 @@ def get_available_models(*, prefer_cache: bool = False, force_refresh: bool = Fa
             ):
                 return cached
             if _cache_build_in_progress:
-                if stale_disk_groups is not None:
-                    return copy.deepcopy(stale_disk_groups)
-                return copy.deepcopy(_static_models_catalog_without_live_probes())
+                # This response is provisional, even when it has nonempty groups.
+                # Stamp only the returned copy: the worker publishes the final
+                # actor-scoped catalog without this transient transport marker.
+                fallback = stale_disk_groups if stale_disk_groups is not None else _static_models_catalog_without_live_probes()
+                return {**copy.deepcopy(fallback), "refresh_pending": True}
 
         # Reload config if changed
         if _cfg_changed:
@@ -7601,9 +7603,10 @@ def get_available_models(*, prefer_cache: bool = False, force_refresh: bool = Fa
         # checks required for authoritative cold-path use. It was read before
         # acquiring _available_models_cache_lock so this over-budget fallback
         # does not extend the lock hold while the worker is ready to publish.
-        if stale_disk_groups is not None:
-            return copy.deepcopy(stale_disk_groups)
-        return copy.deepcopy(_static_models_catalog_without_live_probes())
+        fallback = stale_disk_groups if stale_disk_groups is not None else _static_models_catalog_without_live_probes()
+        if not _cache_build_in_progress:
+            return copy.deepcopy(fallback)  # failed at the boundary; no work to poll
+        return {**copy.deepcopy(fallback), "refresh_pending": True}
 
 
 def _models_cache_file_age_seconds(cache_path: Path, now: float) -> float | None:

@@ -328,7 +328,7 @@ def test_force_refresh_bounded_followers_wait_only_remaining_budget(tmp_path, mo
     result = cfg.get_available_models(force_refresh=True)
     elapsed = time.monotonic() - started_at
 
-    assert result == stale_catalog
+    assert result == {**stale_catalog, "refresh_pending": True}
     assert len(timeout_waits) == 1
     assert timeout_waits[0] is not None
     assert 0.0 <= timeout_waits[0] <= 0.05
@@ -390,7 +390,7 @@ def test_session_visit_overlapping_stale_calls_do_not_duplicate_over_budget_rebu
         futures = [executor.submit(cfg.get_available_models_for_session_visit) for _ in range(2)]
         results = [future.result(timeout=10) for future in futures]
 
-    assert all(result == stale_catalog for result in results)
+    assert all(result == {**stale_catalog, "refresh_pending": True} for result in results)
     assert rebuild_count == 1
     time.sleep(0.1)
     assert cfg._available_models_cache == rebuilt_catalog
@@ -665,8 +665,9 @@ def test_populate_model_dropdown_accepts_session_visit_freshness_and_guards_stal
 
     assert "modelsUrl.searchParams.set('freshness',opts.freshness)" in body
     assert "const requestSeq=++_modelDropdownRequestSeq" in body
-    assert body.count("requestSeq!==_modelDropdownRequestSeq") >= 3
-    assert "_fetchLiveModels(data.active_provider, sel, requestSeq)" in body
+    assert "requestSeq===_modelDropdownRequestSeq" in body
+    assert body.count("if(!current()) return;") >= 3
+    assert "_fetchLiveModels(data.active_provider, sel, requestSeq, current)" in body
     assert live_tail.count("requestSeq!==null&&requestSeq!==_modelDropdownRequestSeq") >= 4
 
 
