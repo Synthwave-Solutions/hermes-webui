@@ -48,3 +48,35 @@ port and set `PROJECT_QA_ORIGIN` to that origin when running the browser script.
 The fixture executes production frontend functions with synthetic API responses;
 it proves rendered controls, not production membership, provider execution or
 successful live delivery. Keep those live checks separate.
+
+### Project actions while team lists load
+
+The Projects team panel renders **New group conversation** as soon as the
+project detail is available. Loading people, bot profiles or project files no
+longer delays that action. The button still calls the existing creation flow,
+which refreshes project membership and bot availability before sending the
+authenticated create request. Loading the lists does not replace a busy button
+or reset its duplicate-click protection.
+
+Saving members and bots requires complete people and profile responses. Failed
+or malformed lists show an error inside the team section without enabling an
+incomplete update or removing the conversation action. A file-list failure does
+not prevent editing a fully loaded team. Each metadata load owns a generation
+and a specific DOM host; a new load or replacement host invalidates older
+success and error responses, including returning to the same project.
+
+`tests/test_project_team_readiness.py` runs the complete `static/projects.js`
+inside Chromium through `tests/project_team_readiness_browser.cjs`. The 28
+scenario executions cover pending, failed and malformed lists, clicks through
+the real conversation action, metadata arriving during creation, A-to-B-to-A
+navigation and a same-host revision reload at desktop and narrow widths. All
+network requests are intercepted; project APIs and session navigation use
+synthetic fixtures. This proves the rendered action and request contract, not
+production membership, live provider execution or the full application layout.
+
+Run `./scripts/test.sh tests/test_project_team_readiness.py -q` with Python
+Playwright and Chromium installed; the wrapper discovers its existing Node
+driver package. `PLAYWRIGHT_MODULE` and `CHROMIUM_PATH` can point to an existing
+local installation instead; `PROJECT_QA_SCREENSHOT_DIR` captures before/after
+fixture views without using the user's browser. Existing project dispatch,
+creation, hub and shortcut tests remain separate neighboring checks.

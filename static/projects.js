@@ -21,6 +21,7 @@
 let _projHub = null;        // last /api/projects/hub payload
 let _projDetail = null;     // last /api/projects/hub/detail payload
 let _projSelectedId = '';   // project_id currently open in the main view
+let _projTeamLoadGeneration = 0; // owns metadata for the current team controls
 
 function _projEsc(s) {
   if (typeof _escHtml === 'function') return _escHtml(s);
@@ -366,21 +367,47 @@ async function _projOfferNewSharedConversation(project) {
 async function _projLoadTeamControls(project) {
   const host = $('projTeamControls');
   if (!host) return;
+  const generation = ++_projTeamLoadGeneration;
+  const isCurrent = () => generation === _projTeamLoadGeneration
+    && $('projTeamControls') === host
+    && _projDetail && _projDetail.project.project_id === project.project_id;
+  if (!isCurrent()) return;
+  // Opening a conversation only needs the project's own detail. Keep its
+  // button stable while optional directories/files load or a create is busy.
+  host.innerHTML = '<div class="proj-card"><div class="proj-card-title">Project team</div>'
+    + '<div id="projTeamMetadata"><p class="proj-state">'+_projEsc(_projT('loading','Loading…'))+'</p></div>'
+    + '<p class="proj-state">Project membership does not change your bot or tool permissions.</p>'
+    + '<button class="app-dialog-btn" id="projStartChat">New group conversation</button></div>'
+    + '<div id="projTeamFiles"></div>';
+  const metadataHost = $('projTeamMetadata');
+  const filesHost = $('projTeamFiles');
+  const startButton = $('projStartChat');
+  startButton.onclick = () => {
+    if (!isCurrent()) return;
+    return _projWithBusy(startButton, 'Opening…', async () => {
+      try { await _projStartSharedConversation(project.project_id); }
+      catch(error) { showToast(String(error.message || error)); }
+    });
+  };
   try {
     const [people, bots, files] = await Promise.all([
-      api('/api/people'), api('/api/profiles?fast=1').catch(()=>({profiles:[]})), api('/api/projects/files?project_id='+encodeURIComponent(project.project_id)).catch(()=>null)
+      api('/api/people'), api('/api/profiles?fast=1'), api('/api/projects/files?project_id='+encodeURIComponent(project.project_id)).catch(()=>null)
     ]);
-    if (!_projDetail || _projDetail.project.project_id !== project.project_id) return;
-    const humans = (people.people || []).slice();
+    if (!isCurrent()) return;
+    // Never make incomplete directory data look like an empty selection that
+    // can be saved over the project's existing members or bot assignments.
+    if (!people || !Array.isArray(people.people) || !bots || !Array.isArray(bots.profiles)) {
+      throw new Error('Project team lists are unavailable. Reopen the project to try again.');
+    }
+    const humans = people.people.slice();
     if(people.me && !humans.some(p=>p.email===people.me)) humans.push({email:people.me,display_name:people.me});
-    const profiles = bots.profiles || [];
-    host.innerHTML = '<div class="proj-card"><div class="proj-card-title">Project team</div><div class="proj-team-grid"><section class="proj-team-section"><h3>People</h3>'
+    const profiles = bots.profiles;
+    metadataHost.innerHTML = '<div class="proj-team-grid"><section class="proj-team-section"><h3>People</h3>'
       + '<label class="proj-field" for="projPeopleSearch">Find people<input id="projPeopleSearch" placeholder="Search by name or email" aria-label="Find people"></label>'
       + '<div id="projHumanChoices" class="proj-choices"></div></section><section class="proj-team-section"><h3>Bots</h3><p class="proj-state">Choose assistants for this project.</p><div id="projBotChoices" class="proj-choices"></div></section></div><div class="proj-actions">'
       + (project.can_manage ? '<button class="app-dialog-btn" id="projSaveTeam">Save members and bots</button><button class="app-dialog-btn" id="projArchiveTeam">Archive project</button>' : '')
-      + '</div><p class="proj-state">Project membership does not change your bot or tool permissions.</p>'
-      + '<button class="app-dialog-btn" id="projStartChat">New group conversation</button></div>'
-      + (files ? '<div class="proj-card"><div class="proj-card-title">Project files</div><label class="proj-field" for="projUpload"><span id="projUploadLabel">Upload a file</span><input type="file" id="projUpload"></label><div id="projFileList" class="proj-actions"></div></div>' : '');
+      + '</div>';
+    filesHost.innerHTML = files ? '<div class="proj-card"><div class="proj-card-title">Project files</div><label class="proj-field" for="projUpload"><span id="projUploadLabel">Upload a file</span><input type="file" id="projUpload"></label><div id="projFileList" class="proj-actions"></div></div>' : '';
     const humanHost=$('projHumanChoices');
     const ownerRow=document.createElement('div');ownerRow.className='proj-owner';ownerRow.textContent='Owner: '+project.owner_email;humanHost.appendChild(ownerRow);
     humans.filter(p=>p.email!==project.owner_email).forEach(person=>{
@@ -416,13 +443,8 @@ async function _projLoadTeamControls(project) {
       try {await api('/api/projects/team',{method:'POST',body:JSON.stringify({project_id:project.project_id,revision:project.revision||0,deleted:true})});_projSelectedId='';_projDetail=null;await loadProjectsHub();_projRenderDetail();}
       catch(error){showToast(String(error.message||error));}
     };
-    $('projStartChat').onclick=async()=>{
-      try {
-        await _projStartSharedConversation(project.project_id);
-      } catch(error){showToast(String(error.message||error));}
-    };
-    for(const [id,label] of [['projSaveTeam','Saving…'],['projStartChat','Opening…'],['projArchiveTeam','Archiving…']]){
-      const button=$(id);if(button){const action=button.onclick;button.onclick=()=>_projWithBusy(button,label,action);}
+    for(const [id,label] of [['projSaveTeam','Saving…'],['projArchiveTeam','Archiving…']]){
+      const button=$(id);if(button){const action=button.onclick;button.onclick=()=>isCurrent() && _projWithBusy(button,label,action);}
     }
     if(files){
       const fileHost=$('projFileList');
@@ -449,5 +471,5 @@ async function _projLoadTeamControls(project) {
         };reader.onerror=()=>{resetUpload();showToast('The file could not be read. Please try again.');};reader.readAsDataURL(file);
       };
     }
-  } catch(error){host.textContent=String(error.message||error);}
+  } catch(error){if(isCurrent()) metadataHost.textContent=String(error.message||error);}
 }
