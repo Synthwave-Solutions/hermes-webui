@@ -6655,6 +6655,39 @@ def _run_agent_streaming(
             except Exception:
                 logger.debug('Could not record preparation milestone', exc_info=True)
 
+    def _record_run_timing(stage, started, finished=None, outcome='completed'):
+        # Fixed labels and monotonic intervals only; this private journal record
+        # is neither transcript content nor a change to the SSE lifecycle.
+        if stage not in {
+            'skill_modules', 'cron_wrapper', 'env_lock_wait', 'env_lock_hold',
+            'mcp_discovery', 'agent_run', 'checkpoint_join',
+            'agent_constructor', 'cache_eviction_close',
+        } or outcome not in {'completed', 'skipped', 'unavailable', 'raised'}:
+            return
+        if run_journal is not None:
+            try:
+                finished = time.perf_counter() if finished is None else finished
+                run_journal.append_sse_event('run_timing', {
+                    'stage': stage,
+                    'elapsed_ms': round(max(0, finished - _preparation_started) * 1000, 1),
+                    'duration_ms': round(max(0, finished - started) * 1000, 1),
+                    'outcome': outcome,
+                })
+            except Exception:
+                logger.debug('Could not record run timing')
+
+    @contextlib.contextmanager
+    def _run_timing_stage(stage):
+        started = time.perf_counter()
+        outcome = 'completed'
+        try:
+            yield
+        except BaseException:
+            outcome = 'raised'
+            raise
+        finally:
+            _record_run_timing(stage, started, outcome=outcome)
+
     s = None
     # Access checks can refuse the turn before provider resolution. Keep the
     # error path safe and report that refusal instead of crashing the worker.
@@ -7317,13 +7350,17 @@ def _run_agent_streaming(
         # first-time module initialisation (which can be slow) does not
         # block other concurrent sessions waiting on _ENV_LOCK (#2024).
         _preparation_phase('identity_ready')
-        _prewarm_skill_tool_modules()
-        _install_streaming_cronjob_profile_wrapper()
+        with _run_timing_stage('skill_modules'):
+            _prewarm_skill_tool_modules()
+        with _run_timing_stage('cron_wrapper'):
+            _install_streaming_cronjob_profile_wrapper()
         # Still set process-level env as fallback for tools that bypass thread-local
         # Acquire lock only for the env mutation, then release before the agent runs.
         # The finally block re-acquires to restore — keeping critical sections short
         # and preventing a deadlock where the restore would re-enter the same lock.
+        _env_wait_started = time.perf_counter()
         with _ENV_LOCK:
+            _env_acquired = time.perf_counter()
             old_profile_env = {key: os.environ.get(key) for key in _safe_profile_runtime_env}
             old_cwd = os.environ.get('TERMINAL_CWD')
             old_exec_ask = os.environ.get('HERMES_EXEC_ASK')
@@ -7355,7 +7392,11 @@ def _run_agent_streaming(
                 # the lock (#2024).
                 if patch_skill_home_modules is not None:
                     patch_skill_home_modules(Path(_profile_home))
+            _env_finished = time.perf_counter()
         # Lock released — agent runs without holding it
+        # Record only after release: journal I/O must not extend this lock.
+        _record_run_timing('env_lock_wait', _env_wait_started, _env_acquired)
+        _record_run_timing('env_lock_hold', _env_acquired, _env_finished)
         # ── MCP Server Discovery (lazy import, idempotent) ──
         # MUST run AFTER the HERMES_HOME mutation above — `discover_mcp_tools()`
         # reads `~/.hermes/config.yaml` via `get_hermes_home()`, which uses
@@ -7380,12 +7421,19 @@ def _run_agent_streaming(
         # This is a latency saving only, never a security boundary: the
         # registry is process-global, so the real boundary stays the toolset
         # intersection below plus agent-side governance filtering.
-        if _chat_mode != 'normal':
-            try:
-                from tools.mcp_tool import discover_mcp_tools
-                discover_mcp_tools()
-            except Exception:
-                pass  # MCP not available or not configured: non-fatal
+        _mcp_started = time.perf_counter()
+        _mcp_outcome = 'skipped'
+        try:
+            if _chat_mode != 'normal':
+                _mcp_outcome = 'raised'
+                try:
+                    from tools.mcp_tool import discover_mcp_tools
+                    discover_mcp_tools()
+                    _mcp_outcome = 'completed'
+                except Exception:
+                    _mcp_outcome = 'unavailable'  # Existing non-fatal discovery failure.
+        finally:
+            _record_run_timing('mcp_discovery', _mcp_started, outcome=_mcp_outcome)
         _preparation_phase('mcp_ready')
 
         # Register a gateway-style notify callback so the approval system can
@@ -8291,7 +8339,8 @@ def _run_agent_streaming(
             # Mirrors gateway _agent_cache.  Keeps _user_turn_count alive so
             # injectionFrequency: "first-turn" actually suppresses after turn 1.
             if ephemeral:
-                agent = _AIAgent(**_agent_kwargs)
+                with _run_timing_stage('agent_constructor'):
+                    agent = _AIAgent(**_agent_kwargs)
                 logger.debug('[webui] Created ephemeral agent for session %s', session_id)
             else:
                 import hashlib as _hashlib
@@ -8358,7 +8407,8 @@ def _run_agent_streaming(
 
                 if _identity_mismatch_entry is not None:
                     try:
-                        _close_cached_agent_entry_at_session_boundary(session_id, _identity_mismatch_entry)
+                        with _run_timing_stage('cache_eviction_close'):
+                            _close_cached_agent_entry_at_session_boundary(session_id, _identity_mismatch_entry)
                     except Exception:
                         logger.debug("Failed to close identity-mismatched cached agent for session %s", session_id, exc_info=True)
 
@@ -8376,7 +8426,8 @@ def _run_agent_streaming(
                             _stale_runtime_entry = SESSION_AGENT_CACHE.pop(session_id, None)
                         if _stale_runtime_entry is not None:
                             try:
-                                _close_cached_agent_entry_at_session_boundary(session_id, _stale_runtime_entry)
+                                with _run_timing_stage('cache_eviction_close'):
+                                    _close_cached_agent_entry_at_session_boundary(session_id, _stale_runtime_entry)
                             except Exception:
                                 logger.debug("Failed to close stale-runtime cached agent for session %s", session_id, exc_info=True)
                         agent = None
@@ -8414,7 +8465,8 @@ def _run_agent_streaming(
                     if hasattr(agent, '_api_call_count'):
                         agent._api_call_count = 0
                 else:
-                    agent = _AIAgent(**_agent_kwargs)
+                    with _run_timing_stage('agent_constructor'):
+                        agent = _AIAgent(**_agent_kwargs)
                     # Register the new agent with the memory lifecycle so
                     # its commit_memory_session() can be found later.
                     try:
@@ -8468,7 +8520,8 @@ def _run_agent_streaming(
                     for _evicted_sid, _evicted_entry in _evicted_items:
                         try:
                             _evicted_agent = _evicted_entry[0] if isinstance(_evicted_entry, tuple) else None
-                            _close_evicted_agent_at_session_boundary(_evicted_sid, _evicted_agent)
+                            with _run_timing_stage('cache_eviction_close'):
+                                _close_evicted_agent_at_session_boundary(_evicted_sid, _evicted_agent)
                         except Exception:
                             logger.debug("Failed to close evicted agent for session %s", _evicted_sid, exc_info=True)
                         logger.debug('[webui] Evicted LRU agent from cache: %s', _evicted_sid)
@@ -8636,7 +8689,8 @@ def _run_agent_streaming(
             if moa_config is not None:
                 _run_conversation_kwargs["moa_config"] = moa_config
             _preparation_phase('conversation_ready')
-            result = agent.run_conversation(**_run_conversation_kwargs)
+            with _run_timing_stage('agent_run'):
+                result = agent.run_conversation(**_run_conversation_kwargs)
             # #4729: the run is done — flush any reasoning tail still in the coalescing
             # buffer (the agent never calls reasoning_callback(None), and a turn can end on
             # reasoning with no trailing token/tool boundary to trigger a flush) so the last
@@ -8689,8 +8743,9 @@ def _run_agent_streaming(
                 return  # skip all normal persistence for ephemeral sessions
             if _checkpoint_stop is not None:
                 _checkpoint_stop.set()
-            if _ckpt_thread is not None:
-                _ckpt_thread.join(timeout=15)
+            with _run_timing_stage('checkpoint_join'):
+                if _ckpt_thread is not None:
+                    _ckpt_thread.join(timeout=15)
             if cancel_event.is_set():
                 with _agent_lock:
                     _finalize_cancelled_turn(s, ephemeral=False)
