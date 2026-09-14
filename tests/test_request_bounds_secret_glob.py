@@ -61,4 +61,6 @@ def test_a_whitelist_account_is_decided_the_same_way():
 
 
 def test_an_unmanaged_account_is_unchanged():
-    assert grant_within_bounds(policy(access_mode="", access_level=""), payload())
+    raw = deepcopy(BASE)
+    del raw["users"][ME]["access_mode"], raw["users"][ME]["access_level"]
+    assert grant_within_bounds(parse_governance_policy(raw), payload())

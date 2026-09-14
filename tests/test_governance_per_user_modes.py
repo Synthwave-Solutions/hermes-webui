@@ -110,3 +110,21 @@ def test_direct_terminal_api_is_denied_when_host_execution_cannot_preserve_resou
 def test_invalid_per_user_configuration_fails_closed(entry):
     with pytest.raises(GovernancePolicyError):
         access(**entry)
+
+
+def test_a_blacklist_account_carries_only_its_own_file_blacklist():
+    """14-09-2026: role and group denied_globs are the generic secret rules
+    for whitelist colleagues; on a default-allow account they closed ~/.hermes,
+    every .env and every key file. A blacklist account is closed by its own
+    denied_globs only; whitelist and legacy accounts keep the role rules."""
+    raw = deepcopy(BASE)
+    raw["roles"]["member"]["grants"]["files"] = {"denied_globs": ["**/.env", "**/.hermes/**"]}
+    raw["users"]["alice@example.test"].update(
+        access_mode="blacklist", access_level="elevated",
+        grants={"files": {"denied_globs": ["**/bunq*"]}},
+    )
+    a = resolve_effective_access(parse_governance_policy(raw), GovernanceSubject(email="alice@example.test"))
+    assert a.grants.file_denied_globs == frozenset({"**/bunq*"})
+    raw["users"]["alice@example.test"]["access_mode"] = "whitelist"
+    w = resolve_effective_access(parse_governance_policy(raw), GovernanceSubject(email="alice@example.test"))
+    assert {"**/.env", "**/.hermes/**"} <= set(w.grants.file_denied_globs)
