@@ -476,7 +476,11 @@ def ingest_spool(owner_scope: str | None = None) -> int:
                     approvals.save(registry)
                     pending += 1
             if notification is not None:
-                _notify_admins_of_request(notification)
+                # 14-09-2026: a person with approval: automatic gets the
+                # administrator's rules applied first; administrators are only
+                # pinged when the reviewer leaves the row to them.
+                from api import grant_auto_review
+                grant_auto_review.schedule(notification, on_manual=_notify_admins_of_request)
         return pending
     except Exception as exc:  # pragma: no cover: queue must render regardless
         logger.debug("grant request ingest failed: %s", exc)

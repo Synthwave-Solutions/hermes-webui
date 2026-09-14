@@ -1386,6 +1386,97 @@ def _handle_approvals_revoke(handler, parsed, policy, subject, access) -> bool:
     return True
 
 
+def decide_grant_request(key: str, decision: str, subject: GovernanceSubject, reason: str = "", *,
+                         path: str = "/api/governance/approvals/decide", source: str = "manual") -> tuple[int, dict]:
+    """Apply one decision on a pending access request; shared by the admin
+    handler and the automatic reviewer (14-09-2026). Returns (status, body).
+
+    Approve applies the grant to the USER entry in the policy document (under
+    the policy mutation lock, audited as a policy_change) and then marks the
+    registry row approved; reject only marks the row. The role/deny bounds
+    check stays in this path, so an automatic approval can never exceed what
+    an administrator could grant from the queue.
+    """
+    from types import SimpleNamespace
+    from api import approvals, grant_requests
+
+    parsed = SimpleNamespace(path=path)
+    entry = approvals.get(approvals.KIND_GRANT, key)
+    if entry is None:
+        return 404, {"error": "not_found", "message": f"unknown grant request: {key}"}
+    if str(entry.get("status") or "pending") != "pending":
+        return 409, {"error": "invalid_payload", "message": "request already decided"}
+    decided_by = subject.normalized_email or str(subject.email or "").strip().lower()
+    payload = entry.get("payload") if isinstance(entry.get("payload"), dict) else {}
+    # Composed before the decision, from the row the approver was looking at.
+    digest = _approval_digest(entry)
+    try:
+        current_policy = get_policy()
+    except GovernancePolicyError as exc:
+        return 500, {"error": "policy_error", "message": str(exc)}
+
+    if decision == "approve":
+        with policy_mutation_lock():
+            try:
+                current_policy = get_policy()
+            except GovernancePolicyError as exc:
+                return 500, {"error": "policy_error", "message": str(exc)}
+            raw = deepcopy(_policy_raw(current_policy))
+            old_etag = policy_etag(raw)
+            result = grant_requests.apply_grant_to_policy(raw, payload)
+            if result is None:
+                return 400, {"error": "invalid_payload", "message": "request does not describe an applicable grant"}
+            from api.governance.request_bounds import grant_within_bounds
+            if not grant_within_bounds(parse_governance_policy(raw), payload):
+                return 403, {"error": "forbidden", "message": "This request exceeds the user's role scope or an explicit deny. Edit the policy explicitly."}
+            before, after = result
+            try:
+                save_governance_policy(raw)
+            except GovernancePolicyError as exc:
+                return 400, {"error": "invalid_policy", "message": str(exc)}
+            new_etag = policy_etag(raw)
+        _audit_policy_change(
+            subject,
+            current_policy.mode,
+            parsed,
+            op="grant_request_approve",
+            target=str(payload.get("email") or ""),
+            before=before,
+            after=after,
+            old_etag=old_etag,
+            new_etag=new_etag,
+        )
+        trigger_profile_sync(str(payload.get("email") or "") or None, reason="grant_request_approve")
+        grant_requests.drop_from_spool(key)
+
+    try:
+        updated = approvals.decide(approvals.KIND_GRANT, key, decision, decided_by, reason=reason or None)
+    except (ValueError, KeyError) as exc:
+        return 400, {"error": "invalid_payload", "message": str(exc)}
+    # Both decisions are audited like every other kind (28 Aug 2026 ticket);
+    # the policy_change event on approve is unchanged. `source` says whether
+    # a person or the automatic reviewer decided.
+    _audit_approval(
+        subject, current_policy.mode, parsed,
+        op="approvals.approve" if decision == "approve" else "approvals.reject",
+        key=f"{approvals.KIND_GRANT}:{key}",
+        owner=str(payload.get("email") or entry.get("owner_email") or "").strip().lower(),
+        digest=digest, origin=source,
+    )
+    from api import approval_resume
+    try:
+        approval_resume.decide(entry, decision)
+    except Exception:
+        logger.exception("Approval saved but continuation could not be signalled")
+    # Close the loop with the requester, after the decision is persisted and
+    # audited so a delivery problem can never undo or delay it.
+    try:
+        grant_requests.notify_requester_of_decision(entry, decision, decided_by, reason)
+    except Exception:
+        logger.debug("could not notify the requester of the decision", exc_info=True)
+    return 200, {"ok": True, "kind": approvals.KIND_GRANT, "key": key, "status": str(updated.get("status") or decision), "source": source}
+
+
 def _handle_grant_request_decide(handler, parsed, policy, subject, body) -> bool:
     """Decide a governance access request (kind "grant").
 
@@ -1409,82 +1500,8 @@ def _handle_grant_request_decide(handler, parsed, policy, subject, body) -> bool
     if str(entry.get("status") or "pending") != "pending":
         j(handler, {"error": "invalid_payload", "message": "request already decided"}, status=409)
         return True
-    decided_by = subject.normalized_email or str(subject.email or "").strip().lower()
-    payload = entry.get("payload") if isinstance(entry.get("payload"), dict) else {}
-    # Composed before the decision, from the row the approver was looking at.
-    digest = _approval_digest(entry)
-
-    if decision == "approve":
-        with policy_mutation_lock():
-            try:
-                current_policy = get_policy()
-            except GovernancePolicyError as exc:
-                j(handler, {"error": "policy_error", "message": str(exc)}, status=500)
-                return True
-            raw = deepcopy(_policy_raw(current_policy))
-            old_etag = policy_etag(raw)
-            result = grant_requests.apply_grant_to_policy(raw, payload)
-            if result is None:
-                j(handler, {"error": "invalid_payload", "message": "request does not describe an applicable grant"}, status=400)
-                return True
-            from api.governance.request_bounds import grant_within_bounds
-            if not grant_within_bounds(parse_governance_policy(raw), payload):
-                j(handler, {"error": "forbidden", "message": "This request exceeds the user's role scope or an explicit deny. Edit the policy explicitly."}, status=403)
-                return True
-            before, after = result
-            try:
-                save_governance_policy(raw)
-            except GovernancePolicyError as exc:
-                j(handler, {"error": "invalid_policy", "message": str(exc)}, status=400)
-                return True
-            new_etag = policy_etag(raw)
-        _audit_policy_change(
-            subject,
-            current_policy.mode,
-            parsed,
-            op="grant_request_approve",
-            target=str(payload.get("email") or ""),
-            before=before,
-            after=after,
-            old_etag=old_etag,
-            new_etag=new_etag,
-        )
-        trigger_profile_sync(str(payload.get("email") or "") or None, reason="grant_request_approve")
-        grant_requests.drop_from_spool(key)
-
-    try:
-        updated = approvals.decide(approvals.KIND_GRANT, key, decision, decided_by, reason=str(body.get("reason") or "").strip() or None)
-    except (ValueError, KeyError) as exc:
-        j(handler, {"error": "invalid_payload", "message": str(exc)}, status=400)
-        return True
-    # Access requests are the bulk of this queue and used to leave no
-    # approval_decision behind at all: approving wrote a policy_change and
-    # rejecting wrote nothing, so the risk detail the approver was shown was
-    # recorded nowhere. Both decisions are audited here like every other kind
-    # (28 Aug 2026 ticket); the policy_change event on approve is unchanged.
-    _audit_approval(
-        subject, policy.mode, parsed,
-        op="approvals.approve" if decision == "approve" else "approvals.reject",
-        key=f"{approvals.KIND_GRANT}:{key}",
-        owner=str(payload.get("email") or entry.get("owner_email") or "").strip().lower(),
-        digest=digest,
-    )
-    from api import approval_resume
-    try:
-        approval_resume.decide(entry, decision)
-    except Exception:
-        logger.exception("Approval saved but continuation could not be signalled")
-    # Close the loop with the requester, after the decision is persisted and
-    # audited so a delivery problem can never undo or delay it.
-    try:
-        from api import grant_requests
-
-        grant_requests.notify_requester_of_decision(
-            entry, decision, decided_by, str(body.get("reason") or "").strip()
-        )
-    except Exception:
-        logger.debug("could not notify the requester of the decision", exc_info=True)
-    j(handler, {"ok": True, "kind": approvals.KIND_GRANT, "key": key, "status": str(updated.get("status") or decision)})
+    status, out = decide_grant_request(key, decision, subject, str(body.get("reason") or "").strip(), path=parsed.path)
+    j(handler, out, status=status)
     return True
 
 
