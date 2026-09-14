@@ -1,5 +1,7 @@
 """A capability decision cannot override managed role/resource ceilings."""
-from .models import GovernanceSubject
+import os
+
+from .models import GovernanceSubject, grant_matches
 from .resolver import resolve_effective_access
 
 
@@ -21,7 +23,16 @@ def grant_within_bounds(policy, payload):
     if kind == "skill":
         return access.allows("skills_view", value) and access.allows("skills_load", value)
     if kind == "secret_glob":
-        return False  # managed secret exceptions require an explicit policy edit
+        # 14-09-2026 (Michael: an administrator must be able to approve every
+        # queue item): a secret-file exception lands on one person's
+        # files.allow_globs for one exact path, the per-person exception the
+        # policy already supports, so it is decided from the queue like any
+        # other grant. Only an explicit per-person deny on that path stays out
+        # of reach here; the engine keeps credential and financial denies closed
+        # for blacklist users regardless (EffectiveAccess.configuration_denies_file).
+        expanded = os.path.expanduser(value)
+        candidates = {value, expanded, os.path.realpath(expanded)}
+        return not any(grant_matches(access.deny.file_denied_globs, c) for c in candidates)
     dim = dimensions.get(kind)
     if dim is None:
         return False
