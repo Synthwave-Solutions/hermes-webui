@@ -103,3 +103,24 @@ def test_execution_guard_returns_403_with_the_correct_reason(acl, monkeypatch, m
     assert handler.status == 403
     reason = "unavailable" if malformed else "required"
     assert json.loads(handler.wfile.getvalue()) == {"error": "Workspace membership " + reason}
+
+
+def test_membership_of_a_child_workspace_survives_a_broader_excluding_one(acl, monkeypatch):
+    """14-09-2026: a stray workspace rooted at /home (owner only, everyone else
+    excluded) sat above every client folder and blocked people from the
+    specific workspaces they WERE members of. Membership in any containing
+    workspace must grant access regardless of iteration order."""
+    child = acl.root / "makro"
+    child.mkdir()
+    target = child / "notes.md"
+    target.write_text("client work")
+    broad = {"path": str(acl.root.parent), "owner_email": "someone@example.test", "members": []}
+    specific = {"path": str(child), "owner_email": "owner@example.test",
+                "members": ["member@example.test"]}
+    for rows in ([broad, specific], [specific, broad]):
+        acl.registry.write_text(json.dumps(rows))
+        workspace_access.ensure_scope_access("member@example.test", target)  # no raise
+    # A true non-member of every containing workspace is still refused.
+    acl.registry.write_text(json.dumps([broad, specific]))
+    with pytest.raises(PermissionError, match="^Workspace membership required$"):
+        workspace_access.ensure_scope_access("stranger@example.test", target)

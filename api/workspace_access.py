@@ -33,7 +33,8 @@ def load_acl_entries():
 def ensure_scope_access(scope, path, *, entries=None):
     if scope == 'all' or not path:
         return
-    membership_required = False
+    inside_any = False
+    member_of_any = False
     try:
         target = Path(path).expanduser().resolve()
         for entry in load_acl_entries() if entries is None else entries:
@@ -41,14 +42,23 @@ def ensure_scope_access(scope, path, *, entries=None):
             if not emails:
                 continue
             root = Path(entry['path']).expanduser().resolve()
-            if target.is_relative_to(root) and scope not in emails:
-                membership_required = True
-                break
+            if target.is_relative_to(root):
+                inside_any = True
+                if scope in emails:
+                    member_of_any = True
+                    break
     except (OSError, ValueError, RuntimeError):
         raise PermissionError('Workspace membership unavailable') from None
+    # Membership in ANY workspace that contains the path grants access. The
+    # earlier "deny if any containing workspace excludes you" broke on
+    # overlapping roots: a broad workspace nobody is a member of (e.g. a stray
+    # entry rooted at /home) blocked the specific child workspace the person
+    # WAS a member of (Makro, Peterson, Beumer). Deny only when the path is
+    # inside one or more workspaces and the actor is a member of none of them.
+    # (14-09-2026; a path inside no registered workspace stays allowed as before.)
     # PermissionError is also an OSError. Keep the intentional ACL refusal
     # outside the metadata-error handler, which still hides filesystem errors.
-    if membership_required:
+    if inside_any and not member_of_any:
         raise PermissionError('Workspace membership required')
 
 
