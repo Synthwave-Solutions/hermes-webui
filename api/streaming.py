@@ -5636,6 +5636,45 @@ def _merged_transcript_lacks_final_assistant_answer(
     )
 
 
+def _healthy_text_response_result(result) -> bool:
+    """True when the engine reports a completed text_response turn with an answer."""
+    if not isinstance(result, dict) or _agent_result_terminal_failure(result):
+        return False
+    if result.get('error') or result.get('interrupted'):
+        return False
+    if not str(result.get('turn_exit_reason') or '').startswith('text_response('):
+        return False
+    final_response = str(result.get('final_response') or '').strip()
+    return bool(final_response) and final_response != '(empty)'
+
+
+def _turn_is_terminal_failure(result, saved_transcript_lacks_final_answer, classification_type,
+                              *, session_id='', result_count=0, context_count=0) -> bool:
+    """Decide whether a finished turn must be shown as a failure.
+
+    16-09-2026: the merged-transcript heuristic declared "no final answer" on
+    turns the engine had completed normally (text_response, non-empty
+    final_response): a model fallback after a rate limit, a recovered pending
+    user turn or a compacted history changed the message shapes it compares.
+    Users then saw "No response from provider" printed under a complete
+    answer, 64 times on 12 and 15-09. The engine's own verdict on a healthy
+    turn wins; the heuristic still catches silent failures (no answer, error,
+    failed/partial results).
+    """
+    if _agent_result_terminal_failure(result):
+        return True
+    if not saved_transcript_lacks_final_answer or classification_type in {'cancelled', 'interrupted'}:
+        return False
+    if _healthy_text_response_result(result):
+        logger.warning(
+            "[webui] transcript heuristic reported no final answer for a healthy text_response turn; "
+            "trusting the engine (session=%s result_msgs=%d prev_ctx=%d exit=%s)",
+            session_id, result_count, context_count, result.get('turn_exit_reason'),
+        )
+        return False
+    return True
+
+
 def _agent_result_terminal_failure(result) -> bool:
     """Return True for agent results that must not be finalized as done."""
     if not isinstance(result, dict):
@@ -9022,12 +9061,13 @@ def _run_agent_streaming(
                         drop_replayed_assistant=_drop_replayed_assistant,
                     )
                 )
-                _terminal_failure = (
-                    _agent_result_terminal_failure(result)
-                    or (
-                        _saved_transcript_lacks_final_answer
-                        and _classification['type'] not in {'cancelled', 'interrupted'}
-                    )
+                _terminal_failure = _turn_is_terminal_failure(
+                    result,
+                    _saved_transcript_lacks_final_answer,
+                    _classification['type'],
+                    session_id=s.session_id,
+                    result_count=len(_all_result_messages),
+                    context_count=len(_previous_context_messages),
                 )
                 if _terminal_failure:
                     _assistant_added = False
