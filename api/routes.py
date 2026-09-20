@@ -13036,6 +13036,10 @@ def handle_get(handler, parsed) -> bool:
         from api.user_avatars import handle_me_avatar
         return handle_me_avatar(handler, "GET", None)
 
+    if parsed.path == "/api/me/channels":
+        from api.gateway_channels import handle_me as _channels_me
+        return _channels_me(handler, "GET", parsed.path, None)
+
     if parsed.path == "/api/projects/files":
         return _handle_project_collaboration(handler, parsed)
 
@@ -14627,6 +14631,10 @@ def handle_post(handler, parsed) -> bool:
     if parsed.path == "/api/me/avatar":
         from api.user_avatars import handle_me_avatar
         return handle_me_avatar(handler, "POST", body)
+
+    if parsed.path.startswith("/api/me/channels"):
+        from api.gateway_channels import handle_me as _channels_me
+        return _channels_me(handler, "POST", parsed.path, body)
 
     if parsed.path == "/api/session/participants":
         from api.project_collaboration import project_for as _participants_project

@@ -226,3 +226,82 @@ def test_publish_hook_runs_funnel_and_pins_loopback(env, monkeypatch):
     assert "WHATSAPP_CLOUD_WEBHOOK_HOST=127.0.0.1" in env.read_text()
     with pytest.raises(ValueError):
         ch.publish_hook("telegram")
+
+
+# ── one bot per person (self-service) ───────────────────────────────────────
+
+@pytest.fixture
+def me(monkeypatch, tmp_path, env):
+    monkeypatch.setattr("api.ownership.request_owner_email", lambda handler: "andre@example.test")
+    monkeypatch.setattr(ch, "_is_admin", lambda handler: False)
+    monkeypatch.setattr(ch, "_profile_for_email", lambda email, explicit=None: (explicit or "").lower() if explicit else ("andre" if email == "andre@example.test" else ""))
+    pdir = tmp_path / "profiles" / "andre"
+    pdir.mkdir(parents=True)
+    monkeypatch.setattr(ch, "_profile_env_path", lambda profile: tmp_path / "profiles" / profile / ".env")
+    monkeypatch.setattr(ch, "_people_gateway_state", lambda: {"unit": "hermes-mux-gateway.service", "active": True, "available": True})
+    return pdir
+
+
+def test_my_bot_token_lands_in_my_profile_env(me):
+    out = ch.set_my_bot(object(), "telegram", {"TELEGRAM_BOT_TOKEN": "999:xyz"})
+    assert out["profile"] == "andre" and out["token_set"] is True
+    assert "TELEGRAM_BOT_TOKEN=999:xyz" in (me / ".env").read_text()
+    with pytest.raises(ValueError):
+        ch.set_my_bot(object(), "slack", {"SLACK_BOT_TOKEN": "x"})  # shared platform
+    with pytest.raises(ValueError):
+        ch.set_my_bot(object(), "telegram", {"OPENAI_API_KEY": "x"})
+    payload = ch.my_channels_payload(object())
+    assert payload["profile"] == "andre" and payload["own_bot"]["telegram"]["token_set"] is True and payload["shared_bot"] is False
+    ch.remove_my_bot(object(), "telegram")
+    assert "TELEGRAM_BOT_TOKEN" not in (me / ".env").read_text()
+
+
+def test_linking_my_id_maps_me_and_allowlists_my_bot(me):
+    out = ch.link_me(object(), "telegram", "4242")
+    assert out["email"] == "andre@example.test" and out["profile"] == "andre"
+    assert "TELEGRAM_ALLOWED_USERS=4242" in (me / ".env").read_text()
+    assert ch.mapped_email("telegram", "4242") == "andre@example.test"
+    links = ch.my_channels_payload(object())["links"]
+    assert [(l["platform"], l["user_id"]) for l in links] == [("telegram", "4242")]
+    ch.unlink_me(object(), "telegram", "4242")
+    assert ch.mapped_email("telegram", "4242") == "" and "TELEGRAM_ALLOWED_USERS" not in (me / ".env").read_text()
+    with pytest.raises(LookupError):
+        ch.unlink_me(object(), "telegram", "4242")
+
+
+def test_cannot_steal_someone_elses_link(me):
+    ch.set_identity("telegram", "777", "michael@example.test")
+    with pytest.raises(ValueError):
+        ch.link_me(object(), "telegram", "777")
+
+
+def test_shared_bot_account_cannot_create_a_personal_bot(me, monkeypatch):
+    monkeypatch.setattr("api.ownership.request_owner_email", lambda handler: "michael@example.test")
+    assert ch.my_channels_payload(object())["shared_bot"] is True
+    with pytest.raises(ValueError):
+        ch.set_my_bot(object(), "telegram", {"TELEGRAM_BOT_TOKEN": "1:a"})
+
+
+def test_apply_restarts_the_people_gateway_with_a_rate_limit(me, monkeypatch):
+    calls = []
+    class _Proc:
+        returncode, stdout, stderr = 0, "", ""
+    monkeypatch.setattr("subprocess.run", lambda args, **kw: calls.append(args) or _Proc())
+    out = ch.apply_people_gateway(object())
+    assert out["ok"] and calls[0][:3] == ["systemctl", "--user", "restart"]
+    with pytest.raises(RuntimeError):
+        ch.apply_people_gateway(object())  # second time within ten minutes, non-admin
+    monkeypatch.setattr(ch, "_is_admin", lambda handler: True)
+    assert ch.apply_people_gateway(object())["ok"]
+
+
+def test_self_service_routes_are_wired():
+    root = Path(__file__).resolve().parent.parent
+    routes = (root / "api" / "routes.py").read_text()
+    assert 'parsed.path.startswith("/api/me/channels")' in routes and 'if parsed.path == "/api/me/channels":' in routes
+    from api.governance.catalog import ROUTE_CATALOG
+    rule = next(r for r in ROUTE_CATALOG if r.pattern == "/api/me/channels")
+    assert rule.matches("/api/me/channels/link") and rule.permission_for("POST") == "sessions:read"
+    js = (root / "static" / "integrations.js").read_text()
+    for name in ("chLoadMine", "chSaveMyToken", "chLinkMe", "chApplyMine", "/api/me/channels/apply"):
+        assert name in js

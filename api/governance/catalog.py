@@ -123,6 +123,8 @@ ROUTE_CATALOG: tuple[RouteRule, ...] = (
     # POST only ever targets the caller's own identity (api/user_avatars.py).
     RouteRule("/api/people/avatar",       "sessions:read", match="exact"),
     RouteRule("/api/me/avatar",           "sessions:read", "sessions:read", match="exact"),
+    # Own bot and own platform ids (Connections, "Your bot"): always the caller.
+    RouteRule("/api/me/channels",         "sessions:read", "sessions:read"),
     RouteRule("/api/background",          "sessions:read", "sessions:write"),
     RouteRule("/api/bg-task-complete-ack", "sessions:write", "sessions:write", match="exact"),
     RouteRule("/api/process-complete-ack", "sessions:write", "sessions:write", match="exact"),

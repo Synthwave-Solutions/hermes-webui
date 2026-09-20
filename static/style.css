@@ -8228,3 +8228,8 @@ html[data-nav-audience="member"]:not([data-advanced-chat-controls="1"]) #compose
 .ch-field-toggle{display:flex;align-items:center;gap:8px;font-size:13px;margin:12px 0;}
 .ch-public code{font-size:11px;overflow-wrap:anywhere;}
 .ch-copy{padding:2px 8px;font-size:11px;}
+.ch-mine-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;}
+.ch-inline{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.ch-inline input,.ch-inline select{flex:1;min-width:180px;}
+.ch-steps summary{cursor:pointer;font-size:12px;color:var(--muted);}
+.ch-apply{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px;}

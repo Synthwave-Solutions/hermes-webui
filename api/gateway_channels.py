@@ -603,3 +603,253 @@ def handle_post(handler, path: str, body):
         logger.warning("channels: %s failed", path, exc_info=True)
         return bad(handler, "Channel action failed. Check the server log.", 500)
     return bad(handler, "Not found", 404)
+
+
+# ── Self-service: my own bot and my platform ids ─────────────────────────────
+# One bot per person: a person's engine profile owns its own Telegram bot
+# (token in that profile's .env), served by the multiplex gateway under that
+# profile. The person links their own platform id here; that adds them to
+# their bot's allowlist and to the identity map (governance + profile).
+
+SELF_SERVICE_PLATFORMS = ("telegram",)
+_PEOPLE_GATEWAY_UNIT_ENV = "HERMES_WEBUI_PEOPLE_GATEWAY_UNIT"
+_APPLY_MIN_INTERVAL = 600
+
+
+def _me(handler) -> str:
+    from api.ownership import request_owner_email
+    return str(request_owner_email(handler) or "").strip().lower()
+
+
+def _is_admin(handler) -> bool:
+    try:
+        from api.ownership import identity_is_admin
+        from api.governance.enforce import _request_identity
+        return bool(identity_is_admin(_request_identity(handler)))
+    except Exception:
+        return False
+
+
+def my_profile(email: str) -> str:
+    return _profile_for_email(email)
+
+
+def _profile_env_path(profile: str) -> Path:
+    from api.profiles import get_hermes_home_for_profile
+    return Path(get_hermes_home_for_profile(profile or "default")) / ".env"
+
+
+def _merge_allowlist(env_path: Path, var: str, user_id: str, *, remove: bool = False) -> None:
+    from api.providers import _load_env_file, _write_env_file
+    current = _allowlist(_load_env_file(env_path), var)
+    if remove:
+        current = [x for x in current if x != user_id]
+    elif user_id not in current:
+        current.append(user_id)
+    _write_env_file(env_path, {var: ",".join(current) if current else None})
+
+
+def _people_gateway_unit() -> str:
+    return str(os.getenv(_PEOPLE_GATEWAY_UNIT_ENV) or "hermes-mux-gateway.service")
+
+
+def _people_gateway_state() -> dict:
+    import shutil
+    import subprocess
+    unit = _people_gateway_unit()
+    exe = shutil.which("systemctl")
+    if not exe:
+        return {"unit": unit, "active": None, "available": False}
+    try:
+        proc = subprocess.run([exe, "--user", "is-active", unit], capture_output=True, text=True, timeout=10)
+        return {"unit": unit, "active": proc.stdout.strip() == "active", "available": True}
+    except Exception:
+        return {"unit": unit, "active": None, "available": False}
+
+
+def _apply_stamp_path() -> Path:
+    from api import config
+    return Path(config.STATE_DIR) / "gateway-people-apply.json"
+
+
+def my_channels_payload(handler) -> dict:
+    me = _me(handler)
+    if not me:
+        raise PermissionError("Sign in first")
+    profile = my_profile(me)
+    env = {}
+    env_path = _profile_env_path(profile) if profile else None
+    if env_path is not None:
+        from api.providers import _load_env_file
+        env = _load_env_file(env_path)
+    own = {}
+    for key in SELF_SERVICE_PLATFORMS:
+        p = _BY_KEY[key]
+        own[key] = {
+            "label": p["label"],
+            "token_set": bool(profile) and bool(str(env.get(p["fields"][0]["key"]) or "").strip()),
+            "allowed_ids": _allowlist(env, p["allow_env"]) if profile else [],
+            "user_id_hint": p["user_id_hint"],
+        }
+    links = [{"platform": platform, "user_id": uid, "name": entry.get("name", ""), "profile": entry.get("profile", "")}
+             for platform, rows in load_identities().items() if isinstance(rows, dict)
+             for uid, entry in rows.items()
+             if isinstance(entry, dict) and str(entry.get("email") or "").lower() == me]
+    links.sort(key=lambda r: (r["platform"], r["user_id"]))
+    stamp = {}
+    try:
+        stamp = json.loads(_apply_stamp_path().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        stamp = {}
+    return {
+        "email": me, "profile": profile, "own_bot": own, "links": links,
+        "shared_bot": not profile,
+        "people_gateway": {**_people_gateway_state(), "last_apply_at": stamp.get("at"), "last_apply_by": stamp.get("by")},
+        "platforms": [{"key": p["key"], "label": p["label"], "user_id_hint": p["user_id_hint"]} for p in CATALOG],
+        "is_admin": _is_admin(handler),
+    }
+
+
+def set_my_bot(handler, platform: str, values: dict) -> dict:
+    me = _me(handler)
+    if not me:
+        raise PermissionError("Sign in first")
+    key = str(platform or "").strip().lower()
+    if key not in SELF_SERVICE_PLATFORMS:
+        raise ValueError("This platform is shared by the organisation; ask an admin under Messaging channels")
+    profile = my_profile(me)
+    if not profile:
+        raise ValueError("Your account runs on the workstation's main bot; a personal bot needs your own engine profile")
+    p = _BY_KEY[key]
+    token_key = p["fields"][0]["key"]
+    updates = {}
+    for k, v in (values or {}).items():
+        if k not in {f["key"] for f in p["fields"]}:
+            raise ValueError(f"Unknown field {k}")
+        text = str(v or "").strip()
+        if text:
+            if "\n" in text or len(text) > 4000:
+                raise ValueError(f"Invalid value for {k}")
+            updates[k] = text
+    if not updates:
+        raise ValueError("Nothing to save")
+    from api.providers import _write_env_file
+    env_path = _profile_env_path(profile)
+    env_path.parent.mkdir(parents=True, exist_ok=True)
+    _write_env_file(env_path, updates)
+    return {"ok": True, "platform": key, "profile": profile, "saved": sorted(updates), "token_set": token_key in updates}
+
+
+def remove_my_bot(handler, platform: str) -> dict:
+    me = _me(handler)
+    key = str(platform or "").strip().lower()
+    profile = my_profile(me) if me else ""
+    if key not in SELF_SERVICE_PLATFORMS or not profile:
+        raise ValueError("No personal bot to remove")
+    p = _BY_KEY[key]
+    from api.providers import _write_env_file
+    _write_env_file(_profile_env_path(profile), {f["key"]: None for f in p["fields"]})
+    return {"ok": True, "platform": key, "profile": profile}
+
+
+def link_me(handler, platform: str, user_id, name: str = "") -> dict:
+    me = _me(handler)
+    if not me:
+        raise PermissionError("Sign in first")
+    p = _BY_KEY.get(str(platform or "").strip().lower())
+    if not p:
+        raise ValueError("Unknown channel")
+    uid = normalize_user_id(p["key"], user_id)
+    if not uid:
+        raise ValueError("Invalid platform user id")
+    existing = (load_identities().get(p["key"]) or {}).get(uid)
+    if isinstance(existing, dict) and str(existing.get("email") or "").lower() not in ("", me):
+        raise ValueError("This platform id is already linked to another person; ask an admin")
+    profile = my_profile(me)
+    out = set_identity(p["key"], uid, me, name or me.split("@")[0], actor=me, profile=profile or None)
+    if profile and p["key"] in SELF_SERVICE_PLATFORMS:
+        _merge_allowlist(_profile_env_path(profile), p["allow_env"], uid)
+    return out
+
+
+def unlink_me(handler, platform: str, user_id) -> dict:
+    me = _me(handler)
+    p = _BY_KEY.get(str(platform or "").strip().lower())
+    if not me or not p:
+        raise ValueError("Unknown channel")
+    uid = normalize_user_id(p["key"], user_id)
+    existing = (load_identities().get(p["key"]) or {}).get(uid)
+    if not isinstance(existing, dict) or str(existing.get("email") or "").lower() != me:
+        raise LookupError("Not your link")
+    out = remove_identity(p["key"], uid)
+    profile = my_profile(me)
+    if profile and p["key"] in SELF_SERVICE_PLATFORMS:
+        _merge_allowlist(_profile_env_path(profile), p["allow_env"], uid, remove=True)
+    return out
+
+
+def apply_people_gateway(handler) -> dict:
+    """Restart the multiplex gateway so new bots and allowlists take effect.
+    Admins always; others at most once per 10 minutes (shared service)."""
+    import subprocess
+    me = _me(handler)
+    if not me:
+        raise PermissionError("Sign in first")
+    admin = _is_admin(handler)
+    stamp_path = _apply_stamp_path()
+    now = int(time.time())
+    if not admin:
+        try:
+            last = int((json.loads(stamp_path.read_text(encoding="utf-8")) or {}).get("at") or 0)
+        except (OSError, ValueError):
+            last = 0
+        if now - last < _APPLY_MIN_INTERVAL:
+            raise RuntimeError(f"The bots were restarted {now - last} seconds ago; try again in {(_APPLY_MIN_INTERVAL - (now - last)) // 60 + 1} minutes")
+    unit = _people_gateway_unit()
+    state = _people_gateway_state()
+    if not state.get("available"):
+        raise RuntimeError("Cannot restart the bots from here (no systemctl); ask an operator")
+    proc = subprocess.run(["systemctl", "--user", "restart", unit], capture_output=True, text=True, timeout=120)
+    if proc.returncode != 0:
+        raise RuntimeError("restart failed: " + (proc.stderr or proc.stdout).strip()[-200:])
+    stamp_path.parent.mkdir(parents=True, exist_ok=True)
+    stamp_path.write_text(json.dumps({"at": now, "by": me}), encoding="utf-8")
+    return {"ok": True, "unit": unit, "at": now}
+
+
+def handle_me(handler, method: str, path: str, body):
+    body = body if isinstance(body, dict) else {}
+    try:
+        if method == "GET" and path == "/api/me/channels":
+            return j(handler, my_channels_payload(handler), extra_headers={"Cache-Control": "no-store"})
+        if method == "POST" and path == "/api/me/channels/bot":
+            if body.get("remove"):
+                out = remove_my_bot(handler, body.get("platform"))
+            else:
+                out = set_my_bot(handler, body.get("platform"), body.get("values") or {})
+            _audit(handler, "my_bot", {"platform": out["platform"], "profile": out["profile"], "removed": bool(body.get("remove"))})
+            return j(handler, out)
+        if method == "POST" and path == "/api/me/channels/link":
+            out = link_me(handler, body.get("platform"), body.get("user_id"), body.get("name", ""))
+            _audit(handler, "my_link", {"platform": out["platform"], "user_id": out["user_id"]})
+            return j(handler, out)
+        if method == "POST" and path == "/api/me/channels/unlink":
+            out = unlink_me(handler, body.get("platform"), body.get("user_id"))
+            _audit(handler, "my_unlink", {"platform": body.get("platform"), "user_id": str(body.get("user_id") or "")})
+            return j(handler, out)
+        if method == "POST" and path == "/api/me/channels/apply":
+            out = apply_people_gateway(handler)
+            _audit(handler, "people_gateway_apply", {"unit": out["unit"]})
+            return j(handler, out)
+    except PermissionError as exc:
+        return bad(handler, str(exc), 401)
+    except LookupError as exc:
+        return bad(handler, str(exc), 404)
+    except RuntimeError as exc:
+        return bad(handler, str(exc), 409)
+    except ValueError as exc:
+        return bad(handler, str(exc), 400)
+    except Exception:
+        logger.warning("channels: %s failed", path, exc_info=True)
+        return bad(handler, "Channel action failed. Check the server log.", 500)
+    return bad(handler, "Not found", 404)

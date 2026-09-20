@@ -113,7 +113,7 @@ async function loadIntegrations() {
       ? _intgT('integrations_all_connections', 'All connections')
       : _intgT('integrations_my_connections', 'My connections');
   }
-  await Promise.all([_intgLoadCatalog(), _intgRefreshConnections(), _intgRefreshRequests(), chLoadChannels()]);
+  await Promise.all([_intgLoadCatalog(), _intgRefreshConnections(), _intgRefreshRequests(), chLoadChannels(), chLoadMine()]);
   return true;
 }
 
@@ -1103,3 +1103,93 @@ async function chRemovePerson(platform, userId) {
 if (typeof window !== 'undefined') {
   Object.assign(window, { chLoadChannels, chOpenConfigure, chDisable, chRestartGateway, chApprove, chAddPerson, chRemovePerson, chPublish, chCopy });
 }
+
+
+// ── Your bot: one bot per person, self-service ─────────────────────────────
+let _chMine = null;
+async function chLoadMine() {
+  const root = $('intgMine'), body = $('intgMineBody');
+  if (!root || !body) return;
+  try {
+    _chMine = await api('/api/me/channels', { redirect401: false, timeoutToast: false });
+  } catch (e) {
+    root.style.display = 'none'; _chMine = null; return;
+  }
+  root.style.display = '';
+  chRenderMine();
+}
+
+function chRenderMine() {
+  const body = $('intgMineBody');
+  if (!body || !_chMine) return;
+  const m = _chMine;
+  const tg = (m.own_bot || {}).telegram || {};
+  const gw = m.people_gateway || {};
+  const links = m.links || [];
+  const when = gw.last_apply_at ? new Date(gw.last_apply_at * 1000).toLocaleString() : '';
+  let html = '<div class="ch-mine-grid">';
+  html += '<div class="intg-card configured"><div class="intg-card-head">' + (typeof li === 'function' ? li('zap', 16) : '') + '<div class="intg-card-name">Telegram</div></div>';
+  if (m.shared_bot) {
+    html += '<div class="ch-card-summary">' + _intgEsc(_intgT('mychannels_shared', '')) + '</div>';
+  } else {
+    html += '<div class="ch-card-status">' + (tg.token_set ? '<span class="intg-badge intg-badge-ok">' + _intgT('mychannels_token_stored', 'Token stored') + '</span>' : '<span class="intg-badge">' + _intgT('mychannels_token_missing', 'No bot yet') + '</span>')
+      + '<span class="intg-badge">' + _intgT('mychannels_profile', 'Profile') + ': ' + _intgEsc(m.profile) + '</span></div>';
+    html += '<div class="ch-card-summary">' + _intgEsc(_intgT('mychannels_intro', '')) + '</div>';
+    html += '<details class="ch-steps"><summary>' + _intgT('help', 'How') + '</summary><div class="ch-card-summary">' + _intgEsc(_intgT('mychannels_steps', '')) + '</div></details>';
+    html += '<div class="ch-field"><label>' + _intgT('mychannels_token', 'Bot token from @BotFather') + '</label><div class="ch-inline"><input type="password" id="chMineToken" autocomplete="off" placeholder="' + (tg.token_set ? _intgEsc(_intgT('channels_secret_stored', 'Stored. Leave blank to keep.')) : '123456:ABC...') + '"><button type="button" class="sm-btn primary" onclick="chSaveMyToken()">' + _intgT('mychannels_save_token', 'Save token') + '</button>'
+      + (tg.token_set ? '<button type="button" class="sm-btn" onclick="chRemoveMyBot()">' + _intgT('mychannels_remove_bot', 'Remove bot') + '</button>' : '') + '</div></div>';
+  }
+  html += '<div class="ch-field"><label>' + _intgT('mychannels_your_id', 'Your Telegram user id') + '</label><div class="ch-inline"><input type="text" id="chMineId" placeholder="' + _intgEsc(tg.user_id_hint || '') + '"><button type="button" class="sm-btn primary" onclick="chLinkMe(\'telegram\')">' + _intgT('mychannels_link', 'Link') + '</button></div><div class="ch-hint">' + _intgEsc(_intgT('mychannels_your_id_hint', '')) + '</div></div>';
+  html += '</div>';
+  html += '<div class="intg-card"><div class="intg-card-name">' + _intgT('mychannels_links', 'Your linked platform ids') + '</div>';
+  html += links.length ? '<div class="intg-table-wrap"><table class="ch-people-table"><tbody>' + links.map(l => '<tr><td>' + _intgEsc(_chLabelFrom(m.platforms, l.platform)) + '</td><td><code>' + _intgEsc(l.user_id) + '</code></td><td><code>' + _intgEsc(l.profile || 'gateway') + '</code></td><td><button type="button" class="sm-btn" onclick="chUnlinkMe(\'' + _intgEsc(l.platform) + '\',\'' + _intgEsc(l.user_id) + '\')">' + _intgT('mychannels_unlink', 'Unlink') + '</button></td></tr>').join('') + '</tbody></table></div>'
+    : '<div class="intg-muted">' + _intgT('mychannels_no_links', 'Nothing linked yet.') + '</div>';
+  html += '<div class="ch-field"><label>' + _intgT('channels_platform', 'Platform') + '</label><div class="ch-inline"><select id="chMinePlatform">' + (m.platforms || []).filter(p => p.key !== 'telegram').map(p => '<option value="' + _intgEsc(p.key) + '">' + _intgEsc(p.label) + '</option>').join('') + '</select><input type="text" id="chMineOtherId" placeholder="' + _intgEsc(_intgT('channels_user_id', 'Platform user id')) + '"><button type="button" class="sm-btn" onclick="chLinkMe(null)">' + _intgT('mychannels_link', 'Link') + '</button></div></div>';
+  html += '</div></div>';
+  html += '<div class="ch-apply"><button type="button" class="sm-btn' + (gw.active === false ? ' primary' : '') + '" onclick="chApplyMine()" ' + (gw.available ? '' : 'disabled') + '>' + _intgT('mychannels_apply', 'Apply (restart bots)') + '</button><span class="ch-hint">' + _intgEsc(_intgT('mychannels_apply_hint', '')) + (when ? ' ' + _intgEsc(_intgT('mychannels_last_apply', 'Last applied {when} by {who}').replace('{when}', when).replace('{who}', gw.last_apply_by || '?')) : '') + '</span></div>';
+  body.innerHTML = html;
+}
+function _chLabelFrom(platforms, key) { const p = (platforms || []).find(x => x.key === key); return p ? p.label : key; }
+
+async function chSaveMyToken() {
+  const token = (($('chMineToken') || {}).value || '').trim();
+  if (!token) return;
+  try {
+    const r = await api('/api/me/channels/bot', { method: 'POST', timeoutToast: false, body: JSON.stringify({ platform: 'telegram', values: { TELEGRAM_BOT_TOKEN: token } }) });
+    if (!r || !r.ok) throw new Error((r && r.error) || '');
+    showToast(_intgT('mychannels_saved', 'Saved.')); await chLoadMine();
+  } catch (e) { showToast((e && e.message) || _intgT('channels_failed', 'Channel action failed.')); }
+}
+async function chRemoveMyBot() {
+  if (!confirm(_intgT('mychannels_remove_bot', 'Remove bot') + '?')) return;
+  try {
+    const r = await api('/api/me/channels/bot', { method: 'POST', timeoutToast: false, body: JSON.stringify({ platform: 'telegram', remove: true }) });
+    if (!r || !r.ok) throw new Error((r && r.error) || '');
+    showToast(_intgT('mychannels_saved', 'Saved.')); await chLoadMine();
+  } catch (e) { showToast((e && e.message) || _intgT('channels_failed', 'Channel action failed.')); }
+}
+async function chLinkMe(platform) {
+  const key = platform || (($('chMinePlatform') || {}).value || '');
+  const uid = ((platform ? $('chMineId') : $('chMineOtherId')) || {}).value || '';
+  if (!key || !uid.trim()) return;
+  try {
+    const r = await api('/api/me/channels/link', { method: 'POST', timeoutToast: false, body: JSON.stringify({ platform: key, user_id: uid.trim() }) });
+    if (!r || !r.ok) throw new Error((r && r.error) || '');
+    showToast(_intgT('mychannels_linked', 'Linked.')); await chLoadMine(); if (typeof chLoadChannels === 'function') chLoadChannels();
+  } catch (e) { showToast((e && e.message) || _intgT('channels_failed', 'Channel action failed.')); }
+}
+async function chUnlinkMe(platform, uid) {
+  try {
+    const r = await api('/api/me/channels/unlink', { method: 'POST', timeoutToast: false, body: JSON.stringify({ platform, user_id: uid }) });
+    if (!r || !r.ok) throw new Error((r && r.error) || '');
+    showToast(_intgT('mychannels_unlinked', 'Unlinked.')); await chLoadMine(); if (typeof chLoadChannels === 'function') chLoadChannels();
+  } catch (e) { showToast((e && e.message) || _intgT('channels_failed', 'Channel action failed.')); }
+}
+async function chApplyMine() {
+  try {
+    const r = await api('/api/me/channels/apply', { method: 'POST', body: '{}', timeoutToast: false, timeoutMs: 130000 });
+    if (!r || !r.ok) throw new Error((r && r.error) || '');
+    showToast(_intgT('mychannels_applied', 'Bots are restarting.')); await chLoadMine();
+  } catch (e) { showToast((e && e.message) || _intgT('channels_failed', 'Channel action failed.')); }
+}
+if (typeof window !== 'undefined') Object.assign(window, { chLoadMine, chSaveMyToken, chRemoveMyBot, chLinkMe, chUnlinkMe, chApplyMine });
