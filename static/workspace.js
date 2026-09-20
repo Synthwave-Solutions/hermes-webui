@@ -32,7 +32,7 @@ const _API_SHARED_MEMO_RULES=[
   {test:/^api\/people(?:\?|$)/,ttlMs:30000,invalidate:/^api\/(?:people|governance)/},
   {test:/^api\/governance\/me(?:\?|$)/,ttlMs:60000,invalidate:/^api\/(?:governance|profile)/},
   {test:/^api\/models(?:\?|$)/,ttlMs:60000,invalidate:/^api\/(?:models?|settings|provider|profile|onboarding)/},
-  {test:/^api\/workspaces(?:\?|$)/,ttlMs:15000,invalidate:/^api\/(?:workspaces?|onboarding|profile|session\/new|governance)/},
+  {test:/^api\/workspaces(?:\?|$)/,ttlMs:15000,invalidate:/^api\/(?:workspaces?|onboarding|profile|session\/(?:new|workspace)|governance)/},
   {test:/^api\/dashboard\/config(?:\?|$)/,ttlMs:60000,invalidate:/^api\/dashboard/},
   {test:/^api\/mcp\/tools(?:\?|$)/,ttlMs:30000,invalidate:/^api\/(?:mcp|governance|settings|profile|gateway)/},
 ];

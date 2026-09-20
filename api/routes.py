@@ -20328,6 +20328,14 @@ def _handle_cron_recent(handler, parsed):
         from cron.jobs import list_jobs
 
         jobs = list_jobs(include_disabled=True)
+        # Completion toasts and unread badges are personal: the job's creator
+        # and admins, nobody else (api/cron_scope.py::scope_cron_completions).
+        try:
+            from api.cron_scope import scope_cron_completions_for_caller
+
+            jobs = scope_cron_completions_for_caller(handler, jobs)
+        except Exception:
+            logger.debug("cron completion scoping unavailable; serving unscoped", exc_info=True)
         # Delivery outcome is tracked SEPARATELY from run status (scheduler
         # delivery ticket, 2026-08-26): a run whose last_status is ok but whose
         # update never reached its target must not be reported as plain ok.
@@ -22374,6 +22382,18 @@ def _handle_cron_create(handler, body):
             )
         if not toast_notifications:
             post_create_updates["toast_notifications"] = False
+        # Stamp the creator, as chat-created jobs already are, so completion
+        # notifications and the ownership rule in api/cron_scope.py reach the
+        # person who scheduled it from the Tasks panel. No stamp without a
+        # signed-in email (password/auth-off installs keep the shared view).
+        try:
+            from api.ownership import request_owner_email
+
+            _creator = request_owner_email(handler)
+        except Exception:
+            _creator = None
+        if _creator and not isinstance(job.get("origin"), dict):
+            post_create_updates["origin"] = {"platform": "webui", "chat_id": None, "user_id": _creator}
         if post_create_updates:
             job = update_job(job["id"], post_create_updates) or job
         return j(handler, {"ok": True, "job": _cron_job_for_api(job)})

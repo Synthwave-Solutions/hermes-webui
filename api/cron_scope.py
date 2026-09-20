@@ -246,6 +246,54 @@ def scope_cron_rows(identity, active_jobs, other_jobs, session_owner=None):
     )
 
 
+def _identity_is_cron_admin(identity) -> bool:
+    """Admins receive every completion: bootstrap admins, ``cron:admin``
+    holders, and any caller while governance is off or unreadable (the
+    permission check fails open there, so a single-user install is unchanged)."""
+    from api.governance.enforce import identity_has_permission
+
+    try:
+        if identity_has_permission(identity, CRON_ADMIN_PERMISSION):
+            return True
+    except Exception:
+        return True
+    try:
+        from api.ownership import identity_is_admin
+
+        return bool(identity_is_admin(identity))
+    except Exception:
+        return False
+
+
+def scope_cron_completions(identity, jobs, session_owner=None):
+    """Completion notifications go to the job's creator; admins get them all.
+
+    Requested 20 Sep 2026: every signed-in user was toasted for every cron in
+    the store. A job is "yours" by the same rule the listing uses for
+    ownership (``origin.platform == webui`` and your identity stamp, or the
+    originating conversation is yours). Jobs without a WebUI creator (CLI,
+    messaging platforms, imported) only reach admins. An identity without an
+    email (password login) keeps the old behaviour so nothing goes dark.
+    """
+    if not _identity_email(identity) or _identity_is_cron_admin(identity):
+        return list(jobs or [])
+    return [job for job in (jobs or []) if row_owned_by_identity(identity, job, session_owner)]
+
+
+def scope_cron_completions_for_caller(handler, jobs):
+    """Route hook for ``/api/crons/recent``."""
+    try:
+        identity = _identity_for(handler)
+    except Exception:
+        logger.warning("cron completion identity resolution failed", exc_info=True)
+        return list(jobs or [])
+    try:
+        return scope_cron_completions(identity, jobs)
+    except Exception:
+        logger.warning("cron completion scope filter failed", exc_info=True)
+        return list(jobs or [])
+
+
 def scope_cron_rows_for_caller(handler, active_jobs, other_jobs):
     """Route hook for the ``/api/crons`` listing branch."""
     try:

@@ -67,6 +67,45 @@ def _last_workspace_file() -> Path:
     return _profile_state_dir() / 'last_workspace.txt'
 
 
+# The remembered workspace used to be one file per profile, shared by every
+# person using that profile: when one colleague switched or chatted in another
+# directory, everybody else's next new chat opened there too (reported by
+# Michael, 20 Sep 2026). Each signed-in identity now has its own remembered
+# workspace under the profile; the profile-level file stays as the fallback
+# for identities without an email (password/auth-off) and for callers outside
+# a request (background work), so single-user installs behave as before.
+def _current_request_email() -> str | None:
+    try:
+        from api.ownership import _CURRENT_REQUEST, request_owner_email
+
+        handler = getattr(_CURRENT_REQUEST, 'handler', None)
+        if handler is None:
+            return None
+        return request_owner_email(handler)
+    except Exception:
+        return None
+
+
+def _user_last_workspace_file(email: str) -> Path:
+    import re
+
+    slug = re.sub(r'[^a-z0-9._@+-]', '_', str(email).strip().lower())[:160] or 'unknown'
+    return _profile_state_dir() / 'last_workspace_by_user' / f'{slug}.txt'
+
+
+def _read_user_last_workspace(validator) -> str | None:
+    email = _current_request_email()
+    if not email:
+        return None
+    try:
+        lw_file = _user_last_workspace_file(email)
+        if lw_file.exists():
+            return validator(lw_file.read_text(encoding='utf-8').strip())
+    except Exception:
+        logger.debug("Failed to read per-user last workspace")
+    return None
+
+
 def _expanduser_path(path: str | Path) -> Path:
     """Return *path* after shell-style home expansion.
 
@@ -408,6 +447,9 @@ def get_profile_default_workspace() -> str:
             return raw
         return None
 
+    personal = _read_user_last_workspace(_valid)
+    if personal:
+        return personal
     lw_file = _last_workspace_file()
     if lw_file.exists():
         try:
@@ -436,6 +478,9 @@ def get_last_workspace() -> str:
             return raw
         return None
 
+    personal = _read_user_last_workspace(valid_last_workspace)
+    if personal:
+        return personal
     lw_file = _last_workspace_file()
     if lw_file.exists():
         try:
@@ -457,7 +502,10 @@ def get_last_workspace() -> str:
 
 def set_last_workspace(path: str) -> None:
     try:
-        lw_file = _last_workspace_file()
+        email = _current_request_email()
+        # A signed-in person only moves their own remembered workspace; the
+        # shared profile file is left alone so colleagues keep theirs.
+        lw_file = _user_last_workspace_file(email) if email else _last_workspace_file()
         lw_file.parent.mkdir(parents=True, exist_ok=True)
         lw_file.write_text(str(path), encoding='utf-8')
     except Exception:
