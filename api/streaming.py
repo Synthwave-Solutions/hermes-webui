@@ -7349,8 +7349,12 @@ def _run_agent_streaming(
             _home_scope.__enter__()
             _profile_home_context = _home_scope
             from api.skill_learning_activity import turn_scope as _skill_learning_scope
+            # The notice belongs to whoever spoke; for a private chat that is
+            # the owner (sender_email is None there), for a server-started
+            # turn it is the owner too. Without this the scope had no actor
+            # and nothing was ever recorded for an ordinary conversation.
             _learning_scope = _skill_learning_scope(
-                sender_email, stream_id, _profile_home, session_id)
+                sender_email or _turn_principal, stream_id, _profile_home, session_id)
             _learning_scope.__enter__()
             _skill_learning_context = _learning_scope
             _streaming_cron_profile_home_token = _STREAMING_CRON_PROFILE_HOME.set(_profile_home)
@@ -9817,9 +9821,15 @@ def _run_agent_streaming(
                         # reload and a tab that was not watching.
                         try:
                             from api.skill_learning_activity import record_turn_changes
-                            record_turn_changes(_persistent_changes)
+                            if _persistent_changes.get("memory") or _persistent_changes.get("skills"):
+                                _notice_ok = record_turn_changes(_persistent_changes)
+                                logger.info(
+                                    "Turn notice for session %s: memory=%s skills=%d recorded=%s",
+                                    s.session_id, _persistent_changes.get("memory"),
+                                    len(_persistent_changes.get("skills") or []), _notice_ok,
+                                )
                         except Exception:
-                            logger.debug("Persistent state notice record failed for session %s", s.session_id, exc_info=True)
+                            logger.warning("Persistent state notice record failed for session %s", s.session_id, exc_info=True)
                     except Exception:
                         logger.debug("Persistent state change detection failed for session %s", s.session_id, exc_info=True)
             # Sync to state.db for /insights (opt-in setting)

@@ -161,7 +161,10 @@
     schedule();
   }
   function invalidate() { renderedSession = ''; sync(); }
-  window.SynthPulseSkillActivity = {sync, invalidate};
+  // A state_saved frame means the server just recorded a notice for this
+  // turn: fetch now instead of waiting for the next 10 s poll.
+  function poke(delay = 1500) { setTimeout(() => { lastFetch = 0; void refresh(true); }, delay); }
+  window.SynthPulseSkillActivity = {sync, invalidate, poke};
   document.addEventListener('visibilitychange', sync);
   window.addEventListener('pagehide', () => {
     generation++; controller?.abort(); clearTimeout(timer); session = ''; rows = []; clear();

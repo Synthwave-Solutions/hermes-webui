@@ -5919,6 +5919,7 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
       if(!S.session||S.session.session_id!==activeSid) return;
       _applyToAnchor('state_saved',d,e,null,{render:false});
       _showPersistentStateToast(d.kind, d.name||'', {created:String(d.action||'').toLowerCase()==='created'});
+      if(window.SynthPulseSkillActivity&&typeof window.SynthPulseSkillActivity.poke==='function') window.SynthPulseSkillActivity.poke();
     });
 
     source.addEventListener('title',e=>{
