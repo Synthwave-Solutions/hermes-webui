@@ -1070,8 +1070,7 @@ async function loadCrons(animate) {
       item.innerHTML = `
         <div class="cron-header">
           ${isNewRun ? '<span class="cron-new-dot" title="New run"></span>' : ''}
-          ${isAgentMode ? '<span class="cron-agent-badge" title="Agent mode">🤖</span>' : `<span class="cron-script-badge" title="${esc(t('cron_script_badge_title') || 'Script job (no agent)')}">📜</span>`}
-          ${job.emoji ? `<span class="cron-emoji" aria-hidden="true">${esc(job.emoji)}</span>` : ''}
+          ${job.emoji ? `<span class="cron-emoji" aria-hidden="true">${esc(job.emoji)}</span>` : isAgentMode ? '<span class="cron-agent-badge" title="Agent mode">🤖</span>' : `<span class="cron-script-badge" title="${esc(t('cron_script_badge_title') || 'Script job (no agent)')}">📜</span>`}
           <span class="cron-name" title="${esc(job.name)}">${esc(job.name)}</span>
           <span class="cron-profile-badge" title="${esc(ownerProfileTitle)}">${esc(ownerProfileLabel)}</span>
           ${Array.isArray(job.shared_with) && job.shared_with.length ? `<span class="cron-shared-badge" title="${esc((t('cron_shared_with_label') || 'Shared with') + ': ' + job.shared_with.join(', '))}">${esc(t('cron_shared_badge') || 'shared')}</span>` : ''}
@@ -1299,7 +1298,22 @@ function _cronSharedRowHtml(job){
   return `<div class="detail-row"><div class="detail-row-label">${esc(t('cron_shared_with_label') || 'Shared with')}</div><div class="detail-row-value cron-share-value">${chips}${btn}</div></div>`;
 }
 
-function _pickCronEmoji(e){ const el = $('cronFormEmoji'); if (el) { el.value = e; el.focus(); } }
+function _pickCronEmoji(e){ const el = $('cronFormEmoji'); if (el) { el.value = e; el.focus(); } const g = $('cronEmojiGrid'); if (g && e) g.style.display = 'none'; }
+function _toggleCronEmojiGrid(){ const g = $('cronEmojiGrid'); if (g) g.style.display = g.style.display === 'none' ? '' : 'none'; }
+const _CRON_EMOJI_GROUPS = [
+  ['Work and planning', '📅 🗓️ ⏰ ⏳ ⌛ 🕘 📆 📌 📍 🗂️ 📋 ✅ ☑️ 📝 🗒️ 📎 🖇️ 🧭 🎯 🏁 🚦 🔁 🔄 ♻️'],
+  ['Communication', '📬 📩 📨 📧 ✉️ 📮 💬 🗨️ 💭 📣 📢 🔔 🔕 📞 ☎️ 📱 📲 🗣️ 👋 🤝 📡 🛰️'],
+  ['Finance', '💰 💶 💵 💳 🧾 🏦 💸 📈 📉 💹 🪙 🧮 🏷️ 🛒 🧑‍💼 📦 🚚 🧰'],
+  ['Data and tech', '📊 🗄️ 💾 🖥️ 💻 ⌨️ 🖱️ 🔌 🔋 🧠 🤖 ⚙️ 🛠️ 🔧 🔩 🧲 🧪 🧬 🔬 🔭 🛰️ 🌐 🔗 🧩 🪄 🧯 🧱'],
+  ['Sales and marketing', '🚀 🎯 🧲 📣 🎉 🎁 🏆 🥇 ⭐ 🌟 ✨ 💡 🔥 📸 🎬 🎨 🖼️ 📰 🗞️ 🔍 🕵️ 👥 🧑‍🤝‍🧑'],
+  ['Health and safety', '🛡️ 🔒 🔐 🔑 🗝️ 🚨 ⚠️ 🚧 🩺 💊 🧹 🧽 🧼 🪣 🩹 🆘 🧯 🛟 🚑'],
+  ['Home and family', '🏠 🏡 👨‍👩‍👧 👶 🐶 🐱 🍽️ 🍳 ☕ 🧺 🛏️ 🚗 🚲 🚆 ✈️ 🧳 🛒 🎂 ❤️ 💛'],
+  ['Nature and fun', '🌞 🌙 ⛅ 🌧️ ❄️ 🌱 🌿 🍀 🌻 🌊 🏔️ 🎵 🎧 🎮 ⚽ 🏀 🎲 🧩 🍕 🍎 🍋 🍓'],
+  ['Symbols and status', '🟢 🟡 🔴 🔵 🟣 ⚪ ⚫ 🟠 ❗ ❓ ✔️ ❌ ➕ ➖ ✖️ ➡️ ⬆️ ⬇️ 🔀 🔂 🆕 🆗 🔝 🔜 🔚 💯 🔟 🅰️ 🅱️'],
+];
+function _cronEmojiGridHtml(){
+  return _CRON_EMOJI_GROUPS.map(([label, list]) => `<div class="cron-emoji-group"><div class="cron-emoji-group-title">${esc(label)}</div><div class="cron-emoji-picks">${list.split(/\s+/).filter(Boolean).map(e => `<button type="button" class="cron-emoji-pick" onclick="_pickCronEmoji('${e}')" aria-label="${e}">${e}</button>`).join('')}</div></div>`).join('');
+}
 
 let _cronShareOverlay = null;
 function _closeCronShareDialog(){
@@ -1829,8 +1843,10 @@ function _renderCronForm({ name, schedule, prompt, deliver, profile, toast_notif
           <label for="cronFormEmoji">${esc(t('cron_emoji_label') || 'Emoji')}</label>
           <div class="cron-emoji-row">
             <input type="text" id="cronFormEmoji" value="${esc(emoji || '')}" maxlength="8" placeholder="${esc(t('cron_emoji_placeholder') || 'e.g. 📬')}" autocomplete="off" spellcheck="false">
-            <div class="cron-emoji-picks">${['📬','📅','⏰','🧾','💰','📣','🧹','🔔','🤖','📊','🛡️','⚙️','🚀','🧠','📝','🌐'].map(e => `<button type="button" class="cron-emoji-pick" onclick="_pickCronEmoji('${e}')" aria-label="${e}">${e}</button>`).join('')}<button type="button" class="cron-emoji-pick cron-emoji-clear" onclick="_pickCronEmoji('')" title="${esc(t('cron_emoji_clear') || 'No emoji')}">×</button></div>
+            <button type="button" class="cron-btn" onclick="_toggleCronEmojiGrid()">${esc(t('cron_emoji_choose') || 'Choose')}</button>
+            <button type="button" class="cron-btn" onclick="_pickCronEmoji('')" title="${esc(t('cron_emoji_clear') || 'No emoji')}">×</button>
           </div>
+          <div id="cronEmojiGrid" class="cron-emoji-grid" style="display:none">${_cronEmojiGridHtml()}</div>
           <div class="detail-form-hint">${esc(t('cron_emoji_hint') || 'Shown in the task list and in the title.')}</div>
         </div>
         <div class="detail-form-row">

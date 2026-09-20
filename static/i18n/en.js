@@ -2094,6 +2094,7 @@ window.__registerHermesLocale('en', {
     cron_emoji_placeholder: 'e.g. 📬',
     cron_emoji_hint: 'Shown in the task list and in the title.',
     cron_emoji_clear: 'No emoji',
+    cron_emoji_choose: 'Choose',
     cron_shared_with_label: 'Shared with',
     cron_shared_badge: 'shared',
     cron_share_button: 'Share',

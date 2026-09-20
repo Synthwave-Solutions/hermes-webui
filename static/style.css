@@ -7880,3 +7880,7 @@ html[data-nav-audience="member"]:not([data-advanced-chat-controls="1"]) #compose
 .cron-emoji-pick{border:1px solid var(--border);background:var(--sidebar);border-radius:8px;font-size:15px;line-height:1;padding:4px 6px;cursor:pointer;}
 .cron-emoji-pick:hover{border-color:var(--accent);}
 .cron-emoji-clear{font-size:13px;color:var(--muted);}
+.cron-emoji-grid{margin-top:8px;border:1px solid var(--border);border-radius:10px;background:var(--sidebar);padding:10px 12px;max-height:280px;overflow:auto;}
+.cron-emoji-group{margin-bottom:8px;}
+.cron-emoji-group-title{font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em;}
+.cron-emoji-pick{font-size:18px;padding:4px 5px;}
