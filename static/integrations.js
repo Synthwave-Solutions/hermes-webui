@@ -389,9 +389,23 @@ function _intgRenderGrid() {
     const badges = (authLabel ? '<span class="intg-badge">' + _intgEsc(authLabel) + '</span>' : '')
       + cats.map(c => '<span class="intg-badge intg-badge-cat">' + _intgEsc(c) + '</span>').join('')
       + (connected ? '<span class="intg-badge intg-badge-ok">' + _intgEsc(_intgT('integrations_connected', 'Connected')) + '</span>' : '')
+      + (p.configured && p.needs_setup ? '<span class="intg-badge intg-badge-warn">' + _intgEsc(_intgT('integrations_setup_needed', 'Setup needed')) + '</span>' : '')
       + (approval === 'pending' ? '<span class="intg-badge intg-badge-pending">' + _intgEsc(_intgT('integrations_awaiting_approval', 'Waiting for admin approval')) + '</span>' : '');
     let action;
-    if (p.configured && p.unique_key && approval === 'pending') {
+    if (p.configured && p.unique_key && p.needs_setup) {
+      // The Nango row exists but has no registered OAuth client: connecting
+      // would end on Nango's "Connection failed" page. Admins finish the setup
+      // here; everyone else sees that it is not ready yet.
+      if (isAdminUser && p.setup_kind === 'dynamic') {
+        action = '<button type="button" class="intg-btn primary" data-intg-action="repair" data-key="' + _intgEsc(p.unique_key) + '">'
+          + _intgEsc(_intgT('integrations_register_client', 'Register with provider')) + '</button>';
+      } else if (isAdminUser && (p.setup_kind === 'static' || p.setup_kind === 'oauth')) {
+        action = '<button type="button" class="intg-btn primary" data-intg-action="repair" data-key="' + _intgEsc(p.unique_key) + '">'
+          + _intgEsc(_intgT('integrations_add_app_credentials', 'Add app credentials')) + '</button>';
+      } else {
+        action = '<span class="intg-muted" title="' + _intgEsc(p.setup_message || '') + '">' + _intgEsc(_intgT('integrations_setup_pending', 'Not ready yet: an admin has to finish the setup.')) + '</span>';
+      }
+    } else if (p.configured && p.unique_key && approval === 'pending') {
       // Requested, no admin decision yet: nothing to do from here.
       action = '<button type="button" class="intg-btn" disabled>'
         + _intgEsc(_intgT('integrations_waiting_approval', 'Waiting for approval')) + '</button>';
@@ -495,13 +509,14 @@ async function _intgEnablePayload(providerKey) {
   const payload = { provider_config_key: providerKey };
   const fields = provider.configured && provider.unique_key === providerKey ? [] : (provider.credential_fields || []);
   if (!fields.length) return payload;
-  const credentials = await _intgCredentialDialog(provider, fields);
+  const credentials = await _intgCredentialDialog(provider, fields, { scopes: provider.setup_kind === 'static' || provider.setup_kind === 'oauth' });
   if (credentials === null) return null;
   payload.credentials = credentials;
   return payload;
 }
 
-function _intgCredentialDialog(provider, fields) {
+function _intgCredentialDialog(provider, fields, opts) {
+  opts = opts || {};
   return new Promise(resolve => {
     const dialog = document.createElement('dialog');
     dialog.className = 'app-dialog';
@@ -515,6 +530,23 @@ function _intgCredentialDialog(provider, fields) {
     explanation.className = 'app-dialog-desc';
     explanation.textContent = _intgT('integrations_credentials_prompt', 'Enter the app credentials from this provider to enable sign-in.');
     form.appendChild(explanation);
+    if (provider.callback_url) {
+      // The one value the admin has to copy into the provider's app settings.
+      const hint = document.createElement('p');
+      hint.className = 'app-dialog-desc intg-callback-hint';
+      hint.textContent = _intgT('integrations_callback_hint', 'Redirect URL to register at the provider:') + ' ';
+      const code = document.createElement('code');
+      code.textContent = provider.callback_url;
+      hint.appendChild(code);
+      form.appendChild(hint);
+      if (provider.setup_guide_url || provider.docs) {
+        const guide = document.createElement('a');
+        guide.href = provider.setup_guide_url || provider.docs; guide.target = '_blank'; guide.rel = 'noopener noreferrer';
+        guide.className = 'intg-docs-link';
+        guide.textContent = _intgT('integrations_setup_guide', 'Setup guide');
+        form.appendChild(guide);
+      }
+    }
     const inputs = {};
     for (const field of fields) {
       const label = document.createElement('label');
@@ -532,6 +564,18 @@ function _intgCredentialDialog(provider, fields) {
       form.appendChild(label);
       inputs[field] = input;
     }
+    let scopesInput = null;
+    if (opts.scopes) {
+      const label = document.createElement('label');
+      label.textContent = _intgT('integrations_scopes_label', 'scopes (comma separated, optional)');
+      label.style.cssText = 'display:block;margin:12px 0';
+      scopesInput = document.createElement('input');
+      scopesInput.type = 'text'; scopesInput.className = 'app-dialog-input'; scopesInput.autocomplete = 'off'; scopesInput.spellcheck = false;
+      scopesInput.value = provider.default_scopes || '';
+      scopesInput.style.cssText = 'display:block;width:100%;box-sizing:border-box';
+      label.appendChild(scopesInput);
+      form.appendChild(label);
+    }
     const finish = result => {
       Object.values(inputs).forEach(input => { input.value = ''; });
       dialog.close();
@@ -544,7 +588,7 @@ function _intgCredentialDialog(provider, fields) {
     cancel.onclick = () => finish(null);
     const submit = document.createElement('button');
     submit.type = 'submit'; submit.className = 'app-dialog-btn confirm';
-    submit.textContent = _intgT('integrations_enable', 'Enable');
+    submit.textContent = opts.submitLabel || _intgT('integrations_enable', 'Enable');
     const actions = document.createElement('div');
     actions.className = 'app-dialog-actions';
     actions.append(cancel, submit);
@@ -553,6 +597,7 @@ function _intgCredentialDialog(provider, fields) {
       event.preventDefault();
       const values = Object.fromEntries(fields.map(field => [field, inputs[field].value.trim()]));
       if (Object.values(values).some(value => !value)) return;
+      if (scopesInput) values.scopes = scopesInput.value.trim();
       finish(values);
     };
     dialog.addEventListener('cancel', event => { event.preventDefault(); finish(null); });
@@ -582,6 +627,35 @@ async function _intgEnable(providerKey) {
     } else {
       showToast(_intgT('integrations_enabled', 'Enabled. It can be connected now.'), 4000);
     }
+  }
+  loadIntegrations();
+}
+
+// Finish the OAuth client setup of an integration that exists in Nango
+// without one (admin-gated POST /api/integrations/repair). Dynamic MCP
+// providers register in one click; static MCP and OAuth need the app
+// credentials the admin registered at the provider.
+async function _intgRepair(uniqueKey) {
+  let data;
+  try {
+    const catalog = await api('/api/integrations/catalog', { redirect401: false });
+    const provider = (catalog.providers || []).find(p => p.unique_key === uniqueKey) || (catalog.providers || []).find(p => p.key === uniqueKey);
+    if (!provider) throw new Error('Provider is no longer available. Refresh the catalog.');
+    const payload = { provider_config_key: uniqueKey };
+    if (provider.setup_kind === 'static' || provider.setup_kind === 'oauth') {
+      const credentials = await _intgCredentialDialog(provider, ['client_id', 'client_secret'], { scopes: true, submitLabel: _intgT('integrations_save_credentials', 'Save and enable') });
+      if (credentials === null) return;
+      payload.credentials = credentials;
+    }
+    data = await api('/api/integrations/repair', { method: 'POST', body: JSON.stringify(payload), redirect401: false });
+  } catch (e) {
+    if (typeof showToast === 'function') showToast((e && e.message) || 'setup failed', 7000, 'error');
+    return;
+  }
+  if (typeof showToast === 'function') {
+    showToast(data && data.needs_setup
+      ? _intgT('integrations_repair_incomplete', 'Saved, but the setup is still incomplete.')
+      : _intgT('integrations_repaired', 'Set up. It can be connected now.'), 5000);
   }
   loadIntegrations();
 }
@@ -756,6 +830,8 @@ document.addEventListener('DOMContentLoaded', () => {
         _intgRequestAccess(btn.getAttribute('data-key') || '');
       } else if (action === 'enable') {
         _intgEnable(btn.getAttribute('data-key') || '');
+      } else if (action === 'repair') {
+        _intgRepair(btn.getAttribute('data-key') || '');
       } else if (action === 'disconnect') {
         _intgDisconnect(btn.getAttribute('data-cid') || '', btn.getAttribute('data-key') || '');
       } else if (action === 'category') {

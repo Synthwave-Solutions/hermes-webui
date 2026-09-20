@@ -8123,6 +8123,9 @@ html[data-nav-audience="member"]:not([data-advanced-chat-controls="1"]) #compose
   .bot-editor-actions .sm-btn{width:100%;}
 }
 
+.intg-badge.intg-badge-warn{color:var(--warning);border-color:color-mix(in srgb,var(--warning) 40%,transparent);background:color-mix(in srgb,var(--warning) 10%,transparent);}
+.intg-callback-hint code{display:inline-block;margin-top:4px;padding:3px 8px;border-radius:6px;background:var(--code-bg);color:var(--code-text);font-size:12px;word-break:break-all;user-select:all;}
+
 /* ── Picker: select-style control for people, roles, groups, skills, servers ── */
 .sp-picker{position:relative;min-width:0;width:100%;}
 .sp-picker-control{

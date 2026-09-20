@@ -21,7 +21,9 @@ def test_catalog_preserves_multiple_configurations(monkeypatch):
 def test_catalog_exposes_credential_fields(monkeypatch):
     row = integrations._catalog_item('notion', {'auth_mode': 'OAUTH2'})
     assert row['credential_fields'] == ['client_id', 'client_secret']
-    assert integrations._catalog_item('mcp', {'auth_mode': 'MCP_OAUTH2'})['credential_fields'] == []
+    # MCP without client_registration is static in Nango: the admin pastes an app's id and secret.
+    assert integrations._catalog_item('mcp', {'auth_mode': 'MCP_OAUTH2'})['credential_fields'] == ['client_id', 'client_secret']
+    assert integrations._catalog_item('mcp', {'auth_mode': 'MCP_OAUTH2', 'client_registration': 'dynamic'})['credential_fields'] == []
 
 
 @pytest.mark.parametrize('response, expected', [

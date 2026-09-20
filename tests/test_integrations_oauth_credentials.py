@@ -29,6 +29,8 @@ def catalog(monkeypatch):
     monkeypatch.setattr(integrations, "_approval_entries", lambda: {})
     monkeypatch.setattr(integrations, "_record_admin_approval",
                         lambda *a, **k: None)
+    # Without dashboard credentials the MCP path degrades to the old refusal.
+    monkeypatch.setattr(integrations, "_nango_dashboard_auth", lambda: None)
     return entries
 
 
@@ -94,5 +96,23 @@ class TestProvidersThatNeedNoCredentials:
         _enable("productive")
         assert "credentials" not in sent[0][2]
 
-    def test_mcp_oauth2_does_not_claim_to_need_credentials(self, catalog, sent):
-        assert integrations._catalog_item("slack-mcp", catalog["slack-mcp"])["credential_fields"] == []
+    def test_static_mcp_names_the_app_credentials_it_needs(self, catalog, sent):
+        # slack-mcp has no client_registration in the fixture: Nango treats that
+        # as static, so the admin registers a Slack app and pastes id + secret.
+        assert integrations._catalog_item("slack-mcp", catalog["slack-mcp"])["credential_fields"] == ["client_id", "client_secret"]
+        dynamic = {"display_name": "Granola (MCP)", "auth_mode": "MCP_OAUTH2", "client_registration": "dynamic"}
+        assert integrations._catalog_item("granola-mcp", dynamic)["credential_fields"] == []
+
+    def test_static_mcp_with_dashboard_posts_auth_through_the_dashboard_api(self, catalog, sent, monkeypatch):
+        monkeypatch.setattr(integrations, "_nango_dashboard_auth", lambda: ("u", "p"))
+        v1 = []
+        monkeypatch.setattr(integrations, "_nango_v1_request", lambda m, path, payload=None: v1.append((m, path, payload)) or {"data": {}})
+        with pytest.raises(ValueError) as err:
+            _enable("slack-mcp")
+        assert "client_id" in str(err.value) and "/oauth/callback" in str(err.value)
+        assert v1 == [] and sent == []
+        _enable("slack-mcp", {"client_id": "id", "client_secret": "s", "scopes": "channels:read, chat:write"})
+        assert sent == [], "MCP never goes through the public create API"
+        assert v1 == [("POST", "/integrations", {
+            "provider": "slack-mcp", "integrationId": "slack-mcp", "useSharedCredentials": False,
+            "auth": {"authType": "MCP_OAUTH2", "clientId": "id", "clientSecret": "s", "scopes": "channels:read,chat:write"}})]

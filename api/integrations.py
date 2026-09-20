@@ -37,6 +37,7 @@ Config (env, read at call time so profile .env switches are honoured):
 """
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import os
@@ -103,6 +104,78 @@ def _nango_api_url() -> str:
 def _nango_connect_url() -> str:
     raw = str(os.getenv("HERMES_WEBUI_NANGO_CONNECT_URL", "") or "").strip()
     return (raw or _DEFAULT_CONNECT_URL).rstrip("/")
+
+
+_DEFAULT_NANGO_ENV_FILE = "~/.config/synthwave/nango/nango.env"
+_ENV_FILE_CACHE: dict[str, tuple[tuple[int, int], dict[str, str]]] = {}
+
+
+def _nango_env_file_values() -> dict[str, str]:
+    """KEY=VALUE pairs from the Nango compose env file (mtime-cached).
+
+    The dashboard username/password and the public server URL live there;
+    reading them means one source of truth instead of a second copy in the
+    WebUI environment. Missing file: empty dict, every caller degrades.
+    """
+    raw = str(os.getenv("HERMES_WEBUI_NANGO_ENV_FILE", "") or "").strip()
+    path = Path(raw or _DEFAULT_NANGO_ENV_FILE).expanduser()
+    try:
+        st = path.stat()
+    except OSError:
+        return {}
+    sig = (st.st_size, st.st_mtime_ns)
+    with _SECRET_CACHE_LOCK:
+        cached = _ENV_FILE_CACHE.get(str(path))
+        if cached and cached[0] == sig:
+            return dict(cached[1])
+    values: dict[str, str] = {}
+    try:
+        for line in path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            values[key.strip()] = value.strip().strip("'\"")
+    except OSError:
+        return {}
+    with _SECRET_CACHE_LOCK:
+        _ENV_FILE_CACHE[str(path)] = (sig, dict(values))
+    return values
+
+
+def _nango_dashboard_auth() -> tuple[str, str] | None:
+    """Basic-auth pair for Nango's dashboard API, or None when not configured.
+
+    Self-hosted Nango protects /api/v1 with NANGO_DASHBOARD_USERNAME and
+    NANGO_DASHBOARD_PASSWORD once FLAG_AUTH_ENABLED=false. That API is the
+    only one that runs the OAuth client registration for MCP providers and
+    accepts MCP client credentials; the public API silently skips both.
+    """
+    env = os.environ
+    user = str(env.get("HERMES_WEBUI_NANGO_DASHBOARD_USERNAME", "") or "").strip()
+    password = str(env.get("HERMES_WEBUI_NANGO_DASHBOARD_PASSWORD", "") or "").strip()
+    if not (user and password):
+        values = _nango_env_file_values()
+        user = user or str(values.get("NANGO_DASHBOARD_USERNAME", "") or "").strip()
+        password = password or str(values.get("NANGO_DASHBOARD_PASSWORD", "") or "").strip()
+    if not (user and password):
+        return None
+    return user, password
+
+
+def _nango_environment_name() -> str:
+    """Nango environment the public secret key belongs to (default ``dev``)."""
+    return str(os.getenv("HERMES_WEBUI_NANGO_ENV", "") or "").strip() or "dev"
+
+
+def nango_callback_url() -> str:
+    """OAuth redirect URL a provider app must whitelist for this Nango."""
+    public = str(os.getenv("HERMES_WEBUI_NANGO_PUBLIC_URL", "") or "").strip()
+    if not public:
+        public = str(_nango_env_file_values().get("NANGO_PUBLIC_SERVER_URL", "") or "").strip()
+    if not public:
+        public = _nango_api_url()
+    return public.rstrip("/") + "/oauth/callback"
 
 
 def _providers_yaml_path() -> Path:
@@ -239,6 +312,122 @@ def _nango_request(
 
 _CATALOG_CACHE_LOCK = threading.Lock()
 _CATALOG_CACHE: dict[str, tuple[tuple[int, int], dict[str, dict]]] = {}
+
+
+def _nango_v1_request(method: str, path: str, payload: dict | None = None) -> dict:
+    """Call Nango's dashboard API (``/api/v1``) with basic auth.
+
+    Raises NangoError(code="dashboard_unavailable") when no dashboard
+    credentials are configured, so callers can degrade to the public API.
+    """
+    auth = _nango_dashboard_auth()
+    if auth is None:
+        raise NangoError("Nango dashboard credentials are not configured", code="dashboard_unavailable")
+    sep = "&" if "?" in path else "?"
+    url = f"{_nango_api_url()}/api/v1{path}{sep}env={urllib.parse.quote(_nango_environment_name())}"
+    token = base64.b64encode(f"{auth[0]}:{auth[1]}".encode("utf-8")).decode("ascii")
+    headers = {"Authorization": f"Basic {token}", "Accept": "application/json"}
+    data = None
+    if payload is not None:
+        data = json.dumps(payload).encode("utf-8")
+        headers["Content-Type"] = "application/json"
+    req = urllib.request.Request(url, data=data, method=method, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=_NANGO_TIMEOUT_SECONDS) as resp:
+            body = resp.read(_MAX_RESPONSE_BYTES + 1)
+    except urllib.error.HTTPError as exc:
+        text = exc.read(4096).decode("utf-8", "replace") if exc.fp else ""
+        message = text
+        try:
+            parsed = json.loads(text)
+            err = parsed.get("error") if isinstance(parsed, dict) else None
+            if isinstance(err, dict):
+                message = str(err.get("message") or err.get("code") or text)
+        except ValueError:
+            pass
+        raise NangoError(f"Nango dashboard API error ({exc.code}): {message}", status=exc.code)
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        raise NangoError(f"Nango dashboard API unreachable: {exc}")
+    if len(body) > _MAX_RESPONSE_BYTES:
+        raise NangoError("Nango dashboard API response too large")
+    if not body:
+        return {}
+    try:
+        parsed = json.loads(body.decode("utf-8"))
+    except ValueError:
+        raise NangoError("Nango dashboard API returned invalid JSON")
+    return parsed if isinstance(parsed, dict) else {"data": parsed}
+
+
+def _v1_integrations_by_key() -> dict[str, dict]:
+    """Dashboard view of every integration: carries oauth_client_id, so an
+    OAuth or MCP integration created without its app registration is visible."""
+    data = _nango_v1_request("GET", "/integrations")
+    rows = data.get("data")
+    out: dict[str, dict] = {}
+    for row in rows if isinstance(rows, list) else []:
+        if isinstance(row, dict) and row.get("unique_key"):
+            out[str(row["unique_key"])] = row
+    return out
+
+
+# Auth modes whose integration is unusable until an OAuth client is registered.
+_CLIENT_AUTH_MODES = {"OAUTH1", "OAUTH2", "TBA", "MCP_OAUTH2"}
+
+
+def _setup_kind(entry: dict) -> str:
+    """How the OAuth client for this provider comes to be.
+
+    ``dynamic``: Nango registers a client at the provider (RFC 7591), no
+    human input. ``cimd``: the provider fetches a client metadata document
+    from this Nango, which must therefore be publicly reachable. ``static``:
+    an admin registers an app at the provider and pastes client id/secret.
+    ``oauth``: classic OAuth app credentials. ``""``: nothing to set up.
+    """
+    mode = str(entry.get("auth_mode") or "").upper()
+    if mode == "MCP_OAUTH2":
+        kind = str(entry.get("client_registration") or "static").lower()
+        return kind if kind in ("dynamic", "cimd", "static") else "static"
+    if mode in _CLIENT_AUTH_MODES:
+        return "oauth"
+    return ""
+
+
+def _default_scopes(entry: dict) -> str:
+    scopes = entry.get("default_scopes")
+    if isinstance(scopes, list):
+        return ",".join(str(x).strip() for x in scopes if str(x).strip())
+    return str(scopes or "").strip()
+
+
+def _setup_view(entry: dict, v1_row: dict | None) -> dict:
+    """Setup fields for a configured integration, from the dashboard row."""
+    kind = _setup_kind(entry)
+    label = str(entry.get("display_name") or entry.get("_key") or "This provider")
+    view = {
+        "setup_kind": kind,
+        "needs_setup": False,
+        "setup_message": "",
+        "callback_url": nango_callback_url() if kind else "",
+        "default_scopes": _default_scopes(entry) if kind else "",
+    }
+    if not kind or v1_row is None:
+        return view
+    missing = v1_row.get("missing_fields")
+    has_client = bool(str(v1_row.get("oauth_client_id") or "").strip())
+    if has_client and not (isinstance(missing, list) and missing):
+        return view
+    view["needs_setup"] = True
+    if kind == "dynamic":
+        view["setup_message"] = (f"{label} has no OAuth client yet. An admin can register one with the provider "
+                                 "in one click.")
+    elif kind == "cimd":
+        view["setup_message"] = (f"{label} identifies this Nango by a public metadata URL. "
+                                 "That needs Nango to be reachable from the internet; on the tailnet this provider cannot connect.")
+    else:
+        view["setup_message"] = (f"{label} needs its own OAuth app. An admin registers the app at the provider with the "
+                                 f"redirect URL {nango_callback_url()} and pastes the client id and secret here.")
+    return view
 
 
 def _parse_providers_minimal(text: str) -> dict[str, dict]:
@@ -516,14 +705,21 @@ def _catalog_item(key: str, entry: dict) -> dict:
         "key": key,
         "display_name": str(entry.get("display_name") or key),
         "auth_mode": str(entry.get("auth_mode") or ""),
-        "credential_fields": list(_OAUTH_CREDENTIAL_FIELDS.get(str(entry.get("auth_mode") or "").upper(), ())),
+        "credential_fields": (["client_id", "client_secret"] if _setup_kind(entry) == "static"
+                              else list(_OAUTH_CREDENTIAL_FIELDS.get(str(entry.get("auth_mode") or "").upper(), ()))),
         "categories": [str(c) for c in categories] if isinstance(categories, list) else [],
         "docs": _safe_docs_url(entry.get("docs")),
         "configured": False,
         "unique_key": None,
-        "setup_required": mcp_setup,
-        "setup_message": _mcp_setup_message(entry) if mcp_setup else "",
+        # MCP providers are set up through the dashboard API now (client
+        # registration runs there); setup_required only when that API is off.
+        "setup_required": mcp_setup and _nango_dashboard_auth() is None,
+        "setup_message": _mcp_setup_message(entry) if mcp_setup and _nango_dashboard_auth() is None else "",
         "setup_guide_url": _setup_guide_url(entry),
+        "setup_kind": _setup_kind(entry),
+        "needs_setup": False,
+        "callback_url": nango_callback_url() if _setup_kind(entry) else "",
+        "default_scopes": _default_scopes(entry) if _setup_kind(entry) else "",
         # Served through our own backend rather than linking straight at the
         # Nango host: the browser then needs no route to the Nango port, and
         # the URL stays same-origin so the dashboard CSP never blocks it.
@@ -596,9 +792,15 @@ def get_catalog(owner_email: str | None = None, *, is_admin: bool = False) -> di
         key: _catalog_item(key, entry)
         for key, entry in load_provider_entries().items()
     }
-    nango: dict[str, Any] = {"available": True, "error": None}
+    nango: dict[str, Any] = {"available": True, "error": None, "dashboard": False}
     configured_items = []
     configured_providers = set()
+    v1_rows: dict[str, dict] = {}
+    try:
+        v1_rows = _v1_integrations_by_key()
+        nango["dashboard"] = True
+    except NangoError as exc:
+        logger.info("Nango dashboard API unavailable, setup state hidden: %s", exc)
     try:
         for row in _list_integrations():
             provider = str(row.get("provider") or "")
@@ -614,10 +816,13 @@ def get_catalog(owner_email: str | None = None, *, is_admin: bool = False) -> di
             item = dict(item)
             item["configured"] = True
             item["unique_key"] = unique_key
-            # Existence is not proof of successful OAuth registration. The
-            # public API hides MCP credentials, so do not infer failure from
-            # their absence or disable existing working connections.
+            # Existence is not proof of a registered OAuth client: the public
+            # API hides MCP credentials entirely. The dashboard row carries
+            # oauth_client_id, so the setup state comes from there; without
+            # the dashboard API nothing is inferred and connect stays open.
             item["setup_required"] = False
+            entry = load_provider_entries().get(provider) or {"display_name": row.get("display_name"), "_key": provider}
+            item.update(_setup_view({**entry, "_key": provider}, v1_rows.get(unique_key) if nango.get("dashboard") else None))
             configured_items.append(item)
             configured_providers.add(provider)
     except NangoError as exc:
@@ -790,11 +995,22 @@ def enable_integration(
     if key not in configured:
         if auth_mode == "MCP_OAUTH2":
             # Nango's public POST /integrations accepts MCP entries but skips
-            # the dashboard's DCR/CIMD registration. It creates unusable rows
-            # that later fail with "missing client ID, secret and/or scopes".
-            # Existing configurations remain idempotent and connectable above.
-            guide = _setup_guide_url(entry)
-            raise ValueError(_mcp_setup_message(entry) + (f" Setup guide: {guide}" if guide else ""))
+            # the client registration, leaving rows that fail at connect time
+            # with "missing client ID, secret and/or scopes". The dashboard
+            # API runs that registration (dynamic) or stores the pasted app
+            # credentials (static), so MCP goes through _create_via_dashboard.
+            if _nango_dashboard_auth() is None:
+                guide = _setup_guide_url(entry)
+                raise ValueError(_mcp_setup_message(entry) + (f" Setup guide: {guide}" if guide else ""))
+            _create_via_dashboard(key, {**entry, "_key": key}, credentials)
+            _record_admin_approval(key, admin_email, _approval_entries().get(key))
+            return {
+                "status": "enabled",
+                "provider_config_key": key,
+                "display_name": _provider_label(key),
+                "auth_mode": auth_mode,
+                "needs_credentials": False,
+            }
         payload: dict[str, Any] = {"provider": key, "unique_key": key}
         creds = _credentials_payload(auth_mode, {**entry, "_key": key}, credentials)
         if creds:
@@ -808,6 +1024,96 @@ def enable_integration(
         "auth_mode": auth_mode,
         # OAuth-family integrations need a client id/secret before connects work.
         "needs_credentials": False,
+    }
+
+
+def _static_auth_payload(entry: dict, credentials: dict | None) -> dict:
+    """Dashboard ``auth`` object for a static MCP client, from admin input."""
+    supplied = {k: str(v).strip() for k, v in (credentials or {}).items() if str(v or "").strip()}
+    missing = [name for name in ("client_id", "client_secret") if not supplied.get(name)]
+    if missing:
+        raise ValueError(
+            f"{str(entry.get('display_name') or entry.get('_key'))} needs its own OAuth app. Register it at the provider "
+            f"with redirect URL {nango_callback_url()} and enter: {', '.join(missing)}."
+        )
+    auth: dict[str, Any] = {"authType": "MCP_OAUTH2", "clientId": supplied["client_id"], "clientSecret": supplied["client_secret"]}
+    scopes = supplied.get("scopes", _default_scopes(entry))
+    if scopes:
+        auth["scopes"] = ",".join(part.strip() for part in re.split(r"[,\s]+", scopes) if part.strip())
+    return auth
+
+
+def _create_via_dashboard(key: str, entry: dict, credentials: dict | None) -> dict:
+    """Create an MCP integration the way the Nango dashboard does.
+
+    dynamic: Nango registers the client at the provider during the create.
+    cimd: Nango stores its metadata URL; the provider must be able to fetch
+    it, which fails on a tailnet-only host, so that is reported up front.
+    static: the admin's client id/secret travel along in ``auth``.
+    """
+    kind = _setup_kind(entry)
+    if kind == "cimd" and not _public_https(nango_callback_url()):
+        raise ValueError(
+            f"{str(entry.get('display_name') or key)} identifies this Nango by a public metadata URL, "
+            "which needs Nango to be reachable from the internet. It cannot be enabled on this tailnet-only host."
+        )
+    payload: dict[str, Any] = {"provider": str(entry.get("_provider") or key), "integrationId": key, "useSharedCredentials": False}
+    if kind == "static":
+        payload["auth"] = _static_auth_payload(entry, credentials)
+    return _nango_v1_request("POST", "/integrations", payload=payload)
+
+
+def _public_https(url: str) -> bool:
+    host = str(urllib.parse.urlsplit(url).hostname or "").lower()
+    if not url.startswith("https://") or not host:
+        return False
+    return not (host.endswith(".ts.net") or host in ("localhost", "127.0.0.1") or host.endswith(".local") or host.endswith(".internal"))
+
+
+def repair_integration(admin_email: str | None, provider_config_key: str, credentials: dict | None = None) -> dict:
+    """Finish the OAuth client setup of an integration that exists in Nango
+    without one (admin path).
+
+    dynamic MCP: the row is recreated through the dashboard API so Nango
+    registers a client at the provider; static MCP and classic OAuth: the
+    admin's client id/secret (and scopes) are stored on the existing row.
+    Rows with connections are never recreated.
+    """
+    key = str(provider_config_key or "").strip()
+    if not key:
+        raise ValueError("provider_config_key is required")
+    rows = _v1_integrations_by_key()
+    row = rows.get(key)
+    if row is None:
+        raise ValueError(f"integration '{key}' is not configured in Nango")
+    provider = str(row.get("provider") or key)
+    entry = {**(load_provider_entries().get(provider) or {"display_name": row.get("display_name")}), "_key": key, "_provider": provider}
+    kind = _setup_kind(entry)
+    if not kind:
+        raise ValueError(f"{_provider_label(key)} needs no OAuth client setup")
+    if kind == "dynamic":
+        data = _nango_request("GET", "/connection", query={"limit": _NANGO_CONNECTIONS_LIMIT})
+        rows = data.get("connections") if isinstance(data.get("connections"), list) else []
+        connections = [c for c in rows if isinstance(c, dict) and str(c.get("provider_config_key") or "") == key]
+        if connections:
+            raise ValueError(f"{_provider_label(key)} already has connections; remove them before re-registering the client")
+        _nango_v1_request("DELETE", f"/integrations/{urllib.parse.quote(key, safe='')}")
+        _create_via_dashboard(key, entry, None)
+    elif kind == "cimd":
+        raise ValueError(_setup_view(entry, row)["setup_message"] or f"{_provider_label(key)} cannot be set up here")
+    else:
+        auth = _static_auth_payload(entry, credentials)
+        if kind == "oauth":
+            auth["authType"] = str(entry.get("auth_mode") or "OAUTH2").upper()
+        _nango_v1_request("PATCH", f"/integrations/{urllib.parse.quote(key, safe='')}", payload=auth)
+    _record_admin_approval(key, admin_email, _approval_entries().get(key))
+    fresh = _v1_integrations_by_key().get(key) or {}
+    return {
+        "status": "repaired",
+        "provider_config_key": key,
+        "display_name": _provider_label(key),
+        "setup_kind": kind,
+        "needs_setup": _setup_view(entry, fresh)["needs_setup"],
     }
 
 
@@ -883,6 +1189,18 @@ def create_connect_session(
     configured = {str(row.get("unique_key") or "") for row in _list_integrations()}
     if key not in configured:
         raise ValueError(f"integration '{key}' is not configured in Nango")
+    # An OAuth or MCP integration without a registered client would send the
+    # person to Nango's "Connection failed" page. Say so here instead.
+    try:
+        v1_row = _v1_integrations_by_key().get(key)
+    except NangoError:
+        v1_row = None
+    if v1_row is not None:
+        provider = str(v1_row.get("provider") or key)
+        pentry = {**(load_provider_entries().get(provider) or {}), "_key": key}
+        setup = _setup_view(pentry, v1_row)
+        if setup["needs_setup"]:
+            raise ValueError(setup["setup_message"] or f"{_provider_label(key)} is not set up yet")
 
     entry = _approval_entries().get(key)
     view = _approval_view(entry, owner_email, is_admin=is_admin)
