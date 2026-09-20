@@ -51,7 +51,7 @@ def test_persistent_state_toasts_use_existing_user_visible_labels():
 def test_backend_emits_state_saved_sse_from_file_snapshots():
     assert "def _persistent_state_snapshot" in STREAMING_PY
     assert "def _persistent_state_changes" in STREAMING_PY
-    assert '_persistent_state_before = _persistent_state_snapshot(_profile_home)' in STREAMING_PY
+    assert '_persistent_state_before = _persistent_state_snapshot(_profile_home, str(_personal_root))' in STREAMING_PY
     assert 'put("state_saved", {' in STREAMING_PY
     assert '"kind": "memory"' in STREAMING_PY
     assert '"kind": "skill"' in STREAMING_PY

@@ -299,3 +299,105 @@ def test_unsafe_lock_rejected_without_waiting(activity, tmp_path, kind):
         os.mkfifo(lock, 0o600)
     with pytest.raises(OSError):
         activity.read_activity("a@example.test", "chat-a")
+
+
+# ── 20 Sep 2026: notices for what the conversation itself changed ─────────
+# Michael: "notificaties van aangemaakte skills, geupdate skills, geupdate
+# memories etc werkt niet helemaal". Turn changes (file-signature diff in
+# api/streaming) are now persisted next to the background-review rows, and
+# memory changes are notices too.
+
+def test_turn_changes_are_recorded_for_the_speaker(activity):
+    with activity.turn_scope("a@example.test", "run-t", "profile-a", "chat-a"):
+        assert activity.record_turn_changes({
+            "memory_saved": True, "memory": ["memory", "user"],
+            "skills": [{"name": "invoice-mailer", "path": "finance/invoice-mailer/SKILL.md", "action": "created"},
+                       {"name": "notion-sync", "path": "notion-sync/SKILL.md", "action": "updated"}],
+        }, now=2000)
+    data = activity.read_activity("a@example.test", "chat-a", now=2001)
+    assert len(data["events"]) == 1
+    row = data["events"][0]
+    assert row["source"] == "turn"
+    assert row["memory"] == ["memory", "user"]
+    assert row["counts"] == {"created": 1, "patched": 0, "updated": 1}
+    assert sorted((s["name"], s["kind"]) for s in row["skills"]) == [("invoice-mailer", "created"), ("notion-sync", "updated")]
+
+
+def test_memory_only_turn_is_a_notice_and_unknown_keys_are_dropped(activity):
+    with activity.turn_scope("a@example.test", "run-m", "profile-a", "chat-a"):
+        assert activity.record_turn_changes({"memory": ["soul", "bogus"], "skills": []}, now=3000)
+    row = activity.read_activity("a@example.test", "chat-a", now=3001)["events"][0]
+    assert row["memory"] == ["soul"] and row["counts"] == {"created": 0, "patched": 0, "updated": 0}
+
+
+def test_turn_changes_need_a_scope_and_something_changed(activity):
+    assert activity.record_turn_changes({"memory": ["memory"]}) is False  # no turn scope
+    with activity.turn_scope("a@example.test", "run-e", "profile-a", "chat-a"):
+        assert activity.record_turn_changes({"memory": [], "skills": []}) is False
+        assert activity.record_turn_changes("not a dict") is False
+    assert activity.read_activity("a@example.test", "chat-a")["events"] == []
+
+
+def test_review_rows_without_memory_keep_their_old_shape(activity, tmp_path):
+    scope = activity.ReviewScope("a@example.test", "run-a", "profile-a", "chat-a")
+    activity.record(scope, {"created": 1, "patched": 0, "updated": 0}, now=1000)
+    text = "".join(p.read_text() for p in tmp_path.rglob("*.json"))
+    assert '"memory"' not in text and '"source"' not in text
+    row = activity.read_activity("a@example.test", "chat-a", now=1001)["events"][0]
+    assert row["memory"] == [] and row["source"] == "review"
+
+
+def test_store_rejects_bad_memory_or_source(activity, tmp_path):
+    import json as _json
+    scope = activity.ReviewScope("a@example.test", "run-a", "profile-a", "chat-a")
+    activity.record(scope, {"created": 1, "patched": 0, "updated": 0}, now=1000)
+    path = next(tmp_path.rglob("*.json"))
+    rows = _json.loads(path.read_text())
+    rows[0]["memory"] = ["memory", "memory"]
+    path.write_text(_json.dumps(rows))
+    with pytest.raises(ValueError):
+        activity.read_activity("a@example.test", "chat-a", now=1001)
+    rows[0]["memory"] = ["memory"]; rows[0]["source"] = "elsewhere"
+    path.write_text(_json.dumps(rows))
+    with pytest.raises(ValueError):
+        activity.read_activity("a@example.test", "chat-a", now=1001)
+
+
+def test_snapshot_follows_symlinked_skills_and_both_memory_homes(tmp_path):
+    from api import streaming
+    profile = tmp_path / "profile"; personal = tmp_path / "personal"; elsewhere = tmp_path / "elsewhere"
+    (profile / "skills" / "local" / "one").mkdir(parents=True)
+    (profile / "skills" / "local" / "one" / "SKILL.md").write_text("one")
+    (elsewhere / "linked-skill").mkdir(parents=True)
+    (elsewhere / "linked-skill" / "SKILL.md").write_text("two")
+    (elsewhere / "cat" / "three").mkdir(parents=True)
+    (elsewhere / "cat" / "three" / "SKILL.md").write_text("three")
+    (profile / "skills" / "linked-skill").symlink_to(elsewhere / "linked-skill", target_is_directory=True)
+    (profile / "skills" / "cat").symlink_to(elsewhere / "cat", target_is_directory=True)
+    (profile / "skills" / "loop").symlink_to(profile / "skills", target_is_directory=True)
+    (personal / "memories").mkdir(parents=True)
+    (personal / "memories" / "MEMORY.md").write_text("mine")
+    (profile / "SOUL.md").write_text("soul")
+    before = streaming._persistent_state_snapshot(str(profile), str(personal))
+    assert set(before["skills"]) == {"local/one/SKILL.md", "linked-skill/SKILL.md", "cat/three/SKILL.md"}
+    assert set(before["memory"]) == {"memory", "profile_soul"}
+    (elsewhere / "cat" / "three" / "SKILL.md").write_text("three changed")
+    (elsewhere / "cat" / "four").mkdir()
+    (elsewhere / "cat" / "four" / "SKILL.md").write_text("four")
+    (personal / "memories" / "MEMORY.md").write_text("mine, updated")
+    import os, time
+    os.utime(elsewhere / "cat" / "three" / "SKILL.md", ns=(time.time_ns() + 5_000_000_000,) * 2)
+    os.utime(personal / "memories" / "MEMORY.md", ns=(time.time_ns() + 5_000_000_000,) * 2)
+    changes = streaming._persistent_state_changes(before, streaming._persistent_state_snapshot(str(profile), str(personal)))
+    assert changes["memory_saved"] is True and changes["memory"] == ["memory"]
+    assert sorted((c["name"], c["action"]) for c in changes["skills"]) == [("four", "created"), ("three", "updated")]
+
+
+def test_frontend_notice_card_shows_memory_and_turn_rows():
+    from pathlib import Path
+    js = (Path(__file__).resolve().parent.parent / "static" / "skill_learning_activity.js").read_text()
+    assert "row.source === 'turn'" in js
+    assert "for (const key of row.memory || [])" in js
+    assert "memory.length > 0" in js
+    streaming = (Path(__file__).resolve().parent.parent / "api" / "streaming.py").read_text()
+    assert "record_turn_changes(_persistent_changes)" in streaming

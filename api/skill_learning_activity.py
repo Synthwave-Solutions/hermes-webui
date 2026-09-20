@@ -33,6 +33,9 @@ _MAX_EVENTS = 100
 _RETENTION = 30 * 86400
 _KINDS = ("created", "patched", "updated")
 _MAX_SKILLS = 50
+# Memory files a turn can change (see api/streaming._PERSISTENT_MEMORY_FILES).
+_MEMORY_KEYS = ("memory", "user", "soul", "profile_memory", "profile_user", "profile_soul")
+_SOURCES = ("review", "turn")
 
 
 def _skill_identifier(value):
@@ -252,10 +255,15 @@ def _locked(path):
         os.close(fd)
 
 
-def _counts(value):
+def _counts(value, *, allow_empty=False):
     return (isinstance(value, dict) and set(value) == set(_KINDS)
             and all(type(v) is int and 0 <= v <= 10000 for v in value.values())
-            and any(value.values()))
+            and (allow_empty or any(value.values())))
+
+
+def _memory(value):
+    return (isinstance(value, list) and len(value) <= len(_MEMORY_KEYS)
+            and len(set(value)) == len(value) and all(v in _MEMORY_KEYS for v in value))
 
 
 def _skills(value, counts):
@@ -292,21 +300,30 @@ def _load(path, now):
     if not isinstance(data, list) or len(data) > _MAX_EVENTS:
         raise ValueError("Invalid activity storage")
     for row in data:
-        if (not isinstance(row, dict) or set(row) not in (
-                {"id", "session", "created_at", "counts"},
-                {"id", "session", "created_at", "counts", "skills"})
-                or not re.fullmatch(r"[0-9a-f]{64}", str(row.get("id", "")))
+        if not isinstance(row, dict):
+            raise ValueError("Invalid activity storage")
+        keys = set(row)
+        if not {"id", "session", "created_at", "counts"} <= keys or not keys <= {
+                "id", "session", "created_at", "counts", "skills", "memory", "source"}:
+            raise ValueError("Invalid activity storage")
+        memory = row.get("memory", [])
+        if (not re.fullmatch(r"[0-9a-f]{64}", str(row.get("id", "")))
                 or not re.fullmatch(r"[0-9a-f]{64}", str(row.get("session", "")))
                 or type(row.get("created_at")) is not int
-                or row["created_at"] < 0 or not _counts(row.get("counts"))
-                or not _skills(row.get("skills", []), row["counts"])):
+                or row["created_at"] < 0
+                or not _memory(memory)
+                or not _counts(row.get("counts"), allow_empty=bool(memory))
+                or not _skills(row.get("skills", []), row["counts"])
+                or row.get("source", "review") not in _SOURCES):
             raise ValueError("Invalid activity storage")
     return [row for row in data if now - _RETENTION <= row["created_at"] <= now + 300]
 
 
-def record(scope, counts, *, skills=None, now=None):
+def record(scope, counts, *, skills=None, memory=None, source="review", now=None):
     """Best effort; persistence failure must never change a review outcome."""
-    if not _counts(counts) or not _skills([] if skills is None else skills, counts):
+    memory = [] if memory is None else list(memory)
+    if (not _memory(memory) or not _counts(counts, allow_empty=bool(memory))
+            or not _skills([] if skills is None else skills, counts) or source not in _SOURCES):
         return False
     now = int(time.time() if now is None else now)
     try:
@@ -316,9 +333,14 @@ def record(scope, counts, *, skills=None, now=None):
             rows = _load(path, now)
             if any(row["id"] == ident for row in rows):
                 return True
-            rows.append({"id": ident, "session": hashlib.sha256(scope.session_id.encode()).hexdigest(),
-                         "created_at": now, "counts": dict(counts),
-                         "skills": [{**skill, "resource": skill.get("resource", skill["name"])} for skill in skills or []]})
+            row = {"id": ident, "session": hashlib.sha256(scope.session_id.encode()).hexdigest(),
+                   "created_at": now, "counts": dict(counts),
+                   "skills": [{**skill, "resource": skill.get("resource", skill["name"])} for skill in skills or []]}
+            if memory:
+                row["memory"] = memory
+            if source != "review":
+                row["source"] = source
+            rows.append(row)
             rows = sorted(rows, key=lambda row: row["created_at"])[-_MAX_EVENTS:]
             # Name metadata must not make a valid store unreadable at its byte cap.
             encoded = json.dumps(rows, separators=(",", ":")).encode("utf-8")
@@ -360,11 +382,13 @@ def read_activity(actor, session_id, *, now=None, access=None):
                 continue
             key = (name, kind)
             names[key] = names.get(key, 0) + skill["count"]
-        if not any(counts.values()):
+        memory = list(row.get("memory", []))
+        if not any(counts.values()) and not memory:
             continue
         events.append({"id": row["id"], "created_at": row["created_at"], "counts": counts,
                        "skills": [{"name": name, "kind": kind, "count": count}
-                                  for (name, kind), count in names.items()]})
+                                  for (name, kind), count in names.items()],
+                       "memory": memory, "source": row.get("source", "review")})
     return {"events": events, "coverage": "observed_changes_only",
             "retention_days": 30}
 
@@ -433,6 +457,40 @@ def install_adapter():
         return True
     except (ImportError, AttributeError, TypeError, ValueError):
         return False
+
+
+def record_turn_changes(changes, *, now=None):
+    """Persist what THIS turn changed on disk (api/streaming's file-signature
+    diff) as a notice for the person who spoke. Complements the background
+    review path: that one only sees the review thread's own skill_manage
+    calls, so a skill the agent created or a memory note it saved during the
+    conversation itself never showed up after the toast faded.
+    """
+    scope = _TURN.get()
+    if scope is None or not isinstance(changes, dict):
+        return False
+    counts = dict.fromkeys(_KINDS, 0)
+    skills = {}
+    for change in changes.get("skills") or []:
+        if not isinstance(change, dict):
+            continue
+        kind = "created" if change.get("action") == "created" else "updated"
+        rel = str(change.get("path") or "")
+        resource = _skill_identifier(rel[:-len("/SKILL.md")] if rel.endswith("/SKILL.md") else rel.rsplit("/SKILL.md", 1)[0]) if rel else None
+        name = _display_name(resource) if resource else _display_name(change.get("name"))
+        if not name:
+            continue
+        counts[kind] += 1
+        key = (resource or name, kind)
+        if key in skills or len(skills) < _MAX_SKILLS:
+            skills[key] = skills.get(key, 0) + 1
+    memory = [key for key in (changes.get("memory") or []) if key in _MEMORY_KEYS]
+    if not any(counts.values()) and not memory:
+        return False
+    return record(scope, counts,
+                  skills=[{"name": _display_name(resource), "resource": resource, "kind": kind, "count": count}
+                          for (resource, kind), count in skills.items()],
+                  memory=memory, source="turn", now=now)
 
 
 @contextmanager

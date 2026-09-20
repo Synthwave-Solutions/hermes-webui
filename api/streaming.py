@@ -298,20 +298,55 @@ def _file_signature(path: Path) -> tuple[int, int] | None:
         return None
 
 
+_PERSISTENT_SKILL_SCAN_CAP = 20000
+
+
 def _persistent_state_snapshot(profile_home: str | None, memory_home: str | None = None) -> dict:
-    """Capture lightweight memory/skill file signatures for save toasts."""
+    """Capture lightweight memory/skill file signatures for save notices.
+
+    Memory files are read from the per-user memory home AND the profile home
+    (they differ for governed users: personal notes live under
+    personal_context, the bot's own SOUL and shared notes under the profile).
+    The skill scan follows symlinks: on this workstation whole categories and
+    single skills are symlinked into ~/.hermes/skills, and Path.rglob skips
+    those, so a skill the agent created there was never noticed (Michael,
+    20 Sep 2026: "notificaties van aangemaakte skills werken niet helemaal").
+    """
     if not profile_home:
         return {"memory": {}, "skills": {}}
     root = Path(profile_home)
     memory = {}
-    for key, parts in _PERSISTENT_MEMORY_FILES:
-        sig = _file_signature(Path(memory_home or profile_home).joinpath(*parts))
-        if sig is not None:
-            memory[key] = sig
+    homes = []
+    for home in (memory_home, profile_home):
+        if home and str(home) not in homes:
+            homes.append(str(home))
+    for index, home in enumerate(homes):
+        for key, parts in _PERSISTENT_MEMORY_FILES:
+            sig = _file_signature(Path(home).joinpath(*parts))
+            if sig is not None:
+                memory[key if index == 0 else "profile_" + key] = sig
     skills = {}
     skills_dir = root / "skills"
     try:
-        for skill_md in skills_dir.rglob("SKILL.md"):
+        seen_dirs = set()
+        budget = _PERSISTENT_SKILL_SCAN_CAP
+        for current, dirs, files in os.walk(skills_dir, followlinks=True):
+            try:
+                real = os.path.realpath(current)
+            except OSError:
+                dirs[:] = []
+                continue
+            if real in seen_dirs:
+                dirs[:] = []
+                continue
+            seen_dirs.add(real)
+            dirs[:] = [d for d in dirs if not d.startswith(".")]
+            budget -= 1
+            if budget <= 0:
+                break
+            if "SKILL.md" not in files:
+                continue
+            skill_md = Path(current) / "SKILL.md"
             try:
                 rel = str(skill_md.relative_to(skills_dir)).replace("\\", "/")
             except ValueError:
@@ -331,7 +366,8 @@ def _persistent_state_changes(before: dict | None, after: dict | None) -> dict:
     memory_after = after.get("memory") or {}
     skills_before = before.get("skills") or {}
     skills_after = after.get("skills") or {}
-    memory_changed = any(memory_before.get(key) != sig for key, sig in memory_after.items())
+    memory_keys = [key for key, sig in memory_after.items() if memory_before.get(key) != sig]
+    memory_changed = bool(memory_keys)
     skills = []
     for rel, sig in skills_after.items():
         old_sig = skills_before.get(rel)
@@ -343,7 +379,7 @@ def _persistent_state_changes(before: dict | None, after: dict | None) -> dict:
             "path": rel,
             "action": "created" if old_sig is None else "updated",
         })
-    return {"memory_saved": memory_changed, "skills": skills[:10]}
+    return {"memory_saved": memory_changed, "memory": memory_keys, "skills": skills[:10]}
 
 
 def _apply_profile_provider_context_to_streaming_model(
@@ -9775,6 +9811,15 @@ def _run_agent_streaming(
                                 "action": _skill_change.get("action") or "updated",
                                 "name": _skill_change.get("name") or "",
                             })
+                        # Toasts vanish; the notice card in the transcript stays.
+                        # Same private per-person store the background review
+                        # uses, so "skill created / memory updated" survives a
+                        # reload and a tab that was not watching.
+                        try:
+                            from api.skill_learning_activity import record_turn_changes
+                            record_turn_changes(_persistent_changes)
+                        except Exception:
+                            logger.debug("Persistent state notice record failed for session %s", s.session_id, exc_info=True)
                     except Exception:
                         logger.debug("Persistent state change detection failed for session %s", s.session_id, exc_info=True)
             # Sync to state.db for /insights (opt-in setting)

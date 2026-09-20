@@ -61,12 +61,28 @@
           tr('skill_learning_name_unknown', 'Skill name was not recorded');
         copy.append(line);
       }
+      const memoryLabels = {
+        memory: tr('skill_learning_memory_saved', 'Memory updated'),
+        user: tr('skill_learning_user_saved', 'User profile updated'),
+        soul: tr('skill_learning_soul_saved', 'Bot personality updated'),
+        profile_memory: tr('skill_learning_profile_memory_saved', 'Shared bot memory updated'),
+        profile_user: tr('skill_learning_profile_user_saved', 'Shared user profile updated'),
+        profile_soul: tr('skill_learning_soul_saved', 'Bot personality updated'),
+      };
+      for (const key of row.memory || []) {
+        const line = document.createElement('div');
+        line.textContent = memoryLabels[key];
+        copy.append(line);
+      }
       const meta = document.createElement('small');
       const time = document.createElement('time');
       const date = new Date(row.created_at * 1000);
       time.dateTime = date.toISOString();
       time.textContent = date.toLocaleString();
-      meta.append(document.createTextNode(tr('skill_learning_private', 'Automatic · Visible only to you') + ' · '), time);
+      const origin = row.source === 'turn'
+        ? tr('skill_learning_in_turn', 'This conversation · Visible only to you')
+        : tr('skill_learning_private', 'Automatic · Visible only to you');
+      meta.append(document.createTextNode(origin + ' · '), time);
       card.append(copy, meta);
       insertByTime(host, card, row.created_at);
     }
@@ -82,12 +98,17 @@
       card.append(retry); host.append(card);
     }
   }
+  const MEMORY_KEYS = ['memory', 'user', 'soul', 'profile_memory', 'profile_user', 'profile_soul'];
   function valid(row) {
+    const memory = row && row.memory === undefined ? [] : row && row.memory;
     if (!(row && /^[a-f0-9]{64}$/.test(row.id) && Number.isSafeInteger(row.created_at)
       && row.created_at >= 0 && row.created_at < 8640000000000
       && row.counts && ['created', 'patched', 'updated'].every(key =>
         Number.isSafeInteger(row.counts[key]) && row.counts[key] >= 0 && row.counts[key] <= 10000)
-      && Object.values(row.counts).some(value => value > 0))) return false;
+      && Array.isArray(memory) && memory.length <= MEMORY_KEYS.length
+      && memory.every(key => MEMORY_KEYS.includes(key)) && new Set(memory).size === memory.length
+      && (row.source === undefined || row.source === 'review' || row.source === 'turn')
+      && (Object.values(row.counts).some(value => value > 0) || memory.length > 0))) return false;
     const skills = row.skills === undefined ? [] : row.skills;
     if (!Array.isArray(skills) || skills.length > 50) return false;
     const totals = {created: 0, patched: 0, updated: 0}, seen = new Set();
