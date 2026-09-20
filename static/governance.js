@@ -213,7 +213,7 @@ async function _govLoadUsers(expectedDraft) {
     const entry = users[email] || {};
     return '<tr>' +
       '<td>' + _govEsc(email) + '</td>' +
-      '<td>' + _govEsc(_govUserPolicySummary(entry)) + '</td>' +
+      '<td class="gov-policy-cell">' + _govPolicyChips(_govUserPolicySummary(entry)) + '</td>' +
       '<td>' + _govEsc((entry.roles || []).join(', ')) + '</td>' +
       '<td>' + _govEsc((entry.groups || []).join(', ')) + '</td>' +
       '<td class="gov-row-actions">' +
@@ -433,6 +433,13 @@ function _govUserExtraFieldsHtml(kind) {
     _GOV_USER_ACCESS_FIELDS.map(([name, path, label, hint]) =>
       _govChipFieldHtml(_govUserExtraId(kind, name), _govT('governance_access_' + name.toLowerCase(), label), '', hint)
     ).join('') + '</details>';
+}
+
+function _govPolicyChips(summary) {
+  return String(summary || '').split(' · ').filter(Boolean).map(function (part) {
+    var inherit = /^keep existing/i.test(part);
+    return '<span class="gov-chip ' + (inherit ? 'gov-chip-inherit' : 'gov-chip-policy') + '">' + _govEsc(part) + '</span>';
+  }).join('');
 }
 
 function _govUserPolicySummary(entry) {
@@ -1450,11 +1457,11 @@ function _govRenderWorkspaces() {
       '</div>' +
     '</div>' +
     (isAdmin ? '' : '<div class="gov-muted">You are not a workspace admin: the list below only shows your own entries and editing is disabled.</div>') +
-    '<table class="gov-table"><thead><tr>' +
+    '<div class="gov-table-wrap"><table class="gov-table"><thead><tr>' +
       '<th>Name</th><th>Path</th><th>Owner</th><th>Members</th>' + lensHeader + '<th></th>' +
     '</tr></thead><tbody>' +
     (rows || '<tr><td colspan="' + colCount + '" class="gov-muted">No workspaces configured.</td></tr>') +
-    '</tbody></table>' +
+    '</tbody></table></div>' +
     '<div class="gov-muted">Owner and members control who sees a workspace. An entry without either is legacy shared: visible to every signed-in user. Clearing the owner field returns an entry to legacy shared.</div>';
 }
 

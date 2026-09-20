@@ -6544,7 +6544,7 @@ function _renderWorkspaceDetail(ws){
         <div class="detail-card-title">Ownership</div>
         <div class="detail-row"><div class="detail-row-label">Owner</div><div class="detail-row-value"><input type="text" id="wsAssignOwner" value="${esc(ws.owner_email || '')}" placeholder="owner email (empty = shared)" autocomplete="off" style="width:100%"></div></div>
         <div class="detail-row"><div class="detail-row-label">Members</div><div class="detail-row-value"><input type="text" id="wsAssignMembers" value="${esc((ws.members || []).join(', '))}" placeholder="comma separated emails" autocomplete="off" style="width:100%"></div></div>
-        <div style="padding:8px 0"><button type="button" class="btn" id="wsAssignSaveBtn">Save ownership</button></div>
+        <div class="bot-editor-actions" style="justify-content:flex-start"><button type="button" class="sm-btn primary" id="wsAssignSaveBtn">Save ownership</button></div>
       </div>` : '';
   body.innerHTML = `
     <div class="main-view-content">
@@ -7333,8 +7333,8 @@ function _renderProfileDetail(p, activeName){
             <label class="bot-editor-wide" for="botAvatarFile">${esc(t('bot_upload'))}<input id="botAvatarFile" type="file" accept="image/png,image/jpeg,image/webp" onchange="uploadBotAvatar(this)" aria-describedby="botAvatarHint"></label>
           </div>
           <p class="bot-field-hint" id="botAvatarHint">${esc(t('bot_avatar_limit'))}</p>
-          <div class="bot-editor-wide"><h3>${esc(t('bot_knowledge_files'))}</h3><p class="bot-field-hint">${esc(t('bot_editor_choose_hint'))}</p><button type="button" class="sm-btn" onclick="openBotConfiguration('knowledge')">${esc(t('bot_editor_choose_knowledge'))}</button></div>
-          ${editable?`<button type="submit" class="sm-btn primary">${esc(t('save'))}</button>`:''}
+          <div class="bot-editor-wide bot-editor-section"><h3>${esc(t('bot_knowledge_files'))}</h3><p class="bot-field-hint">${esc(t('bot_editor_choose_hint'))}</p><button type="button" class="sm-btn" onclick="openBotConfiguration('knowledge')">${esc(t('bot_editor_choose_knowledge'))}</button></div>
+          ${editable?`<div class="bot-editor-actions"><button type="submit" class="sm-btn primary">${esc(t('save'))}</button></div>`:''}
         </fieldset>
         ${editable?'':`<p class="bot-field-hint">${esc(t('bot_read_only'))}</p>`}
       </form>
