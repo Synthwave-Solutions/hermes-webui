@@ -10,7 +10,111 @@ function _notifyForbidden(resource,reason){
   if(typeof showToast==='function') showToast('Access restricted: '+what+' - ask your admin',6000);
 }
 
+// ── Shared read layer for api() ──────────────────────────────────────────────
+// Two costs every page load paid many times over, measured on the VPS:
+//  1. The same GET issued by several panels within seconds of each other. One
+//     boot fired /api/profiles five times, /api/governance/me four times and
+//     /api/people three times, each a full server round trip. Identical
+//     in-flight GETs now share a single network request.
+//  2. Catalog-style endpoints that change rarely (profiles, people, models,
+//     workspaces, governance identity) re-fetched on every panel open. Those
+//     are memoised for a short TTL. Any non-GET api() call whose path touches
+//     the same resource family drops the memo, so a save is visible on the
+//     very next read; the memo is also cleared whenever the tab becomes
+//     visible again. Pass {fresh:true} to bypass; URLs carrying an explicit
+//     refresh/force/nocache/ts query parameter are never memoised.
+// Every consumer receives its own structured clone, so a caller mutating its
+// result can never leak into another caller's copy.
+const _API_SHARED_INFLIGHT=new Map();
+const _API_SHARED_MEMO=new Map();
+const _API_SHARED_MEMO_RULES=[
+  {test:/^api\/profiles(?:\?|$)/,ttlMs:30000,invalidate:/^api\/(?:profile|bot)/},
+  {test:/^api\/people(?:\?|$)/,ttlMs:30000,invalidate:/^api\/(?:people|governance)/},
+  {test:/^api\/governance\/me(?:\?|$)/,ttlMs:60000,invalidate:/^api\/(?:governance|profile)/},
+  {test:/^api\/models(?:\?|$)/,ttlMs:60000,invalidate:/^api\/(?:models?|settings|provider|profile|onboarding)/},
+  {test:/^api\/workspaces(?:\?|$)/,ttlMs:15000,invalidate:/^api\/(?:workspaces?|onboarding|profile|session\/new|governance)/},
+  {test:/^api\/dashboard\/config(?:\?|$)/,ttlMs:60000,invalidate:/^api\/dashboard/},
+  {test:/^api\/mcp\/tools(?:\?|$)/,ttlMs:30000,invalidate:/^api\/(?:mcp|governance|settings|profile|gateway)/},
+];
+function _apiSharedRel(path){
+  const rel=String(path||'').replace(/^\/+/,'');
+  return rel.startsWith('api/')?rel:null;
+}
+function _apiSharedRuleFor(rel){
+  for(const rule of _API_SHARED_MEMO_RULES){ if(rule.test.test(rel)) return rule; }
+  return null;
+}
+function _apiSharedClone(value){
+  if(value===null||typeof value!=='object') return value;
+  try{ return structuredClone(value); }catch(_){}
+  try{ return JSON.parse(JSON.stringify(value)); }catch(_){ return value; }
+}
+function _apiSharedInvalidateFor(rel){
+  for(const rule of _API_SHARED_MEMO_RULES){
+    if(!rule.invalidate||!rule.invalidate.test(rel)) continue;
+    for(const [key,entry] of _API_SHARED_MEMO){ if(entry.rule===rule) _API_SHARED_MEMO.delete(key); }
+  }
+}
+// Drop memoised reads whose request path matches `pattern` (RegExp or string
+// prefix such as 'api/profiles'). No argument clears everything.
+function apiInvalidateShared(pattern){
+  if(!pattern){ _API_SHARED_MEMO.clear(); return; }
+  const re=pattern instanceof RegExp?pattern:new RegExp('^'+String(pattern).replace(/^\/+/,'').replace(/[.*+?^${}()|[\]\\]/g,'\\$&'));
+  for(const key of _API_SHARED_MEMO.keys()){ if(re.test(key)) _API_SHARED_MEMO.delete(key); }
+}
+function _apiSharedRead(path,opts,invoke){
+  const rel=_apiSharedRel(path);
+  if(!rel) return null;
+  const o=opts||{};
+  const method=String(o.method||'GET').toUpperCase();
+  if(method!=='GET'){ _apiSharedInvalidateFor(rel); return null; }
+  if(o.fresh===true||o.signal||o.body||o.cache==='no-store') return null;
+  if(/\/stream|[?&](?:refresh|force|nocache|ts)=/.test(rel)) return null;
+  const key=rel+'|'+(o.redirect401===false?'0':'1')+(o.timeoutToast===false?'0':'1');
+  const rule=_apiSharedRuleFor(rel);
+  if(rule){
+    const hit=_API_SHARED_MEMO.get(key);
+    if(hit&&hit.expiresAt>Date.now()) return Promise.resolve(_apiSharedClone(hit.value));
+    if(hit) _API_SHARED_MEMO.delete(key);
+  }
+  const inflight=_API_SHARED_INFLIGHT.get(key);
+  if(inflight) return inflight.then(_apiSharedClone);
+  const p=invoke(path,{...o,_apiShared:true}).then(value=>{
+    if(rule&&value!==undefined) _API_SHARED_MEMO.set(key,{value,expiresAt:Date.now()+rule.ttlMs,rule});
+    return value;
+  }).finally(()=>{ if(_API_SHARED_INFLIGHT.get(key)===p) _API_SHARED_INFLIGHT.delete(key); });
+  _API_SHARED_INFLIGHT.set(key,p);
+  return p.then(_apiSharedClone);
+}
+if(typeof document!=='undefined'&&typeof document.addEventListener==='function'){
+  document.addEventListener('visibilitychange',()=>{ if(!document.hidden) _API_SHARED_MEMO.clear(); });
+}
+
+// Run `fn` once the boot sequence has published the first conversation
+// (synpulse:boot-ready), then at browser idle. Used for chrome that is not
+// needed for first paint (quota chip, dashboard link probe) so those requests
+// stop competing with the session restore for the server's attention. A
+// ceiling of `maxWaitMs` guarantees the work still runs if boot never signals.
+function runAfterBootReady(fn,maxWaitMs=8000){
+  const run=()=>{ try{ const r=fn(); if(r&&typeof r.catch==='function') r.catch(()=>{}); }catch(_){} };
+  const idle=()=>{ if(typeof requestIdleCallback==='function') requestIdleCallback(()=>run(),{timeout:1500}); else setTimeout(run,0); };
+  if(typeof S!=='undefined'&&S&&S._bootReady){ idle(); return; }
+  if(typeof window==='undefined'||typeof window.addEventListener!=='function'){ idle(); return; }
+  let done=false;
+  const once=()=>{ if(done) return; done=true; window.removeEventListener('synpulse:boot-ready',once); idle(); };
+  window.addEventListener('synpulse:boot-ready',once);
+  setTimeout(once,maxWaitMs);
+}
+
 async function api(path,opts={}){
+  // Shared read layer (see above): coalesce identical in-flight GETs and serve
+  // memoised catalog reads. The inner request below runs with _apiShared set
+  // so it cannot recurse into the layer. Guarded so the function body still
+  // runs standalone in the Node test harnesses that extract it.
+  if(typeof _apiSharedRead==='function'&&!(opts&&opts._apiShared)){
+    const shared=_apiSharedRead(path,opts,api);
+    if(shared) return shared;
+  }
   // Strip leading slash so URL resolves relative to location.href (supports subpath mounts)
   const rel = path.startsWith('/') ? path.slice(1) : path;
   const url=new URL(rel,document.baseURI||location.href);
@@ -39,6 +143,8 @@ async function api(path,opts={}){
       delete fetchOpts.retryTimeouts;
       delete fetchOpts.retryStatuses;
       delete fetchOpts.retryDelayMs;
+      delete fetchOpts._apiShared;
+      delete fetchOpts.fresh;
 
       const useTimeout=Number.isFinite(Number(timeoutMs))&&Number(timeoutMs)>0;
       if(useTimeout&&typeof AbortController!=='undefined'){

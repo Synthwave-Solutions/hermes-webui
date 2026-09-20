@@ -18,9 +18,15 @@ def _path(name):
     if path.is_symlink(): raise ValueError('Bot metadata must be a regular file')
     return path
 
+# libyaml's C loader parses the same documents roughly ten times faster than
+# the pure-Python SafeLoader. Three profile config.yaml files on the VPS are
+# ~290 KB each; with the pure-Python loader a single /api/profiles response
+# spent 1.5 to 1.9 s inside this module. Fall back when libyaml is absent.
+_YAML_LOADER = getattr(yaml, 'CSafeLoader', yaml.SafeLoader)
+
 def _load(path):
     if not path.exists(): return {}
-    data=yaml.safe_load(path.read_text())
+    data=yaml.load(path.read_text(), Loader=_YAML_LOADER)
     if data is None: return {}
     if not isinstance(data,dict): raise ValueError('Bot metadata is not an object')
     return data
@@ -134,7 +140,41 @@ def knowledge_prompt(name, workspace):
     except (OSError,ValueError):return ''
 
 
+# configuration_summary() is called once per profile on every /api/profiles
+# request (21 profiles on the VPS). The summary only depends on config.yaml
+# and the presence of SOUL.md, so memoize the small result dict keyed by the
+# config's (size, mtime_ns) and the SOUL.md flag. A saved config changes the
+# mtime and misses the cache on the next read; nothing here ever goes stale
+# past one filesystem write.
+_SUMMARY_CACHE: dict = {}
+_SUMMARY_CACHE_LOCK = threading.Lock()
+_SUMMARY_CACHE_MAX = 256
+
+def _summary_signature(home):
+    config_path=home/'config.yaml'
+    try:
+        st=config_path.stat() if not config_path.is_symlink() else None
+    except OSError:
+        st=None
+    return (st.st_size if st else -1, st.st_mtime_ns if st else -1, (home/'SOUL.md').is_file())
+
 def configuration_summary(home):
+    try:
+        sig=_summary_signature(home)
+        key=str(home)
+        with _SUMMARY_CACHE_LOCK:
+            cached=_SUMMARY_CACHE.get(key)
+            if cached is not None and cached[0]==sig:
+                return dict(cached[1], toolsets=list(cached[1]['toolsets']), mcp_servers=list(cached[1]['mcp_servers']))
+        summary=_compute_configuration_summary(home)
+        if summary:
+            with _SUMMARY_CACHE_LOCK:
+                if len(_SUMMARY_CACHE)>=_SUMMARY_CACHE_MAX: _SUMMARY_CACHE.clear()
+                _SUMMARY_CACHE[key]=(sig, dict(summary, toolsets=list(summary['toolsets']), mcp_servers=list(summary['mcp_servers'])))
+        return summary
+    except (OSError,ValueError,yaml.YAMLError):return {}
+
+def _compute_configuration_summary(home):
     try:
         config_path=home/'config.yaml'
         cfg=_load(config_path) if not config_path.is_symlink() else {}

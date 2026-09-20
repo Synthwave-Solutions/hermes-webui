@@ -2012,9 +2012,52 @@ def _get_profile_skills_stats(profile_dir: Path) -> tuple[int, int]:
         return res
 
 
-_LIST_PROFILES_CACHE: tuple[list, float] | None = None
-_LIST_PROFILES_CACHE_TTL = 4.0  # seconds. The perf(session-load-latency) pass bumped this to 60s, but that was reverted: profile-row mutations (defaults / providers / skills / gateway config) do NOT invalidate this cache, so a 60s TTL served stale profile rows for too long after such a change. 4s keeps the os.walk frequent enough that mutation→poll staleness is negligible while still making rapid dropdown re-opens free. The create/delete invalidation hooks below clear the cache immediately on those specific mutations.
+_LIST_PROFILES_CACHE: tuple[list, float, tuple | None] | None = None
+# seconds. An earlier pass bumped this to 60s and reverted, because profile-row
+# mutations (model/provider in config.yaml, profile.yaml visibility, gateway
+# pid/state files, .env) did not invalidate the cache. They do now: every read
+# compares a cheap filesystem signature over exactly those files (see
+# _profile_rows_signature, ~100 stat calls, well under a millisecond) and any
+# change rebuilds immediately, so the TTL only bounds staleness for things the
+# signature cannot see (a gateway process that died without touching its pid
+# file). The create/delete hooks below still clear the cache outright.
+_LIST_PROFILES_CACHE_TTL = 30.0
 _LIST_PROFILES_CACHE_LOCK = threading.Lock()
+
+# Files whose content feeds a profile row. Ordered, so the signature tuple is
+# stable across calls for an unchanged tree.
+_PROFILE_ROW_SIGNATURE_FILES = ('config.yaml', 'profile.yaml', 'gateway.pid', 'gateway_state.json', '.env')
+
+
+def _profile_rows_signature() -> tuple | None:
+    """Cheap change detector for the cached profile rows.
+
+    Returns a hashable tuple built from the profiles root's own mtime (create /
+    delete) plus (size, mtime_ns) of the handful of files each row is derived
+    from. Returns None when anything about the layout cannot be read, in which
+    case the caller falls back to the plain TTL.
+    """
+    def _stat(path: Path):
+        try:
+            st = path.stat()
+            return (st.st_size, st.st_mtime_ns)
+        except OSError:
+            return None
+    try:
+        base = Path(_DEFAULT_HERMES_HOME)
+        homes = [base]
+        root = base / 'profiles'
+        root_sig = _stat(root)
+        if root_sig is not None:
+            for entry in sorted(root.iterdir()):
+                if entry.is_dir():
+                    homes.append(entry)
+        return (root_sig, tuple(
+            (str(home),) + tuple(_stat(home / name) for name in _PROFILE_ROW_SIGNATURE_FILES)
+            for home in homes
+        ))
+    except Exception:
+        return None
 
 
 def _invalidate_list_profiles_cache() -> None:
@@ -2022,6 +2065,21 @@ def _invalidate_list_profiles_cache() -> None:
     global _LIST_PROFILES_CACHE
     with _LIST_PROFILES_CACHE_LOCK:
         _LIST_PROFILES_CACHE = None
+    with _LIST_PROFILES_FAST_CACHE_LOCK:
+        _LIST_PROFILES_FAST_CACHE.clear()
+
+
+# The ``fast=True`` rows (what every WebUI dropdown and the boot sequence
+# request) used to bypass the cache above entirely: each call re-parsed every
+# profile's config.yaml and re-walked every skills tree, 200 to 500 ms on the
+# VPS with 21 profiles, and one page load issued the request five times. The
+# fast rows get the same signature-validated cache, keyed by the isolated /
+# include_skill_counts variant. While any row still reports its skill counts
+# as pending (the background scan has not finished) the entry expires quickly
+# so the counts fill in; once complete it lives the full TTL.
+_LIST_PROFILES_FAST_CACHE: dict = {}
+_LIST_PROFILES_FAST_CACHE_LOCK = threading.Lock()
+_LIST_PROFILES_FAST_PENDING_TTL = 2.0
 
 
 _FAST_SKILL_QUEUE: list[Path] = []
@@ -2170,8 +2228,27 @@ def list_profiles_api(*, fast=False, include_skill_counts=True) -> list:
     if fast or not include_skill_counts:
         isolated = ((Path(_INITIAL_HERMES_HOME).expanduser(), _isolated_profile_name())
                     if _is_isolated_profile_mode() else None)
-        rows = _build_profile_rows_fast(deferred_counts=True, isolated=isolated,
-                                        include_skill_counts=include_skill_counts)
+        cache_key = (str(isolated[0]) if isolated else None,
+                     isolated[1] if isolated else None,
+                     bool(include_skill_counts))
+        # Single-flight: the lock is held across the build so a boot burst of
+        # concurrent requests collapses to one build (same rule as the full
+        # path below).
+        with _LIST_PROFILES_FAST_CACHE_LOCK:
+            entry = _LIST_PROFILES_FAST_CACHE.get(cache_key)
+            signature = _profile_rows_signature()
+            now = time.time()
+            if (entry is not None
+                    and now - entry[1] < entry[3]
+                    and (entry[2] is None or signature is None or entry[2] == signature)):
+                rows = entry[0]
+            else:
+                rows = _build_profile_rows_fast(deferred_counts=True, isolated=isolated,
+                                                include_skill_counts=include_skill_counts)
+                if rows is not None:
+                    pending = any(r.get('skill_counts_pending') for r in rows)
+                    ttl = _LIST_PROFILES_FAST_PENDING_TTL if pending else _LIST_PROFILES_CACHE_TTL
+                    _LIST_PROFILES_FAST_CACHE[cache_key] = (rows, time.time(), signature, ttl)
         if rows is not None:
             active = _isolated_profile_name() if isolated else get_active_profile_name()
             return [{**p, 'is_active': p['name'] == active} for p in rows]
@@ -2235,14 +2312,19 @@ def list_profiles_api(*, fast=False, include_skill_counts=True) -> list:
     # acquired AFTER this lock (never the reverse), so there is no deadlock.
     with _LIST_PROFILES_CACHE_LOCK:
         cached = _LIST_PROFILES_CACHE
-        if cached is not None and time.time() - cached[1] < _LIST_PROFILES_CACHE_TTL:
+        signature = _profile_rows_signature()
+        if (cached is not None
+                and time.time() - cached[1] < _LIST_PROFILES_CACHE_TTL
+                and (cached[2] is None or signature is None or cached[2] == signature)):
             rows = cached[0]
         else:
+            # Signature is taken BEFORE the build so a write that lands during
+            # the build shows up as a mismatch on the next read (TOCTOU-safe).
             rows = _build_profile_rows_fast()
             if rows is not None:
                 # A cold skill scan can take longer than the TTL. Start the
                 # freshness window when the completed rows become available.
-                _LIST_PROFILES_CACHE = (rows, time.time())
+                _LIST_PROFILES_CACHE = (rows, time.time(), signature)
 
     if rows is None:
         # Fallback: cheap helpers unavailable — use the original (slow) path,

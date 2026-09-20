@@ -3797,7 +3797,11 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
   // re-run when the browser restores the page from bfcache.
   const _srch = document.getElementById('sessionSearch'); if (_srch) _srch.value = '';
   if (typeof syncSessionSearchClear === 'function') syncSessionSearchClear();
-  if(typeof refreshProviderQuotaIndicator==='function') refreshProviderQuotaIndicator();
+  // Quota chip is chrome: fetch it after boot-ready + idle instead of in the
+  // middle of the session restore burst.
+  if(typeof runAfterBootReady==='function'){
+    runAfterBootReady(()=>{ if(typeof refreshProviderQuotaIndicator==='function') return refreshProviderQuotaIndicator(); });
+  }else if(typeof refreshProviderQuotaIndicator==='function') refreshProviderQuotaIndicator();
   if(await _finishBootAfterNewerSessionActivation()) return;
   const urlSession=(typeof _sessionIdFromLocation==='function')?_sessionIdFromLocation():null;
   const pwaLaunchAction=(window.HermesPWA&&typeof window.HermesPWA.launchAction==='function')

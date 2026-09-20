@@ -212,7 +212,12 @@
   window.addEventListener('synpulse:bot-updated', () => { key = ''; window.refreshChatBots(); });
   window.addEventListener('synpulse:boot-ready', () => { if (contextKey() !== key) window.refreshChatBots(); else paint(); });
   paint();
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => window.refreshChatBots(), {once:true});
+  // The recipient catalog (profiles + people) is chrome for the @-menu, not
+  // the conversation. Load it after synpulse:boot-ready and browser idle so it
+  // stops competing with the session restore; the boot-ready listener above
+  // and the shared api() read layer collapse any overlap into one request.
+  if (typeof runAfterBootReady === 'function') runAfterBootReady(() => window.refreshChatBots());
+  else if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => window.refreshChatBots(), {once:true});
   else window.refreshChatBots();
   window.chatBotRecipientRules = {available, address, mentions, fold, normalizeBotAddress};
 })();

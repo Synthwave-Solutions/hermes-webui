@@ -2239,16 +2239,23 @@ function openHermesDashboard(event){
   return false;
 }
 function _initDashboardLinkProbe(){
-  loadDashboardSettings();
-  refreshDashboardStatus(true);
-  setInterval(refreshDashboardStatus,DASHBOARD_STATUS_TTL_MS);
-  // Catch up once when the tab becomes visible again, since the interval poll
-  // was skipped while hidden and its cache is now stale.
-  if(typeof document!=='undefined'&&typeof document.addEventListener==='function'){
-    document.addEventListener('visibilitychange',()=>{
-      if(!document.hidden) refreshDashboardStatus(true);
-    });
-  }
+  // The dashboard link is chrome, not conversation: its two requests wait for
+  // synpulse:boot-ready plus browser idle so they stop competing with the
+  // session restore for the server (see runAfterBootReady in workspace.js).
+  const start=()=>{
+    loadDashboardSettings();
+    refreshDashboardStatus(true);
+    setInterval(refreshDashboardStatus,DASHBOARD_STATUS_TTL_MS);
+    // Catch up once when the tab becomes visible again, since the interval poll
+    // was skipped while hidden and its cache is now stale.
+    if(typeof document!=='undefined'&&typeof document.addEventListener==='function'){
+      document.addEventListener('visibilitychange',()=>{
+        if(!document.hidden) refreshDashboardStatus(true);
+      });
+    }
+  };
+  if(typeof runAfterBootReady==='function') runAfterBootReady(start);
+  else start();
 }
 if(document.readyState==='complete'){
   _initDashboardLinkProbe();
