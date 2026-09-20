@@ -13392,6 +13392,7 @@ def handle_get(handler, parsed) -> bool:
             # lives in api/cron_scope.py to keep this shared route minimal.
             from api.cron_scope import scope_cron_rows_for_caller
             active_jobs, other_jobs = scope_cron_rows_for_caller(handler, active_jobs, other_jobs)
+        _promote_prompt_diagrams(active_jobs)
         jobs = active_jobs + other_jobs if all_profiles else active_jobs
         hidden_other_count = 0 if all_profiles else len(other_jobs)
         return j(handler, {
@@ -22344,6 +22345,45 @@ def _selected_profile_snapshot_updates(
     return updates
 
 
+_CRON_PROMPT_DIAGRAM_RE = re.compile(r"```mermaid[^\n]*\n([\s\S]*?)```", re.IGNORECASE)
+
+
+def _cron_diagram_from_prompt(prompt) -> str:
+    """The Mermaid fence an agent appends as the prompt's DIAGRAM section.
+
+    The cronjob tool has no diagram parameter, so a job created from chat
+    carries its flowchart inside the prompt. The Tasks tab draws it from there,
+    and the listing promotes it into the job's own ``diagram`` field so it is
+    stored per cron like a diagram set from the form."""
+    m = _CRON_PROMPT_DIAGRAM_RE.search(str(prompt or ""))
+    return m.group(1).strip()[:20000] if m else ""
+
+
+def _promote_prompt_diagrams(jobs, limit: int = 10) -> None:
+    """Copy prompt-embedded diagrams into ``diagram`` for active-store rows that
+    have none yet. Bounded per request; idempotent; never raises."""
+    todo = [job for job in (jobs or [])
+            if isinstance(job, dict) and not str(job.get("diagram") or "").strip()
+            and not job.get("read_only") and _cron_diagram_from_prompt(job.get("prompt"))]
+    if not todo:
+        return
+    try:
+        from api.profiles import cron_profile_context
+        from cron.jobs import update_job
+
+        with cron_profile_context():
+            for job in todo[:limit]:
+                diagram = _cron_diagram_from_prompt(job.get("prompt"))
+                try:
+                    update_job(job["id"], {"diagram": diagram, "diagram_source": "prompt"})
+                    job["diagram"] = diagram
+                    job["diagram_source"] = "prompt"
+                except Exception:
+                    logger.debug("diagram promotion failed for %s", job.get("id"), exc_info=True)
+    except Exception:
+        logger.debug("diagram promotion unavailable", exc_info=True)
+
+
 def _normalize_cron_emoji(value):
     """One short emoji (or nothing) for the task list; never free text."""
     text = str(value or "").strip()
@@ -22412,6 +22452,9 @@ def _handle_cron_create(handler, body):
         _diagram = body.get("diagram")
         if isinstance(_diagram, str) and _diagram.strip():
             post_create_updates["diagram"] = _diagram.strip()[:20000]
+        elif _cron_diagram_from_prompt(body.get("prompt")):
+            post_create_updates["diagram"] = _cron_diagram_from_prompt(body.get("prompt"))
+            post_create_updates["diagram_source"] = "prompt"
         _emoji = _normalize_cron_emoji(body.get("emoji"))
         if _emoji:
             post_create_updates["emoji"] = _emoji
