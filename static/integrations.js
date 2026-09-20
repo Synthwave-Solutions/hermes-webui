@@ -113,7 +113,7 @@ async function loadIntegrations() {
       ? _intgT('integrations_all_connections', 'All connections')
       : _intgT('integrations_my_connections', 'My connections');
   }
-  await Promise.all([_intgLoadCatalog(), _intgRefreshConnections(), _intgRefreshRequests()]);
+  await Promise.all([_intgLoadCatalog(), _intgRefreshConnections(), _intgRefreshRequests(), chLoadChannels()]);
   return true;
 }
 
@@ -853,3 +853,225 @@ window.addEventListener('load', () => {
     switchPanel('integrations');
   }
 });
+
+
+// ── Messaging channels: Telegram, WhatsApp, Slack, Teams, Discord, Google Chat ──
+// Admin-only section at the top of Connections. Backed by api/gateway_channels.py.
+// Tokens go to the profile .env and are never echoed; the gateway picks them up
+// after a restart. Each platform user is mapped to a colleague so governance
+// follows them (gateway hook) and they see their own messaging sessions here.
+let _chState = null;
+const _CH_PLATFORM_ICON = { telegram: 'zap', whatsapp_cloud: 'message-square', slack: 'hash', teams: 'globe', discord: 'bot', google_chat: 'message-square' };
+
+async function chLoadChannels() {
+  const root = $('intgChannels');
+  if (!root) return;
+  if (!_intgIsAdmin(_intgMe)) { root.style.display = 'none'; return; }
+  root.style.display = '';
+  try {
+    _chState = await api('/api/gateway/channels', { redirect401: false, timeoutToast: false });
+  } catch (e) {
+    _chState = null;
+    const grid = $('intgChannelGrid');
+    if (grid) grid.innerHTML = '<div class="intg-error">' + _intgEsc((e && e.message) || _intgT('channels_failed', 'Channel action failed.')) + '</div>';
+    return;
+  }
+  chRenderGrid(); chRenderPending(); chRenderPeople();
+}
+
+function _chLabel(key) {
+  const p = (_chState && _chState.platforms || []).find(x => x.key === key);
+  return p ? p.label : key;
+}
+
+function chRenderGrid() {
+  const grid = $('intgChannelGrid');
+  if (!grid || !_chState) return;
+  grid.innerHTML = (_chState.platforms || []).map(p => {
+    const badges = [];
+    badges.push(p.configured
+      ? '<span class="intg-badge intg-badge-ok">' + _intgT('channels_configured', 'Connected') + '</span>'
+      : '<span class="intg-badge">' + _intgT('channels_not_configured', 'Not connected') + '</span>');
+    if (p.configured && p.allow_all) badges.push('<span class="intg-badge intg-badge-warn">' + _intgT('channels_allow_all_short', 'open to all') + '</span>');
+    if (p.pending_count) badges.push('<span class="intg-badge intg-badge-pending">' + p.pending_count + ' ' + _intgT('channels_pairing_short', 'pairing') + '</span>');
+    const meta = p.configured ? '<div class="ch-card-meta">' + _intgT('channels_people_count', '{n} people mapped').replace('{n}', String(p.mapped_count || 0)) + (p.approved_count ? ' · ' + p.approved_count + ' approved' : '') + '</div>' : '';
+    const icon = (typeof li === 'function') ? li(_CH_PLATFORM_ICON[p.key] || 'message-circle', 16) : '';
+    return '<div class="intg-card' + (p.configured ? ' configured' : '') + '" data-channel="' + _intgEsc(p.key) + '">'
+      + '<div class="intg-card-head">' + icon + '<div class="intg-card-name">' + _intgEsc(p.label) + '</div></div>'
+      + '<div class="ch-card-status">' + badges.join('') + '</div>'
+      + '<div class="ch-card-summary">' + _intgEsc(p.summary) + '</div>' + meta
+      + '<div class="intg-card-actions">'
+      + '<button type="button" class="sm-btn' + (p.configured ? '' : ' primary') + '" onclick="chOpenConfigure(\'' + _intgEsc(p.key) + '\')">' + (p.configured ? _intgT('channels_edit', 'Edit') : _intgT('channels_configure', 'Connect')) + '</button>'
+      + (p.configured ? '<button type="button" class="sm-btn" onclick="chDisable(\'' + _intgEsc(p.key) + '\')">' + _intgT('channels_disable', 'Disconnect') + '</button>' : '')
+      + '</div></div>';
+  }).join('');
+}
+
+function chOpenConfigure(key) {
+  const p = (_chState && _chState.platforms || []).find(x => x.key === key);
+  if (!p) return;
+  document.querySelectorAll('dialog.ch-dialog').forEach(d => d.remove());
+  const dialog = document.createElement('dialog');
+  dialog.className = 'app-dialog ch-dialog';
+  dialog.style.cssText = 'max-width:520px;width:calc(100% - 32px);max-height:90vh;overflow:auto;margin:auto';
+  const form = document.createElement('form'); form.method = 'dialog';
+  const title = document.createElement('div'); title.className = 'app-dialog-title'; title.textContent = p.label; form.appendChild(title);
+  const desc = document.createElement('div'); desc.className = 'app-dialog-desc'; desc.textContent = p.summary + ' ' + _intgT('channels_dialog_hint', ''); form.appendChild(desc);
+  const inputs = {};
+  p.fields.forEach(f => {
+    const wrap = document.createElement('div'); wrap.className = 'ch-field';
+    const label = document.createElement('label'); label.textContent = f.label + (f.required ? ' *' : ''); wrap.appendChild(label);
+    const input = document.createElement('input');
+    input.type = f.secret ? 'password' : 'text'; input.autocomplete = 'off'; input.className = 'app-dialog-input';
+    input.placeholder = f.set ? _intgT('channels_secret_stored', 'Stored. Leave blank to keep.') : '';
+    wrap.appendChild(input);
+    const hint = document.createElement('div'); hint.className = 'ch-hint'; hint.textContent = f.hint || ''; wrap.appendChild(hint);
+    inputs[f.key] = input; form.appendChild(wrap);
+  });
+  const toggle = document.createElement('label'); toggle.className = 'ch-field-toggle';
+  const box = document.createElement('input'); box.type = 'checkbox'; box.checked = !!p.allow_all;
+  toggle.appendChild(box); toggle.appendChild(document.createTextNode(_intgT('channels_allow_all', 'Everyone on this platform may message the bot')));
+  form.appendChild(toggle);
+  const err = document.createElement('div'); err.className = 'intg-error'; err.style.display = 'none'; form.appendChild(err);
+  const actions = document.createElement('div'); actions.className = 'app-dialog-actions';
+  const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'app-dialog-btn'; cancel.textContent = t('cancel') || 'Cancel';
+  cancel.addEventListener('click', () => { dialog.close(); dialog.remove(); });
+  const submit = document.createElement('button'); submit.type = 'submit'; submit.className = 'app-dialog-btn confirm'; submit.textContent = t('save') || 'Save';
+  actions.appendChild(cancel); actions.appendChild(submit); form.appendChild(actions);
+  form.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const values = {};
+    Object.keys(inputs).forEach(k => { if (inputs[k].value.trim()) values[k] = inputs[k].value.trim(); });
+    const allowKey = p.fields.length ? null : null;
+    values[_chAllowAllEnv(p.key)] = box.checked ? 'true' : 'false';
+    submit.disabled = true; err.style.display = 'none';
+    try {
+      const r = await api('/api/gateway/channels/configure', { method: 'POST', body: JSON.stringify({ platform: p.key, values }), timeoutToast: false });
+      if (!r || !r.ok) throw new Error((r && r.error) || _intgT('channels_failed', 'Channel action failed.'));
+      showToast(_intgT('channels_saved', 'Channel saved. Restart the gateway to apply.'));
+      dialog.close(); dialog.remove();
+      Object.keys(inputs).forEach(k => { inputs[k].value = ''; });
+      await chLoadChannels();
+    } catch (e) {
+      err.textContent = (e && e.message) || _intgT('channels_failed', 'Channel action failed.'); err.style.display = '';
+      submit.disabled = false;
+    }
+  });
+  dialog.appendChild(form); document.body.appendChild(dialog); dialog.showModal();
+}
+
+function _chAllowAllEnv(key) {
+  return { telegram: 'TELEGRAM_ALLOW_ALL_USERS', whatsapp_cloud: 'WHATSAPP_CLOUD_ALLOW_ALL_USERS', slack: 'SLACK_ALLOW_ALL_USERS',
+           teams: 'TEAMS_ALLOW_ALL_USERS', discord: 'DISCORD_ALLOW_ALL_USERS', google_chat: 'GOOGLE_CHAT_ALLOW_ALL_USERS' }[key] || '';
+}
+
+async function chDisable(key) {
+  if (!confirm(_chLabel(key) + ': ' + _intgT('channels_disable', 'Disconnect') + '?')) return;
+  try {
+    const r = await api('/api/gateway/channels/disable', { method: 'POST', body: JSON.stringify({ platform: key }), timeoutToast: false });
+    if (!r || !r.ok) throw new Error((r && r.error) || '');
+    showToast(_intgT('channels_disabled', 'Channel disconnected. Restart the gateway to apply.'));
+    await chLoadChannels();
+  } catch (e) { showToast((e && e.message) || _intgT('channels_failed', 'Channel action failed.')); }
+}
+
+async function chRestartGateway() {
+  try {
+    showToast(_intgT('channels_restarting', 'Restarting the gateway. This takes about two minutes.'));
+    const r = await api('/api/gateway/restart', { method: 'POST', body: '{}', timeoutToast: false, timeoutMs: 120000 });
+    if (r && r.ok === false) throw new Error(r.error || '');
+    if (typeof loadGatewayStatus === 'function') loadGatewayStatus();
+  } catch (e) { showToast((e && e.message) || _intgT('channels_failed', 'Channel action failed.')); }
+}
+
+function _chPersonPickerHtml(id) {
+  return '<input type="text" id="' + id + '" data-sp-picker data-sp-source="people" data-sp-custom="0" placeholder="' + _intgEsc(_intgT('channels_pick_person', 'Pick a person')) + '">';
+}
+
+function chRenderPending() {
+  const host = $('intgChannelPending');
+  if (!host || !_chState) return;
+  const pending = (_chState.pairing && _chState.pairing.pending) || [];
+  if (!_chState.pairing || !_chState.pairing.available) {
+    host.innerHTML = '<div class="intg-muted">' + _intgT('channels_engine_missing', 'Pairing store not available on this server.') + '</div>';
+    return;
+  }
+  if (!pending.length) { host.innerHTML = ''; return; }
+  const engineToKey = { telegram: 'telegram', whatsapp_cloud: 'whatsapp_cloud', whatsapp: 'whatsapp_cloud', slack: 'slack', teams: 'teams', discord: 'discord', google_chat: 'google_chat' };
+  host.innerHTML = '<div class="ch-pending"><div class="ch-pending-title">' + _intgT('channels_pending_title', 'Waiting for approval') + '</div>'
+    + pending.map((r, i) => {
+      const key = engineToKey[r.platform] || r.platform;
+      const who = _intgT('channels_pending_row', '{name} on {platform} asked for access {age} min ago')
+        .replace('{name}', r.user_name || r.user_id || '?').replace('{platform}', _chLabel(key)).replace('{age}', String(r.age_minutes || 0));
+      return '<div class="ch-pending-row" data-platform="' + _intgEsc(key) + '" data-request="' + _intgEsc(r.request_id || '') + '">'
+        + '<span class="ch-pending-who">' + _intgEsc(who) + ' <code>' + _intgEsc(String(r.user_id || '')) + '</code></span>'
+        + _chPersonPickerHtml('chPendingPerson' + i)
+        + '<button type="button" class="sm-btn primary" ' + (r.request_id ? '' : 'disabled ') + 'onclick="chApprove(this, \'chPendingPerson' + i + '\')">' + _intgT('channels_approve_btn', 'Approve') + '</button>'
+        + '</div>';
+    }).join('') + '</div>';
+  if (window.SpPicker) SpPicker.mountAll(host);
+}
+
+async function chApprove(btn, pickerId) {
+  const row = btn.closest('.ch-pending-row');
+  const email = (document.getElementById(pickerId) || {}).value || '';
+  if (!email) { showToast(_intgT('channels_pick_person', 'Pick a person')); return; }
+  btn.disabled = true;
+  try {
+    const r = await api('/api/gateway/pairing/approve', { method: 'POST', timeoutToast: false,
+      body: JSON.stringify({ platform: row.dataset.platform, request_id: row.dataset.request, email: String(email).split(',')[0].trim() }) });
+    if (!r || !r.ok) throw new Error((r && r.error) || '');
+    showToast(_intgT('channels_approved', 'Access approved.'));
+    await chLoadChannels();
+  } catch (e) { btn.disabled = false; showToast((e && e.message) || _intgT('channels_failed', 'Channel action failed.')); }
+}
+
+function chRenderPeople() {
+  const host = $('intgChannelPeople');
+  if (!host || !_chState) return;
+  const people = _chState.people || [];
+  const platforms = _chState.platforms || [];
+  const rows = people.map(r => '<tr>'
+    + '<td>' + _intgEsc(_chLabel(r.platform)) + '</td>'
+    + '<td><code>' + _intgEsc(r.user_id) + '</code>' + (r.name ? ' <span class="intg-muted">' + _intgEsc(r.name) + '</span>' : '') + '</td>'
+    + '<td class="ch-person">' + (typeof _personAvatarHtml === 'function' ? _personAvatarHtml(r.email, r.email, 22) : '') + '<span>' + _intgEsc(r.email) + '</span></td>'
+    + '<td><button type="button" class="sm-btn" onclick="chRemovePerson(\'' + _intgEsc(r.platform) + '\',\'' + _intgEsc(r.user_id) + '\')">' + _intgT('channels_remove', 'Remove') + '</button></td>'
+    + '</tr>').join('');
+  host.innerHTML = (people.length
+    ? '<div class="intg-table-wrap"><table class="ch-people-table"><thead><tr><th>' + _intgT('channels_platform', 'Platform') + '</th><th>' + _intgT('channels_user_id', 'Platform user id') + '</th><th>' + _intgT('channels_person', 'Person') + '</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+    : '<div class="intg-muted">' + _intgT('channels_no_people', 'Nobody is mapped yet. Approve a pairing request or map a person by id.') + '</div>')
+    + '<div class="ch-people-add">'
+    + '<label>' + _intgT('channels_platform', 'Platform') + '<select id="chAddPlatform">' + platforms.map(p => '<option value="' + _intgEsc(p.key) + '">' + _intgEsc(p.label) + '</option>').join('') + '</select></label>'
+    + '<label>' + _intgT('channels_user_id', 'Platform user id') + '<input type="text" id="chAddUserId" placeholder="' + _intgEsc((platforms[0] || {}).user_id_hint || '') + '"></label>'
+    + '<label>' + _intgT('channels_person', 'Person') + _chPersonPickerHtml('chAddPerson') + '</label>'
+    + '<button type="button" class="sm-btn primary" onclick="chAddPerson()">' + _intgT('channels_add_person', '+ Map a person') + '</button>'
+    + '</div>';
+  const sel = $('chAddPlatform');
+  if (sel) sel.addEventListener('change', () => { const p = platforms.find(x => x.key === sel.value); const inp = $('chAddUserId'); if (inp && p) inp.placeholder = p.user_id_hint || ''; });
+  if (window.SpPicker) SpPicker.mountAll(host);
+}
+
+async function chAddPerson() {
+  const platform = ($('chAddPlatform') || {}).value, userId = (($('chAddUserId') || {}).value || '').trim();
+  const email = String(($('chAddPerson') || {}).value || '').split(',')[0].trim();
+  if (!platform || !userId || !email) { showToast(_intgT('channels_pick_person', 'Pick a person')); return; }
+  try {
+    const r = await api('/api/gateway/identities/set', { method: 'POST', timeoutToast: false, body: JSON.stringify({ platform, user_id: userId, email }) });
+    if (!r || !r.ok) throw new Error((r && r.error) || '');
+    showToast(_intgT('channels_person_saved', 'Person mapped.'));
+    await chLoadChannels();
+  } catch (e) { showToast((e && e.message) || _intgT('channels_failed', 'Channel action failed.')); }
+}
+
+async function chRemovePerson(platform, userId) {
+  try {
+    const r = await api('/api/gateway/identities/remove', { method: 'POST', timeoutToast: false, body: JSON.stringify({ platform, user_id: userId }) });
+    if (!r || !r.ok) throw new Error((r && r.error) || '');
+    showToast(_intgT('channels_person_removed', 'Mapping removed.'));
+    await chLoadChannels();
+  } catch (e) { showToast((e && e.message) || _intgT('channels_failed', 'Channel action failed.')); }
+}
+
+if (typeof window !== 'undefined') {
+  Object.assign(window, { chLoadChannels, chOpenConfigure, chDisable, chRestartGateway, chApprove, chAddPerson, chRemovePerson });
+}

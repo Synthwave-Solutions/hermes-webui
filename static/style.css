@@ -8201,3 +8201,28 @@ html[data-nav-audience="member"]:not([data-advanced-chat-controls="1"]) #compose
 .gov-table td .sp-picker-control{min-height:var(--sp-control-h-sm);padding:3px 32px 3px 6px;}
 .gov-table td .sp-chip{font-size:11.5px;padding:2px 4px 2px 8px;}
 .gov-form-row .sp-picker,.detail-row-value .sp-picker{width:100%;}
+
+/* ── Messaging channels (Connections) ── */
+.intg-channels{margin-bottom:22px;}
+.intg-channels-title{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.intg-channels-intro{margin:-4px 0 12px;max-width:72ch;}
+.ch-card-status{display:flex;gap:6px;flex-wrap:wrap;}
+.ch-card-summary{font-size:12px;color:var(--muted);line-height:1.45;}
+.ch-card-meta{font-size:11px;color:var(--muted);}
+.ch-pending{border:1px solid var(--warning,#e8a44c);border-radius:12px;padding:12px 14px;margin:14px 0;background:color-mix(in srgb,var(--warning,#e8a44c) 8%,transparent);}
+.ch-pending-title{font-weight:700;font-size:13px;margin-bottom:8px;}
+.ch-pending-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--border);}
+.ch-pending-row:first-of-type{border-top:0;}
+.ch-pending-row .ch-pending-who{flex:1;min-width:200px;font-size:13px;}
+.ch-pending-row .sp-picker{min-width:220px;}
+.ch-people-table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px;}
+.ch-people-table th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);}
+.ch-people-table td{padding:8px;border-bottom:1px solid var(--border);vertical-align:middle;}
+.ch-people-table td.ch-person{display:flex;align-items:center;gap:8px;}
+.ch-people-add{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-top:12px;padding:12px;border:1px dashed var(--border);border-radius:12px;}
+.ch-people-add label{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--muted);min-width:180px;flex:1;}
+.ch-people-add label .sp-picker,.ch-people-add label select,.ch-people-add label input{min-width:0;}
+.ch-field{display:flex;flex-direction:column;gap:4px;margin:10px 0;}
+.ch-field label{font-size:12px;font-weight:600;color:var(--text);}
+.ch-field .ch-hint{font-size:11px;color:var(--muted);}
+.ch-field-toggle{display:flex;align-items:center;gap:8px;font-size:13px;margin:12px 0;}

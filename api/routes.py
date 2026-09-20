@@ -559,11 +559,33 @@ def _session_visible_to_request(session, handler=None) -> bool:
     from api.group_chat import visible_to_scope as _group_visible_to_scope
     from api.ownership import request_owner_scope
 
-    return _group_visible_to_scope(
+    if _group_visible_to_scope(
         getattr(session, "owner_email", None),
         getattr(session, "participants", None),
         request_owner_scope(handler),
-    )
+    ):
+        return True
+    return _messaging_session_visible_to_mapped_person(session, handler)
+
+
+def _messaging_session_visible_to_mapped_person(session, handler) -> bool:
+    """A Telegram/Slack/... conversation belongs to the colleague mapped to
+    that platform user (Connections, Messaging channels), even though the
+    gateway stamps no owner_email on it. Admins already see everything."""
+    try:
+        if getattr(session, "owner_email", None):
+            return False
+        meta = _load_gateway_session_identity_map().get(str(getattr(session, "session_id", "") or ""))
+        if not meta or not meta.get("platform") or not meta.get("user_id"):
+            return False
+        from api.gateway_channels import mapped_email
+        from api.ownership import request_owner_email
+        email = mapped_email(str(meta.get("platform")), meta.get("user_id"))
+        me = str(request_owner_email(handler) or "").strip().lower()
+        return bool(email and me and email == me)
+    except Exception:
+        logger.debug("messaging session identity lookup failed", exc_info=True)
+        return False
 
 
 def _request_owner_email_for_new_session(handler):
@@ -13667,6 +13689,11 @@ def handle_get(handler, parsed) -> bool:
     if parsed.path == "/api/gateway/status":
         return j(handler, _gateway_status_payload())
 
+    # ── Messaging channels: platforms, pairing, who-is-who (GET) ──
+    if parsed.path == "/api/gateway/channels":
+        from api.gateway_channels import handle_get as _channels_get
+        return _channels_get(handler, parsed.path)
+
     # ── MCP Servers (GET) ──
     if parsed.path == "/api/mcp/servers":
         return _handle_mcp_servers_list(handler)
@@ -15649,6 +15676,11 @@ def handle_post(handler, parsed) -> bool:
 
     if parsed.path in {"/api/gateway/start", "/api/gateway/stop", "/api/gateway/restart"}:
         return _handle_gateway_lifecycle(handler, parsed.path.rsplit("/", 1)[-1], body)
+
+    if parsed.path.startswith("/api/gateway/channels/") or parsed.path.startswith("/api/gateway/identities/") \
+            or parsed.path.startswith("/api/gateway/pairing/"):
+        from api.gateway_channels import handle_post as _channels_post
+        return _channels_post(handler, parsed.path, body)
 
     # ── Profile API (POST) ──
     if parsed.path == "/api/profile/switch":

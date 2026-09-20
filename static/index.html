@@ -1062,6 +1062,19 @@
         <div class="main-view-content intg-content">
           <div id="intgNotice" style="display:none"></div>
           <div id="intgRequests" style="display:none"></div>
+          <section id="intgChannels" class="intg-channels" style="display:none">
+            <div class="intg-section-title intg-channels-title">
+              <span data-i18n="channels_title">Messaging channels</span>
+              <span class="intg-channels-actions">
+                <button type="button" class="sm-btn" onclick="chRestartGateway()" data-i18n="channels_restart_gateway">Restart gateway</button>
+              </span>
+            </div>
+            <p class="intg-muted intg-channels-intro" data-i18n="channels_intro">Connect the bot to the chat tools your organisation uses. Each person on a platform is mapped to a person on this workstation, so the same governance applies there.</p>
+            <div id="intgChannelGrid" class="intg-grid"><div class="intg-muted" data-i18n="loading">Loading...</div></div>
+            <div id="intgChannelPending"></div>
+            <div class="intg-section-title" data-i18n="channels_people_title">People on channels</div>
+            <div id="intgChannelPeople"></div>
+          </section>
           <div class="intg-section-title" id="intgConnectionsTitle" data-i18n="integrations_my_connections">My connections</div>
           <div id="intgConnections"><div class="intg-muted" data-i18n="loading">Loading...</div></div>
           <div class="intg-section-title" data-i18n="integrations_catalog">Available services</div>
