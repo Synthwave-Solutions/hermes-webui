@@ -41,10 +41,11 @@
       card.dataset.skillLearningNotice = row.id;
       card.className = 'skill-learning-notice';
       const copy = document.createElement('div');
+      const inTurn = row.source === 'turn';
       const labels = [
-        ['created', tr('skill_learning_created', 'Skill automatically created')],
-        ['patched', tr('skill_learning_patched', 'Skill automatically patched')],
-        ['updated', tr('skill_learning_updated', 'Skill automatically updated')],
+        ['created', inTurn ? tr('skill_created', 'Skill created') : tr('skill_learning_created', 'Skill automatically created')],
+        ['patched', inTurn ? tr('skill_updated', 'Skill updated') : tr('skill_learning_patched', 'Skill automatically patched')],
+        ['updated', inTurn ? tr('skill_updated', 'Skill updated') : tr('skill_learning_updated', 'Skill automatically updated')],
       ];
       const named = {created: 0, patched: 0, updated: 0};
       for (const skill of row.skills || []) {
