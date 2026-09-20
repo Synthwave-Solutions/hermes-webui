@@ -22382,6 +22382,10 @@ def _handle_cron_create(handler, body):
             )
         if not toast_notifications:
             post_create_updates["toast_notifications"] = False
+        # Optional Mermaid flowchart of the automation, shown in the task detail.
+        _diagram = body.get("diagram")
+        if isinstance(_diagram, str) and _diagram.strip():
+            post_create_updates["diagram"] = _diagram.strip()[:20000]
         # Stamp the creator, as chat-created jobs already are, so completion
         # notifications and the ownership rule in api/cron_scope.py reach the
         # person who scheduled it from the Tasks panel. No stamp without a

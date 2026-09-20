@@ -1203,6 +1203,102 @@ function _cronScriptCardHtml(job){
       </div>`;
 }
 
+// ── Automation diagram (Mermaid) ─────────────────────────────────────────────
+// Every job gets a flowchart in its detail view: what it reads, what runs, where
+// the result goes. Source order: the job's own `diagram` field (set from the
+// Tasks form or by the automation skill), a ```mermaid fence inside the prompt
+// (the only channel a governed agent has when it creates a job from chat), and
+// otherwise a diagram derived from the job's settings and a keyword scan.
+const _CRON_DIAGRAM_SOURCES = [
+  [/\bgmail\b|\bmail(box)?\b|\be-?mail\b|inbox/i, 'Gmail'],
+  [/calendar|agenda/i, 'Google Calendar'],
+  [/google chat|gchat|\bchat space|spaces\//i, 'Google Chat'],
+  [/\bnotion\b/i, 'Notion'],
+  [/\battio\b/i, 'Attio'],
+  [/fireflies/i, 'Fireflies'],
+  [/github|\bgh\b|pull request|\bissue/i, 'GitHub'],
+  [/\bbunq\b/i, 'bunq'],
+  [/lemlist|lemno/i, 'Lemlist'],
+  [/linkedin/i, 'LinkedIn'],
+  [/productive/i, 'Productive'],
+  [/whatsapp|waapi/i, 'WhatsApp'],
+  [/google drive|\bdrive\b/i, 'Google Drive'],
+  [/supabase/i, 'Supabase'],
+  [/telegram/i, 'Telegram'],
+  [/omniroute/i, 'OmniRoute'],
+  [/ragflow/i, 'RAGFlow'],
+  [/obsidian/i, 'Obsidian'],
+  [/marktplaats|mpbot|pareltje/i, 'Marktplaats'],
+  [/\bweb\b|https?:\/\/|website|scrape/i, 'Web'],
+];
+const _CRON_DIAGRAM_WRITES = [
+  [/\blabel|archiv|mark(ed)? as|update(s|d)? (the )?(status|row|record|page)|schrijf|write(s)? (to|back)|status (naar|to)/i, 'updates source records'],
+  [/backup|back-up/i, 'writes a backup'],
+  [/commit|push\b/i, 'commits to git'],
+  [/draft/i, 'creates drafts'],
+  [/token|refresh(es)? (the )?(oauth|token)/i, 'refreshes tokens'],
+];
+function _mermaidLabel(text){
+  return '"' + String(text || '').replace(/["\[\]{}()<>|]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60) + '"';
+}
+function _cronDiagramFromPrompt(prompt){
+  const m = /```mermaid[^\n]*\n([\s\S]*?)```/i.exec(String(prompt || ''));
+  return m ? m[1].trim() : '';
+}
+function _cronDerivedDiagram(job){
+  const text = [job.name, job.prompt, job.script, (job.skills || []).join(' ')].join('\n');
+  const sources = [];
+  for (const [re, label] of _CRON_DIAGRAM_SOURCES) {
+    if (re.test(text) && !sources.includes(label)) sources.push(label);
+  }
+  const writes = [];
+  for (const [re, label] of _CRON_DIAGRAM_WRITES) {
+    if (re.test(text) && !writes.includes(label)) writes.push(label);
+  }
+  const schedule = job.schedule_display || (job.schedule && (job.schedule.display || job.schedule.expr)) || 'schedule';
+  const isScript = !!job.no_agent;
+  const runner = isScript
+    ? 'Script: ' + String(job.script || '').split('/').pop()
+    : 'Agent' + (Array.isArray(job.skills) && job.skills.length ? ' + ' + job.skills.slice(0, 3).join(', ') + (job.skills.length > 3 ? ' ...' : '') : '');
+  const deliver = String(job.deliver || 'local');
+  let out;
+  if (deliver === 'local') out = /google chat|gchat/i.test(text) ? 'Google Chat (sent by the script)' : /whatsapp|waapi/i.test(text) ? 'WhatsApp (sent by the script)' : 'run output only';
+  else if (deliver === 'origin') out = 'this conversation';
+  else out = deliver;
+  const lines = ['flowchart LR', `  T([${_mermaidLabel('schedule ' + schedule)}]) --> R`];
+  if (sources.length) {
+    lines.push('  subgraph Sources');
+    sources.slice(0, 6).forEach((s, i) => lines.push(`    S${i}[${_mermaidLabel(s)}]`));
+    lines.push('  end');
+    sources.slice(0, 6).forEach((_, i) => lines.push(`  S${i} --> R`));
+  }
+  lines.push(`  R[${_mermaidLabel(runner)}]`);
+  lines.push(`  R --> O[${_mermaidLabel(out)}]`);
+  writes.slice(0, 3).forEach((w, i) => lines.push(`  R -.-> W${i}[${_mermaidLabel(w)}]`));
+  return lines.join('\n');
+}
+function _cronDiagramSource(job){
+  const field = typeof job.diagram === 'string' ? job.diagram.trim() : '';
+  if (field) return { code: field, source: 'field' };
+  const fromPrompt = _cronDiagramFromPrompt(job.prompt);
+  if (fromPrompt) return { code: fromPrompt, source: 'prompt' };
+  return { code: _cronDerivedDiagram(job), source: 'derived' };
+}
+function _cronDiagramCardHtml(job){
+  const { code, source } = _cronDiagramSource(job);
+  const badge = source === 'field' ? (t('cron_diagram_from_plan') || 'from plan')
+    : source === 'prompt' ? (t('cron_diagram_from_prompt') || 'from prompt')
+    : (t('cron_diagram_derived') || 'derived from settings');
+  const domId = 'cron-' + String(job.id || '').replace(/[^a-zA-Z0-9_-]/g, '');
+  return `<div class="detail-card cron-diagram-card">
+        <div class="detail-card-title detail-card-title-row">
+          <span>${esc(t('cron_diagram_label') || 'Diagram')}</span>
+          <span class="detail-badge ${source === 'derived' ? 'derived' : 'active'}">${esc(badge)}</span>
+        </div>
+        <div class="mermaid-block cron-diagram" data-mermaid-id="${esc(domId)}">${esc(code)}</div>
+      </div>`;
+}
+
 function _cronAgentPromptCardHtml(job){
   const promptExpanded = _cronExpansionGet(_cronPanelExpandKey(job.id, 'prompt'));
   const promptToggleLabel = promptExpanded ? (t('cron_collapse_prompt') || 'Collapse prompt') : (t('cron_expand_prompt') || 'Expand prompt');
@@ -1288,6 +1384,7 @@ function _renderCronDetail(job){
         ${skillsRow}
         ${lastError}
       </div>
+      ${_cronDiagramCardHtml(job)}
       ${instructionCard}
       <div class="detail-card ${!isReadOnly && _cronNewJobIds.has(String(job.id)) ? 'has-new-run' : ''}" id="cronDetailRuns">
         <div class="detail-card-title">${esc(outputTitle)}</div>
@@ -1296,6 +1393,7 @@ function _renderCronDetail(job){
     </div>`;
   body.style.display = '';
   if (empty) empty.style.display = 'none';
+  if (typeof renderMermaidBlocks === 'function') { try { renderMermaidBlocks(body); } catch (_) {} }
   _cronMode = 'read';
   _setCronHeaderButtons('read', job);
   // Load runs asynchronously
@@ -1532,6 +1630,7 @@ function duplicateCurrentCron(){
     script: job.script || '',
     model: job.model || '',
     provider: job.provider || '',
+    diagram: job.diagram || '',
     isEdit: false,
   });
   if (!_cronSkillsCache) {
@@ -1590,6 +1689,7 @@ function openCronEdit(job){
     script: job.script || '',
     model: job.model || '',
     provider: job.provider || '',
+    diagram: job.diagram || '',
     isEdit: true,
   });
   if (!_cronSkillsCache) {
@@ -1600,7 +1700,7 @@ function openCronEdit(job){
   loadCronProfiles().then(()=>_refreshCronProfileSelect(job.profile || '')).catch(()=>{});
 }
 
-function _renderCronForm({ name, schedule, prompt, deliver, profile, toast_notifications=true, no_agent=false, script='', model='', provider='', isEdit }){
+function _renderCronForm({ name, schedule, prompt, deliver, profile, toast_notifications=true, no_agent=false, script='', model='', provider='', diagram='', isEdit }){
   _disposeCronSkillPicker();
   const title = $('taskDetailTitle');
   const body = $('taskDetailBody');
@@ -1683,6 +1783,11 @@ function _renderCronForm({ name, schedule, prompt, deliver, profile, toast_notif
         </div>
         ${scriptBlock}
         ${promptBlock}
+        <div class="detail-form-row">
+          <label for="cronFormDiagram">${esc(t('cron_diagram_form_label') || 'Diagram (Mermaid)')}</label>
+          <textarea id="cronFormDiagram" rows="5" placeholder="flowchart LR&#10;  T([every workday 08:00]) --> R[Agent + google-workspace]&#10;  R --> O[this conversation]" spellcheck="false">${esc(diagram || '')}</textarea>
+          <div class="detail-form-hint">${esc(t('cron_diagram_form_hint') || 'Optional flowchart of what this automation reads, does and writes. Shown in the task detail; without it a diagram is derived from the settings.')}</div>
+        </div>
         <div class="detail-form-row">
           <label for="cronFormDeliver">${esc(t('cron_deliver_label') || 'Deliver output to')}</label>
           <select id="cronFormDeliver">
@@ -1934,6 +2039,7 @@ async function saveCronForm(){
   const delivEl=$('cronFormDeliver');
   const profileEl=$('cronFormProfile');
   const toastEl=$('cronFormToastNotifications');
+  const diagramEl=$('cronFormDiagram');
   const errEl=$('cronFormError');
   if(!schEl||!errEl) return;
   const isNoAgent = !!(_cronPreFormDetail && _cronPreFormDetail.no_agent);
@@ -1944,6 +2050,7 @@ async function saveCronForm(){
   const deliver=delivEl?delivEl.value:'local';
   const profile=profileEl?profileEl.value:'';
   const toastNotifications=toastEl?!!toastEl.checked:true;
+  const diagram=diagramEl?diagramEl.value.trim():'';
   errEl.style.display='none';
   if(!schedule){errEl.textContent=t('cron_schedule_required_example');errEl.style.display='';return;}
   if(!isNoAgent && !prompt){errEl.textContent=t('cron_prompt_required');errEl.style.display='';return;}
@@ -1954,6 +2061,7 @@ async function saveCronForm(){
     if (_editingCronId) {
       const updates = {job_id: _editingCronId, schedule, profile: profile, toast_notifications: toastNotifications};
       if (!isNoAgent) updates.prompt = prompt;
+      if (diagramEl) updates.diagram = diagram;
       if (name) updates.name = name;
       if (deliver) updates.deliver = deliver;
       if (modelEl) {
@@ -1982,6 +2090,7 @@ async function saveCronForm(){
     const body={schedule,prompt,deliver,profile: profile, toast_notifications: toastNotifications};
     if(_cronIsDuplicate) body.enabled=false;
     if(name)body.name=name;
+    if(diagram)body.diagram=diagram;
     if(_cronSelectedSkills.length)body.skills=_cronSelectedSkills;
     if (modelEl && modelLoaded) {
       if (selectedModel) {
