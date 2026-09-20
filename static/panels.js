@@ -1425,6 +1425,16 @@ async function spKnownCategories(){
 }
 if (window.SpPicker) {
   SpPicker.sources['sp:categories'] = () => spKnownCategories();
+  SpPicker.sources['skills:categories'] = async () => {
+    let skills = _skillsData;
+    if (!skills) { try { skills = (await api('/api/skills', { timeoutToast: false })).skills || []; } catch (_e) { skills = []; } }
+    const seen = new Set();
+    const out = [];
+    for (const sk of skills) { const c = String(sk.category || '').trim(); if (c && !seen.has(c)) { seen.add(c); out.push(c); } }
+    out.sort((a, b) => a.localeCompare(b));
+    const shared = (await spKnownCategories()).map(c => String(typeof c === 'string' ? c : c.value).toLowerCase().replace(/\s+/g, '-'));
+    return out.concat(shared.filter(c => c && !seen.has(c) && seen.add(c)).map(c => ({ value: c, label: c, hint: t('cron_category_suggested') || 'suggested' })));
+  };
   SpPicker.sources['cron:categories'] = () => spKnownCategories();
 }
 // Render a sidebar list grouped by category: collapsible sections with a
@@ -5685,7 +5695,8 @@ function _renderSkillForm({ name, category, content, isEdit }) {
         </div>
         <div class="detail-form-row">
           <label for="skillFormCategory">${esc(t('skill_category') || 'Category')}</label>
-          <input type="text" id="skillFormCategory" value="${esc(category || '')}" placeholder="${esc(t('skill_category_placeholder') || 'Optional, e.g. devops')}" autocomplete="off">
+          <input type="hidden" id="skillFormCategory" data-sp-picker data-sp-source="skills:categories" data-sp-custom="1" value="${esc(category || '')}" placeholder="${esc(t('skill_category_placeholder') || 'Pick a category or add one')}">
+          <div class="detail-form-hint">${esc(t('skill_category_hint') || 'The folder the skill lives in; groups it in the Skills library.')}</div>
         </div>
         <div class="detail-form-row">
           <label for="skillFormContent">${esc(t('skill_content') || 'SKILL.md content')}</label>
@@ -5696,8 +5707,9 @@ function _renderSkillForm({ name, category, content, isEdit }) {
     </div>`;
   body.style.display = '';
   if (empty) empty.style.display = 'none';
+  if (window.SpPicker) SpPicker.mountAll(body);
   _setSkillHeaderButtons(isEdit ? 'edit' : 'create');
-  const focusEl = isEdit ? $('skillFormCategory') : $('skillFormName');
+  const focusEl = isEdit ? body.querySelector('.sp-picker:has(#skillFormCategory) .sp-picker-control') : $('skillFormName');
   if (focusEl) focusEl.focus();
 }
 
@@ -5730,7 +5742,8 @@ async function saveSkillForm() {
   const errEl = $('skillFormError');
   if (!nameInput || !contentInput || !errEl) return;
   const name = (nameInput.value || '').trim().toLowerCase().replace(/\s+/g, '-');
-  const category = (catInput ? (catInput.value || '').trim() : '');
+  // Skill categories are folder names: lowercase, dashes for spaces.
+  const category = (catInput ? String(catInput.value || '').trim().toLowerCase().replace(/\s+/g, '-') : '');
   const content = contentInput.value;
   errEl.style.display = 'none';
   if (!name) { errEl.textContent = t('skill_name_required'); errEl.style.display = ''; return; }

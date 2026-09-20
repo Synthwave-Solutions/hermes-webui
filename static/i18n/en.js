@@ -2103,7 +2103,7 @@ window.__registerHermesLocale('en', {
     // skill form
     skill_name: 'Name',
     skill_category: 'Category',
-    skill_category_placeholder: 'Optional, e.g. devops',
+    skill_category_placeholder: 'Pick a category or add one',
     skill_content: 'SKILL.md content',
     skill_content_placeholder: 'YAML frontmatter + markdown body',
     skill_rename_not_supported: 'Renaming a skill is not supported. Create a new skill and delete the old one to rename.',
@@ -2144,6 +2144,7 @@ window.__registerHermesLocale('en', {
     cron_category_change_title: 'Category',
     cron_category_suggested: 'suggested',
     category_label: 'Category',
+    skill_category_hint: 'The folder the skill lives in; groups it in the Skills library.',
     projects_category_placeholder: 'Category (optional)',
     cron_emoji_change: 'Change emoji',
     cron_share_title: 'Share this task',
