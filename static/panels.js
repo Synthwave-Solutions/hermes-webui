@@ -1090,7 +1090,42 @@ async function loadCrons(animate) {
       if (_cronMode !== 'create' && _cronMode !== 'edit') _clearCronDetail();
       return;
     }
-    for (const entry of _activeJobs) _appendCronItem(box, entry);
+    // Group active jobs by category (department, team, theme) the way Projects
+    // group chats. Jobs without a category form the last group; when nobody
+    // has set a category yet the list stays flat.
+    const _groups = new Map();
+    for (const entry of _activeJobs) {
+      const key = String(entry.job.category || '').trim();
+      if (!_groups.has(key)) _groups.set(key, []);
+      _groups.get(key).push(entry);
+    }
+    const _groupKeys = [..._groups.keys()].filter(Boolean).sort((a, b) => a.localeCompare(b));
+    if (!_groupKeys.length) {
+      for (const entry of _activeJobs) _appendCronItem(box, entry);
+    } else {
+      if (_groups.has('')) _groupKeys.push('');
+      for (const key of _groupKeys) {
+        const entries = _groups.get(key) || [];
+        const details = document.createElement('details');
+        details.className = 'cron-group';
+        const storeKey = 'cron-group-collapsed:' + (key || '__none__');
+        let collapsed = false;
+        try { collapsed = localStorage.getItem(storeKey) === '1'; } catch (_e) {}
+        if (!collapsed) details.open = true;
+        const summary = document.createElement('summary');
+        summary.className = 'cron-group-summary';
+        summary.innerHTML = `<span class="cron-group-name">${esc(key || (t('cron_category_none') || 'No category'))}</span><span class="cron-group-count">${entries.length}</span>`;
+        details.appendChild(summary);
+        details.addEventListener('toggle', () => {
+          try { localStorage.setItem(storeKey, details.open ? '0' : '1'); } catch (_e) {}
+        });
+        const inner = document.createElement('div');
+        inner.className = 'cron-group-inner';
+        for (const entry of entries) _appendCronItem(inner, entry);
+        details.appendChild(inner);
+        box.appendChild(details);
+      }
+    }
     if (_pausedJobs.length) {
       let collapsed = true;
       try { collapsed = localStorage.getItem('cron-paused-collapsed') !== '0'; } catch (_e) {}
@@ -1322,7 +1357,10 @@ function _cronMetaBarHtml(job){
   const chips = shared.map(e => `<span class="cron-share-chip" title="${esc(e)}">${esc(String(e).split('@')[0])}</span>`).join('');
   const shareLink = job.read_only ? '' : `<button type="button" class="cron-link-btn" onclick="openCronShareDialog('${esc(job.id)}')">${esc(shared.length ? (t('cron_share_edit') || 'Change sharing') : (t('cron_share_button_long') || 'Share with colleagues'))}</button>`;
   const owner = job.origin && job.origin.user_id ? String(job.origin.user_id).split('@')[0] : '';
+  const category = String(job.category || '').trim();
+  const categoryLink = job.read_only ? '' : `<button type="button" class="cron-link-btn" onclick="openCronCategoryPopover('${esc(job.id)}')">${esc(category ? (t('cron_category_change') || 'Change') : (t('cron_category_set') || 'Set category'))}</button>`;
   return `<div class="cron-meta-bar">
+      <span class="cron-meta-item"><span class="cron-meta-label">${esc(t('cron_category_label') || 'Category')}</span>${category ? `<span class="cron-share-chip cron-category-chip">${esc(category)}</span>` : `<span class="cron-meta-muted">${esc(t('cron_category_none') || 'No category')}</span>`}${categoryLink}</span>
       <span class="cron-meta-item"><span class="cron-meta-label">${esc(t('cron_shared_with_label') || 'Shared with')}</span>${chips || `<span class="cron-meta-muted">${esc(t('cron_share_nobody') || 'nobody yet')}</span>`}${shareLink}</span>
       ${owner ? `<span class="cron-meta-item"><span class="cron-meta-label">${esc(t('cron_owner_label') || 'Owner')}</span><span class="cron-share-chip">${esc(owner)}</span></span>` : ''}
     </div>`;
@@ -1359,6 +1397,51 @@ async function _saveCronEmoji(jobId, emoji){
     await api('/api/crons/update', { method: 'POST', body: JSON.stringify({ job_id: jobId, emoji: String(emoji || '').trim() }) });
     _closeCronEmojiPopover();
     await loadCrons();
+  } catch (e) { showToast((t('error_prefix') || 'Error: ') + e.message, 5000, 'error'); }
+}
+
+// Category: one label per task that groups the list (department, team, theme).
+// Existing categories feed the picker so people pick before they type.
+if (window.SpPicker) {
+  SpPicker.sources['cron:categories'] = () => {
+    const seen = new Set();
+    const out = [];
+    for (const job of (_cronList || [])) { const c = String(job.category || '').trim(); if (c && !seen.has(c)) { seen.add(c); out.push(c); } }
+    for (const c of ['Sales', 'Marketing', 'Finance', 'Delivery', 'Engineering', 'Platform', 'Management', 'Family']) { if (!seen.has(c)) { seen.add(c); out.push({ value: c, label: c, hint: t('cron_category_suggested') || 'suggested' }); } }
+    return out;
+  };
+}
+let _cronCategoryOverlay = null;
+function _closeCronCategoryPopover(){ if (_cronCategoryOverlay) { _cronCategoryOverlay.remove(); _cronCategoryOverlay = null; } document.removeEventListener('keydown', _cronCategoryEscape, true); }
+function _cronCategoryEscape(e){ if (e.key === 'Escape') { e.preventDefault(); _closeCronCategoryPopover(); } }
+function openCronCategoryPopover(jobId){
+  const job = (_cronList || []).find(j => String(j.id) === String(jobId)) || _currentCronDetail;
+  if (!job || job.read_only) return;
+  _closeCronCategoryPopover();
+  const overlay = document.createElement('div');
+  overlay.className = 'cron-share-overlay';
+  overlay.innerHTML = `<div class="cron-share-dialog detail-card" role="dialog" aria-modal="true">
+      <div class="detail-card-title">${esc(t('cron_category_change_title') || 'Category')}</div>
+      <p class="cron-share-hint">${esc(t('cron_category_hint') || 'Groups the task in the list, for example per department.')}</p>
+      <input type="hidden" id="cronCategoryPick" data-sp-picker data-sp-source="cron:categories" data-sp-custom="1" value="${esc(job.category || '')}" placeholder="${esc(t('cron_category_placeholder') || 'Pick a category or add one')}">
+      <div class="cron-share-actions">
+        <button type="button" class="cron-btn" onclick="_closeCronCategoryPopover()">${esc(t('cancel') || 'Cancel')}</button>
+        <button type="button" class="cron-btn run" onclick="_saveCronCategory('${esc(job.id)}', document.getElementById('cronCategoryPick').value)">${esc(t('save') || 'Save')}</button>
+      </div>
+    </div>`;
+  overlay.addEventListener('click', e => { if (e.target === overlay) _closeCronCategoryPopover(); });
+  document.body.appendChild(overlay);
+  _cronCategoryOverlay = overlay;
+  if (window.SpPicker) SpPicker.mountAll(overlay);
+  document.addEventListener('keydown', _cronCategoryEscape, true);
+}
+async function _saveCronCategory(jobId, category){
+  try {
+    await api('/api/crons/update', { method: 'POST', body: JSON.stringify({ job_id: jobId, category: String(category || '').trim() }) });
+    _closeCronCategoryPopover();
+    await loadCrons();
+    const job = (_cronList || []).find(j => String(j.id) === String(jobId));
+    if (job && _currentCronDetail && String(_currentCronDetail.id) === String(jobId)) openCronDetail(job);
   } catch (e) { showToast((t('error_prefix') || 'Error: ') + e.message, 5000, 'error'); }
 }
 
@@ -1843,6 +1926,7 @@ function openCronEdit(job){
     provider: job.provider || '',
     diagram: job.diagram || '',
     emoji: job.emoji || '',
+    category: job.category || '',
     isEdit: true,
   });
   if (!_cronSkillsCache) {
@@ -1853,7 +1937,7 @@ function openCronEdit(job){
   loadCronProfiles().then(()=>_refreshCronProfileSelect(job.profile || '')).catch(()=>{});
 }
 
-function _renderCronForm({ name, schedule, prompt, deliver, profile, toast_notifications=true, no_agent=false, script='', model='', provider='', diagram='', emoji='', isEdit }){
+function _renderCronForm({ name, schedule, prompt, deliver, profile, toast_notifications=true, no_agent=false, script='', model='', provider='', diagram='', emoji='', category='', isEdit }){
   _disposeCronSkillPicker();
   const title = $('taskDetailTitle');
   const body = $('taskDetailBody');
@@ -1900,6 +1984,11 @@ function _renderCronForm({ name, schedule, prompt, deliver, profile, toast_notif
           </div>
           <div id="cronEmojiGrid" class="cron-emoji-grid" style="display:none">${_cronEmojiGridHtml()}</div>
           <div class="detail-form-hint">${esc(t('cron_emoji_hint') || 'Shown in the task list and in the title.')}</div>
+        </div>
+        <div class="detail-form-row">
+          <label for="cronFormCategory">${esc(t('cron_category_label') || 'Category')}</label>
+          <input type="hidden" id="cronFormCategory" data-sp-picker data-sp-source="cron:categories" data-sp-custom="1" value="${esc(category || '')}" placeholder="${esc(t('cron_category_placeholder') || 'Pick a category or add one')}">
+          <div class="detail-form-hint">${esc(t('cron_category_hint') || 'Groups the task in the list, for example per department.')}</div>
         </div>
         <div class="detail-form-row">
           <label for="cronFormSchedulePreset">${esc(t('cron_schedule_preset_label') || 'Schedule')}</label>
@@ -1989,6 +2078,7 @@ function _renderCronForm({ name, schedule, prompt, deliver, profile, toast_notif
   _populateCronFormModelSelect(model, provider, isNoAgent);
   if (!isNoAgent) _renderCronSkillTags();
   _initCronSchedulePresetControls();
+  if (window.SpPicker) SpPicker.mountAll(body);
   const focusEl = $('cronFormName');
   if (focusEl) focusEl.focus();
 }
@@ -2204,6 +2294,7 @@ async function saveCronForm(){
   const toastEl=$('cronFormToastNotifications');
   const diagramEl=$('cronFormDiagram');
   const emojiEl=$('cronFormEmoji');
+  const categoryEl=$('cronFormCategory');
   const errEl=$('cronFormError');
   if(!schEl||!errEl) return;
   const isNoAgent = !!(_cronPreFormDetail && _cronPreFormDetail.no_agent);
@@ -2216,6 +2307,7 @@ async function saveCronForm(){
   const toastNotifications=toastEl?!!toastEl.checked:true;
   const diagram=diagramEl?diagramEl.value.trim():'';
   const emoji=emojiEl?emojiEl.value.trim():'';
+  const category=categoryEl?String(categoryEl.value||'').trim():'';
   errEl.style.display='none';
   if(!schedule){errEl.textContent=t('cron_schedule_required_example');errEl.style.display='';return;}
   if(!isNoAgent && !prompt){errEl.textContent=t('cron_prompt_required');errEl.style.display='';return;}
@@ -2228,6 +2320,7 @@ async function saveCronForm(){
       if (!isNoAgent) updates.prompt = prompt;
       if (diagramEl) updates.diagram = diagram;
       if (emojiEl) updates.emoji = emoji;
+      if (categoryEl) updates.category = category;
       if (name) updates.name = name;
       if (deliver) updates.deliver = deliver;
       if (modelEl) {
@@ -2258,6 +2351,7 @@ async function saveCronForm(){
     if(name)body.name=name;
     if(diagram)body.diagram=diagram;
     if(emoji)body.emoji=emoji;
+    if(category)body.category=category;
     if(_cronSelectedSkills.length)body.skills=_cronSelectedSkills;
     if (modelEl && modelLoaded) {
       if (selectedModel) {

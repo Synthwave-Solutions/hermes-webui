@@ -8126,6 +8126,19 @@ html[data-nav-audience="member"]:not([data-advanced-chat-controls="1"]) #compose
 .intg-badge.intg-badge-warn{color:var(--warning);border-color:color-mix(in srgb,var(--warning) 40%,transparent);background:color-mix(in srgb,var(--warning) 10%,transparent);}
 .intg-callback-hint code{display:inline-block;margin-top:4px;padding:3px 8px;border-radius:6px;background:var(--code-bg);color:var(--code-text);font-size:12px;word-break:break-all;user-select:all;}
 
+.cron-group{margin:0 0 6px;}
+.cron-group-summary{list-style:none;display:flex;align-items:center;gap:8px;padding:8px 6px 6px;cursor:pointer;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);user-select:none;}
+.cron-group-summary::-webkit-details-marker{display:none;}
+.cron-group-summary::before{content:"";width:6px;height:6px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(-45deg);margin:0 4px 1px 2px;transition:transform .15s var(--sp-ease);}
+.cron-group[open]>.cron-group-summary::before{transform:rotate(45deg);}
+.cron-group-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.cron-group-count{font-size:10px;font-weight:600;padding:1px 7px;border-radius:999px;background:var(--surface-subtle);border:1px solid var(--border-subtle);color:var(--muted);}
+.cron-group-inner{padding:0 0 2px;}
+.cron-category-chip{background:var(--accent-bg)!important;border-color:var(--accent-bg-strong)!important;color:var(--accent-text);font-weight:600;}
+.cron-share-hint{font-size:12.5px;color:var(--muted);margin:0 0 10px;line-height:1.5;}
+.cron-share-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;}
+.cron-share-dialog .sp-picker{margin-top:4px;}
+
 /* ── Picker: select-style control for people, roles, groups, skills, servers ── */
 .sp-picker{position:relative;min-width:0;width:100%;}
 .sp-picker-control{

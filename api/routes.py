@@ -13393,6 +13393,7 @@ def handle_get(handler, parsed) -> bool:
             from api.cron_scope import scope_cron_rows_for_caller
             active_jobs, other_jobs = scope_cron_rows_for_caller(handler, active_jobs, other_jobs)
         _promote_prompt_diagrams(active_jobs)
+        _promote_prompt_categories(active_jobs)
         jobs = active_jobs + other_jobs if all_profiles else active_jobs
         hidden_other_count = 0 if all_profiles else len(other_jobs)
         return j(handler, {
@@ -22406,6 +22407,48 @@ def _promote_prompt_diagrams(jobs, limit: int = 10) -> None:
         logger.debug("diagram promotion unavailable", exc_info=True)
 
 
+_CRON_CATEGORY_MAX = 40
+_CRON_PROMPT_CATEGORY_RE = re.compile(r"^\s*CATEGORY\s*:\s*([^\n]{1,60})\s*$", re.IGNORECASE | re.MULTILINE)
+
+
+def _normalize_cron_category(value):
+    """One short label to group tasks by (department, team, theme); empty clears it."""
+    text = " ".join(str(value or "").split())
+    return text[:_CRON_CATEGORY_MAX]
+
+
+def _cron_category_from_prompt(prompt):
+    """A ``CATEGORY: <label>`` line in a job prompt names its group. That is the
+    only channel a governed agent has through the cronjob tool, mirroring the
+    DIAGRAM section; the listing promotes it into the ``category`` field."""
+    match = _CRON_PROMPT_CATEGORY_RE.search(str(prompt or ""))
+    return _normalize_cron_category(match.group(1)) if match else ""
+
+
+def _promote_prompt_categories(jobs, limit: int = 10) -> None:
+    """Copy a prompt-embedded CATEGORY into ``category`` for active-store rows
+    that have none yet. Bounded per request; idempotent; never raises."""
+    todo = [job for job in (jobs or [])
+            if isinstance(job, dict) and not str(job.get("category") or "").strip()
+            and not job.get("read_only") and _cron_category_from_prompt(job.get("prompt"))]
+    if not todo:
+        return
+    try:
+        from api.profiles import cron_profile_context
+        from cron.jobs import update_job
+
+        with cron_profile_context():
+            for job in todo[:limit]:
+                category = _cron_category_from_prompt(job.get("prompt"))
+                try:
+                    update_job(job["id"], {"category": category})
+                    job["category"] = category
+                except Exception:
+                    logger.debug("category promotion failed for %s", job.get("id"), exc_info=True)
+    except Exception:
+        logger.debug("category promotion unavailable", exc_info=True)
+
+
 def _normalize_cron_emoji(value):
     """One short emoji (or nothing) for the task list; never free text."""
     text = str(value or "").strip()
@@ -22480,6 +22523,9 @@ def _handle_cron_create(handler, body):
         _emoji = _normalize_cron_emoji(body.get("emoji"))
         if _emoji:
             post_create_updates["emoji"] = _emoji
+        _category = _normalize_cron_category(body.get("category")) or _cron_category_from_prompt(body.get("prompt"))
+        if _category:
+            post_create_updates["category"] = _category
         _shared = _normalize_cron_shared_with(body.get("shared_with"))
         if _shared:
             post_create_updates["shared_with"] = _shared
@@ -22538,6 +22584,8 @@ def _handle_cron_update(handler, body):
                 updates[k] = v if v else None
             elif k == "emoji":
                 updates[k] = _normalize_cron_emoji(v)
+            elif k == "category":
+                updates[k] = _normalize_cron_category(v)
             elif k == "shared_with":
                 updates[k] = _normalize_cron_shared_with(v)
             elif v is not None:
