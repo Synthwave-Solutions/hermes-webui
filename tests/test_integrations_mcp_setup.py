@@ -115,6 +115,13 @@ def test_setup_guide_never_uses_unsafe_uri(mcp):
 
 # ── With the dashboard API: register, detect, repair, guard ──────────────────
 
+def test_enable_cimd_mcp_goes_through_the_dashboard_when_nango_is_public(dashboard):
+    entries, configured, sent, approved, rows, v1 = dashboard
+    result = integrations.enable_integration('admin@example.test', 'lovable-mcp')
+    assert result['status'] == 'enabled'
+    assert v1 == [('POST', '/integrations', {'provider': 'lovable-mcp', 'integrationId': 'lovable-mcp', 'useSharedCredentials': False})]
+
+
 def test_enable_dynamic_mcp_registers_through_the_dashboard(dashboard):
     entries, configured, sent, approved, rows, v1 = dashboard
     result = integrations.enable_integration('admin@example.test', 'granola-mcp')
@@ -124,8 +131,9 @@ def test_enable_dynamic_mcp_registers_through_the_dashboard(dashboard):
     assert len(approved) == 1
 
 
-def test_enable_cimd_mcp_is_refused_on_a_private_host(dashboard):
+def test_enable_cimd_mcp_is_refused_on_a_private_host(dashboard, monkeypatch):
     entries, configured, sent, approved, rows, v1 = dashboard
+    monkeypatch.setattr(integrations, 'nango_callback_url', lambda: 'http://nango.internal:3003/oauth/callback')
     with pytest.raises(ValueError, match='internet'):
         integrations.enable_integration('admin@example.test', 'lovable-mcp')
     assert v1 == [] and approved == []

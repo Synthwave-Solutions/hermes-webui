@@ -423,7 +423,7 @@ def _setup_view(entry: dict, v1_row: dict | None) -> dict:
                                  "in one click.")
     elif kind == "cimd":
         view["setup_message"] = (f"{label} identifies this Nango by a public metadata URL. "
-                                 "That needs Nango to be reachable from the internet; on the tailnet this provider cannot connect.")
+                                 "Nango must be reachable from the internet (Tailscale Funnel) before it can connect.")
     else:
         view["setup_message"] = (f"{label} needs its own OAuth app. An admin registers the app at the provider with the "
                                  f"redirect URL {nango_callback_url()} and pastes the client id and secret here.")
@@ -1064,10 +1064,15 @@ def _create_via_dashboard(key: str, entry: dict, credentials: dict | None) -> di
 
 
 def _public_https(url: str) -> bool:
+    """Whether a provider on the internet can plausibly fetch this URL.
+
+    A tailnet name can be public too (Tailscale Funnel), so only plain
+    local names are rejected here; the provider's own fetch is the real test.
+    """
     host = str(urllib.parse.urlsplit(url).hostname or "").lower()
     if not url.startswith("https://") or not host:
         return False
-    return not (host.endswith(".ts.net") or host in ("localhost", "127.0.0.1") or host.endswith(".local") or host.endswith(".internal"))
+    return not (host in ("localhost", "127.0.0.1") or host.endswith(".local") or host.endswith(".internal") or host.endswith(".localhost"))
 
 
 def repair_integration(admin_email: str | None, provider_config_key: str, credentials: dict | None = None) -> dict:
