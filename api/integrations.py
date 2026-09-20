@@ -43,6 +43,7 @@ import logging
 import os
 import re
 import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -188,7 +189,12 @@ _SECRET_CACHE: dict[str, tuple[tuple[int, int], str]] = {}
 
 
 def _nango_secret_key() -> str:
-    """Read the Nango environment secret key from its key file (mtime-cached)."""
+    """The Nango environment secret key: HERMES_WEBUI_NANGO_SECRET_KEY when set
+    (container deployments pass it through the compose environment), else the
+    key file (mtime-cached)."""
+    inline = str(os.getenv("HERMES_WEBUI_NANGO_SECRET_KEY", "") or "").strip()
+    if inline:
+        return inline
     raw = str(os.getenv("HERMES_WEBUI_NANGO_SECRET_KEY_FILE", "") or "").strip()
     path = Path(raw or _DEFAULT_SECRET_KEY_FILE).expanduser()
     try:
@@ -512,13 +518,51 @@ def _resolve_aliases(entries: dict[str, dict]) -> dict[str, dict]:
     return resolved
 
 
+_PROVIDERS_JSON_TTL = 3600.0
+
+
+def _load_provider_entries_from_nango() -> dict[str, dict]:
+    """The provider catalog from Nango's own ``/providers.json`` (the same
+    providers.yaml, served as JSON, no auth). Used when no providers.yaml is
+    readable next to the WebUI, which is the case in a container stack where
+    Nango runs in its own image. Cached for an hour; failures raise."""
+    cache_key = "nango:/providers.json"
+    now = time.time()
+    with _CATALOG_CACHE_LOCK:
+        cached = _CATALOG_CACHE.get(cache_key)
+    if cached and cached[0] and float(cached[0][0]) > now:
+        return cached[1]
+    url = f"{_nango_api_url()}/providers.json"
+    req = urllib.request.Request(url, headers={"Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=_NANGO_TIMEOUT_SECONDS) as resp:
+            body = resp.read(_MAX_RESPONSE_BYTES + 1)
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        raise RuntimeError(f"Nango provider catalog unavailable: {exc}")
+    if len(body) > _MAX_RESPONSE_BYTES:
+        raise RuntimeError("Nango provider catalog too large")
+    try:
+        data = json.loads(body.decode("utf-8"))
+    except ValueError:
+        raise RuntimeError("Nango provider catalog returned invalid JSON")
+    if not isinstance(data, dict):
+        raise RuntimeError("Nango provider catalog did not return a mapping")
+    resolved = _resolve_aliases({str(k): v for k, v in data.items() if isinstance(v, dict)})
+    with _CATALOG_CACHE_LOCK:
+        if len(_CATALOG_CACHE) > 4:
+            _CATALOG_CACHE.clear()
+        _CATALOG_CACHE[cache_key] = ((now + _PROVIDERS_JSON_TTL, 0), resolved)
+    return resolved
+
+
 def load_provider_entries() -> dict[str, dict]:
-    """providers.yaml as {key: entry} with aliases resolved (mtime-cached)."""
+    """providers.yaml as {key: entry} with aliases resolved (mtime-cached);
+    without a readable file, Nango's /providers.json."""
     path = _providers_yaml_path()
     try:
         st = path.stat()
-    except OSError as exc:
-        raise RuntimeError(f"Nango providers.yaml is not readable: {exc.strerror or exc}")
+    except OSError:
+        return _load_provider_entries_from_nango()
     sig = (st.st_size, st.st_mtime_ns)
     cache_key = str(path)
     with _CATALOG_CACHE_LOCK:
