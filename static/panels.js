@@ -1071,8 +1071,10 @@ async function loadCrons(animate) {
         <div class="cron-header">
           ${isNewRun ? '<span class="cron-new-dot" title="New run"></span>' : ''}
           ${isAgentMode ? '<span class="cron-agent-badge" title="Agent mode">🤖</span>' : `<span class="cron-script-badge" title="${esc(t('cron_script_badge_title') || 'Script job (no agent)')}">📜</span>`}
+          ${job.emoji ? `<span class="cron-emoji" aria-hidden="true">${esc(job.emoji)}</span>` : ''}
           <span class="cron-name" title="${esc(job.name)}">${esc(job.name)}</span>
           <span class="cron-profile-badge" title="${esc(ownerProfileTitle)}">${esc(ownerProfileLabel)}</span>
+          ${Array.isArray(job.shared_with) && job.shared_with.length ? `<span class="cron-shared-badge" title="${esc((t('cron_shared_with_label') || 'Shared with') + ': ' + job.shared_with.join(', '))}">${esc(t('cron_shared_badge') || 'shared')}</span>` : ''}
           <span class="cron-status ${status.listClass}">${esc(status.label)}</span>
           ${readOnlyBadge}
         </div>`;
@@ -1284,6 +1286,87 @@ function _cronDiagramSource(job){
   if (fromPrompt) return { code: fromPrompt, source: 'prompt' };
   return { code: _cronDerivedDiagram(job), source: 'derived' };
 }
+// ── Task sharing ─────────────────────────────────────────────────────────────
+// `shared_with` (e-mails) on a job: those colleagues see the task in their Tasks
+// tab, can open its output and get its completion toasts. Editing stays with
+// governance and the owner. Set from the detail card; stored via /api/crons/update.
+function _cronSharedRowHtml(job){
+  const shared = Array.isArray(job.shared_with) ? job.shared_with : [];
+  const chips = shared.length
+    ? shared.map(e => `<span class="cron-share-chip" title="${esc(e)}">${esc(String(e).split('@')[0])}</span>`).join('')
+    : `<span style="color:var(--muted)">${esc(t('cron_share_nobody') || 'Not shared')}</span>`;
+  const btn = job.read_only ? '' : `<button type="button" class="cron-btn cron-share-btn" onclick="openCronShareDialog('${esc(job.id)}')">${esc(t('cron_share_button') || 'Share')}</button>`;
+  return `<div class="detail-row"><div class="detail-row-label">${esc(t('cron_shared_with_label') || 'Shared with')}</div><div class="detail-row-value cron-share-value">${chips}${btn}</div></div>`;
+}
+
+function _pickCronEmoji(e){ const el = $('cronFormEmoji'); if (el) { el.value = e; el.focus(); } }
+
+let _cronShareOverlay = null;
+function _closeCronShareDialog(){
+  if (_cronShareOverlay) { _cronShareOverlay.remove(); _cronShareOverlay = null; }
+  document.removeEventListener('keydown', _cronShareEscape, true);
+}
+function _cronShareEscape(e){ if (e.key === 'Escape') { e.preventDefault(); _closeCronShareDialog(); } }
+
+async function openCronShareDialog(jobId){
+  const job = (_cronList || []).find(j => String(j.id) === String(jobId)) || _currentCronDetail;
+  if (!job) return;
+  _closeCronShareDialog();
+  const overlay = document.createElement('div');
+  overlay.className = 'cron-share-overlay';
+  overlay.innerHTML = `<div class="cron-share-dialog detail-card" role="dialog" aria-modal="true" aria-labelledby="cronShareTitle">
+      <div class="detail-card-title" id="cronShareTitle">${esc(t('cron_share_title') || 'Share this task')}</div>
+      <div class="detail-hint">${esc(t('cron_share_hint') || 'Colleagues you share with see the task in their Tasks tab, can open its output and get its completion notifications. Editing stays with the owner.')}</div>
+      <div class="cron-share-list" id="cronShareList"><div style="color:var(--muted);font-size:12px">${esc(t('loading') || 'Loading...')}</div></div>
+      <div class="detail-form-row">
+        <label for="cronShareExtra">${esc(t('cron_share_extra_label') || 'Other address')}</label>
+        <input type="email" id="cronShareExtra" placeholder="name@synthwave.solutions" autocomplete="off">
+      </div>
+      <div class="detail-alert-actions">
+        <button type="button" class="cron-btn" id="cronShareCancel">${esc(t('cancel') || 'Cancel')}</button>
+        <button type="button" class="cron-btn run" id="cronShareSave">${esc(t('cron_share_save') || 'Save sharing')}</button>
+      </div>
+      <div id="cronShareError" class="detail-form-error" style="display:none"></div>
+    </div>`;
+  document.body.appendChild(overlay);
+  _cronShareOverlay = overlay;
+  document.addEventListener('keydown', _cronShareEscape, true);
+  overlay.addEventListener('click', e => { if (e.target === overlay) _closeCronShareDialog(); });
+  overlay.querySelector('#cronShareCancel').onclick = _closeCronShareDialog;
+  const current = new Set((Array.isArray(job.shared_with) ? job.shared_with : []).map(e => String(e).toLowerCase()));
+  let me = '';
+  try {
+    const data = await api('/api/people', { timeoutToast: false });
+    me = String((data && data.me) || '').toLowerCase();
+    const people = (data && Array.isArray(data.people) ? data.people : [])
+      .filter(p => p && p.email && String(p.email).toLowerCase() !== me)
+      .sort((a, b) => String(a.display_name || a.email).localeCompare(String(b.display_name || b.email)));
+    for (const e of current) if (!people.some(p => String(p.email).toLowerCase() === e)) people.push({ email: e, display_name: e });
+    const list = overlay.querySelector('#cronShareList');
+    list.innerHTML = people.length ? people.map(p => {
+      const email = String(p.email).toLowerCase();
+      return `<label class="detail-form-check cron-share-person"><input type="checkbox" value="${esc(email)}" ${current.has(email) ? 'checked' : ''}><span>${esc(p.display_name || email)} <small>${esc(email)}</small></span></label>`;
+    }).join('') : `<div style="color:var(--muted);font-size:12px">${esc(t('cron_share_no_people') || 'No colleagues found; use the address field.')}</div>`;
+  } catch (e) {
+    overlay.querySelector('#cronShareList').innerHTML = `<div class="detail-form-error">${esc(e.message || 'People directory unavailable')}</div>`;
+  }
+  overlay.querySelector('#cronShareSave').onclick = async () => {
+    const err = overlay.querySelector('#cronShareError');
+    err.style.display = 'none';
+    const picked = Array.from(overlay.querySelectorAll('#cronShareList input[type=checkbox]:checked')).map(i => i.value);
+    const extra = (overlay.querySelector('#cronShareExtra').value || '').trim().toLowerCase();
+    if (extra) { if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(extra)) { err.textContent = 'Not an e-mail address'; err.style.display = ''; return; } picked.push(extra); }
+    try {
+      await api('/api/crons/update', { method: 'POST', body: JSON.stringify({ job_id: job.id, shared_with: Array.from(new Set(picked)) }) });
+      _closeCronShareDialog();
+      showToast(t('cron_share_saved') || 'Sharing saved');
+      await loadCrons();
+    } catch (e) {
+      err.textContent = (t('error_prefix') || 'Error: ') + e.message; err.style.display = '';
+    }
+  };
+}
+
 function _cronDiagramCardHtml(job){
   const { code, source } = _cronDiagramSource(job);
   const badge = source === 'field' ? (t('cron_diagram_from_plan') || 'from plan')
@@ -1320,7 +1403,7 @@ function _renderCronDetail(job){
   const body = $('taskDetailBody');
   const empty = $('taskDetailEmpty');
   if (!title || !body) return;
-  title.textContent = job.name || job.schedule_display || '(unnamed)';
+  title.textContent = (job.emoji ? job.emoji + ' ' : '') + (job.name || job.schedule_display || '(unnamed)');
   const status = _cronStatusMeta(job);
   const nextRun = job.next_run_at ? new Date(job.next_run_at).toLocaleString() : t('not_available');
   const lastRun = job.last_run_at ? new Date(job.last_run_at).toLocaleString() : t('never');
@@ -1384,6 +1467,7 @@ function _renderCronDetail(job){
         <div class="detail-row"><div class="detail-row-label">${esc(t('cron_profile_label') || 'Profile')}</div><div class="detail-row-value"><span class="detail-badge active" title="${esc(profileTitle)}">${esc(profileLabel)}</span></div></div>
         <div class="detail-row"><div class="detail-row-label">${esc(t('cron_toast_notifications_label') || 'Completion toasts')}</div><div class="detail-row-value"><span class="detail-badge ${toastNotifications ? 'active' : ''}">${esc(toastNotifications ? (t('cron_toast_notifications_enabled') || 'Enabled') : (t('cron_toast_notifications_disabled') || 'Disabled'))}</span></div></div>
         ${skillsRow}
+        ${_cronSharedRowHtml(job)}
         ${lastError}
       </div>
       ${instructionCard}
@@ -1632,6 +1716,7 @@ function duplicateCurrentCron(){
     model: job.model || '',
     provider: job.provider || '',
     diagram: job.diagram || '',
+    emoji: job.emoji || '',
     isEdit: false,
   });
   if (!_cronSkillsCache) {
@@ -1691,6 +1776,7 @@ function openCronEdit(job){
     model: job.model || '',
     provider: job.provider || '',
     diagram: job.diagram || '',
+    emoji: job.emoji || '',
     isEdit: true,
   });
   if (!_cronSkillsCache) {
@@ -1701,7 +1787,7 @@ function openCronEdit(job){
   loadCronProfiles().then(()=>_refreshCronProfileSelect(job.profile || '')).catch(()=>{});
 }
 
-function _renderCronForm({ name, schedule, prompt, deliver, profile, toast_notifications=true, no_agent=false, script='', model='', provider='', diagram='', isEdit }){
+function _renderCronForm({ name, schedule, prompt, deliver, profile, toast_notifications=true, no_agent=false, script='', model='', provider='', diagram='', emoji='', isEdit }){
   _disposeCronSkillPicker();
   const title = $('taskDetailTitle');
   const body = $('taskDetailBody');
@@ -1738,6 +1824,14 @@ function _renderCronForm({ name, schedule, prompt, deliver, profile, toast_notif
         <div class="detail-form-row">
           <label for="cronFormName">${esc(t('cron_name_label') || 'Name')}</label>
           <input type="text" id="cronFormName" value="${esc(name || '')}" placeholder="${esc(t('cron_name_placeholder') || 'Optional')}" autocomplete="off">
+        </div>
+        <div class="detail-form-row">
+          <label for="cronFormEmoji">${esc(t('cron_emoji_label') || 'Emoji')}</label>
+          <div class="cron-emoji-row">
+            <input type="text" id="cronFormEmoji" value="${esc(emoji || '')}" maxlength="8" placeholder="${esc(t('cron_emoji_placeholder') || 'e.g. 📬')}" autocomplete="off" spellcheck="false">
+            <div class="cron-emoji-picks">${['📬','📅','⏰','🧾','💰','📣','🧹','🔔','🤖','📊','🛡️','⚙️','🚀','🧠','📝','🌐'].map(e => `<button type="button" class="cron-emoji-pick" onclick="_pickCronEmoji('${e}')" aria-label="${e}">${e}</button>`).join('')}<button type="button" class="cron-emoji-pick cron-emoji-clear" onclick="_pickCronEmoji('')" title="${esc(t('cron_emoji_clear') || 'No emoji')}">×</button></div>
+          </div>
+          <div class="detail-form-hint">${esc(t('cron_emoji_hint') || 'Shown in the task list and in the title.')}</div>
         </div>
         <div class="detail-form-row">
           <label for="cronFormSchedulePreset">${esc(t('cron_schedule_preset_label') || 'Schedule')}</label>
@@ -2041,6 +2135,7 @@ async function saveCronForm(){
   const profileEl=$('cronFormProfile');
   const toastEl=$('cronFormToastNotifications');
   const diagramEl=$('cronFormDiagram');
+  const emojiEl=$('cronFormEmoji');
   const errEl=$('cronFormError');
   if(!schEl||!errEl) return;
   const isNoAgent = !!(_cronPreFormDetail && _cronPreFormDetail.no_agent);
@@ -2052,6 +2147,7 @@ async function saveCronForm(){
   const profile=profileEl?profileEl.value:'';
   const toastNotifications=toastEl?!!toastEl.checked:true;
   const diagram=diagramEl?diagramEl.value.trim():'';
+  const emoji=emojiEl?emojiEl.value.trim():'';
   errEl.style.display='none';
   if(!schedule){errEl.textContent=t('cron_schedule_required_example');errEl.style.display='';return;}
   if(!isNoAgent && !prompt){errEl.textContent=t('cron_prompt_required');errEl.style.display='';return;}
@@ -2063,6 +2159,7 @@ async function saveCronForm(){
       const updates = {job_id: _editingCronId, schedule, profile: profile, toast_notifications: toastNotifications};
       if (!isNoAgent) updates.prompt = prompt;
       if (diagramEl) updates.diagram = diagram;
+      if (emojiEl) updates.emoji = emoji;
       if (name) updates.name = name;
       if (deliver) updates.deliver = deliver;
       if (modelEl) {
@@ -2092,6 +2189,7 @@ async function saveCronForm(){
     if(_cronIsDuplicate) body.enabled=false;
     if(name)body.name=name;
     if(diagram)body.diagram=diagram;
+    if(emoji)body.emoji=emoji;
     if(_cronSelectedSkills.length)body.skills=_cronSelectedSkills;
     if (modelEl && modelLoaded) {
       if (selectedModel) {

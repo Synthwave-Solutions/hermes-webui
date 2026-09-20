@@ -22344,6 +22344,32 @@ def _selected_profile_snapshot_updates(
     return updates
 
 
+def _normalize_cron_emoji(value):
+    """One short emoji (or nothing) for the task list; never free text."""
+    text = str(value or "").strip()
+    return text[:8] if text else ""
+
+
+def _normalize_cron_shared_with(value):
+    """Lowercased, de-duplicated e-mail list for task sharing; max 25 people."""
+    if value is None:
+        return []
+    if isinstance(value, str):
+        value = [part for part in value.replace(";", ",").split(",")]
+    if not isinstance(value, list):
+        raise ValueError("shared_with must be a list of e-mail addresses")
+    out = []
+    for item in value:
+        email = str(item or "").strip().lower()
+        if not email:
+            continue
+        if "@" not in email or len(email) > 120:
+            raise ValueError(f"shared_with: '{email}' is not an e-mail address")
+        if email not in out:
+            out.append(email)
+    return out[:25]
+
+
 def _handle_cron_create(handler, body):
     try:
         require(body, "prompt", "schedule")
@@ -22386,6 +22412,12 @@ def _handle_cron_create(handler, body):
         _diagram = body.get("diagram")
         if isinstance(_diagram, str) and _diagram.strip():
             post_create_updates["diagram"] = _diagram.strip()[:20000]
+        _emoji = _normalize_cron_emoji(body.get("emoji"))
+        if _emoji:
+            post_create_updates["emoji"] = _emoji
+        _shared = _normalize_cron_shared_with(body.get("shared_with"))
+        if _shared:
+            post_create_updates["shared_with"] = _shared
         # Stamp the creator, as chat-created jobs already are, so completion
         # notifications and the ownership rule in api/cron_scope.py reach the
         # person who scheduled it from the Tasks panel. No stamp without a
@@ -22439,6 +22471,10 @@ def _handle_cron_update(handler, body):
                 updates[k] = target
             elif k in ("model", "provider"):
                 updates[k] = v if v else None
+            elif k == "emoji":
+                updates[k] = _normalize_cron_emoji(v)
+            elif k == "shared_with":
+                updates[k] = _normalize_cron_shared_with(v)
             elif v is not None:
                 updates[k] = v
     except ValueError as e:

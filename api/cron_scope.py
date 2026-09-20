@@ -184,6 +184,19 @@ def row_owned_by_identity(identity, row, session_owner=None) -> bool:
     return lookup(str(origin.get("chat_id") or "")) == email
 
 
+def row_shared_with_identity(identity, row) -> bool:
+    """A job explicitly shared with this person (``shared_with`` emails, set from
+    the Tasks tab). Sharing grants visibility, output and completion notices,
+    not editing: that stays with governance and the owner."""
+    email = _identity_email(identity)
+    if not email or not isinstance(row, dict):
+        return False
+    shared = row.get("shared_with")
+    if not isinstance(shared, list):
+        return False
+    return email in {str(x or "").strip().lower() for x in shared}
+
+
 def _active_store_job(job_id: str):
     """Load one job from the ACTIVE profile's store (the store the detail
     routes serve). None when absent or the cron package is unavailable."""
@@ -214,7 +227,8 @@ def caller_sees_cron_profile(handler, profile, job_id: str | None = None) -> boo
         if identity_sees_cron_profile(identity, profile):
             return True
         if job_id:
-            return row_owned_by_identity(identity, _active_store_job(job_id))
+            job = _active_store_job(job_id)
+            return row_owned_by_identity(identity, job) or row_shared_with_identity(identity, job)
         return False
     except Exception:
         logger.warning("cron scope governance check failed", exc_info=True)
@@ -233,7 +247,7 @@ def scope_cron_rows(identity, active_jobs, other_jobs, session_owner=None):
     decisions: dict[str, bool] = {}
 
     def _keep(row) -> bool:
-        if row_owned_by_identity(identity, row, session_owner):
+        if row_owned_by_identity(identity, row, session_owner) or row_shared_with_identity(identity, row):
             return True
         profile = str((row.get("owner_profile") if isinstance(row, dict) else None) or "default")
         if profile not in decisions:
@@ -270,14 +284,15 @@ def scope_cron_completions(identity, jobs, session_owner=None):
 
     Requested 20 Sep 2026: every signed-in user was toasted for every cron in
     the store. A job is "yours" by the same rule the listing uses for
-    ownership (``origin.platform == webui`` and your identity stamp, or the
+    ownership, or when it was shared with you from the Tasks tab, (``origin.platform == webui`` and your identity stamp, or the
     originating conversation is yours). Jobs without a WebUI creator (CLI,
     messaging platforms, imported) only reach admins. An identity without an
     email (password login) keeps the old behaviour so nothing goes dark.
     """
     if not _identity_email(identity) or _identity_is_cron_admin(identity):
         return list(jobs or [])
-    return [job for job in (jobs or []) if row_owned_by_identity(identity, job, session_owner)]
+    return [job for job in (jobs or [])
+            if row_owned_by_identity(identity, job, session_owner) or row_shared_with_identity(identity, job)]
 
 
 def scope_cron_completions_for_caller(handler, jobs):

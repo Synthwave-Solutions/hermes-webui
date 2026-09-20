@@ -7864,3 +7864,19 @@ html[data-nav-audience="member"]:not([data-advanced-chat-controls="1"]) #compose
 .cron-diagram-card .cron-diagram{min-height:120px;}
 .cron-diagram-legend{margin-top:6px;}
 #cronFormDiagram{font-family:'SF Mono',ui-monospace,monospace;font-size:12px;}
+/* Task emoji and sharing (Tasks tab). */
+.cron-emoji{font-size:14px;line-height:1;margin-right:2px;}
+.cron-shared-badge{font-size:10px;padding:1px 6px;border-radius:10px;background:var(--sidebar);border:1px solid var(--border);color:var(--muted);white-space:nowrap;}
+.cron-share-value{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+.cron-share-chip{font-size:11px;padding:2px 8px;border-radius:10px;background:var(--sidebar);border:1px solid var(--border);}
+.cron-share-btn{margin-left:auto;}
+.cron-share-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:1200;padding:16px;}
+.cron-share-dialog{width:min(520px,100%);max-height:90vh;overflow:auto;background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:16px 18px;box-shadow:0 12px 40px rgba(0,0,0,.35);}
+.cron-share-list{display:flex;flex-direction:column;gap:4px;margin:10px 0;max-height:44vh;overflow:auto;}
+.cron-share-person small{color:var(--muted);margin-left:6px;}
+.cron-emoji-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+#cronFormEmoji{width:72px;text-align:center;font-size:16px;}
+.cron-emoji-picks{display:flex;flex-wrap:wrap;gap:4px;}
+.cron-emoji-pick{border:1px solid var(--border);background:var(--sidebar);border-radius:8px;font-size:15px;line-height:1;padding:4px 6px;cursor:pointer;}
+.cron-emoji-pick:hover{border-color:var(--accent);}
+.cron-emoji-clear{font-size:13px;color:var(--muted);}
