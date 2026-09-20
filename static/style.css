@@ -7861,4 +7861,6 @@ html[data-nav-audience="member"]:not([data-advanced-chat-controls="1"]) #compose
 .cron-diagram.mermaid-rendered{white-space:normal;font-family:inherit;}
 .cron-diagram svg{max-width:100%;height:auto;}
 .detail-badge.derived{opacity:.7;}
+.cron-diagram-card .cron-diagram{min-height:120px;}
+.cron-diagram-legend{margin-top:6px;}
 #cronFormDiagram{font-family:'SF Mono',ui-monospace,monospace;font-size:12px;}

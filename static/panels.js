@@ -1292,10 +1292,11 @@ function _cronDiagramCardHtml(job){
   const domId = 'cron-' + String(job.id || '').replace(/[^a-zA-Z0-9_-]/g, '');
   return `<div class="detail-card cron-diagram-card">
         <div class="detail-card-title detail-card-title-row">
-          <span>${esc(t('cron_diagram_label') || 'Diagram')}</span>
+          <span>${esc(t('cron_diagram_label') || 'Visual overview cron job')}</span>
           <span class="detail-badge ${source === 'derived' ? 'derived' : 'active'}">${esc(badge)}</span>
         </div>
         <div class="mermaid-block cron-diagram" data-mermaid-id="${esc(domId)}">${esc(code)}</div>
+        <div class="detail-hint cron-diagram-legend">${esc(t('cron_diagram_legend') || 'Trigger, sources, processing, output. Dotted lines are what the run writes or changes.')}</div>
       </div>`;
 }
 
@@ -1370,6 +1371,7 @@ function _renderCronDetail(job){
       ${attentionBanner}
       ${readOnlyBanner}
       ${isNoAgent ? _cronScriptJobBannerHtml() : ''}
+      ${_cronDiagramCardHtml(job)}
       <div class="detail-card">
         <div class="detail-card-title">${esc(t('cron_status_active').replace(/./,c=>c.toUpperCase()))}</div>
         <div class="detail-row"><div class="detail-row-label">Status</div><div class="detail-row-value"><span class="detail-badge ${status.detailClass}">${esc(status.label)}</span></div></div>
@@ -1384,7 +1386,6 @@ function _renderCronDetail(job){
         ${skillsRow}
         ${lastError}
       </div>
-      ${_cronDiagramCardHtml(job)}
       ${instructionCard}
       <div class="detail-card ${!isReadOnly && _cronNewJobIds.has(String(job.id)) ? 'has-new-run' : ''}" id="cronDetailRuns">
         <div class="detail-card-title">${esc(outputTitle)}</div>
