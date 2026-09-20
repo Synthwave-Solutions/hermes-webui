@@ -8803,6 +8803,7 @@ function switchSettingsSection(name,opts){
     if(section==='access'&&typeof loadMyAccessRequests==='function') loadMyAccessRequests();
     if(section==='preferences'&&typeof loadInteractionPreferences==='function') loadInteractionPreferences();
     if(section==='system'&&typeof loadCapacityAlerts==='function') loadCapacityAlerts();
+    if(section==='appearance'&&typeof loadProfilePhotoSetting==='function') loadProfilePhotoSetting();
   }
   if(opts&&opts.fromSidebarItem)_closeMobileSidebarAfterPanelSelection();
 }

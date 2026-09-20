@@ -2689,7 +2689,23 @@
      the settings menu so it is visible without opening the screen. */
   .access-pending-badge{margin-left:auto;min-width:18px;padding:1px 6px;border-radius:999px;background:var(--accent-bg);color:var(--accent);font-size:11px;font-weight:700;text-align:center;}
   /* Author line above a message in a group conversation. */
-  .msg-author{font-size:11px;font-weight:600;color:var(--muted);margin-bottom:2px;letter-spacing:.01em;}
+  .msg-author{font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px;letter-spacing:.01em;display:flex;align-items:center;gap:6px;}
+  .msg-author .msg-author-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .person-avatar{display:inline-flex;align-items:center;justify-content:center;flex:none;border-radius:50%;object-fit:cover;background:var(--bg3,var(--bg2));box-shadow:0 0 0 1px var(--border);}
+  .person-avatar.initials{color:#fff;font-size:.6em;font-weight:700;letter-spacing:.02em;line-height:1;text-transform:uppercase;}
+  .msg-author .person-avatar.initials{font-size:9px;}
+  .person-avatar-wrap{display:inline-flex;flex:none;}
+  .person-avatar-wrap .person-avatar.initials{font-size:11px;}
+  .profile-photo-row{display:flex;align-items:flex-start;gap:16px;margin-top:6px;}
+  .profile-photo-preview{flex:none;width:64px;height:64px;}
+  .profile-photo-preview .person-avatar{width:64px;height:64px;}
+  .profile-photo-preview .person-avatar.initials{font-size:22px;}
+  .profile-photo-actions{display:flex;flex-direction:column;gap:6px;min-width:0;}
+  .profile-photo-who{font-size:12px;color:var(--text);font-weight:600;overflow-wrap:anywhere;}
+  .profile-photo-hint{font-size:12px;color:var(--muted);line-height:1.45;max-width:46ch;}
+  .profile-photo-buttons{display:flex;gap:8px;flex-wrap:wrap;margin-top:2px;}
+  .profile-photo-upload{cursor:pointer;}
+  .profile-photo-status{font-size:12px;color:var(--muted);min-height:1em;}
   /* Toolsets chip — session-level toolset override (#493) */
   .composer-toolsets-wrap{display:none;}
   .composer-toolsets-chip{display:inline-flex;align-items:center;gap:8px;max-width:180px;padding:8px 10px 8px 12px;border-radius:999px;border:1px solid transparent;background-color:transparent;color:var(--muted);font-weight:500;cursor:pointer;transition:color .15s,background-color .15s,border-color .15s;}

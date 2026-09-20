@@ -5749,6 +5749,178 @@ if (typeof window !== 'undefined') { window.toggleChatMode = toggleChatMode; win
 // how every conversation behaved before this existed.
 let _groupPeopleDirectory = null;
 let _groupPeopleDraft = [];
+let _groupPeopleDirectoryLoading = null;
+let _groupPeopleDirectoryLoadedAt = 0;
+
+function _myIdentityEmail() {
+  try {
+    return String((window.__GOV_ME__ && window.__GOV_ME__.email) || '').trim().toLowerCase();
+  } catch (_) { return ''; }
+}
+if (typeof window !== 'undefined') window._myIdentityEmail = _myIdentityEmail;
+
+// One loader for the colleague directory (names, addresses, photos). The
+// picker awaits it; the transcript calls it lazily so author lines can show a
+// photo without a picker ever being opened. Bots are folded in when allowed.
+async function _loadGroupPeopleDirectory() {
+  if (_groupPeopleDirectoryLoading) return _groupPeopleDirectoryLoading;
+  _groupPeopleDirectoryLoading = (async () => {
+    const data = await api('/api/people', { timeoutToast: false });
+    let dir = Array.isArray(data && data.people) ? data.people : [];
+    const me = String((data && data.me) || '').trim().toLowerCase();
+    if (me) {
+      const mine = dir.find(p => String(p.email || '').trim().toLowerCase() === me);
+      _groupMyDirectoryEntry = mine || null;
+      dir = dir.filter(p => String(p.email || '').trim().toLowerCase() !== me);
+    }
+    try {
+      const bots = await api('/api/profiles?fast=1', {timeoutToast:false});
+      dir = dir.concat((bots.profiles || bots || []).map(bot => ({
+        email:'bot:' + bot.name,
+        display_name:(bot.bot && bot.bot.title) || bot.name,
+        kind:'bot',
+        avatar:bot.bot_avatar_url || '',
+      })));
+    } catch (_) { /* People remain usable when bot discovery is not permitted. */ }
+    _groupPeopleDirectory = dir;
+    _groupPeopleDirectoryLoadedAt = Date.now();
+    return dir;
+  })();
+  try { return await _groupPeopleDirectoryLoading; }
+  finally { _groupPeopleDirectoryLoading = null; }
+}
+let _groupMyDirectoryEntry = null;
+
+function _groupPersonEntry(email) {
+  const key = String(email || '').trim().toLowerCase();
+  if (!key) return null;
+  if (_groupMyDirectoryEntry && String(_groupMyDirectoryEntry.email || '').toLowerCase() === key) return _groupMyDirectoryEntry;
+  return (_groupPeopleDirectory || []).find(p => p && String(p.email || '').toLowerCase() === key) || null;
+}
+
+function _groupPersonAvatarUrl(email) {
+  const key = String(email || '').trim().toLowerCase();
+  if (key === _myIdentityEmail() && typeof _myAvatarUrl === 'string') return _myAvatarUrl;
+  const entry = _groupPersonEntry(key);
+  return entry ? String(entry.avatar_url || entry.avatar || '') : '';
+}
+let _myAvatarUrl = null; // null = unknown, '' = none, string = url
+
+function _groupInitials(label, email) {
+  const src = String(label || '').trim() || String(email || '').split('@')[0];
+  const parts = src.replace(/[._-]+/g, ' ').split(/\s+/).filter(Boolean);
+  const two = parts.length >= 2 ? parts[0][0] + parts[parts.length - 1][0] : src.slice(0, 2);
+  return two.toUpperCase();
+}
+function _groupAvatarHue(email) {
+  let h = 0;
+  const key = String(email || '');
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) % 360;
+  return h;
+}
+// Round avatar: the person's photo when there is one, otherwise initials.
+function _personAvatarHtml(email, label, size) {
+  const url = _groupPersonAvatarUrl(email);
+  const px = Number(size) || 22;
+  if (url) {
+    try {
+      const u = new URL(url, window.location.href);
+      if (u.origin === window.location.origin) {
+        return `<img class="person-avatar" src="${esc(u.href)}" alt="" width="${px}" height="${px}" loading="lazy">`;
+      }
+    } catch (_) {}
+  }
+  const hue = _groupAvatarHue(email);
+  return `<span class="person-avatar initials" style="width:${px}px;height:${px}px;background:hsl(${hue} 45% 42%)" aria-hidden="true">${esc(_groupInitials(label, email))}</span>`;
+}
+if (typeof window !== 'undefined') { window._personAvatarHtml = _personAvatarHtml; window._loadGroupPeopleDirectory = _loadGroupPeopleDirectory; }
+
+// ── Settings > Appearance: my profile photo ────────────────────────────────
+function _renderProfilePhotoSetting() {
+  const box = $('profilePhotoPreview');
+  const remove = $('profilePhotoRemoveBtn');
+  if (!box) return;
+  const me = _myIdentityEmail();
+  const label = (window.__GOV_ME__ && (window.__GOV_ME__.display_name || window.__GOV_ME__.name)) || (me ? me.split('@')[0] : '');
+  box.innerHTML = me ? _personAvatarHtml(me, label, 64) : '';
+  if (remove) remove.style.display = _myAvatarUrl ? '' : 'none';
+  const who = $('profilePhotoWho');
+  if (who) who.textContent = me || '';
+}
+async function loadProfilePhotoSetting() {
+  const status = $('profilePhotoStatus');
+  try {
+    const r = await api('/api/me/avatar', { timeoutToast: false, redirect401: false });
+    _myAvatarUrl = (r && r.avatar_url) ? String(r.avatar_url) : '';
+  } catch (_) {
+    _myAvatarUrl = _myAvatarUrl === null ? '' : _myAvatarUrl;
+  }
+  if (status) status.textContent = '';
+  _renderProfilePhotoSetting();
+}
+function _fileToSquareDataUrl(file, side) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      try {
+        const s = Math.min(img.naturalWidth, img.naturalHeight);
+        const c = document.createElement('canvas');
+        c.width = side; c.height = side;
+        const ctx = c.getContext('2d');
+        ctx.drawImage(img, (img.naturalWidth - s) / 2, (img.naturalHeight - s) / 2, s, s, 0, 0, side, side);
+        resolve(c.toDataURL('image/png'));
+      } catch (e) { reject(e); }
+      finally { URL.revokeObjectURL(url); }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('unreadable image')); };
+    img.src = url;
+  });
+}
+async function uploadProfilePhoto(input) {
+  const file = input && input.files && input.files[0];
+  if (!file) return;
+  const status = $('profilePhotoStatus');
+  if (status) status.textContent = t('profile_photo_saving');
+  try {
+    if (!/^image\/(png|jpeg|webp|gif|heic|heif|bmp)$/i.test(file.type || '') && !/\.(png|jpe?g|webp|gif|bmp)$/i.test(file.name || '')) {
+      throw new Error(t('profile_photo_type'));
+    }
+    // Crop to a square and shrink in the browser: the server keeps 256 px.
+    const dataUrl = await _fileToSquareDataUrl(file, 512);
+    const r = await api('/api/me/avatar', { method: 'POST', body: JSON.stringify({ avatar: dataUrl }), timeoutToast: false });
+    if (!r || !r.ok) throw new Error((r && r.error) || t('profile_photo_failed'));
+    _myAvatarUrl = String(r.avatar_url || '');
+    if (status) status.textContent = t('profile_photo_saved');
+    showToast(t('profile_photo_saved'));
+    _renderProfilePhotoSetting();
+    if (typeof renderMessages === 'function') { try { renderMessages(); } catch (_) {} }
+  } catch (e) {
+    const msg = (e && e.message) || t('profile_photo_failed');
+    if (status) status.textContent = msg;
+    showToast(msg);
+  } finally {
+    try { input.value = ''; } catch (_) {}
+  }
+}
+async function removeProfilePhoto() {
+  const status = $('profilePhotoStatus');
+  try {
+    const r = await api('/api/me/avatar', { method: 'POST', body: JSON.stringify({ avatar: null }), timeoutToast: false });
+    if (!r || !r.ok) throw new Error((r && r.error) || t('profile_photo_failed'));
+    _myAvatarUrl = '';
+    if (status) status.textContent = t('profile_photo_removed');
+    _renderProfilePhotoSetting();
+    if (typeof renderMessages === 'function') { try { renderMessages(); } catch (_) {} }
+  } catch (e) {
+    if (status) status.textContent = (e && e.message) || t('profile_photo_failed');
+  }
+}
+if (typeof window !== 'undefined') {
+  window.loadProfilePhotoSetting = loadProfilePhotoSetting;
+  window.uploadProfilePhoto = uploadProfilePhoto;
+  window.removeProfilePhoto = removeProfilePhoto;
+}
 
 function _currentParticipants() {
   if (typeof S === 'undefined' || !S) return [];
@@ -5758,7 +5930,7 @@ function _currentParticipants() {
 }
 
 function _groupPersonLabel(email) {
-  const found = (_groupPeopleDirectory || []).find(p => p && p.email === email);
+  const found = (typeof _groupPersonEntry === 'function') ? _groupPersonEntry(email) : null;
   if (found && found.display_name) return found.display_name;
   return String(email || '');
 }
@@ -5803,18 +5975,7 @@ async function openGroupPeoplePicker() {
   _groupPeopleDraft = _currentParticipants();
   {
     try {
-      const data = await api('/api/people', { timeoutToast: false });
-      _groupPeopleDirectory = Array.isArray(data && data.people) ? data.people : [];
-      if (data && data.me) _groupPeopleDirectory = _groupPeopleDirectory.filter(p => String(p.email || '').trim().toLowerCase() !== String(data.me).trim().toLowerCase());
-      try {
-        const bots = await api('/api/profiles?fast=1', {timeoutToast:false});
-        _groupPeopleDirectory = _groupPeopleDirectory.concat((bots.profiles || bots || []).map(bot => ({
-          email:'bot:' + bot.name,
-          display_name:(bot.bot && bot.bot.title) || bot.name,
-          kind:'bot',
-          avatar:bot.bot_avatar_url || '',
-        })));
-      } catch (_) { /* People remain usable when bot discovery is not permitted. */ }
+      await _loadGroupPeopleDirectory();
     } catch (e) {
       _groupPeopleDirectory = null;
       if (err) err.textContent = t('group_people_load_failed');
@@ -5906,6 +6067,11 @@ function renderGroupPeopleList() {
         avatar.src = avatarUrl.href; avatar.alt = ''; avatar.width = 28; avatar.height = 28;
         avatar.style.borderRadius = '50%'; row.appendChild(avatar);
       }
+    } else if (person.kind !== 'bot') {
+      const holder = document.createElement('span');
+      holder.className = 'person-avatar-wrap';
+      holder.innerHTML = _personAvatarHtml(person.email, person.display_name, 28);
+      row.appendChild(holder);
     }
     row.appendChild(text);
     if (person.kind === 'bot' && _currentParticipants().includes(person.email)) {
@@ -16630,8 +16796,14 @@ function _groupAuthorLineHtml(message){
     const author=String(message.author_email||'').trim().toLowerCase()
       ||String(S.session.owner_email||'').trim().toLowerCase();
     if(!author) return '';
+    if(_groupPeopleDirectory===null&&!_groupPeopleDirectoryLoading&&typeof _loadGroupPeopleDirectory==='function'){
+      // First group render in this tab: fetch names and photos once, then
+      // repaint so the author lines pick them up.
+      _loadGroupPeopleDirectory().then(()=>{ try{ if(typeof renderMessages==='function') renderMessages(); }catch(_){ } }).catch(()=>{ _groupPeopleDirectory=[]; });
+    }
     const label=(typeof _groupPersonLabel==='function')?_groupPersonLabel(author):author;
-    return `<div class="msg-author" title="${esc(author)}">${esc(String(label))}</div>`;
+    const avatar=(typeof _personAvatarHtml==='function')?_personAvatarHtml(author,label,22):'';
+    return `<div class="msg-author" title="${esc(author)}">${avatar}<span class="msg-author-name">${esc(String(label))}</span></div>`;
   }catch(e){ return ''; }
 }
 if(typeof window!=='undefined') window._groupAuthorLineHtml=_groupAuthorLineHtml;

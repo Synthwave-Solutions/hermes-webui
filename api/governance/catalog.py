@@ -119,6 +119,10 @@ ROUTE_CATALOG: tuple[RouteRule, ...] = (
     # The colleague directory behind the group-chat picker: names and addresses
     # only, and only for people who may already start a conversation.
     RouteRule("/api/people",              "sessions:read", match="exact"),
+    # Profile photos: anyone who can see the directory may load a photo; the
+    # POST only ever targets the caller's own identity (api/user_avatars.py).
+    RouteRule("/api/people/avatar",       "sessions:read", match="exact"),
+    RouteRule("/api/me/avatar",           "sessions:read", "sessions:read", match="exact"),
     RouteRule("/api/background",          "sessions:read", "sessions:write"),
     RouteRule("/api/bg-task-complete-ack", "sessions:write", "sessions:write", match="exact"),
     RouteRule("/api/process-complete-ack", "sessions:write", "sessions:write", match="exact"),

@@ -18,17 +18,20 @@ def test_people_picker_retries_refreshes_and_folds_accents():
     end=source.index("if (typeof window !== 'undefined') window.openGroupPeoplePicker",start)
     search_start=source.find('function _groupSearchText(')
     search=source[search_start:source.index('function renderGroupPeopleList()',search_start)] if search_start>=0 else ''
+    # The picker awaits the shared directory loader (names, addresses, photos).
+    loader_start=source.index('async function _loadGroupPeopleDirectory()')
+    loader=source[loader_start:source.index('function _groupPersonEntry(',loader_start)]
     script=r'''
 const assert=require('assert');
 let calls=0, fail=false;
 const nodes={groupPeopleModal:{},groupPeopleModalError:{},groupPeopleModalSubmit:{},groupPeopleFilter:{focus(){}}};
 const $=id=>nodes[id]; const t=x=>x;
-let _groupPeopleDirectory=[],_groupPeopleDraft=[];
+let _groupPeopleDirectory=[],_groupPeopleDraft=[],_groupPeopleDirectoryLoading=null,_groupPeopleDirectoryLoadedAt=0;
 const _currentParticipants=()=>[];
 const _groupPeopleCanManage=()=>true;
 const renderGroupPeopleList=()=>{};
 const api=async(url)=>{if(url==='/api/profiles?fast=1')return [];calls++;if(fail)throw Error('offline');return {me:' OTHER@example.test ',people:[{email:'other@example.test'},{email:'michael@example.test'}]};};
-''' + source[start:end] + search + r'''
+''' + loader + source[start:end] + search + r'''
 (async()=>{
  await openGroupPeoplePicker();assert.equal(calls,1);
  assert.deepEqual(_groupPeopleDirectory,[{email:'michael@example.test'}]);

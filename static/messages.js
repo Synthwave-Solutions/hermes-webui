@@ -1690,7 +1690,7 @@ async function send(){
   // upload window. _composerDraftClearPromise / _submittedDraftFilesForClear are
   // set there; nothing to re-declare here.
   const displayText=_slashDisplayTextOverride||text||(uploaded.length?`Uploaded: ${uploadedNames.join(', ')}`:'(file upload)');
-  const userMsg={role:'user',content:displayText,attachments:uploaded.length?uploadedNames:undefined,_ts:Date.now()/1000,_pending:true};
+  const userMsg={role:'user',content:displayText,attachments:uploaded.length?uploadedNames:undefined,_ts:Date.now()/1000,_pending:true,author_email:(typeof _myIdentityEmail==='function'?_myIdentityEmail():'')||undefined};
   S.toolCalls=[];  // clear tool calls from previous turn
   clearLiveToolCards();  // clear any leftover live cards from last turn
   let optimisticMessages;
@@ -8058,9 +8058,58 @@ function startSessionStream(sid) {
     // (attachLiveStream — the exact path /api/chat/start uses) to the
     // server-created stream so the open tab renders the turn live. Reuses
     // the one renderer; does NOT hand-roll a second one.
+    // ── Group conversations: another participant just spoke ──────────────
+    // Reported by Michael on 20 Sep 2026: other people's turns only showed up
+    // after a refresh. The server now fans `peer_turn_started` {stream_id,
+    // sender_email, message} onto this channel from /api/chat/start for group
+    // sessions. Append the writer's message locally and ride the SAME
+    // attach path as a server-initiated turn so the reply streams live. The
+    // writer's own tab ignores the frame (it already renders its send).
+    es.addEventListener('peer_turn_started', e => {
+      try {
+        const d = JSON.parse(e.data || '{}');
+        const evSid = d.session_id || sid;
+        if (evSid !== sid) return;
+        const sender = String(d.sender_email || '').trim().toLowerCase();
+        const me = (typeof _myIdentityEmail === 'function') ? _myIdentityEmail() : '';
+        if (sender && me && sender === me) return;
+        const streamId = String(d.stream_id || '');
+        if (!streamId) return;
+        if (S.activeStreamId === streamId) return;
+        const isCurrent = (typeof _isSessionCurrentPane === 'function')
+          ? _isSessionCurrentPane(sid)
+          : (S.session && S.session.session_id === sid);
+        if (isCurrent && Array.isArray(S.messages)) {
+          const already = S.messages.some(m => m && m._peer_stream_id === streamId);
+          if (!already) {
+            const text = String(d.message || '');
+            const names = Array.isArray(d.attachments) ? d.attachments.map(String) : [];
+            S.messages.push({
+              role: 'user',
+              content: text || (names.length ? 'Uploaded: ' + names.join(', ') : ''),
+              attachments: names.length ? names : undefined,
+              author_email: sender || undefined,
+              _ts: (typeof d.pending_started_at === 'number' ? d.pending_started_at : Date.now() / 1000),
+              _peer_stream_id: streamId,
+            });
+            if (S.session && S.session.session_id === sid && Number.isFinite(Number(S.session.message_count))) {
+              S.session.message_count = Number(S.session.message_count) + 1;
+            }
+            if (typeof renderMessages === 'function') renderMessages();
+            if (typeof scrollToBottom === 'function') { try { scrollToBottom(); } catch (_) {} }
+          }
+        }
+        _onServerTurnStarted(sid, d);
+      } catch (_) {}
+    });
     es.addEventListener('server_turn_started', e => {
       try {
         const d = JSON.parse(e.data || '{}');
+        _onServerTurnStarted(sid, d);
+      } catch (_) {}
+    });
+    function _onServerTurnStarted(sid, d) {
+      {
         const evSid = d.session_id || sid;
         const streamId = String(d.stream_id || '');
         if (!streamId || evSid !== sid) return;
@@ -8110,8 +8159,8 @@ function startSessionStream(sid) {
           );
         }
         if (typeof renderSessionList === 'function') void renderSessionList();
-      } catch (_) {}
-    });
+      }
+    }
     es.onerror = () => {
       // Browser already auto-reconnects EventSource on most transient
       // failures. We only intervene if the connection has been closed for

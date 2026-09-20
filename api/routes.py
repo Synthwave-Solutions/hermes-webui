@@ -11618,6 +11618,15 @@ def _people_display_name(user, email: str) -> str:
     return " ".join(p[:1].upper() + p[1:] for p in parts) if parts else str(email or "")
 
 
+def _people_avatar_url(address: str) -> str:
+    try:
+        from api.user_avatars import avatar_url
+        return avatar_url(address)
+    except Exception:
+        logger.debug("people directory: avatar lookup failed for %s", address, exc_info=True)
+        return ""
+
+
 def _handle_people_directory(handler) -> bool:
     """GET /api/people: the colleagues you can put in a group conversation.
 
@@ -11649,12 +11658,14 @@ def _handle_people_directory(handler) -> bool:
             people.append({
                 "email": address,
                 "display_name": _people_display_name(user, address),
+                "avatar_url": _people_avatar_url(address),
             })
         for email in (getattr(policy, "bootstrap_admins", None) or ()):
             address = str(email or "").strip().lower()
             if address and address not in seen:
                 seen.add(address)
-                people.append({"email": address, "display_name": _people_display_name(None, address)})
+                people.append({"email": address, "display_name": _people_display_name(None, address),
+                               "avatar_url": _people_avatar_url(address)})
     if not people:
         return bad(handler, "People directory is unavailable. Please try again.", 503)
     people.sort(key=lambda p: (p.get("display_name") or p.get("email") or ""))
@@ -12994,6 +13005,14 @@ def handle_get(handler, parsed) -> bool:
 
     if parsed.path == "/api/people":
         return _handle_people_directory(handler)
+
+    if parsed.path == "/api/people/avatar":
+        from api.user_avatars import handle_people_avatar
+        return handle_people_avatar(handler, parse_qs(parsed.query))
+
+    if parsed.path == "/api/me/avatar":
+        from api.user_avatars import handle_me_avatar
+        return handle_me_avatar(handler, "GET", None)
 
     if parsed.path == "/api/projects/files":
         return _handle_project_collaboration(handler, parsed)
@@ -14577,6 +14596,10 @@ def handle_post(handler, parsed) -> bool:
             s.personality = name if name else None
             s.save()
         return j(handler, {"ok": True, "personality": s.personality, "prompt": prompt})
+
+    if parsed.path == "/api/me/avatar":
+        from api.user_avatars import handle_me_avatar
+        return handle_me_avatar(handler, "POST", body)
 
     if parsed.path == "/api/session/participants":
         from api.project_collaboration import project_for as _participants_project
@@ -21626,6 +21649,56 @@ def start_session_turn(
     return resp
 
 
+def _fan_out_peer_turn(s, response, sender_email, msg, attachments) -> bool:
+    """Tell the other open tabs of a group conversation that someone just spoke.
+
+    Reported by Michael on 20 Sep 2026: in a group chat the other people only
+    saw a new turn after a manual refresh. The per-session live-view channel
+    (``/api/session/stream``) already existed, but only server-initiated turns
+    announced themselves on it (``server_turn_started``). A human turn from
+    /api/chat/start now fans a ``peer_turn_started`` frame with the writer and
+    the text, so every other participant's tab appends the message and
+    attaches the existing chat-stream renderer to the same stream_id. Private
+    (one-person) conversations emit nothing: their own tab already renders.
+    The channel accessor is non-creating, so with no tab open this is a no-op.
+    """
+    try:
+        if not (getattr(s, "participants", None) or getattr(s, "bot_participants", None)):
+            return False
+        stream_id = str((response or {}).get("stream_id") or "")
+        if not stream_id:
+            return False
+        from api.background_process import get_session_channel
+
+        ch = get_session_channel(s.session_id)
+        if ch is None:
+            return False
+        names = []
+        for item in attachments or []:
+            if isinstance(item, dict):
+                name = item.get("name") or item.get("filename") or item.get("path")
+            else:
+                name = item
+            if name:
+                names.append(str(name).rsplit("/", 1)[-1])
+        ch.emit(
+            "peer_turn_started",
+            {
+                "session_id": str(s.session_id),
+                "stream_id": stream_id,
+                "sender_email": str(sender_email or "").strip().lower(),
+                "message": str(msg or ""),
+                "attachments": names,
+                "pending_started_at": (response or {}).get("pending_started_at")
+                or getattr(s, "pending_started_at", None),
+            },
+        )
+        return True
+    except Exception:
+        logger.debug("peer_turn_started fan-out failed for session %s", getattr(s, "session_id", "?"), exc_info=True)
+        return False
+
+
 def _handle_bg_task_complete_ack(handler, body):
     """Acknowledge a bg_task_complete SSE event (diagnostic only).
 
@@ -22025,6 +22098,8 @@ def _handle_chat_start(handler, body, diag=None):
         if response.get("_status") == 501 and "error" in response:
             return j(handler, {"error": response["error"]}, status=501)
         status = int(response.pop("_status", 200) or 200)
+        if status < 400:
+            _fan_out_peer_turn(s, response, start_run_kwargs.get("sender_email"), msg, attachments)
         diag.stage("response_write") if diag else None
         return j(handler, response, status=status)
     finally:
