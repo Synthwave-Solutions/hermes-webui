@@ -92,14 +92,15 @@ function _projRenderList() {
   const list = $('projectsPanelList');
   if (!list) return;
   const rows = (_projHub && Array.isArray(_projHub.projects)) ? _projHub.projects : [];
-  const create='<div class="proj-card proj-create"><label class="proj-field" for="projNewName">Project name<input id="projNewName" placeholder="e.g. Product launch" aria-label="Project name"></label><button class="app-dialog-btn" id="projCreateButton" onclick="_projCreateShared()">New project</button></div>';
+  const create='<div class="proj-card proj-create"><label class="proj-field" for="projNewName">Project name<input id="projNewName" placeholder="e.g. Product launch" aria-label="Project name"></label><label class="proj-field" for="projNewCategory">' + _projEsc(_projT('category_label', 'Category')) + '<input type="hidden" id="projNewCategory" data-sp-picker data-sp-source="sp:categories" data-sp-custom="1" placeholder="' + _projEsc(_projT('projects_category_placeholder', 'Category (optional)')) + '"></label><button class="app-dialog-btn" id="projCreateButton" onclick="_projCreateShared()">New project</button></div>';
   if (!rows.length) {
     list.innerHTML = create + '<div class="proj-empty">'
       + _projEsc(_projT('projects_none_yet', 'You do not have any projects on this workstation yet.'))
       + '</div>';
+    if (window.SpPicker) SpPicker.mountAll(list);
     return;
   }
-  list.innerHTML = create + rows.map(p => {
+  const rowHtml = p => {
     const meta = [];
     meta.push(String(p.conversation_count || 0) + ' '
       + _projT('projects_section_conversations', 'Conversations').toLowerCase());
@@ -122,7 +123,15 @@ function _projRenderList() {
       + '<div class="proj-row-name">' + _projEsc(String(p.name)) + '</div>'
       + '<div class="proj-row-meta">' + _projEsc(meta.join(' · ')) + '</div>'
       + '</div>' + system + '</div>';
-  }).join('');
+  };
+  list.innerHTML = create;
+  if (typeof spRenderGrouped === 'function') {
+    const entries = rows.map(p => { const tpl = document.createElement('template'); tpl.innerHTML = rowHtml(p); return { category: p.category, node: tpl.content.firstElementChild }; });
+    spRenderGrouped(list, entries, { storagePrefix: 'projects-group' });
+  } else {
+    list.insertAdjacentHTML('beforeend', rows.map(rowHtml).join(''));
+  }
+  if (window.SpPicker) SpPicker.mountAll(list);
 }
 
 async function _projOpen(projectId) {
@@ -274,8 +283,9 @@ async function _projCreateShared() {
 
 async function _projCreateSharedAction() {
   const name = ($('projNewName') || {}).value || '';
+  const category = String(($('projNewCategory') || {}).value || '').trim();
   try {
-    const result = await api('/api/projects/team', {method:'POST', body:JSON.stringify({name, members:[], bot_participants:[], profile:'default'})});
+    const result = await api('/api/projects/team', {method:'POST', body:JSON.stringify({name, category, members:[], bot_participants:[], profile:'default'})});
     _projSelectedId = result.project.project_id;
     await loadProjectsHub();
   } catch (error) { showToast(String(error.message || error)); }
@@ -405,8 +415,10 @@ async function _projLoadTeamControls(project) {
     metadataHost.innerHTML = '<div class="proj-team-grid"><section class="proj-team-section"><h3>People</h3>'
       + '<label class="proj-field" for="projPeopleSearch">Find people<input id="projPeopleSearch" placeholder="Search by name or email" aria-label="Find people"></label>'
       + '<div id="projHumanChoices" class="proj-choices"></div></section><section class="proj-team-section"><h3>Bots</h3><p class="proj-state">Choose assistants for this project.</p><div id="projBotChoices" class="proj-choices"></div></section></div><div class="proj-actions">'
-      + (project.can_manage ? '<button class="app-dialog-btn" id="projSaveTeam">Save members and bots</button><button class="app-dialog-btn" id="projArchiveTeam">Archive project</button>' : '')
-      + '</div>';
+      + '</div>'
+      + '<label class="proj-field" for="projCategory">' + _projEsc(_projT('category_label', 'Category')) + '<input type="hidden" id="projCategory" data-sp-picker data-sp-source="sp:categories" data-sp-custom="1" value="' + _projEsc(String(project.category || '')) + '" placeholder="' + _projEsc(_projT('cron_category_placeholder', 'Pick a category or add one')) + '"' + (project.can_manage ? '' : ' disabled') + '></label>'
+      + (project.can_manage ? '<div class="proj-actions"><button class="app-dialog-btn" id="projSaveTeam">Save members, bots and category</button><button class="app-dialog-btn" id="projArchiveTeam">Archive project</button></div>' : '');
+    if (window.SpPicker) SpPicker.mountAll(metadataHost);
     filesHost.innerHTML = files ? '<div class="proj-card"><div class="proj-card-title">Project files</div><label class="proj-field" for="projUpload"><span id="projUploadLabel">Upload a file</span><input type="file" id="projUpload"></label><div id="projFileList" class="proj-actions"></div></div>' : '';
     const humanHost=$('projHumanChoices');
     const ownerRow=document.createElement('div');ownerRow.className='proj-owner';ownerRow.textContent='Owner: '+project.owner_email;humanHost.appendChild(ownerRow);
@@ -434,6 +446,7 @@ async function _projLoadTeamControls(project) {
     if ($('projSaveTeam')) $('projSaveTeam').onclick=async()=>{
       try {
         await api('/api/projects/team',{method:'POST',body:JSON.stringify({project_id:project.project_id,revision:project.revision||0,
+          category:String(($('projCategory')||{}).value||'').trim(),
           members:Array.from(humanHost.querySelectorAll('input:checked')).map(x=>x.value),
           bot_participants:Array.from(botHost.querySelectorAll('input:checked')).map(x=>x.value)})});
         await _projOpen(project.project_id);

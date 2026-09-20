@@ -185,10 +185,14 @@ def handle(handler, path, body=None, query=None):
                            'created_at': time.time(), 'collaboration': True, 'revision': 0}
             name = body.get('name', project.get('name', ''))
             if not isinstance(name, str) or not name.strip() or len(name) > 128: raise ValueError('Project name required (at most 128 characters)')
+            # One short grouping label (department, team, theme), shared with Tasks, Bots and Spaces.
+            category = body.get('category', project.get('category', ''))
+            if not isinstance(category, str): raise ValueError('Category must be text')
+            category = ' '.join(category.split())[:40]
             members, error = group_chat.validate(body.get('members', project.get('members', [])), owner_email=project['owner_email'])
             if error: raise ValueError(error)
             bots = group_chat.validate_bots(body.get('bot_participants', project.get('bot_participants', [])), actor_identity)
-            project = {**project, 'collaboration': True, 'name': name.strip(), 'members': members, 'bot_participants': bots,
+            project = {**project, 'collaboration': True, 'name': name.strip(), 'category': category, 'members': members, 'bot_participants': bots,
                        'revision': project.get('revision', 0) + 1, 'deleted': bool(body.get('deleted', False))}
             root = models.PROJECTS_FILE.parent / 'project_workspaces'
             root.mkdir(parents=True, exist_ok=True)

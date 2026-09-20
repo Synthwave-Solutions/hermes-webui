@@ -23751,9 +23751,12 @@ def _handle_workspace_remove(handler, body):
 
 
 def _handle_workspace_rename(handler, body):
-    path_str = body.get("path", "").strip()
-    name = body.get("name", "").strip()
-    if not path_str or not name:
+    """Rename a space and/or set its category (one short grouping label)."""
+    path_str = str(body.get("path", "") or "").strip()
+    name = str(body.get("name", "") or "").strip()
+    has_category = "category" in body
+    category = " ".join(str(body.get("category") or "").split())[:40]
+    if not path_str or not (name or has_category):
         return bad(handler, "path and name are required")
     wss = load_workspaces()
     for w in wss:
@@ -23762,7 +23765,13 @@ def _handle_workspace_rename(handler, body):
             # may rename an owned entry; legacy ownerless stays open.
             if not _workspace_visible_to(w, handler):
                 return bad(handler, "forbidden", 403)
-            w["name"] = name
+            if name:
+                w["name"] = name
+            if has_category:
+                if category:
+                    w["category"] = category
+                else:
+                    w.pop("category", None)
             break
     else:
         return bad(handler, "Workspace not found", 404)

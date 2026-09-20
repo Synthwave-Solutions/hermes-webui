@@ -1400,17 +1400,70 @@ async function _saveCronEmoji(jobId, emoji){
   } catch (e) { showToast((t('error_prefix') || 'Error: ') + e.message, 5000, 'error'); }
 }
 
-// Category: one label per task that groups the list (department, team, theme).
-// Existing categories feed the picker so people pick before they type.
-if (window.SpPicker) {
-  SpPicker.sources['cron:categories'] = () => {
-    const seen = new Set();
-    const out = [];
-    for (const job of (_cronList || [])) { const c = String(job.category || '').trim(); if (c && !seen.has(c)) { seen.add(c); out.push(c); } }
-    for (const c of ['Sales', 'Marketing', 'Finance', 'Delivery', 'Engineering', 'Platform', 'Management', 'Family']) { if (!seen.has(c)) { seen.add(c); out.push({ value: c, label: c, hint: t('cron_category_suggested') || 'suggested' }); } }
-    return out;
-  };
+// Shared across Tasks, Bots, Projects and Spaces: every category anyone set
+// anywhere, plus a few suggested departments, so the same names are offered
+// in every picker.
+const SP_SUGGESTED_CATEGORIES = ['Sales', 'Marketing', 'Finance', 'Delivery', 'Engineering', 'Platform', 'Management', 'Family'];
+async function spKnownCategories(){
+  const seen = new Set();
+  const out = [];
+  const add = c => { c = String(c || '').trim(); if (c && !seen.has(c)) { seen.add(c); out.push(c); } };
+  (_cronList || []).forEach(j => add(j.category));
+  (((_profilesCache || {}).profiles) || []).forEach(p => add(p.bot && p.bot.category));
+  ((typeof _projHub !== 'undefined' && _projHub && _projHub.projects) || []).forEach(p => add(p.category));
+  (typeof _workspaceList !== 'undefined' ? (_workspaceList || []) : []).forEach(w => add(w.category));
+  // Lists the person has not opened yet: one memoised read each.
+  const fetches = [];
+  if (!(_cronList || []).length) fetches.push(api('/api/crons', { timeoutToast: false }).then(d => (d.jobs || []).forEach(j => add(j.category))).catch(() => {}));
+  if (!_profilesCache) fetches.push(api('/api/profiles?fast=1', { timeoutToast: false }).then(d => (d.profiles || []).forEach(p => add(p.bot && p.bot.category))).catch(() => {}));
+  if (typeof _projHub === 'undefined' || !_projHub) fetches.push(api('/api/projects/hub', { timeoutToast: false, redirect401: false }).then(d => (d.projects || []).forEach(p => add(p.category))).catch(() => {}));
+  if (typeof _workspaceList === 'undefined' || !(_workspaceList || []).length) fetches.push(api('/api/workspaces', { timeoutToast: false }).then(d => (d.workspaces || []).forEach(w => add(w.category))).catch(() => {}));
+  await Promise.all(fetches);
+  out.sort((a, b) => a.localeCompare(b));
+  const suggested = SP_SUGGESTED_CATEGORIES.filter(c => !seen.has(c)).map(c => ({ value: c, label: c, hint: t('cron_category_suggested') || 'suggested' }));
+  return out.concat(suggested);
 }
+if (window.SpPicker) {
+  SpPicker.sources['sp:categories'] = () => spKnownCategories();
+  SpPicker.sources['cron:categories'] = () => spKnownCategories();
+}
+// Render a sidebar list grouped by category: collapsible sections with a
+// count, "No category" last, flat when nobody has set a category yet.
+function spRenderGrouped(container, entries, opts){
+  opts = opts || {};
+  const groups = new Map();
+  for (const entry of entries) {
+    const key = String(entry.category || '').trim();
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(entry);
+  }
+  const keys = [...groups.keys()].filter(Boolean).sort((a, b) => a.localeCompare(b));
+  if (!keys.length) { for (const entry of entries) container.appendChild(entry.node); return false; }
+  if (groups.has('')) keys.push('');
+  for (const key of keys) {
+    const items = groups.get(key) || [];
+    const details = document.createElement('details');
+    details.className = 'cron-group sp-group';
+    const storeKey = (opts.storagePrefix || 'sp-group') + ':' + (key || '__none__');
+    let collapsed = false;
+    try { collapsed = localStorage.getItem(storeKey) === '1'; } catch (_e) {}
+    if (!collapsed) details.open = true;
+    const summary = document.createElement('summary');
+    summary.className = 'cron-group-summary';
+    summary.innerHTML = `<span class="cron-group-name">${esc(key || (t('cron_category_none') || 'No category'))}</span><span class="cron-group-count">${items.length}</span>`;
+    details.appendChild(summary);
+    details.addEventListener('toggle', () => { try { localStorage.setItem(storeKey, details.open ? '0' : '1'); } catch (_e) {} });
+    const inner = document.createElement('div');
+    inner.className = 'cron-group-inner';
+    for (const entry of items) inner.appendChild(entry.node);
+    details.appendChild(inner);
+    container.appendChild(details);
+  }
+  return true;
+}
+window.spRenderGrouped = spRenderGrouped;
+window.spKnownCategories = spKnownCategories;
+
 let _cronCategoryOverlay = null;
 function _closeCronCategoryPopover(){ if (_cronCategoryOverlay) { _cronCategoryOverlay.remove(); _cronCategoryOverlay = null; } document.removeEventListener('keydown', _cronCategoryEscape, true); }
 function _cronCategoryEscape(e){ if (e.key === 'Escape') { e.preventDefault(); _closeCronCategoryPopover(); } }
@@ -6526,6 +6579,7 @@ function renderWorkspacesPanel(workspaces){
   const panel=$('workspacesPanel');
   panel.innerHTML='';
   const activePath = S.session ? S.session.workspace : '';
+  const _wsEntries=[];
   for(let i=0;i<workspaces.length;i++){
     const w=workspaces[i];
     const row=document.createElement('div');
@@ -6599,8 +6653,9 @@ function renderWorkspacesPanel(workspaces){
       }
     });
 
-    panel.appendChild(row);
+    _wsEntries.push({ category: w.category, node: row });
   }
+  spRenderGrouped(panel, _wsEntries, { storagePrefix: 'spaces-group' });
   const hint=document.createElement('div');
   hint.style.cssText='font-size:11px;color:var(--muted);padding:8px 0';
   hint.textContent=t('workspace_paths_validated_hint');
@@ -6648,6 +6703,7 @@ function _renderWorkspaceDetail(ws){
         <div class="detail-row"><div class="detail-row-label">Path</div><div class="detail-row-value"><code>${esc(ws.path)}</code></div></div>
         <div class="detail-row"><div class="detail-row-label">Status</div><div class="detail-row-value">${statusBadge}${defaultBadge}</div></div>
         <div class="detail-row"><div class="detail-row-label">Owner</div><div class="detail-row-value">${ownerValue}</div></div>
+        ${ws.category ? `<div class="detail-row"><div class="detail-row-label">${esc(t('category_label') || 'Category')}</div><div class="detail-row-value"><span class="cron-share-chip cron-category-chip">${esc(ws.category)}</span></div></div>` : ''}
         ${membersRow}
       </div>${assignCard}
       <div class="detail-card" style="margin-top:12px">
@@ -6772,10 +6828,10 @@ function editCurrentWorkspace(){
   if (!_currentWorkspaceDetail) return;
   _workspacePreFormDetail = { ..._currentWorkspaceDetail };
   _workspaceMode = 'edit';
-  _renderWorkspaceForm({ name: _currentWorkspaceDetail.name || '', path: _currentWorkspaceDetail.path || '', isEdit: true });
+  _renderWorkspaceForm({ name: _currentWorkspaceDetail.name || '', path: _currentWorkspaceDetail.path || '', category: _currentWorkspaceDetail.category || '', isEdit: true });
 }
 
-function _renderWorkspaceForm({ name, path, isEdit }){
+function _renderWorkspaceForm({ name, path, category='', isEdit }){
   const title = $('workspaceDetailTitle');
   const body = $('workspaceDetailBody');
   const empty = $('workspaceDetailEmpty');
@@ -6800,11 +6856,17 @@ function _renderWorkspaceForm({ name, path, isEdit }){
           </div>
           ${pathHint}
         </div>
+        <div class="detail-form-row">
+          <label for="workspaceFormCategory">${esc(t('category_label') || 'Category')}</label>
+          <input type="hidden" id="workspaceFormCategory" data-sp-picker data-sp-source="sp:categories" data-sp-custom="1" value="${esc(category || '')}" placeholder="${esc(t('cron_category_placeholder') || 'Pick a category or add one')}">
+          <div class="detail-form-hint">${esc(t('cron_category_hint') || 'Groups the space in the list, for example per department.')}</div>
+        </div>
         <div id="workspaceFormError" class="detail-form-error" style="display:none"></div>
       </form>
     </div>`;
   body.style.display = '';
   if (empty) empty.style.display = 'none';
+  if (window.SpPicker) SpPicker.mountAll(body);
   _setWorkspaceHeaderButtons(isEdit ? 'edit' : 'create');
   if (!isEdit) _wireWorkspaceFormPathSuggestions();
   const focus = isEdit ? $('workspaceFormName') : $('workspaceFormPath');
@@ -6828,6 +6890,8 @@ async function saveWorkspaceForm(){
   const errEl = $('workspaceFormError');
   if (!pathEl || !errEl) return;
   const name = (nameEl ? nameEl.value : '').trim();
+  const categoryEl = $('workspaceFormCategory');
+  const category = categoryEl ? String(categoryEl.value || '').trim() : '';
   const path = (pathEl.value || '').trim();
   errEl.style.display = 'none';
   if (!path) { errEl.textContent = t('workspace_path_required') || 'Path is required'; errEl.style.display = ''; return; }
@@ -6835,7 +6899,7 @@ async function saveWorkspaceForm(){
     if (_workspaceMode === 'edit' && _currentWorkspaceDetail) {
       const targetPath = _currentWorkspaceDetail.path;
       const newName = name || _currentWorkspaceDetail.name || '';
-      await api('/api/workspaces/rename', { method:'POST', body: JSON.stringify({ path: targetPath, name: newName }) });
+      await api('/api/workspaces/rename', { method:'POST', body: JSON.stringify({ path: targetPath, name: newName, category }) });
       // Refresh list and re-render detail
       const data = await api('/api/workspaces');
       _workspaceList = data.workspaces || [];
@@ -6849,8 +6913,8 @@ async function saveWorkspaceForm(){
     _workspaceList = data.workspaces || [];
     _workspacePreFormDetail = null;
     // Apply rename if a friendly name was supplied
-    if (name) {
-      try { await api('/api/workspaces/rename', { method:'POST', body: JSON.stringify({ path, name }) }); } catch(_) {}
+    if (name || category) {
+      try { await api('/api/workspaces/rename', { method:'POST', body: JSON.stringify({ path, name: name || '', category }) }); } catch(_) {}
       const refreshed = await api('/api/workspaces');
       _workspaceList = refreshed.workspaces || _workspaceList;
     }
@@ -7239,7 +7303,7 @@ function botAvatarHtml(p){
 async function saveBotAppearance(){
   const p=_currentProfileDetail;if(!p)return;
   try{
-    await api('/api/profile/appearance',{method:'POST',body:JSON.stringify({name:p.name,revision:p.bot_revision||0,bot:{title:$('botTitle').value,description:$('botDescription').value,shape:$('botShape').value,color:$('botColor').value,knowledge_sources:p.bot_knowledge_sources||[]}})});
+    await api('/api/profile/appearance',{method:'POST',body:JSON.stringify({name:p.name,revision:p.bot_revision||0,bot:{title:$('botTitle').value,description:$('botDescription').value,shape:$('botShape').value,color:$('botColor').value,knowledge_sources:p.bot_knowledge_sources||[],category:($('botCategory')?String($('botCategory').value||'').trim():'')}})});
     _profileDropdownClearStoredCache();
     window.dispatchEvent(new CustomEvent('synpulse:bot-updated'));
     await loadProfilesPanel();showToast(t('bot_saved'));
@@ -7311,6 +7375,7 @@ async function loadProfilesPanel() {
     const activeName = (S.activeProfile && data.profiles.some(p => p.name === S.activeProfile))
       ? S.activeProfile
       : (data.active || 'default');
+    const _profileCardEntries = [];
     for (const p of data.profiles) {
       const card = document.createElement('div');
       card.className = 'profile-card';
@@ -7339,8 +7404,9 @@ async function loadProfilesPanel() {
         </div>`;
       card.onclick = () => openProfileDetail(p.name, card);
       if (_currentProfileDetail && _currentProfileDetail.name === p.name) card.classList.add('active');
-      panel.appendChild(card);
+      _profileCardEntries.push({ category: p.bot && p.bot.category, node: card });
     }
+    spRenderGrouped(panel, _profileCardEntries, { storagePrefix: 'bots-group' });
     // Re-render detail with fresh data if we have one and we're not in a form
     if (_currentProfileDetail && _profileMode !== 'create') {
       const refreshed = data.profiles.find(p => p.name === _currentProfileDetail.name);
@@ -7425,6 +7491,7 @@ function _renderProfileDetail(p, activeName){
             <label for="botDescription" class="bot-editor-wide">${esc(t('bot_description'))}<textarea id="botDescription" maxlength="400" rows="3">${esc((p.bot&&p.bot.description)||'')}</textarea></label>
             <label for="botShape">${esc(t('bot_avatar'))}<select id="botShape">${['circle','squircle','hexagon'].map(shape=>`<option value="${shape}" ${(p.bot&&p.bot.shape)===shape?'selected':''}>${shape}</option>`).join('')}</select></label>
             <label for="botColor">${esc(t('bot_color'))}<input type="color" id="botColor" value="${/^#[0-9a-f]{6}$/i.test((p.bot&&p.bot.color)||'')?p.bot.color:'#6688aa'}"></label>
+            <label class="bot-editor-wide" for="botCategory">${esc(t('category_label')||'Category')}<input type="hidden" id="botCategory" data-sp-picker data-sp-source="sp:categories" data-sp-custom="1" value="${esc((p.bot&&p.bot.category)||'')}" placeholder="${esc(t('cron_category_placeholder')||'Pick a category or add one')}"></label>
             <label class="bot-editor-wide" for="botAvatarFile">${esc(t('bot_upload'))}<input id="botAvatarFile" type="file" accept="image/png,image/jpeg,image/webp" onchange="uploadBotAvatar(this)" aria-describedby="botAvatarHint"></label>
           </div>
           <p class="bot-field-hint" id="botAvatarHint">${esc(t('bot_avatar_limit'))}</p>
@@ -7435,6 +7502,7 @@ function _renderProfileDetail(p, activeName){
       </form>
       <details class="bot-technical-details"><summary>${esc(t('bot_configuration_details'))}</summary>${rows.join('')}</details>
     </div>`;
+  if (window.SpPicker) SpPicker.mountAll(body);
   body.style.display = '';
   if (empty) empty.style.display = 'none';
   _profileMode = 'read';

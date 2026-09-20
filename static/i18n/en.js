@@ -2143,6 +2143,8 @@ window.__registerHermesLocale('en', {
     cron_category_change: 'Change',
     cron_category_change_title: 'Category',
     cron_category_suggested: 'suggested',
+    category_label: 'Category',
+    projects_category_placeholder: 'Category (optional)',
     cron_emoji_change: 'Change emoji',
     cron_share_title: 'Share this task',
     cron_share_hint: 'Colleagues you share with see the task in their Tasks tab, can open its output and get its completion notifications. Editing stays with the owner.',

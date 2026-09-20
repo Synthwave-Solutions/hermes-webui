@@ -43,7 +43,7 @@ def read_profile(name):
         image_url='/api/profile/avatar?profile='+quote(name)+'&v='+str(image.stat().st_mtime_ns) if image.is_file() and not image.is_symlink() else ''
         return {
             'bot_configuration':configuration_summary(path.parent),
-            'bot':{k:meta[k] for k in ('title','description','shape','color') if isinstance(meta.get(k),str)},
+            'bot':{k:meta[k] for k in ('title','description','shape','color','category') if isinstance(meta.get(k),str)},
             'bot_knowledge_sources':meta.get('knowledge_sources',[]) if isinstance(meta.get('knowledge_sources'),list) else [],
             'bot_revision':max(0,revision) if isinstance(revision,int) and not isinstance(revision,bool) else 0,
             'bot_avatar_url':image_url,
@@ -52,7 +52,7 @@ def read_profile(name):
 
 
 def save_profile(name, values, revision):
-    if not isinstance(values,dict) or set(values)-{'title','description','shape','color','knowledge_sources'}: raise ValueError('Unknown bot appearance field')
+    if not isinstance(values,dict) or set(values)-{'title','description','shape','color','category','knowledge_sources'}: raise ValueError('Unknown bot appearance field')
     if not isinstance(revision,int) or isinstance(revision,bool) or revision<0: raise ValueError('Revision required')
     if 'knowledge_sources' in values: validate_sources(values['knowledge_sources'])
     for key,value in values.items():
