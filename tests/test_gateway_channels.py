@@ -247,7 +247,7 @@ def test_my_bot_token_lands_in_my_profile_env(me):
     assert out["profile"] == "andre" and out["token_set"] is True
     assert "TELEGRAM_BOT_TOKEN=999:xyz" in (me / ".env").read_text()
     with pytest.raises(ValueError):
-        ch.set_my_bot(object(), "slack", {"SLACK_BOT_TOKEN": "x"})  # shared platform
+        ch.set_my_bot(object(), "teams", {"TEAMS_CLIENT_ID": "x"})  # shared platform
     with pytest.raises(ValueError):
         ch.set_my_bot(object(), "telegram", {"OPENAI_API_KEY": "x"})
     payload = ch.my_channels_payload(object())
@@ -303,5 +303,17 @@ def test_self_service_routes_are_wired():
     rule = next(r for r in ROUTE_CATALOG if r.pattern == "/api/me/channels")
     assert rule.matches("/api/me/channels/link") and rule.permission_for("POST") == "sessions:read"
     js = (root / "static" / "integrations.js").read_text()
-    for name in ("chLoadMine", "chSaveMyToken", "chLinkMe", "chApplyMine", "/api/me/channels/apply"):
+    for name in ("chLoadMine", "chSaveMyBot", "chLinkMe", "chApplyMine", "/api/me/channels/apply"):
         assert name in js
+
+
+def test_discord_and_slack_are_own_bot_platforms_too(me):
+    out = ch.set_my_bot(object(), "slack", {"SLACK_BOT_TOKEN": "xoxb-1", "SLACK_APP_TOKEN": "xapp-1"})
+    assert out["token_set"] is True
+    out = ch.set_my_bot(object(), "discord", {"DISCORD_HOME_CHANNEL": "42"})
+    assert out["token_set"] is False  # token still missing
+    own = ch.my_channels_payload(object())["own_bot"]
+    assert own["slack"]["token_set"] and not own["discord"]["token_set"]
+    assert [f["key"] for f in own["discord"]["fields"]] == ["DISCORD_BOT_TOKEN", "DISCORD_HOME_CHANNEL"]
+    with pytest.raises(ValueError):
+        ch.set_my_bot(object(), "teams", {"TEAMS_CLIENT_ID": "x"})

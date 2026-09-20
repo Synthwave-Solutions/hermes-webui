@@ -611,7 +611,10 @@ def handle_post(handler, path: str, body):
 # profile. The person links their own platform id here; that adds them to
 # their bot's allowlist and to the identity map (governance + profile).
 
-SELF_SERVICE_PLATFORMS = ("telegram",)
+# Own bot per person: platforms whose adapter connects outbound (no public
+# URL, no port), so a secondary profile can run its own. Teams, WhatsApp and
+# Google Chat stay one bot per organisation.
+SELF_SERVICE_PLATFORMS = ("telegram", "discord", "slack")
 _PEOPLE_GATEWAY_UNIT_ENV = "HERMES_WEBUI_PEOPLE_GATEWAY_UNIT"
 _APPLY_MIN_INTERVAL = 600
 
@@ -685,9 +688,13 @@ def my_channels_payload(handler) -> dict:
     own = {}
     for key in SELF_SERVICE_PLATFORMS:
         p = _BY_KEY[key]
+        required = [f for f in p["fields"] if f["required"]]
         own[key] = {
             "label": p["label"],
-            "token_set": bool(profile) and bool(str(env.get(p["fields"][0]["key"]) or "").strip()),
+            "summary": p["summary"],
+            "token_set": bool(profile) and all(str(env.get(f["key"]) or "").strip() for f in required),
+            "fields": [{"key": f["key"], "label": f["label"], "secret": f["secret"], "required": f["required"], "hint": f["hint"],
+                        "set": bool(profile) and bool(str(env.get(f["key"]) or "").strip())} for f in p["fields"]],
             "allowed_ids": _allowlist(env, p["allow_env"]) if profile else [],
             "user_id_hint": p["user_id_hint"],
         }
@@ -721,7 +728,7 @@ def set_my_bot(handler, platform: str, values: dict) -> dict:
     if not profile:
         raise ValueError("Your account runs on the workstation's main bot; a personal bot needs your own engine profile")
     p = _BY_KEY[key]
-    token_key = p["fields"][0]["key"]
+    required_keys = {f["key"] for f in p["fields"] if f["required"]}
     updates = {}
     for k, v in (values or {}).items():
         if k not in {f["key"] for f in p["fields"]}:
@@ -737,7 +744,10 @@ def set_my_bot(handler, platform: str, values: dict) -> dict:
     env_path = _profile_env_path(profile)
     env_path.parent.mkdir(parents=True, exist_ok=True)
     _write_env_file(env_path, updates)
-    return {"ok": True, "platform": key, "profile": profile, "saved": sorted(updates), "token_set": token_key in updates}
+    from api.providers import _load_env_file
+    stored = _load_env_file(env_path)
+    return {"ok": True, "platform": key, "profile": profile, "saved": sorted(updates),
+            "token_set": all(str(stored.get(k) or "").strip() for k in required_keys)}
 
 
 def remove_my_bot(handler, platform: str) -> dict:
