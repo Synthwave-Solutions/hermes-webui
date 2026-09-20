@@ -7884,3 +7884,16 @@ html[data-nav-audience="member"]:not([data-advanced-chat-controls="1"]) #compose
 .cron-emoji-group{margin-bottom:8px;}
 .cron-emoji-group-title{font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em;}
 .cron-emoji-pick{font-size:18px;padding:4px 5px;}
+/* Task detail: meta bar under the title, clickable emoji in the title. */
+.cron-title-emoji{font-size:22px;line-height:1;margin-right:8px;vertical-align:middle;}
+.cron-title-emoji-btn{font-size:22px;line-height:1;margin-right:8px;vertical-align:middle;background:transparent;border:1px dashed transparent;border-radius:8px;padding:2px 4px;cursor:pointer;}
+.cron-title-emoji-btn:hover{border-color:var(--border);background:var(--sidebar);}
+.cron-title-emoji-btn.empty{opacity:.35;}
+.cron-title-emoji-btn.empty:hover{opacity:1;}
+.cron-title-text{vertical-align:middle;}
+.cron-meta-bar{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin:0 0 12px;padding:8px 12px;border:1px solid var(--border);border-radius:10px;background:var(--sidebar);font-size:12px;}
+.cron-meta-item{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+.cron-meta-label{color:var(--muted);text-transform:uppercase;font-size:10px;letter-spacing:.04em;margin-right:2px;}
+.cron-meta-muted{color:var(--muted);}
+.cron-link-btn{background:transparent;border:none;color:var(--accent);cursor:pointer;font-size:12px;padding:0 2px;text-decoration:underline;}
+.cron-emoji-grid-popover{max-height:52vh;margin-top:10px;}

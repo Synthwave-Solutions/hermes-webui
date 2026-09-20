@@ -1311,8 +1311,55 @@ const _CRON_EMOJI_GROUPS = [
   ['Nature and fun', '🌞 🌙 ⛅ 🌧️ ❄️ 🌱 🌿 🍀 🌻 🌊 🏔️ 🎵 🎧 🎮 ⚽ 🏀 🎲 🧩 🍕 🍎 🍋 🍓'],
   ['Symbols and status', '🟢 🟡 🔴 🔵 🟣 ⚪ ⚫ 🟠 ❗ ❓ ✔️ ❌ ➕ ➖ ✖️ ➡️ ⬆️ ⬇️ 🔀 🔂 🆕 🆗 🔝 🔜 🔚 💯 🔟 🅰️ 🅱️'],
 ];
-function _cronEmojiGridHtml(){
-  return _CRON_EMOJI_GROUPS.map(([label, list]) => `<div class="cron-emoji-group"><div class="cron-emoji-group-title">${esc(label)}</div><div class="cron-emoji-picks">${list.split(/\s+/).filter(Boolean).map(e => `<button type="button" class="cron-emoji-pick" onclick="_pickCronEmoji('${e}')" aria-label="${e}">${e}</button>`).join('')}</div></div>`).join('');
+function _cronEmojiGridHtml(onPick){
+  // onPick: JS call prefix; the emoji is appended as the last string argument.
+  const prefix = onPick || "_pickCronEmoji(";
+  return _CRON_EMOJI_GROUPS.map(([label, list]) => `<div class="cron-emoji-group"><div class="cron-emoji-group-title">${esc(label)}</div><div class="cron-emoji-picks">${list.split(/\s+/).filter(Boolean).map(e => `<button type="button" class="cron-emoji-pick" onclick="${prefix}'${e}')" aria-label="${e}">${e}</button>`).join('')}</div></div>`).join('');
+}
+
+function _cronMetaBarHtml(job){
+  const shared = Array.isArray(job.shared_with) ? job.shared_with : [];
+  const chips = shared.map(e => `<span class="cron-share-chip" title="${esc(e)}">${esc(String(e).split('@')[0])}</span>`).join('');
+  const shareLink = job.read_only ? '' : `<button type="button" class="cron-link-btn" onclick="openCronShareDialog('${esc(job.id)}')">${esc(shared.length ? (t('cron_share_edit') || 'Change sharing') : (t('cron_share_button_long') || 'Share with colleagues'))}</button>`;
+  const owner = job.origin && job.origin.user_id ? String(job.origin.user_id).split('@')[0] : '';
+  return `<div class="cron-meta-bar">
+      <span class="cron-meta-item"><span class="cron-meta-label">${esc(t('cron_shared_with_label') || 'Shared with')}</span>${chips || `<span class="cron-meta-muted">${esc(t('cron_share_nobody') || 'nobody yet')}</span>`}${shareLink}</span>
+      ${owner ? `<span class="cron-meta-item"><span class="cron-meta-label">${esc(t('cron_owner_label') || 'Owner')}</span><span class="cron-share-chip">${esc(owner)}</span></span>` : ''}
+    </div>`;
+}
+function shareCurrentCron(){ if (_currentCronDetail && !_currentCronDetail.read_only) openCronShareDialog(_currentCronDetail.id); }
+
+let _cronEmojiOverlay = null;
+function _closeCronEmojiPopover(){ if (_cronEmojiOverlay) { _cronEmojiOverlay.remove(); _cronEmojiOverlay = null; } document.removeEventListener('keydown', _cronEmojiEscape, true); }
+function _cronEmojiEscape(e){ if (e.key === 'Escape') { e.preventDefault(); _closeCronEmojiPopover(); } }
+function openCronEmojiPopover(jobId){
+  const job = (_cronList || []).find(j => String(j.id) === String(jobId)) || _currentCronDetail;
+  if (!job || job.read_only) return;
+  _closeCronEmojiPopover();
+  const overlay = document.createElement('div');
+  overlay.className = 'cron-share-overlay';
+  overlay.innerHTML = `<div class="cron-share-dialog detail-card" role="dialog" aria-modal="true">
+      <div class="detail-card-title detail-card-title-row"><span>${esc(t('cron_emoji_change') || 'Change emoji')}</span><span class="cron-title-emoji">${esc(job.emoji || '')}</span></div>
+      <div class="cron-emoji-row">
+        <input type="text" id="cronEmojiCustom" maxlength="8" placeholder="${esc(t('cron_emoji_placeholder') || 'e.g. 📬')}" autocomplete="off" spellcheck="false">
+        <button type="button" class="cron-btn run" onclick="_saveCronEmoji('${esc(job.id)}', document.getElementById('cronEmojiCustom').value)">${esc(t('save') || 'Save')}</button>
+        <button type="button" class="cron-btn" onclick="_saveCronEmoji('${esc(job.id)}', '')">${esc(t('cron_emoji_clear') || 'No emoji')}</button>
+        <button type="button" class="cron-btn" onclick="_closeCronEmojiPopover()">${esc(t('cancel') || 'Cancel')}</button>
+      </div>
+      <div class="cron-emoji-grid cron-emoji-grid-popover">${_cronEmojiGridHtml("_saveCronEmoji('" + esc(job.id) + "',")}</div>
+    </div>`;
+  document.body.appendChild(overlay);
+  _cronEmojiOverlay = overlay;
+  document.addEventListener('keydown', _cronEmojiEscape, true);
+  overlay.addEventListener('click', e => { if (e.target === overlay) _closeCronEmojiPopover(); });
+  const input = overlay.querySelector('#cronEmojiCustom'); if (input) input.focus();
+}
+async function _saveCronEmoji(jobId, emoji){
+  try {
+    await api('/api/crons/update', { method: 'POST', body: JSON.stringify({ job_id: jobId, emoji: String(emoji || '').trim() }) });
+    _closeCronEmojiPopover();
+    await loadCrons();
+  } catch (e) { showToast((t('error_prefix') || 'Error: ') + e.message, 5000, 'error'); }
 }
 
 let _cronShareOverlay = null;
@@ -1417,7 +1464,10 @@ function _renderCronDetail(job){
   const body = $('taskDetailBody');
   const empty = $('taskDetailEmpty');
   if (!title || !body) return;
-  title.textContent = (job.emoji ? job.emoji + ' ' : '') + (job.name || job.schedule_display || '(unnamed)');
+  title.innerHTML = (job.read_only
+      ? (job.emoji ? `<span class="cron-title-emoji">${esc(job.emoji)}</span>` : '')
+      : `<button type="button" class="cron-title-emoji-btn ${job.emoji ? '' : 'empty'}" onclick="openCronEmojiPopover('${esc(job.id)}')" title="${esc(t('cron_emoji_change') || 'Change emoji')}">${esc(job.emoji || '🙂')}</button>`)
+    + `<span class="cron-title-text">${esc(job.name || job.schedule_display || '(unnamed)')}</span>`;
   const status = _cronStatusMeta(job);
   const nextRun = job.next_run_at ? new Date(job.next_run_at).toLocaleString() : t('not_available');
   const lastRun = job.last_run_at ? new Date(job.last_run_at).toLocaleString() : t('never');
@@ -1467,6 +1517,7 @@ function _renderCronDetail(job){
     <div class="main-view-content">
       ${attentionBanner}
       ${readOnlyBanner}
+      ${_cronMetaBarHtml(job)}
       ${isNoAgent ? _cronScriptJobBannerHtml() : ''}
       ${_cronDiagramCardHtml(job)}
       <div class="detail-card">
@@ -1481,7 +1532,6 @@ function _renderCronDetail(job){
         <div class="detail-row"><div class="detail-row-label">${esc(t('cron_profile_label') || 'Profile')}</div><div class="detail-row-value"><span class="detail-badge active" title="${esc(profileTitle)}">${esc(profileLabel)}</span></div></div>
         <div class="detail-row"><div class="detail-row-label">${esc(t('cron_toast_notifications_label') || 'Completion toasts')}</div><div class="detail-row-value"><span class="detail-badge ${toastNotifications ? 'active' : ''}">${esc(toastNotifications ? (t('cron_toast_notifications_enabled') || 'Enabled') : (t('cron_toast_notifications_disabled') || 'Disabled'))}</span></div></div>
         ${skillsRow}
-        ${_cronSharedRowHtml(job)}
         ${lastError}
       </div>
       ${instructionCard}
@@ -1504,6 +1554,7 @@ function _setCronHeaderButtons(mode, job) {
   const pauseBtn = $('btnPauseTaskDetail');
   const resumeBtn = $('btnResumeTaskDetail');
   const editBtn = $('btnEditTaskDetail');
+  const shareBtn = $('btnShareTaskDetail');
   const dupBtn = $('btnDuplicateTaskDetail');
   const delBtn = $('btnDeleteTaskDetail');
   const cancelBtn = $('btnCancelTaskDetail');
@@ -1514,9 +1565,10 @@ function _setCronHeaderButtons(mode, job) {
   if (mode === 'read') {
     if (header) header.style.display = 'flex';
     if (job && job.read_only) {
-      [runBtn,pauseBtn,resumeBtn,editBtn,dupBtn,delBtn,cancelBtn,saveBtn].forEach(hide);
+      [runBtn,pauseBtn,resumeBtn,editBtn,shareBtn,dupBtn,delBtn,cancelBtn,saveBtn].forEach(hide);
       return;
     }
+    show(shareBtn);
     show(runBtn);
     const status = job ? _cronStatusMeta(job) : null;
     const resumable = job && (
@@ -1528,10 +1580,10 @@ function _setCronHeaderButtons(mode, job) {
     show(editBtn); show(dupBtn); show(delBtn); hide(cancelBtn); hide(saveBtn);
   } else if (mode === 'create' || mode === 'edit') {
     if (header) header.style.display = 'flex';
-    hide(runBtn); hide(pauseBtn); hide(resumeBtn); hide(editBtn); hide(dupBtn); hide(delBtn);
+    hide(runBtn); hide(pauseBtn); hide(resumeBtn); hide(editBtn); hide(shareBtn); hide(dupBtn); hide(delBtn);
     show(cancelBtn); show(saveBtn);
   } else {
-    [runBtn,pauseBtn,resumeBtn,editBtn,dupBtn,delBtn,cancelBtn,saveBtn].forEach(hide);
+    [runBtn,pauseBtn,resumeBtn,editBtn,shareBtn,dupBtn,delBtn,cancelBtn,saveBtn].forEach(hide);
     if (header) header.style.display = 'none';
   }
 }
