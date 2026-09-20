@@ -8226,3 +8226,5 @@ html[data-nav-audience="member"]:not([data-advanced-chat-controls="1"]) #compose
 .ch-field label{font-size:12px;font-weight:600;color:var(--text);}
 .ch-field .ch-hint{font-size:11px;color:var(--muted);}
 .ch-field-toggle{display:flex;align-items:center;gap:8px;font-size:13px;margin:12px 0;}
+.ch-public code{font-size:11px;overflow-wrap:anywhere;}
+.ch-copy{padding:2px 8px;font-size:11px;}

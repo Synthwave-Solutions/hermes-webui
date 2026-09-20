@@ -38,6 +38,19 @@ logger = logging.getLogger(__name__)
 
 _LOCK = threading.Lock()
 _USER_ID_RE = re.compile(r"^[A-Za-z0-9@._:+\-]{1,120}$")
+_PROFILE_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
+
+# Platforms that receive HTTP webhooks from the provider and therefore need a
+# public HTTPS URL. The gateway listens on these loopback ports and paths; we
+# publish them through Tailscale Funnel as a path on port 8443 (Funnel allows
+# only 443, 8443 and 10000), so the public URL is https://<node>:8443/hooks/<p>.
+PUBLIC_HOOKS = {
+    "whatsapp_cloud": {"port": 8090, "path": "/whatsapp/webhook", "mount": "/hooks/whatsapp",
+                       "host_env": "WHATSAPP_CLOUD_WEBHOOK_HOST", "label": "Meta webhook callback URL"},
+    "teams": {"port": 3978, "path": "/api/messages", "mount": "/hooks/teams",
+              "host_env": "TEAMS_HOST", "label": "Azure Bot messaging endpoint"},
+}
+FUNNEL_PORT = 8443
 
 # One entry per supported platform. ``fields`` are written to the profile
 # .env; ``required`` decides whether the platform counts as configured.
@@ -157,8 +170,62 @@ def load_identities() -> dict:
     try:
         data = json.loads(_identities_path().read_text(encoding="utf-8"))
         return data if isinstance(data, dict) else {}
-    except (FileNotFoundError, ValueError, OSError):
+    except FileNotFoundError:
+        return _seed_from_env()
+    except (ValueError, OSError):
         return {}
+
+
+def _seed_from_env() -> dict:
+    """First boot at a client: client.yaml people[].channels arrives as
+    SP_GATEWAY_IDENTITIES_JSON (rendered by client_render). Materialise it once
+    so the UI can edit it from there on."""
+    raw = os.getenv("SP_GATEWAY_IDENTITIES_JSON", "").strip()
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    clean = {}
+    for platform, rows in data.items():
+        if platform not in _BY_KEY or not isinstance(rows, dict):
+            continue
+        for uid, entry in rows.items():
+            email = str((entry or {}).get("email") if isinstance(entry, dict) else entry or "").strip().lower()
+            nuid = normalize_user_id(platform, uid)
+            if nuid and email and "@" in email:
+                clean.setdefault(platform, {})[nuid] = {
+                    "email": email, "name": str((entry or {}).get("name") or "") if isinstance(entry, dict) else "",
+                    "profile": _profile_for_email(email, (entry or {}).get("profile") if isinstance(entry, dict) else None),
+                    "added_by": "client.yaml", "added_at": int(time.time())}
+    if clean:
+        try:
+            with _LOCK:
+                _save_identities(clean)
+        except OSError:
+            logger.debug("channels: could not materialise the identity seed", exc_info=True)
+    return clean
+
+
+def _profile_for_email(email: str, explicit=None) -> str:
+    """The engine profile a mapped person runs under: an explicit value, else
+    the single profile the governance policy grants them (e.g. andre -> andre),
+    else '' (the gateway's own profile)."""
+    value = str(explicit or "").strip().lower()
+    if value:
+        return value if _PROFILE_RE.match(value) else ""
+    try:
+        from api.governance.loader import get_policy
+        user = (getattr(get_policy(), "users", None) or {}).get(str(email or "").lower())
+        grants = getattr(user, "grants", None) if user is not None else None
+        profiles = sorted(p for p in (getattr(grants, "profiles", None) or ()) if p and p != "*" and p != "default")
+        return profiles[0] if len(profiles) == 1 and _PROFILE_RE.match(profiles[0]) else ""
+    except Exception:
+        logger.debug("channels: profile lookup failed for %s", email, exc_info=True)
+        return ""
 
 
 def _save_identities(data: dict) -> None:
@@ -250,8 +317,13 @@ def status_payload() -> dict:
         for uid, entry in rows.items():
             if isinstance(entry, dict):
                 people.append({"platform": platform, "user_id": uid, "email": entry.get("email", ""),
-                               "name": entry.get("name", ""), "added_at": entry.get("added_at")})
+                               "name": entry.get("name", ""), "profile": entry.get("profile", ""),
+                               "added_at": entry.get("added_at")})
     people.sort(key=lambda r: (r["platform"], str(r.get("email") or ""), r["user_id"]))
+    hooks = public_hooks_status(env)
+    for p in platforms:
+        if p["key"] in hooks:
+            p["public"] = hooks[p["key"]]
     return {
         "platforms": platforms,
         "people": people,
@@ -296,7 +368,7 @@ def disable(platform: str) -> dict:
     return {"ok": True, "platform": p["key"]}
 
 
-def set_identity(platform: str, user_id, email: str, name: str = "", *, actor: str = "") -> dict:
+def set_identity(platform: str, user_id, email: str, name: str = "", *, actor: str = "", profile=None) -> dict:
     p = _BY_KEY.get(str(platform or "").strip().lower())
     if not p:
         raise ValueError("Unknown channel")
@@ -310,12 +382,16 @@ def set_identity(platform: str, user_id, email: str, name: str = "", *, actor: s
     if known and email not in known:
         raise ValueError("This address is not known to the governance policy")
     name = str(name or "").strip()[:120]
+    if profile is not None and str(profile).strip() and not _PROFILE_RE.match(str(profile).strip().lower()):
+        raise ValueError("Invalid profile name")
+    resolved_profile = _profile_for_email(email, profile)
     with _LOCK:
         data = load_identities()
         rows = data.setdefault(p["key"], {})
-        rows[uid] = {"email": email, "name": name, "added_by": str(actor or "").lower(), "added_at": int(time.time())}
+        rows[uid] = {"email": email, "name": name, "profile": resolved_profile,
+                     "added_by": str(actor or "").lower(), "added_at": int(time.time())}
         _save_identities(data)
-    return {"ok": True, "platform": p["key"], "user_id": uid, "email": email, "name": name}
+    return {"ok": True, "platform": p["key"], "user_id": uid, "email": email, "name": name, "profile": resolved_profile}
 
 
 def remove_identity(platform: str, user_id) -> dict:
@@ -359,6 +435,95 @@ def revoke_pairing(platform: str, user_id) -> dict:
     return {"ok": True, "revoked": revoked}
 
 
+# ── Public webhook URLs through Tailscale Funnel ────────────────────────────
+
+def _tailscale(*args, timeout=25):
+    import shutil
+    import subprocess
+    exe = shutil.which("tailscale")
+    if not exe:
+        raise FileNotFoundError("tailscale CLI not available")
+    return subprocess.run([exe, *args], capture_output=True, text=True, timeout=timeout)
+
+
+def _tailnet_fqdn() -> str:
+    try:
+        proc = _tailscale("status", "--json", timeout=15)
+        data = json.loads(proc.stdout or "{}")
+        return str((data.get("Self") or {}).get("DNSName") or "").rstrip(".")
+    except Exception:
+        return ""
+
+
+def public_hooks_status(env: dict | None = None) -> dict:
+    """Per webhook platform: {state, url, mount}. state is published (Funnel
+    serves the mount), unpublished (CLI present, not served), or unavailable
+    (no CLI: a client container; the VM bootstrap owns Funnel there and hands
+    the base URL in as SP_TS_HOOKS_BASE)."""
+    env = env if env is not None else _env_values()
+    out = {}
+    base_hint = str(os.getenv("SP_TS_HOOKS_BASE") or env.get("SP_TS_HOOKS_BASE") or "").rstrip("/")
+    served = None
+    try:
+        proc = _tailscale("serve", "status", "--json", timeout=15)
+        data = json.loads(proc.stdout or "{}")
+        served = {}
+        fqdn = _tailnet_fqdn()
+        for hostport, cfg in (data.get("Web") or {}).items():
+            if not hostport.endswith(":" + str(FUNNEL_PORT)):
+                continue
+            funnel_on = bool((data.get("AllowFunnel") or {}).get(hostport))
+            for mount, handler in (cfg.get("Handlers") or {}).items():
+                served[mount] = {"proxy": handler.get("Proxy"), "funnel": funnel_on, "fqdn": fqdn}
+    except FileNotFoundError:
+        served = None
+    except Exception:
+        logger.debug("channels: tailscale serve status failed", exc_info=True)
+        served = {}
+    for key, spec in PUBLIC_HOOKS.items():
+        if served is None:
+            url = base_hint + spec["mount"].replace("/hooks", "", 1) if base_hint else ""
+            out[key] = {"state": "published" if url else "unavailable", "url": url, "mount": spec["mount"],
+                        "label": spec["label"], "managed_by": "bootstrap"}
+            continue
+        row = served.get(spec["mount"])
+        if row and row.get("funnel") and row.get("fqdn"):
+            out[key] = {"state": "published", "url": f"https://{row['fqdn']}:{FUNNEL_PORT}{spec['mount']}",
+                        "mount": spec["mount"], "label": spec["label"], "managed_by": "webui"}
+        else:
+            out[key] = {"state": "unpublished", "url": "", "mount": spec["mount"], "label": spec["label"], "managed_by": "webui"}
+    return out
+
+
+def publish_hook(platform: str) -> dict:
+    """Expose the platform's webhook on the tailnet node through Funnel and pin
+    the gateway listener to loopback. Idempotent; requires the Funnel node
+    attribute in the tailnet ACL (docs/TAILSCALE.md)."""
+    spec = PUBLIC_HOOKS.get(str(platform or "").strip().lower())
+    if not spec:
+        raise ValueError("This channel has no public webhook")
+    fqdn = _tailnet_fqdn()
+    if not fqdn:
+        raise RuntimeError("Tailscale is not available on this host; the deploy bootstrap publishes webhooks at a client")
+    backend = f"http://127.0.0.1:{spec['port']}{spec['path']}"
+    proc = _tailscale("funnel", "--bg", f"--https={FUNNEL_PORT}", "--set-path", spec["mount"], backend, timeout=40)
+    if proc.returncode != 0:
+        detail = (proc.stderr or proc.stdout or "").strip().splitlines()
+        raise RuntimeError("tailscale funnel failed: " + (detail[-1] if detail else "unknown error"))
+    from api.providers import _write_env_file
+    _write_env_file(_env_path(), {spec["host_env"]: "127.0.0.1"})
+    url = f"https://{fqdn}:{FUNNEL_PORT}{spec['mount']}"
+    return {"ok": True, "platform": platform, "url": url, "mount": spec["mount"], "backend": backend}
+
+
+def unpublish_hook(platform: str) -> dict:
+    spec = PUBLIC_HOOKS.get(str(platform or "").strip().lower())
+    if not spec:
+        raise ValueError("This channel has no public webhook")
+    proc = _tailscale("funnel", f"--https={FUNNEL_PORT}", "--set-path", spec["mount"], "off", timeout=40)
+    return {"ok": proc.returncode == 0, "platform": platform}
+
+
 def _audit(handler, action: str, extra: dict) -> None:
     try:
         from api.governance.audit import append_audit_event
@@ -388,14 +553,34 @@ def handle_post(handler, path: str, body):
     try:
         if path == "/api/gateway/channels/configure":
             out = configure(body.get("platform"), body.get("values") or {})
+            if out["platform"] in PUBLIC_HOOKS:
+                # Webhook platforms need a public URL before the provider can
+                # be configured; publish it in the same step when we can.
+                try:
+                    out["public"] = publish_hook(out["platform"])
+                except Exception as exc:
+                    out["public"] = {"ok": False, "error": str(exc)}
             _audit(handler, "configure", {"platform": out["platform"], "keys": out["saved"]})
             return j(handler, out)
         if path == "/api/gateway/channels/disable":
             out = disable(body.get("platform"))
+            if out["platform"] in PUBLIC_HOOKS:
+                try:
+                    unpublish_hook(out["platform"])
+                except Exception:
+                    logger.debug("channels: unpublish after disable failed", exc_info=True)
             _audit(handler, "disable", {"platform": out["platform"]})
             return j(handler, out)
+        if path == "/api/gateway/channels/publish":
+            try:
+                out = publish_hook(body.get("platform"))
+            except RuntimeError as exc:
+                return bad(handler, str(exc), 409)
+            _audit(handler, "publish", {"platform": out["platform"], "url": out["url"]})
+            return j(handler, out)
         if path == "/api/gateway/identities/set":
-            out = set_identity(body.get("platform"), body.get("user_id"), body.get("email"), body.get("name", ""), actor=_actor(handler))
+            out = set_identity(body.get("platform"), body.get("user_id"), body.get("email"), body.get("name", ""),
+                               actor=_actor(handler), profile=body.get("profile"))
             _audit(handler, "identity_set", {k: out[k] for k in ("platform", "user_id", "email")})
             return j(handler, out)
         if path == "/api/gateway/identities/remove":

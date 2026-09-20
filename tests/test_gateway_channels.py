@@ -139,3 +139,90 @@ def test_routes_and_ui_are_wired():
         assert name in js
     html = (root / "static" / "index.html").read_text()
     assert 'id="intgChannels"' in html and 'id="intgChannelPeople"' in html
+
+
+# ── profile per person, env seed, public webhooks ───────────────────────────
+
+def test_identity_carries_the_persons_profile(env, monkeypatch):
+    class _Grants:
+        profiles = frozenset({"andre"})
+    class _User:
+        grants = _Grants()
+    class _Policy:
+        users = {"andre@example.test": _User()}
+        bootstrap_admins = ()
+    monkeypatch.setattr("api.governance.loader.get_policy", lambda: _Policy())
+    out = ch.set_identity("telegram", "555", "andre@example.test")
+    assert out["profile"] == "andre"
+    out = ch.set_identity("telegram", "556", "michael@example.test")  # no single profile: gateway profile
+    assert out["profile"] == ""
+    out = ch.set_identity("slack", "U1", "andre@example.test", profile="Custom-Profile")
+    assert out["profile"] == "custom-profile"
+    with pytest.raises(ValueError):
+        ch.set_identity("slack", "U2", "andre@example.test", profile="bad/profile")
+    rows = {(r["platform"], r["user_id"]): r for r in ch.status_payload()["people"]}
+    assert rows[("telegram", "555")]["profile"] == "andre"
+
+
+def test_seed_from_env_materialises_once(env, monkeypatch):
+    seed = {"telegram": {"555": {"email": "andre@example.test", "name": "Andre"}}, "bogus": {"1": "x@example.test"},
+            "slack": {"U9": "michael@example.test"}}
+    monkeypatch.setenv("SP_GATEWAY_IDENTITIES_JSON", json.dumps(seed))
+    assert ch.mapped_email("telegram", "555") == "andre@example.test"
+    assert ch.mapped_email("slack", "U9") == "michael@example.test"
+    stored = json.loads((Path(env).parent / "state" / "gateway-identities.json").read_text())
+    assert "bogus" not in stored and stored["telegram"]["555"]["added_by"] == "client.yaml"
+    monkeypatch.delenv("SP_GATEWAY_IDENTITIES_JSON")
+    assert ch.mapped_email("telegram", "555") == "andre@example.test"  # file wins from now on
+
+
+def test_public_hooks_status_reads_the_funnel_config(env, monkeypatch):
+    class _Proc:
+        def __init__(self, out):
+            self.stdout, self.stderr, self.returncode = out, "", 0
+    serve = {"AllowFunnel": {"node.tail.ts.net:8443": True},
+             "Web": {"node.tail.ts.net:8443": {"Handlers": {"/hooks/whatsapp": {"Proxy": "http://127.0.0.1:8090/whatsapp/webhook"}}}}}
+    def fake(*args, timeout=25):
+        if args[:2] == ("serve", "status"):
+            return _Proc(json.dumps(serve))
+        if args[:2] == ("status", "--json"):
+            return _Proc(json.dumps({"Self": {"DNSName": "node.tail.ts.net."}}))
+        raise AssertionError(args)
+    monkeypatch.setattr(ch, "_tailscale", fake)
+    hooks = ch.public_hooks_status({})
+    assert hooks["whatsapp_cloud"] == {"state": "published", "url": "https://node.tail.ts.net:8443/hooks/whatsapp",
+                                       "mount": "/hooks/whatsapp", "label": "Meta webhook callback URL", "managed_by": "webui"}
+    assert hooks["teams"]["state"] == "unpublished"
+    tg = next(p for p in ch.status_payload()["platforms"] if p["key"] == "whatsapp_cloud")
+    assert tg["public"]["state"] == "published"
+
+
+def test_public_hooks_without_cli_use_the_bootstrap_base(env, monkeypatch):
+    def missing(*args, timeout=25):
+        raise FileNotFoundError("no tailscale")
+    monkeypatch.setattr(ch, "_tailscale", missing)
+    assert ch.public_hooks_status({})["teams"]["state"] == "unavailable"
+    monkeypatch.setenv("SP_TS_HOOKS_BASE", "https://synthpulse-acme.tail.ts.net:8443/hooks")
+    hooks = ch.public_hooks_status({})
+    assert hooks["teams"] == {"state": "published", "url": "https://synthpulse-acme.tail.ts.net:8443/hooks/teams",
+                              "mount": "/hooks/teams", "label": "Azure Bot messaging endpoint", "managed_by": "bootstrap"}
+    with pytest.raises(RuntimeError):
+        ch.publish_hook("teams")
+
+
+def test_publish_hook_runs_funnel_and_pins_loopback(env, monkeypatch):
+    calls = []
+    class _Proc:
+        stdout, stderr, returncode = "", "", 0
+    def fake(*args, timeout=25):
+        calls.append(args)
+        if args[:2] == ("status", "--json"):
+            p = _Proc(); p.stdout = json.dumps({"Self": {"DNSName": "node.tail.ts.net."}}); return p
+        return _Proc()
+    monkeypatch.setattr(ch, "_tailscale", fake)
+    out = ch.publish_hook("whatsapp_cloud")
+    assert out["url"] == "https://node.tail.ts.net:8443/hooks/whatsapp"
+    assert ("funnel", "--bg", "--https=8443", "--set-path", "/hooks/whatsapp", "http://127.0.0.1:8090/whatsapp/webhook") in calls
+    assert "WHATSAPP_CLOUD_WEBHOOK_HOST=127.0.0.1" in env.read_text()
+    with pytest.raises(ValueError):
+        ch.publish_hook("telegram")

@@ -894,7 +894,16 @@ function chRenderGrid() {
       : '<span class="intg-badge">' + _intgT('channels_not_configured', 'Not connected') + '</span>');
     if (p.configured && p.allow_all) badges.push('<span class="intg-badge intg-badge-warn">' + _intgT('channels_allow_all_short', 'open to all') + '</span>');
     if (p.pending_count) badges.push('<span class="intg-badge intg-badge-pending">' + p.pending_count + ' ' + _intgT('channels_pairing_short', 'pairing') + '</span>');
-    const meta = p.configured ? '<div class="ch-card-meta">' + _intgT('channels_people_count', '{n} people mapped').replace('{n}', String(p.mapped_count || 0)) + (p.approved_count ? ' · ' + p.approved_count + ' approved' : '') + '</div>' : '';
+    let meta = p.configured ? '<div class="ch-card-meta">' + _intgT('channels_people_count', '{n} people mapped').replace('{n}', String(p.mapped_count || 0)) + (p.approved_count ? ' · ' + p.approved_count + ' approved' : '') + '</div>' : '';
+    if (p.public) {
+      if (p.public.state === 'published') {
+        meta += '<div class="ch-card-meta ch-public"><span>' + _intgEsc(p.public.label) + ':</span> <code>' + _intgEsc(p.public.url) + '</code> <button type="button" class="sm-btn ch-copy" onclick="chCopy(this)" data-copy="' + _intgEsc(p.public.url) + '">' + _intgT('copy', 'Copy') + '</button></div>';
+      } else if (p.public.state === 'unpublished') {
+        meta += '<div class="ch-card-meta ch-public">' + _intgT('channels_hook_unpublished', 'Webhook not public yet.') + ' <button type="button" class="sm-btn" onclick="chPublish(\'' + _intgEsc(p.key) + '\')">' + _intgT('channels_publish', 'Publish via Funnel') + '</button></div>';
+      } else {
+        meta += '<div class="ch-card-meta ch-public">' + _intgT('channels_hook_unavailable', 'Public webhook URL is set by the deploy bootstrap on this host.') + '</div>';
+      }
+    }
     const icon = (typeof li === 'function') ? li(_CH_PLATFORM_ICON[p.key] || 'message-circle', 16) : '';
     return '<div class="intg-card' + (p.configured ? ' configured' : '') + '" data-channel="' + _intgEsc(p.key) + '">'
       + '<div class="intg-card-head">' + icon + '<div class="intg-card-name">' + _intgEsc(p.label) + '</div></div>'
@@ -917,6 +926,13 @@ function chOpenConfigure(key) {
   const form = document.createElement('form'); form.method = 'dialog';
   const title = document.createElement('div'); title.className = 'app-dialog-title'; title.textContent = p.label; form.appendChild(title);
   const desc = document.createElement('div'); desc.className = 'app-dialog-desc'; desc.textContent = p.summary + ' ' + _intgT('channels_dialog_hint', ''); form.appendChild(desc);
+  if (p.public) {
+    const pub = document.createElement('div'); pub.className = 'app-dialog-desc ch-public';
+    pub.textContent = p.public.state === 'published'
+      ? p.public.label + ': ' + p.public.url
+      : _intgT('channels_hook_on_save', 'On save the webhook is published through Tailscale Funnel and the public URL appears on the card. Enter that URL at the provider.');
+    form.appendChild(pub);
+  }
   const inputs = {};
   p.fields.forEach(f => {
     const wrap = document.createElement('div'); wrap.className = 'ch-field';
@@ -1035,10 +1051,11 @@ function chRenderPeople() {
     + '<td>' + _intgEsc(_chLabel(r.platform)) + '</td>'
     + '<td><code>' + _intgEsc(r.user_id) + '</code>' + (r.name ? ' <span class="intg-muted">' + _intgEsc(r.name) + '</span>' : '') + '</td>'
     + '<td class="ch-person">' + (typeof _personAvatarHtml === 'function' ? _personAvatarHtml(r.email, r.email, 22) : '') + '<span>' + _intgEsc(r.email) + '</span></td>'
+    + '<td><code>' + _intgEsc(r.profile || 'gateway') + '</code></td>'
     + '<td><button type="button" class="sm-btn" onclick="chRemovePerson(\'' + _intgEsc(r.platform) + '\',\'' + _intgEsc(r.user_id) + '\')">' + _intgT('channels_remove', 'Remove') + '</button></td>'
     + '</tr>').join('');
   host.innerHTML = (people.length
-    ? '<div class="intg-table-wrap"><table class="ch-people-table"><thead><tr><th>' + _intgT('channels_platform', 'Platform') + '</th><th>' + _intgT('channels_user_id', 'Platform user id') + '</th><th>' + _intgT('channels_person', 'Person') + '</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+    ? '<div class="intg-table-wrap"><table class="ch-people-table"><thead><tr><th>' + _intgT('channels_platform', 'Platform') + '</th><th>' + _intgT('channels_user_id', 'Platform user id') + '</th><th>' + _intgT('channels_person', 'Person') + '</th><th>' + _intgT('channels_profile', 'Runs as profile') + '</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>'
     : '<div class="intg-muted">' + _intgT('channels_no_people', 'Nobody is mapped yet. Approve a pairing request or map a person by id.') + '</div>')
     + '<div class="ch-people-add">'
     + '<label>' + _intgT('channels_platform', 'Platform') + '<select id="chAddPlatform">' + platforms.map(p => '<option value="' + _intgEsc(p.key) + '">' + _intgEsc(p.label) + '</option>').join('') + '</select></label>'
@@ -1051,6 +1068,17 @@ function chRenderPeople() {
   if (window.SpPicker) SpPicker.mountAll(host);
 }
 
+function chCopy(btn) {
+  try { navigator.clipboard.writeText(btn.dataset.copy || ''); showToast(_intgT('copied', 'Copied')); } catch (_) {}
+}
+async function chPublish(key) {
+  try {
+    const r = await api('/api/gateway/channels/publish', { method: 'POST', body: JSON.stringify({ platform: key }), timeoutToast: false, timeoutMs: 60000 });
+    if (!r || !r.ok) throw new Error((r && r.error) || '');
+    showToast(_intgT('channels_published', 'Webhook published.') + ' ' + r.url);
+    await chLoadChannels();
+  } catch (e) { showToast((e && e.message) || _intgT('channels_failed', 'Channel action failed.')); }
+}
 async function chAddPerson() {
   const platform = ($('chAddPlatform') || {}).value, userId = (($('chAddUserId') || {}).value || '').trim();
   const email = String(($('chAddPerson') || {}).value || '').split(',')[0].trim();
@@ -1073,5 +1101,5 @@ async function chRemovePerson(platform, userId) {
 }
 
 if (typeof window !== 'undefined') {
-  Object.assign(window, { chLoadChannels, chOpenConfigure, chDisable, chRestartGateway, chApprove, chAddPerson, chRemovePerson });
+  Object.assign(window, { chLoadChannels, chOpenConfigure, chDisable, chRestartGateway, chApprove, chAddPerson, chRemovePerson, chPublish, chCopy });
 }
