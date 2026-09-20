@@ -91,6 +91,7 @@ window.__registerHermesLocale('en', {
   "bot_editor_knowledge_busy": "Wait for the knowledge file operation to finish.",
   "bot_editor_knowledge_unsaved": "Save your knowledge file selection first, then save the bot.",
   "bot_editor_choose_knowledge": "Choose knowledge files",
+  "bot_documents_pick": "Pick the documents this bot may use",
   "bot_editor_choose_hint": "Choose or upload documents in Memory & knowledge.",
   "chat_mentions_picker": "Mention a person or bot",
   "chat_mentions_bot": "Bot",

@@ -97,12 +97,29 @@ async function knowledge(page: Page, name: string) {
   await page.locator('#builderTab4').click();
   await expect(page.locator('[data-knowledge-save]')).toBeVisible();
 }
-const documentRow = (page: Page, name: string) => page.locator('[data-knowledge-row]').filter({hasText: name});
+// Documents are chosen in the shared picker: a chip means selected, an option
+// in the open menu means available. These helpers keep the flow readable.
+const docsPicker = (page: Page) => page.locator('.sp-picker:has(#botKnowledgeSelect)');
+const docChip = (page: Page, name: string) => docsPicker(page).locator('.sp-chip').filter({hasText: name});
+async function openDocs(page: Page) {
+  if (!(await page.locator('.sp-picker-menu').count())) await docsPicker(page).locator('.sp-picker-control').click();
+  await expect(page.locator('.sp-picker-menu')).toBeVisible();
+}
+async function closeDocs(page: Page) { await page.keyboard.press('Escape'); await expect(page.locator('.sp-picker-menu')).toHaveCount(0); }
+const docOption = (page: Page, name: string) => page.locator('.sp-picker-menu .sp-picker-option').filter({hasText: name});
+async function docAvailable(page: Page, name: string) { await openDocs(page); const n = await docOption(page, name).count(); await closeDocs(page); return n; }
+async function setDoc(page: Page, name: string, on: boolean) {
+  await openDocs(page); const option = docOption(page, name); await expect(option).toBeVisible();
+  const selected = /is-selected/.test((await option.getAttribute('class')) || '');
+  if (selected !== on) await option.click();
+  await closeDocs(page);
+  if (on) await expect(docChip(page, name)).toBeVisible(); else await expect(docChip(page, name)).toHaveCount(0);
+}
 async function upload(page: Page, names: string[]) {
   await page.locator('[data-knowledge-upload]').setInputFiles(names.map(name =>
     ({name, mimeType: 'text/plain', buffer: Buffer.from(`Synthetic private document: ${name}`)})));
   await expect(page.locator('[data-knowledge-status]')).toContainText(`${names.length} document(s) uploaded.`);
-  for (const name of names) await expect(documentRow(page, name).locator('input')).not.toBeChecked();
+  for (const name of names) await expect(docChip(page, name)).toHaveCount(0);
 }
 async function saveKnowledge(page: Page, expectedStatus = 200) {
   const saved = response(page, '/api/bots/knowledge');
@@ -235,19 +252,19 @@ test('SUPPLEMENT PROJECT KNOWLEDGE bot catalogs search deselection and foreign d
   const alpha = unique('knowledge-a'), beta = unique('knowledge-b');
   const alphaFile = 'alpha-only.txt', otherFile = 'alpha-secondary.txt', betaFile = 'beta-only.txt';
   await createBot(page, alpha); await knowledge(page, alpha); await upload(page, [alphaFile, otherFile]);
-  await page.getByRole('searchbox', {name: 'Find a document'}).fill(alphaFile);
-  await expect(documentRow(page, alphaFile)).toBeVisible(); await expect(documentRow(page, otherFile)).toBeHidden();
-  await page.getByRole('searchbox', {name: 'Find a document'}).fill(''); await expect(documentRow(page, otherFile)).toBeVisible();
-  await documentRow(page, alphaFile).locator('input').check(); const selectedAlpha = await saveKnowledge(page);
+  await openDocs(page); await page.locator('.sp-picker-menu input').fill(alphaFile);
+  await expect(docOption(page, alphaFile)).toBeVisible(); await expect(docOption(page, otherFile)).toHaveCount(0);
+  await page.locator('.sp-picker-menu input').fill(''); await expect(docOption(page, otherFile)).toBeVisible(); await closeDocs(page);
+  await setDoc(page, alphaFile, true); const selectedAlpha = await saveKnowledge(page);
   const alphaId = selectedAlpha.files.find((f: any) => f.name === alphaFile).id;
   expect(selectedAlpha.selected).toEqual([alphaId]);
-  await knowledge(page, alpha); await expect(documentRow(page, alphaFile).locator('input')).toBeChecked();
-  await documentRow(page, alphaFile).locator('input').uncheck(); const deselected = await saveKnowledge(page);
+  await knowledge(page, alpha); await expect(docChip(page, alphaFile)).toBeVisible();
+  await setDoc(page, alphaFile, false); const deselected = await saveKnowledge(page);
   expect(deselected.selected).toEqual([]); expect(deselected.revision).toBe(selectedAlpha.revision + 1);
-  await knowledge(page, alpha); await expect(documentRow(page, alphaFile).locator('input')).not.toBeChecked();
+  await knowledge(page, alpha); await expect(docChip(page, alphaFile)).toHaveCount(0);
   await createBot(page, beta); await knowledge(page, beta); await upload(page, [betaFile]);
-  await expect(documentRow(page, alphaFile)).toHaveCount(0);
-  await documentRow(page, betaFile).locator('input').check(); const selectedBeta = await saveKnowledge(page);
+  expect(await docAvailable(page, alphaFile)).toBe(0);
+  await setDoc(page, betaFile, true); const selectedBeta = await saveKnowledge(page);
   const betaId = selectedBeta.files.find((f: any) => f.name === betaFile).id;
   expect(selectedBeta.selected).toEqual([betaId]);
   // No foreign ID is selectable in the UI; forge the direct request to prove
@@ -256,8 +273,8 @@ test('SUPPLEMENT PROJECT KNOWLEDGE bot catalogs search deselection and foreign d
   expect(foreign.status).toBe(400); expect(foreign.body.error).toContain('no longer available');
   expect(await catalog(page, beta)).toEqual(selectedBeta);
   expect(await catalog(page, alpha)).toEqual(deselected);
-  await knowledge(page, alpha); await expect(documentRow(page, betaFile)).toHaveCount(0);
-  await expect(documentRow(page, alphaFile).locator('input')).not.toBeChecked();
+  await knowledge(page, alpha); expect(await docAvailable(page, betaFile)).toBe(0);
+  await expect(docChip(page, alphaFile)).toHaveCount(0);
   const member = await actor(browser, info);
   try {
     await open(member.page, 'profiles');
@@ -278,15 +295,15 @@ test('SUPPLEMENT PROJECT KNOWLEDGE concurrent bot editors reject stale selection
   const other = await actor(browser, info, 'admin');
   try {
     await knowledge(other.page, name);
-    await documentRow(page, first).locator('input').check(); const saved = await saveKnowledge(page);
+    await setDoc(page, first, true); const saved = await saveKnowledge(page);
     const firstId = saved.files.find((f: any) => f.name === first).id, secondId = saved.files.find((f: any) => f.name === second).id;
     expect(saved.selected).toEqual([firstId]); expect(saved.revision).toBe(initial.revision + 1);
-    await documentRow(other.page, second).locator('input').check();
+    await setDoc(other.page, second, true);
     const conflict = await saveKnowledge(other.page, 409);
     expect(conflict.error).toContain('Bot documents changed elsewhere');
     await expect(other.page.locator('[data-knowledge-status]')).toContainText('Close and reopen the bot editor before saving');
-    await expect(documentRow(other.page, second).locator('input')).toBeChecked();
-    await expect(documentRow(other.page, first).locator('input')).not.toBeChecked();
+    await expect(docChip(other.page, second)).toBeVisible();
+    await expect(docChip(other.page, first)).toHaveCount(0);
     expect(await catalog(page, name)).toEqual(saved);
     await capture(other.page, 'stale-document-selection-conflict', info);
     // Use the visible editor Cancel and Edit controls to obtain a fresh revision.
@@ -294,13 +311,13 @@ test('SUPPLEMENT PROJECT KNOWLEDGE concurrent bot editors reject stale selection
     await other.page.locator('#profilesPanel').getByText(name, {exact: true}).click();
     await other.page.getByRole('button', {name: 'Edit bot', exact: true}).click();
     await other.page.locator('#builderTab4').click();
-    await expect(documentRow(other.page, first).locator('input')).toBeChecked();
-    await expect(documentRow(other.page, second).locator('input')).not.toBeChecked();
-    await documentRow(other.page, first).locator('input').uncheck(); await documentRow(other.page, second).locator('input').check();
+    await expect(docChip(other.page, first)).toBeVisible();
+    await expect(docChip(other.page, second)).toHaveCount(0);
+    await setDoc(other.page, first, false); await setDoc(other.page, second, true);
     const final = await saveKnowledge(other.page); expect(final.selected).toEqual([secondId]); expect(final.revision).toBe(saved.revision + 1);
     expect(final.files).toEqual(initial.files);
     await knowledge(page, name);
-    await expect(documentRow(page, first).locator('input')).not.toBeChecked(); await expect(documentRow(page, second).locator('input')).toBeChecked();
+    await expect(docChip(page, first)).toHaveCount(0); await expect(docChip(page, second)).toBeVisible();
     expect(await catalog(page, name)).toEqual(final); await capture(page, 'fresh-document-selection-persisted', info);
   } finally { await other.finish(); }
 });

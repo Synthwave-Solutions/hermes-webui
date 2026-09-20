@@ -21,16 +21,15 @@
       const uploadLabel=node('label',tr("bot_documents_upload","Upload documents from your computer"));uploadLabel.className='bot-builder-field';
       const upload=node('input');upload.type='file';upload.multiple=true;upload.accept='.md,.txt,.csv,.json,.pdf,.docx';upload.dataset.knowledgeUpload='';upload.disabled=busy;
       uploadLabel.append(upload);container.append(uploadLabel,node('p','PDF, DOCX, Markdown, text, CSV or JSON. Up to 10 MB per document. Uploading alone does not add a document to the bot’s selected knowledge.'));
-      const search=node('input');search.type='search';search.placeholder=tr("bot_documents_find","Find a document");search.setAttribute('aria-label',tr("bot_documents_find","Find a document"));container.append(search);
-      const list=node('fieldset');list.className='bot-builder-options';list.append(node('legend',tr("bot_documents_available","Available bot documents")));
-      const rows=node('div');rows.className='bot-builder-choice-list';
-      for(const file of data.files||[]){
-        const label=node('label');label.dataset.knowledgeRow='';const check=node('input');check.type='checkbox';check.value=file.id;check.checked=selected.has(file.id);check.disabled=busy;check.dataset.knowledgeFile='';
-        check.onchange=()=>{if(check.checked)selected.add(file.id);else selected.delete(file.id);status.textContent=tr("bot_documents_changed","Selection changed. Choose Save knowledge to apply it.");};
-        label.append(check,node('span',file.name+' ('+Math.ceil(file.size/1024)+' KB)'));rows.append(label);
-      }
-      if(!(data.files||[]).length)rows.append(node('p','No documents uploaded yet. Choose files above to add them.'));
-      list.append(rows);container.append(list);
+      // Pick, never type: the documents are a searchable multi-select (shared picker).
+      const field=node('div');field.className='bot-builder-field';
+      const pickLabel=node('label',tr("bot_documents_available","Available bot documents"));pickLabel.htmlFor='botKnowledgeSelect';
+      const pick=node('input');pick.type='hidden';pick.id='botKnowledgeSelect';pick.dataset.spPicker='';pick.dataset.spMulti='1';pick.dataset.spSource='bot:knowledge';pick.dataset.knowledgeSelect='';
+      pick.setAttribute('placeholder',tr("bot_documents_pick","Pick the documents this bot may use"));pick.value=[...selected].join(', ');pick.disabled=busy;
+      field.append(pickLabel,pick);container.append(field);
+      if(window.SpPicker){SpPicker.sources['bot:knowledge']=()=>(data.files||[]).map(file=>({value:file.id,label:file.name,hint:Math.ceil(file.size/1024)+' KB'}));SpPicker.mountAll(field);}
+      pick.addEventListener('change',()=>{selected.clear();for(const id of String(pick.value||'').split(',').map(v=>v.trim()).filter(Boolean))selected.add(id);status.textContent=tr("bot_documents_changed","Selection changed. Choose Save knowledge to apply it.");});
+      if(!(data.files||[]).length)container.append(node('p','No documents uploaded yet. Choose files above to add them.'));
       if((data.legacy_sources||[]).length){
         const legacy=node('details');legacy.append(node('summary','Previously configured workspace references'));
         legacy.append(node('p','These references are preserved and still depend on each chat’s workspace. Upload the documents above to make them available across this bot’s chats.'));
@@ -38,8 +37,7 @@
       }
       const save=node('button',tr("bot_documents_save","Save knowledge"));save.type='button';save.className='sm-btn primary';save.dataset.knowledgeSave='';save.disabled=busy;container.append(save);
       const status=node('p');status.setAttribute('role','status');status.dataset.knowledgeStatus='';container.append(status);
-      search.oninput=()=>{for(const row of rows.querySelectorAll('[data-knowledge-row]'))row.hidden=!row.textContent.toLowerCase().includes(search.value.toLowerCase());};
-      const setBusy=value=>{busy=value;draft.busy=value;upload.disabled=value;save.disabled=value;for(const check of rows.querySelectorAll('input'))check.disabled=value;};
+      const setBusy=value=>{busy=value;draft.busy=value;upload.disabled=value;save.disabled=value;pick.disabled=value;};
       save.onclick=async()=>{
         if(busy)return;setBusy(true);status.textContent=tr("bot_documents_saving","Saving knowledge selection\u2026");
         try{const result=await api(endpoint,{method:'POST',body:JSON.stringify({profile,action:'select',selected:[...selected],revision:draft.revision})});if(!alive())return;data=result;draft.saved=new Set(result.selected||[]);draft.revision=result.revision;status.textContent=tr("bot_documents_saved","Knowledge selection saved.");window.dispatchEvent(new CustomEvent('synpulse:bot-updated',{detail:{name:profile}}));}
