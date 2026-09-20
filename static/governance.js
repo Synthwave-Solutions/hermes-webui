@@ -234,7 +234,7 @@ async function _govLoadUsers(expectedDraft) {
       '<div class="gov-form-section">' +
         '<div class="gov-form-title" id="govUserFormTitle">' + _govT('governance_user_add', 'Add user') + '</div>' +
         '<div class="gov-form-row"><label for="govUserEmail">' + _govT('governance_col_email', 'Email') + '</label>' +
-          '<input id="govUserEmail" type="text" placeholder="name@example.com" autocomplete="off" oninput="_govUserPolicyChanged()"></div>' +
+          '<input id="govUserEmail" type="hidden" data-sp-picker data-sp-source="people" data-sp-custom="1" placeholder="' + _govT('picker_pick_person', 'Pick a person') + '" oninput="_govUserPolicyChanged()"></div>' +
         _govChipFieldHtml('govUserRolesSel', _govT('governance_roles_csv', 'Roles'), 'govDlRolesUsr', _govT('governance_pick_role', 'pick a role')) +
         _govChipFieldHtml('govUserGroupsSel', _govT('governance_groups_csv', 'Groups'), 'govDlGroupsUsr', _govT('governance_pick_group', 'pick a group')) +
         '<datalist id="govDlRolesUsr"></datalist><datalist id="govDlGroupsUsr"></datalist>' +
@@ -273,6 +273,7 @@ async function _govLoadUsers(expectedDraft) {
         '<button type="button" class="gov-btn" onclick="_govResetUserForm()">' + _govT('governance_cancel', 'Cancel') + '</button>' +
       '</div>' +
     '</div>';
+  if (window.SpPicker) SpPicker.mountAll(el);
   _govResetUserForm();
   _govEnsureCatalogs().then(_govFillCatalogDatalists).catch(() => {});
 }
@@ -325,12 +326,20 @@ function _govMcpToolMapAdd(id, server = '', tools) {
   const node = document.createElement('div');
   node.className = 'gov-form-section gov-mcp-tool-row'; node.dataset.mcpToolRule = '';
   node.innerHTML = '<div class="gov-form-row"><label for="' + rowId + 'Server">Server</label>' +
-    '<input id="' + rowId + 'Server" data-mcp-tool-server type="text" list="' + _govEsc(host.dataset.serverList || '') + '" placeholder="Choose or enter a server" autocomplete="off"></div>' +
+    '<input id="' + rowId + 'Server" data-mcp-tool-server type="hidden" data-sp-picker data-sp-source="gov:mcp" data-sp-custom="1" placeholder="' + _govT('picker_pick_server', 'Pick a server') + '"></div>' +
     _govChipFieldHtml(rowId, 'Tools', rowId + 'Options', 'Choose or enter a tool name') +
     '<datalist id="' + rowId + 'Options"></datalist>' +
     '<button type="button" class="gov-btn" data-mcp-tool-remove>Remove server rule</button>';
   host.querySelector('[data-mcp-tool-rows]').appendChild(node);
   row.node = node;
+  if (window.SpPicker) {
+    SpPicker.sources['gov:mcptools:' + rowId] = () => _govEnsureCatalogs().then(c => {
+      const server = String(($(rowId + 'Server') || {}).value || '').trim();
+      const names = (c.mcpTools || {})[server] || [];
+      return [{ value: '*', label: '*', hint: _govT('picker_all_tools', 'every tool') }].concat(names);
+    });
+    SpPicker.mountAll(node);
+  }
   const input = $(rowId + 'Server'); input.value = server;
   input.addEventListener('input', () => _govMcpToolMapOptions(id));
   node.querySelector('[data-mcp-tool-remove]').addEventListener('click', () => {
@@ -339,23 +348,10 @@ function _govMcpToolMapAdd(id, server = '', tools) {
   });
   _govChipsSet(rowId, names);
   _govMcpToolMapOptions(id);
-  if (!server) input.focus();
+  if (!server && input.type !== 'hidden') input.focus();
 }
 
-function _govMcpToolMapOptions(id) {
-  const state = _govMcpToolMaps[id];
-  if (!state) return;
-  const tools = (window.__GOV_CAT__ || {}).mcpTools || {};
-  state.rows.forEach(row => {
-    const input = $(row.id + 'Server'), list = $(row.id + 'Options');
-    if (!input || !list) return;
-    const values = tools[input.value.trim()];
-    const names = Array.isArray(values) ? values : [];
-    list.replaceChildren(...names.map(name => {
-      const option = document.createElement('option'); option.value = name; return option;
-    }));
-  });
-}
+function _govMcpToolMapOptions() { /* tool lists resolve lazily via the picker source */ }
 
 function _govMcpToolMapSignature(id) {
   const state = _govMcpToolMaps[id];
@@ -536,98 +532,56 @@ function _govCollectExtraUserFields(kind, mapping) {
   return Object.keys(result).length ? result : null;
 }
 
-// ── Chip multi-select with datalist autocomplete ──────────────────────────
-// Values live in _govChipState (fieldId -> ordered unique array); the DOM is
-// re-rendered from that state. Datalists are filled from _govEnsureCatalogs.
+// ── Chip multi-select backed by the shared picker (static/sp-picker.js) ───
+// Values live in the picker; input.value is the comma list, _govChipState
+// mirrors it for code that compares snapshots. Nobody types: every field
+// offers a searchable list from the live catalogs, custom entries only where
+// the catalog cannot be complete (CLI commands, SSO groups, new users).
 
 let _govChipState = {};
 
-function _govChipsGet(id) { return _govChipState[id] || []; }
+function _govChipsGet(id) {
+  const el = $(id + 'Input');
+  return el ? _govCsv(el.value) : (_govChipState[id] || []);
+}
 
 function _govChipsSet(id, values) {
   const seen = new Set();
-  _govChipState[id] = (values || []).map(v => String(v).trim()).filter(v => v && !seen.has(v) && seen.add(v));
+  const vals = (values || []).map(v => String(v).trim()).filter(v => v && !seen.has(v) && seen.add(v));
+  _govChipState[id] = vals;
+  const el = $(id + 'Input');
+  if (el) el.value = vals.join(', ');
   _govRenderChipField(id);
 }
 
+// datalist ids are the historical field keys; map them to picker sources
+function _govSourceForDatalist(datalistId) {
+  const key = String(datalistId || '');
+  if (/^govDlSkills/.test(key)) return 'gov:skills';
+  if (/^govDlMcp/.test(key)) return 'gov:mcp';
+  if (/^govDlCli/.test(key)) return 'gov:cli';
+  if (/^govDlRoles/.test(key)) return 'gov:roles';
+  if (/^govDlGroups/.test(key)) return 'gov:groups';
+  if (/^govDlSso/.test(key)) return 'gov:sso';
+  if (/^govDlEmails/.test(key)) return 'people';
+  if (/Options$/.test(key)) return 'gov:mcptools:' + key.replace(/Options$/, '');
+  return key;
+}
+
 function _govChipFieldHtml(id, label, datalistId, placeholder) {
-  // Selection-first: focusing the input opens a clickable option menu fed by
-  // the same datalist; typing filters it and free text still works for
-  // values the catalog does not know yet.
+  const source = _govSourceForDatalist(datalistId);
+  const custom = (source === 'gov:cli' || source === 'gov:sso' || source.indexOf('gov:mcptools:') === 0) ? '1' : '0';
+  const hints = { 'gov:skills': _govT('picker_pick_skills', 'Pick skills'), 'gov:mcp': _govT('picker_pick_servers', 'Pick servers'), 'gov:cli': _govT('picker_pick_commands', 'Pick commands'),
+    'gov:roles': _govT('picker_pick_roles', 'Pick roles'), 'gov:groups': _govT('picker_pick_groups', 'Pick groups'), 'gov:sso': _govT('picker_pick_sso', 'Pick SSO groups or people'), 'people': _govT('picker_pick_people', 'Pick people') };
+  const hint = hints[source] || (source.indexOf('gov:mcptools:') === 0 ? _govT('picker_pick_tools', 'Pick tools') : _govT('picker_placeholder', 'Pick from the list'));
   return '<div class="gov-form-row"><label for="' + id + 'Input">' + _govEsc(label) + '</label>' +
-    '<div class="gov-chipwrap">' +
-    '<div class="gov-chipbox" id="' + id + 'Box" onclick="(function(i){if(i)i.focus();})($(\'' + id + 'Input\'))">' +
-      '<input id="' + id + 'Input" type="text" data-chip-dl="' + _govEsc(datalistId) + '" placeholder="' + _govEsc(placeholder || '') + '" autocomplete="off"' +
-      ' onkeydown="_govChipKey(event, \'' + id + '\')" onchange="_govChipCommit(\'' + id + '\')"' +
-      ' onfocus="_govChipMenuOpen(\'' + id + '\')" oninput="_govChipMenuOpen(\'' + id + '\')"' +
-      ' onblur="_govChipMenuBlur(\'' + id + '\')">' +
-    '</div>' +
-    '<div class="gov-chip-menu" id="' + id + 'Menu" style="display:none"></div>' +
-    '</div></div>';
-}
-
-// ── Chip option menu (click-to-pick) ──────────────────────────────────────
-
-function _govChipMenuOptions(id) {
-  const input = $(id + 'Input');
-  if (!input) return [];
-  const dl = $(input.getAttribute('data-chip-dl') || '');
-  if (!dl) return [];
-  const chosen = new Set(_govChipsGet(id));
-  const q = String(input.value || '').trim().toLowerCase();
-  return Array.from(dl.querySelectorAll('option'))
-    .map(o => o.value)
-    .filter(v => v && !chosen.has(v) && (!q || v.toLowerCase().includes(q)))
-    .slice(0, 60);
-}
-
-function _govChipMenuOpen(id) {
-  const menu = $(id + 'Menu');
-  if (!menu) return;
-  const options = _govChipMenuOptions(id);
-  if (!options.length) { menu.style.display = 'none'; return; }
-  menu.innerHTML = options.map(v =>
-    '<button type="button" class="gov-chip-option" data-value="' + _govEsc(v) + '">' + _govEsc(v) + '</button>'
-  ).join('');
-  menu.querySelectorAll('.gov-chip-option').forEach(btn => {
-    // mousedown, not click: it fires before the input's blur closes the menu
-    btn.addEventListener('mousedown', ev => {
-      ev.preventDefault();
-      _govChipAdd(id, btn.getAttribute('data-value'));
-      const input = $(id + 'Input');
-      if (input) { input.value = ''; input.focus(); }
-      _govChipMenuOpen(id);
-    });
-  });
-  menu.style.display = '';
-}
-
-function _govChipMenuBlur(id) {
-  _govChipCommit(id);
-  const menu = $(id + 'Menu');
-  if (menu) setTimeout(() => { menu.style.display = 'none'; }, 150);
+    '<input id="' + id + 'Input" type="hidden" data-sp-picker data-sp-multi="1" data-sp-custom="' + custom + '" data-sp-source="' + _govEsc(source) + '" data-gov-chip="' + _govEsc(id) + '"' +
+    ' placeholder="' + _govEsc(hint) + '"></div>';
 }
 
 function _govRenderChipField(id) {
-  const box = $(id + 'Box');
-  const input = $(id + 'Input');
-  if (!box || !input) return;
-  box.querySelectorAll('.gov-chip-item').forEach(n => n.remove());
-  _govChipsGet(id).forEach(value => {
-    const chip = document.createElement('span');
-    chip.className = 'gov-chip gov-chip-item';
-    chip.textContent = value;
-    const x = document.createElement('button');
-    x.type = 'button';
-    x.className = 'gov-chip-x';
-    x.textContent = '×';
-    x.title = _govT('governance_remove', 'Remove');
-    x.addEventListener('click', ev => { ev.stopPropagation(); _govChipRemove(id, value); });
-    chip.appendChild(x);
-    box.insertBefore(chip, input);
-  });
   // deny fields drive the effective on/off view
-  if (_GOV_USER_DENY_FIELDS.includes(id)) _govRenderUserEffective();
+  if (typeof _GOV_USER_DENY_FIELDS !== 'undefined' && _GOV_USER_DENY_FIELDS.includes(id)) _govRenderUserEffective();
 }
 
 function _govChipAdd(id, value) {
@@ -641,29 +595,36 @@ function _govChipRemove(id, value) {
   _govChipsSet(id, _govChipsGet(id).filter(v => v !== value));
 }
 
-function _govChipCommit(id) {
-  const input = $(id + 'Input');
-  if (!input) return;
-  // a paste/typed value may itself be a comma list
-  _govCsv(input.value).forEach(v => _govChipAdd(id, v));
-  input.value = '';
-}
+// Picker changes flow back into the mirror and the effective view.
+document.addEventListener('change', ev => {
+  const el = ev.target;
+  if (!el || !el.dataset || !el.dataset.govChip) return;
+  const id = el.dataset.govChip;
+  _govChipState[id] = _govCsv(el.value);
+  _govRenderChipField(id);
+});
 
-function _govChipKey(event, id) {
-  const menu = $(id + 'Menu');
-  if (event.key === 'Enter' || event.key === ',') {
-    event.preventDefault();
-    _govChipCommit(id);
-    if (menu) menu.style.display = 'none';
-  } else if (event.key === 'Escape') {
-    event.preventDefault();
-    event.stopPropagation();
-    if (menu) menu.style.display = 'none';
-  } else if (event.key === 'Backspace' && !event.target.value) {
-    const values = _govChipsGet(id);
-    if (values.length) _govChipRemove(id, values[values.length - 1]);
-  }
-}
+function _govChipCommit() { /* pickers commit on selection; kept for callers */ }
+
+// Picker sources: resolved lazily from the catalogs so a menu opened before the
+// catalog request finished shows "Loading" and then the list.
+(function registerGovPickerSources() {
+  if (!window.SpPicker) { document.addEventListener('DOMContentLoaded', registerGovPickerSources, { once: true }); return; }
+  const cat = () => _govEnsureCatalogs();
+  const wild = label => ({ value: '*', label: '*', hint: label });
+  SpPicker.sources['gov:skills'] = () => cat().then(c => [wild(_govT('picker_all_skills', 'every skill'))].concat(c.skills));
+  SpPicker.sources['gov:mcp'] = () => cat().then(c => [wild(_govT('picker_all_servers', 'every server'))].concat(c.mcp));
+  SpPicker.sources['gov:cli'] = () => cat().then(c => [wild(_govT('picker_all_commands', 'every command'))].concat(c.cli));
+  SpPicker.sources['gov:roles'] = () => cat().then(c => c.roles);
+  SpPicker.sources['gov:groups'] = () => cat().then(c => c.groups);
+  SpPicker.sources['gov:sso'] = () => Promise.all([cat(), SpPicker.sources.people()]).then(([c, people]) => {
+    const seen = new Set();
+    const out = [];
+    (c.sso || []).forEach(g => { if (!seen.has(g)) { seen.add(g); out.push({ value: g, label: g, hint: _govT('governance_sso_group', 'SSO group') }); } });
+    people.forEach(p => { if (!seen.has(p.value)) { seen.add(p.value); out.push(p); } });
+    return out;
+  });
+})();
 
 // ── Autocomplete catalogs (skills, MCP servers, CLI commands) ─────────────
 // Skills and MCP servers come from their live catalogs; CLI command ids have
@@ -672,7 +633,7 @@ function _govChipKey(event, id) {
 
 async function _govEnsureCatalogs(force) {
   if (window.__GOV_CAT__ && !force) return window.__GOV_CAT__;
-  const cat = { skills: [], mcp: [], mcpTools: Object.create(null), cli: [], roles: [], groups: [], emails: [] };
+  const cat = { skills: [], mcp: [], mcpTools: Object.create(null), cli: [], roles: [], groups: [], emails: [], sso: [] };
   const opts = { redirect401: false, timeoutToast: false, timeoutMs: 15000 };
   await Promise.all([
     api('/api/skills', opts).then(d => {
@@ -708,6 +669,9 @@ async function _govEnsureCatalogs(force) {
       cat.roles = Object.keys(policy.roles || {}).sort();
       cat.groups = Object.keys(policy.groups || {}).sort();
       cat.emails = Object.keys(policy.users || {}).sort();
+      const sso = new Set();
+      Object.values(policy.groups || {}).forEach(g => ((g || {}).sso_groups || []).forEach(v => { if (v) sso.add(String(v)); }));
+      cat.sso = Array.from(sso).sort();
       // Autocomplete may finish after an editor loaded an older policy. Its
       // independent request must not replace the editor's concurrency token.
     }).catch(() => {}),
@@ -1160,9 +1124,9 @@ async function _govLoadGroups() {
         '<div class="gov-form-row"><label for="govGroupDesc">' + _govT('governance_col_description', 'Description') + '</label>' +
           '<input id="govGroupDesc" type="text" placeholder="What is this group for?" autocomplete="off"></div>' +
         '<div class="gov-form-row"><label for="govGroupSso">' + _govT('governance_sso_csv', 'SSO groups') + '</label>' +
-          '<input id="govGroupSso" type="text" list="govDlSso" placeholder="engineering@example.com" autocomplete="off"></div>' +
+          '<input id="govGroupSso" type="hidden" data-sp-picker data-sp-multi="1" data-sp-custom="1" data-sp-source="gov:sso" placeholder="' + _govT('picker_pick_sso', 'Pick SSO groups or people') + '"></div>' +
         '<div class="gov-form-row"><label for="govGroupRoles">' + _govT('governance_roles_csv', 'Roles') + '</label>' +
-          '<input id="govGroupRoles" type="text" list="govDlRoles" placeholder="operator" autocomplete="off"></div>' +
+          '<input id="govGroupRoles" type="hidden" data-sp-picker data-sp-multi="1" data-sp-source="gov:roles" placeholder="' + _govT('picker_pick_roles', 'Pick roles') + '"></div>' +
         '<datalist id="govDlSso"></datalist><datalist id="govDlRoles"></datalist>' +
       '</div>' +
       _govGroupGrantsHtml() +
@@ -1171,6 +1135,7 @@ async function _govLoadGroups() {
         '<button type="button" class="gov-btn" onclick="_govResetGroupForm()">' + _govT('governance_cancel', 'Cancel') + '</button>' +
       '</div>' +
     '</div>';
+  if (window.SpPicker) SpPicker.mountAll(el);
   _govResetGroupForm();
   _govEnsureCatalogs().then(_govFillCatalogDatalists).catch(() => {});
 }
@@ -1427,29 +1392,28 @@ function _govRenderWorkspaces() {
       lensCell = '<td class="gov-nowrap">' + state + action + '</td>';
     }
     const ownerCell = isAdmin
-      ? '<input id="govWsOwner_' + idx + '" type="text" placeholder="owner@example.com" value="' + _govEsc(owner) + '">'
+      ? '<input id="govWsOwner_' + idx + '" type="hidden" data-sp-picker data-sp-source="people" placeholder="' + _govT('picker_pick_owner', 'Pick an owner') + '" value="' + _govEsc(owner) + '">'
       : (_govEsc(owner) || '<span class="gov-muted">Shared (unowned)</span>');
     const membersCell = isAdmin
-      ? '<input id="govWsMembers_' + idx + '" type="text" placeholder="a@example.com, b@example.com" value="' + _govEsc(members.join(', ')) + '">'
+      ? '<input id="govWsMembers_' + idx + '" type="hidden" data-sp-picker data-sp-multi="1" data-sp-source="people" placeholder="' + _govT('picker_pick_members', 'Pick members') + '" value="' + _govEsc(members.join(', ')) + '">'
       : (_govEsc(members.join(', ')) || '<span class="gov-muted">none</span>');
     const actionsCell = isAdmin
       ? '<td class="gov-row-actions"><button type="button" class="gov-btn primary" onclick="_govSaveWorkspaceAssign(' + idx + ')">Save</button></td>'
       : '<td></td>';
     return '<tr>' +
-      '<td>' + _govEsc(w.name || '') + legacyBadge + '</td>' +
-      '<td class="gov-path">' + _govEsc(w.path || '') + '</td>' +
+      '<td class="gov-ws-name"><div>' + _govEsc(w.name || '') + legacyBadge + '</div><div class="gov-path" title="' + _govEsc(w.path || '') + '">' + _govEsc(w.path || '') + '</div></td>' +
       '<td>' + ownerCell + '</td>' +
       '<td>' + membersCell + '</td>' +
       lensCell +
       actionsCell +
     '</tr>';
   }).join('');
-  const colCount = filter ? 6 : 5;
+  const colCount = filter ? 5 : 4;
   el.innerHTML =
     '<div class="gov-form">' +
       '<div class="gov-form-title">Per-user view</div>' +
       '<div class="gov-form-row"><label for="govWsUserFilter">User email</label>' +
-        '<input id="govWsUserFilter" type="text" list="govWsUserEmails" placeholder="name@example.com" value="' + _govEsc(filter) + '" onchange="_govApplyWsUserFilter()"></div>' +
+        '<input id="govWsUserFilter" type="hidden" data-sp-picker data-sp-source="people" placeholder="' + _govT('picker_pick_person', 'Pick a person') + '" value="' + _govEsc(filter) + '" onchange="_govApplyWsUserFilter()"></div>' +
       '<datalist id="govWsUserEmails">' + options + '</datalist>' +
       '<div class="gov-form-actions">' +
         '<button type="button" class="gov-btn primary" onclick="_govApplyWsUserFilter()">Apply</button>' +
@@ -1458,11 +1422,12 @@ function _govRenderWorkspaces() {
     '</div>' +
     (isAdmin ? '' : '<div class="gov-muted">You are not a workspace admin: the list below only shows your own entries and editing is disabled.</div>') +
     '<div class="gov-table-wrap"><table class="gov-table"><thead><tr>' +
-      '<th>Name</th><th>Path</th><th>Owner</th><th>Members</th>' + lensHeader + '<th></th>' +
+      '<th>Name</th><th>Owner</th><th>Members</th>' + lensHeader + '<th></th>' +
     '</tr></thead><tbody>' +
     (rows || '<tr><td colspan="' + colCount + '" class="gov-muted">No workspaces configured.</td></tr>') +
     '</tbody></table></div>' +
     '<div class="gov-muted">Owner and members control who sees a workspace. An entry without either is legacy shared: visible to every signed-in user. Clearing the owner field returns an entry to legacy shared.</div>';
+  if (window.SpPicker) SpPicker.mountAll(el);
 }
 
 function _govApplyWsUserFilter() {
