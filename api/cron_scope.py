@@ -26,6 +26,8 @@ api/governance/enforce.py::enforce_request.
 from __future__ import annotations
 
 import logging
+import threading
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -107,17 +109,50 @@ def _identity_email(identity) -> str:
         return ""
 
 
+# Owner lookups for legacy WebUI-origin jobs (no ``origin.user_id`` stamp)
+# read the originating conversation's sidecar on EVERY /api/crons and Projects
+# hub request; five such jobs on the VPS cost 0.7 to 1.2 s per request because
+# their sidecars are large. Cache the answer per session keyed by the sidecar's
+# (size, mtime_ns): a rewritten sidecar misses, an unchanged one is one stat.
+_OWNER_EMAIL_CACHE: dict = {}
+_OWNER_EMAIL_CACHE_LOCK = threading.Lock()
+_OWNER_EMAIL_CACHE_MAX = 512
+
+
+def _session_sidecar_signature(session_id: str):
+    try:
+        from api.config import SESSION_DIR
+
+        st = (Path(SESSION_DIR) / f"{session_id}.json").stat()
+        return (st.st_size, st.st_mtime_ns)
+    except Exception:
+        return None
+
+
 def _session_owner_email(session_id: str) -> str:
     """Owner email of a WebUI conversation, empty when unknown. Best effort."""
     if not session_id:
         return ""
+    sid = str(session_id)
+    sig = _session_sidecar_signature(sid)
+    if sig is not None:
+        with _OWNER_EMAIL_CACHE_LOCK:
+            hit = _OWNER_EMAIL_CACHE.get(sid)
+            if hit is not None and hit[0] == sig:
+                return hit[1]
     try:
         from api.models import get_session
 
-        session = get_session(str(session_id), metadata_only=True)
-        return str(getattr(session, "owner_email", "") or "").strip().lower()
+        session = get_session(sid, metadata_only=True)
+        email = str(getattr(session, "owner_email", "") or "").strip().lower()
     except Exception:
         return ""
+    if sig is not None:
+        with _OWNER_EMAIL_CACHE_LOCK:
+            if len(_OWNER_EMAIL_CACHE) >= _OWNER_EMAIL_CACHE_MAX:
+                _OWNER_EMAIL_CACHE.clear()
+            _OWNER_EMAIL_CACHE[sid] = (sig, email)
+    return email
 
 
 def row_owned_by_identity(identity, row, session_owner=None) -> bool:

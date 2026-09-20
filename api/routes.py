@@ -1625,6 +1625,17 @@ def _ensure_agent_cron_import_path() -> None:
                     sys.modules.pop(name, None)
 
 
+def _list_profile_rows_without_counts(list_profiles_fn) -> list:
+    """Profile rows for callers that only read name/path/visible.
+
+    Skips the inline skill-count scan when the listing supports it; test
+    doubles that take no arguments keep working unchanged.
+    """
+    if _callable_accepts_kwarg(list_profiles_fn, "fast"):
+        return list_profiles_fn(fast=True, include_skill_counts=False)
+    return list_profiles_fn()
+
+
 def _cron_jobs_cross_profile(active_profile: str) -> tuple[list[dict], list[dict]]:
     """Return active-profile rows plus foreign rows for the Tasks panel.
 
@@ -1659,7 +1670,10 @@ def _cron_jobs_cross_profile(active_profile: str) -> tuple[list[dict], list[dict
         names.append(name)
 
     _add_name(active_profile)
-    for row in list_profiles_api():
+    # Names and visibility only: the full listing computes skill counts inline
+    # (parsing every SKILL.md of every profile once its 5-minute cache lapses),
+    # which made the Tasks panel and the Projects hub pay 1 to 2 s per open.
+    for row in _list_profile_rows_without_counts(list_profiles_api):
         if not isinstance(row, dict):
             continue
         name = str(row.get("name") or "").strip()
@@ -1701,7 +1715,7 @@ def _available_cron_profile_names() -> set[str]:
     from api.profiles import list_profiles_api
 
     names = {"default"}
-    for profile in list_profiles_api():
+    for profile in _list_profile_rows_without_counts(list_profiles_api):
         try:
             name = str(profile.get("name") or "").strip()
         except AttributeError:
@@ -11612,12 +11626,15 @@ def _handle_people_directory(handler) -> bool:
     asking people to type addresses, and a directory that leaks who has which
     rights would be a governance surface rather than a contact list.
     """
-    from api.governance.loader import load_governance_policy
+    from api.governance.loader import get_policy
     from api.ownership import request_owner_email
 
     people = []
     try:
-        policy = load_governance_policy()
+        # get_policy() serves the parsed policy per file version (one stat per
+        # call). load_governance_policy() re-parsed the 170 KB YAML on every
+        # picker open, ~300 ms on the VPS.
+        policy = get_policy()
     except Exception:
         logger.debug("people directory: governance policy unavailable", exc_info=True)
         return bad(handler, "People directory is unavailable. Please try again.", 503)

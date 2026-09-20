@@ -62,12 +62,32 @@ def _warm_model_catalog() -> None:
         print(f"[prewarm] model catalog warm failed: {e!r}", flush=True)
 
 
+def _warm_profile_rows() -> None:
+    # 3. Profile rows + bot metadata (every dropdown and the boot sequence ask
+    # for these; the first build parses 21 configs and kicks off the skill
+    # scans, which otherwise land on the first human request after a restart).
+    try:
+        from api import profiles as profiles_api, bot_metadata
+
+        t = time.time()
+        rows = profiles_api.list_profiles_api(fast=True)
+        for row in rows:
+            try:
+                bot_metadata.read_profile(row["name"])
+            except Exception:
+                pass
+        print(f"[prewarm] profile rows warm ({len(rows)} profiles, {time.time()-t:.1f}s)", flush=True)
+    except Exception as e:
+        print(f"[prewarm] profile rows warm failed: {e!r}", flush=True)
+
+
 def start_prewarm_thread() -> bool:
     """Start the pre-warm thread; returns True when started."""
     if not _prewarm_enabled():
         return False
     # Network discovery and local transcript projection are independent.
     threading.Thread(target=_warm_model_catalog, name="webui-prewarm-models", daemon=True).start()
+    threading.Thread(target=_warm_profile_rows, name="webui-prewarm-profiles", daemon=True).start()
     t = threading.Thread(target=_run, name="webui-prewarm", daemon=True)
     t.start()
     return True

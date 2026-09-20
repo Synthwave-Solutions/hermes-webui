@@ -6,6 +6,8 @@ parent's ACL. Legacy unowned roots and existing admin recovery stay compatible.
 This is application authorization, not an OS sandbox for host execution.
 """
 import json
+import time
+import threading
 from pathlib import Path
 
 
@@ -30,6 +32,31 @@ def load_acl_entries():
         raise PermissionError('Workspace membership unavailable') from None
 
 
+# Registry roots resolved through the filesystem, remembered for a short
+# window. The picker filter and the governance check both resolved every
+# registry entry for every candidate workspace (56 x 56 realpath walks per
+# /api/workspaces on the VPS); a workspace root's symlink chain does not
+# change from one request to the next.
+_RESOLVED_ROOT_CACHE: dict = {}
+_RESOLVED_ROOT_CACHE_LOCK = threading.Lock()
+_RESOLVED_ROOT_TTL_SECONDS = 30.0
+
+
+def _resolved_root(raw_path) -> Path:
+    key = str(raw_path)
+    now = time.monotonic()
+    with _RESOLVED_ROOT_CACHE_LOCK:
+        hit = _RESOLVED_ROOT_CACHE.get(key)
+        if hit is not None and hit[0] > now:
+            return hit[1]
+    resolved = Path(key).expanduser().resolve()
+    with _RESOLVED_ROOT_CACHE_LOCK:
+        if len(_RESOLVED_ROOT_CACHE) > 4096:
+            _RESOLVED_ROOT_CACHE.clear()
+        _RESOLVED_ROOT_CACHE[key] = (now + _RESOLVED_ROOT_TTL_SECONDS, resolved)
+    return resolved
+
+
 def ensure_scope_access(scope, path, *, entries=None):
     if scope == 'all' or not path:
         return
@@ -41,7 +68,7 @@ def ensure_scope_access(scope, path, *, entries=None):
             emails = entry_emails(entry)
             if not emails:
                 continue
-            root = Path(entry['path']).expanduser().resolve()
+            root = _resolved_root(entry['path'])
             if target.is_relative_to(root):
                 inside_any = True
                 if scope in emails:
@@ -115,7 +142,7 @@ def _ensure_governance_selection(identity, path, *, entries=None):
         target = Path(path).expanduser().resolve()
         rows = load_acl_entries() if entries is None else entries
         names = [str(row.get('name') or '') for row in rows
-                 if target.is_relative_to(Path(row['path']).expanduser().resolve())]
+                 if target.is_relative_to(_resolved_root(row['path']))]
         if grant_matches(access.deny.workspaces, str(target), path=True) or any(
                 grant_matches(access.deny.workspaces, name) for name in names):
             raise PermissionError('Workspace explicitly denied by governance')

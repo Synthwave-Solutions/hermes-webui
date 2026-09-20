@@ -1898,6 +1898,40 @@ def _skill_tree_max_mtime_ns(skills_dir: Path, config_path: Path) -> int:
     return max_ns
 
 
+# Parsed SKILL.md frontmatter keyed by the resolved file, validated by
+# (size, mtime_ns). Every profile on the VPS symlinks the same ~70 skill
+# directories, so a skill-count scan for 21 profiles read and parsed the same
+# files 21 times over; any write into the shared tree (skill usage ledgers,
+# curator state) re-queued all of them. With the cache, one parse per distinct
+# file per change.
+_SKILL_FRONTMATTER_CACHE: dict = {}
+_SKILL_FRONTMATTER_CACHE_LOCK = threading.Lock()
+_SKILL_FRONTMATTER_CACHE_MAX = 4096
+
+
+def _skill_frontmatter_cached(skill_md: Path, parse_frontmatter) -> dict:
+    try:
+        resolved = skill_md.resolve()
+        st = resolved.stat()
+        key = str(resolved)
+        sig = (st.st_size, st.st_mtime_ns)
+    except OSError:
+        content = skill_md.read_text(encoding="utf-8")[:4000]
+        frontmatter, _ = parse_frontmatter(content)
+        return frontmatter
+    with _SKILL_FRONTMATTER_CACHE_LOCK:
+        hit = _SKILL_FRONTMATTER_CACHE.get(key)
+        if hit is not None and hit[0] == sig:
+            return hit[1]
+    content = resolved.read_text(encoding="utf-8")[:4000]
+    frontmatter, _ = parse_frontmatter(content)
+    with _SKILL_FRONTMATTER_CACHE_LOCK:
+        if len(_SKILL_FRONTMATTER_CACHE) >= _SKILL_FRONTMATTER_CACHE_MAX:
+            _SKILL_FRONTMATTER_CACHE.clear()
+        _SKILL_FRONTMATTER_CACHE[key] = (sig, frontmatter)
+    return frontmatter
+
+
 def _compute_profile_skills_stats(profile_dir: Path) -> tuple[int, int]:
     """Compute (enabled_count, compatible_count) by reading and parsing all SKILL.md files."""
     skills_dir = profile_dir / "skills"
@@ -1909,7 +1943,10 @@ def _compute_profile_skills_stats(profile_dir: Path) -> tuple[int, int]:
     if config_path.exists():
         try:
             import yaml as _yaml
-            cfg = _yaml.safe_load(config_path.read_text(encoding="utf-8"))
+            # libyaml when present: the largest profile configs are ~290 KB and
+            # the pure-Python loader spent ~0.5 s per profile here.
+            cfg = _yaml.load(config_path.read_text(encoding="utf-8"),
+                             Loader=getattr(_yaml, "CSafeLoader", _yaml.SafeLoader))
             if isinstance(cfg, dict):
                 skills_cfg = cfg.get("skills")
                 if isinstance(skills_cfg, dict):
@@ -1935,8 +1972,7 @@ def _compute_profile_skills_stats(profile_dir: Path) -> tuple[int, int]:
 
     for skill_md in iter_skill_index_files(skills_dir, "SKILL.md"):
         try:
-            content = skill_md.read_text(encoding="utf-8")[:4000]
-            frontmatter, _ = parse_frontmatter(content)
+            frontmatter = _skill_frontmatter_cached(skill_md, parse_frontmatter)
             if not skill_matches_platform(frontmatter):
                 continue
             name = frontmatter.get("name", skill_md.parent.name)[:64]
@@ -2246,7 +2282,28 @@ def list_profiles_api(*, fast=False, include_skill_counts=True) -> list:
                 rows = _build_profile_rows_fast(deferred_counts=True, isolated=isolated,
                                                 include_skill_counts=include_skill_counts)
                 if rows is not None:
-                    pending = any(r.get('skill_counts_pending') for r in rows)
+                    # A pending count means the background scan has not landed
+                    # yet (its 5-minute cache lapsed, or a write into the shared
+                    # skills tree re-queued it). Carry the previously served
+                    # counts over rather than returning "pending": the numbers
+                    # are at most one scan stale, and the row cache keeps its
+                    # full TTL instead of rebuilding every 2 s until the scan
+                    # completes.
+                    if entry is not None and any(r.get('skill_counts_pending') for r in rows):
+                        previous = {r.get('name'): r for r in entry[0] if isinstance(r, dict)}
+                        for r in rows:
+                            if not r.get('skill_counts_pending'):
+                                continue
+                            old = previous.get(r.get('name'))
+                            if old is None or old.get('skill_counts_pending') or old.get('skill_count') is None:
+                                continue
+                            r['skill_count'] = old.get('skill_count')
+                            r['enabled_skills'] = old.get('enabled_skills')
+                            r['total_skills'] = old.get('total_skills')
+                            r['skill_counts_pending'] = False
+                    # Callers that opt out of counts get None by design; that is
+                    # not "pending" and must not shorten the TTL.
+                    pending = bool(include_skill_counts) and any(r.get('skill_counts_pending') for r in rows)
                     ttl = _LIST_PROFILES_FAST_PENDING_TTL if pending else _LIST_PROFILES_CACHE_TTL
                     _LIST_PROFILES_FAST_CACHE[cache_key] = (rows, time.time(), signature, ttl)
         if rows is not None:

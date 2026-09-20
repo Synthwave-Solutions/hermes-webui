@@ -190,9 +190,9 @@ def known_emails() -> set:
     grants transcript visibility, so an unavailable directory must fail closed.
     """
     try:
-        from api.governance.loader import load_governance_policy
+        from api.governance.loader import get_policy
 
-        policy = load_governance_policy()
+        policy = get_policy()
     except Exception:
         logger.debug("group chat: governance policy unavailable for validation", exc_info=True)
         return set()
