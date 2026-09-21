@@ -327,6 +327,29 @@ def _clean_workspace_list(workspaces: list) -> list:
     return result
 
 
+def overbroad_workspace_error(candidate: Path, *, home: Path | None = None, state_dir: Path | None = None) -> str | None:
+    """Refuse a workspace root that contains the home directory or the WebUI state.
+
+    The live membership check (api/workspace_access.py) denies any path that
+    lies inside a registered workspace the actor is not a member of. A root
+    such as "/" or "/home" contains every session's attachment inbox and the
+    engine cache, so registering it silently blocked uploads for everyone but
+    that entry's owner (Yaser, 20-09-2026). Such a root is never a workspace.
+    """
+    from api.config import STATE_DIR
+    try:
+        root = Path(candidate).expanduser().resolve()
+        home_dir = (home or Path.home()).resolve()
+        state = (state_dir or STATE_DIR).resolve()
+    except (OSError, RuntimeError, ValueError):
+        return None
+    for protected, label in ((home_dir, "the home directory"), (state, "the WebUI state directory")):
+        if protected == root or protected.is_relative_to(root):
+            return (f"Path is too broad for a workspace: {root} contains {label}. "
+                    "Register a project folder instead.")
+    return None
+
+
 def _workspace_access_error(candidate: Path, *, missing_label: str = "Path does not exist") -> str | None:
     """Return a user-facing validation error for an unusable workspace path.
 

@@ -23832,6 +23832,10 @@ def _handle_workspace_add(handler, body):
         p = validate_workspace_to_add(path_str)
     except ValueError as e:
         return bad(handler, str(e))
+    from api.workspace import overbroad_workspace_error
+    too_broad = overbroad_workspace_error(p)
+    if too_broad:
+        return bad(handler, too_broad)
     wss = load_workspaces()
     if any(w["path"] == str(p) for w in wss):
         return bad(handler, "Workspace already in list")
