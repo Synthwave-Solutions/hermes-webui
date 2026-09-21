@@ -25,6 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from api.cron_scope import (  # noqa: E402
     identity_sees_cron_profile,
+    identity_sees_cron_row,
     scope_cron_rows,
 )
 from api.governance import loader  # noqa: E402
@@ -578,3 +579,51 @@ def test_non_webui_origin_stays_on_profile_rule(inject_policy):
 
 def test_detail_routes_pass_job_id_to_scope_guard():
     assert "caller_sees_cron_profile(handler, _get_active_profile_name() or \"default\", job_id=_scope_job_id)" in ROUTES
+
+
+# ── Root store: profile grants are not a ticket to everyone's jobs (21 Sep 2026) ──
+
+ROOT_READER = "rootreader@example.test"
+ROOT_POLICY = json.loads(json.dumps(POLICY))
+ROOT_POLICY["roles"]["root_reader"] = {
+    "grants": {
+        "permissions": ["cron:read", "cron:write", "cron:run"],
+        "profiles": ["*"],
+        "routes": ["*"],
+    },
+}
+ROOT_POLICY["users"][ROOT_READER] = {"roles": ["root_reader"]}
+
+
+def test_root_store_rows_hidden_without_ownership_share_or_cron_admin(inject_policy):
+    inject_policy(ROOT_POLICY)
+    shared = dict(_job("s1", "default"), shared_with=[ROOT_READER])
+    own = _webui_job("w1", "default", "sess-9", user_id=ROOT_READER)
+    active = ACTIVE_ROWS + [shared, own]
+    kept_active, kept_other = scope_cron_rows(_identity(ROOT_READER), active, OTHER_ROWS,
+                                              session_owner=lambda sid: "")
+    assert [r["id"] for r in kept_active] == ["s1", "w1"]   # root rows only when own or shared
+    assert [r["id"] for r in kept_other] == ["b1", "b2", "b3"]  # other stores still follow the profile grant
+    admin_active, _ = scope_cron_rows(_identity("cronadmin@example.test"), active, OTHER_ROWS)
+    assert [r["id"] for r in admin_active] == ["a1", "a2", "s1", "w1"]
+
+
+def test_root_store_rows_stay_visible_under_report_only(inject_policy):
+    inject_policy(dict(ROOT_POLICY, mode="report_only"))
+    kept_active, _ = scope_cron_rows(_identity(ROOT_READER), ACTIVE_ROWS, [])
+    assert kept_active == ACTIVE_ROWS
+
+
+def test_identity_sees_cron_row_uses_store_profile_for_unlabelled_rows(inject_policy):
+    inject_policy(ROOT_POLICY)
+    row = {"id": "x1", "name": "legacy"}
+    assert identity_sees_cron_row(_identity(ROOT_READER), row, store_profile="default") is False
+    assert identity_sees_cron_row(_identity(ROOT_READER), row, store_profile="alpha") is True
+    assert identity_sees_cron_row(_identity("cronadmin@example.test"), row, store_profile="default") is True
+    assert identity_sees_cron_row(_identity(ROOT_READER), dict(row, shared_with=[ROOT_READER]), store_profile="default") is True
+
+
+def test_mutation_routes_pass_job_id_to_scope_guard():
+    marker = 'caller_sees_cron_profile(handler, _get_active_profile_name() or "default",\n' \
+             '                                        job_id=str((body or {}).get("job_id") or ""))'
+    assert marker in ROUTES

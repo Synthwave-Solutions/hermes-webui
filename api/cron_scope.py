@@ -32,6 +32,7 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 CRON_ADMIN_PERMISSION = "cron:admin"
+ROOT_PROFILE = "default"
 
 
 def _policy_mode() -> str:
@@ -81,17 +82,22 @@ def identity_sees_cron_profile(identity, profile) -> bool:
     """Pure decision core: may ``identity`` see jobs owned by ``profile``?
 
     Testable without a handler; the route-facing wrappers below resolve the
-    request identity and delegate here. Under ``report_only`` policy mode a
-    row that would be hidden is audited as ``would_deny`` and kept visible.
+    request identity and delegate here. The root store (``default``, where
+    every job created outside a personal profile lands) is only visible to
+    ``cron:admin`` holders: a profile grant covering it (``*`` or ``default``)
+    is not a ticket to the whole company's schedule (Michael, 21 Sep 2026).
+    Under ``report_only`` policy mode a row that would be hidden is audited as
+    ``would_deny`` and kept visible.
     """
     from api.governance.enforce import identity_has_permission, is_profile_allowed_for
 
     if identity_has_permission(identity, CRON_ADMIN_PERMISSION):
         return True
-    if is_profile_allowed_for(identity, str(profile or "default")):
+    target = str(profile or ROOT_PROFILE)
+    if target != ROOT_PROFILE and is_profile_allowed_for(identity, target):
         return True
     if _policy_mode() == "report_only":
-        _audit_would_deny(identity, profile)
+        _audit_would_deny(identity, target)
         return True
     return False
 
@@ -215,24 +221,49 @@ def _active_store_job(job_id: str):
 
 
 def caller_sees_cron_profile(handler, profile, job_id: str | None = None) -> bool:
-    """Route hook for the per-job detail endpoints (output/history/run/recent).
+    """Route hook for the per-job detail and mutation endpoints.
 
-    Those endpoints serve the ACTIVE profile's cron store, so a single check on
-    the active profile is enough to stop direct-URL retrieval of jobs outside
-    the caller's scope. A ``job_id`` lets a caller reach their OWN job in a
-    store their profile grants do not cover (see row_owned_by_identity).
+    Those endpoints serve the ACTIVE profile's cron store. With a ``job_id`` the
+    decision is per row (identity_sees_cron_row): the caller reaches their OWN
+    or a shared job in any store, a root-store job of somebody else only with
+    ``cron:admin``, and other stores by the profile rule. Without a ``job_id``
+    (status polling, delivery options, a request the handler will reject
+    anyway) the root store stays reachable because those payloads are
+    row-scoped separately (scope_cron_completions); other stores follow the
+    profile rule.
     """
     try:
         identity = _identity_for(handler)
-        if identity_sees_cron_profile(identity, profile):
-            return True
         if job_id:
             job = _active_store_job(job_id)
-            return row_owned_by_identity(identity, job) or row_shared_with_identity(identity, job)
-        return False
+            if job is not None:
+                return identity_sees_cron_row(identity, job, store_profile=str(profile or ROOT_PROFILE))
+        if str(profile or ROOT_PROFILE) == ROOT_PROFILE:
+            return True
+        return identity_sees_cron_profile(identity, profile)
     except Exception:
         logger.warning("cron scope governance check failed", exc_info=True)
         return False
+
+
+def _row_profile(row) -> str:
+    return str((row.get("owner_profile") if isinstance(row, dict) else None) or ROOT_PROFILE)
+
+
+def _root_store_visible(identity) -> bool:
+    """Rows of the root store that are neither own nor shared: cron:admin only."""
+    return identity_sees_cron_profile(identity, ROOT_PROFILE)
+
+
+def identity_sees_cron_row(identity, row, session_owner=None, store_profile: str | None = None) -> bool:
+    """Pure per-row decision: own or shared rows always, everything else by the
+    profile rule (root store: cron:admin only). ``store_profile`` names the
+    store a row was read from when the row carries no ``owner_profile`` (the
+    per-job detail routes serve the active store)."""
+    if row_owned_by_identity(identity, row, session_owner) or row_shared_with_identity(identity, row):
+        return True
+    profile = str((row.get("owner_profile") if isinstance(row, dict) else None) or store_profile or ROOT_PROFILE)
+    return identity_sees_cron_profile(identity, profile)
 
 
 def scope_cron_rows(identity, active_jobs, other_jobs, session_owner=None):
@@ -242,17 +273,21 @@ def scope_cron_rows(identity, active_jobs, other_jobs, session_owner=None):
     removed entirely, so neither their metadata nor their count leaks into the
     ``/api/crons`` payload (``other_profile_count`` is derived from the
     filtered ``other_jobs`` by the route). A row the caller created from their
-    own WebUI conversation is always kept, whichever store it lives in.
+    own WebUI conversation, or that was shared with them, is always kept,
+    whichever store it lives in. Rows of the root store are otherwise only
+    kept for ``cron:admin`` holders (see _root_store_visible).
     """
     decisions: dict[str, bool] = {}
+
+    def _profile_ok(profile: str) -> bool:
+        if profile not in decisions:
+            decisions[profile] = identity_sees_cron_profile(identity, profile)
+        return decisions[profile]
 
     def _keep(row) -> bool:
         if row_owned_by_identity(identity, row, session_owner) or row_shared_with_identity(identity, row):
             return True
-        profile = str((row.get("owner_profile") if isinstance(row, dict) else None) or "default")
-        if profile not in decisions:
-            decisions[profile] = identity_sees_cron_profile(identity, profile)
-        return decisions[profile]
+        return _profile_ok(_row_profile(row))
 
     return (
         [row for row in (active_jobs or []) if _keep(row)],

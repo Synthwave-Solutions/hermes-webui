@@ -15372,7 +15372,8 @@ def handle_post(handler, parsed) -> bool:
     if parsed.path in ("/api/crons/delete", "/api/crons/run",
                        "/api/crons/pause", "/api/crons/resume"):
         from api.cron_scope import caller_sees_cron_profile
-        if not caller_sees_cron_profile(handler, _get_active_profile_name() or "default"):
+        if not caller_sees_cron_profile(handler, _get_active_profile_name() or "default",
+                                        job_id=str((body or {}).get("job_id") or "")):
             return j(handler, {"error": "forbidden", "reason": "cron_scope"}, status=403)
 
     if parsed.path == "/api/crons/delete":
