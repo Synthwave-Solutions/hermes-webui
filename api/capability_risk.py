@@ -416,6 +416,14 @@ GKIND_RISKS = {
         "narrower": "",
         "depends_on": (),
     },
+    "skill_manage": {
+        "capability": "Lets this person change one skill: the written instructions the assistant follows for everyone who uses it.",
+        "data": "The skill's text and supporting files. Every later run of that skill, by anyone, follows the edited version.",
+        "risks": (),
+        "mitigation": "Approve for people who maintain that skill. Read the change afterwards: an edit reaches every user of the skill, not only the editor.",
+        "narrower": "A one-off change can be made by an admin instead of granting editing rights.",
+        "depends_on": (),
+    },
     "cli": {
         "capability": "Lets this person have the assistant run one command on this machine.",
         "data": "Everything that command can reach on the machine.",
@@ -823,7 +831,7 @@ def _explain_grant(entry: dict, payload: dict, skill_detail: bool) -> dict:
                 f"{out['capability']} It is a tool of the connected service "
                 f"named '{server}'."
             )
-    elif gkind == "skill":
+    elif gkind in {"skill", "skill_manage"}:
         description = _skill_description(value) if skill_detail else ""
         if description:
             out["capability"] = f"{out['capability']} The skill describes itself as: {description}"

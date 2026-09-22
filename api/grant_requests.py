@@ -35,6 +35,9 @@ def _spool_path() -> Path:
 # gkind -> (top-level grants section, nested path) applied on approval.
 _GRANT_TARGETS = {
     "skill": ("skills", ("view", "load")),
+    # Editing one skill (skill_manage). Approving adds the name to
+    # skills.manage only; viewing and loading it are a separate grant.
+    "skill_manage": ("skills", ("manage",)),
     "cli": ("cli", ("commands",)),
     "workdir": ("cli", ("workdir_roots",)),
     "file_read": ("files", ("read_roots",)),
@@ -112,6 +115,7 @@ def _request_label(item: dict) -> str:
     labels = {
         "cli": "CLI command",
         "skill": "Skill",
+        "skill_manage": "Skill editing",
         "workdir": "CLI workdir",
         "file_read": "File read access",
         "file_write": "File write access",
