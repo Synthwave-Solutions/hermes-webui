@@ -3586,8 +3586,13 @@ def _is_generic_fallback_title(title: str) -> bool:
     return str(title or '').strip().lower() in {'conversation topic'}
 
 
-def _run_background_title_update(session_id: str, user_text: str, assistant_text: str, placeholder_title: str, put_event, agent=None):
-    """Generate and publish a better title after `done`, then end the stream."""
+def _run_background_title_update(session_id: str, user_text: str, assistant_text: str, placeholder_title: str, put_event, agent=None, emit_stream_end=True):
+    """Generate and publish a better title after `done`, then end the stream.
+
+    SynthPulse passes ``emit_stream_end=False`` with a per-session channel
+    publisher: the chat stream already ended, so the title model no longer
+    holds a finished turn open (see ``_session_channel_put``).
+    """
     try:
         try:
             s = get_session(session_id)
@@ -3675,7 +3680,28 @@ def _run_background_title_update(session_id: str, user_text: str, assistant_text
         else:
             _put_title_status(put_event, session_id, 'skipped', source or 'unchanged', effective_title, raw_preview)
     finally:
-        put_event('stream_end', {'session_id': session_id})
+        if emit_stream_end:
+            put_event('stream_end', {'session_id': session_id})
+
+
+def _session_channel_put(session_id: str):
+    """Publish title events on the per-session channel (/api/session/stream).
+
+    The chat stream is closed once ``stream_end`` is sent, so a title that
+    arrives later travels on the session channel the open tab re-subscribes to.
+    Fire-and-forget: a tab that is not subscribed at that instant still gets
+    the persisted title on its next subscribe (routes replays it) or on the
+    next sidebar refresh.
+    """
+    def _put(event, data):
+        try:
+            from api.background_process import get_session_channel
+            channel = get_session_channel(session_id)
+            if channel is not None:
+                channel.emit(event, data)
+        except Exception:
+            logger.debug("session-channel title publish failed for %s", session_id, exc_info=True)
+    return _put
 
 
 def _run_background_title_refresh(session_id: str, user_text: str, assistant_text: str, current_title: str, put_event, agent=None):
@@ -10102,9 +10128,16 @@ def _run_agent_streaming(
                 # background-title thread spawn below. (#4923 gate hardening)
                 pass
             if _should_bg_title and _u0 and _a0:
+                # SynthPulse: end the turn now and let the first title follow
+                # on the per-session channel, instead of keeping the finished
+                # turn "Running" for the title model (3-5 s, more when the
+                # router is slow). Original session_id, as below (#652).
+                put('stream_end', {'session_id': session_id})
                 threading.Thread(
                     target=_run_background_title_update,
-                    args=(s.session_id, _u0, _a0, str(s.title or '').strip(), put, agent),
+                    args=(s.session_id, _u0, _a0, str(s.title or '').strip(),
+                          _session_channel_put(s.session_id), agent),
+                    kwargs={'emit_stream_end': False},
                     daemon=True,
                 ).start()
             else:
@@ -10114,8 +10147,9 @@ def _run_agent_streaming(
                 put('stream_end', {'session_id': session_id})
                 # Adaptive title refresh: re-generate title from latest exchange
                 # every N exchanges (when enabled in settings). Runs after stream_end
-                # so it doesn't block the stream.
-                _maybe_schedule_title_refresh(s, put, agent)
+                # so it doesn't block the stream; its title travels on the
+                # per-session channel because the chat stream is closed by then.
+                _maybe_schedule_title_refresh(s, _session_channel_put(s.session_id), agent)
         finally:
             # #4729: guaranteed-exit flush of any reasoning tail still buffered. On the
             # normal path the on_token/on_tool/post-run flushes already emptied it (no-op

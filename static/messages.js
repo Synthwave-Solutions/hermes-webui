@@ -8059,6 +8059,20 @@ function startSessionStream(sid) {
     // (attachLiveStream — the exact path /api/chat/start uses) to the
     // server-created stream so the open tab renders the turn live. Reuses
     // the one renderer; does NOT hand-roll a second one.
+    // ── Session title (SynthPulse) ─────────────────────────────────────────
+    // The first LLM title is generated after the chat stream ended, so it
+    // arrives here instead of on /api/chat/stream (the server also replays a
+    // generated title to every new subscriber). Keeps a finished turn from
+    // staying "Running" while the title model answers.
+    es.addEventListener('title', e => {
+      try {
+        const d = JSON.parse(e.data || '{}');
+        const evSid = d.session_id || sid;
+        if (evSid !== sid || !d.title) return;
+        applySessionTitleUpdate(evSid, d.title);
+      } catch (_) {}
+    });
+
     // ── Group conversations: another participant just spoke ──────────────
     // Reported by Michael on 20 Sep 2026: other people's turns only showed up
     // after a refresh. The server now fans `peer_turn_started` {stream_id,

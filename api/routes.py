@@ -19826,6 +19826,19 @@ def _handle_session_sse_stream(handler, parsed):
                 exc_info=True,
             )
 
+        # SynthPulse: the first LLM title is published on this channel after the
+        # chat stream ended, while the tab usually has this stream closed (it is
+        # paused during a live chat stream). Replay a generated title to every
+        # new subscriber so a title finished inside that gap still arrives.
+        try:
+            title_session = get_session(sid, metadata_only=True)
+            if getattr(title_session, "llm_title_generated", False) and str(title_session.title or "").strip():
+                _sse(handler, 'title', {"session_id": sid, "title": str(title_session.title).strip()})
+        except _CLIENT_DISCONNECT_ERRORS:
+            raise
+        except Exception:
+            logger.debug("session-stream title replay failed for %s", sid, exc_info=True)
+
         while True:
             try:
                 payload = q.get(timeout=_SSE_HEARTBEAT_INTERVAL_SECONDS)

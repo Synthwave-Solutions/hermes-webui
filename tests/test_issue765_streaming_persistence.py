@@ -332,12 +332,19 @@ class TestIssue765FollowupHardening:
             encoding="utf-8"
         )
         stop_idx = src.find("if _checkpoint_stop is not None:\n                _checkpoint_stop.set()")
-        join_idx = src.find("if _ckpt_thread is not None:\n                _ckpt_thread.join(timeout=15)")
+        # The join is timed now (checkpoint_join stage), one level deeper.
+        join_idx = src.find(
+            "with _run_timing_stage('checkpoint_join'):\n"
+            "                if _ckpt_thread is not None:\n"
+            "                    _ckpt_thread.join(timeout=15)"
+        )
         lock_idx = src.find(
             "with _agent_lock:\n"
             "                if not ephemeral and not _stream_writeback_is_current(s, stream_id):"
         )
-        save_idx = src.find("_result_messages = _settle_result_messages(")
+        # The settlement helper was folded into the merge stage; its first line
+        # is now the result read below (still inside the success-path lock).
+        save_idx = src.find("_result_messages = result.get('messages') or _previous_context_messages")
 
         assert stop_idx != -1, "Success path must stop the checkpoint thread"
         assert join_idx != -1, "Success path must join the checkpoint thread"
