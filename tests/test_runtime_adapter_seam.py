@@ -326,7 +326,10 @@ def test_approval_respond_does_not_fallback_to_oldest_when_explicit_id_is_stale(
 
     assert "A stale explicit id must not accidentally approve" in helper_body
     assert "if not pending and not approval_id:" in helper_body
-    stale_branch = helper_body[helper_body.index("else:", helper_body.index("for i, entry")):helper_body.index("else:\n                pending = queue.pop(0)")]
+    # SynthPulse checks governance before popping the oldest entry, so anchor
+    # on the pop itself and take the `else:` that opens its branch.
+    pop_oldest = helper_body.index("pending = queue.pop(0) if queue else None")
+    stale_branch = helper_body[helper_body.index("else:", helper_body.index("for i, entry")):helper_body.rindex("else:", 0, pop_oldest)]
     assert "pending = None" in stale_branch
     assert "queue.pop(0)" not in stale_branch
 
@@ -440,7 +443,10 @@ def test_runner_local_chat_start_selection_does_not_fallback_to_legacy():
     start_idx = src.index("def _handle_chat_start")
     start_body = src[start_idx:src.index("def _resolve_chat_workspace_with_recovery", start_idx)]
 
-    flag_branch = "if runtime_adapter_enabled() or runtime_adapter_runner_enabled():"
+    # SynthPulse keeps continuations and group conversations on the governed
+    # local worker, so they bypass the adapter branch.
+    flag_branch = ("if not continuation_ref and (runtime_adapter_enabled() or runtime_adapter_runner_enabled())"
+                   " and not (getattr(s, 'participants', None) or getattr(s, 'bot_participants', None)):")
     assert flag_branch in helper_body
     assert "except NotImplementedError as exc:" in helper_body
     # The helper returns {"error": str(exc), "_status": 501}; the route then

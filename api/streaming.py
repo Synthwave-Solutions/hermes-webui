@@ -12249,100 +12249,24 @@ def _run_agent_streaming(
             _error_payload['old_session_id'] = session_id
         put('apperror', _error_payload)
     finally:
-        # #4633/#2476: symmetric metering teardown. begin_session() (top of the
-        # outer try) had no paired end_session(), so zero-token turns leaked a
-        # _sessions[stream_id] entry that get_stats() pruning never reclaims (its
-        # criterion requires first_token_ts > 0). end_session() is idempotent —
-        # it just pops _sessions[stream_id]; the metering payload is unchanged.
-        # _metering_stop.set() deterministically stops the ticker (the inner
-        # finally also sets it on the normal path; setting twice is harmless).
         try:
-            # 0: end_session() currently ignores final_output_tokens — it only
-            # pops _sessions[stream_id]. If it is ever extended to consume the
-            # count (e.g. persisting final output tokens to a billing ledger),
-            # this teardown caller will need to supply the real total; the outer
-            # finally doesn't have easy access to it today.
-            meter().end_session(stream_id, 0)
-        except Exception:
-            logger.debug("Failed to end metering session for stream %s", stream_id, exc_info=True)
-        _metering_stop.set()
-        # Stop the periodic checkpoint thread before the final recovery path.
-        # The checkpoint thread also uses the per-session lock; joining it first
-        # avoids contending with checkpoint writes during stale-pending repair.
-        if _checkpoint_stop is not None:
-            _checkpoint_stop.set()
-        if _ckpt_thread is not None:
-            _ckpt_thread.join(timeout=15)
-        if (s is not None
-                and getattr(s, 'active_stream_id', None) == stream_id
-                and getattr(s, 'pending_user_message', None)):
-            update_active_run(stream_id, phase="finalizing")
-            _last_resort_sync_from_core(s, stream_id, _agent_lock)
-        _clear_thread_env()  # TD1: always clear thread-local context
-        if _streaming_cron_profile_home_token is not None:
-            _STREAMING_CRON_PROFILE_HOME.reset(_streaming_cron_profile_home_token)
-        if _restore_streaming_skill_home_modules and _streaming_skill_home_snapshot is not None:
-            with _ENV_LOCK:
-                if restore_skill_home_modules is not None:
-                    try:
-                        restore_skill_home_modules(_streaming_skill_home_snapshot)
-                    except Exception:
-                        logger.debug("Failed to restore skill module state for streaming profile", exc_info=True)
-                _streaming_skill_home_snapshot = None
-                _restore_streaming_skill_home_modules = False
-        if _acquired_streaming_skill_home_patch_lock:
-            _SKILL_HOME_MODULE_PATCH_LOCK.release()
-            _acquired_streaming_skill_home_patch_lock = False
-        _reset_streaming_hermes_home_override(*_streaming_hermes_home_override_ctx)
-        # xsession wakeup misroute root fix (Option 1): restore the per-turn
-        # session-identity context-locals (reset-token semantics). MUST run on
-        # every exit path so a reused thread-pool worker leaks no identity and
-        # CLI/cron env fallback resumes — same lifecycle slot as the env
-        # restore above.
-        _reset_turn_session_identity(_turn_session_identity_tokens)
-        with STREAMS_LOCK:
-            STREAMS.pop(stream_id, None)
-            CANCEL_FLAGS.pop(stream_id, None)
-            AGENT_INSTANCES.pop(stream_id, None)  # Clean up agent instance reference
-            STREAM_PARTIAL_TEXT.pop(stream_id, None)  # Clean up partial text buffer (#893)
-            STREAM_REASONING_TEXT.pop(stream_id, None)  # Clean up reasoning trace (#1361 §A)
-            STREAM_LIVE_TOOL_CALLS.pop(stream_id, None)  # Clean up tool calls (#1361 §B)
-            STREAM_GOAL_RELATED.pop(stream_id, None)  # Clean up goal-related flag (#1932)
-            STREAM_LAST_EVENT_ID.pop(stream_id, None)  # Clean up event_id pointer (stage-364)
-            unregister_active_run(stream_id)
-            # Clean up the stream-owner registry so stale stream_id→session_id
-            # mappings do not accumulate over thousands of completed streams (#6351).
-            unregister_stream_owner(stream_id)
-            # NOTE: do NOT discard PENDING_GOAL_CONTINUATION here. The marker
-            # is set by goal_continue (line ~3328) inside the SAME function
-            # call and consumed atomically by `_start_chat_stream_for_session`
-            # in routes.py (around line 6522) when the next stream starts.
-            # Discarding here in the streaming worker's `finally` would
-            # almost always race ahead of the frontend's SSE-receive →
-            # POST /api/chat/start round-trip and erase the marker before
-            # the next stream can read it, breaking the goal-continuation
-            # chain. Stage-326 critical fix per Opus advisor review.
-
-        # ── Defer-path fix: turn-teardown idle-hook ────────────────────────
-        # The session has just transitioned active→idle: unregister_active_run
-        # above cleared this stream's ACTIVE_RUNS row (under ACTIVE_RUNS_LOCK,
-        # independent of STREAMS_LOCK), so _session_has_active_turn() is now
-        # False for this session unless a *different* stream is still active
-        # (cancel/reconnect — drain_deferred_wakeups_for_session guards on
-        # that and leaves the marker for the later teardown). A FAST
-        # background task that completed while this turn was tearing down was
-        # deferred by api/background_process._process_one (it could not start
-        # a turn → would 409) and its wakeup_prompt persisted in
-        # DEFERRED_PROCESS_WAKEUPS. For an autonomous agent there is no next
-        # user turn, so the PR #2279 next-turn drain never runs; without this
-        # hook the deferred wakeup is lost forever (the Test B failure). This
-        # makes the busy-at-completion case symmetric with the idle case:
-        # idle now → fire now (Option Z idle branch); busy now → fire here at
-        # turn-end. claim_deferred_wakeups pops atomically, so this is
-        # idempotent with the next-turn drain (no double-fire) and the wakeup
-        # turn's own teardown finds nothing claimed (no wakeup loop). The
-        # drain spawns its own daemon thread, so teardown never blocks.
-        try:
+            # #4633/#2476: symmetric metering teardown. begin_session() (top of the
+            # outer try) had no paired end_session(), so zero-token turns leaked a
+            # _sessions[stream_id] entry that get_stats() pruning never reclaims (its
+            # criterion requires first_token_ts > 0). end_session() is idempotent —
+            # it just pops _sessions[stream_id]; the metering payload is unchanged.
+            # _metering_stop.set() deterministically stops the ticker (the inner
+            # finally also sets it on the normal path; setting twice is harmless).
+            try:
+                # 0: end_session() currently ignores final_output_tokens — it only
+                # pops _sessions[stream_id]. If it is ever extended to consume the
+                # count (e.g. persisting final output tokens to a billing ledger),
+                # this teardown caller will need to supply the real total; the outer
+                # finally doesn't have easy access to it today.
+                meter().end_session(stream_id, 0)
+            except Exception:
+                logger.debug("Failed to end metering session for stream %s", stream_id, exc_info=True)
+            _metering_stop.set()
             if _personal_memory_token is not None:
                 reset_personal_memory_dir(_personal_memory_token)
             # Stop the periodic checkpoint thread before the final recovery path.
@@ -12358,8 +12282,22 @@ def _run_agent_streaming(
                 update_active_run(stream_id, phase="finalizing")
                 _last_resort_sync_from_core(s, stream_id, _agent_lock)
             _clear_thread_env()  # TD1: always clear thread-local context
+            # Each scope below was entered once, so it is left exactly once.
             if _streaming_cron_profile_home_token is not None:
                 _STREAMING_CRON_PROFILE_HOME.reset(_streaming_cron_profile_home_token)
+            if _restore_streaming_skill_home_modules and _streaming_skill_home_snapshot is not None:
+                with _ENV_LOCK:
+                    if restore_skill_home_modules is not None:
+                        try:
+                            restore_skill_home_modules(_streaming_skill_home_snapshot)
+                        except Exception:
+                            logger.debug("Failed to restore skill module state for streaming profile", exc_info=True)
+                    _streaming_skill_home_snapshot = None
+                    _restore_streaming_skill_home_modules = False
+            if _acquired_streaming_skill_home_patch_lock:
+                _SKILL_HOME_MODULE_PATCH_LOCK.release()
+                _acquired_streaming_skill_home_patch_lock = False
+            _reset_streaming_hermes_home_override(*_streaming_hermes_home_override_ctx)
             # xsession wakeup misroute root fix (Option 1): restore the per-turn
             # session-identity context-locals (reset-token semantics). MUST run on
             # every exit path so a reused thread-pool worker leaks no identity and
@@ -12388,6 +12326,9 @@ def _run_agent_streaming(
                 STREAM_GOAL_RELATED.pop(stream_id, None)  # Clean up goal-related flag (#1932)
                 STREAM_LAST_EVENT_ID.pop(stream_id, None)  # Clean up event_id pointer (stage-364)
                 unregister_active_run(stream_id)
+                # Clean up the stream-owner registry so stale stream_id→session_id
+                # mappings do not accumulate over thousands of completed streams (#6351).
+                unregister_stream_owner(stream_id)
                 # NOTE: do NOT discard PENDING_GOAL_CONTINUATION here. The marker
                 # is set by goal_continue (line ~3328) inside the SAME function
                 # call and consumed atomically by `_start_chat_stream_for_session`
@@ -12399,6 +12340,11 @@ def _run_agent_streaming(
                 # chain. Stage-326 critical fix per Opus advisor review.
 
         finally:
+            # Upstream drains deferred process wakeups here at turn teardown.
+            # This fork drains them in _drain_after_worker_retirement instead,
+            # when the last owner of the session retires: a wakeup turn started
+            # while this worker (or a leased cancellation callback) still owns
+            # the session would be refused.
             from api.worker_ownership import release as release_worker
             try:
                 try:

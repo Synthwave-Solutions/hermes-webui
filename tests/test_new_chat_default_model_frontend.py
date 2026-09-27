@@ -58,15 +58,20 @@ def test_boot_model_hydration_prefers_active_session_over_persisted_model():
 
 def test_hard_refresh_hydrates_saved_session_model_before_revealing_model_chip():
     boot_js = Path("static/boot.js").read_text(encoding="utf-8")
-    load_marker = "await loadSession(saved, {preserveActiveInput:true});"
+    # SynthPulse (53071075) also passes draftInputGeneration, primes the
+    # saved route synchronously, and only awaits the catalog dropdown when
+    # that route cannot be applied yet, so a slow catalog never delays the
+    # restored chat. Either way the model is applied before S._bootReady.
+    load_marker = "loadSession(saved, {preserveActiveInput:true"
     assert load_marker in boot_js
     restore_end = "await checkInflightOnBoot(saved);"
     saved_restore = boot_js[boot_js.index(load_marker) : boot_js.index(restore_end, boot_js.index(load_marker))]
-    assert "await _startBootModelDropdown();" in saved_restore
-    assert saved_restore.index("await _startBootModelDropdown();") > saved_restore.index(load_marker)
-    assert saved_restore.index("await _startBootModelDropdown();") < saved_restore.index("S._bootReady=true;"), (
-        "hard refresh must hydrate/re-apply the active session model before S._bootReady lets syncModelChip display stale static HTML defaults"
-    )
+    ready = saved_restore.index("S._bootReady=true;")
+    for step in ("_primeRestoredSessionModelForBoot()", "else await _startBootModelDropdown();"):
+        assert step in saved_restore
+        assert saved_restore.index(load_marker) < saved_restore.index(step) < ready, (
+            "hard refresh must hydrate/re-apply the active session model before S._bootReady lets syncModelChip display stale static HTML defaults"
+        )
 
 
 def test_pwa_new_chat_launch_does_not_block_first_paint_on_model_catalog():

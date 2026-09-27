@@ -14,10 +14,15 @@ ROUTES_PY = (REPO / "api" / "routes.py").read_text(encoding="utf-8")
 
 
 def test_profile_create_form_exposes_model_picker():
-    assert 'id="profileFormModel"' in PANELS_JS
+    # SynthPulse replaced the profile create form with the guided bot builder
+    # (6cb8de88, docs/bot-builder.md): a new bot starts on the configured
+    # model, which the review step shows before anything is created. The
+    # #749 payload and route plumbing stay covered by the tests below.
+    bot_builder = (REPO / "static" / "bot-builder.js").read_text(encoding="utf-8")
+    assert "if(window.BotBuilder){window.BotBuilder.open();return;}" in PANELS_JS
     assert "_populateProfileFormModelSelect" in PANELS_JS
-    assert "profile_model_label" in PANELS_JS
-    assert "profile_model_hint" in PANELS_JS
+    assert "c.default_model" in bot_builder
+    assert "c.model_provider" in bot_builder
 
 
 def test_profile_create_payload_preserves_provider_context():

@@ -531,6 +531,11 @@ global.EventSource=FakeEventSource;
 const attachStart=messagesSrc.indexOf('function attachLiveStream(');
 const attachEnd=messagesSrc.indexOf('\nfunction transcript(){',attachStart);
 if(attachStart<0||attachEnd<0) throw new Error('attachLiveStream source boundary not found');
+// attachLiveStream only attaches the current pane's own stream and keeps a
+// per-session attachment registry (bd24eeb1).
+eval(extractFunc(messagesSrc,'_isSessionCurrentPane'));
+global._LIVE_STREAM_ATTACHMENTS={};
+eval(extractFunc(messagesSrc,'_liveStreamAttachmentIsCurrent'));
 eval(messagesSrc.slice(attachStart,attachEnd));
 attachLiveStream('sid-1','stream-1');
 const source=FakeEventSource.instances[0];

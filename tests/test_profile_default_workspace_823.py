@@ -157,11 +157,24 @@ class TestProfileActiveDefaultWorkspaceApi:
             "j",
             lambda _handler, payload, status=200: {"status": status, "payload": payload},
         )
+        # SynthPulse: the profile's remembered workspace is a hint shared by
+        # everyone on that profile, so the route projects it through the
+        # caller's workspace access before exposing it.
+        import api.workspace_access as workspace_access
+
+        consulted = []
+
+        def fake_implicit(handler, preferred=None):
+            consulted.append(preferred)
+            return preferred
+
+        monkeypatch.setattr(workspace_access, "resolve_implicit_workspace", fake_implicit)
 
         from types import SimpleNamespace
         from urllib.parse import urlparse
 
         response = routes.handle_get(SimpleNamespace(), urlparse("/api/profile/active"))
 
+        assert consulted == [expected_ws]
         assert response["payload"]["default_workspace"] == expected_ws
         assert response["payload"]["name"] == "work"
