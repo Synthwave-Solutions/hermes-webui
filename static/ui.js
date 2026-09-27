@@ -19820,7 +19820,16 @@ function _loadExternalScript(src,integrity){
 function ensurePrism(){
   if(typeof Prism!=='undefined')return Promise.resolve(Prism);
   if(_prismLoadPromise)return _prismLoadPromise;
-  if(!$('prism-theme')){const link=document.createElement('link');link.id='prism-theme';link.rel='stylesheet';link.href='https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css';link.crossOrigin='anonymous';document.head.appendChild(link);}
+  if(!$('prism-theme')){
+    // Match the current theme on first use; _setResolvedTheme keeps it in
+    // sync after that. The lazy link always took the dark stylesheet, so light
+    // mode showed dark code colours until the theme changed. No SRI on the
+    // theme CSS (#1100).
+    const dark=document.documentElement.classList.contains('dark');
+    const link=document.createElement('link');link.id='prism-theme';link.rel='stylesheet';
+    link.href=dark?'https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css':'https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism.min.css';
+    link.crossOrigin='anonymous';document.head.appendChild(link);
+  }
   _prismLoadPromise=_loadExternalScript('https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js','sha384-MXybTpajaBV0AkcBaCPT4KIvo0FzoCiWXgcihYsw4FUkEz0Pv3JGV6tk2G8vJtDc').then(()=>_loadExternalScript('https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js','sha384-Uq05+JLko69eOiPr39ta9bh7kld5PKZoU+fF7g0EXTAriEollhZ+DrN8Q/Oi8J2Q')).then(()=>Prism).catch(err=>{_prismLoadPromise=null;console.warn('[prism] lazy load failed',err);throw err;});
   return _prismLoadPromise;
 }

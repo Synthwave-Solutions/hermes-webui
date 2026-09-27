@@ -24,7 +24,10 @@ def test_handler_adds_content_security_policy_report_only(monkeypatch):
     policy = headers["Content-Security-Policy-Report-Only"]
     assert "default-src 'self'" in policy
     assert "object-src 'none'" in policy
-    assert "frame-ancestors 'none'" in policy
+    # Same-origin only since the split view (05a4329a, 17 Aug 2026) frames the
+    # app itself; cross-origin embedding stays blocked.
+    assert "frame-ancestors 'self'" in policy
+    assert "frame-ancestors *" not in policy
     assert "base-uri 'self'" in policy
     assert "report-uri /api/csp-report" in policy
     assert "report-to csp-endpoint" in policy

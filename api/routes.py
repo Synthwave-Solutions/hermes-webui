@@ -17300,7 +17300,11 @@ def handle_post(handler, parsed) -> bool:
         )
 
         if "bot_name" in body:
-            body["bot_name"] = (str(body["bot_name"]) or "").strip() or "Hermes"
+            # An empty name falls back to the configured default (SynthPulse,
+            # or HERMES_WEBUI_BOT_NAME), the same value a fresh install shows.
+            # It fell back to "Hermes" while the default had become SynthPulse.
+            from api.config import _SETTINGS_DEFAULTS as _bot_name_defaults
+            body["bot_name"] = (str(body["bot_name"]) or "").strip() or _bot_name_defaults["bot_name"]
 
         auth_enabled_before = is_auth_enabled()
         password_auth_enabled_before = auth_enabled_before and get_password_hash() is not None
