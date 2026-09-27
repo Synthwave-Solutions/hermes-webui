@@ -20,6 +20,9 @@ The rules pinned here:
   ``shared_with`` only names people in the policy.
 * On create the owner and the origin are stamped from the signed-in identity.
 * The four job routes read ``job_id`` once, as a non-empty string.
+* Run now runs governed: through the engine's ``run_job_governed`` when it
+  has one, otherwise bound to the owner's governance like a chat turn, and
+  never unbound for anyone but a cron admin.
 * ``report_only`` never enforces (it audits ``would_deny``), and installs with
   governance off behave as before.
 
@@ -45,6 +48,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from api.governance import loader  # noqa: E402
 from api.governance.audit import read_audit_events  # noqa: E402
 from api.governance.loader import parse_governance_policy  # noqa: E402
+from api.governance.agent_context import (  # noqa: E402
+    bind_governed_agent_turn as _REAL_BIND,
+    reset_governed_agent_turn as _REAL_RESET,
+)
 from api.profiles import cron_profile_context as _REAL_CRON_PROFILE_CONTEXT  # noqa: E402
 from api.routes import _handle_cron_run as _REAL_HANDLE_CRON_RUN  # noqa: E402
 
@@ -355,7 +362,7 @@ def env(monkeypatch, inject_policy):
 @pytest.fixture
 def run_env(env, monkeypatch, tmp_path):
     """``env`` with the real Run now handler. The worker thread it starts is
-    recorded (job and homes) instead of running the job."""
+    recorded (job, homes and the run plan) instead of running the job."""
     import threading
 
     import api.profiles as profiles
@@ -370,9 +377,10 @@ def run_env(env, monkeypatch, tmp_path):
     env.runs = []
     started = threading.Event()
 
-    def _tracked(job, profile_home=None, execution_profile_home=None, event_profile=None):
+    def _tracked(job, profile_home=None, execution_profile_home=None, event_profile=None, run_plan=None):
         env.runs.append(SimpleNamespace(job=job, profile_home=profile_home,
-                                        execution_profile_home=execution_profile_home))
+                                        execution_profile_home=execution_profile_home,
+                                        run_plan=run_plan))
         routes._mark_cron_done(job["id"])
         started.set()
 
@@ -388,6 +396,16 @@ def run_env(env, monkeypatch, tmp_path):
 
     env.act = _act
     return env
+
+
+def _engine_has_run_job_governed(monkeypatch, present=True):
+    """Give the fake engine the governed entry point E0 adds, or take it away."""
+    scheduler = sys.modules["cron.scheduler"]
+    if present:
+        monkeypatch.setattr(scheduler, "run_job_governed",
+                            lambda job, *, reason, **kwargs: None, raising=False)
+    else:
+        monkeypatch.delattr(scheduler, "run_job_governed", raising=False)
 
 
 # The payloads static/panels.js sends today (emoji picker L1397, category
@@ -1388,3 +1406,462 @@ def test_real_engine_store_with_immutable_identity_fields(tmp_path, monkeypatch,
     routes._handle_cron_update(handler, {"job_id": job_id, "owner_email": ""})
     assert handler.status == 400
     assert jobs.JOBS_FILE.read_bytes() == before
+
+
+# ── Run now runs governed ───────────────────────────────────────────────────
+# POST /api/crons/run ran the job in a spawned child through
+# cron.scheduler.run_job with no governance bound: the tool, skill, MCP and
+# model gates were off for that run, so a job ran with more than its owner's
+# rights, and an ownerless agent job ran unbound under enforce. The child now
+# runs it through the engine's governed entry point (run_job_governed, from
+# the engine identity fix) when the engine has one; the gate reads the policy
+# of the store that holds the job. On an engine without it the child binds
+# the owner's governance the way a chat turn binds its sender's, only a cron
+# admin or the job's owner may start a run, and nobody but a cron admin runs a
+# job with nothing bound.
+
+RUN_REFUSAL = "Not run: this scheduled task has no owner."  # the fake engine's
+
+
+def _ownerless_cli_task():
+    return {
+        "id": "cli",
+        "name": "CLI task",
+        "prompt": "ping",
+        "schedule": {"kind": "interval", "minutes": 60},
+        "deliver": "local",
+        "owner_email": "",
+        "origin": None,
+    }
+
+
+def _plan(run_as, *, unbound_allowed=False, store_home=None, profile="default"):
+    return {
+        "run_as": run_as,
+        "unbound_allowed": unbound_allowed,
+        "profile": profile,
+        "store_home": str(store_home) if store_home is not None else None,
+        "governance_policy": "",
+    }
+
+
+def _bound_email():
+    """Who the engine's governance context names right now (None: unbound)."""
+    try:
+        from hermes_cli.dashboard_governance.context import current_governance_context
+    except ImportError:
+        return None
+    ctx = current_governance_context()
+    return None if ctx is None else ctx.subject.normalized_email
+
+
+def _run_now_scheduler(monkeypatch, events, *, governed, outcome="ran"):
+    """A cron.scheduler stand-in. With ``governed`` it has run_job_governed
+    with the engine's result shape, and like the engine it looks run_job up on
+    the module when a run starts."""
+    import os
+
+    scheduler = types.ModuleType("cron.scheduler")
+    scheduler._KNOWN_DELIVERY_PLATFORMS = frozenset({"telegram", "slack"})
+
+    def run_job(job, **kwargs):
+        events.append(("run_job", job["id"], os.environ.get("HERMES_HOME"), _bound_email()))
+        return True, "output", "final", None
+
+    scheduler.run_job = run_job
+    if governed:
+        def run_job_governed(job, *, reason, record_refusal=True, **kwargs):
+            events.append(("gate", job["id"], reason, record_refusal, os.environ.get("HERMES_HOME")))
+            owner = str(job.get("owner_email") or "")
+            if outcome == "refused":
+                return SimpleNamespace(outcome="refused", success=False, output="", final_response="",
+                                       error=RUN_REFUSAL, refusal=RUN_REFUSAL,
+                                       refusal_recorded=record_refusal, owner_email=owner)
+            if outcome == "failed":
+                return SimpleNamespace(outcome="failed", success=False, output="", final_response="",
+                                       error="ValueError: boom", refusal=None,
+                                       refusal_recorded=False, owner_email=owner)
+            success, output, final, error = scheduler.run_job(job, **kwargs)
+            return SimpleNamespace(outcome="ran", success=success, output=output, final_response=final,
+                                   error=error, refusal=None, refusal_recorded=False, owner_email=owner)
+
+        scheduler.run_job_governed = run_job_governed
+    monkeypatch.setitem(sys.modules, "cron.scheduler", scheduler)
+    return scheduler
+
+
+# Deciding on the request: who the run executes as, and who may start one.
+
+def test_run_now_runs_as_the_owner(run_env):
+    env = run_env
+    assert env.act(OWNER, "run", "own").status == 200
+    run = env.runs[0]
+    assert run.profile_home == env.store_home
+    assert run.run_plan["run_as"] == OWNER
+    assert run.run_plan["unbound_allowed"] is False
+    assert run.run_plan["store_home"] == str(env.store_home)
+    assert run.run_plan["profile"] == "default"
+
+
+def test_run_now_for_admins_and_legacy_creators(run_env):
+    env = run_env
+    env.store.jobs["cli"] = _ownerless_cli_task()
+    assert env.act(ADMIN, "run", "own").status == 200     # owned: it runs as its owner
+    assert env.act(ADMIN, "run", "cli").status == 200     # ownerless: an admin runs it unbound
+    assert env.act(OWNER, "run", "legacy").status == 200  # before the owner stamp: its creator
+    plans = [(run.run_plan["run_as"], run.run_plan["unbound_allowed"]) for run in env.runs]
+    assert plans == [(OWNER, True), ("", True), (OWNER, False)]
+
+
+@pytest.mark.parametrize("governed", [False, True], ids=["engine-without-entry", "governed-engine"])
+def test_run_now_under_enforce_stays_with_the_owner_and_admins(run_env, monkeypatch, governed):
+    env = run_env
+    _engine_has_run_job_governed(monkeypatch, governed)
+    handler = env.act(SHAREE, "run", "own")
+    assert handler.status == 403 and handler.body["reason"] == "cron_owner"
+    env.active = "alpha"
+    handler = env.act(OTHER, "run", "own")
+    assert handler.status == 403 and handler.body["reason"] == "cron_owner"
+    assert env.runs == []
+    assert env.act(OWNER, "run", "own").status == 200
+
+
+def test_report_only_run_by_a_non_owner_is_refused_without_the_governed_entry(run_env, inject_policy, monkeypatch):
+    """The WebUI cannot evaluate the engine's gate itself, so under report_only
+    too only a cron admin or the owner may start a run on such an engine."""
+    env = run_env
+    inject_policy({**POLICY, "mode": "report_only"})
+    _engine_has_run_job_governed(monkeypatch, present=False)
+    env.store.jobs["cli"] = _ownerless_cli_task()
+    for job_id in ("own", "cli"):
+        handler = env.act(SHAREE, "run", job_id)
+        assert handler.status == 403, (job_id, handler.body)
+        assert handler.body["reason"] == "cron_run_ungoverned"
+    assert env.runs == []
+    assert env.act(OWNER, "run", "own").status == 200
+    assert env.act(ADMIN, "run", "cli").status == 200
+
+
+def test_report_only_run_by_a_non_owner_goes_to_the_governed_engine(run_env, inject_policy, monkeypatch):
+    env = run_env
+    inject_policy({**POLICY, "mode": "report_only"})
+    _engine_has_run_job_governed(monkeypatch)
+    handler = env.act(SHAREE, "run", "own")
+    assert handler.status == 200, handler.body
+    plan = env.runs[0].run_plan
+    # The engine's gate runs it as the owner; were the child's engine to lack
+    # the entry point after all, it binds the owner and never runs unbound.
+    assert (plan["run_as"], plan["unbound_allowed"]) == (OWNER, False)
+    assert [e["reason"] for e in read_audit_events(10)] == ["cron_owner"]
+
+
+def test_governance_off_keeps_run_now(run_env, inject_policy):
+    env = run_env
+    inject_policy({"version": 1, "mode": "off", "default_effect": "deny"})
+    assert env.act(None, "run", "own").status == 200
+    assert env.runs[0].run_plan["unbound_allowed"] is True
+
+
+# Running in the child: _cron_job_subprocess_main, driven in-process.
+
+class _ResultQueue:
+    def __init__(self):
+        self.items = []
+
+    def put(self, item):
+        self.items.append(item)
+
+
+@pytest.fixture
+def child(env, monkeypatch, tmp_path):
+    import api.governance.agent_context as agent_context
+
+    events = []
+    homes = SimpleNamespace(store=tmp_path / "store", execution=tmp_path / "exec")
+    homes.store.mkdir()
+    homes.execution.mkdir()
+    env.store.jobs["cli"] = _ownerless_cli_task()
+
+    def _bind(identity, **kwargs):
+        events.append(("bind", identity, kwargs.get("active_profile"), kwargs.get("session_id")))
+        return ("token", identity)
+
+    def _reset(token):
+        events.append(("reset", token))
+
+    monkeypatch.setattr(agent_context, "bind_governed_agent_turn", _bind)
+    monkeypatch.setattr(agent_context, "reset_governed_agent_turn", _reset)
+
+    def engine(governed, outcome="ran"):
+        return _run_now_scheduler(monkeypatch, events, governed=governed, outcome=outcome)
+
+    def run(job_id, plan, execution_home=homes.execution):
+        import api.routes as routes
+
+        queue = _ResultQueue()
+        routes._cron_job_subprocess_main(copy.deepcopy(env.store.jobs[job_id]), execution_home, queue, plan)
+        assert len(queue.items) == 1, queue.items
+        return queue.items[0]
+
+    return SimpleNamespace(events=events, homes=homes, engine=engine, run=run)
+
+
+def test_child_runs_through_the_governed_entry_point(child):
+    child.engine(governed=True)
+    result = child.run("own", _plan(OWNER, store_home=child.homes.execution))
+    assert result == ("ok", (True, "output", "final", None))
+    assert [e[0] for e in child.events] == ["gate", "run_job"]
+    _, job_id, reason, record_refusal, _home = child.events[0]
+    assert (job_id, reason, record_refusal) == ("own", "manual", True)
+
+
+def test_child_gate_reads_the_store_that_holds_the_job(child):
+    child.engine(governed=True)
+    assert child.run("own", _plan(OWNER, store_home=child.homes.store))[0] == "ok"
+    gate, run = child.events
+    assert gate[4] == str(child.homes.store)
+    assert run[2] == str(child.homes.execution)
+    assert sys.modules["cron.scheduler"].run_job.__name__ == "run_job"  # restored
+
+
+def test_child_reports_a_governed_refusal_without_running(child):
+    child.engine(governed=True, outcome="refused")
+    result = child.run("cli", _plan("", unbound_allowed=True, store_home=child.homes.store))
+    assert result == ("refused", RUN_REFUSAL, True)
+    assert [e[0] for e in child.events] == ["gate"]
+
+
+def test_child_reports_a_failed_governed_run_as_an_error(child):
+    child.engine(governed=True, outcome="failed")
+    status, message, _traceback = child.run("own", _plan(OWNER, store_home=child.homes.store))
+    assert (status, message) == ("error", "ValueError: boom")
+
+
+def test_child_without_a_plan_leaves_recording_to_the_parent(child):
+    child.engine(governed=True, outcome="refused")
+    assert child.run("cli", None) == ("refused", RUN_REFUSAL, False)
+    gate = child.events[0]
+    assert gate[3] is False and gate[4] == str(child.homes.execution)
+
+
+def test_child_on_an_engine_without_the_entry_point_binds_the_owner(child):
+    child.engine(governed=False)
+    result = child.run("own", _plan(OWNER, store_home=child.homes.store))
+    assert result == ("ok", (True, "output", "final", None))
+    assert [e[0] for e in child.events] == ["bind", "run_job", "reset"]
+    assert child.events[0][1:] == (OWNER, "default", "own")
+    assert child.events[1][2] == str(child.homes.execution)
+
+
+def test_child_never_runs_unbound_for_a_non_admin(child):
+    child.engine(governed=False)
+    status, refusal, recorded = child.run("cli", _plan("", store_home=child.homes.store))
+    assert status == "refused" and recorded is False
+    assert "owner" in refusal
+    assert child.events == []
+
+
+def test_child_runs_an_ownerless_job_unbound_for_a_cron_admin(child):
+    child.engine(governed=False)
+    result = child.run("cli", _plan("", unbound_allowed=True, store_home=child.homes.store))
+    assert result[0] == "ok"
+    assert [e[0] for e in child.events] == ["run_job"]
+
+
+def test_child_refuses_when_the_owners_governance_cannot_be_bound(child, monkeypatch):
+    import api.governance.agent_context as agent_context
+
+    child.engine(governed=False)
+
+    def _fail(identity, **kwargs):
+        raise agent_context.GovernanceBindingError()
+
+    monkeypatch.setattr(agent_context, "bind_governed_agent_turn", _fail)
+    status, refusal, _recorded = child.run("own", _plan(OWNER, store_home=child.homes.store))
+    assert status == "refused"
+    assert "governance context unavailable" in refusal
+    assert child.events == []
+
+
+def test_child_refuses_when_the_policy_cannot_be_read(child):
+    child.engine(governed=False)
+
+    def _unreadable():
+        raise OSError("policy unreadable")
+
+    loader.set_policy_loader(_unreadable)
+    status, _refusal, _recorded = child.run("own", _plan(OWNER, store_home=child.homes.store))
+    assert status == "refused"
+    assert child.events == []
+
+
+def test_child_without_a_plan_binds_the_owner_like_the_scheduler(child):
+    child.engine(governed=False)
+    assert child.run("own", None)[0] == "ok"
+    assert child.run("cli", None)[0] == "ok"
+    assert [e[0] for e in child.events] == ["bind", "run_job", "reset", "run_job"]
+
+
+def test_child_binds_the_owners_real_governance(child, monkeypatch):
+    """With the engine's own context module the run sees the owner's grants."""
+    pytest.importorskip("hermes_cli.dashboard_governance.context")
+    import api.governance.agent_context as agent_context
+
+    monkeypatch.setattr(agent_context, "bind_governed_agent_turn", _REAL_BIND)
+    monkeypatch.setattr(agent_context, "reset_governed_agent_turn", _REAL_RESET)
+    child.engine(governed=False)
+    assert child.run("own", _plan(OWNER, store_home=child.homes.store))[0] == "ok"
+    assert child.events == [("run_job", "own", str(child.homes.execution), OWNER)]
+    assert _bound_email() is None  # reset after the run
+
+
+def test_child_pins_the_policy_file_the_request_decided_with(child, monkeypatch, tmp_path):
+    import os
+
+    child.engine(governed=False)
+    seen = []
+    monkeypatch.delenv("HERMES_WEBUI_GOVERNANCE_POLICY", raising=False)
+    policy_file = tmp_path / "decided.yaml"
+
+    def _bind(identity, **kwargs):
+        seen.append(os.environ.get("HERMES_WEBUI_GOVERNANCE_POLICY"))
+        return None
+
+    import api.governance.agent_context as agent_context
+
+    monkeypatch.setattr(agent_context, "bind_governed_agent_turn", _bind)
+    plan = dict(_plan(OWNER, store_home=child.homes.store), governance_policy=str(policy_file))
+    assert child.run("own", plan)[0] == "ok"
+    assert seen == [str(policy_file)]
+    assert "HERMES_WEBUI_GOVERNANCE_POLICY" not in os.environ
+
+
+# The parent records a refusal where the job lives, and delivers nothing.
+
+@pytest.fixture
+def tracked(env, monkeypatch):
+    import api.routes as routes
+
+    jobs = sys.modules["cron.jobs"]
+    calls = []
+    monkeypatch.setattr(jobs, "save_job_output",
+                        lambda job_id, output: calls.append(("save", job_id)), raising=False)
+    monkeypatch.setattr(jobs, "mark_job_run",
+                        lambda job_id, success, error=None, **kw: calls.append(("mark_run", job_id, success, error)),
+                        raising=False)
+    monkeypatch.setattr(jobs, "mark_job_refused",
+                        lambda job_id, reason, *, consume_occurrence=True, **kw:
+                        calls.append(("mark_refused", job_id, reason, consume_occurrence)) or True,
+                        raising=False)
+    monkeypatch.setattr(sys.modules["cron.scheduler"], "_deliver_result",
+                        lambda job, content: calls.append(("deliver", job["id"])), raising=False)
+
+    def refuse(recorded):
+        def _subprocess(job, execution_profile_home, run_plan=None):
+            raise routes._CronRunRefused(RUN_REFUSAL, recorded=recorded)
+        monkeypatch.setattr(routes, "_run_cron_job_in_profile_subprocess", _subprocess)
+
+    def run(job_id="own"):
+        routes._mark_cron_running(job_id)
+        routes._run_cron_tracked(copy.deepcopy(env.store.jobs[job_id]), None, None, None,
+                                 run_plan=_plan(OWNER))
+        assert routes._is_cron_running(job_id) == (False, 0.0)
+
+    return SimpleNamespace(calls=calls, refuse=refuse, run=run, jobs=jobs)
+
+
+def test_a_refused_run_is_recorded_as_a_refusal(tracked):
+    tracked.refuse(recorded=False)
+    tracked.run()
+    assert tracked.calls == [("mark_refused", "own", RUN_REFUSAL, False)]
+
+
+def test_a_refusal_the_engine_recorded_is_not_recorded_twice(tracked):
+    tracked.refuse(recorded=True)
+    tracked.run()
+    assert tracked.calls == []
+
+
+def test_an_engine_without_mark_job_refused_records_a_failed_run(tracked, monkeypatch):
+    monkeypatch.delattr(tracked.jobs, "mark_job_refused")
+    tracked.refuse(recorded=False)
+    tracked.run()
+    assert tracked.calls == [("mark_run", "own", False, RUN_REFUSAL)]
+
+
+# End to end: the handler, the worker thread, the child (run inline) and the
+# bookkeeping, on both engine shapes.
+
+class _InlineQueue(list):
+    def put(self, item):
+        self.append(item)
+
+    def get(self, timeout=None):
+        return self.pop(0)
+
+    def close(self):
+        pass
+
+    def join_thread(self):
+        pass
+
+
+class _InlineContext:
+    def Queue(self, maxsize=0):
+        return _InlineQueue()
+
+    def Process(self, target, args=()):
+        return SimpleNamespace(start=lambda: target(*args), join=lambda timeout=None: None,
+                               is_alive=lambda: False, terminate=lambda: None, exitcode=0)
+
+
+@pytest.mark.parametrize("governed", [True, False], ids=["governed-engine", "engine-without-entry"])
+@pytest.mark.parametrize("outcome", ["ran", "refused"])
+def test_run_now_end_to_end(env, tracked, child, monkeypatch, governed, outcome):
+    import multiprocessing
+    import time
+
+    import api.profiles as profiles
+    import api.routes as routes
+
+    monkeypatch.setattr(routes, "_handle_cron_run", _REAL_HANDLE_CRON_RUN)
+    monkeypatch.setattr(profiles, "get_active_hermes_home", lambda: child.homes.store)
+    monkeypatch.setattr(multiprocessing, "get_context", lambda method: _InlineContext())
+    scheduler = child.engine(governed=governed, outcome=outcome)
+    monkeypatch.setattr(scheduler, "_deliver_result",
+                        lambda job, content: tracked.calls.append(("deliver", job["id"])), raising=False)
+    if not governed and outcome == "refused":
+        import api.governance.agent_context as agent_context
+
+        def _unbindable(identity, **kwargs):
+            child.events.append(("bind", identity, kwargs.get("active_profile"), kwargs.get("session_id")))
+            raise agent_context.GovernanceBindingError()
+
+        monkeypatch.setattr(agent_context, "bind_governed_agent_turn", _unbindable)
+
+    handler = env.act(OWNER, "run", "own")
+    assert handler.status == 200, handler.body
+    deadline = time.monotonic() + 5
+    while routes._is_cron_running("own")[0] and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert routes._is_cron_running("own") == (False, 0.0)
+
+    kinds = [e[0] for e in child.events]
+    if governed:
+        assert kinds[0] == "gate" and child.events[0][4] == str(child.homes.store)
+    else:
+        assert kinds[0] == "bind" and child.events[0][1] == OWNER
+    if outcome == "ran":
+        assert "run_job" in kinds
+        assert tracked.calls == [("save", "own"), ("deliver", "own"), ("mark_run", "own", True, None)]
+    elif governed:
+        assert "run_job" not in kinds
+        assert tracked.calls == []  # recorded by the engine in the job's own store
+    else:
+        assert "run_job" not in kinds
+        # Recorded by the WebUI in the job's store, as a refusal: no output,
+        # no delivery.
+        assert len(tracked.calls) == 1
+        kind, job_id, refusal, consume_occurrence = tracked.calls[0]
+        assert (kind, job_id, consume_occurrence) == ("mark_refused", "own", False)
+        assert refusal.startswith("Not run: ")

@@ -1953,22 +1953,238 @@ def _event_profile_for_cron_job(job: dict) -> str | None:
     return raw
 
 
-def _cron_job_subprocess_main(job, execution_profile_home, result_queue):
-    """Run one cron job inside a child process pinned to a profile home."""
+class _CronRunRefused(Exception):
+    """Governance did not let a Run now job run (W0).
+
+    ``refusal`` is the plain-language reason; ``recorded`` says whether it is
+    already on the job, so the parent does not record it twice. Nothing ran,
+    so there is no output and nothing to deliver.
+    """
+
+    def __init__(self, refusal, *, recorded=False):
+        super().__init__(refusal)
+        self.refusal = str(refusal)
+        self.recorded = bool(recorded)
+
+
+class _CronRunFailed(Exception):
+    """The engine's governed entry point ran the job and the run raised."""
+
+
+_CRON_RUN_OWNERLESS_REFUSAL = (
+    "Not run: this task has no owner, so there are no access rights to run it "
+    "under. A cron admin can run it."
+)
+_CRON_RUN_POLICY_REFUSAL = (
+    "Not run: the access policy could not be read, so this task cannot be "
+    "checked. An administrator must fix the policy before it can run."
+)
+
+
+def _cron_same_home(first, second) -> bool:
     try:
-        def _run():
-            from cron.scheduler import run_job
+        return Path(first).expanduser().resolve(strict=False) == Path(second).expanduser().resolve(strict=False)
+    except Exception:
+        return str(first) == str(second)
 
-            return run_job(job)
 
-        if execution_profile_home is None:
-            result = _run()
-        else:
-            from api.profiles import cron_profile_context_for_home
+def _cron_run_governed_entry(job, execution_profile_home, store_home=None):
+    """Run ``job`` through the engine's governed entry point, if it has one.
 
-            with cron_profile_context_for_home(execution_profile_home):
-                result = _run()
+    Returns None when the engine has no ``cron.scheduler.run_job_governed``
+    (feature detected by name), otherwise what ``run_job`` returned. That
+    entry point (engine identity fix, E0) applies the gate every scheduled
+    fire goes through: the run is bound to the owner's governance, and under
+    ``enforce`` an ownerless agent job, or an owner whose grants cannot be
+    resolved, is refused. Raises _CronRunRefused for a refusal and
+    _CronRunFailed when the run raised.
+
+    The gate reads the policy of the ACTIVE cron store, so it runs in the
+    store that holds the job (``store_home``), like a scheduled fire of that
+    store, and records a refusal there. The job itself runs in its execution
+    profile: when that is another home, the entry point's run_job call leaves
+    the store for it (this child process runs this one job, so replacing
+    cron.scheduler.run_job here touches nothing else). Without a
+    ``store_home`` the gate runs in the execution profile and the parent
+    records a refusal in the owning store.
+    """
+    import importlib
+    from contextlib import nullcontext
+
+    from api.profiles import cron_profile_context_for_home
+
+    gate_home = store_home if store_home is not None else execution_profile_home
+    gate = cron_profile_context_for_home(gate_home) if gate_home is not None else nullcontext()
+    gate.__enter__()
+    in_gate = [True]
+
+    def _leave_gate():
+        if in_gate[0]:
+            in_gate[0] = False
+            gate.__exit__(None, None, None)
+
+    ran_in_execution_profile = []
+    try:
+        scheduler = importlib.import_module("cron.scheduler")
+        entry = getattr(scheduler, "run_job_governed", None)
+        if not callable(entry):
+            return None
+        original_run_job = scheduler.run_job
+        switch_home = (
+            store_home is not None
+            and execution_profile_home is not None
+            and not _cron_same_home(store_home, execution_profile_home)
+        )
+        if switch_home:
+            def _run_job_in_execution_profile(run_job_arg, *args, **kwargs):
+                ran_in_execution_profile.append(True)
+                _leave_gate()
+                with cron_profile_context_for_home(execution_profile_home):
+                    return original_run_job(run_job_arg, *args, **kwargs)
+
+            scheduler.run_job = _run_job_in_execution_profile
+        try:
+            outcome = entry(job, reason="manual", record_refusal=store_home is not None)
+        finally:
+            if switch_home:
+                scheduler.run_job = original_run_job
+    finally:
+        _leave_gate()
+
+    status = str(getattr(outcome, "outcome", "") or "")
+    if status == "ran":
+        if switch_home and not ran_in_execution_profile:
+            logger.warning("Manual cron run of %s ran in its store, not its execution profile",
+                           (job or {}).get("id", "?"))
+        return (
+            bool(getattr(outcome, "success", False)),
+            getattr(outcome, "output", "") or "",
+            getattr(outcome, "final_response", "") or "",
+            getattr(outcome, "error", None),
+        )
+    if status == "refused":
+        refusal = getattr(outcome, "refusal", None) or getattr(outcome, "error", None) or "Not run."
+        raise _CronRunRefused(refusal, recorded=bool(getattr(outcome, "refusal_recorded", False)))
+    raise _CronRunFailed(str(getattr(outcome, "error", "") or f"unexpected run outcome {status!r}"))
+
+
+def _cron_bind_run_governance(job, run_plan):
+    """Bind the governance a Run now executes under on an engine WITHOUT
+    ``run_job_governed``. Returns a token for _reset_cron_run_governance
+    (None: nothing bound); raises _CronRunRefused.
+
+    ``run_plan`` (from _cron_run_plan) names who the run executes as
+    (``run_as``: the job's owner, or the caller who created a job made before
+    the owner stamp) and whether a run with nobody to bind may go ahead
+    (``unbound_allowed``: only when a cron admin asked for it). Without a
+    plan the job's owner_email is bound and an ownerless job runs unbound, as
+    the engine's own scheduler runs it.
+
+    The binding is the one a chat turn uses for its sender
+    (api.governance.agent_context.bind_governed_agent_turn): nothing bound for
+    a bootstrap admin or with governance off, unrestricted but audited when
+    the context cannot be built under report_only, refused under enforce. An
+    unreadable policy refuses.
+    """
+    if run_plan is None:
+        run_as = str((job or {}).get("owner_email") or "").strip().lower()
+        unbound_allowed = True
+        profile = str((job or {}).get("profile") or "").strip() or "default"
+    else:
+        run_as = str(run_plan.get("run_as") or "").strip().lower()
+        unbound_allowed = run_plan.get("unbound_allowed") is True
+        profile = str(run_plan.get("profile") or "").strip() or "default"
+    if not run_as:
+        if unbound_allowed:
+            return None
+        raise _CronRunRefused(_CRON_RUN_OWNERLESS_REFUSAL)
+
+    from api.governance import loader
+    from api.governance.agent_context import GovernanceBindingError, bind_governed_agent_turn
+
+    try:
+        loader.get_policy()
+    except Exception:
+        logger.warning("Manual cron run: governance policy unreadable, refusing", exc_info=True)
+        raise _CronRunRefused(_CRON_RUN_POLICY_REFUSAL) from None
+    try:
+        return bind_governed_agent_turn(
+            run_as, active_profile=profile, session_id=str((job or {}).get("id") or ""))
+    except GovernanceBindingError as exc:
+        raise _CronRunRefused(f"Not run: {exc}") from None
+
+
+def _reset_cron_run_governance(token) -> None:
+    if token is None:
+        return
+    from api.governance.agent_context import reset_governed_agent_turn
+
+    reset_governed_agent_turn(token)
+
+
+class _cron_run_policy_file:
+    """Pin the WebUI governance policy file for a Run now child to the one
+    the request decided with (``HERMES_WEBUI_GOVERNANCE_POLICY``), so the
+    child cannot read another file through a HERMES_HOME it inherited while
+    a cron profile context had swapped it. Restored on exit."""
+
+    _ENV = "HERMES_WEBUI_GOVERNANCE_POLICY"
+
+    def __init__(self, path):
+        self._path = str(path or "")
+
+    def __enter__(self):
+        self._previous = os.environ.get(self._ENV)
+        if self._path:
+            os.environ[self._ENV] = self._path
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        if self._path:
+            if self._previous is None:
+                os.environ.pop(self._ENV, None)
+            else:
+                os.environ[self._ENV] = self._previous
+        return False
+
+
+def _cron_job_subprocess_main(job, execution_profile_home, result_queue, run_plan=None):
+    """Run one cron job inside a child process pinned to a profile home.
+
+    The run is governed (W0). An engine with ``cron.scheduler.run_job_governed``
+    runs it through that entry point, gated in the store that holds the job
+    (_cron_run_governed_entry). On an engine without it the child binds the
+    governance the request decided (``run_plan``, _cron_run_plan) the way a
+    chat turn binds its sender's, and never runs a job with nothing bound for
+    a caller who is not a cron admin (_cron_bind_run_governance). A refusal
+    goes back as ``("refused", refusal, recorded)``.
+    """
+    try:
+        plan = run_plan if isinstance(run_plan, dict) else None
+        with _cron_run_policy_file((plan or {}).get("governance_policy")):
+            result = _cron_run_governed_entry(job, execution_profile_home, (plan or {}).get("store_home"))
+            if result is None:
+                token = _cron_bind_run_governance(job, plan)
+                try:
+                    def _run():
+                        from cron.scheduler import run_job
+
+                        return run_job(job)
+
+                    if execution_profile_home is None:
+                        result = _run()
+                    else:
+                        from api.profiles import cron_profile_context_for_home
+
+                        with cron_profile_context_for_home(execution_profile_home):
+                            result = _run()
+                finally:
+                    _reset_cron_run_governance(token)
         result_queue.put(("ok", result))
+    except _CronRunRefused as refused:
+        result_queue.put(("refused", refused.refusal, refused.recorded))
+    except _CronRunFailed as failed:
+        result_queue.put(("error", str(failed), ""))
     except BaseException as exc:  # pragma: no cover - surfaced in parent
         import traceback
 
@@ -1992,14 +2208,15 @@ def _cron_subprocess_result_timeout_seconds(job):
     return 6 * 60 * 60.0
 
 
-def _run_cron_job_in_profile_subprocess(job, execution_profile_home):
+def _run_cron_job_in_profile_subprocess(job, execution_profile_home, run_plan=None):
     """Execute cron.scheduler.run_job without holding the parent cron env lock.
 
     cron.scheduler/cron.jobs still rely on process-global HERMES_HOME and module
     constants, so running the job body in a child process gives each long cron
     execution its own globals. The parent process only uses cron_profile_context
     for short metadata reads/writes and remains responsive to unrelated cron UI
-    and API calls while the job runs.
+    and API calls while the job runs. Raises _CronRunRefused when governance
+    did not let the job run (``run_plan``: _cron_run_plan).
     """
     import multiprocessing
     import queue
@@ -2008,7 +2225,7 @@ def _run_cron_job_in_profile_subprocess(job, execution_profile_home):
     result_queue = ctx.Queue(maxsize=1)
     process = ctx.Process(
         target=_cron_job_subprocess_main,
-        args=(job, execution_profile_home, result_queue),
+        args=(job, execution_profile_home, result_queue, run_plan),
     )
     process.start()
 
@@ -2053,6 +2270,8 @@ def _run_cron_job_in_profile_subprocess(job, execution_profile_home):
 
     if status == "ok":
         return payload[0]
+    if status == "refused":
+        raise _CronRunRefused(payload[0], recorded=bool(payload[1]) if len(payload) > 1 else False)
 
     message = payload[0]
     traceback_text = payload[1] if len(payload) > 1 else ""
@@ -2066,6 +2285,7 @@ def _run_cron_tracked(
     profile_home=None,
     execution_profile_home=None,
     event_profile=None,
+    run_plan=None,
 ):
     """Wrapper that tracks running state around cron.scheduler.run_job.
 
@@ -2073,6 +2293,9 @@ def _run_cron_tracked(
     ``execution_profile_home`` is the selected per-job profile used to load
     agent config/.env while running. When no job profile is selected, both homes
     are the same and legacy server-default behavior is preserved.
+    ``run_plan`` is who the run executes as (_cron_run_plan). A run governance
+    refused is recorded on the job in its owning store unless the engine
+    already did, without output or delivery (_record_cron_run_refusal).
     """
     import importlib
 
@@ -2095,9 +2318,14 @@ def _run_cron_tracked(
             return fn()
 
     try:
-        success, output, final_response, error = _run_cron_job_in_profile_subprocess(
-            job, execution_profile_home
-        )
+        if run_plan is None:
+            success, output, final_response, error = _run_cron_job_in_profile_subprocess(
+                job, execution_profile_home
+            )
+        else:
+            success, output, final_response, error = _run_cron_job_in_profile_subprocess(
+                job, execution_profile_home, run_plan=run_plan
+            )
 
         # Persist output, deliver the same content the scheduled cron path would
         # send, and write run metadata back to the job's owning cron store even
@@ -2139,6 +2367,14 @@ def _run_cron_tracked(
                 mark_job_run(job_id, _success, _error)
 
         _with_cron_home(profile_home, _persist_success)
+    except _CronRunRefused as refused:
+        refusal = refused.refusal
+        logger.warning("Manual cron run of job %s refused: %s", job_id, refusal)
+        if not refused.recorded:
+            try:
+                _with_cron_home(profile_home, lambda: _record_cron_run_refusal(job_id, refusal))
+            except Exception:
+                logger.warning("Failed to record the refused manual cron run of %s", job_id, exc_info=True)
     except Exception as e:
         logger.exception("Manual cron run failed for job %s", job_id)
         try:
@@ -2148,6 +2384,21 @@ def _run_cron_tracked(
     finally:
         _mark_cron_done(job_id)
         _publish_session_list_changed("cron_complete", profile=event_profile)
+
+
+def _record_cron_run_refusal(job_id, refusal):
+    """Record a refused Run now on the job in the active cron store.
+
+    The engine's ``mark_job_refused`` records it as an outcome only (no
+    repeat used up, schedule untouched). An engine without it records a
+    failed run, as every Run now failure is recorded there.
+    """
+    import cron.jobs as cron_jobs
+
+    mark_job_refused = getattr(cron_jobs, "mark_job_refused", None)
+    if callable(mark_job_refused):
+        return mark_job_refused(job_id, refusal, consume_occurrence=False)
+    return cron_jobs.mark_job_run(job_id, False, refusal)
 
 _PROVIDER_ALIASES = {
     "claude": "anthropic",
@@ -25195,6 +25446,10 @@ def _handle_cron_run(handler, body):
     job = get_job(job_id)
     if not job:
         return bad(handler, "Job not found", 404)
+    # Who the run executes as is decided here, where the caller is known (W0).
+    run_plan, refusal = _cron_run_plan(handler, job)
+    if refusal is not None:
+        return j(handler, refusal[1], status=refusal[0])
     # Prevent double-run: reject if the job is already tracked as running
     already_running, elapsed = _is_cron_running(job_id)
     if already_running:
@@ -25218,8 +25473,67 @@ def _handle_cron_run(handler, body):
     _profile_home = get_active_hermes_home()
     _execution_profile_home = _profile_home_for_cron_job(job)
     _event_profile = _event_profile_for_cron_job(job)
-    threading.Thread(target=_run_cron_tracked, args=(job, _profile_home, _execution_profile_home, _event_profile), daemon=True).start()
+    run_plan["store_home"] = str(_profile_home)
+    threading.Thread(target=_run_cron_tracked, args=(job, _profile_home, _execution_profile_home, _event_profile),
+                     kwargs={"run_plan": run_plan}, daemon=True).start()
     return j(handler, {"ok": True, "job_id": job_id, "status": "running"})
+
+
+def _cron_governed_run_available() -> bool:
+    """Whether the running engine has ``cron.scheduler.run_job_governed``."""
+    try:
+        import importlib
+
+        scheduler = importlib.import_module("cron.scheduler")
+    except Exception:
+        return False
+    return callable(getattr(scheduler, "run_job_governed", None))
+
+
+def _cron_run_plan(handler, job):
+    """Decide, on the request, who a Run now of ``job`` executes as.
+
+    Returns ``(plan, None)`` or ``(None, (status, payload))`` to refuse. The
+    plan travels to the child process (_cron_job_subprocess_main) as plain
+    data:
+
+    - ``run_as``: the job's owner_email; for a job from before that stamp,
+      the caller when they created it (cron_scope.identity_owns_cron_job);
+      empty for an ownerless job a cron admin runs.
+    - ``unbound_allowed``: the caller is a cron admin (every caller is when
+      governance is off), so a job with nobody to bind may run unbound, as
+      the engine's scheduler runs it.
+    - ``profile``: the profile the run executes in, for the binding.
+    - ``governance_policy``: the policy file these decisions were read from.
+    - ``store_home``: added by the handler, the store that holds the job.
+
+    An engine with ``run_job_governed`` gates the run itself (the owner's
+    governance, ownerless agent jobs refused under enforce); the plan is only
+    its fallback. On an engine without it the WebUI binds the governance, so
+    only a cron admin or the job's owner may start a run at all, under
+    report_only too: the WebUI cannot evaluate the engine's gate for anyone
+    else, and a run must never go unbound for a non-admin.
+    """
+    import api.cron_scope as cron_scope
+    from api.governance.enforce import _request_identity
+    from api.governance.loader import resolve_policy_path
+
+    identity = _request_identity(handler)
+    is_admin = _cron_admin_allowed(handler)
+    owns = cron_scope.identity_owns_cron_job(identity, job)
+    if not (is_admin or owns) and not _cron_governed_run_available():
+        return None, (403, {
+            "error": "Only the owner of this task or a cron admin can run it.",
+            "reason": "cron_run_ungoverned",
+        })
+    owner = str(job.get("owner_email") or "").strip().lower()
+    caller = str(identity.get("email") or "").strip().lower() if isinstance(identity, dict) else ""
+    return {
+        "run_as": owner or (caller if owns and not is_admin else ""),
+        "unbound_allowed": bool(is_admin),
+        "profile": _event_profile_for_cron_job(job) or _get_active_profile_name() or "default",
+        "governance_policy": str(resolve_policy_path()),
+    }, None
 
 
 def _handle_cron_pause(handler, body):
