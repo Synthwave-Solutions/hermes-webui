@@ -16522,6 +16522,9 @@ def handle_post(handler, parsed) -> bool:
     # api/cron_scope.py, which allows + audits would_deny under report_only).
     if parsed.path in ("/api/crons/delete", "/api/crons/run",
                        "/api/crons/pause", "/api/crons/resume"):
+        # Both guards read the store: pin the agent's cron package first, so a
+        # shadowing top-level ``cron`` package cannot answer for it.
+        _ensure_agent_cron_import_path()
         from api.cron_scope import caller_sees_cron_profile
         if not caller_sees_cron_profile(handler, _get_active_profile_name() or "default",
                                         job_id=str((body or {}).get("job_id") or "")):
@@ -25058,17 +25061,34 @@ def _handle_cron_update(handler, body):
     return j(handler, {"ok": True, "job": _cron_job_for_api(job)})
 
 
+def _cron_job_by_id(job_id):
+    """The active store's job whose id is exactly ``job_id``, else None.
+
+    Pause, resume and delete look their job up by id before they act, as run
+    and update do. The engine's pause_job, resume_job and remove_job also
+    accept a job NAME (cron.jobs.resolve_job_ref), but the scope and owner
+    guards in api/cron_scope.py match ids only, so a name could reach a task
+    the caller does not own. The engine call then gets the canonical id.
+    """
+    from cron.jobs import get_job
+
+    return get_job(str(job_id))
+
+
 def _handle_cron_delete(handler, body):
     try:
         require(body, "job_id")
     except ValueError as e:
         return bad(handler, str(e))
+    job = _cron_job_by_id(body["job_id"])
+    if not job:
+        return bad(handler, "Job not found", 404)
     from cron.jobs import remove_job
 
-    ok = remove_job(body["job_id"])
+    ok = remove_job(job["id"])
     if not ok:
         return bad(handler, "Job not found", 404)
-    return j(handler, {"ok": True, "job_id": body["job_id"]})
+    return j(handler, {"ok": True, "job_id": job["id"]})
 
 
 def _handle_cron_run(handler, body):
@@ -25111,9 +25131,12 @@ def _handle_cron_pause(handler, body):
     job_id = body.get("job_id", "")
     if not job_id:
         return bad(handler, "job_id required")
+    job = _cron_job_by_id(job_id)
+    if not job:
+        return bad(handler, "Job not found", 404)
     from cron.jobs import pause_job
 
-    result = pause_job(job_id, reason=body.get("reason"))
+    result = pause_job(job["id"], reason=body.get("reason"))
     if result:
         return j(handler, {"ok": True, "job": result})
     return bad(handler, "Job not found", 404)
@@ -25123,9 +25146,12 @@ def _handle_cron_resume(handler, body):
     job_id = body.get("job_id", "")
     if not job_id:
         return bad(handler, "job_id required")
+    job = _cron_job_by_id(job_id)
+    if not job:
+        return bad(handler, "Job not found", 404)
     from cron.jobs import resume_job
 
-    result = resume_job(job_id)
+    result = resume_job(job["id"])
     if result:
         return j(handler, {"ok": True, "job": result})
     return bad(handler, "Job not found", 404)

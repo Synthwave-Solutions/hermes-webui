@@ -308,12 +308,17 @@ def caller_may_act_on_cron_job(handler, job_id: str, *, path: str) -> bool:
     ``cron:admin`` holder may pause, resume or delete it or run it now. A run
     executes as the owner (``owner_email``) and delivers to the owner's
     targets, so a sharee may not trigger one either. A job missing from the
-    active store passes (the handler answers 404). Under ``report_only`` a
-    refusal is audited as ``would_deny`` (reason ``cron_owner``) and allowed;
-    an unreadable store or an unexpected governance error refuses.
+    active store passes: the handlers look their job up by this same exact id
+    (routes._cron_job_by_id, get_job) and answer 404, and never hand a job
+    NAME to the engine, whose pause, resume and remove calls would resolve it
+    to a row this check never saw. Under ``report_only`` a refusal is audited
+    as ``would_deny`` (reason ``cron_owner``) and allowed; an unreadable store,
+    a cron package that cannot be imported, or an unexpected governance error
+    refuses.
 
     Runs outside cron_profile_context (the route enters it afterwards), so the
-    row lookup may take that non-reentrant lock itself.
+    row lookup may take that non-reentrant lock itself. The route pins the
+    agent's cron package on the import path before calling this.
     """
     try:
         from api.governance.enforce import identity_has_permission
@@ -329,7 +334,8 @@ def caller_may_act_on_cron_job(handler, job_id: str, *, path: str) -> bool:
             try:
                 from cron.jobs import get_job
             except ImportError:
-                return True  # no cron package: the handler cannot act either
+                logger.warning("cron owner check: cron.jobs unavailable, refusing")
+                return False
             job = get_job(str(job_id))
         if job is None or identity_owns_cron_job(identity, job):
             return True

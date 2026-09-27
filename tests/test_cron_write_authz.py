@@ -190,28 +190,51 @@ class _Store:
 
         mod.get_job = get_job
         mod.update_job = update_job
-        def pause_job(job_id, reason=None):
-            if job_id not in store.jobs:
+
+        class AmbiguousJobReference(LookupError):
+            pass
+
+        # Like the engine's cron.jobs.resolve_job_ref: an exact id first, then
+        # a case-insensitive name. pause_job, resume_job and remove_job accept
+        # either, while get_job and update_job match ids only.
+        def resolve_job_ref(ref):
+            if not ref:
                 return None
-            store.actions.append(("pause", job_id))
-            store.jobs[job_id]["enabled"] = False
-            return copy.deepcopy(store.jobs[job_id])
+            if ref in store.jobs:
+                return copy.deepcopy(store.jobs[ref])
+            matches = [job for job in store.jobs.values()
+                       if str(job.get("name") or "").lower() == str(ref).lower()]
+            if len(matches) > 1:
+                raise AmbiguousJobReference(ref)
+            return copy.deepcopy(matches[0]) if matches else None
+
+        def pause_job(job_id, reason=None):
+            job = resolve_job_ref(job_id)
+            if not job:
+                return None
+            store.actions.append(("pause", job["id"]))
+            store.jobs[job["id"]]["enabled"] = False
+            return copy.deepcopy(store.jobs[job["id"]])
 
         def resume_job(job_id):
-            if job_id not in store.jobs:
+            job = resolve_job_ref(job_id)
+            if not job:
                 return None
-            store.actions.append(("resume", job_id))
-            store.jobs[job_id]["enabled"] = True
-            return copy.deepcopy(store.jobs[job_id])
+            store.actions.append(("resume", job["id"]))
+            store.jobs[job["id"]]["enabled"] = True
+            return copy.deepcopy(store.jobs[job["id"]])
 
         def remove_job(job_id):
-            if job_id not in store.jobs:
+            job = resolve_job_ref(job_id)
+            if not job:
                 return False
-            store.actions.append(("delete", job_id))
-            del store.jobs[job_id]
+            store.actions.append(("delete", job["id"]))
+            del store.jobs[job["id"]]
             return True
 
         mod.create_job = create_job
+        mod.AmbiguousJobReference = AmbiguousJobReference
+        mod.resolve_job_ref = resolve_job_ref
         mod.pause_job = pause_job
         mod.resume_job = resume_job
         mod.remove_job = remove_job
@@ -716,6 +739,144 @@ def test_owner_check_fails_closed_when_the_store_cannot_be_read(env, monkeypatch
     handler = env.act(SHAREE, "delete", "own")
     assert handler.status == 403
     assert env.store.actions == []
+
+
+def test_owner_check_refuses_when_the_cron_package_cannot_be_imported(env, monkeypatch):
+    monkeypatch.setitem(sys.modules, "cron.jobs", None)  # import fails
+    handler = env.act(SHAREE, "pause", "own")
+    assert handler.status == 403
+    assert handler.body["reason"] == "cron_owner"
+    assert env.store.actions == []
+
+
+def test_the_agent_cron_package_is_pinned_before_the_guards_read_the_store(env, monkeypatch):
+    """A plugin's top-level ``cron`` package can shadow the agent's until a
+    cron route pins the agent dir first: the guards must not read the store
+    before that pin (tests/test_cron_import_shadowing.py)."""
+    import api.routes as routes
+
+    order = []
+    store_get_job = sys.modules["cron.jobs"].get_job
+
+    def _get_job(job_id):
+        order.append("lookup")
+        return store_get_job(job_id)
+
+    monkeypatch.setattr(sys.modules["cron.jobs"], "get_job", _get_job)
+    monkeypatch.setattr(routes, "_ensure_agent_cron_import_path", lambda: order.append("pin"))
+    assert env.act(OWNER, "pause", "own").status == 200
+    assert "lookup" in order
+    assert order.index("pin") < order.index("lookup"), order
+
+
+# ── A job name must not slip past the owner guard ───────────────────────────
+# The engine's pause_job, resume_job and remove_job resolve a job NAME as well
+# as an id (resolve_job_ref), while both guards look the job up by id. Before
+# this fix a cron:write user who sent the name of someone else's task passed
+# both guards (no job has that id, so "the handler answers 404"), and the
+# engine then paused, resumed or deleted it; the pause reply even carried the
+# whole job record. The routes now act on ids only, like run and update.
+
+NON_OWNERS = [
+    pytest.param(SHAREE, "default", id="sharee"),
+    pytest.param(OTHER, "alpha", id="profile-grant"),
+    pytest.param(OTHER, "default", id="out-of-scope"),
+]
+
+
+@pytest.mark.parametrize("ref", ["Owner task", "owner task"])
+@pytest.mark.parametrize("email,active", NON_OWNERS)
+@pytest.mark.parametrize("action", JOB_ACTIONS)
+def test_a_job_name_cannot_bypass_the_owner_guard(env, action, email, active, ref):
+    env.active = active
+    before = copy.deepcopy(env.store.jobs)
+    handler = env.act(email, action, ref)
+    assert handler.status in (403, 404), handler.body
+    assert env.store.actions == []
+    assert env.store.jobs == before
+    assert "summarise the inbox" not in json.dumps(handler.body)
+
+
+@pytest.mark.parametrize("action", JOB_ACTIONS)
+def test_the_job_routes_act_on_ids_only(env, action):
+    """The Tasks panel always sends the id; a name is not found, for anyone."""
+    for email in (OWNER, ADMIN, BOOTSTRAP):
+        handler = env.act(email, action, "Owner task")
+        assert handler.status == 404, (email, handler.body)
+    assert env.store.actions == []
+    assert env.act(OWNER, action, "own").status == 200
+    assert env.store.actions == [(action, "own")]
+
+
+def test_real_engine_store_refuses_a_job_name_from_a_non_owner(tmp_path, monkeypatch, inject_policy):
+    """Against the engine's own cron.jobs, whose pause_job, resume_job and
+    remove_job also resolve names, through the real handle_post dispatcher:
+    a sharee, a profile-grant holder and an out-of-scope colleague cannot
+    reach the owner's task by its name, and the store does not change."""
+    import api.governance.enforce as enforce
+    import api.profiles as profiles
+    import api.routes as routes
+
+    jobs = pytest.importorskip("cron.jobs")
+    if not routes._callable_accepts_kwarg(jobs.create_job, "owner_email"):
+        pytest.skip("engine create_job predates owner_email")
+    monkeypatch.setattr(jobs, "CRON_DIR", tmp_path / "cron")
+    monkeypatch.setattr(jobs, "JOBS_FILE", tmp_path / "cron" / "jobs.json")
+    monkeypatch.setattr(jobs, "OUTPUT_DIR", tmp_path / "cron" / "output")
+    monkeypatch.setattr(jobs, "_compute_provider_model_snapshots", lambda **k: (None, None), raising=False)
+    try:
+        import cron.notepad as notepad
+        monkeypatch.setattr(notepad, "NOTEPAD_FILE", tmp_path / "cron" / "notepad.db")
+    except ImportError:
+        pass
+    active = {"name": "default"}
+    monkeypatch.setattr(routes, "_get_active_profile_name", lambda: active["name"])
+    monkeypatch.setattr(routes, "_check_csrf", lambda _handler: True)
+    monkeypatch.setattr(
+        routes, "_guard_request_session_visibility",
+        lambda handler, parsed, body=None, method="POST": True,
+    )
+    monkeypatch.setattr(routes, "_ensure_agent_cron_import_path", lambda: None)
+    monkeypatch.setattr(profiles, "cron_profile_context", nullcontext)
+    inject_policy(POLICY)
+
+    def _post(email, path, body):
+        identity = _identity(email)
+        monkeypatch.setattr(enforce, "_request_identity", lambda handler: identity)
+        monkeypatch.setattr(routes, "read_body", lambda _handler: copy.deepcopy(body))
+        handler = _JSONHandler()
+        assert routes.handle_post(handler, SimpleNamespace(path=path, query="")) is not False
+        return handler
+
+    handler = _post(OWNER, "/api/crons/create", _form_create_payload(
+        name="Owner private task", prompt="owner secret prompt",
+        model=None, provider=None, skills=[]))
+    assert handler.status == 200, handler.body
+    job_id = handler.body["job"]["id"]
+    assert _post(OWNER, "/api/crons/update", _share_payload(job_id, [SHAREE])).status == 200
+    assert jobs.get_job(job_id)["shared_with"] == [SHAREE]
+
+    before = jobs.JOBS_FILE.read_bytes()
+    for email, profile in ((SHAREE, "default"), (OTHER, "alpha"), (OTHER, "default")):
+        active["name"] = profile
+        for action in ("pause", "resume", "delete"):
+            for ref in ("Owner private task", "owner private task"):
+                handler = _post(email, f"/api/crons/{action}", {"job_id": ref})
+                assert handler.status in (403, 404), (email, profile, action, ref, handler.body)
+                assert "owner secret prompt" not in json.dumps(handler.body)
+                assert jobs.JOBS_FILE.read_bytes() == before, (email, profile, action, ref)
+            # The id they could always send is refused as well.
+            handler = _post(email, f"/api/crons/{action}", {"job_id": job_id})
+            assert handler.status == 403, (email, profile, action, handler.body)
+    assert jobs.JOBS_FILE.read_bytes() == before
+
+    active["name"] = "default"
+    handler = _post(OWNER, "/api/crons/pause", {"job_id": job_id})
+    assert handler.status == 200, handler.body
+    assert jobs.get_job(job_id)["enabled"] is False
+    handler = _post(OWNER, "/api/crons/delete", {"job_id": job_id})
+    assert handler.status == 200, handler.body
+    assert jobs.get_job(job_id) is None
 
 
 # ── Value checks ────────────────────────────────────────────────────────────
