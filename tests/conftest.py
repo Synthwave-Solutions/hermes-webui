@@ -257,6 +257,88 @@ def _invalidate_providers_cache():
         invalidate_providers_cache()
 
 
+_LIVE_TURN_REGISTRIES = (
+    ('STREAMS', 'STREAMS_LOCK'),
+    ('ACTIVE_RUNS', 'ACTIVE_RUNS_LOCK'),
+    ('STREAM_SESSION_OWNERS', 'STREAM_SESSION_OWNERS_LOCK'),
+)
+
+
+@pytest.fixture(autouse=True)
+def _drop_leaked_live_turn_registrations():
+    """Remove the live-turn registrations a test leaves behind.
+
+    Tests that start a turn in-process but stub the streaming worker (the
+    btw/background owner tests, the commands and cron-delivery tests and
+    others) never run the worker's ``finally``, which is what pops STREAMS,
+    ACTIVE_RUNS and the stream-owner entry. The stale id made every later test
+    see a turn "streaming": the CLI sessions cache freezes its key while
+    anything streams (#4842), so
+    test_get_cli_sessions_cache_invalidates_when_sqlite_wal_changes failed in
+    the full run only (27 Sep 2026). Only ids added during the test are
+    removed, so registrations that existed before the test are left alone.
+    """
+    cfg = sys.modules.get('api.config')
+    before = {}
+    if cfg is not None:
+        for name, _lock_name in _LIVE_TURN_REGISTRIES:
+            registry = getattr(cfg, name, None)
+            if isinstance(registry, dict):
+                before[name] = set(registry.keys())
+    yield
+    cfg = sys.modules.get('api.config')
+    if cfg is None:
+        return
+    for name, lock_name in _LIVE_TURN_REGISTRIES:
+        registry = getattr(cfg, name, None)
+        if not isinstance(registry, dict):
+            continue
+        lock = getattr(cfg, lock_name, None)
+        keep = before.get(name, set())
+        if lock is not None:
+            with lock:
+                for key in [k for k in registry if k not in keep]:
+                    registry.pop(key, None)
+        else:
+            for key in [k for k in registry if k not in keep]:
+                registry.pop(key, None)
+
+
+@pytest.fixture(autouse=True)
+def _restore_agent_runtime_pin():
+    """Restore api.agent_runtime's captured Agent revision after every test.
+
+    The guard captures the Agent checkout's HEAD the first time a test loads
+    the real run_agent and then keeps it for the whole process, so every later
+    turn in the suite is compared against that one capture. When a commit
+    landed in ~/.hermes/hermes-agent during a full run (other sessions commit
+    there; 798d18f00 did on 27 Sep 2026), about 50 unrelated tests failed with
+    "Hermes Agent was updated while Hermes WebUI was running". Each test now
+    starts from the pin it found; the guard's own tests set up theirs.
+    """
+    runtime = sys.modules.get('api.agent_runtime')
+    saved = None
+    if runtime is not None:
+        saved = (
+            runtime._AGENT_SOURCE_DIR,
+            runtime._AGENT_MODULE_PATH,
+            runtime._AGENT_REVISION,
+            runtime._AIAgent,
+        )
+    yield
+    runtime = sys.modules.get('api.agent_runtime')
+    if runtime is None:
+        return
+    if saved is None:
+        saved = (None, None, None, None)
+    (
+        runtime._AGENT_SOURCE_DIR,
+        runtime._AGENT_MODULE_PATH,
+        runtime._AGENT_REVISION,
+        runtime._AIAgent,
+    ) = saved
+
+
 _MISSING = object()  # sentinel: api.profiles module not loaded pre-test
 
 
