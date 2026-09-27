@@ -24668,8 +24668,36 @@ def _normalize_cron_shared_with(value):
     return out[:25]
 
 
+# ── Cron write authorisation (POST /api/crons/create and /api/crons/update) ──
+# Both routes used to hand every body key to the engine, so any cron:write user
+# could edit someone else's task, point its delivery at any recipient or blank
+# the owner_email the engine runs it as. Every write passes _cron_write_allowed.
+
+# What static/panels.js sends: the emoji picker, the category popover and the
+# share dialog one field each, saveCronForm the whole form. Anything else,
+# including owner_email, origin, created_at and run state, is refused (400).
+_CRON_WRITE_FIELDS = frozenset({
+    "name", "schedule", "prompt", "deliver", "profile", "model", "provider",
+    "toast_notifications", "diagram", "emoji", "category", "shared_with",
+})
+# Only a new task takes these (saveCronForm's create branch); an existing task
+# is paused and resumed through its own routes.
+_CRON_CREATE_ONLY_FIELDS = frozenset({"enabled", "skills"})
+# A no_agent script runs without any governance, and managed_by decides who is
+# told when a task fails, so only cron admins may set them.
+_CRON_ADMIN_FIELDS = frozenset({"script", "no_agent", "managed_by"})
+_CRON_MANAGED_BY_VALUES = frozenset({"synthwave", "client"})
+
+
+def _normalize_cron_managed_by(value):
+    """``synthwave`` or ``client``; empty clears the marker."""
+    return str(value or "").strip().lower() or None
+
+
 def _cron_delivery_platforms():
-    """The delivery choices GET /api/crons/delivery-options offers."""
+    """The delivery choices GET /api/crons/delivery-options offers. They are
+    also the only ``deliver`` values a non-admin may write: a free-form target
+    such as ``telegram:<chat id>`` would send a task's output to anyone."""
     try:
         from cron.scheduler import _KNOWN_DELIVERY_PLATFORMS
     except Exception:
@@ -24683,6 +24711,146 @@ def _cron_delivery_platforms():
     return platforms
 
 
+def _cron_model_pin_allowed(handler, model, provider) -> bool:
+    """Whether the caller's model grants cover pinning this model/provider.
+    Fails closed when the policy cannot be resolved."""
+    try:
+        from api.governance.resource_scope import access_for, allowed, model_allowed
+
+        access = access_for(handler)
+        if access is None:
+            return True
+        if model:
+            return model_allowed(access, model, provider or "")
+        from api.config import _resolve_provider_alias
+
+        return allowed(access, "model_providers", _resolve_provider_alias(str(provider)))
+    except Exception:
+        logger.warning("cron model grant check failed", exc_info=True)
+        return False
+
+
+def _cron_people_outside_policy(emails) -> list[str]:
+    """The addresses in ``emails`` the governance policy does not know (its
+    users and bootstrap admins, the list GET /api/people offers). Empty when
+    governance is off: those installs have no directory to check against."""
+    from api.governance.loader import get_policy
+
+    policy = get_policy()
+    if not policy.enabled:
+        return []
+    known = {str(email).strip().lower() for email in (policy.users or {})}
+    known |= {str(email).strip().lower() for email in (policy.bootstrap_admins or ())}
+    return sorted(email for email in emails if email not in known)
+
+
+def _cron_write_refusal(identity, path, reason, message, job_id=""):
+    """A 403 for a governed cron write, or None under report_only, which
+    audits the refusal as would_deny and lets the write through."""
+    import api.cron_scope as cron_scope
+
+    if cron_scope.audit_write_would_deny(identity, path=path, reason=reason, job_id=job_id):
+        return None
+    return 403, {"error": message, "reason": reason}
+
+
+def _cron_write_allowed(handler, body, job_id=None):
+    """Authorise one cron create (``job_id`` None) or update before anything
+    is written. Returns None when the write may go ahead, otherwise the
+    ``(status, payload)`` refusal to send.
+
+    Order: the field allowlist (400); for an update the per-job scope guard,
+    then ownership (403: the owner or a cron admin may edit, a sharee may
+    not); then the values. Cron admins skip ownership and the value grants,
+    never the allowlist or the people check. Installs with governance off
+    resolve every caller as cron admin (identity_has_permission fails open
+    there), and report_only audits a 403 as would_deny instead of enforcing.
+    """
+    creating = job_id is None
+    path = "/api/crons/create" if creating else "/api/crons/update"
+    accepted = _CRON_WRITE_FIELDS | _CRON_ADMIN_FIELDS | (
+        _CRON_CREATE_ONLY_FIELDS if creating else {"job_id"})
+    refused = sorted(str(key) for key in body if key not in accepted)
+    if refused:
+        return 400, {"error": f"Field not allowed: {', '.join(refused)}"}
+
+    from api.governance.enforce import _request_identity
+
+    identity = _request_identity(handler)
+    is_admin = _cron_admin_allowed(handler)
+    job = None
+    if not creating and (not is_admin or "shared_with" in body):
+        from cron.jobs import get_job
+
+        job = get_job(job_id)
+        if job is None:
+            return 404, {"error": "Job not found"}
+
+    def _refuse(reason, message):
+        return _cron_write_refusal(identity, path, reason, message, job_id or "")
+
+    if not creating and not is_admin:
+        import api.cron_scope as cron_scope
+
+        # The handler already holds cron_profile_context, so pass the loaded
+        # row instead of letting the guard enter that lock again.
+        if not cron_scope.caller_sees_cron_profile(
+                handler, _get_active_profile_name() or "default", job_id=str(job_id), job=job):
+            return 403, {"error": "forbidden", "reason": "cron_scope"}
+        if not cron_scope.identity_owns_cron_job(identity, job):
+            refusal = _refuse("cron_owner", "Only the owner of this task or a cron admin can change it.")
+            if refusal:
+                return refusal
+
+    admin_fields = sorted(_CRON_ADMIN_FIELDS.intersection(body))
+    if admin_fields and not is_admin:
+        refusal = _refuse("cron_admin_field", f"Only a cron admin can set {', '.join(admin_fields)}.")
+        if refusal:
+            return refusal
+    if body.get("script") is not None and not isinstance(body["script"], str):
+        return 400, {"error": "script must be a string"}
+    if "no_agent" in body and not isinstance(body["no_agent"], bool):
+        return 400, {"error": "no_agent must be a boolean"}
+    if "managed_by" in body and _normalize_cron_managed_by(body["managed_by"]) not in (
+            _CRON_MANAGED_BY_VALUES | {None}):
+        return 400, {"error": "managed_by must be synthwave or client"}
+
+    if not is_admin and body.get("deliver") is not None:
+        deliver = str(body["deliver"]).strip() or ("local" if creating else "")
+        stored = None if job is None else str(job.get("deliver") or "").strip()
+        # Saving the stored target back unchanged is not a new target.
+        if deliver != stored and deliver not in {p["value"] for p in _cron_delivery_platforms()}:
+            refusal = _refuse("cron_deliver", "This delivery target is not available to you.")
+            if refusal:
+                return refusal
+
+    if not is_admin and ("model" in body or "provider" in body):
+        stored_pin = (None, None) if job is None else (job.get("model") or None, job.get("provider") or None)
+        model = (body.get("model") or None) if "model" in body else stored_pin[0]
+        provider = (body.get("provider") or None) if "provider" in body else stored_pin[1]
+        if ((model or provider) and (model, provider) != stored_pin
+                and not _cron_model_pin_allowed(handler, model, provider)):
+            refusal = _refuse("cron_model", "This model is not available to you.")
+            if refusal:
+                return refusal
+
+    if "shared_with" in body:
+        try:
+            people = _normalize_cron_shared_with(body["shared_with"])
+            already = set(_normalize_cron_shared_with((job or {}).get("shared_with")))
+        except ValueError as e:
+            return 400, {"error": str(e)}
+        try:
+            # Someone already on the task may stay after leaving the directory.
+            unknown = _cron_people_outside_policy(email for email in people if email not in already)
+        except Exception:
+            logger.warning("cron share check: governance policy unavailable", exc_info=True)
+            return 503, {"error": "People directory is unavailable. Please try again."}
+        if unknown:
+            return 400, {"error": f"shared_with: not in the people directory: {', '.join(unknown)}"}
+    return None
+
+
 def _handle_cron_create(handler, body):
     try:
         require(body, "prompt", "schedule")
@@ -24690,6 +24858,10 @@ def _handle_cron_create(handler, body):
             raise ValueError("enabled must be a boolean")
     except ValueError as e:
         return bad(handler, str(e))
+    refusal = _cron_write_allowed(handler, body)
+    if refusal is not None:
+        status, payload = refusal
+        return j(handler, payload, status=status)
     try:
         from cron.jobs import create_job, update_job
 
@@ -24699,16 +24871,21 @@ def _handle_cron_create(handler, body):
         toast_notifications = body.get("toast_notifications") is not False
         requested_model = body.get("model") or None
         requested_provider = body.get("provider") or None
-        job = create_job(
-            prompt=body["prompt"],
-            schedule=body["schedule"],
-            name=body.get("name") or None,
-            deliver=body.get("deliver") or "local",
-            skills=body.get("skills") or [],
-            model=requested_model,
-            provider=requested_provider,
-            **({"enabled": body["enabled"]} if "enabled" in body else {}),
-        )
+        create_kwargs = {
+            "prompt": body["prompt"],
+            "schedule": body["schedule"],
+            "name": body.get("name") or None,
+            "deliver": body.get("deliver") or "local",
+            "skills": body.get("skills") or [],
+            "model": requested_model,
+            "provider": requested_provider,
+        }
+        if "enabled" in body:
+            create_kwargs["enabled"] = body["enabled"]
+        for _key in ("script", "no_agent"):  # cron admins only, see _cron_write_allowed
+            if _key in body:
+                create_kwargs[_key] = body[_key]
+        job = create_job(**create_kwargs)
         post_create_updates = {}
         if profile is not None:
             post_create_updates["profile"] = profile
@@ -24737,6 +24914,8 @@ def _handle_cron_create(handler, body):
         _shared = _normalize_cron_shared_with(body.get("shared_with"))
         if _shared:
             post_create_updates["shared_with"] = _shared
+        if "managed_by" in body:
+            post_create_updates["managed_by"] = _normalize_cron_managed_by(body["managed_by"])
         # Stamp the creator, as chat-created jobs already are, so completion
         # notifications and the ownership rule in api/cron_scope.py reach the
         # person who scheduled it from the Tasks panel. No stamp without a
@@ -24766,6 +24945,10 @@ def _handle_cron_update(handler, body):
         require(body, "job_id")
     except ValueError as e:
         return bad(handler, str(e))
+    refusal = _cron_write_allowed(handler, body, job_id=body["job_id"])
+    if refusal is not None:
+        status, payload = refusal
+        return j(handler, payload, status=status)
     from cron.jobs import update_job
 
     try:
@@ -24786,6 +24969,8 @@ def _handle_cron_update(handler, body):
                 updates[k] = _normalize_cron_category(v)
             elif k == "shared_with":
                 updates[k] = _normalize_cron_shared_with(v)
+            elif k == "managed_by":
+                updates[k] = _normalize_cron_managed_by(v)
             elif v is not None:
                 updates[k] = v
     except ValueError as e:

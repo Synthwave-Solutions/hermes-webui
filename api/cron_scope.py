@@ -190,6 +190,55 @@ def row_owned_by_identity(identity, row, session_owner=None) -> bool:
     return lookup(str(origin.get("chat_id") or "")) == email
 
 
+def identity_owns_cron_job(identity, job, session_owner=None) -> bool:
+    """Edit rights on one job: its owner (cron admins are checked separately).
+
+    ``owner_email`` is the identity the engine runs the job as, so when it is
+    set it decides alone: a stale or copied WebUI origin stamp cannot make
+    someone else the owner. Jobs from before that field was stamped fall back
+    to the WebUI creator rule of row_owned_by_identity. Sharing never grants
+    editing (row_shared_with_identity).
+    """
+    email = _identity_email(identity)
+    if not email or not isinstance(job, dict):
+        return False
+    owner = str(job.get("owner_email") or "").strip().lower()
+    if owner:
+        return owner == email
+    return row_owned_by_identity(identity, job, session_owner)
+
+
+def audit_write_would_deny(identity, *, path: str, reason: str, job_id: str = "") -> bool:
+    """Under ``report_only``, record a refused cron write as ``would_deny`` and
+    return True so the caller lets it through; otherwise return False.
+
+    Mirrors api/governance/enforce.py::enforce_request: report_only observes
+    and never enforces. An unreadable policy reports ``enforce`` (see
+    _policy_mode), so a broken policy never turns a refusal into an allow.
+    """
+    if _policy_mode() != "report_only":
+        return False
+    try:
+        from api.governance.audit import append_audit_event
+        from api.governance.enforce import subject_from_identity
+
+        subject = subject_from_identity(identity)
+        append_audit_event(
+            "would_deny",
+            subject_email=subject.email,
+            subject_user_id=subject.user_id,
+            path=path,
+            method="POST",
+            reason=reason,
+            mode="report_only",
+            report_only=True,
+            extra={"resource": "cron:write", "job_id": str(job_id or "")},
+        )
+    except Exception:
+        logger.warning("cron write would_deny audit append failed", exc_info=True)
+    return True
+
+
 def row_shared_with_identity(identity, row) -> bool:
     """A job explicitly shared with this person (``shared_with`` emails, set from
     the Tasks tab). Sharing grants visibility, output and completion notices,
@@ -220,7 +269,7 @@ def _active_store_job(job_id: str):
         return None
 
 
-def caller_sees_cron_profile(handler, profile, job_id: str | None = None) -> bool:
+def caller_sees_cron_profile(handler, profile, job_id: str | None = None, job=None) -> bool:
     """Route hook for the per-job detail and mutation endpoints.
 
     Those endpoints serve the ACTIVE profile's cron store. With a ``job_id`` the
@@ -231,11 +280,16 @@ def caller_sees_cron_profile(handler, profile, job_id: str | None = None) -> boo
     anyway) the root store stays reachable because those payloads are
     row-scoped separately (scope_cron_completions); other stores follow the
     profile rule.
+
+    ``job`` is that row when the caller already loaded it: the cron write
+    handlers run inside cron_profile_context, whose lock is not reentrant, so
+    they must not let _active_store_job enter it a second time.
     """
     try:
         identity = _identity_for(handler)
         if job_id:
-            job = _active_store_job(job_id)
+            if job is None:
+                job = _active_store_job(job_id)
             if job is not None:
                 return identity_sees_cron_row(identity, job, store_profile=str(profile or ROOT_PROFILE))
         if str(profile or ROOT_PROFILE) == ROOT_PROFILE:
