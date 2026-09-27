@@ -109,7 +109,7 @@ class TestSlashCommandHandlers:
         assert helper_idx >= 0, "_trySteer helper must exist"
         helper_body = _source_between(COMMANDS_JS, "async function _trySteer(", "\nasync function cmdTitle")
         assert "cancelStream" not in helper_body
-        gateway_fallback_idx = helper_body.find("result&&result.fallback==='gateway_steer_queued'")
+        gateway_fallback_idx = helper_body.find("result.fallback==='gateway_steer_queued'")
         gateway_queue_idx = helper_body.find("queueSessionMessage", gateway_fallback_idx)
         assert gateway_fallback_idx >= 0
         assert gateway_queue_idx > gateway_fallback_idx
@@ -326,7 +326,9 @@ class TestSendBusyBranchDispatch:
         assert send_idx >= 0, "send() not found"
         steer_idx = MESSAGES_JS.find("defaultMessageMode==='steer'", send_idx)
         assert steer_idx >= 0, "busy steer branch not found"
-        branch_end = MESSAGES_JS.find("} else if(defaultMessageMode==='interrupt')", steer_idx)
+        # Since 27 Sep 2026 the interrupt branch also skips someone else's
+        # group-chat turn (``&&!_peerTurn``).
+        branch_end = MESSAGES_JS.find("} else if(defaultMessageMode==='interrupt'", steer_idx)
         assert branch_end > steer_idx, "busy steer branch end not found"
         branch = MESSAGES_JS[steer_idx:branch_end]
         assert "await _trySteer(text, /*explicitSteer=*/false)" in branch

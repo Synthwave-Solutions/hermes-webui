@@ -6731,6 +6731,9 @@ def _run_agent_streaming(
         provider=model_provider,
         ephemeral=bool(ephemeral),
         worker_lifetime_tracked=True,
+        # Who started this turn. Empty means the owner (the caller only
+        # passes a sender for someone else's turn in a group conversation).
+        sender_email=str(sender_email or "").strip().lower() or None,
     )
     try:
         run_journal = RunJournalWriter(session_id, stream_id)
@@ -10531,6 +10534,18 @@ def _run_agent_streaming(
 # ============================================================
 
 
+def _active_turn_sender(stream_id, session):
+    """E-mail of whoever started the running turn, or None when unknown."""
+    from api import config as _cfg
+
+    with _cfg.ACTIVE_RUNS_LOCK:
+        meta = dict(_cfg.ACTIVE_RUNS.get(stream_id) or {})
+    if not meta:
+        return None
+    sender = str(meta.get("sender_email") or "").strip().lower()
+    return sender or str(getattr(session, "owner_email", "") or "").strip().lower() or None
+
+
 def _handle_chat_steer(handler, body: dict) -> bool:
     """Inject a /steer payload into the active agent for a session.
 
@@ -10613,6 +10628,21 @@ def _handle_chat_steer(handler, body: dict) -> bool:
         # Active stream id is stale — stream has ended; caller falls back
         return j(handler, {"accepted": False, "fallback": "stream_dead",
                            "stream_id": None})
+
+    # Group conversations (27 Sep 2026): a turn runs under the access of the
+    # person who started it. Steering it from another participant would slip
+    # their words into that turn under someone else's rights, so their
+    # message waits for its own turn instead (the client queues it on this
+    # fallback). Unknown turn owner or caller: refuse, never guess.
+    participants = getattr(s, "participants", None)
+    if isinstance(participants, (list, tuple)) and participants:
+        from api.ownership import request_owner_email
+
+        caller = str(request_owner_email(handler) or "").strip().lower()
+        turn_sender = _active_turn_sender(active_stream_id, s)
+        if not caller or not turn_sender or caller != turn_sender:
+            return j(handler, {"accepted": False, "fallback": "peer_turn",
+                               "stream_id": active_stream_id})
 
     try:
         accepted = bool(agent.steer(text))

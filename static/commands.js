@@ -1628,7 +1628,11 @@ async function _trySteer(msg, explicitSteer){
     showToast(t('cmd_steer_delivered'),2500);
     return true;
   }
-  if(result&&result.fallback==='gateway_steer_queued'&&typeof queueSessionMessage==='function'){
+  // peer_turn (27 Sep 2026): in a group conversation someone else's turn is
+  // running. Their turn runs under their access, so this message waits in
+  // the queue and goes out as the writer's own turn when theirs is done.
+  const _peerTurnFallback=!!(result&&result.fallback==='peer_turn');
+  if(result&&(result.fallback==='gateway_steer_queued'||_peerTurnFallback)&&typeof queueSessionMessage==='function'){
     _steerUploadCache=null;
     queueSessionMessage(ownerSid,{
       text:originalMsg,
@@ -1644,7 +1648,7 @@ async function _trySteer(msg, explicitSteer){
       const _remaining=S.pendingFiles.filter(f=>!_queued.has(f));
       if(_remaining.length!==S.pendingFiles.length){S.pendingFiles=_remaining;if(typeof renderTray==='function')renderTray();}
     }
-    showToast(t('steer_leftover_queued'),3000);
+    showToast(t(_peerTurnFallback?'group_turn_queued':'steer_leftover_queued'),3000);
     return true;
   }
   // Do not fall back to interrupt: Steer failure is not permission to cancel

@@ -556,6 +556,7 @@ window.__registerHermesLocale('en', {
     profile_photo_failed: 'Could not save the photo.',
     profile_photo_type: 'Use a PNG, JPEG or WebP image.',
     group_people_saved: 'Conversation members updated',
+    group_turn_queued: 'Queued. It goes out as your own message when the current answer is done.',
     group_people_staged: 'They join when you send the first message',
     group_people_cleared: 'This conversation is private again',
     group_people_failed: 'Could not change who is in this conversation',

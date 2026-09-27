@@ -1427,7 +1427,10 @@ async function send(){
         }
       }
     const defaultMessageMode=window._defaultMessageMode||'steer';
-      if(defaultMessageMode==='steer'&&S.activeStreamId&&typeof _trySteer==='function'){
+      // Group conversations: someone else's running turn is never steered or
+      // interrupted from here; the message waits and becomes your own turn.
+      const _peerTurn=typeof _peerTurnIsRunning==='function'&&_peerTurnIsRunning();
+      if(defaultMessageMode==='steer'&&S.activeStreamId&&!_peerTurn&&typeof _trySteer==='function'){
         // Real steer: clear the input first so the user gets immediate
         // feedback, then ship the steer payload via /api/chat/steer.
         // _trySteer captures the owner session/files before awaiting uploads,
@@ -1439,7 +1442,7 @@ async function send(){
         await _trySteer(text, /*explicitSteer=*/false);
         // _trySteer clears staged files only after /api/chat/steer accepts, and
         // only when the visible session still matches the captured owner sid.
-      } else if(defaultMessageMode==='interrupt'){
+      } else if(defaultMessageMode==='interrupt'&&!_peerTurn){
         // Queue the message, then cancel so drain re-sends it.
         const _modelState=_chatPayloadModelState();
         queueSessionMessage(S.session.session_id,{text,files:[...S.pendingFiles],model:_modelState.model,model_provider:_modelState.model_provider,profile:S.activeProfile||'default'});
@@ -1454,13 +1457,15 @@ async function send(){
         }
       } else {
         // Default: queue mode (current behavior). Also the fallback for
-        // 'steer' mode when no stream is active or _trySteer is unavailable.
+        // 'steer' mode when no stream is active or _trySteer is unavailable,
+        // and for any message sent during someone else's group-chat turn.
         const _modelState=_chatPayloadModelState();
         queueSessionMessage(S.session.session_id,{text,files:[...S.pendingFiles],model:_modelState.model,model_provider:_modelState.model_provider,profile:S.activeProfile||'default'});
         _clearComposerAfterQueuedSelectionSend(S.session&&S.session.session_id);
         S.pendingFiles=[];renderTray();
         updateQueueBadge(S.session.session_id);
-        showToast(`Queued: "${text.slice(0,40)}${text.length>40?'…':''}"`,2000);
+        if(_peerTurn) showToast(t('group_turn_queued'),3000);
+        else showToast(`Queued: "${text.slice(0,40)}${text.length>40?'…':''}"`,2000);
       }
     }
     return;
@@ -8090,6 +8095,7 @@ function startSessionStream(sid) {
         if (sender && me && sender === me) return;
         const streamId = String(d.stream_id || '');
         if (!streamId) return;
+        _rememberPeerTurn(streamId);
         if (S.activeStreamId === streamId) return;
         const isCurrent = (typeof _isSessionCurrentPane === 'function')
           ? _isSessionCurrentPane(sid)
@@ -8232,6 +8238,22 @@ function stopSessionStream() {
 // a toast. The diagnostic ack POST still fires for both focused and
 // unfocused viewers so the server receives the delivery/cleanup signal;
 // the focus gate suppresses UI noise only.
+// Group conversations (27 Sep 2026): stream ids of turns other people
+// started, from the peer_turn_started frame. While one of those runs, what
+// you send waits in the queue instead of steering or interrupting their turn,
+// which runs under their access, not yours. The server refuses such a steer
+// too (fallback "peer_turn"), which covers a tab that missed the frame.
+const _peerTurnStreamIds = new Set();
+function _rememberPeerTurn(streamId) {
+  if (!streamId) return;
+  _peerTurnStreamIds.add(String(streamId));
+  if (_peerTurnStreamIds.size > 64) _peerTurnStreamIds.delete(_peerTurnStreamIds.values().next().value);
+}
+function _peerTurnIsRunning() {
+  const sid = (typeof S !== 'undefined' && S && S.activeStreamId) || '';
+  return !!(sid && _peerTurnStreamIds.has(String(sid)));
+}
+
 // The toast used to read "Task proc_1a2b done: IMPORTANT: Background process
 // proc_1a2b... completed (exit_code=0)." (Michael Ramirez, 27 Sep 2026). It
 // now says the same thing as the notice in the chat, plus which chat it is.

@@ -311,7 +311,8 @@ class TestFrontendWiring:
         body = _source_between(self.cmds, "async function _trySteer(", "\nasync function cmdTitle")
         # Must check result.accepted and keep generic failures from cancelling.
         assert "result&&result.accepted" in body or "result.accepted" in body
-        assert "result&&result.fallback==='gateway_steer_queued'" in body
+        assert "result.fallback==='gateway_steer_queued'" in body
+        assert "result.fallback==='peer_turn'" in body
         assert "queueSessionMessage(ownerSid" in body
         assert "cancelStream" not in body, "fallback path must not cancel the stream"
         assert "inp.value" in body, "fallback path must restore the composer draft"
@@ -681,7 +682,7 @@ class TestFrontendWiring:
               assert.strictEqual(apiCalls, 2);
             }}
 
-            async function runGatewayQueuedFallback(switchDuringAwait=false){{
+            async function runGatewayQueuedFallback(switchDuringAwait=false, fallback='gateway_steer_queued', expectedToast='steer_leftover_queued'){{
               let input = {{value:''}};
               let clearInflightCalls = [];
               let updateSendBtnCalls = 0;
@@ -721,7 +722,7 @@ class TestFrontendWiring:
                 }}else{{
                   S.pendingFiles=[submittedFile, replacementFile];
                 }}
-                return {{accepted:false, fallback:'gateway_steer_queued'}};
+                return {{accepted:false, fallback}};
               }};
 
               const delivered = await _trySteer('queue me', false);
@@ -744,7 +745,7 @@ class TestFrontendWiring:
               assert.strictEqual(draftClears[0].sid, 'A');
               assert.strictEqual(draftClears[0].text, 'queue me');
               assert.deepStrictEqual(draftClears[0].files, [submittedFile]);
-              assert.deepStrictEqual(toasts, ['steer_leftover_queued']);
+              assert.deepStrictEqual(toasts, [expectedToast]);
               if(switchDuringAwait){{
                 assert.strictEqual(S.session.session_id, 'B');
                 assert.deepStrictEqual(S.pendingFiles, [replacementFile]);
@@ -830,6 +831,9 @@ class TestFrontendWiring:
               await runNoCachedAgentFallback(true);
               await runGatewayQueuedFallback(false);
               await runGatewayQueuedFallback(true);
+              // Group chat, someone else's turn: the server refuses the steer
+              // (peer_turn) and the message waits as the writer's own turn.
+              await runGatewayQueuedFallback(false, 'peer_turn', 'group_turn_queued');
               await runStreamDeadFallback();
               await runStreamDeadFallback(true);
               await runStreamDeadFallback(true, '/help');
