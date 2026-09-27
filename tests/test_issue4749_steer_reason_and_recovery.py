@@ -42,6 +42,9 @@ BACKEND_CODES = {
 
 HANDLED_NON_RECOVERY_CODES = {
     "gateway_steer_queued",
+    # Group chats (27 Sep 2026): the running turn belongs to someone else, so
+    # the client queues the message as the writer's own next turn.
+    "peer_turn",
 }
 
 FRONTEND_NETWORK_CODE = "network_error"
@@ -147,6 +150,9 @@ def test_backend_parity():
     )
     # Also confirm frontend adds network_error
     commands_text = COMMANDS_JS.read_text(encoding="utf-8")
+    # Every handled non-recovery code has its own branch in _trySteer.
+    for code in HANDLED_NON_RECOVERY_CODES:
+        assert f"result.fallback==='{code}'" in commands_text, f"{code} is not handled in _trySteer"
     assert FRONTEND_NETWORK_CODE in commands_text, (
         "network_error not found in commands.js"
     )
