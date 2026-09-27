@@ -1,6 +1,8 @@
 """Cached initialization cancellation must not become a successor's Stop."""
 import ast
+import os
 from pathlib import Path
+import subprocess
 import threading
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -10,29 +12,52 @@ import pytest
 from api.streaming import _clear_cached_agent_interrupt
 
 
-def test_cached_reset_uses_complete_engine_contract():
-    from run_agent import AIAgent
+_ENGINE_CONTRACT_CHECK = '''
+import threading
+from run_agent import AIAgent
+from api.streaming import _clear_cached_agent_interrupt
 
-    # The real engine methods also clear redirect, hard-stop, and tool-thread
-    # signals. Build only their required state, without contacting a provider.
-    agent = object.__new__(AIAgent)
-    agent._execution_thread_id = None
-    agent._interrupt_requested = True
-    agent._interrupt_message = 'old turn'
-    agent._tool_interrupt_reason = 'old tool'
-    agent._interrupt_thread_signal_pending = True
-    agent._hard_interrupt_requested = threading.Event()
-    agent._hard_interrupt_requested.set()
-    agent._pending_redirect = {'text': 'old redirect'}
-    agent._pending_steer = []
-    agent._pending_steer_lock = threading.Lock()
-    assert _clear_cached_agent_interrupt(agent) is True
-    assert agent._interrupt_requested is False
-    assert agent._interrupt_message is None
-    assert agent._tool_interrupt_reason is None
-    assert agent._interrupt_thread_signal_pending is False
-    assert not agent._hard_interrupt_requested.is_set()
-    assert agent._pending_redirect is None
+# The real engine methods also clear redirect, hard-stop, and tool-thread
+# signals. Build only their required state, without contacting a provider.
+agent = object.__new__(AIAgent)
+agent._execution_thread_id = None
+agent._interrupt_requested = True
+agent._interrupt_message = 'old turn'
+agent._tool_interrupt_reason = 'old tool'
+agent._interrupt_thread_signal_pending = True
+agent._hard_interrupt_requested = threading.Event()
+agent._hard_interrupt_requested.set()
+agent._pending_redirect = {'text': 'old redirect'}
+agent._pending_steer = []
+agent._pending_steer_lock = threading.Lock()
+assert _clear_cached_agent_interrupt(agent) is True
+assert agent._interrupt_requested is False
+assert agent._interrupt_message is None
+assert agent._tool_interrupt_reason is None
+assert agent._interrupt_thread_signal_pending is False
+assert not agent._hard_interrupt_requested.is_set()
+assert agent._pending_redirect is None
+print('engine contract ok')
+'''
+
+
+def test_cached_reset_uses_complete_engine_contract():
+    # The engine (run_agent) is not importable in the WebUI test venv, which
+    # lacks the engine's dependencies. Run the check in the interpreter the
+    # WebUI itself uses for the engine (conftest's VENV_PYTHON), with the same
+    # isolated HERMES_HOME/state environment conftest set for this process.
+    from tests.conftest import HERMES_AGENT, VENV_PYTHON
+
+    if HERMES_AGENT is None:
+        pytest.skip('hermes-agent not found (skipping agent-dependent test)')
+    root = Path(__file__).resolve().parents[1]
+    env = dict(os.environ)
+    env['PYTHONPATH'] = os.pathsep.join(
+        [str(root), str(HERMES_AGENT)] + ([env['PYTHONPATH']] if env.get('PYTHONPATH') else []))
+    proc = subprocess.run([VENV_PYTHON, '-c', _ENGINE_CONTRACT_CHECK], cwd=str(root), env=env,
+                          capture_output=True, text=True, timeout=180)
+    assert proc.returncode == 0, (proc.stdout[-2000:] + proc.stderr[-4000:])
+    assert proc.stdout.strip().endswith('engine contract ok')
 
 
 @pytest.mark.parametrize('clear', [None, False, Mock(return_value=False),

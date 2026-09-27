@@ -29,7 +29,11 @@ def test_terminal_is_opened_by_slash_command_not_permanent_composer_icon():
     assert 'id="terminalSurface"' in html
     assert 'static/terminal.js' in html
     assert './static/terminal.js' in sw
-    assert "xterm@5.3.0" in html
+    # SynthPulse serves xterm 5.3.0 from vendored files, injected on first
+    # terminal use instead of a CDN tag in the page shell.
+    terminal_js = _read("static/terminal.js")
+    assert "static/vendor/xterm/5.3.0/lib/xterm.js" in terminal_js
+    assert (REPO_ROOT / "static/vendor/xterm/5.3.0/lib/xterm.js").is_file()
 
 
 def test_terminal_surface_uses_composer_flyout_card_pattern():

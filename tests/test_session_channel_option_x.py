@@ -939,7 +939,12 @@ def test_load_session_rearms_stream_on_every_early_return():
     # added inside loadSession pushed the fetch-error catch's stream restart past
     # the old 14000-char cutoff.
     fn_ix = js.index("async function loadSession(")
-    body = js[fn_ix:fn_ix + 16000]
+    # Bound by the function itself instead of a fixed window; the SynthPulse
+    # loadSession (scene cache, group chats) is longer than 16000 characters.
+    fn_end = js.find("\nasync function ", fn_ix + 1)
+    fn_end_plain = js.find("\nfunction ", fn_ix + 1)
+    ends = [e for e in (fn_end, fn_end_plain) if e != -1]
+    body = js[fn_ix:min(ends) if ends else len(js)]
 
     # The unconditional teardown must still be there (this is what creates the
     # dead-stream window the re-arm closes).

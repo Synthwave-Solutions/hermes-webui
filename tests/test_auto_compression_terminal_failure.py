@@ -185,7 +185,17 @@ def test_terminal_failure_gates_shape_check_to_no_streamed_text():
     assert "_is_agent_result_terminal = _agent_result_terminal_failure(result)" in block
     assert "_is_agent_result_terminal" in block
     assert "_saved_transcript_lacks_final_answer" in block
-    assert "_classification['type'] not in {'cancelled', 'interrupted'}" in block
+    # SynthPulse (16 Sep 2026) moved the shape-check gate into
+    # _turn_is_terminal_failure, which also trusts the engine's verdict on a
+    # healthy text_response turn. The gate itself is unchanged: a transcript
+    # that lacks a final answer is terminal, except for cancelled or
+    # interrupted turns.
+    assert "_turn_is_terminal_failure(" in block
+    assert "_classification['type']" in block
+    assert streaming._turn_is_terminal_failure({}, True, 'cancelled') is False
+    assert streaming._turn_is_terminal_failure({}, True, 'interrupted') is False
+    assert streaming._turn_is_terminal_failure({}, True, 'no_response') is True
+    assert streaming._turn_is_terminal_failure({}, False, 'no_response') is False
     assert "not _token_sent" not in block
     assert "_session_lacks_final_assistant_answer(_all_result_messages)" not in block
 

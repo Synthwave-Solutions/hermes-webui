@@ -724,7 +724,10 @@ def test_frontend_subscribes_with_known_count_and_handles_session_updated():
     # (a) known_count is sent on subscribe, sourced from S.session.message_count.
     assert "known_count" in js
     ss_ix = js.index("function startSessionStream")
-    ss_src = js[ss_ix:ss_ix + 4000]
+    # Bound by the function itself: the SynthPulse version is longer than a
+    # fixed 4000-character window.
+    ss_end = js.find("\nfunction ", ss_ix + 1)
+    ss_src = js[ss_ix:ss_end if ss_end != -1 else len(js)]
     assert "known_count=" in ss_src
     assert "S.session.message_count" in ss_src
     # Must NOT key the reported count on S.messages.length (tail window) — that
@@ -734,7 +737,11 @@ def test_frontend_subscribes_with_known_count_and_handles_session_updated():
     assert "S.messages.length" not in knc_src
     # (b) the session-updated listener routes through the swap-in-place path.
     su_ix = js.index("addEventListener('session-updated'")
-    su_src = js[su_ix:su_ix + 1400]
+    # Bound by the listener itself (it closes with `    });`); SynthPulse
+    # also drops the session's cached scene here, which makes it longer than a
+    # fixed 1400-character window.
+    su_end = js.find("\n    });", su_ix)
+    su_src = js[su_ix:su_end if su_end != -1 else su_ix + 1400]
     assert "keepStaleUntilLoaded: true" in su_src or "keepStaleUntilLoaded:true" in su_src
     assert "loadSession(" in su_src
     # Idle-only: must bail when a live turn is rendering (that path owns its own
