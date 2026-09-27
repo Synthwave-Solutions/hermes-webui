@@ -1,7 +1,6 @@
 """Hermes Web UI server entry point."""
 import logging
 import os
-import re
 import signal
 import socket
 import ssl
@@ -99,16 +98,8 @@ from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
-
-def _env_int(name: str, default: int, minimum: int) -> int:
-    try:
-        value = int(os.getenv(name, str(default)))
-    except (TypeError, ValueError):
-        value = default
-    return max(minimum, value)
-
 from api.auth import check_auth, reset_trusted_auth_request_state
-from api.governance.enforce import enforce_request
+from api.synthpulse_server import clear_owner_context as _clear_owner_context, enforce_request, env_int as _env_int, set_owner_context as _set_owner_context, start_background_threads, stop_background_threads  # SynthPulse hooks
 from api.config import HOST, PORT, STATE_DIR, SESSION_DIR, DEFAULT_WORKSPACE
 from api.helpers import (
     j,
@@ -117,7 +108,7 @@ from api.helpers import (
     _CLIENT_DISCONNECT_ERRORS,
 )
 from api.profiles import set_request_profile, clear_request_profile
-from api.routes import handle_delete, handle_get, handle_patch, handle_post, handle_put, apply_cors_preflight_headers
+from api.routes import handle_delete, handle_get, handle_patch, handle_post, handle_put, apply_cors_preflight_headers, _shutdown_log_value  # one shared copy
 from api.startup import auto_install_agent_deps, fix_credential_permissions
 from api.updates import WEBUI_VERSION
 from api.crash_visibility import install_crash_visibility
@@ -299,23 +290,6 @@ class QuietHTTPServer(ThreadingHTTPServer):
         super().handle_error(request, client_address)
 
 
-def _set_owner_context(handler) -> None:
-    """Bind the current request to this thread for ownership stamping."""
-    try:
-        from api.ownership import set_request_context
-        set_request_context(handler)
-    except Exception:
-        pass
-
-
-def _clear_owner_context() -> None:
-    try:
-        from api.ownership import clear_request_context
-        clear_request_context()
-    except Exception:
-        pass
-
-
 class Handler(BaseHTTPRequestHandler):
     # HTTP/1.1 keep-alive stays on, so every response must declare framing.
     protocol_version = "HTTP/1.1"
@@ -398,15 +372,13 @@ class Handler(BaseHTTPRequestHandler):
         self._safe_webui_print(f'[webui] {record}')
 
     def do_GET(self) -> None:
-        self._req_t0 = time.time(); reset_trusted_auth_request_state(self)
-        _set_owner_context(self)
+        self._req_t0 = time.time(); reset_trusted_auth_request_state(self); _set_owner_context(self)
         cookie_profile = get_profile_cookie(self)
         if cookie_profile:
             set_request_profile(cookie_profile)
         try:
             parsed = urlparse(self.path)
-            if not check_auth(self, parsed): return
-            if not enforce_request(self, parsed, "GET"): return
+            if not check_auth(self, parsed) or not enforce_request(self, parsed, "GET"): return
             result = handle_get(self, parsed)
             if result is False:
                 return j(self, {'error': 'not found'}, status=404)
@@ -422,12 +394,10 @@ class Handler(BaseHTTPRequestHandler):
             except Exception:
                 self._safe_webui_print(traceback.format_exc())
         finally:
-            clear_request_profile()
-            _clear_owner_context()
+            clear_request_profile(); _clear_owner_context()
 
     def _handle_write(self, route_func) -> None:
-        self._req_t0 = time.time(); reset_trusted_auth_request_state(self)
-        _set_owner_context(self)
+        self._req_t0 = time.time(); reset_trusted_auth_request_state(self); _set_owner_context(self)
         cookie_profile = get_profile_cookie(self)
         if cookie_profile:
             set_request_profile(cookie_profile)
@@ -436,12 +406,8 @@ class Handler(BaseHTTPRequestHandler):
             _is_csp_report_post = (
                 parsed.path == "/api/csp-report" and self.command == "POST"
             )
-            if not _is_csp_report_post and not check_auth(self, parsed):
-                self.close_connection = True  # The rejected body has not been consumed.
-                return
-            if not _is_csp_report_post and not enforce_request(self, parsed, self.command):
-                self.close_connection = True  # Never parse leftover JSON as another request.
-                return
+            if not _is_csp_report_post and not (check_auth(self, parsed) and enforce_request(self, parsed, self.command)):
+                self.close_connection = True; return  # rejected: never parse the unread body as another request
             result = route_func(self, parsed)
             if result is False:
                 return j(self, {'error': 'not found'}, status=404)
@@ -457,8 +423,7 @@ class Handler(BaseHTTPRequestHandler):
             except Exception:
                 self._safe_webui_print(traceback.format_exc())
         finally:
-            clear_request_profile()
-            _clear_owner_context()
+            clear_request_profile(); _clear_owner_context()
 
     def do_POST(self) -> None:
         self._handle_write(handle_post)
@@ -505,23 +470,6 @@ def _raise_fd_soft_limit(target: int = 4096) -> dict:
 
 
 _SHUTDOWN_AUDIT_LOGGED = False
-_SHUTDOWN_LOG_VALUE_RE = re.compile(r"[\x00-\x1f\x7f]+")
-
-
-def _shutdown_log_value(value, *, default: str = "unknown", max_len: int = 160) -> str:
-    """Return a bounded single-line value safe for shutdown diagnostics."""
-    if value is None:
-        return default
-    try:
-        text = str(value)
-    except Exception:
-        return default
-    text = _SHUTDOWN_LOG_VALUE_RE.sub("?", text).strip()
-    if not text:
-        return default
-    if len(text) > max_len:
-        text = f"{text[:max_len]}…"
-    return text
 
 
 def _log_shutdown_audit(reason: str = "serve_forever_exit") -> None:
@@ -685,13 +633,6 @@ def main() -> None:
         print(f'[!!] WARNING: Gateway watcher failed to start: {e}', flush=True)
 
     try:
-        from api.prewarm import start_prewarm_thread
-        if start_prewarm_thread():
-            print('[ok] cache pre-warm thread started (claude-code transcripts + model catalog)', flush=True)
-    except Exception as e:
-        print(f'[!!] WARNING: cache pre-warm failed to start: {e}', flush=True)
-
-    try:
         from api.background_process import start_drain_thread
         if start_drain_thread():
             print('[ok] bg_task_complete drain thread started', flush=True)
@@ -705,13 +646,7 @@ def main() -> None:
     except Exception as e:
         print(f'[!!] WARNING: SessionChannel reaper failed to start: {e}', flush=True)
 
-    try:
-        from api.cron_webui_delivery import start_cron_delivery_thread
-        if start_cron_delivery_thread():
-            print('[ok] cron WebUI delivery bridge started', flush=True)
-    except Exception as e:
-        print(f'[!!] WARNING: cron WebUI delivery bridge failed to start: {e}', flush=True)
-
+    start_background_threads()  # SynthPulse: cache pre-warm and cron delivery bridge
     try:
         from api.plugins import load_plugins
         load_plugins()
@@ -795,11 +730,7 @@ def main() -> None:
             stop_session_channel_reaper()
         except Exception:
             logger.debug("Failed to stop SessionChannel reaper during shutdown", exc_info=True)
-        try:
-            from api.cron_webui_delivery import stop_cron_delivery_thread
-            stop_cron_delivery_thread()
-        except Exception:
-            logger.debug("Failed to stop cron WebUI delivery bridge during shutdown", exc_info=True)
+        stop_background_threads()
 
 if __name__ == '__main__':
     main()
