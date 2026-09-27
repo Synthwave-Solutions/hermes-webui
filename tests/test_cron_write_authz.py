@@ -15,8 +15,8 @@ The rules pinned here:
   resume, delete and run, which are reached through the same scope guard.
 * Values are checked: ``deliver`` must be one of the caller's own delivery
   options, ``model`` and ``provider`` must be within the caller's model
-  grants, the ``skills`` of a new task must be ones the caller may view and
-  load, ``script``, ``no_agent`` and ``managed_by`` are cron admin only,
+  grants, every new ``skills`` entry must be one a chat turn of the caller
+  could load, ``script``, ``no_agent`` and ``managed_by`` are cron admin only,
   ``shared_with`` only names people in the policy.
 * On create the owner and the origin are stamped from the signed-in identity.
 * The four job routes read ``job_id`` once, as a non-empty string.
@@ -64,6 +64,10 @@ WRITER_GRANTS = {
     "profiles": ["alpha"],
     "routes": ["/api/crons", "/api/crons/*"],
     "models": {"providers": ["openai"], "models": ["gpt-allowed"]},
+    # A chat turn loads a skill through the skill_view tool: the skills
+    # toolset plus a view grant for the skill.
+    "tools": {"toolsets": ["skills"]},
+    "skills": {"view": ["google-workspace"]},
 }
 
 POLICY = {
@@ -456,7 +460,7 @@ def _form_create_payload(**overrides):
     ("base_url", "http://127.0.0.1:1/v1"),
     ("context_from", "legacy"),
     ("enabled", True),
-    ("skills", ["google-workspace"]),
+    ("skill", "google-workspace"),
     ("unknown_field", 1),
 ])
 def test_update_refuses_fields_outside_the_allowlist(env, field, value):
@@ -1119,24 +1123,44 @@ def test_empty_deliver_on_update_is_local(env):
 
 # Skills: the scheduler injects every listed skill into the job's prompt
 # (cron/scheduler.py _build_job_prompt calls skill_view directly, with no
-# governance gate), so a skill the creator may not view and load would reach
-# the agent, and its output the creator, through a scheduled task.
+# governance gate), so a skill its creator could not load in a chat would
+# reach the agent, and its output the creator, through a scheduled task. The
+# rule is the chat rule: the engine's own skill_view gates on the governance
+# context a chat turn of the caller binds. That rule is stricter than the
+# /api/skills listing guard, which treats "no skill grant" as "every skill".
 SECRET_SKILL = "finance-secrets"
+PLAIN = "plain@example.test"        # the skills toolset, no skill grant
+TOOLLESS = "toolless@example.test"  # a skill grant, but no skill_view tool
 SKILL_POLICY = {
     **POLICY,
+    "roles": {
+        **POLICY["roles"],
+        "plain": {"grants": {k: v for k, v in WRITER_GRANTS.items() if k != "skills"}},
+        "toolless": {"grants": {k: v for k, v in WRITER_GRANTS.items() if k != "tools"}},
+    },
     "users": {
         **POLICY["users"],
-        # Denied one skill outright; every other skill stays open.
+        # Every skill but one: finance-secrets is denied outright.
         OWNER: {"roles": ["writer"],
+                "grants": {"skills": {"view": ["*"]}},
                 "deny": {"skills": {"view": [SECRET_SKILL], "load": [SECRET_SKILL]}}},
-        # A restricted skill grant: only google-workspace.
-        OTHER: {"roles": ["writer"],
-                "grants": {"skills": {"view": ["google-workspace"], "load": ["google-workspace"]}}},
-        # May see every skill but load only google-workspace.
+        # Only the role's google-workspace.
+        OTHER: {"roles": ["writer"]},
+        # May view every skill, but loading notion is denied.
         SHAREE: {"roles": ["writer"],
-                 "grants": {"skills": {"view": ["*"], "load": ["google-workspace"]}}},
+                 "grants": {"skills": {"view": ["*"]}},
+                 "deny": {"skills": {"load": ["notion"]}}},
+        PLAIN: {"roles": ["plain"]},
+        TOOLLESS: {"roles": ["toolless"]},
     },
 }
+
+
+@pytest.fixture
+def chat_rule():
+    """The skill rule is the engine's own chat gate: skip without the engine."""
+    pytest.importorskip("hermes_cli.dashboard_governance.tool_policy")
+    pytest.importorskip("tools.registry")
 
 
 @pytest.mark.parametrize("email,skills", [
@@ -1145,9 +1169,11 @@ SKILL_POLICY = {
     (OWNER, ["Finance Secrets"]),            # the display form of the name
     (OWNER, [f"finance/{SECRET_SKILL}"]),     # a category path to the same skill
     (OTHER, ["notion"]),
-    (SHAREE, ["notion"]),                    # viewable but not loadable
+    (SHAREE, ["notion"]),                    # viewable, but its load is denied
+    (PLAIN, ["google-workspace"]),           # no skill grant: chat loads none
+    (TOOLLESS, ["google-workspace"]),        # granted, but chat has no skill_view
 ])
-def test_skill_outside_the_callers_grants_is_forbidden(env, inject_policy, email, skills):
+def test_skill_outside_the_callers_grants_is_forbidden(env, inject_policy, chat_rule, email, skills):
     inject_policy(SKILL_POLICY)
     handler = env.create(email, _form_create_payload(skills=skills))
     assert handler.status == 403, handler.body
@@ -1155,36 +1181,114 @@ def test_skill_outside_the_callers_grants_is_forbidden(env, inject_policy, email
     assert env.store.creates == []
 
 
-def test_skill_within_the_callers_grants_is_allowed(env, inject_policy):
+def test_skill_within_the_callers_grants_is_allowed(env, inject_policy, chat_rule):
     inject_policy(SKILL_POLICY)
     for email in (OWNER, OTHER, SHAREE):
         handler = env.create(email, _form_create_payload(skills=["google-workspace"]))
         assert handler.status == 200, (email, handler.body)
     handler = env.create(OWNER, _form_create_payload(skills=["notion"]))
     assert handler.status == 200, handler.body
-    handler = env.create(OTHER, _form_create_payload(skills=[]))
-    assert handler.status == 200, handler.body
+    for email in (OTHER, PLAIN, TOOLLESS):
+        handler = env.create(email, _form_create_payload(skills=[]))
+        assert handler.status == 200, (email, handler.body)
     handler = env.create(ADMIN, _form_create_payload(skills=[SECRET_SKILL]))
     assert handler.status == 200, handler.body
     assert env.store.creates[-1]["skills"] == [SECRET_SKILL]
 
 
-@pytest.mark.parametrize("skills", [SECRET_SKILL, [1], [["nested"]], {"name": SECRET_SKILL}])
+def test_skill_rule_is_the_chat_gate(env, inject_policy, chat_rule, monkeypatch):
+    """The decision comes from the engine's skill_view gates, on the context a
+    chat turn of the caller binds, not from a copy of the rule."""
+    import hermes_cli.dashboard_governance.tool_policy as tool_policy
+
+    inject_policy(SKILL_POLICY)
+    seen = []
+    real = tool_policy.tool_arguments_allowed_for_context
+
+    def _spy(ctx, tool_name, args):
+        seen.append((ctx.subject.normalized_email, tool_name, args.get("name"), ctx.access.mode))
+        return real(ctx, tool_name, args)
+
+    monkeypatch.setattr(tool_policy, "tool_arguments_allowed_for_context", _spy)
+    handler = env.create(OTHER, _form_create_payload(skills=["google-workspace"]))
+    assert handler.status == 200, handler.body
+    assert seen == [(OTHER, "skill_view", "google-workspace", "enforce")]
+
+
+@pytest.mark.parametrize("skills", [SECRET_SKILL, [1], [["nested"]], {"name": SECRET_SKILL}, ""])
 def test_skills_must_be_a_list_of_names(env, skills):
     for email in (OWNER, ADMIN):
         handler = env.create(email, _form_create_payload(skills=skills))
         assert handler.status == 400, (email, handler.body)
-    assert env.store.creates == []
+        handler = env.update(email, {"job_id": "own", "skills": skills})
+        assert handler.status == 400, (email, handler.body)
+    assert env.store.creates == [] and env.store.updates == []
 
 
-def test_report_only_audits_a_skill_outside_the_grants(env, inject_policy):
+def test_report_only_audits_a_skill_outside_the_grants(env, inject_policy, chat_rule):
     inject_policy({**SKILL_POLICY, "mode": "report_only"})
     handler = env.create(OWNER, _form_create_payload(skills=[SECRET_SKILL]))
     assert handler.status == 200, handler.body
+    handler = env.update(OWNER, {"job_id": "own", "skills": [SECRET_SKILL]})
+    assert handler.status == 200, handler.body
     events = read_audit_events(10)
-    assert [e["event"] for e in events] == ["would_deny"]
-    assert events[0]["reason"] == "cron_skill"
-    assert events[0]["path"] == "/api/crons/create"
+    assert [e["event"] for e in events] == ["would_deny", "would_deny"]
+    assert [e["reason"] for e in events] == ["cron_skill", "cron_skill"]
+    assert sorted(e["path"] for e in events) == ["/api/crons/create", "/api/crons/update"]
+
+
+def test_skill_check_fails_closed_without_the_engine_gate(env, inject_policy, monkeypatch):
+    inject_policy(SKILL_POLICY)
+    monkeypatch.setitem(sys.modules, "hermes_cli.dashboard_governance.tool_policy", None)
+    handler = env.create(OTHER, _form_create_payload(skills=["google-workspace"]))
+    assert handler.status == 403, handler.body
+    assert handler.body["reason"] == "cron_skill"
+    # No skills, nothing to check; admins are exempt.
+    assert env.create(OTHER, _form_create_payload(skills=[])).status == 200
+    assert env.create(ADMIN, _form_create_payload(skills=["google-workspace"])).status == 200
+
+
+# Update takes skills too, under the same rule. Only a new name is checked:
+# a skill already on the task stays when the owner saves it back.
+
+def test_update_checks_new_skills_against_the_chat_rule(env, inject_policy, chat_rule):
+    inject_policy(SKILL_POLICY)
+    env.active = "alpha"  # a store OTHER and PLAIN may see
+    handler = env.update(OTHER, {"job_id": "reowned", "skills": ["notion"]})
+    assert handler.status == 403, handler.body
+    assert handler.body["reason"] == "cron_skill"
+    handler = env.update(PLAIN, {"job_id": "own", "skills": ["google-workspace"]})
+    assert handler.status == 403  # ownership comes first
+    assert handler.body["reason"] == "cron_owner"
+    assert env.store.updates == []
+
+    handler = env.update(OTHER, {"job_id": "reowned", "skills": ["google-workspace"]})
+    assert handler.status == 200, handler.body
+    assert env.store.jobs["reowned"]["skills"] == ["google-workspace"]
+    handler = env.update(OTHER, {"job_id": "reowned", "skills": []})
+    assert handler.status == 200, handler.body
+    assert env.store.jobs["reowned"]["skills"] == []
+
+
+def test_update_keeps_a_stored_skill_the_owner_may_not_load(env, inject_policy, chat_rule):
+    inject_policy(SKILL_POLICY)
+    env.active = "alpha"
+    env.store.jobs["reowned"]["skills"] = ["notion"]  # set by a cron admin
+    handler = env.update(OTHER, {"job_id": "reowned", "skills": ["notion", "google-workspace"]})
+    assert handler.status == 200, handler.body
+    handler = env.update(OTHER, {"job_id": "reowned", "skills": ["notion", SECRET_SKILL]})
+    assert handler.status == 403
+    assert "notion" not in handler.body["error"] and SECRET_SKILL in handler.body["error"]
+    handler = env.update(ADMIN, {"job_id": "reowned", "skills": [SECRET_SKILL]})
+    assert handler.status == 200, handler.body
+
+
+def test_sharee_cannot_change_skills(env, inject_policy, chat_rule):
+    inject_policy(SKILL_POLICY)
+    handler = env.update(SHAREE, {"job_id": "own", "skills": ["google-workspace"]})
+    assert handler.status == 403
+    assert handler.body["reason"] == "cron_owner"
+    assert env.store.updates == []
 
 
 # ── Create stamps the owner ─────────────────────────────────────────────────

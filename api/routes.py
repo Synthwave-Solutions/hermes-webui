@@ -24697,10 +24697,11 @@ def _normalize_cron_shared_with(value):
 _CRON_WRITE_FIELDS = frozenset({
     "name", "schedule", "prompt", "deliver", "profile", "model", "provider",
     "toast_notifications", "diagram", "emoji", "category", "shared_with",
+    "skills",
 })
-# Only a new task takes these (saveCronForm's create branch); an existing task
+# Only a new task takes this (saveCronForm's create branch); an existing task
 # is paused and resumed through its own routes.
-_CRON_CREATE_ONLY_FIELDS = frozenset({"enabled", "skills"})
+_CRON_CREATE_ONLY_FIELDS = frozenset({"enabled"})
 # A no_agent script runs without any governance, and managed_by decides who is
 # told when a task fails, so only cron admins may set them.
 _CRON_ADMIN_FIELDS = frozenset({"script", "no_agent", "managed_by"})
@@ -24764,31 +24765,106 @@ def _cron_model_pin_allowed(handler, model, provider) -> bool:
 
 
 def _cron_skills_outside_grants(handler, skills) -> list[str]:
-    """The names in ``skills`` the caller may not both view and load.
+    """The names in ``skills`` a chat turn of the caller could not load.
 
-    The scheduler injects every skill of a job into its prompt without a
-    governance gate of its own, so a task must not carry a skill its creator
-    could not load in a chat. Names match the way the /api/skills/ route guard
-    matches them: normalized, as given, and by basename. Fails closed: every
-    name is reported when the grants cannot be resolved."""
-    names = [str(name).strip() for name in skills if str(name).strip()]
+    The scheduler injects every skill of a job into its prompt through
+    skill_view, outside the tool gates (cron/scheduler.py _build_job_prompt),
+    so a task must not carry a skill its creator could not load in a chat.
+    Same rule as chat: the governance context a chat turn of the caller binds
+    (agent_context.bind_governed_agent_turn, on the caller's active profile,
+    so a managed bot's skill selection applies as well), checked by the
+    engine's own skill_view gates (tool_allowed_for_context for the tool,
+    tool_arguments_allowed_for_context for the name, which also matches a
+    category path by its last segment). Each name is checked as given and in
+    its normalized form (lower case, spaces as hyphens). The rule is evaluated
+    as enforced, so under report_only a refusal is audited as would_deny.
+    Governance off: every skill. Fails closed: every name is reported when the
+    context cannot be built or checked, or a chat turn would run unbound.
+    """
+    names = list(dict.fromkeys(str(name).strip() for name in skills if str(name).strip()))
+    if not names:
+        return []
     try:
-        from api.governance.resource_scope import allowed
+        from api.governance.loader import get_policy
 
-        access = _cron_grant_access(handler)
-        if access is None:
+        if not get_policy().enabled:
             return []
+        ctx = _cron_caller_chat_context(handler)
+        if ctx is None:
+            return names
+        from hermes_cli.dashboard_governance.tool_policy import (
+            tool_allowed_for_context,
+            tool_arguments_allowed_for_context,
+        )
+
+        ctx = _cron_context_as_enforced(ctx)
+        if not tool_allowed_for_context(ctx, "skill_view", _cron_skill_tool_registry()).allowed:
+            return names
         outside = []
         for name in names:
-            normalized = name.lower().replace(" ", "-")
-            aliases = (name, normalized.rsplit("/", 1)[-1])
-            if not (allowed(access, "skills_view", normalized, aliases)
-                    and allowed(access, "skills_load", normalized, aliases)):
+            forms = dict.fromkeys((name, name.lower().replace(" ", "-")))
+            if not all(tool_arguments_allowed_for_context(ctx, "skill_view", {"name": form}).allowed
+                       for form in forms):
                 outside.append(name)
         return outside
     except Exception:
         logger.warning("cron skill grant check failed", exc_info=True)
         return names
+
+
+def _cron_caller_chat_context(handler):
+    """The engine governance context a chat turn of the caller runs under, or
+    None when such a turn would run unbound. Bound and reset on this thread
+    only for the duration of the lookup."""
+    from api.governance.agent_context import bind_governed_agent_turn, reset_governed_agent_turn
+    from api.governance.enforce import _request_identity
+
+    token = bind_governed_agent_turn(
+        _request_identity(handler), active_profile=_get_active_profile_name() or "default")
+    if token is None:
+        return None
+    try:
+        from hermes_cli.dashboard_governance.context import current_governance_context
+
+        return current_governance_context()
+    finally:
+        reset_governed_agent_turn(token)
+
+
+def _cron_context_as_enforced(ctx):
+    """``ctx`` with its access (and bot ceiling) evaluated as under enforce."""
+    from dataclasses import replace
+
+    def _enforced(access):
+        if access is None or getattr(access, "mode", "enforce") == "enforce":
+            return access
+        return replace(access, mode="enforce")
+
+    updates = {"access": _enforced(ctx.access)}
+    if getattr(ctx, "bot_access_ceiling", None) is not None:
+        updates["bot_access_ceiling"] = _enforced(ctx.bot_access_ceiling)
+    return replace(ctx, **updates)
+
+
+def _cron_skill_tool_registry():
+    """The engine tool registry with skill_view registered."""
+    from tools.registry import registry
+
+    if registry.get_entry("skill_view") is None:
+        import tools.skills_tool  # noqa: F401  (registers skill_view)
+    return registry
+
+
+def _cron_job_skill_names(job) -> set[str]:
+    """The skills stored on ``job`` (``skills``, or the legacy ``skill``)."""
+    if not isinstance(job, dict):
+        return set()
+    raw = job.get("skills")
+    if raw is None:
+        raw = [job.get("skill")]
+    elif isinstance(raw, str):
+        raw = [raw]
+    return {str(name).strip() for name in raw if str(name or "").strip()}
 
 
 def _cron_people_outside_policy(emails) -> list[str]:
@@ -24822,7 +24898,7 @@ def _cron_write_allowed(handler, body, job_id=None):
 
     Order: the field allowlist (400); for an update the per-job scope guard,
     then ownership (403: the owner or a cron admin may edit, a sharee may
-    not); then the values (deliver, model, and on create the skills). Cron
+    not); then the values (skills by the chat rule, deliver, model). Cron
     admins skip ownership and the value grants, never the allowlist, the value
     shapes or the people check. Installs with governance off
     resolve every caller as cron admin (identity_has_permission fails open
@@ -24877,11 +24953,14 @@ def _cron_write_allowed(handler, body, job_id=None):
             _CRON_MANAGED_BY_VALUES | {None}):
         return 400, {"error": "managed_by must be synthwave or client"}
 
-    skills = body.get("skills") if creating else None
-    if skills:
+    skills = body.get("skills")
+    if skills is not None:
         if not isinstance(skills, list) or not all(isinstance(name, str) for name in skills):
             return 400, {"error": "skills must be a list of skill names"}
-        denied = [] if is_admin else _cron_skills_outside_grants(handler, skills)
+        # A skill already on the task is not a new one: saving it back is fine.
+        stored = _cron_job_skill_names(job)
+        new_skills = [name for name in skills if name.strip() and name.strip() not in stored]
+        denied = [] if is_admin or not new_skills else _cron_skills_outside_grants(handler, new_skills)
         if denied:
             refusal = _refuse("cron_skill", f"These skills are not available to you: {', '.join(denied)}.")
             if refusal:
