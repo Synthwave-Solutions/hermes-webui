@@ -24668,6 +24668,21 @@ def _normalize_cron_shared_with(value):
     return out[:25]
 
 
+def _cron_delivery_platforms():
+    """The delivery choices GET /api/crons/delivery-options offers."""
+    try:
+        from cron.scheduler import _KNOWN_DELIVERY_PLATFORMS
+    except Exception:
+        _KNOWN_DELIVERY_PLATFORMS = frozenset()
+    platforms = [
+        {"value": "local", "label": "Local (save output only)"},
+        {"value": "origin", "label": "Origin (reply to creator)"}
+    ]
+    for name in sorted(_KNOWN_DELIVERY_PLATFORMS):
+        platforms.append({"value": name, "label": name.capitalize()})
+    return platforms
+
+
 def _handle_cron_create(handler, body):
     try:
         require(body, "prompt", "schedule")
@@ -24743,17 +24758,7 @@ def _handle_cron_create(handler, body):
 
 def _handle_cron_delivery_options(handler):
     """Return available delivery platforms for cron jobs."""
-    try:
-        from cron.scheduler import _KNOWN_DELIVERY_PLATFORMS
-    except Exception:
-        _KNOWN_DELIVERY_PLATFORMS = frozenset()
-    platforms = [
-        {"value": "local", "label": "Local (save output only)"},
-        {"value": "origin", "label": "Origin (reply to creator)"}
-    ]
-    for name in sorted(_KNOWN_DELIVERY_PLATFORMS):
-        platforms.append({"value": name, "label": name.capitalize()})
-    return j(handler, {"platforms": platforms})
+    return j(handler, {"platforms": _cron_delivery_platforms()})
 
 
 def _handle_cron_update(handler, body):
