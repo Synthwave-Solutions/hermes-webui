@@ -90,7 +90,9 @@ def test_send_clears_stale_busy_state_before_queue_branch():
         "send() should reconcile client-only stale busy state before deciding busy/queue mode"
     )
     reconcile_idx = body.index("_clearStaleBusyStateBeforeSend")
-    busy_branch_idx = body.index("if(S.busy||compressionRunning)")
+    # SynthPulse lets a drained queue entry through the branch:
+    # `if((S.busy||compressionRunning)&&!queueDrainOwnsSend){`.
+    busy_branch_idx = body.index("if((S.busy||compressionRunning)&&!queueDrainOwnsSend)")
     chat_start_idx = body.index("api('/api/chat/start'")
     assert reconcile_idx < busy_branch_idx < chat_start_idx, (
         "stale busy reconciliation must run before the queue branch and before /api/chat/start"

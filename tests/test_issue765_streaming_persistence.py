@@ -344,7 +344,13 @@ class TestIssue765FollowupHardening:
         )
         # The settlement helper was folded into the merge stage; its first line
         # is now the result read below (still inside the success-path lock).
-        save_idx = src.find("_result_messages = result.get('messages') or _previous_context_messages")
+        # Upstream #6481 made the fallback `is None` only, so an explicit empty
+        # message list from the engine is kept.
+        save_idx = src.find(
+            "_result_messages = result.get('messages')\n"
+            "                    if _result_messages is None:\n"
+            "                        _result_messages = _previous_context_messages"
+        )
 
         assert stop_idx != -1, "Success path must stop the checkpoint thread"
         assert join_idx != -1, "Success path must join the checkpoint thread"

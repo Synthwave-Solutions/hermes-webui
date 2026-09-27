@@ -1419,8 +1419,10 @@ class TestCheckpointOrdering:
         import inspect
         source = inspect.getsource(streaming._run_agent_streaming)
 
-        # Find the finally block
-        finally_idx = source.rfind("finally:")
+        # Find the finally block that holds the recovery call. The outer
+        # teardown now ends in a nested finally that releases the worker
+        # ownership token, so the last `finally:` is not the teardown itself.
+        finally_idx = source.rfind("finally:", 0, source.rfind("_last_resort_sync_from_core"))
         assert finally_idx != -1, "Could not find 'finally:' in _run_agent_streaming"
 
         finally_block = source[finally_idx:]
