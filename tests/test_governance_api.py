@@ -169,6 +169,8 @@ def test_me_shape_admin(policy_file, as_user):
         # permissions that gate the panels' APIs (27 Aug 2026 ticket).
         "hidden_nav", "nav_audience",
         "access_level", "access_mode", "approval_mode", "can_chat", "effective_access",
+        # Per-feature switches the panels read (c3ede8f8, 11 Sep 2026).
+        "feature_permissions",
     }
 
 

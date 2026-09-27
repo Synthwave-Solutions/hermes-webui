@@ -24,6 +24,8 @@ def catalog(monkeypatch):
                               for name in ("public", "private", "joplin")},
               "webui_external_notes_sources": True}
     monkeypatch.setattr(routes, "get_config", lambda: deepcopy(config))
+    # The MCP list handlers read the active profile's config (upstream #5619).
+    monkeypatch.setattr(routes, "get_config_for_profile_home", lambda _home=None: deepcopy(config))
     monkeypatch.setattr(routes, "_mcp_runtime_status_by_name", lambda: source)
     monkeypatch.setattr(routes, "_mcp_tools_from_registry", lambda _: [])
     monkeypatch.setattr("api.mcp_requests.sync_approved_quietly", lambda **_: None)

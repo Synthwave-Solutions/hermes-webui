@@ -17,6 +17,18 @@ ROUTES_PY = (ROOT / "api" / "routes.py").read_text(encoding="utf-8")
 NODE = shutil.which("node")
 
 
+# SynthPulse's _switchProfileForSessionLoad also guards against a newer
+# switch (_profileSwitchGeneration), resets per-profile workspace and scene
+# state and re-enables the profile controls; stub those collaborators.
+_SWITCH_STUBS = """
+let _profileSwitchGeneration=0;
+function _resetWorkspaceListState(){}
+function loadWorkspaceList(){ return Promise.resolve(); }
+function _clearSessionSceneCache(){}
+function $(){ return null; }
+"""
+
+
 def _extract_function(source: str, name: str) -> str:
     start = source.index(f"function {name}(")
     if source[max(0, start - 6) : start] == "async ":
@@ -79,6 +91,7 @@ global.api=async()=>({{active:'alternate',is_default:false}});
 global.localStorage={{removeItem(){{}}}};
 global.updateCronBadge=()=>{{ _cronUnreadCount=_cronNewJobIds.size; }};
 function _clearCronSessionCompletionUnreadForInactiveProfiles(){{}}
+{_SWITCH_STUBS}
 {reset}
 {switch}
 (async()=>{{
@@ -204,6 +217,7 @@ function _clearSessionCompletionUnread(sid){{
 {has_marker}
 {has_unread}
 {clear_helpers}
+{_SWITCH_STUBS}
 {reset}
 {switch}
 (async()=>{{

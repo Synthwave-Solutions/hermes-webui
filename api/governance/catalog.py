@@ -224,6 +224,8 @@ ROUTE_CATALOG: tuple[RouteRule, ...] = (
     RouteRule("/api/health/restart",      "system:ops", "system:ops", match="exact"),
     RouteRule("/api/health",              "status:read"),
     RouteRule("/api/system",              "system:read"),
+    # WebUI memory diagnostics (/api/debug/memory): operator-only, read-only.
+    RouteRule("/api/debug",               "system:read", "system:ops"),
     RouteRule("/api/shutdown",            "system:ops", "system:ops", match="exact"),
     RouteRule("/api/updates/check",       "system:read", "system:read", match="exact"),
     RouteRule("/api/updates/summary",     "system:read", "system:read", match="exact"),

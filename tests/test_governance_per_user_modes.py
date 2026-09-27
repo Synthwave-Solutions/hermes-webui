@@ -35,13 +35,17 @@ def test_explicit_empty_whitelist_has_no_inherited_work_permissions():
 
 def test_blacklist_inherits_role_envelope_and_concrete_deny_beats_wildcard():
     a = access(access_level="elevated", access_mode="blacklist",
-               deny={"tools": {"builtins": ["terminal"]}, "routes": ["/api/file*"]})
+               deny={"tools": {"builtins": ["terminal"]}, "routes": ["/api/file*"],
+                     "profiles": ["bob"]})
     assert a.has_permission("chat:use")
     assert not a.has_permission("governance:write")
     assert a.is_tool_allowed("web_search")
     assert not a.is_tool_allowed("terminal")
     assert not a.is_route_allowed("/api/file")
+    # Blacklist is default-allow for profiles too (c3ede8f8, 11-09-2026):
+    # only a concrete deny closes one.
     assert not a.is_profile_allowed("bob")
+    assert a.is_profile_allowed("carol")
 
 
 def test_user_level_cannot_acquire_elevated_or_administrative_permission():

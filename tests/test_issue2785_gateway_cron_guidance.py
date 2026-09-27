@@ -25,9 +25,12 @@ def test_cron_panel_loads_gateway_status_for_scheduling_guidance():
     assert "Gateway not configured" in panels
     assert "Gateway not running" in panels
     assert "Gateway endpoint not reachable" in panels
-    assert "configured gateway URL env var" in panels
-    assert "GATEWAY_HEALTH_URL" in panels
-    assert "scheduled jobs require the Hermes gateway daemon" in panels
+    assert "Gateway metadata stale" in panels
+    # SynthPulse copy (844071da, 4 Jul 2026): the notice names the agent
+    # gateway and says "environment variable" in plain words instead of
+    # listing variable names in the Tasks panel.
+    assert "configured gateway URL environment variable" in panels
+    assert "scheduled jobs require the agent gateway daemon" in panels
     assert "loadCronGatewayNotice()" in panels
 
 

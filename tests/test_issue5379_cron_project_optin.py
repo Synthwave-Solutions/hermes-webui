@@ -294,7 +294,9 @@ def test_renamed_root_alias_cron_project_resolves_when_zero_user_projects(tmp_pa
     _write_projects(projects_file, [
         {"project_id": "root-alias-cron", "name": "Cron Jobs", "profile": "default", "color": "#6366f1", "created_at": 1.0},
     ])
-    monkeypatch.setattr(profiles, "list_profiles_api", lambda: [
+    # _is_root_profile lists profiles in fast mode (5e4d60b8), so the stub
+    # must accept the same keyword arguments.
+    monkeypatch.setattr(profiles, "list_profiles_api", lambda **_kwargs: [
         {"name": "kinni", "is_default": True, "path": str(tmp_path)},
     ])
     monkeypatch.setattr(profiles, "_active_profile", "kinni")
