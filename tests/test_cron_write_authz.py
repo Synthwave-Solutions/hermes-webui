@@ -16,6 +16,7 @@ The rules pinned here:
   options, ``model`` and ``provider`` must be within the caller's model
   grants, ``script``, ``no_agent`` and ``managed_by`` are cron admin only,
   ``shared_with`` only names people in the policy.
+* On create the owner and the origin are stamped from the signed-in identity.
 * ``report_only`` never enforces (it audits ``would_deny``), and installs with
   governance off behave as before.
 
@@ -691,6 +692,39 @@ def test_model_within_grants_unchanged_or_cleared_is_allowed(env):
     assert handler.status == 200, handler.body
 
 
+# ── Create stamps the owner ─────────────────────────────────────────────────
+
+def test_create_stamps_owner_and_origin_from_the_identity(env):
+    handler = env.create(OWNER, _form_create_payload())
+    assert handler.status == 200, handler.body
+    stamp = {"platform": "webui", "chat_id": None, "user_id": OWNER}
+    # Both go in at creation: an engine with immutable identity fields refuses
+    # them through update_job.
+    assert env.store.creates[0]["owner_email"] == OWNER
+    assert env.store.creates[0]["origin"] == stamp
+    assert all("owner_email" not in u and "origin" not in u for _, u in env.store.updates)
+    job = env.store.jobs["new1"]
+    assert job["owner_email"] == OWNER
+    assert job["origin"] == stamp
+
+
+def test_create_stamps_the_owner_on_an_engine_without_the_owner_kwarg(env):
+    env.install(_Store(owner_kwarg=False))
+    handler = env.create(OWNER, _form_create_payload())
+    assert handler.status == 200, handler.body
+    assert "owner_email" not in env.store.creates[0]
+    assert env.store.jobs["new1"]["owner_email"] == OWNER
+    assert env.store.jobs["new1"]["origin"]["user_id"] == OWNER
+
+
+def test_create_without_a_signed_in_email_stays_unstamped(env, inject_policy):
+    inject_policy({"version": 1, "mode": "off", "default_effect": "deny"})
+    handler = env.create(None, _form_create_payload())
+    assert handler.status == 200, handler.body
+    assert env.store.creates[0]["owner_email"] is None
+    assert env.store.jobs["new1"]["origin"] is None
+
+
 # ── cron_scope ownership helper ─────────────────────────────────────────────
 
 def test_identity_owns_cron_job_rules():
@@ -709,3 +743,49 @@ def test_identity_owns_cron_job_rules():
     telegram = dict(jobs["legacy"], origin={"platform": "telegram", "chat_id": "1", "user_id": OWNER})
     assert identity_owns_cron_job(_identity(OWNER), telegram, no_session) is False
 
+
+def test_real_engine_store_with_immutable_identity_fields(tmp_path, monkeypatch, inject_policy):
+    """Against the engine's own cron.jobs, with owner_email, origin and
+    created_at immutable in update_job (the E0 engine fix): a Tasks panel
+    create still stamps both, the owner edits, a colleague cannot."""
+    import api.governance.enforce as enforce
+    import api.routes as routes
+
+    jobs = pytest.importorskip("cron.jobs")
+    if not routes._callable_accepts_kwarg(jobs.create_job, "owner_email"):
+        pytest.skip("engine create_job predates owner_email")
+    monkeypatch.setattr(jobs, "CRON_DIR", tmp_path / "cron")
+    monkeypatch.setattr(jobs, "JOBS_FILE", tmp_path / "cron" / "jobs.json")
+    monkeypatch.setattr(jobs, "OUTPUT_DIR", tmp_path / "cron" / "output")
+    monkeypatch.setattr(jobs, "_compute_provider_model_snapshots", lambda **k: (None, None), raising=False)
+    monkeypatch.setattr(jobs, "_IMMUTABLE_JOB_FIELDS",
+                        frozenset({"id", "owner_email", "origin", "created_at"}))
+    monkeypatch.setattr(routes, "_get_active_profile_name", lambda: "default")
+    inject_policy(POLICY)
+
+    def _as(email):
+        identity = _identity(email)
+        monkeypatch.setattr(enforce, "_request_identity", lambda handler: identity)
+        return _JSONHandler()
+
+    handler = _as(OWNER)
+    routes._handle_cron_create(handler, _form_create_payload(model=None, provider=None, skills=[]))
+    assert handler.status == 200, handler.body
+    job_id = handler.body["job"]["id"]
+    stored = jobs.get_job(job_id)
+    assert stored["owner_email"] == OWNER
+    assert stored["origin"] == {"platform": "webui", "chat_id": None, "user_id": OWNER}
+    assert stored["emoji"] == "📬" and stored["category"] == "Finance"
+
+    handler = _as(OWNER)
+    routes._handle_cron_update(handler, _category_payload(job_id))
+    assert handler.status == 200, handler.body
+
+    before = jobs.JOBS_FILE.read_bytes()
+    handler = _as(OTHER)
+    routes._handle_cron_update(handler, _emoji_payload(job_id))
+    assert handler.status == 403
+    handler = _as(OWNER)
+    routes._handle_cron_update(handler, {"job_id": job_id, "owner_email": ""})
+    assert handler.status == 400
+    assert jobs.JOBS_FILE.read_bytes() == before

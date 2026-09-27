@@ -24871,6 +24871,17 @@ def _handle_cron_create(handler, body):
         toast_notifications = body.get("toast_notifications") is not False
         requested_model = body.get("model") or None
         requested_provider = body.get("provider") or None
+        # Stamp the creator, as chat-created jobs already are, so completion
+        # notifications and the ownership rule in api/cron_scope.py reach the
+        # person who scheduled it from the Tasks panel, and every run is
+        # governed as them (owner_email). No stamp without a signed-in email
+        # (password/auth-off installs keep the shared view).
+        try:
+            from api.ownership import request_owner_email
+
+            _creator = request_owner_email(handler)
+        except Exception:
+            _creator = None
         create_kwargs = {
             "prompt": body["prompt"],
             "schedule": body["schedule"],
@@ -24885,8 +24896,17 @@ def _handle_cron_create(handler, body):
         for _key in ("script", "no_agent"):  # cron admins only, see _cron_write_allowed
             if _key in body:
                 create_kwargs[_key] = body[_key]
-        job = create_job(**create_kwargs)
         post_create_updates = {}
+        if _creator:
+            # Identity goes in at creation: the engine's update_job refuses
+            # owner_email and origin once they are immutable. Engines whose
+            # create_job has no owner_email kwarg take it right after.
+            create_kwargs["origin"] = {"platform": "webui", "chat_id": None, "user_id": _creator}
+            if _callable_accepts_kwarg(create_job, "owner_email"):
+                create_kwargs["owner_email"] = _creator
+            else:
+                post_create_updates["owner_email"] = _creator
+        job = create_job(**create_kwargs)
         if profile is not None:
             post_create_updates["profile"] = profile
             post_create_updates.update(
@@ -24916,18 +24936,6 @@ def _handle_cron_create(handler, body):
             post_create_updates["shared_with"] = _shared
         if "managed_by" in body:
             post_create_updates["managed_by"] = _normalize_cron_managed_by(body["managed_by"])
-        # Stamp the creator, as chat-created jobs already are, so completion
-        # notifications and the ownership rule in api/cron_scope.py reach the
-        # person who scheduled it from the Tasks panel. No stamp without a
-        # signed-in email (password/auth-off installs keep the shared view).
-        try:
-            from api.ownership import request_owner_email
-
-            _creator = request_owner_email(handler)
-        except Exception:
-            _creator = None
-        if _creator and not isinstance(job.get("origin"), dict):
-            post_create_updates["origin"] = {"platform": "webui", "chat_id": None, "user_id": _creator}
         if post_create_updates:
             job = update_job(job["id"], post_create_updates) or job
         return j(handler, {"ok": True, "job": _cron_job_for_api(job)})
