@@ -1085,6 +1085,7 @@ class Session:
                  chat_mode=None,
                  participants=None,
                  bot_participants=None,
+                 pinned_by=None,
                  composer_draft=None,
                  anchor_activity_scenes=None,
                  cost_status=None, cost_source=None,
@@ -1100,6 +1101,11 @@ class Session:
         self.created_at = created_at or time.time()
         self.updated_at = updated_at or time.time()
         self.pinned = bool(pinned)
+        # Pins per person (27 Sep 2026): ``pinned`` is the owner's own pin,
+        # ``pinned_by`` lists everyone else who pinned this conversation. See
+        # api/session_pins.py.
+        from api.session_pins import normalize as _normalize_pinned_by
+        self.pinned_by = _normalize_pinned_by(pinned_by)
         self.archived = bool(archived)
         self.project_id = project_id or None
         self.project_shared = bool(project_shared)
@@ -1222,7 +1228,7 @@ class Session:
         # Fields are listed in the order they should appear in the JSON file.
         METADATA_FIELDS = [
             'session_id', 'title', 'workspace', 'model', 'model_provider', 'created_at', 'updated_at',
-            'pinned', 'archived', 'project_id', 'profile', 'owner_email',
+            'pinned', 'pinned_by', 'archived', 'project_id', 'profile', 'owner_email',
             'share_token', 'share_created_at',
             'input_tokens', 'output_tokens', 'estimated_cost', 'cost_status', 'cost_source',
             'cache_read_tokens', 'cache_write_tokens',
@@ -1464,6 +1470,7 @@ class Session:
             'updated_at': self.updated_at,
             'last_message_at': last_message_at,
             'pinned': self.pinned,
+            'pinned_by': list(self.pinned_by or []),
             'archived': self.archived,
             'project_id': self.project_id,
             'profile': self.profile,
@@ -3914,7 +3921,7 @@ def _refresh_index_rows_from_sidecar_metadata(
         refreshed = dict(session)
         for key in (
             'message_count', 'updated_at', 'last_message_at', 'title', 'workspace',
-            'model', 'model_provider', 'created_at', 'pinned', 'archived', 'project_id',
+            'model', 'model_provider', 'created_at', 'pinned', 'pinned_by', 'archived', 'project_id',
             'profile', 'pre_compression_snapshot', 'parent_session_id', 'source_tag',
             'raw_source', 'session_source', 'source_label', 'active_stream_id',
             'has_pending_user_message', 'pending_user_message', 'pending_started_at',
