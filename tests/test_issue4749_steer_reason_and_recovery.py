@@ -11,9 +11,10 @@ import subprocess
 import sys
 import textwrap
 from pathlib import Path
+from tests._i18n_source import monolithic_i18n_file
 
 REPO = Path(__file__).parent.parent
-I18N_JS = REPO / "static" / "i18n.js"
+I18N_JS = monolithic_i18n_file()
 COMMANDS_JS = REPO / "static" / "commands.js"
 STREAMING_PY = REPO / "api" / "streaming.py"
 

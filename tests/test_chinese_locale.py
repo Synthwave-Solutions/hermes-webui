@@ -2,6 +2,7 @@ from collections import Counter
 from pathlib import Path
 import re
 from tests.test_issue2147_profile_concept_help import PROFILE_CONCEPT_KEYS
+from tests._i18n_source import monolithic_i18n_source
 
 
 REPO = Path(__file__).resolve().parent.parent
@@ -76,14 +77,14 @@ def extract_locale_block(src: str, locale_key: str) -> str:
 
 
 def test_chinese_locale_block_exists():
-    src = read(REPO / "static" / "i18n.js")
+    src = monolithic_i18n_source()
     assert "\n  zh: {" in src
     assert "_lang: 'zh'" in src
     assert "_speech: 'zh-CN'" in src
 
 
 def test_chinese_locale_includes_representative_translations():
-    src = read(REPO / "static" / "i18n.js")
+    src = monolithic_i18n_source()
     # Each tuple is a list of acceptable source forms for the same translation —
     # either escape-encoded `\uXXXX` form or literal CJK characters. They produce
     # the same runtime string; do not pin source encoding.
@@ -91,10 +92,12 @@ def test_chinese_locale_includes_representative_translations():
         [r"settings_title: '\u8bbe\u7f6e'", "settings_title: '设置'"],
         [r"login_title: '\u767b\u5f55'", "login_title: '登录'"],
         ["approval_heading: '需要审批'"],
-        ["tab_tasks: '任务'"],
+        # SynthPulse calls this panel Scheduled jobs/tasks (commit 820be9fd), not Tasks.
+        ["tab_tasks: '定时任务'"],
         ["tab_profiles: '配置'"],
         ["session_time_bucket_today: '今天'"],
-        ["onboarding_title: '欢迎使用 Hermes Web UI'"],
+        # SynthPulse product naming (docs/product-name.md): no Hermes in UI copy.
+        ["onboarding_title: '欢迎使用 SynthPulse Control'"],
         ["onboarding_complete: '引导完成'"],
     ]
     for alts in expected_alternatives:
@@ -104,7 +107,7 @@ def test_chinese_locale_includes_representative_translations():
 
 
 def test_chinese_locale_covers_english_keys():
-    src = read(REPO / "static" / "i18n.js")
+    src = monolithic_i18n_source()
     key_pattern = re.compile(r"^\s{4}([a-zA-Z0-9_]+):", re.MULTILINE)
     en_keys = set(key_pattern.findall(extract_locale_block(src, "en")))
     zh_keys = set(key_pattern.findall(extract_locale_block(src, "zh")))
@@ -114,7 +117,7 @@ def test_chinese_locale_covers_english_keys():
 
 
 def test_chinese_locale_has_no_duplicate_keys():
-    src = read(REPO / "static" / "i18n.js")
+    src = monolithic_i18n_source()
     key_pattern = re.compile(r"^\s{4}([a-zA-Z0-9_]+):", re.MULTILINE)
     keys = key_pattern.findall(extract_locale_block(src, "zh"))
     duplicates = sorted(k for k, count in Counter(keys).items() if count > 1)
@@ -128,7 +131,7 @@ def test_traditional_chinese_mcp_and_tree_labels_are_not_cyrillic():
     "Дерево", and "Исходный".  Those labels show up under JSON/YAML code
     block tree toggles and Settings → System → MCP Servers for zh-TW users.
     """
-    src = read(REPO / "static" / "i18n.js")
+    src = monolithic_i18n_source()
     start = src.index("  'zh-Hant': {")
     end = src.index("\n  pt:", start)
     block = src[start:end]

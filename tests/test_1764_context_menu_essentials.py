@@ -26,13 +26,14 @@ in the wider suite).
 """
 from pathlib import Path
 import re
+from tests._i18n_source import monolithic_i18n_file
 
 
 ROOT = Path(__file__).resolve().parent.parent
 ROUTES = ROOT / "api" / "routes.py"
 UI = ROOT / "static" / "ui.js"
 SESSIONS = ROOT / "static" / "sessions.js"
-I18N = ROOT / "static" / "i18n.js"
+I18N = monolithic_i18n_file()
 
 
 # ════════════════════════════════════════════════════════════════════

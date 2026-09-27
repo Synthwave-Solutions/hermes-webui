@@ -3,13 +3,14 @@ from pathlib import Path
 import json
 import shutil
 import subprocess
+from tests._i18n_source import monolithic_i18n_file
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 INDEX = REPO_ROOT / "static" / "index.html"
 STYLE = REPO_ROOT / "static" / "style.css"
 PANELS = REPO_ROOT / "static" / "panels.js"
 BOOT = REPO_ROOT / "static" / "boot.js"
-I18N = REPO_ROOT / "static" / "i18n.js"
+I18N = monolithic_i18n_file()
 CONFIG = REPO_ROOT / "api" / "config.py"
 
 

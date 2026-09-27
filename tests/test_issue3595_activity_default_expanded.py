@@ -2,6 +2,7 @@
 import json
 import pathlib
 import re
+from tests._i18n_source import monolithic_i18n_source
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
@@ -169,7 +170,7 @@ def test_panels_wiring():
 
 
 def test_i18n_keys():
-    src = (ROOT / "static" / "i18n.js").read_text(encoding="utf-8")
+    src = monolithic_i18n_source()
     assert "settings_label_worklog_details_expanded_default" in src, \
         "i18n.js must have the label key for the setting"
     assert "settings_desc_worklog_details_expanded_default" in src, \

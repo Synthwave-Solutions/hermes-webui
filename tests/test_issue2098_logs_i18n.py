@@ -1,8 +1,9 @@
 import re
 from pathlib import Path
+from tests._i18n_source import monolithic_i18n_file
 
 
-I18N_PATH = Path(__file__).resolve().parent.parent / "static" / "i18n.js"
+I18N_PATH = monolithic_i18n_file()
 
 
 LOGS_FILTER_KEYS = {

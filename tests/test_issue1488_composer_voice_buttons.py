@@ -17,6 +17,7 @@ share the same tooltip ("Voice input") in master. This module pins the fix:
    string was identical to the dictation tooltip and caused the bug.
 """
 import re
+from tests._i18n_source import monolithic_i18n_source
 
 
 def _src(name: str) -> str:
@@ -128,7 +129,7 @@ class TestComposerVoiceButtonI18n:
     def test_legacy_voice_toggle_key_removed(self):
         """The old key whose string was 'Voice input' caused the duplicate-
         tooltip bug. It must no longer appear in i18n.js."""
-        src = _src("i18n.js")
+        src = monolithic_i18n_source()
         # Match the property name only (not strings that happen to mention it).
         leftover = re.findall(r'\bvoice_toggle\s*:', src)
         assert not leftover, (
@@ -138,7 +139,7 @@ class TestComposerVoiceButtonI18n:
 
     def test_all_locales_define_new_keys(self):
         """Every locale block must define all 4 new composer voice-button keys."""
-        src = _src("i18n.js")
+        src = monolithic_i18n_source()
         for key in self.REQUIRED_KEYS:
             count = len(re.findall(rf'\b{re.escape(key)}\s*:', src))
             assert count == len(self.LOCALES), (
@@ -149,7 +150,7 @@ class TestComposerVoiceButtonI18n:
 
     def test_english_dictate_label_is_dictate(self):
         """English voice_dictate must read 'Dictate' (not 'Voice input')."""
-        src = _src("i18n.js")
+        src = monolithic_i18n_source()
         # Find the en block (first occurrence of voice_dictate is in en)
         m = re.search(r"\bvoice_dictate\s*:\s*'([^']+)'", src)
         assert m, "voice_dictate key not found"
@@ -159,7 +160,7 @@ class TestComposerVoiceButtonI18n:
     def test_english_voice_mode_label_is_voice_mode(self):
         """English voice_mode_toggle must read 'Voice mode' — matches
         ChatGPT/Gemini convention (industry-standard label)."""
-        src = _src("i18n.js")
+        src = monolithic_i18n_source()
         # Find the FIRST voice_mode_toggle in the file (en block) but skip
         # _active suffix variant — use a lookahead to assert no _active.
         m = re.search(r"\bvoice_mode_toggle\s*:\s*'([^']+)'", src)
@@ -211,7 +212,7 @@ class TestVoiceModePreferenceGate:
 
     def test_settings_pane_has_voice_mode_i18n_keys(self):
         """The two new pref-label i18n keys must exist in every locale."""
-        src = _src("i18n.js")
+        src = monolithic_i18n_source()
         for key in ("settings_label_voice_mode", "settings_desc_voice_mode"):
             count = len(re.findall(rf'\b{re.escape(key)}\s*:', src))
             assert count == len(self.LOCALES), (

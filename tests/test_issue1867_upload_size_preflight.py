@@ -1,9 +1,10 @@
 from pathlib import Path
+from tests._i18n_source import monolithic_i18n_file
 
 
 ROOT = Path(__file__).resolve().parents[1]
 UI_JS = ROOT / "static" / "ui.js"
-I18N_JS = ROOT / "static" / "i18n.js"
+I18N_JS = monolithic_i18n_file()
 CONFIG_PY = ROOT / "api" / "config.py"
 UPLOAD_PY = ROOT / "api" / "upload.py"
 

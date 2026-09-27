@@ -2,6 +2,7 @@ from collections import Counter
 from pathlib import Path
 import re
 from tests.test_issue2147_profile_concept_help import PROFILE_CONCEPT_KEYS
+from tests._i18n_source import monolithic_i18n_source
 
 
 REPO = Path(__file__).resolve().parent.parent
@@ -81,7 +82,7 @@ def locale_keys(src: str, locale_key: str) -> list[str]:
 
 
 def test_turkish_locale_block_exists():
-    src = read(REPO / "static" / "i18n.js")
+    src = monolithic_i18n_source()
     tr_block = extract_locale_block(src, "tr")
     assert tr_block
     assert "_lang: 'tr'" in tr_block
@@ -90,7 +91,7 @@ def test_turkish_locale_block_exists():
 
 
 def test_turkish_locale_includes_representative_translations():
-    src = read(REPO / "static" / "i18n.js")
+    src = monolithic_i18n_source()
     tr_block = extract_locale_block(src, "tr")
     expected = [
         "settings_title: 'Ayarlar'",
@@ -98,17 +99,19 @@ def test_turkish_locale_includes_representative_translations():
         "login_title: 'Oturum aç'",
         "approval_heading: 'Onay gerekli'",
         "tab_chat: 'Sohbet'",
-        "tab_tasks: 'Görevler'",
+        # SynthPulse calls this panel Scheduled jobs/tasks (commit 820be9fd), not Tasks.
+        "tab_tasks: 'Zamanlanmış işler'",
         "tab_profiles: 'Agent profilleri'",
         "empty_title: 'Hangi konuda yardımcı olabilirim?'",
-        "onboarding_title: 'Hermes Web Kullanıcı Arayüzüne Hoş Geldiniz'",
+        # SynthPulse product naming (docs/product-name.md): no Hermes in UI copy.
+        "onboarding_title: 'SynthPulse Web Kullanıcı Arayüzüne Hoş Geldiniz'",
     ]
     for entry in expected:
         assert entry in tr_block
 
 
 def test_turkish_settings_detail_descriptions_are_translated():
-    src = read(REPO / "static" / "i18n.js")
+    src = monolithic_i18n_source()
     tr_block = extract_locale_block(src, "tr")
     expected = [
         "settings_desc_workspace_panel_open: 'Etkinleştirildiğinde, çalışma alanı / dosya tarayıcı paneli her yeni oturumda otomatik olarak açılır. Yine de istediğiniz zaman manuel olarak kapatabilirsiniz.'",
@@ -117,7 +120,8 @@ def test_turkish_settings_detail_descriptions_are_translated():
         "settings_desc_sidebar_density: 'Oturum listesinin sol kenar çubuğunda ne kadar meta veri göstereceğini kontrol eder.'",
         "settings_desc_auto_title_refresh: 'Oturum başlıklarını en son konuşmaya göre otomatik olarak yeniden oluşturarak konuşma ilerledikçe başlıkların alakalı kalmasını sağlar. LLM başlık oluşturma modeli yapılandırması gerektirir.'",
         "settings_desc_external_sessions: 'Oturum listesinde CLI, Telegram, Discord, Slack ve diğer kanallardan gelen konuşmaları gösterin. İçe aktarmak ve devam etmek için tıklayın.'",
-        "settings_desc_sync_insights: 'WebUI belirteci kullanımını state.db\\'ye yansıtır, böylece hermes /insights tarayıcı oturum verilerini içerir. Varsayılan olarak kapalıdır.'",
+        # SynthPulse product naming (docs/product-name.md): no Hermes in UI copy.
+        "settings_desc_sync_insights: 'WebUI belirteci kullanımını state.db\\'ye yansıtır, böylece /insights tarayıcı oturum verilerini içerir. Varsayılan olarak kapalıdır.'",
         "settings_desc_check_updates: 'WebUI veya Agent\\'ın daha yeni sürümleri mevcut olduğunda bir banner gösterin. Periyodik olarak bir arka plan git getirme işlemi çalıştırır.'",
         "settings_desc_bot_name: 'Yalnızca varsayılan profil için kullanılır. Diğer profiller kendi profil adlarını kullanır.'",
         "settings_desc_password: 'Ayarlamak veya değiştirmek için yeni bir şifre girin. Geçerli ayarı korumak için boş bırakın.'",
@@ -127,7 +131,7 @@ def test_turkish_settings_detail_descriptions_are_translated():
 
 
 def test_turkish_locale_matches_english_key_coverage():
-    src = read(REPO / "static" / "i18n.js")
+    src = monolithic_i18n_source()
     en_keys = set(locale_keys(src, "en"))
     tr_keys = set(locale_keys(src, "tr"))
     assert sorted((en_keys - tr_keys) - PROFILE_CONCEPT_FALLBACK_KEYS) == []
@@ -135,14 +139,14 @@ def test_turkish_locale_matches_english_key_coverage():
 
 
 def test_turkish_locale_has_no_duplicate_keys():
-    src = read(REPO / "static" / "i18n.js")
+    src = monolithic_i18n_source()
     keys = locale_keys(src, "tr")
     duplicates = sorted(k for k, count in Counter(keys).items() if count > 1)
     assert not duplicates, f"Turkish locale has duplicate keys: {duplicates}"
 
 
 def test_turkish_locale_keys_use_standard_indentation():
-    src = read(REPO / "static" / "i18n.js")
+    src = monolithic_i18n_source()
     tr_block = extract_locale_block(src, "tr")
     badly_indented = [
         line.strip()
@@ -154,7 +158,7 @@ def test_turkish_locale_keys_use_standard_indentation():
 
 def test_turkish_locale_has_no_double_escaped_unicode_sequences():
     """JSON-style double escapes (\\\\u2026) render literal backslash-u in the UI."""
-    src = read(REPO / "static" / "i18n.js")
+    src = monolithic_i18n_source()
     tr_block = extract_locale_block(src, "tr")
     for bad in ("\\\\u2026", "\\\\u2192", "\\\\u2713"):
         assert bad not in tr_block, f"Turkish locale must not contain {bad!r}"

@@ -11,6 +11,7 @@ from collections import Counter
 from pathlib import Path
 import re
 from tests.test_issue2147_profile_concept_help import PROFILE_CONCEPT_KEYS
+from tests._i18n_source import monolithic_i18n_source
 
 
 REPO = Path(__file__).resolve().parent.parent
@@ -85,7 +86,7 @@ def extract_locale_block(src: str, locale_key: str) -> str:
 
 
 def test_japanese_locale_block_exists():
-    src = read(REPO / "static" / "i18n.js")
+    src = monolithic_i18n_source()
     assert "\n  ja: {" in src
     assert "_lang: 'ja'" in src
     assert "_label: '日本語'" in src
@@ -96,15 +97,17 @@ def test_japanese_locale_includes_representative_translations():
     """Spot-check a handful of high-traffic UI strings to make sure they were
     actually translated (not left in English or replaced with a placeholder).
     """
-    src = read(REPO / "static" / "i18n.js")
+    src = monolithic_i18n_source()
     expected = [
         "settings_title: '設定'",
         "login_title: 'サインイン'",
         "approval_heading: '承認が必要'",
-        "tab_tasks: 'タスク'",
+        # SynthPulse calls this panel Scheduled jobs/tasks (commit 820be9fd), not Tasks.
+        "tab_tasks: 'スケジュール済みジョブ'",
         "tab_profiles: 'プロファイル'",
         "session_time_bucket_today: '今日'",
-        "onboarding_title: 'Hermes Web UI へようこそ'",
+        # SynthPulse product naming (docs/product-name.md): no Hermes in UI copy.
+        "onboarding_title: 'SynthPulse Control へようこそ'",
         "mcp_servers_title: 'MCPサーバー'",
         "tree_view: 'ツリー'",
     ]
@@ -119,7 +122,7 @@ def test_japanese_locale_covers_english_keys():
     via the i18n.js fallback path. The profile-concept help copy intentionally
     stays English-owned so other locales inherit it through that path.
     """
-    src = read(REPO / "static" / "i18n.js")
+    src = monolithic_i18n_source()
     key_pattern = re.compile(r"^\s{4}([a-zA-Z0-9_]+):", re.MULTILINE)
     en_keys = set(key_pattern.findall(extract_locale_block(src, "en")))
     ja_keys = set(key_pattern.findall(extract_locale_block(src, "ja")))
@@ -132,7 +135,7 @@ def test_japanese_locale_has_no_keys_outside_english():
     """ja should not invent keys that en doesn't have — those would only ever
     fire on the ja branch and silently regress every other locale.
     """
-    src = read(REPO / "static" / "i18n.js")
+    src = monolithic_i18n_source()
     key_pattern = re.compile(r"^\s{4}([a-zA-Z0-9_]+):", re.MULTILINE)
     en_keys = set(key_pattern.findall(extract_locale_block(src, "en")))
     ja_keys = set(key_pattern.findall(extract_locale_block(src, "ja")))
@@ -148,7 +151,7 @@ def test_japanese_locale_duplicates_match_english():
     for a different UI surface. ja must mirror exactly the same duplicate
     set so the JS resolution order is consistent.
     """
-    src = read(REPO / "static" / "i18n.js")
+    src = monolithic_i18n_source()
     key_pattern = re.compile(r"^\s{4}([a-zA-Z0-9_]+):", re.MULTILINE)
     en_dupes = sorted(
         k for k, c in Counter(key_pattern.findall(extract_locale_block(src, "en"))).items() if c > 1
@@ -167,7 +170,7 @@ def test_japanese_locale_preserves_placeholder_patterns():
     or `{0}`-style positional placeholders — those are interpolated by JS at
     render time and missing them produces literal `${name}` in the UI.
     """
-    src = read(REPO / "static" / "i18n.js")
+    src = monolithic_i18n_source()
 
     en_block = extract_locale_block(src, "en")
     ja_block = extract_locale_block(src, "ja")
@@ -211,7 +214,7 @@ def test_japanese_locale_arrow_function_values_mirror_english():
     function values in ja — turning one into a static string breaks the call
     site `t('n_messages')(5)` and produces `[object Function]` in the UI.
     """
-    src = read(REPO / "static" / "i18n.js")
+    src = monolithic_i18n_source()
     en_block = extract_locale_block(src, "en")
     ja_block = extract_locale_block(src, "ja")
 
@@ -238,7 +241,7 @@ def test_japanese_label_is_japanese_script():
     """The locale label in the language picker must actually be in Japanese
     script (kanji/hiragana/katakana), not transliterated 'Japanese'.
     """
-    src = read(REPO / "static" / "i18n.js")
+    src = monolithic_i18n_source()
     # Find the ja locale's _label
     m = re.search(r"\bja\s*:\s*\{[^{}]*?_label:\s*['\"]([^'\"]+)['\"]", src, re.DOTALL)
     assert m, "ja locale _label not found"

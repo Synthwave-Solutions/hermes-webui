@@ -14,12 +14,13 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from tests._i18n_source import monolithic_i18n_source
 
 
 ROOT = Path(__file__).resolve().parents[1]
 UI_JS_PATH = ROOT / "static" / "ui.js"
 STYLE_CSS = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
-I18N_JS = (ROOT / "static" / "i18n.js").read_text(encoding="utf-8")
+I18N_JS = monolithic_i18n_source()
 NODE = shutil.which("node")
 
 pytestmark = pytest.mark.skipif(NODE is None, reason="node not on PATH")
@@ -229,4 +230,5 @@ def test_process_wakeup_label_key_exists_in_all_locales():
         assert re.search(r"\bprocess_wakeup_label\s*:", block), (
             f"process_wakeup_label missing from locale {name}"
         )
-    assert "process_wakeup_label:'Background wakeup'" in I18N_JS
+    # Plain-language background task notice (27 Sep 2026).
+    assert "process_wakeup_label: 'Background task complete'" in I18N_JS

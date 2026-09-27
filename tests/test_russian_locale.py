@@ -2,6 +2,7 @@ from collections import Counter
 from pathlib import Path
 import re
 from tests.test_issue2147_profile_concept_help import PROFILE_CONCEPT_KEYS
+from tests._i18n_source import monolithic_i18n_source
 
 
 REPO = Path(__file__).resolve().parent.parent
@@ -16,7 +17,7 @@ def read(path: Path) -> str:
 
 
 def test_russian_locale_block_exists():
-    src = read(REPO / "static" / "i18n.js")
+    src = monolithic_i18n_source()
     assert "\n  ru: {" in src
     assert "_label: 'Русский'" in src
     assert "_speech: 'ru-RU'" in src
@@ -83,15 +84,17 @@ def extract_locale_block(src: str, locale_key: str) -> str:
 
 
 def test_russian_locale_includes_representative_translations():
-    src = read(REPO / "static" / "i18n.js")
+    src = monolithic_i18n_source()
     expected = [
         "settings_title: '\u041d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0438'",
         "login_title: '\u0412\u0445\u043e\u0434'",
         "approval_heading: '\u0422\u0440\u0435\u0431\u0443\u0435\u0442\u0441\u044f \u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u0438\u0435'",
-        "tab_tasks: '\u0417\u0430\u0434\u0430\u0447\u0438'",
+        # SynthPulse calls this panel Scheduled jobs/tasks (commit 820be9fd), not Tasks.
+        "tab_tasks: 'Запланированные задания'",
         "tab_profiles: '\u041f\u0440\u043e\u0444\u0438\u043b\u0438'",
         "session_time_bucket_today: '\u0421\u0435\u0433\u043e\u0434\u043d\u044f'",
-        "onboarding_title: '\u0414\u043e\u0431\u0440\u043e \u043f\u043e\u0436\u0430\u043b\u043e\u0432\u0430\u0442\u044c \u0432 Hermes Web UI'",
+        # SynthPulse product naming (docs/product-name.md): no Hermes in UI copy.
+        "onboarding_title: 'Добро пожаловать в SynthPulse Control'",
         "onboarding_complete: '\u041f\u0435\u0440\u0432\u0438\u0447\u043d\u0430\u044f \u043d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0430 \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043d\u0430'",
         "profile_default_label: '\u0028\u043f\u043e \u0443\u043c\u043e\u043b\u0447\u0430\u043d\u0438\u044e\u0029'",
         "profile_name_placeholder: '\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 \u043f\u0440\u043e\u0444\u0438\u043b\u044f \u0028\u0441\u0442\u0440\u043e\u0447\u043d\u044b\u0435 \u0431\u0443\u043a\u0432\u044b, a-z, 0-9, \u0434\u0435\u0444\u0438\u0441\u044b\u0029'",
@@ -109,12 +112,13 @@ def test_russian_locale_includes_representative_translations():
 
 
 def test_public_share_locale_values_are_not_swapped():
-    src = read(REPO / "static" / "i18n.js")
+    src = monolithic_i18n_source()
     en_block = extract_locale_block(src, "en")
     ru_block = extract_locale_block(src, "ru")
 
-    assert "share_session: 'Share'" in en_block
-    assert "share_session_tooltip: 'Create a public read-only share link'" in en_block
+    # SynthPulse labels the share action "Share this conversation" in English.
+    assert "share_session: 'Share this conversation'" in en_block
+    assert "share_session_tooltip: 'Create a read-only link to this conversation'" in en_block
     assert "stop_sharing_session: 'Stop sharing'" in en_block
     assert "share_session: 'Поделиться'" not in en_block
 
@@ -125,7 +129,7 @@ def test_public_share_locale_values_are_not_swapped():
 
 
 def test_russian_locale_covers_english_keys():
-    src = read(REPO / "static" / "i18n.js")
+    src = monolithic_i18n_source()
     key_pattern = re.compile(r"^\s+([a-zA-Z0-9_]+):", re.MULTILINE)
     en_keys = set(key_pattern.findall(extract_locale_block(src, "en")))
     ru_keys = set(key_pattern.findall(extract_locale_block(src, "ru")))
@@ -135,7 +139,7 @@ def test_russian_locale_covers_english_keys():
 
 
 def test_russian_locale_has_no_duplicate_keys():
-    src = read(REPO / "static" / "i18n.js")
+    src = monolithic_i18n_source()
     key_pattern = re.compile(r"^\s+([a-zA-Z0-9_]+):", re.MULTILINE)
     keys = key_pattern.findall(extract_locale_block(src, "ru"))
     duplicates = sorted(k for k, count in Counter(keys).items() if count > 1)
@@ -143,6 +147,6 @@ def test_russian_locale_has_no_duplicate_keys():
 
 
 def test_russian_locale_has_no_cjk_fallback_text():
-    src = read(REPO / "static" / "i18n.js")
+    src = monolithic_i18n_source()
     ru_block = extract_locale_block(src, "ru")
     assert not re.search(r"[\u3400-\u9fff\u3040-\u30ff]", ru_block)

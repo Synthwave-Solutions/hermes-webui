@@ -2,6 +2,7 @@
 import json, pytest
 from unittest.mock import patch, MagicMock, call
 from api.routes import _handle_workspace_reorder
+from tests._i18n_source import monolithic_i18n_path
 
 
 def _make_handler():
@@ -115,7 +116,7 @@ class TestWorkspaceReorderFrontend:
 
     def test_i18n_keys_present_in_all_locales(self):
         """workspace_drag_hint and workspace_reorder_failed must exist in all locales."""
-        with open("static/i18n.js", "r", encoding="utf-8") as f:
+        with open(monolithic_i18n_path(), "r", encoding="utf-8") as f:
             content = f.read()
         for key in ("workspace_drag_hint", "workspace_reorder_failed"):
             count = content.count(key)

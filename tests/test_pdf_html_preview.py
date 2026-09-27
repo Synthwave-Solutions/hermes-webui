@@ -7,6 +7,7 @@ and that CSS classes are defined.
 import os
 import re
 import pytest
+from tests._i18n_source import monolithic_i18n_path
 
 
 def _read_js(name):
@@ -316,7 +317,7 @@ class TestI18nKeys:
     HTML_KEYS = ['html_loading', 'html_too_large', 'html_error', 'html_open_full', 'html_sandbox_label']
 
     def _find_locale_block(self, locale):
-        with open('static/i18n.js', encoding="utf-8") as f:
+        with open(monolithic_i18n_path(), encoding="utf-8") as f:
             content = f.read()
         start = content.find(f"'{locale}':")
         if start < 0:

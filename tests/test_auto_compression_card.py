@@ -13,6 +13,7 @@ from api.streaming import (
     _restore_reasoning_metadata,
     _sanitize_messages_for_api,
 )
+from tests._i18n_source import monolithic_i18n_source
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -1134,7 +1135,7 @@ def test_reference_message_inserted_before_future_assistant_anchor():
 
 def test_frontend_uses_context_engine_metadata_for_indexed_context_copy():
     src = _read("static/ui.js")
-    i18n = _read("static/i18n.js")
+    i18n = monolithic_i18n_source()
 
     assert "function _compressionEngineForSession" in src
     assert "S.session.compression_anchor_engine" in src

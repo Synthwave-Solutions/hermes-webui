@@ -5,12 +5,13 @@ Salvaged from @malulian's PR #1721 per @aronprins design review (May 13 2026):
 Implementation drops the composer button and keeps only the Settings toggle + CSS.
 """
 from pathlib import Path
+from tests._i18n_source import monolithic_i18n_file
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 INDEX = REPO_ROOT / "static" / "index.html"
 STYLE = REPO_ROOT / "static" / "style.css"
 PANELS = REPO_ROOT / "static" / "panels.js"
-I18N = REPO_ROOT / "static" / "i18n.js"
+I18N = monolithic_i18n_file()
 CONFIG = REPO_ROOT / "api" / "config.py"
 
 

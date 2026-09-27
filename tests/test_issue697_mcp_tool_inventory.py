@@ -7,6 +7,7 @@ from api.routes import (
     _mcp_schema_summary,
     _mcp_tool_summary,
 )
+from tests._i18n_source import monolithic_i18n_source
 
 
 def _make_handler():
@@ -126,7 +127,7 @@ class TestMcpToolInventoryUi:
         assert "mcp-tool-error-state" in js
 
     def test_mcp_tool_i18n_keys_are_present(self):
-        i18n = _read("static/i18n.js")
+        i18n = monolithic_i18n_source()
         for key in [
             "mcp_tools_title",
             "mcp_tools_desc",

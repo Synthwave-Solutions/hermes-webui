@@ -2,9 +2,10 @@
 
 from pathlib import Path
 import re
+from tests._i18n_source import monolithic_i18n_source
 
 ROOT = Path(__file__).resolve().parents[1]
-I18N_JS = (ROOT / "static" / "i18n.js").read_text(encoding="utf-8")
+I18N_JS = monolithic_i18n_source()
 
 
 def _locale_block(locale: str) -> str:

@@ -20,6 +20,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from tests._i18n_source import monolithic_i18n_path
 
 
 REPO_ROOT = Path(__file__).parent.parent.resolve()
@@ -243,7 +244,7 @@ class TestTreeCSS:
 
 class TestTreeI18n:
     def test_i18n_keys_present(self):
-        with open("static/i18n.js", "r", encoding="utf-8") as f:
+        with open(monolithic_i18n_path(), "r", encoding="utf-8") as f:
             content = f.read()
         for key in ("tree_view", "raw_view"):
             count = content.count(key)
@@ -251,7 +252,7 @@ class TestTreeI18n:
 
     def test_structured_code_setting_i18n_keys_present(self):
         """The new settings labels/options/help text must exist in i18n."""
-        with open("static/i18n.js", "r", encoding="utf-8") as f:
+        with open(monolithic_i18n_path(), "r", encoding="utf-8") as f:
             content = f.read()
         for key in (
             "settings_label_structured_code",

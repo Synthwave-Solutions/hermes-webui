@@ -6,12 +6,13 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from tests._i18n_source import monolithic_i18n_file
 
 
 ROOT = Path(__file__).resolve().parent.parent
 PANELS_JS = ROOT / "static" / "panels.js"
 STYLE_CSS = ROOT / "static" / "style.css"
-I18N_JS = ROOT / "static" / "i18n.js"
+I18N_JS = monolithic_i18n_file()
 NODE = shutil.which("node")
 
 pytestmark = pytest.mark.skipif(NODE is None, reason="node not on PATH")

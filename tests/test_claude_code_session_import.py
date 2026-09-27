@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from tests._i18n_source import monolithic_i18n_source
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -370,7 +371,7 @@ def test_messaging_source_badge_in_sidebar_not_gated_on_is_cli_session():
 
 def test_compression_queue_discoverability_ux():
     ui_js = (REPO_ROOT / "static" / "ui.js").read_text(encoding="utf-8")
-    i18n_js = (REPO_ROOT / "static" / "i18n.js").read_text(encoding="utf-8")
+    i18n_js = monolithic_i18n_source()
 
     # Old misleading tooltip key must be gone from the compression branch
     assert "composer_disabled_compression','Waiting for compression to finish'" not in ui_js
