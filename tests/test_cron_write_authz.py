@@ -1865,3 +1865,99 @@ def test_run_now_end_to_end(env, tracked, child, monkeypatch, governed, outcome)
         kind, job_id, refusal, consume_occurrence = tracked.calls[0]
         assert (kind, job_id, consume_occurrence) == ("mark_refused", "own", False)
         assert refusal.startswith("Not run: ")
+
+
+# ── The policy the request decided with, inside the profile swap ────────────
+# cron_profile_context points HERMES_HOME at the active profile's home, and
+# without HERMES_WEBUI_GOVERNANCE_POLICY the loader reads the policy file under
+# HERMES_HOME. For a named profile without its own file that read governance
+# off, which made every caller a cron admin in the checks of create, update
+# and Run now: a colleague could rewrite someone's task into a no_agent script,
+# and a Run now was planned (and, on an engine without run_job_governed, run)
+# unbound. The routes now keep the policy file the request was admitted with.
+
+def _root_policy_file(monkeypatch):
+    """The policy as a real file in the root HERMES_HOME, read by the real
+    loader with HERMES_WEBUI_GOVERNANCE_POLICY unset (the upstream default),
+    and a named profile ``alpha`` without a policy file of its own."""
+    import os
+
+    import yaml
+
+    root = Path(os.environ["HERMES_HOME"])
+    policy_file = root / "dashboard-governance.yaml"
+    policy_file.write_text(yaml.safe_dump(POLICY), encoding="utf-8")
+    alpha = root / "profiles" / "alpha"
+    (alpha / "cron").mkdir(parents=True)
+    monkeypatch.delenv("HERMES_WEBUI_GOVERNANCE_POLICY", raising=False)
+    loader.set_policy_loader(None)
+    assert loader.get_policy().mode == "enforce"
+    return policy_file, alpha
+
+
+def _swap_to(env, monkeypatch, home):
+    import api.profiles as profiles
+
+    env.active = "alpha"
+    monkeypatch.setattr(profiles, "get_active_hermes_home", lambda: home)
+    monkeypatch.setattr(profiles, "cron_profile_context", _REAL_CRON_PROFILE_CONTEXT)
+
+
+def test_update_on_a_named_profile_keeps_the_request_policy(env, monkeypatch):
+    import os
+
+    _policy_file, alpha = _root_policy_file(monkeypatch)
+    _swap_to(env, monkeypatch, alpha)
+    before = copy.deepcopy(env.store.jobs["own"])
+    handler = env.update(OTHER, {"job_id": "own", "prompt": "exfiltrate", "script": "x.py", "no_agent": True})
+    assert handler.status == 403, handler.body
+    assert handler.body["reason"] == "cron_owner"
+    handler = env.update(OWNER, {"job_id": "own", "script": "x.py", "no_agent": True})
+    assert handler.status == 403, handler.body
+    assert handler.body["reason"] == "cron_admin_field"
+    assert env.store.jobs["own"] == before and env.store.updates == []
+    assert "HERMES_WEBUI_GOVERNANCE_POLICY" not in os.environ
+    # The owner's own edit still goes through.
+    assert env.update(OWNER, _category_payload("own")).status == 200
+
+
+def test_create_on_a_named_profile_keeps_the_request_policy(env, monkeypatch):
+    _policy_file, alpha = _root_policy_file(monkeypatch)
+    _swap_to(env, monkeypatch, alpha)
+    handler = env.create(OWNER, _form_create_payload(script="x.py", no_agent=True))
+    assert handler.status == 403, handler.body
+    assert handler.body["reason"] == "cron_admin_field"
+    assert env.store.creates == []
+
+
+def test_run_now_on_a_named_profile_is_planned_with_the_request_policy(run_env, monkeypatch):
+    import os
+
+    policy_file, alpha = _root_policy_file(monkeypatch)
+    _swap_to(run_env, monkeypatch, alpha)
+    handler = run_env.act(OWNER, "run", "own")
+    assert handler.status == 200, handler.body
+    plan = run_env.runs[-1].run_plan
+    assert plan["unbound_allowed"] is False
+    assert plan["run_as"] == OWNER
+    assert plan["governance_policy"] == str(policy_file)
+    assert "HERMES_WEBUI_GOVERNANCE_POLICY" not in os.environ
+
+
+def test_a_deployment_pinned_policy_file_is_kept(env, monkeypatch, tmp_path):
+    """HQ and the stack set HERMES_WEBUI_GOVERNANCE_POLICY: the routes use it
+    and leave it as it was."""
+    import os
+
+    import yaml
+
+    _root_policy_file(monkeypatch)
+    pinned = tmp_path / "pinned" / "governance.yaml"
+    pinned.parent.mkdir()
+    pinned.write_text(yaml.safe_dump({**POLICY, "mode": "report_only"}), encoding="utf-8")
+    monkeypatch.setenv("HERMES_WEBUI_GOVERNANCE_POLICY", str(pinned))
+    _swap_to(env, monkeypatch, tmp_path / "profiles" / "alpha")
+    handler = env.update(OTHER, _emoji_payload("own"))
+    # The pinned file says report_only (allowed); the root file says enforce.
+    assert handler.status == 200, handler.body
+    assert os.environ["HERMES_WEBUI_GOVERNANCE_POLICY"] == str(pinned)

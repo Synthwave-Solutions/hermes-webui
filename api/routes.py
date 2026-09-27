@@ -2122,11 +2122,30 @@ def _reset_cron_run_governance(token) -> None:
     reset_governed_agent_turn(token)
 
 
-class _cron_run_policy_file:
-    """Pin the WebUI governance policy file for a Run now child to the one
-    the request decided with (``HERMES_WEBUI_GOVERNANCE_POLICY``), so the
-    child cannot read another file through a HERMES_HOME it inherited while
-    a cron profile context had swapped it. Restored on exit."""
+def _cron_request_policy_path() -> str:
+    """The governance policy file this request was admitted with.
+
+    Read before cron_profile_context swaps HERMES_HOME to the active profile's
+    home: without ``HERMES_WEBUI_GOVERNANCE_POLICY`` the loader reads the file
+    under HERMES_HOME, and for a named profile without a file of its own that
+    is governance off, which would make every caller a cron admin (W0).
+    """
+    from api.governance.loader import resolve_policy_path
+
+    return str(resolve_policy_path())
+
+
+class _cron_policy_file_pin:
+    """Pin the WebUI governance policy file (``HERMES_WEBUI_GOVERNANCE_POLICY``)
+    to the one the request decided with, restored on exit.
+
+    The cron create, update and run routes enter it inside cron_profile_context
+    (_cron_request_policy_path), so their checks keep reading that file while
+    HERMES_HOME points at the profile's home; the context's lock serialises the
+    pin with every other cron route. A Run now child enters it with the file
+    from its plan, so it cannot read another file through a HERMES_HOME it
+    inherited while a cron profile context had swapped it.
+    """
 
     _ENV = "HERMES_WEBUI_GOVERNANCE_POLICY"
 
@@ -2161,7 +2180,7 @@ def _cron_job_subprocess_main(job, execution_profile_home, result_queue, run_pla
     """
     try:
         plan = run_plan if isinstance(run_plan, dict) else None
-        with _cron_run_policy_file((plan or {}).get("governance_policy")):
+        with _cron_policy_file_pin((plan or {}).get("governance_policy")):
             result = _cron_run_governed_entry(job, execution_profile_home, (plan or {}).get("store_home"))
             if result is None:
                 token = _cron_bind_run_governance(job, plan)
@@ -16752,17 +16771,22 @@ def handle_post(handler, parsed) -> bool:
     # ── Cron API (POST) ──
     # See GET-side comment above: wrap in cron_profile_context so writes go
     # to the TLS-active profile's jobs.json instead of the process default.
+    # The write checks and the Run now plan decide inside that context, so
+    # they keep the policy file the request was admitted with: resolved
+    # before the swap, pinned while the context holds its lock (W0).
     if parsed.path == "/api/crons/create":
         from api.profiles import cron_profile_context
 
-        with cron_profile_context():
+        _cron_policy = _cron_request_policy_path()
+        with cron_profile_context(), _cron_policy_file_pin(_cron_policy):
             _ensure_agent_cron_import_path()
             return _handle_cron_create(handler, body)
 
     if parsed.path == "/api/crons/update":
         from api.profiles import cron_profile_context
 
-        with cron_profile_context():
+        _cron_policy = _cron_request_policy_path()
+        with cron_profile_context(), _cron_policy_file_pin(_cron_policy):
             _ensure_agent_cron_import_path()
             return _handle_cron_update(handler, body)
 
@@ -16805,7 +16829,8 @@ def handle_post(handler, parsed) -> bool:
     if parsed.path == "/api/crons/run":
         from api.profiles import cron_profile_context
 
-        with cron_profile_context():
+        _cron_policy = _cron_request_policy_path()
+        with cron_profile_context(), _cron_policy_file_pin(_cron_policy):
             _ensure_agent_cron_import_path()
             return _handle_cron_run(handler, body)
 
