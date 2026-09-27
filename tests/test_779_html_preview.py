@@ -129,7 +129,10 @@ def test_file_raw_inline_responses_use_sandbox_csp():
     content = _get_routes_content()
     idx = content.find("def _handle_file_raw")
     assert idx != -1, "_handle_file_raw not found"
-    block = content[idx:idx + 2200]
+    # The whole handler, not a fixed-size prefix: the governed file-ops lookup
+    # made the function longer than the old 2200-character window.
+    end = content.find("\ndef ", idx + 1)
+    block = content[idx:end if end != -1 else len(content)]
     assert "sandbox_csp" in block
     assert "inline_preview" in block
     assert "disposition == \"inline\"" in block

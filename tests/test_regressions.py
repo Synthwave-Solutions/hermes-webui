@@ -342,6 +342,16 @@ def test_deleted_session_does_not_appear_in_list(cleanup_test_sessions):
     assert sid not in ids_after,         f"Deleted session {sid} still appears in list -- index not invalidated on delete"
 
 
+def _route_block(text: str, start: int) -> str:
+    """The whole `if parsed.path == ...` branch, not a fixed-size prefix.
+
+    SynthPulse's governance and lock checks made the delete branch longer
+    than the old 2400-character window; the cleanup still sits inside it.
+    """
+    end = text.find("\n    if parsed.path ==", start + 1)
+    return text[start:end if end != -1 else len(text)]
+
+
 def test_server_delete_prunes_session_index(cleanup_test_sessions):
     """session/delete should prune the deleted row without discarding the index."""
     src = (REPO_ROOT / "server.py").read_text()
@@ -354,7 +364,7 @@ def test_server_delete_prunes_session_index(cleanup_test_sessions):
             text.find('if parsed.path == "/api/session/delete":'),
         )
         if delete_idx >= 0:
-            delete_block = text[delete_idx:delete_idx+2400]
+            delete_block = _route_block(text, delete_idx)
             assert "prune_session_from_index(sid)" in delete_block, \
                 f"{label} session/delete must prune SESSION_INDEX_FILE"
             return
@@ -369,7 +379,7 @@ def test_server_delete_removes_session_bak_snapshot(cleanup_test_sessions):
         routes_src.find('if parsed.path == "/api/session/delete":'),
     )
     assert delete_idx >= 0, "session/delete handler not found in api/routes.py"
-    delete_block = routes_src[delete_idx:delete_idx+2400]
+    delete_block = _route_block(routes_src, delete_idx)
     assert "with_suffix('.json.bak').unlink" in delete_block or 'with_suffix(".json.bak").unlink' in delete_block, \
         "session/delete must unlink <sid>.json.bak to avoid later orphan-backup recovery"
 
@@ -788,7 +798,9 @@ def test_renderMessages_preserves_loading_placeholder_for_session_switch(cleanup
     ui_src = (REPO_ROOT / "static/ui.js").read_text()
     fn_start = ui_src.find("function renderMessages")
     assert fn_start >= 0, "renderMessages() not found in ui.js"
-    fn_body = ui_src[fn_start:fn_start + 1400]
+    # SynthPulse runs four sync hooks first (skill activity, send recovery,
+    # chat bots, session progress), so the guard sits a little further in.
+    fn_body = ui_src[fn_start:fn_start + 2400]
 
     compact = re.sub(r"\s+", "", fn_body)
     assert (
@@ -1119,6 +1131,13 @@ def test_messages_js_finalizes_thinking_card_before_tool_card(cleanup_test_sessi
     tool_complete_start = src.find("source.addEventListener('tool_complete'", tool_start + 1)
     assert tool_start >= 0 and tool_complete_start > tool_start
     body = src[tool_start:tool_complete_start]
+    # SynthPulse registers a named handler (53620edd, sub-agent lifecycle);
+    # inspect that function when the listener delegates to it.
+    named = re.match(r"source\.addEventListener\('tool',\s*([A-Za-z_$][\w$]*)\)", src[tool_start:])
+    if named:
+        fn_start = src.find("function " + named.group(1) + "(")
+        assert fn_start >= 0, f"tool handler {named.group(1)} not found"
+        body = src[fn_start:src.find("\n    function ", fn_start + 1)]
     assert "finalizeThinkingCard()" in body, \
         "tool handler must finalize the current live thinking card before appending a tool card"
     assert "liveReasoningText='';" in body or 'liveReasoningText = "";' in body, \
