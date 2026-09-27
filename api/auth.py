@@ -53,6 +53,7 @@ PUBLIC_PATHS = frozenset({
     '/api/auth/login', '/api/auth/status',
     '/api/auth/oidc/start', '/api/auth/oidc/callback',
     '/api/auth/passkey/options', '/api/auth/passkey/login',
+    '/share',
     '/manifest.json', '/manifest.webmanifest',
     '/session/manifest.json', '/session/manifest.webmanifest',
 })
@@ -100,20 +101,42 @@ def _warn_auth_persistence_failure(prefix: str, artifact: Path, exc: Exception, 
 
 
 _SESSIONS_FILE = STATE_DIR / '.sessions.json'
+_TRUSTED_AUTH_HEADER_ENV = 'HERMES_WEBUI_TRUSTED_AUTH_HEADER'
+_TRUSTED_GROUPS_HEADER_ENV = 'HERMES_WEBUI_TRUSTED_GROUPS_HEADER'
+_TRUSTED_GROUP_PROFILE_MAP_ENV = 'HERMES_WEBUI_GROUP_PROFILE_MAP'
+_TRUSTED_AUTH_LOGOUT_URL_ENV = 'HERMES_WEBUI_TRUSTED_AUTH_LOGOUT_URL'
+_TRUSTED_AUTH_WARNINGS_EMITTED: set[str] = set()
 
 
-def _session_expiry(value) -> float:
-    """Return the expiry timestamp for a session store entry.
+def _warn_trusted_auth_once(key: str, message: str, *args) -> None:
+    if key in _TRUSTED_AUTH_WARNINGS_EMITTED:
+        return
+    _TRUSTED_AUTH_WARNINGS_EMITTED.add(key)
+    logger.warning(message, *args)
 
-    Entries are either a plain float expiry (legacy anonymous sessions,
-    kept as-is forever) or a dict ``{"exp": float, "email": str,
-    "groups": [str], "claims_subset": dict, "method": str}`` (identity-aware
-    sessions). Unknown shapes resolve to 0.0 so they are treated as expired.
+
+def _session_expiry(record) -> float | None:
+    """Return the expiry timestamp for a session store entry, or None.
+
+    Entries are a plain float expiry (legacy anonymous sessions, kept as-is),
+    an identity dict carrying ``exp`` (SynthPulse identity-aware sessions:
+    ``{"exp": float, "email": str, "groups": [str], "claims_subset": dict,
+    "method": str}``) or an upstream record dict carrying ``expiry``
+    (trusted-header and profile-bound sessions: ``auth_type``, ``username``,
+    ``bound_profile``). Unknown or malformed shapes resolve to None, which
+    every caller treats as expired.
     """
-    if isinstance(value, dict):
-        exp = value.get('exp')
-        return float(exp) if isinstance(exp, (int, float)) else 0.0
-    return float(value) if isinstance(value, (int, float)) else 0.0
+    if isinstance(record, dict):
+        expiry = record.get('exp', record.get('expiry', record.get('expires_at')))
+    else:
+        expiry = record
+    if isinstance(expiry, bool):
+        return None
+    try:
+        expiry_f = float(expiry)
+    except (TypeError, ValueError):
+        return None
+    return expiry_f
 
 
 def _load_sessions() -> dict[str, float | dict]:
@@ -159,13 +182,23 @@ def _load_sessions() -> dict[str, float | dict]:
         return {}
     now = time.time()
     sessions: dict[str, float | dict] = {}
-    for t, v in data.items():
-        if not isinstance(t, str):
+    for token, record in data.items():
+        if not isinstance(token, str) or not token:
             continue
-        if isinstance(v, (int, float)) and v > now:
-            sessions[t] = v  # legacy anonymous entry, kept as a float
-        elif isinstance(v, dict) and _session_expiry(v) > now:
-            sessions[t] = v  # identity-aware entry
+        expiry = _session_expiry(record)
+        if expiry is None or expiry <= now:
+            continue
+        if isinstance(record, dict):
+            # Identity-aware entries keep their ``exp`` key; upstream records
+            # (trusted-header, profile-bound) keep ``expiry``.
+            normalized = dict(record)
+            if 'exp' in normalized:
+                normalized['exp'] = expiry
+            else:
+                normalized['expiry'] = expiry
+            sessions[token] = normalized
+        else:
+            sessions[token] = expiry  # legacy anonymous entry, kept as a float
     return sessions
 
 
@@ -525,11 +558,12 @@ def get_oidc_startup_warning() -> str | None:
 
 
 def is_auth_enabled() -> bool:
-    """True if password auth, passkeys, or OIDC login is configured."""
+    """True if password auth, passkeys, OIDC login, or trusted-header auth is configured."""
     return (
         is_password_auth_enabled()
         or are_passkeys_enabled()
         or is_oidc_auth_enabled()
+        or is_trusted_auth_enabled()
     )
 
 
@@ -738,22 +772,43 @@ def _local_login_identity() -> dict:
     return {'email': email.lower(), 'groups': [], 'claims_subset': {}, 'method': 'local'}
 
 
-def create_session(identity: dict | None = None) -> str:
+def create_session(
+    identity: dict | None = None,
+    *,
+    auth_type: str | None = None,
+    username: str | None = None,
+    bound_profile: str | None = None,
+) -> str:
     """Create a new auth session. Returns signed cookie value.
 
     The session records who logged in: the explicit *identity* argument wins,
     then the identity staged on this thread by the OIDC callback (see
     stage_session_identity), then the local password/passkey identity mapping.
     Cookie format and signing are unchanged.
+
+    A trusted-header or profile-bound session (``auth_type``, ``username`` or
+    ``bound_profile`` given) records those fields under ``expiry`` instead and
+    never borrows the local login identity: a proxy-asserted user must not
+    become the governance bootstrap admin.
     """
     token = secrets.token_hex(32)
-    identity = identity or _pop_pending_identity() or _local_login_identity()
-    exp = time.time() + _resolve_session_ttl()
-    if identity:
-        entry: float | dict = {k: v for k, v in identity.items() if k != 'exp'}
-        entry['exp'] = exp
+    expiry = time.time() + _resolve_session_ttl()
+    entry: float | dict
+    if any(value is not None for value in (auth_type, username, bound_profile)):
+        entry = {k: v for k, v in (identity or {}).items() if k not in ('exp', 'expiry')}
+        entry.update({
+            'expiry': expiry,
+            'auth_type': auth_type,
+            'username': username,
+            'bound_profile': bound_profile,
+        })
     else:
-        entry = exp  # anonymous legacy behavior, kept for safety
+        identity = identity or _pop_pending_identity() or _local_login_identity()
+        if identity:
+            entry = {k: v for k, v in identity.items() if k not in ('exp', 'expiry')}
+            entry['exp'] = expiry
+        else:
+            entry = expiry  # anonymous legacy behavior, kept for safety
     with _SESSIONS_LOCK:
         _sessions[token] = entry
         _save_sessions(_sessions)
@@ -765,7 +820,7 @@ def _prune_expired_sessions():
     """Remove all expired session entries to prevent unbounded memory growth."""
     now = time.time()
     with _SESSIONS_LOCK:
-        expired = [t for t, v in _sessions.items() if now > _session_expiry(v)]
+        expired = [t for t, record in _sessions.items() if (expiry := _session_expiry(record)) is None or now > expiry]
         if expired:
             for token in expired:
                 _sessions.pop(token, None)
@@ -788,8 +843,8 @@ def verify_session(cookie_value: str) -> bool:
     if not valid:
         return False
     with _SESSIONS_LOCK:
-        entry = _sessions.get(token)
-        if entry is None or time.time() > _session_expiry(entry):
+        expiry = _session_expiry(_sessions.get(token))
+        if expiry is None or time.time() > expiry:
             _sessions.pop(token, None)
             _save_sessions(_sessions)
             return False
@@ -800,8 +855,10 @@ def get_session_identity(cookie_value: str) -> dict | None:
     """Return the identity dict for a valid session cookie, or None.
 
     Shape: {"email": str, "groups": [str], "claims_subset": dict, "method": str}.
-    None means the cookie is invalid/expired or the session is a legacy
-    anonymous float entry (created before identity-aware sessions).
+    None means the cookie is invalid/expired, the session is a legacy
+    anonymous float entry (created before identity-aware sessions), or it is
+    an upstream trusted-header/profile-bound record, which carries no
+    identity.
     """
     if not cookie_value or not verify_session(cookie_value):
         return None
@@ -810,9 +867,282 @@ def get_session_identity(cookie_value: str) -> dict | None:
         return None
     with _SESSIONS_LOCK:
         entry = _sessions.get(token)
-    if not isinstance(entry, dict):
+    if not isinstance(entry, dict) or 'email' not in entry:
         return None
-    return {k: v for k, v in entry.items() if k != 'exp'}
+    return {k: v for k, v in entry.items() if k not in ('exp', 'expiry')}
+
+
+def _trusted_auth_header_name() -> str | None:
+    name = os.getenv(_TRUSTED_AUTH_HEADER_ENV, '').strip()
+    if not name:
+        return None
+    if not _COOKIE_NAME_RE.match(name):
+        _warn_trusted_auth_once(
+            'trusted-auth-header',
+            'Ignoring invalid %s=%r; trusted-header auth rejects every request',
+            _TRUSTED_AUTH_HEADER_ENV,
+            name,
+        )
+        return None
+    return name
+
+
+def _trusted_auth_header_configured() -> bool:
+    return bool(os.getenv(_TRUSTED_AUTH_HEADER_ENV, '').strip())
+
+
+def _trusted_group_profile_map() -> dict[str, str] | None:
+    raw = os.getenv(_TRUSTED_GROUP_PROFILE_MAP_ENV, '').strip()
+    if not raw:
+        return None
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        _warn_trusted_auth_once(
+            'trusted-group-map',
+            'Ignoring invalid %s JSON; trusted-header auth falls back to default profile binding',
+            _TRUSTED_GROUP_PROFILE_MAP_ENV,
+        )
+        return {}
+    if not isinstance(data, dict):
+        _warn_trusted_auth_once(
+            'trusted-group-map-type',
+            'Ignoring non-dict %s; trusted-header auth falls back to default profile binding',
+            _TRUSTED_GROUP_PROFILE_MAP_ENV,
+        )
+        return {}
+    mapping: dict[str, str] = {}
+    for group, profile in data.items():
+        group_name = str(group or '').strip()
+        profile_name = str(profile or '').strip()
+        if not group_name or not profile_name:
+            _warn_trusted_auth_once(
+                'trusted-group-map-entry',
+                'Ignoring invalid entry in %s; trusted-header auth falls back to default profile binding',
+                _TRUSTED_GROUP_PROFILE_MAP_ENV,
+            )
+            continue
+        mapping[group_name] = profile_name
+    return mapping
+
+
+def _trusted_groups_header_value(handler) -> list[str]:
+    header_name = os.getenv(_TRUSTED_GROUPS_HEADER_ENV, '').strip()
+    if not header_name:
+        return []
+    try:
+        raw = handler.headers.get(header_name, '')
+    except Exception:
+        return []
+    if not raw:
+        return []
+    values = []
+    for part in str(raw).replace('\n', ',').split(','):
+        part = part.strip()
+        if part:
+            values.append(part)
+    return values
+
+
+def _trusted_auth_username(handler) -> str | None:
+    header_name = _trusted_auth_header_name()
+    if not header_name:
+        return None
+    try:
+        raw = handler.headers.get(header_name, '')
+    except Exception:
+        return None
+    username = str(raw or '').strip()
+    return username or None
+
+
+def _trusted_auth_bound_profile(handler) -> str | None:
+    mapping = _trusted_group_profile_map()
+    if mapping is None:
+        return None
+    groups = set(_trusted_groups_header_value(handler))
+    for group, profile in mapping.items():
+        if group in groups:
+            return profile
+    return 'default'
+
+
+def _queue_pending_cookie(handler, cookie_header: str) -> None:
+    if not cookie_header:
+        return
+    pending = getattr(handler, '_pending_set_cookies', None)
+    if pending is None:
+        pending = []
+        handler._pending_set_cookies = pending
+    pending.append(cookie_header)
+
+
+def _auth_cookie_header(cookie_value, handler=None) -> str:
+    cookie = http.cookies.SimpleCookie()
+    name = _resolve_cookie_name()
+    cookie[name] = cookie_value
+    cookie[name]['httponly'] = True
+    cookie[name]['samesite'] = 'Lax'
+    cookie[name]['path'] = '/'
+    cookie[name]['max-age'] = str(_resolve_session_ttl())
+    if _is_secure_context(handler):
+        cookie[name]['secure'] = True
+    return cookie[name].OutputString()
+
+
+def _clear_auth_cookie_header() -> str:
+    cookie = http.cookies.SimpleCookie()
+    name = _resolve_cookie_name()
+    cookie[name] = ''
+    cookie[name]['httponly'] = True
+    cookie[name]['path'] = '/'
+    cookie[name]['samesite'] = 'Lax'
+    cookie[name]['max-age'] = '0'
+    return cookie[name].OutputString()
+
+
+def _build_profile_cookie_header(name: str, session_cookie_value: str | None) -> str:
+    from api.helpers import build_profile_cookie
+
+    return build_profile_cookie(name, session_cookie_value=session_cookie_value)
+
+
+def _request_profile_matches_bound(bound_profile: str | None) -> bool:
+    if not bound_profile:
+        return True
+    try:
+        from api.profiles import get_active_profile_name, _profiles_match
+
+        return _profiles_match(bound_profile, get_active_profile_name())
+    except Exception:
+        return False
+
+
+def get_session_info(cookie_value: str) -> dict | None:
+    if not verify_session(cookie_value):
+        return None
+    token = _session_token_from_cookie_value(cookie_value)
+    if not token:
+        return None
+    with _SESSIONS_LOCK:
+        record = _sessions.get(token)
+    expiry = _session_expiry(record)
+    if expiry is None:
+        return None
+    info: dict[str, object] = {'token': token, 'expiry': expiry}
+    if isinstance(record, dict):
+        info.update({k: v for k, v in record.items() if k != 'expiry'})
+    if 'bound_profile' not in info and isinstance(info.get('profile'), str):
+        info['bound_profile'] = info.get('profile')
+    info.setdefault('auth_type', None)
+    info.setdefault('username', None)
+    info.setdefault('bound_profile', None)
+    return info
+
+
+def session_bound_profile(cookie_value: str) -> str | None:
+    info = get_session_info(cookie_value)
+    if not info:
+        return None
+    bound_profile = info.get('bound_profile')
+    bound_profile = str(bound_profile or '').strip()
+    return bound_profile or None
+
+
+def is_trusted_auth_enabled() -> bool:
+    return _trusted_auth_header_configured()
+
+
+def get_trusted_auth_logout_url() -> str | None:
+    value = os.getenv(_TRUSTED_AUTH_LOGOUT_URL_ENV, '').strip()
+    return value or None
+
+
+def _remember_trusted_auth_session(handler, info: dict | None, cookie_value: str | None = None) -> dict | None:
+    handler._trusted_auth_session_reconciled = info
+    if info and info.get('auth_type') == 'trusted':
+        handler._trusted_auth_session_info = info
+        handler._trusted_auth_session_cookie_value = cookie_value
+    return info
+
+
+def reset_trusted_auth_request_state(handler) -> None:
+    for name in (
+        '_trusted_auth_session_reconciled',
+        '_trusted_auth_session_rejected',
+        '_trusted_auth_session_info',
+        '_trusted_auth_session_cookie_value',
+        # Clear any auth cookie queued by a prior request but not yet flushed.
+        # The handler is reused across HTTP/1.1 keep-alive requests, so a stale
+        # queued Set-Cookie would otherwise cross the request boundary and be
+        # emitted by a later response — e.g. after trusted-identity rotation on
+        # logout it could overwrite a subsequent valid login cookie and 401 the
+        # user. Reset it at the per-request boundary (server.py do_GET/do_POST).
+        '_pending_set_cookies',
+    ):
+        try:
+            delattr(handler, name)
+        except AttributeError:
+            pass
+
+
+def _apply_trusted_session_profile(handler, bound_profile: str | None, cookie_value: str) -> None:
+    if bound_profile is None:
+        return
+    from api.helpers import get_profile_cookie
+    from api.profiles import set_request_profile
+
+    set_request_profile(bound_profile)
+    if get_profile_cookie(handler) != bound_profile:
+        _queue_pending_cookie(handler, _build_profile_cookie_header(bound_profile, cookie_value))
+
+
+def ensure_trusted_auth_session(handler) -> dict | None:
+    if hasattr(handler, '_trusted_auth_session_reconciled'):
+        return handler._trusted_auth_session_reconciled
+    cookie_value = parse_cookie(handler)
+    info = get_session_info(cookie_value) if cookie_value and verify_session(cookie_value) else None
+    if info and info.get('auth_type') != 'trusted':
+        return _remember_trusted_auth_session(handler, info)
+    if not is_trusted_auth_enabled():
+        if info:
+            invalidate_session(cookie_value)
+            handler._trusted_auth_session_rejected = True
+        return _remember_trusted_auth_session(handler, None)
+    from api.routes import _raw_peer_is_trusted_proxy
+
+    if not _raw_peer_is_trusted_proxy(handler):
+        if info:
+            invalidate_session(cookie_value)
+            handler._trusted_auth_session_rejected = True
+        return _remember_trusted_auth_session(handler, None)
+    username = _trusted_auth_username(handler)
+    if not username:
+        if info:
+            invalidate_session(cookie_value)
+            handler._trusted_auth_session_rejected = True
+        return _remember_trusted_auth_session(handler, None)
+    bound_profile = _trusted_auth_bound_profile(handler)
+    if info and info.get('username') == username and info.get('bound_profile') == bound_profile:
+        _apply_trusted_session_profile(handler, bound_profile, cookie_value)
+        return _remember_trusted_auth_session(handler, info, cookie_value)
+    if info:
+        invalidate_session(cookie_value)
+    cookie_value = create_session(
+        auth_type='trusted',
+        username=username,
+        bound_profile=bound_profile,
+    )
+    _queue_pending_cookie(handler, _auth_cookie_header(cookie_value, handler))
+    _apply_trusted_session_profile(handler, bound_profile, cookie_value)
+    info = get_session_info(cookie_value)
+    return _remember_trusted_auth_session(handler, info, cookie_value)
+
+
+def trusted_session_allows_active_profile(info: dict | None) -> bool:
+    if not info:
+        return True
+    return _request_profile_matches_bound(str(info.get('bound_profile') or '') or None)
 
 
 def _session_token_from_cookie_value(cookie_value: str) -> str | None:
@@ -917,6 +1247,46 @@ def parse_cookie(handler) -> str | None:
     return morsel.value if morsel else None
 
 
+def _safe_login_inner_next(query: str | None) -> str:
+    """#5578: extract a SAFE, non-login inner redirect from a login page's query.
+
+    When an expired-auth bounce lands back on the login page (which already
+    carries its own `next` in the query), we want to preserve a legitimate inner
+    destination X across the redirect to the real login route — but only if X is
+    itself safe (path-absolute, not protocol-relative/backslash, no control
+    chars) AND not login-shaped / not itself carrying a nested next param.
+    Anything else collapses to '' (no inner redirect), which kills the
+    self-referential chain. Mirrors _safe_login_redirect_path().
+    """
+    import urllib.parse as _u
+    raw = _u.parse_qs(query or "").get("next", [""])[0]
+    path = str(raw or "").strip()
+    if not path or path[0] != "/" or path[1:2] in {"/", "\\"}:
+        return ""
+    if re.search(r"[\x00-\x1f\x7f\s]", path) or len(path) > 2048:
+        return ""
+    # Collapse only login-route chains — decode a few levels so a nested
+    # `/session/login%3Fnext%3D...` (encoded `?`) is still recognized by its
+    # leading PATH — but preserve a legitimate non-login inner path that merely
+    # carries its own `next=` query key (e.g. `/admin?next=/real/path`).
+    _probe = path
+    for _ in range(8):
+        _p = _probe.split("?", 1)[0].split("#", 1)[0].split("&", 1)[0].rstrip("/")
+        if _p == "/login" or _p.endswith("/login"):
+            return ""
+        _decoded = _u.unquote(_probe)
+        if _decoded == _probe:
+            break
+        _probe = _decoded
+    else:
+        # Still decoding at the cap (pathologically deep encoding) → fail closed.
+        _p = _probe.split("?", 1)[0].split("#", 1)[0].split("&", 1)[0].rstrip("/")
+        if _p == "/login" or _p.endswith("/login"):
+            return ""
+        return ""
+    return path
+
+
 def check_auth(handler, parsed) -> bool:
     """Check if request is authorized. Returns True if OK.
     If not authorized, sends 401 (API) or 302 redirect (page) and returns False."""
@@ -926,11 +1296,44 @@ def check_auth(handler, parsed) -> bool:
     if is_public_share_request(parsed.path, getattr(handler, "command", "GET")):
         return True
     # Public paths don't require auth
-    if parsed.path in PUBLIC_PATHS or parsed.path.startswith('/static/') or parsed.path.startswith('/session/static/'):
+    if (
+        parsed.path in PUBLIC_PATHS
+        or parsed.path.startswith('/share/')
+        or (
+            parsed.path.startswith('/api/share/')
+            and parsed.path not in {'/api/share/create', '/api/share/revoke'}
+        )
+        or parsed.path.startswith('/static/')
+        or parsed.path.startswith('/session/static/')
+    ):
         return True
-    # Check session cookie
     cookie_val = parse_cookie(handler)
-    if cookie_val and verify_session(cookie_val):
+    has_session = bool(cookie_val and verify_session(cookie_val))
+    if parsed.path == '/api/auth/logout':
+        if has_session:
+            return True
+        body = b'{"error":"Authentication required"}'
+        handler.send_response(401)
+        handler.send_header('Content-Type', 'application/json')
+        handler.send_header('Content-Length', str(len(body)))
+        handler.end_headers()
+        handler.wfile.write(body)
+        return False
+    session_info = ensure_trusted_auth_session(handler)
+    if session_info:
+        if not trusted_session_allows_active_profile(session_info):
+            if parsed.path.startswith('/api/'):
+                body = b'{"error":"Profile access forbidden"}'
+                handler.send_response(403)
+                handler.send_header('Content-Type', 'application/json')
+            else:
+                body = b'Profile access forbidden'
+                handler.send_response(403)
+                handler.send_header('Content-Type', 'text/plain; charset=utf-8')
+            handler.send_header('Content-Length', str(len(body)))
+            handler.end_headers()
+            handler.wfile.write(body)
+            return False
         return True
     # Not authorized
     if parsed.path.startswith(('/api/', '/dashboard-plugins/', '/plugins/')):
@@ -964,6 +1367,35 @@ def check_auth(handler, parsed) -> bool:
         # the full original URL (the browser auto-decodes once).
         # (Opus pre-release advisor finding for v0.50.258.)
         import urllib.parse as _urlparse
+        # #5578: if the page being redirected is ALREADY login-shaped, do NOT
+        # wrap its full `path?query` into a fresh `next=` — that query already
+        # carries a `next=`, so quoting the whole thing nests the login URL into
+        # itself and re-encodes it on every expired-auth bounce, exploding the
+        # URL until the tab breaks. This guard runs in check_auth() (BEFORE
+        # route handling), the actual source of the server-side loop.
+        #
+        # The login page is served ONLY at the public `/login` route (see
+        # PUBLIC_PATHS + the routes.py `/login` handler); the app's client route
+        # `/session/login` is NOT public, so a bare relative `login` from
+        # `/session/login` resolves to `/session/login` again and re-triggers
+        # check_auth() — an infinite redirect. Resolve to the real login route
+        # with `../login`, which lands on `/login` from a `/session/*` scope and
+        # on `<mount>/login` under a subpath mount (verified via urljoin). Carry
+        # through only a validated, non-login inner `next` so a legitimate
+        # post-login destination still survives a bounce that happened to land
+        # on the login page.
+        _login_path = (parsed.path or '/').rstrip('/')
+        if _login_path == '/login' or _login_path.endswith('/login'):
+            # /login itself is public → check_auth never redirects it; this only
+            # fires for the non-public client login route (e.g. /session/login).
+            _target = '../login' if '/' in _login_path.lstrip('/') else 'login'
+            _inner = _safe_login_inner_next(parsed.query)
+            if _inner:
+                _target += '?next=' + _urlparse.quote(_inner, safe='/')
+            handler.send_header('Location', _target)
+            handler.send_header('Content-Length', '0')
+            handler.end_headers()
+            return False
         _path_with_query = parsed.path or '/'
         if parsed.query:
             _path_with_query += '?' + parsed.query
@@ -1024,24 +1456,9 @@ def _is_secure_context(handler=None) -> bool:
 
 def set_auth_cookie(handler, cookie_value) -> None:
     """Set the auth cookie on the response."""
-    cookie = http.cookies.SimpleCookie()
-    name = _resolve_cookie_name()
-    cookie[name] = cookie_value
-    cookie[name]['httponly'] = True
-    cookie[name]['samesite'] = 'Lax'
-    cookie[name]['path'] = '/'
-    cookie[name]['max-age'] = str(_resolve_session_ttl())
-    if _is_secure_context(handler):
-        cookie[name]['secure'] = True
-    handler.send_header('Set-Cookie', cookie[name].OutputString())
+    handler.send_header('Set-Cookie', _auth_cookie_header(cookie_value, handler))
 
 
 def clear_auth_cookie(handler) -> None:
     """Clear the auth cookie on the response."""
-    cookie = http.cookies.SimpleCookie()
-    name = _resolve_cookie_name()
-    cookie[name] = ''
-    cookie[name]['httponly'] = True
-    cookie[name]['path'] = '/'
-    cookie[name]['max-age'] = '0'
-    handler.send_header('Set-Cookie', cookie[name].OutputString())
+    handler.send_header('Set-Cookie', _clear_auth_cookie_header())
