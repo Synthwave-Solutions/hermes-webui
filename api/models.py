@@ -1411,6 +1411,17 @@ class Session:
                 f"Reload with metadata_only=False before mutating state. "
                 f"See #1558."
             )
+        # A conversation the user deleted stays deleted. A turn that was still
+        # running when it was deleted saved it again at the end, and the chat
+        # came back in the sidebar (27 Sep 2026). The delete route records the
+        # tombstone before any late save can run; creating and importing a
+        # session clear it first, so they are unaffected.
+        try:
+            if self.session_id in _load_webui_deleted_session_tombstone():
+                logger.info("Not saving deleted session %s", self.session_id)
+                return
+        except Exception:
+            logger.debug("Deleted-session check failed for %s", self.session_id, exc_info=True)
         if touch_updated_at:
             self.updated_at = time.time()
         # Every persisted chat carries an owner. Rows created outside an

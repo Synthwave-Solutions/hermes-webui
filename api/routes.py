@@ -15987,8 +15987,11 @@ def handle_post(handler, parsed) -> bool:
             return bad(handler, "Subagent sessions are view-only and cannot be deleted from WebUI", 400)
         is_messaging_session = _is_messaging_session_id(sid)
         worktree_retained = _worktree_retained_payload_for_session_id(sid)
+        running_stream_id = None
         try:
-            event_profile = getattr(get_session(sid, metadata_only=True), "profile", None)
+            _deleted_meta = get_session(sid, metadata_only=True)
+            event_profile = getattr(_deleted_meta, "profile", None)
+            running_stream_id = getattr(_deleted_meta, "active_stream_id", None) or None
         except KeyError:
             event_profile = None
         except Exception:
@@ -16033,6 +16036,18 @@ def handle_post(handler, parsed) -> bool:
                         logger.debug("Failed to tombstone deleted WebUI session %s", sid, exc_info=True)
             finally:
                 session_lock.release()
+        # Deleting a conversation stops the answer that is still being written
+        # for it (27 Sep 2026). The tombstone above already keeps the worker's
+        # late saves from writing the chat back; cancelling also stops the
+        # agent from doing more work for a conversation that no longer exists.
+        if running_stream_id:
+            try:
+                with STREAMS_LOCK:
+                    _still_running = running_stream_id in STREAMS
+                if _still_running:
+                    cancel_stream(running_stream_id)
+            except Exception:
+                logger.debug("Failed to stop the running turn of deleted session %s", sid, exc_info=True)
         # Evict outside the project transaction and the per-session lock:
         # lifecycle commit may wait for provider memory commits (provider I/O)
         # and must hold neither lock.
