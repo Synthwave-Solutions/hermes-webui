@@ -24722,13 +24722,28 @@ def _cron_delivery_platforms():
     return platforms
 
 
+def _cron_grant_access(handler):
+    """The caller's effective grants for the cron value checks, or None when
+    governance is off. Unlike resource_scope.access_for this also resolves
+    under report_only, so a would-be refusal reaches _cron_write_refusal and
+    is audited as would_deny instead of passing unseen."""
+    from api.governance.enforce import _request_identity, subject_from_identity
+    from api.governance.loader import get_policy
+    from api.governance.resolver import resolve_effective_access
+
+    policy = get_policy()
+    if not policy.enabled:
+        return None
+    return resolve_effective_access(policy, subject_from_identity(_request_identity(handler)))
+
+
 def _cron_model_pin_allowed(handler, model, provider) -> bool:
     """Whether the caller's model grants cover pinning this model/provider.
     Fails closed when the policy cannot be resolved."""
     try:
-        from api.governance.resource_scope import access_for, allowed, model_allowed
+        from api.governance.resource_scope import allowed, model_allowed
 
-        access = access_for(handler)
+        access = _cron_grant_access(handler)
         if access is None:
             return True
         if model:
@@ -24739,6 +24754,34 @@ def _cron_model_pin_allowed(handler, model, provider) -> bool:
     except Exception:
         logger.warning("cron model grant check failed", exc_info=True)
         return False
+
+
+def _cron_skills_outside_grants(handler, skills) -> list[str]:
+    """The names in ``skills`` the caller may not both view and load.
+
+    The scheduler injects every skill of a job into its prompt without a
+    governance gate of its own, so a task must not carry a skill its creator
+    could not load in a chat. Names match the way the /api/skills/ route guard
+    matches them: normalized, as given, and by basename. Fails closed: every
+    name is reported when the grants cannot be resolved."""
+    names = [str(name).strip() for name in skills if str(name).strip()]
+    try:
+        from api.governance.resource_scope import allowed
+
+        access = _cron_grant_access(handler)
+        if access is None:
+            return []
+        outside = []
+        for name in names:
+            normalized = name.lower().replace(" ", "-")
+            aliases = (name, normalized.rsplit("/", 1)[-1])
+            if not (allowed(access, "skills_view", normalized, aliases)
+                    and allowed(access, "skills_load", normalized, aliases)):
+                outside.append(name)
+        return outside
+    except Exception:
+        logger.warning("cron skill grant check failed", exc_info=True)
+        return names
 
 
 def _cron_people_outside_policy(emails) -> list[str]:
@@ -24772,8 +24815,9 @@ def _cron_write_allowed(handler, body, job_id=None):
 
     Order: the field allowlist (400); for an update the per-job scope guard,
     then ownership (403: the owner or a cron admin may edit, a sharee may
-    not); then the values. Cron admins skip ownership and the value grants,
-    never the allowlist or the people check. Installs with governance off
+    not); then the values (deliver, model, and on create the skills). Cron
+    admins skip ownership and the value grants, never the allowlist, the value
+    shapes or the people check. Installs with governance off
     resolve every caller as cron admin (identity_has_permission fails open
     there), and report_only audits a 403 as would_deny instead of enforcing.
     """
@@ -24826,8 +24870,19 @@ def _cron_write_allowed(handler, body, job_id=None):
             _CRON_MANAGED_BY_VALUES | {None}):
         return 400, {"error": "managed_by must be synthwave or client"}
 
+    skills = body.get("skills") if creating else None
+    if skills:
+        if not isinstance(skills, list) or not all(isinstance(name, str) for name in skills):
+            return 400, {"error": "skills must be a list of skill names"}
+        denied = [] if is_admin else _cron_skills_outside_grants(handler, skills)
+        if denied:
+            refusal = _refuse("cron_skill", f"These skills are not available to you: {', '.join(denied)}.")
+            if refusal:
+                return refusal
+
     if not is_admin and body.get("deliver") is not None:
-        deliver = str(body["deliver"]).strip() or ("local" if creating else "")
+        # The engine reads an empty deliver as local (_normalize_deliver_value).
+        deliver = str(body["deliver"]).strip() or "local"
         stored = None if job is None else str(job.get("deliver") or "").strip()
         # Saving the stored target back unchanged is not a new target.
         if deliver != stored and deliver not in {p["value"] for p in _cron_delivery_platforms()}:

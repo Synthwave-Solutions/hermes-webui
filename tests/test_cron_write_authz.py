@@ -11,10 +11,12 @@ The rules pinned here:
 * Only the fields the Tasks panel sends are accepted; identity fields, run
   state and anything unknown give 400.
 * The per-job scope guard runs first, then ownership: the owner or a cron
-  admin may edit, a sharee may not.
+  admin may edit, a sharee may not. The same ownership rule covers pause,
+  resume, delete and run, which are reached through the same scope guard.
 * Values are checked: ``deliver`` must be one of the caller's own delivery
   options, ``model`` and ``provider`` must be within the caller's model
-  grants, ``script``, ``no_agent`` and ``managed_by`` are cron admin only,
+  grants, the ``skills`` of a new task must be ones the caller may view and
+  load, ``script``, ``no_agent`` and ``managed_by`` are cron admin only,
   ``shared_with`` only names people in the policy.
 * On create the owner and the origin are stamped from the signed-in identity.
 * ``report_only`` never enforces (it audits ``would_deny``), and installs with
@@ -838,6 +840,94 @@ def test_model_within_grants_unchanged_or_cleared_is_allowed(env):
         assert handler.status == 200, (model, provider, handler.body)
     handler = env.create(OWNER, _form_create_payload(model=None, provider=None))
     assert handler.status == 200, handler.body
+
+
+def test_report_only_audits_a_model_outside_the_grants(env, inject_policy):
+    inject_policy({**POLICY, "mode": "report_only"})
+    handler = env.create(OWNER, _form_create_payload(model="gpt-forbidden", provider="openai"))
+    assert handler.status == 200, handler.body
+    events = read_audit_events(10)
+    assert [e["event"] for e in events] == ["would_deny"]
+    assert events[0]["reason"] == "cron_model"
+    assert events[0]["path"] == "/api/crons/create"
+
+
+def test_empty_deliver_on_update_is_local(env):
+    """The engine reads an empty deliver as local (_normalize_deliver_value)."""
+    handler = env.update(OWNER, _form_update_payload("own", deliver=""))
+    assert handler.status == 200, handler.body
+    handler = env.update(OWNER, _form_update_payload("own", deliver="  "))
+    assert handler.status == 200, handler.body
+
+
+# Skills: the scheduler injects every listed skill into the job's prompt
+# (cron/scheduler.py _build_job_prompt calls skill_view directly, with no
+# governance gate), so a skill the creator may not view and load would reach
+# the agent, and its output the creator, through a scheduled task.
+SECRET_SKILL = "finance-secrets"
+SKILL_POLICY = {
+    **POLICY,
+    "users": {
+        **POLICY["users"],
+        # Denied one skill outright; every other skill stays open.
+        OWNER: {"roles": ["writer"],
+                "deny": {"skills": {"view": [SECRET_SKILL], "load": [SECRET_SKILL]}}},
+        # A restricted skill grant: only google-workspace.
+        OTHER: {"roles": ["writer"],
+                "grants": {"skills": {"view": ["google-workspace"], "load": ["google-workspace"]}}},
+        # May see every skill but load only google-workspace.
+        SHAREE: {"roles": ["writer"],
+                 "grants": {"skills": {"view": ["*"], "load": ["google-workspace"]}}},
+    },
+}
+
+
+@pytest.mark.parametrize("email,skills", [
+    (OWNER, [SECRET_SKILL]),
+    (OWNER, ["google-workspace", SECRET_SKILL]),
+    (OWNER, ["Finance Secrets"]),            # the display form of the name
+    (OWNER, [f"finance/{SECRET_SKILL}"]),     # a category path to the same skill
+    (OTHER, ["notion"]),
+    (SHAREE, ["notion"]),                    # viewable but not loadable
+])
+def test_skill_outside_the_callers_grants_is_forbidden(env, inject_policy, email, skills):
+    inject_policy(SKILL_POLICY)
+    handler = env.create(email, _form_create_payload(skills=skills))
+    assert handler.status == 403, handler.body
+    assert handler.body["reason"] == "cron_skill"
+    assert env.store.creates == []
+
+
+def test_skill_within_the_callers_grants_is_allowed(env, inject_policy):
+    inject_policy(SKILL_POLICY)
+    for email in (OWNER, OTHER, SHAREE):
+        handler = env.create(email, _form_create_payload(skills=["google-workspace"]))
+        assert handler.status == 200, (email, handler.body)
+    handler = env.create(OWNER, _form_create_payload(skills=["notion"]))
+    assert handler.status == 200, handler.body
+    handler = env.create(OTHER, _form_create_payload(skills=[]))
+    assert handler.status == 200, handler.body
+    handler = env.create(ADMIN, _form_create_payload(skills=[SECRET_SKILL]))
+    assert handler.status == 200, handler.body
+    assert env.store.creates[-1]["skills"] == [SECRET_SKILL]
+
+
+@pytest.mark.parametrize("skills", [SECRET_SKILL, [1], [["nested"]], {"name": SECRET_SKILL}])
+def test_skills_must_be_a_list_of_names(env, skills):
+    for email in (OWNER, ADMIN):
+        handler = env.create(email, _form_create_payload(skills=skills))
+        assert handler.status == 400, (email, handler.body)
+    assert env.store.creates == []
+
+
+def test_report_only_audits_a_skill_outside_the_grants(env, inject_policy):
+    inject_policy({**SKILL_POLICY, "mode": "report_only"})
+    handler = env.create(OWNER, _form_create_payload(skills=[SECRET_SKILL]))
+    assert handler.status == 200, handler.body
+    events = read_audit_events(10)
+    assert [e["event"] for e in events] == ["would_deny"]
+    assert events[0]["reason"] == "cron_skill"
+    assert events[0]["path"] == "/api/crons/create"
 
 
 # ── Create stamps the owner ─────────────────────────────────────────────────
