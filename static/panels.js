@@ -5833,7 +5833,8 @@ const MEMORY_SECTIONS = [
 ];
 
 function _memorySectionMeta(key) {
-  return MEMORY_SECTIONS.find(s => s.key === key) || MEMORY_SECTIONS[0];
+  // Registered sections (memory section registry below) are read-only.
+  return MEMORY_SECTIONS.find(s => s.key === key) || _memoryExtSectionMeta(key) || MEMORY_SECTIONS[0];
 }
 
 function _memorySectionLabel(meta) {
@@ -5970,6 +5971,19 @@ function _renderMemoryDetail(section) {
   const body = $('memoryDetailBody');
   const empty = $('memoryDetailEmpty');
   if (!title || !body) return;
+  if (meta.provider) {
+    // A registered section renders itself (memory section registry).
+    title.textContent = t(meta.labelKey);
+    try {
+      const pending = meta.provider.render(section, {title, body, empty});
+      if (pending && typeof pending.catch === 'function') pending.catch(e => console.warn('[memory] section render failed', e));
+    } catch (e) {
+      console.warn('[memory] section render failed', e);
+    }
+    _memoryMode = 'read';
+    _setMemoryHeaderButtons('read');
+    return;
+  }
   title.textContent = _memorySectionLabel(meta);
   const content = _memorySectionContent(section);
   const mtime = _memorySectionMtime(section);
@@ -8160,8 +8174,16 @@ async function loadMemory(force) {
       : '/api/memory';
     const data = await api(memoryUrl);
     if (epoch !== _memoryRequestEpoch || context !== _memoryContext()) return;
+    // Registered sections (memory section registry below). Without a
+    // provider nothing is awaited here and the panel is unchanged.
+    const extProviders = _memoryExtensionProviders();
+    const extSections = extProviders.length ? await _memoryExtCollect(extProviders, data) : [];
+    if (extProviders.length && (epoch !== _memoryRequestEpoch || context !== _memoryContext())) return;
     _memoryData = data;
     _memoryLoadedContext = context;
+    _memoryExtSections = extSections;
+    if (_currentMemorySection && !MEMORY_SECTIONS.some(s => s.key === _currentMemorySection)
+        && !extSections.some(s => s.key === _currentMemorySection)) _currentMemorySection = null;
     if (_currentMemorySection === 'shared_project_context' && !data.shared_project_context) _currentMemorySection = null;
     if (_currentMemorySection === 'external_notes' && !data.external_notes_enabled) {
       _currentMemorySection = null;
@@ -8187,10 +8209,69 @@ async function loadMemory(force) {
     if (_currentMemorySection && _memoryMode !== 'edit') {
       _renderMemoryDetail(_currentMemorySection);
     }
+    if (panel && extSections.length) {
+      for (const s of extSections) {
+        const el = document.createElement('button');
+        el.type = 'button';
+        el.className = 'side-menu-item';
+        if (_currentMemorySection === s.key) el.classList.add('active');
+        el.innerHTML = `${li(s.iconKey,16)}<span>${esc(t(s.labelKey))}</span>`;
+        el.title = t(s.titleKey);
+        el.onclick = () => openMemorySection(s.key, el);
+        panel.appendChild(el);
+      }
+    }
   } catch(e) {
     if (epoch !== _memoryRequestEpoch || context !== _memoryContext()) return;
     if (panel) panel.innerHTML = `<div style="padding:12px;color:var(--accent);font-size:12px">${esc(t('error_prefix'))}${esc(e.message)}</div>`;
   }
+}
+
+// ── Memory section registry (plan addendum AE-9) ──
+// Scripts outside this file add read-only sections to the Memory panel by
+// pushing a provider onto window.SynthPulseMemoryExtensions:
+//   sections(data): the entries {key, labelKey, iconKey, titleKey} to list,
+//     for the /api/memory payload `data`; it may return a promise.
+//   render(key, {title, body, empty}): fills the detail view of one entry.
+// A key matches ^[a-z][a-z0-9_]{2,39}$ and is never a built-in key; the
+// first provider to list a key wins. The labels are i18n keys. With no
+// provider registered the panel lists and renders exactly what it did.
+let _memoryExtSections = [];
+const _MEMORY_EXT_KEY_RE = /^[a-z][a-z0-9_]{2,39}$/;
+
+function _memoryExtensionProviders() {
+  const list = typeof window === 'undefined' ? null : window.SynthPulseMemoryExtensions;
+  if (!Array.isArray(list)) return [];
+  return list.filter(p => p && typeof p.sections === 'function' && typeof p.render === 'function');
+}
+
+async function _memoryExtCollect(providers, data) {
+  const builtIn = new Set(MEMORY_SECTIONS.map(s => s.key));
+  const taken = new Set();
+  const out = [];
+  for (const provider of providers) {
+    let entries = null;
+    try {
+      entries = await provider.sections(data);
+    } catch (e) {
+      console.warn('[memory] section list failed', e);
+      continue;
+    }
+    if (!Array.isArray(entries)) continue;
+    for (const entry of entries) {
+      if (!entry || typeof entry !== 'object') continue;
+      const {key, labelKey, iconKey, titleKey} = entry;
+      if (typeof key !== 'string' || !_MEMORY_EXT_KEY_RE.test(key) || builtIn.has(key) || taken.has(key)) continue;
+      if (![labelKey, iconKey, titleKey].every(v => typeof v === 'string' && v)) continue;
+      taken.add(key);
+      out.push(Object.freeze({key, labelKey, iconKey, titleKey, readOnly: true, provider}));
+    }
+  }
+  return out;
+}
+
+function _memoryExtSectionMeta(key) {
+  return _memoryExtSections.find(s => s.key === key) || null;
 }
 
 // Drag and drop
