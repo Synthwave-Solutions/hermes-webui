@@ -1,0 +1,263 @@
+# Shared managed-service fixture: the client organisation "acme".
+#
+# Byte-identical in two repositories, with its sha256 pinned in both:
+#   STACK  apps/cockpit/backend/tests/fixtures/org_acme.yaml (C1, C5)
+#   WEBUI  tests/fixtures/managed_service/org_acme.yaml (W3a)
+# Wave 1 packages read this file and never edit it. A change is a request to
+# the orchestrator, who updates both copies and both pins together.
+#
+# Sections
+#   client_yaml  Render input (C5): a complete clients/acme/client.yaml. The
+#                installation, organization, departments and support blocks
+#                are the new managed-service blocks; the rest is the minimum
+#                the current renderer needs.
+#   expected     What every side derives from client_yaml:
+#                  policy_sections       the installation, organization and
+#                                        departments sections of the rendered
+#                                        governance policy (verbatim copies of
+#                                        the client_yaml blocks)
+#                  org_members_artifact  the artifact C5 writes (as JSON, at
+#                                        org_members_artifact_path under the
+#                                        client directory) and C1 imports;
+#                                        members sorted by email, then role;
+#                                        no timestamp (rendering is
+#                                        deterministic; C1 stamps rendered_at
+#                                        at import)
+#                  org_roles             central roles per email: org_members
+#                                        rows and ActingUser.org_roles
+#                  acting_departments    the X-SP-Acting-Member-Of and
+#                                        X-SP-Acting-Admin-Of department keys
+#                                        the WebUI server sends per person
+#                  delegated_scope       installation-side designation per
+#                                        email (W3a delegated_scope)
+#   policy       A small but complete governance policy for WebUI tests: the
+#                expected sections plus roles, groups and users. People who
+#                exist only here: it.admin (platform through access_level
+#                admin) and power.user (elevated blacklist account, the
+#                wildcard-leak regression subject).
+#
+# admins_sha256 = contract.admins_sha256(organization.admins,
+# organization.billing_admins): the sha256 hex of the canonical JSON
+# {"admins":[...],"billing_admins":[...]} (sorted keys, no spaces, ASCII
+# only), each list stripped, lowercased, de-duplicated and sorted.
+#
+# Every address uses the reserved .example domain. No secrets, no real people.
+
+fixture: org_acme
+version: 1
+
+client_yaml:
+  client:
+    name: "Acme BV"
+    display_name: "Acme"
+    hostname_label: "acme-pulse"
+    timezone: "Europe/Amsterdam"
+  deploy:
+    cloud: "compose"
+    compliant: false
+    size: "standard"
+  modules:
+    profiles:
+      - n8n
+  identity:
+    google_workspace_domain: "acme.example"
+    admins:
+      - "ops@synthwave.example"
+    groups:
+      - "All Staff"
+  people:
+    - email: "owner@acme.example"
+      name: "Acme Owner"
+      role: "operator"
+      groups: ["All Staff"]
+    - email: "it.lead@acme.example"
+      name: "Acme IT Lead"
+      role: "operator"
+      groups: ["All Staff"]
+    - email: "finance@acme.example"
+      name: "Acme Finance"
+      role: "viewer"
+      groups: ["All Staff", "dept-finance"]
+    - email: "head.sales@acme.example"
+      name: "Acme Head of Sales"
+      role: "operator"
+      groups: ["All Staff", "dept-sales"]
+    - email: "rep.sales@acme.example"
+      name: "Acme Sales Rep"
+      role: "operator"
+      groups: ["All Staff", "dept-sales"]
+    - email: "head.finance@acme.example"
+      name: "Acme Head of Finance"
+      role: "operator"
+      groups: ["All Staff", "dept-finance"]
+    - email: "clerk.finance@acme.example"
+      name: "Acme Finance Clerk"
+      role: "viewer"
+      groups: ["All Staff", "dept-finance"]
+  governance:
+    mode: "report_only"
+    baseline: "standard"
+  installation: &installation
+    kind: client
+  organization: &organization
+    id: org_acme
+    name: Acme
+    admins:
+      - it.lead@acme.example
+      - owner@acme.example
+    billing_admins:
+      - finance@acme.example
+      - owner@acme.example
+  departments: &departments
+    sales:
+      name: Sales
+      group: dept-sales
+      admins:
+        - head.sales@acme.example
+      assignable_roles: [viewer, operator]
+      assignable_groups: [dept-sales, all-staff]
+    finance:
+      name: Finance
+      group: dept-finance
+      admins:
+        - head.finance@acme.example
+      assignable_roles: [viewer]
+      assignable_groups: [dept-finance]
+  support:
+    org: org_acme
+    operational_telemetry: true
+    diagnostic_payloads: false
+    control_url: "https://control.synthwave.example"
+
+expected:
+  org_id: org_acme
+  policy_sections:
+    installation: *installation
+    organization: *organization
+    departments: *departments
+  org_members_artifact_path: generated/org-members.json
+  org_members_artifact:
+    format: sp-org-members/1
+    org_id: org_acme
+    admins_sha256: "7bf7b0628dea79540caeaf1f153a27fec2c1a0a7f66a970dada171e32664411f"
+    members:
+      - {email: finance@acme.example, role: billing_admin}
+      - {email: it.lead@acme.example, role: org_admin}
+      - {email: owner@acme.example, role: billing_admin}
+      - {email: owner@acme.example, role: org_admin}
+  # Platform admins of the installation hold no central organisation role.
+  org_roles:
+    ops@synthwave.example: []
+    it.admin@acme.example: []
+    owner@acme.example: [billing_admin, org_admin]
+    it.lead@acme.example: [org_admin]
+    finance@acme.example: [billing_admin]
+    head.sales@acme.example: []
+    rep.sales@acme.example: []
+    head.finance@acme.example: []
+    clerk.finance@acme.example: []
+    power.user@acme.example: []
+  acting_departments:
+    it.admin@acme.example: {member_of: [], admin_of: []}
+    owner@acme.example: {member_of: [], admin_of: []}
+    it.lead@acme.example: {member_of: [], admin_of: []}
+    finance@acme.example: {member_of: [finance], admin_of: []}
+    head.sales@acme.example: {member_of: [sales], admin_of: [sales]}
+    rep.sales@acme.example: {member_of: [sales], admin_of: []}
+    head.finance@acme.example: {member_of: [finance], admin_of: [finance]}
+    clerk.finance@acme.example: {member_of: [finance], admin_of: []}
+    power.user@acme.example: {member_of: [], admin_of: []}
+  # With several designations the widest wins: platform, org, billing,
+  # department, none. owner is org admin and billing admin, so org.
+  delegated_scope:
+    ops@synthwave.example: {scope: platform}
+    it.admin@acme.example: {scope: platform}
+    owner@acme.example: {scope: org}
+    it.lead@acme.example: {scope: org}
+    finance@acme.example: {scope: billing}
+    head.sales@acme.example: {scope: department, departments: [sales]}
+    head.finance@acme.example: {scope: department, departments: [finance]}
+    rep.sales@acme.example: {scope: none}
+    clerk.finance@acme.example: {scope: none}
+    power.user@acme.example: {scope: none}
+    stranger@elsewhere.example: {scope: none}
+
+policy:
+  version: 1
+  mode: enforce
+  default_effect: deny
+  bootstrap_admins:
+    - ops@synthwave.example
+  installation: *installation
+  organization: *organization
+  departments: *departments
+  roles:
+    admin:
+      description: "Platform administrator. Never delegable."
+      grants:
+        permissions: ["governance:read", "governance:write"]
+    tech_lead:
+      description: "Builds and ships. Not delegable."
+      grants:
+        permissions: ["chat:use"]
+    operator:
+      description: "Everyday worker."
+      delegable: true
+      grants:
+        permissions: ["chat:use"]
+    viewer:
+      description: "Reads only."
+      delegable: true
+      grants:
+        permissions: []
+  groups:
+    administrators:
+      description: "Platform administrators of Acme. Privileged."
+      roles: [admin]
+      sso_groups: []
+    all-staff:
+      description: "Every Acme account."
+      delegable: true
+      roles: []
+      sso_groups: []
+    dept-sales:
+      description: "Sales department."
+      delegable: true
+      roles: []
+      sso_groups: []
+    dept-finance:
+      description: "Finance department."
+      delegable: true
+      roles: []
+      sso_groups: []
+  users:
+    it.admin@acme.example:
+      access_level: admin
+      roles: []
+      groups: [all-staff]
+    owner@acme.example:
+      roles: [operator]
+      groups: [all-staff]
+    it.lead@acme.example:
+      roles: [operator]
+      groups: [all-staff]
+    finance@acme.example:
+      roles: [viewer]
+      groups: [all-staff, dept-finance]
+    head.sales@acme.example:
+      roles: [operator]
+      groups: [all-staff, dept-sales]
+    rep.sales@acme.example:
+      roles: [operator]
+      groups: [all-staff, dept-sales]
+    head.finance@acme.example:
+      roles: [operator]
+      groups: [all-staff, dept-finance]
+    clerk.finance@acme.example:
+      roles: [viewer]
+      groups: [all-staff, dept-finance]
+    power.user@acme.example:
+      access_level: elevated
+      access_mode: blacklist
+      roles: [operator]
+      groups: [all-staff]
