@@ -694,6 +694,12 @@ function _persistentToastHasWriteIntent(name, text){
   if(/\b(read|list|view|search|lookup|get|fetch|load|usage|toggle|delete|remove)\b/.test(nameWords))return false;
   if(/\b(no|not|nothing)\s+(?:was\s+)?(?:saved|updated|created|written|stored|changed)\b/.test(haystack))return false;
   if(/\b(?:unchanged|skipped|dry[- ]run|failed|error)\b/.test(haystack))return false;
+  // A governance refusal or a staged (unapproved) change saved nothing, even
+  // though the tool arguments say "create". Reported by Michael on 20 Sep
+  // 2026: the toast said the skill was created while skill_manage had been
+  // blocked, so the Skills library never showed it.
+  if(/not_allowed|not allowed|denied|blocked|forbidden|refused|rejected|requires approval|pending_id|"staged"\s*:\s*true/.test(haystack))return false;
+  if(/"success"\s*:\s*false/.test(haystack))return false;
   return /\b(save|saved|write|wrote|written|update|updated|create|created|store|stored|persist|persisted|remember|remembered)\b/.test(haystack);
 }
 
