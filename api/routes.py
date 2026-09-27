@@ -19732,7 +19732,7 @@ def _serve_file_bytes(handler, target: Path, mime: str, disposition: str, cache_
             handler.send_header("Content-Range", f"bytes */{file_size}")
             handler.send_header("Accept-Ranges", "bytes")
             handler.send_header("Content-Length", "0")
-            _security_headers(handler)
+            _security_headers(handler, frame_options="DENY")
             handler.end_headers()
             return True
 
@@ -19757,7 +19757,7 @@ def _serve_file_bytes(handler, target: Path, mime: str, disposition: str, cache_
                 "camera=(), microphone=(self), geolocation=(), clipboard-write=(self)",
             )
         else:
-            _security_headers(handler)
+            _security_headers(handler, frame_options="DENY")
         handler.end_headers()
 
         if content_length:

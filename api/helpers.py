@@ -179,14 +179,19 @@ def _build_csp_report_only_policy(
     )
 
 
-def _security_headers(handler, *, referrer_policy="same-origin"):
-    """Add security headers to every response."""
+def _security_headers(handler, *, referrer_policy="same-origin", frame_options="SAMEORIGIN"):
+    """Add security headers to every response.
+
+    SAMEORIGIN lets the split view frame the app itself. Raw file bytes pass
+    frame_options="DENY": nothing in the app frames them outside the
+    sandboxed preview path, which sends its own headers.
+    """
     extra_connect_src = _csp_extra_connect_src()
     extra_frame_src = _csp_extra_frame_src()
     handler._csp_extra_connect_src = extra_connect_src
     handler._csp_extra_frame_src = extra_frame_src
     handler.send_header('X-Content-Type-Options', 'nosniff')
-    handler.send_header('X-Frame-Options', 'SAMEORIGIN')
+    handler.send_header('X-Frame-Options', frame_options)
     handler.send_header('Referrer-Policy', referrer_policy)
     handler.send_header(_CSP_HEADER_NAME, _build_csp_enforced_policy(extra_connect_src, extra_frame_src))
     handler.send_header(
