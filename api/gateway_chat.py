@@ -896,7 +896,13 @@ def _run_gateway_chat_streaming(
             # Normalize all upstream failure paths before durable or live use.
             for field in ("message", "hint"):
                 data[field] = _redact_text(str(data.get(field) or ""))
-            if s is not None:
+            # _settle_gateway_terminal_error already settled this turn (error
+            # message appended, pending state cleared, saved) and hands over
+            # the saved session. Settling again would see the stream as no
+            # longer current and drop the event, so the user never saw the
+            # error (restoration merge, 27 Sep 2026).
+            already_settled = isinstance(data.get("session"), dict)
+            if s is not None and not already_settled:
                 try:
                     from api.streaming import (
                         _materialize_pending_user_turn_before_error,
