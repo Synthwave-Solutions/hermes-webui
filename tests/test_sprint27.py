@@ -9,6 +9,9 @@ import urllib.request
 
 from tests._pytest_port import BASE
 
+# SynthPulse default (api/config.py _SETTINGS_DEFAULTS, 80f13c9e).
+DEFAULT_BOT_NAME = "SynthPulse"
+
 
 def get(path):
     with urllib.request.urlopen(BASE + path, timeout=10) as r:
@@ -34,11 +37,14 @@ def post(path, body=None):
 # ── Default value ─────────────────────────────────────────────────────────
 
 def test_settings_default_bot_name():
-    """GET /api/settings should return bot_name defaulting to 'Hermes'."""
+    """GET /api/settings should return bot_name defaulting to the product name.
+
+    SynthPulse ships "SynthPulse" as the default (80f13c9e, 12 Jul 2026).
+    """
     d, status = get("/api/settings")
     assert status == 200
     assert "bot_name" in d
-    assert d["bot_name"] == "Hermes"
+    assert d["bot_name"] == DEFAULT_BOT_NAME
 
 
 # ── Round-trip ────────────────────────────────────────────────────────────
@@ -52,7 +58,7 @@ def test_settings_set_bot_name():
         d2, _ = get("/api/settings")
         assert d2.get("bot_name") == "TestBot"
     finally:
-        post("/api/settings", {"bot_name": "Hermes"})
+        post("/api/settings", {"bot_name": DEFAULT_BOT_NAME})
 
 
 def test_settings_bot_name_special_chars():
@@ -63,53 +69,58 @@ def test_settings_bot_name_special_chars():
         d2, _ = get("/api/settings")
         assert d2.get("bot_name") == "My Assistant 2.0"
     finally:
-        post("/api/settings", {"bot_name": "Hermes"})
+        post("/api/settings", {"bot_name": DEFAULT_BOT_NAME})
 
 
 # ── Server-side sanitization ──────────────────────────────────────────────
 
 def test_settings_empty_bot_name_defaults_to_hermes():
-    """Posting an empty bot_name should default to 'Hermes' server-side."""
+    """Posting an empty bot_name should fall back to the default name server-side."""
     try:
         d, status = post("/api/settings", {"bot_name": ""})
         assert status == 200
-        assert d.get("bot_name") == "Hermes"
+        assert d.get("bot_name") == DEFAULT_BOT_NAME
         d2, _ = get("/api/settings")
-        assert d2.get("bot_name") == "Hermes"
+        assert d2.get("bot_name") == DEFAULT_BOT_NAME
     finally:
-        post("/api/settings", {"bot_name": "Hermes"})
+        post("/api/settings", {"bot_name": DEFAULT_BOT_NAME})
 
 
 def test_settings_whitespace_bot_name_defaults_to_hermes():
-    """Posting a whitespace-only bot_name should default to 'Hermes'."""
+    """Posting a whitespace-only bot_name should fall back to the default name."""
     try:
         d, status = post("/api/settings", {"bot_name": "   "})
         assert status == 200
-        assert d.get("bot_name") == "Hermes"
+        assert d.get("bot_name") == DEFAULT_BOT_NAME
     finally:
-        post("/api/settings", {"bot_name": "Hermes"})
+        post("/api/settings", {"bot_name": DEFAULT_BOT_NAME})
 
 
 # ── Login page rendering ──────────────────────────────────────────────────
 
 def test_login_page_shows_default_bot_name():
-    """GET /login should contain 'Hermes' in title and h1 when default."""
+    """GET /login shows the product brand in title and h1.
+
+    SynthPulse brands the login page as the product (80f13c9e); the
+    assistant's display name is used inside the app, not on the login.
+    """
     html, status = get_raw("/login")
     assert status == 200
-    assert "<title>Hermes" in html
-    assert "<h1>Hermes</h1>" in html
+    assert "<title>SynthPulse Control" in html
+    assert "<h1>SynthPulse Control</h1>" in html
 
 
 def test_login_page_shows_custom_bot_name():
-    """GET /login should reflect the configured bot_name."""
+    """A custom bot_name keeps the product-branded login page intact."""
     try:
         post("/api/settings", {"bot_name": "Aria"})
         html, status = get_raw("/login")
         assert status == 200
-        assert "<title>Aria" in html
-        assert "<h1>Aria</h1>" in html
+        assert "<title>SynthPulse Control" in html
+        assert "<h1>SynthPulse Control</h1>" in html
+        assert "{{BOT_NAME" not in html
     finally:
-        post("/api/settings", {"bot_name": "Hermes"})
+        post("/api/settings", {"bot_name": DEFAULT_BOT_NAME})
 
 
 def test_login_page_empty_name_does_not_crash():
@@ -130,7 +141,9 @@ def test_login_page_xss_escaped():
         assert status == 200
         # Raw tag must not appear unescaped
         assert "<script>alert(1)</script>" not in html
-        # Escaped form should appear
-        assert "&lt;script&gt;" in html
+        # The product-branded page renders no bot name at all, so neither an
+        # unescaped nor a half-escaped copy can reach the markup.
+        assert "alert(1)" not in html
+        assert "<h1>SynthPulse Control</h1>" in html
     finally:
-        post("/api/settings", {"bot_name": "Hermes"})
+        post("/api/settings", {"bot_name": DEFAULT_BOT_NAME})
