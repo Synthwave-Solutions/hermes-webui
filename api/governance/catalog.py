@@ -64,6 +64,20 @@ _SELF_ROUTES: frozenset[str] = frozenset({
     "/api/mcp/servers/request",
     "/api/mcp/requests",
     "/api/integrations/request",
+    # Managed-service routes (plan Appendix E.1). Each handler scopes itself:
+    # the viewer's own notification settings for jobs they can see; browser
+    # error reports (size and rate limited, off unless support telemetry is
+    # on) and help usage counts, both counts only and never content; the
+    # read-only organisation views, which enforce delegated_scope() in the
+    # handler (plan 3.6), so a member without a designation gets nothing.
+    "/api/crons/notifications",
+    "/api/client-errors",
+    "/api/help/events",
+    "/api/org/overview",
+    "/api/org/departments",
+    "/api/org/people",
+    "/api/org/approvals",
+    "/api/org/usage",
 })
 
 
@@ -126,6 +140,9 @@ ROUTE_CATALOG: tuple[RouteRule, ...] = (
     # Own bot and own platform ids (Connections, "Your bot"): always the caller.
     RouteRule("/api/me/channels",         "sessions:read", "sessions:read"),
     RouteRule("/api/background",          "sessions:read", "sessions:write"),
+    # AG-UI replay of one run (plan 5.1): the handler admits only the owner of
+    # the stream or a current participant of its conversation.
+    RouteRule("/api/agui/runs",           "sessions:read"),
     RouteRule("/api/bg-task-complete-ack", "sessions:write", "sessions:write", match="exact"),
     RouteRule("/api/process-complete-ack", "sessions:write", "sessions:write", match="exact"),
 
@@ -187,6 +204,17 @@ ROUTE_CATALOG: tuple[RouteRule, ...] = (
     RouteRule("/api/personalities",       "config:read", match="exact"),
     RouteRule("/api/personality",         "config:write", "config:write"),
     RouteRule("/api/prompts",             "config:read", "config:write", match="exact"),
+    # Personal memory self view (plan addendum AE-8): the signed-in person's
+    # own memories only. Exact rules and no /api/mnemo prefix rule, so an
+    # unknown child route stays unclassified and fails closed.
+    RouteRule("/api/mnemo/scopes", "chat:use", match="exact"),
+    RouteRule("/api/mnemo/me/summary", "chat:use", match="exact"),
+    RouteRule("/api/mnemo/me/memories", "chat:use", match="exact"),
+    RouteRule("/api/mnemo/me/memory/update", "chat:use", "chat:use", match="exact"),
+    RouteRule("/api/mnemo/me/memory/forget", "chat:use", "chat:use", match="exact"),
+    RouteRule("/api/mnemo/me/export", "chat:use", match="exact"),
+    RouteRule("/api/mnemo/me/erase", "chat:use", "chat:use", match="exact"),
+    RouteRule("/api/mnemo/me/settings", "chat:use", "chat:use", match="exact"),
     RouteRule("/api/memory/write",        "chat:use", "chat:use", match="exact"),
     RouteRule("/api/memory",              "chat:use", match="exact"),
     RouteRule("/api/admin",               "config:write", "config:write"),
