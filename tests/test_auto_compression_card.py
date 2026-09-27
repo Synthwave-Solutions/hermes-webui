@@ -820,12 +820,13 @@ def test_auto_compression_running_card_completes_on_followup_live_events():
     assert "message:'Context auto-compressed'" in helper
     assert "appendLiveCompressionCard({" in helper
 
+    # SynthPulse names the tool handlers (handleLiveToolEvent and
+    # handleLiveToolCompleteEvent, 53620edd) so sub-agent lifecycle events can
+    # reuse them; live_sse_handler returns the handler for either shape.
+    from tests.helpers import live_sse_handler
+
     for event_name in ("token", "interim_assistant", "reasoning", "tool", "tool_complete"):
-        start = src.find(f"source.addEventListener('{event_name}'")
-        assert start != -1, f"{event_name} listener not found"
-        end = src.find("source.addEventListener(", start + 1)
-        assert end != -1, f"{event_name} listener end not found"
-        block = src[start:end]
+        block = live_sse_handler(src, event_name)
         assert "_completeAutomaticCompressionOnLiveProgress(activeSid)" in block
         assert "settleLiveCompressionCards" not in block
         assert "clearCompressionUi()" not in block

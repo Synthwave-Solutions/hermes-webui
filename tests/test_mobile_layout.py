@@ -102,7 +102,22 @@ def _js_function_body(src, name):
     start = src.find(signature)
     if start == -1:
         raise AssertionError(f"Missing JS function {name}()")
-    brace = src.find("{", start)
+    # Skip the parameter list first: a destructured default such as
+    # ``{preserveSelection = false} = {}`` (loadKanbanTask, 0ded2005) holds
+    # braces that are not the function body.
+    params_depth = 0
+    params_end = -1
+    for idx in range(start + len(signature) - 1, len(src)):
+        if src[idx] == "(":
+            params_depth += 1
+        elif src[idx] == ")":
+            params_depth -= 1
+            if params_depth == 0:
+                params_end = idx
+                break
+    if params_end == -1:
+        raise AssertionError(f"Unterminated parameter list for {name}()")
+    brace = src.find("{", params_end)
     if brace == -1:
         raise AssertionError(f"Missing function body for {name}()")
     depth = 0
@@ -899,7 +914,9 @@ def test_mobile_titlebar_has_new_conversation_button():
     assert "data-i18n-title=\"new_conversation\"" in header_html
     assert "data-i18n-aria-label=\"new_conversation\"" in header_html
     assert "aria-label=\"New conversation\"" in header_html
-    assert "title=\"New conversation\"" in header_html
+    # The titlebar uses the custom tooltip instead of a native title
+    # (a62def5c "give the titlebar real tooltips").
+    assert "data-tooltip=\"New conversation\" id=\"btnTitlebarNewChat\"" in header_html
     assert "$('btnNewChat').click()" in header_html
 
 
