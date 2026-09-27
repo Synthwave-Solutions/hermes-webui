@@ -2408,16 +2408,30 @@ def _run_cron_tracked(
 def _record_cron_run_refusal(job_id, refusal):
     """Record a refused Run now on the job in the active cron store.
 
-    The engine's ``mark_job_refused`` records it as an outcome only (no
-    repeat used up, schedule untouched). An engine without it records a
-    failed run, as every Run now failure is recorded there.
+    A refusal is not a run: only the outcome is recorded, and the schedule,
+    state, enabled flag and repeat count are left alone. The engine's
+    ``mark_job_refused(consume_occurrence=False)`` does exactly that. An engine
+    without it (the live one) gets the same fields through ``update_job``:
+    its ``mark_job_run`` counts a run, so a refused Run now of a one-shot
+    would use up its only run and complete it without running it.
     """
     import cron.jobs as cron_jobs
 
     mark_job_refused = getattr(cron_jobs, "mark_job_refused", None)
     if callable(mark_job_refused):
         return mark_job_refused(job_id, refusal, consume_occurrence=False)
-    return cron_jobs.mark_job_run(job_id, False, refusal)
+    job = cron_jobs.get_job(job_id)
+    if job is None:
+        return False
+    try:
+        streak = int(job.get("failure_streak") or 0)
+    except (TypeError, ValueError):
+        streak = 0
+    return cron_jobs.update_job(job_id, {
+        "last_status": "blocked_config",
+        "last_error": refusal,
+        "failure_streak": streak + 1,
+    }) is not None
 
 _PROVIDER_ALIASES = {
     "claude": "anthropic",

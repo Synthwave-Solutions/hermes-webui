@@ -1782,11 +1782,79 @@ def test_a_refusal_the_engine_recorded_is_not_recorded_twice(tracked):
     assert tracked.calls == []
 
 
-def test_an_engine_without_mark_job_refused_records_a_failed_run(tracked, monkeypatch):
+def _oneshot_task():
+    return {
+        "id": "once",
+        "name": "One-shot task",
+        "prompt": "ping",
+        "schedule": {"kind": "once", "run_at": "2026-10-01T09:00:00+00:00"},
+        "repeat": {"times": 1, "completed": 0},
+        "enabled": True,
+        "state": "scheduled",
+        "next_run_at": "2026-10-01T09:00:00+00:00",
+        "deliver": "local",
+        "owner_email": OWNER,
+        "origin": None,
+    }
+
+
+def test_an_engine_without_mark_job_refused_records_only_the_outcome(env, tracked, monkeypatch):
+    """The live engine has no mark_job_refused, and its mark_job_run counts a
+    run: a refused Run now of a one-shot used up its only run without running
+    it. The fallback records the outcome and leaves the schedule alone, as
+    mark_job_refused(consume_occurrence=False) does."""
     monkeypatch.delattr(tracked.jobs, "mark_job_refused")
+
+    def _engine_mark_job_run(job_id, success, error=None, **kwargs):
+        # The live engine's accounting (cron/jobs.py _mark_job_run_locked).
+        tracked.calls.append(("mark_run", job_id, success, error))
+        job = env.store.jobs[job_id]
+        job["repeat"]["completed"] += 1
+        job["last_status"] = "ok" if success else "error"
+        job["last_error"] = None if success else error
+        if job["repeat"]["completed"] >= job["repeat"]["times"]:
+            job.update(enabled=False, state="completed", next_run_at=None)
+        return True
+
+    monkeypatch.setattr(tracked.jobs, "mark_job_run", _engine_mark_job_run)
+    env.store.jobs["once"] = _oneshot_task()
+    before = copy.deepcopy(env.store.jobs["once"])
     tracked.refuse(recorded=False)
-    tracked.run()
-    assert tracked.calls == [("mark_run", "own", False, RUN_REFUSAL)]
+    tracked.run("once")
+    after = env.store.jobs["once"]
+    for field in ("schedule", "repeat", "enabled", "state", "next_run_at"):
+        assert after[field] == before[field], field
+    assert (after["last_status"], after["last_error"]) == ("blocked_config", RUN_REFUSAL)
+    assert after["failure_streak"] == 1
+    assert tracked.calls == []  # no run counted, no output, no delivery
+
+
+def test_real_engine_fallback_keeps_a_refused_one_shot_scheduled(tmp_path, monkeypatch):
+    """The same against the engine's own cron.jobs, with mark_job_refused
+    taken away when the engine has it (the live engine does not)."""
+    from datetime import datetime, timedelta, timezone
+
+    import api.routes as routes
+
+    jobs = pytest.importorskip("cron.jobs")
+    if not routes._callable_accepts_kwarg(jobs.create_job, "owner_email"):
+        pytest.skip("engine create_job predates owner_email")
+    monkeypatch.setattr(jobs, "CRON_DIR", tmp_path / "cron")
+    monkeypatch.setattr(jobs, "JOBS_FILE", tmp_path / "cron" / "jobs.json")
+    monkeypatch.setattr(jobs, "OUTPUT_DIR", tmp_path / "cron" / "output")
+    monkeypatch.setattr(jobs, "_compute_provider_model_snapshots", lambda **k: (None, None), raising=False)
+    monkeypatch.delattr(jobs, "mark_job_refused", raising=False)
+    run_at = (datetime.now(timezone.utc) + timedelta(hours=2)).isoformat()
+    job = jobs.create_job(prompt="ping", schedule=run_at, name="One-shot task", owner_email=OWNER)
+    before = jobs.get_job(job["id"])
+    assert before["enabled"] is True and before["next_run_at"]
+
+    routes._record_cron_run_refusal(job["id"], RUN_REFUSAL)
+
+    after = jobs.get_job(job["id"])
+    for field in ("schedule", "repeat", "enabled", "state", "next_run_at", "last_run_at"):
+        assert after.get(field) == before.get(field), field
+    assert (after["last_status"], after["last_error"]) == ("blocked_config", RUN_REFUSAL)
 
 
 # End to end: the handler, the worker thread, the child (run inline) and the
