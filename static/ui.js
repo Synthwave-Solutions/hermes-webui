@@ -8139,6 +8139,7 @@ function renderMd(raw){
     const firstMermaidLine=codeLines.map(line=>line.trim()).find(line=>line&&!line.startsWith('%%'))||'';
     const looksLikeLineNumberedToolOutput=/^\s*\d+\|/.test(firstCodeLine);
     const looksLikeMermaidStart=firstMermaidLine==='---'||/^(graph|flowchart|sequenceDiagram|classDiagram|classDiagram-v2|stateDiagram|stateDiagram-v2|erDiagram|journey|gantt|pie|gitGraph|mindmap|timeline|quadrantChart|requirementDiagram|C4Context|C4Container|C4Component|C4Dynamic|c4Context|c4Container|c4Component|c4Dynamic|sankey-beta|block-beta|packet-beta|xychart-beta|kanban|architecture-beta)\b/.test(firstMermaidLine);
+    if(_svgVisualFenceAccepts(lang,code)) return lead+_svgVisualPlaceholder(code);
     if(lang==='mermaid'&&!looksLikeLineNumberedToolOutput&&looksLikeMermaidStart){
       const id='mermaid-'+Math.random().toString(36).slice(2,10);
       _preBlock_stash.push(`<div class="mermaid-block" data-mermaid-id="${id}">${esc(code.trim())}</div>`);
@@ -8179,6 +8180,7 @@ function renderMd(raw){
     }
     return lead+'\x00P'+(_preBlock_stash.length-1)+'\x00';
   });
+  s=_svgVisualRawRuns(s);
   s=s.replace(/`([^`\n]+)`/g,(_,c)=>{fence_stash.push('<code>'+esc(c)+'</code>');return '\x00F'+(fence_stash.length-1)+'\x00';});
   // Math stash: protect $$..$$ and $..$ from markdown processing
   // Runs AFTER fence_stash so backtick code spans protect their dollar-sign contents
@@ -8605,7 +8607,9 @@ function renderMd(raw){
   // fix targeted the wrong layer (Prism token white-space) — by the time it
   // ran, the \n had already been replaced. The CSS rule is kept as defense
   // in depth.
-  s=s.replace(/(<div class="pre-header">[\s\S]*?<\/div>)?<pre[^>]*>[\s\S]*?<\/pre>|<div class="(mermaid-block|katex-block)"[\s\S]*?<\/div>/g,m=>{
+  // The svg-visual-block alternation (plan addendum AE-3) only ever matches
+  // placeholders built above: _tag strips that class from raw HTML.
+  s=s.replace(/(<div class="pre-header">[\s\S]*?<\/div>)?<pre[^>]*>[\s\S]*?<\/pre>|<div class="(mermaid-block|katex-block)"[\s\S]*?<\/div>|<div class="svg-visual-block"[\s\S]*?<\/div>/g,m=>{
     _pre_stash.push(m);
     return '\x00E'+(_pre_stash.length-1)+'\x00';
   });
@@ -8621,6 +8625,49 @@ function renderMd(raw){
   // string verbatim — no further passes can mangle it.
   s=s.replace(/\x00Q(\d+)\x00/g,(_,i)=>_bq_stash[+i]);
   return s;
+
+  // ── Inline SVG visuals seams (plan addendum AE-1, AE-2) ──────────────────
+  // Declared below the return (function declarations are hoisted), so the
+  // passes above only gain one call each. static/svg_visuals.js may define the hooks
+  // svgVisualFenceAccepts(lang,code) and svgVisualRawSpans(s); they answer
+  // yes or no, or name offsets, and never supply HTML: the renderer builds
+  // every placeholder itself, with the content escaped. Without the hooks
+  // (or when they throw) the output is exactly what it was.
+  function _svgVisualFenceAccepts(lang,code){
+    if(typeof svgVisualFenceAccepts!=='function') return false;
+    try{return svgVisualFenceAccepts(lang,code)===true;}catch(_){return false;}
+  }
+  function _svgVisualPlaceholder(code){
+    const id='svg-'+Math.random().toString(36).slice(2,10);
+    _preBlock_stash.push(`<div class="svg-visual-block" data-svg-id="${id}">${esc(code.trim())}</div>`);
+    return '\x00P'+(_preBlock_stash.length-1)+'\x00';
+  }
+  // Raw <svg> runs outside fences: only integer [start,end] pairs with
+  // 0<=start<end<=s.length that do not overlap and cover a whole
+  // <svg>...</svg> run without a stash token are taken, applied from the
+  // last pair backwards so earlier offsets stay valid.
+  function _svgVisualRawRuns(s){
+    if(typeof svgVisualRawSpans!=='function') return s;
+    let spans=null;
+    try{spans=svgVisualRawSpans(s);}catch(_){return s;}
+    if(!Array.isArray(spans)) return s;
+    const runs=spans
+      .filter(p=>Array.isArray(p)&&p.length===2&&Number.isInteger(p[0])&&Number.isInteger(p[1])&&0<=p[0]&&p[0]<p[1]&&p[1]<=s.length)
+      .map(p=>[p[0],p[1]])
+      .sort((a,b)=>a[0]-b[0]);
+    const kept=[];
+    for(const run of runs){
+      if(kept.length&&run[0]<kept[kept.length-1][1]) continue;
+      const raw=s.slice(run[0],run[1]);
+      if(!/^<svg\b/i.test(raw)||!/<\/svg>$/i.test(raw)||raw.indexOf('\x00')!==-1) continue;
+      kept.push(run);
+    }
+    for(let k=kept.length-1;k>=0;k--){
+      const [a,b]=kept[k];
+      s=s.slice(0,a)+'\n\n'+_svgVisualPlaceholder(s.slice(a,b))+'\n\n'+s.slice(b);
+    }
+    return s;
+  }
 }
 
 function _stripAttachedFilesMarkerForDisplay(text){
@@ -19811,6 +19858,9 @@ function postProcessRenderedMessages(container) {
   renderMermaidBlocks(container);
   renderKatexBlocks(container);
   initTreeViews(container);
+  // Inline SVG visuals (plan addendum AE-4): hooks from static/svg_visuals.js.
+  if(typeof renderSvgVisualBlocks==='function'){try{renderSvgVisualBlocks(container);}catch(e){console.warn('[svg] render failed',e);}}
+  if(typeof enhanceSvgMediaCards==='function'){try{enhanceSvgMediaCards(container);}catch(e){console.warn('[svg] render failed',e);}}
 }
 
 let _prismLoadPromise=null;
