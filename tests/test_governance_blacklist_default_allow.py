@@ -56,7 +56,10 @@ def test_levels_and_explicit_denials_remain_independent(level):
 
 def test_default_allow_preserves_constraints_and_explicit_secret_forwarding():
     a = access(policy())
-    assert a.grants.file_denied_globs == frozenset({"*/bank/*", "*/private/*"})
+    # 14-09-2026 (0759e2a2): a blacklist account carries only its own file
+    # blacklist; the role's "*/bank/*" is a whitelist-colleague rule. See
+    # test_governance_per_user_modes.test_a_blacklist_account_carries_only_its_own_file_blacklist.
+    assert a.grants.file_denied_globs == frozenset({"*/private/*"})
     assert a.grants.file_allow_globs == frozenset({"*/private/example.md"})
     assert a.grants.cli_approval_commands == frozenset({"deploy-prod"})
     assert a.grants.usage_caps == {"tool_calls": 12}

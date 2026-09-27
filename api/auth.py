@@ -116,26 +116,27 @@ def _warn_trusted_auth_once(key: str, message: str, *args) -> None:
 
 
 def _session_expiry(record) -> float | None:
-    """Return the expiry timestamp for a session store entry, or None.
+    """Return the expiry timestamp for a session store entry.
 
     Entries are a plain float expiry (legacy anonymous sessions, kept as-is),
     an identity dict carrying ``exp`` (SynthPulse identity-aware sessions:
     ``{"exp": float, "email": str, "groups": [str], "claims_subset": dict,
     "method": str}``) or an upstream record dict carrying ``expiry``
     (trusted-header and profile-bound sessions: ``auth_type``, ``username``,
-    ``bound_profile``). Unknown or malformed shapes resolve to None, which
-    every caller treats as expired.
+    ``bound_profile``). Unknown or malformed shapes resolve to 0.0, which is
+    always in the past, so every caller treats them as expired and prunes
+    them (tests/test_governance_sessions.py). Callers also accept None.
     """
     if isinstance(record, dict):
         expiry = record.get('exp', record.get('expiry', record.get('expires_at')))
     else:
         expiry = record
     if isinstance(expiry, bool):
-        return None
+        return 0.0
     try:
         expiry_f = float(expiry)
     except (TypeError, ValueError):
-        return None
+        return 0.0
     return expiry_f
 
 
@@ -565,6 +566,41 @@ def is_auth_enabled() -> bool:
         or is_oidc_auth_enabled()
         or is_trusted_auth_enabled()
     )
+
+
+# One POST request reads "is auth enabled?" once, when it starts. Governance
+# identity lookups and the first-password gate run at different moments of the
+# same request; if auth flipped in between, the gate could judge the request by
+# a different state than the rest of it saw. Thread-local and keyed by the
+# handler, and restored when the request returns, because keep-alive
+# connections reuse the handler object for the next request.
+_REQUEST_AUTH_STATE = threading.local()
+
+
+def request_auth_snapshot(function):
+    """Decorator for a request dispatcher: capture the auth state at its start."""
+    from functools import wraps
+
+    @wraps(function)
+    def wrapped(handler, *args, **kwargs):
+        previous = getattr(_REQUEST_AUTH_STATE, "value", None)
+        try:
+            _REQUEST_AUTH_STATE.value = (handler, bool(is_auth_enabled()))
+        except Exception:
+            _REQUEST_AUTH_STATE.value = None
+        try:
+            return function(handler, *args, **kwargs)
+        finally:
+            _REQUEST_AUTH_STATE.value = previous
+    return wrapped
+
+
+def request_auth_enabled(handler) -> bool:
+    """The auth state captured when this handler's request started, else live."""
+    snapshot = getattr(_REQUEST_AUTH_STATE, "value", None)
+    if snapshot is not None and snapshot[0] is handler:
+        return snapshot[1]
+    return is_auth_enabled()
 
 
 def verify_password(plain: str) -> bool:

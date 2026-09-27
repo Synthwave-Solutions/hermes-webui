@@ -1235,6 +1235,13 @@ _REAL_AGENT_ENV = {k: os.environ.get(k) for k in _AGENT_PATH_ENV_KEYS}
 _REAL_SYS_PATH = list(sys.path)
 
 
+def _app_resolved_agent_dir():
+    """The hermes-agent checkout api.config discovered, if it is loaded."""
+    cfg = sys.modules.get("api.config")
+    agent_dir = getattr(cfg, "_AGENT_DIR", None) if cfg is not None else None
+    return str(agent_dir) if agent_dir else None
+
+
 def _hermes_cli_is_healthy() -> bool:
     mod = sys.modules.get("hermes_cli")
     if mod is None or mod is not _REAL_HERMES_CLI:
@@ -1283,9 +1290,18 @@ def _restore_hermes_cli_module():
                 os.environ.pop(_k, None)
             else:
                 os.environ[_k] = _v
-    # Restore the real sys.path if a test stripped the agent dir from it.
+    # Restore the real sys.path if a test stripped the agent dir from it. Keep
+    # the agent checkout that api.config resolved and appended when it was
+    # first imported: that happens after this snapshot, so a plain restore
+    # stripped the real agent dir after the first test and every later
+    # first-time import of an agent module (e.g. acp_adapter from the engine's
+    # write_file guard) failed in the full suite but passed alone.
     if sys.path != _REAL_SYS_PATH:
-        sys.path[:] = _REAL_SYS_PATH
+        restored = list(_REAL_SYS_PATH)
+        app_agent_dir = _app_resolved_agent_dir()
+        if app_agent_dir and app_agent_dir not in restored:
+            restored.append(app_agent_dir)
+        sys.path[:] = restored
 
 
 # ── Per-test session cleanup ──────────────────────────────────────────────────

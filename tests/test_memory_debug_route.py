@@ -55,20 +55,33 @@ def test_memory_debug_route_reports_session_route_cache_and_rss(monkeypatch):
 
 
 def test_session_list_cache_uses_an_immutable_snapshot_without_deepcopy():
+    """The cache stores one immutable snapshot and hands every caller a fresh
+    JSON-shaped copy (_materialize_session_list_snapshot): the runtime overlay
+    mutates rows and the JSON encoder cannot serialize MappingProxyType, so the
+    immutable form must never escape. Neither the writer nor a reader can
+    change what the next reader gets."""
+    from types import MappingProxyType
+
     from api import route_session_list_cache as slc
 
     slc._session_list_cache_clear()
     key = slc._session_list_cache_key("default", False, False, False, False)
     payload = {"sessions": [{"session_id": "one", "title": "Original"}]}
     slc._session_list_cache_set(key, payload)
-    cached, _fresh = slc._session_list_cache_get(key, allow_stale=True)
-
-    payload["sessions"][0]["title"] = "Mutated"
-    assert cached["sessions"][0]["title"] == "Original"
+    stored = slc._SESSIONS_CACHE[key][2]
+    assert isinstance(stored, MappingProxyType)
+    assert isinstance(stored["sessions"][0], MappingProxyType)
     try:
-        cached["sessions"][0]["title"] = "Forbidden"
+        stored["sessions"][0]["title"] = "Forbidden"
     except TypeError:
         pass
     else:
         raise AssertionError("cached snapshots must be immutable")
+
+    cached, _fresh = slc._session_list_cache_get(key, allow_stale=True)
+    payload["sessions"][0]["title"] = "Mutated"
+    assert cached["sessions"][0]["title"] == "Original"
+    cached["sessions"][0]["title"] = "Changed by a reader"
+    again, _fresh = slc._session_list_cache_get(key, allow_stale=True)
+    assert again["sessions"][0]["title"] == "Original"
     slc._session_list_cache_clear()

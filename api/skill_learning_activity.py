@@ -241,7 +241,10 @@ def _open_regular(path, flags):
 def _locked(path):
     fd = _open_regular(path, os.O_RDWR | os.O_CREAT)
     try:
-        deadline = time.monotonic() + 1
+        # Each append fsyncs inside the lock, so a burst of same-actor writes
+        # on a busy host needs more than one second; still bounded well below
+        # the 3 s a stuck holder may cost (test_contended_lock_fails_with_bounded_wait).
+        deadline = time.monotonic() + 2
         while True:
             try:
                 fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)

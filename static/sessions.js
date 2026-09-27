@@ -1546,7 +1546,7 @@ async function newSession(flash, options={}){
     return _newSessionInFlight;
   }
   const requestedProject=Object.prototype.hasOwnProperty.call(options,'project_id')
-    ? options.project_id : (_activeProject!==NO_PROJECT_FILTER ? _activeProject : null);
+    ? options.project_id : (_activeProject&&_activeProject!==NO_PROJECT_FILTER ? _activeProject : null);
   const sharedProject=typeof _allProjects!=='undefined' && _allProjects.find(p=>p.project_id===requestedProject && p.collaboration);
   if(sharedProject && typeof _projStartSharedConversation==='function'){
     _setNewSessionPending(true);

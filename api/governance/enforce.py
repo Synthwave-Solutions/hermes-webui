@@ -271,7 +271,7 @@ def _request_identity(handler) -> dict | None:
     from api import auth  # late import to avoid cycles
 
     try:
-        if not auth.is_auth_enabled():
+        if not auth.request_auth_enabled(handler):
             return _auth_disabled_identity()
         get_identity = getattr(auth, "get_session_identity", None)
         if not callable(get_identity):

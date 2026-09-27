@@ -102,34 +102,53 @@ def test_project_context_absent_returns_empty_fields(tmp_path):
 
 
 def test_project_context_content_is_redacted_in_memory_response(tmp_path, monkeypatch):
-    home = tmp_path / "home"
+    # SynthPulse (fde0754f and 073713d1, 6 Sep 2026, docs/personal-context.md):
+    # the Memory API serves the caller's private project notes as
+    # project_context, and a workspace AGENTS.md only as the read-only
+    # shared_project_context of an authorized shared project. Both must come
+    # back redacted.
+    from api import personal_context
+    from api import project_collaboration
+
+    monkeypatch.setattr("api.config.STATE_DIR", tmp_path / "state")
+    identity = {"email": "alice@example.test"}
     workspace = tmp_path / "redacted"
-    (home / "memories").mkdir(parents=True)
     workspace.mkdir()
     secret = "ghp_TestFakeCredential1234567890ab"
     (workspace / "AGENTS.md").write_text(
         f"# Agent Rules\n\nGitHub PAT: {secret}\nNormal note: keep me.",
         encoding="utf-8",
     )
+    session = SimpleNamespace(project_shared=True, profile="bot", project_id="project",
+                              workspace=str(workspace), owner_email=identity["email"],
+                              participants=[])
+    personal_context.write(identity, "project_context",
+                           f"Private PAT: {secret}\nPrivate note: keep me too.", session)
 
-    monkeypatch.setattr(api.profiles, "get_active_hermes_home", lambda: home)
-    monkeypatch.setattr(routes, "_memory_project_context_workspace", lambda _parsed: workspace)
-    monkeypatch.setattr(routes, "_external_notes_sources_enabled", lambda: False)
+    monkeypatch.setattr("api.governance.enforce._request_identity", lambda _handler: identity)
+    monkeypatch.setattr(personal_context, "session_for", lambda _identity, _sid: session)
+    monkeypatch.setattr(project_collaboration, "runtime_file_scope",
+                        lambda *_args, **_kwargs: (str(workspace), lambda _path: True))
     monkeypatch.setattr(routes, "j", lambda _handler, payload, **_kwargs: payload)
 
-    payload = routes._handle_memory_read(object(), SimpleNamespace(query=""))
+    payload = routes._handle_memory_read(object(), SimpleNamespace(query="session_id=sid"))
     dumped = json.dumps(payload)
 
     assert secret not in dumped
-    assert "Normal note: keep me." in payload["project_context"]
+    assert "Normal note: keep me." in payload["shared_project_context"]
+    assert "Private note: keep me too." in payload["project_context"]
 
 
 def test_memory_panel_defines_read_only_project_context_section():
     panels = (REPO_ROOT / "static" / "panels.js").read_text(encoding="utf-8")
 
     assert "key: 'project_context'" in panels
-    assert "readOnly: true" in panels
-    assert "project_context_shadowed" in panels
+    # SynthPulse (fde0754f): project_context is the editable private "My
+    # project notes"; the workspace instructions are the separate read-only
+    # shared_project_context section.
+    shared = panels[panels.index("{ key: 'shared_project_context'"):]
+    shared = shared[:shared.index("},")]
+    assert "readOnly: true" in shared
     assert "/api/memory?session_id=" in panels
 
 
@@ -141,8 +160,11 @@ def test_memory_panel_references_all_memory_path_fields():
     assert "_memoryData.user_path" in panels
     assert "_memoryData.soul_path" in panels
     assert "_memoryData.project_context_path" in panels
-    assert "const sectionPath = _memorySectionPath(s.key)" in panels
-    assert "if (sectionPath) el.title = sectionPath" in panels
+    # SynthPulse (fde0754f): private files live in a server-generated
+    # per-person directory, so the section list shows who can read a section
+    # instead of an on-disk path.
+    assert "'Only you'" in panels
+    assert "'Shared with project members · Read only'" in panels
 
 
 def _memory_render_blocks():
@@ -210,7 +232,9 @@ _renderMemoryDetail('soul');
 const soulHtml = nodes.memoryDetailBody.innerHTML;
 _renderMemoryDetail('project_context');
 const projectHtml = nodes.memoryDetailBody.innerHTML;
-console.log(JSON.stringify({memoryHtml, userHtml, soulHtml, projectHtml, memoryMode: _memoryMode}));
+_renderMemoryDetail('shared_project_context');
+const sharedHtml = nodes.memoryDetailBody.innerHTML;
+console.log(JSON.stringify({memoryHtml, userHtml, soulHtml, projectHtml, sharedHtml, memoryMode: _memoryMode}));
 """
     )
     completed = subprocess.run(
@@ -257,6 +281,8 @@ let _memoryData = {
   project_context_path: 'D:/Repos/hermes-webui/AGENTS.md',
   external_notes_enabled: true,
 };
+_memoryData.shared_project_context = 'Shared project rules';
+const data = _memoryData;
 let _currentMemorySection = 'memory';
 const nodes = {
   memoryPanel: {
@@ -309,39 +335,46 @@ console.log(JSON.stringify(buttons));
 
 
 def test_memory_detail_renders_path_for_non_project_sections():
-    """Base-fails/head-passes regression for issue #4999.
+    """Issue #4999 showed the on-disk path above each memory section.
 
-    On base, `_renderMemoryDetail('memory')` ignores `memory_path`, so the
-    rendered header omits the path row entirely. On head, the same render must
-    show `MEMORY.md · <path>` using the existing pinned header row pattern.
+    SynthPulse (fde0754f, 6 Sep 2026) keeps that header row but fills it with
+    who can read the section: private sections live in a server-generated
+    per-person directory whose path means nothing to the reader, and shared
+    project instructions are marked read-only.
     """
     if NODE is None:
         pytest.skip("node not on PATH")
 
     rendered = _run_memory_render_harness()
 
-    assert "MEMORY.md" in rendered["memoryHtml"]
-    assert "C:/Users/Rod/.hermes/memories/MEMORY.md" in rendered["memoryHtml"]
-    assert "USER.md" in rendered["userHtml"]
-    assert "C:/Users/Rod/.hermes/memories/USER.md" in rendered["userHtml"]
-    assert "SOUL.md" in rendered["soulHtml"]
-    assert "C:/Users/Rod/.hermes/SOUL.md" in rendered["soulHtml"]
-    assert "AGENTS.md · D:/Repos/hermes-webui/AGENTS.md" in rendered["projectHtml"]
-    assert "CLAUDE.md present, shadowed by AGENTS.md" in rendered["projectHtml"]
+    for key in ("memoryHtml", "userHtml", "soulHtml", "projectHtml"):
+        assert '<div class="memory-detail-mtime">Only you</div>' in rendered[key]
+    assert "Shared with project members · Read only" in rendered["sharedHtml"]
+    assert "C:/Users/Rod/.hermes/memories/MEMORY.md" not in rendered["memoryHtml"]
+    assert "C:/Users/Rod/.hermes/memories/USER.md" not in rendered["userHtml"]
+    assert "C:/Users/Rod/.hermes/SOUL.md" not in rendered["soulHtml"]
+    assert "D:/Repos/hermes-webui/AGENTS.md" not in rendered["projectHtml"]
+    assert "rendered:Primary memory body" in rendered["memoryHtml"]
+    assert "rendered:Project context body" in rendered["projectHtml"]
 
 
 def test_memory_section_list_renders_hover_path_titles():
-    """Base-fails/head-passes regression for issue #5045."""
+    """Issue #5045 gave every memory section button a hover title.
+
+    SynthPulse (fde0754f) titles them with who can read the section instead
+    of the on-disk path (see test_memory_detail_renders_path_for_non_project_sections).
+    """
     if NODE is None:
         pytest.skip("node not on PATH")
 
     rendered = {item["label"]: item["title"] for item in _run_memory_button_harness()}
 
-    assert rendered["memory"] == "C:/Users/Rod/.hermes/memories/MEMORY.md"
-    assert rendered["user"] == "C:/Users/Rod/.hermes/memories/USER.md"
-    assert rendered["soul"] == "C:/Users/Rod/.hermes/SOUL.md"
-    assert rendered["project_context"] == "D:/Repos/hermes-webui/AGENTS.md"
-    assert rendered["external_notes"] == ""
+    assert rendered["memory"] == "Only you"
+    assert rendered["user"] == "Only you"
+    assert rendered["soul"] == "Only you"
+    assert rendered["project_context"] == "Only you"
+    assert rendered["shared_project_context"] == "Shared with project members · Read only"
+    assert rendered["external_notes"] == "Connected notes sources"
 
 
 def test_blank_session_workspace_does_not_resolve_to_server_cwd(monkeypatch):

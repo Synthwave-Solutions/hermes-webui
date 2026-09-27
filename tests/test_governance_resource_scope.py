@@ -28,7 +28,7 @@ def harness(monkeypatch, tmp_path):
     monkeypatch.setattr(routes, "j", respond)
     monkeypatch.setattr("api.helpers.j", respond)
     monkeypatch.setattr(routes, "bad", lambda h, message, status=400: respond(h, {"error": message}, status))
-    def policy(deny=None, grants=None, managed=False, mode="enforce"):
+    def policy(deny=None, grants=None, managed=False, mode="enforce", access_mode="blacklist"):
         base = {"permissions": ["*"], "profiles": ["*"], "routes": ["*"],
                 "skills": {"view": ["*"], "load": ["*"], "manage": ["*"]},
                 "settings": {"read": ["*"], "write": ["*"]},
@@ -38,7 +38,7 @@ def harness(monkeypatch, tmp_path):
         if grants is not None:
             raw["roles"]["member"]["grants"] = grants
         if managed:
-            raw["users"][identity["email"]].update(access_mode="blacklist", access_level="elevated")
+            raw["users"][identity["email"]].update(access_mode=access_mode, access_level="elevated")
         parsed = loader.parse_governance_policy(raw)
         monkeypatch.setattr(loader, "get_policy", lambda: parsed)
     def request(path, body=None):
@@ -161,8 +161,12 @@ def test_legacy_omitted_dimensions_remain_compatible_but_managed_empty_is_denied
     grants = {"permissions": ["config:read"], "routes": ["*"]}
     harness.policy(grants=grants)
     assert resource_scope.setting_allowed(resource_scope.access_for(harness.handler), "theme", True)
-    harness.policy(grants=grants, managed=True)
+    # A managed whitelist account with an omitted dimension stays closed; a
+    # managed blacklist account is default-allow (c3ede8f8, 11-09-2026).
+    harness.policy(grants=grants, managed=True, access_mode="whitelist")
     assert not resource_scope.setting_allowed(resource_scope.access_for(harness.handler), "theme", True)
+    harness.policy(grants=grants, managed=True)
+    assert resource_scope.setting_allowed(resource_scope.access_for(harness.handler), "theme", True)
 
 
 def test_report_only_keeps_resource_payloads_visible(harness, monkeypatch):
