@@ -218,7 +218,10 @@ def test_cron_profile_selector_source_hooks_present():
     i18n = monolithic_i18n_source()
 
     assert "async function loadCronProfiles()" in panels
-    assert "api('/api/profiles')" in panels
+    # SynthPulse loads profile lists through the fast listing without cold
+    # skill counts (210c661b); the selector still fetches the profiles API.
+    loader = panels.split("async function loadCronProfiles()", 1)[1].split("\nfunction ", 1)[0]
+    assert "api('/api/profiles?fast=1')" in loader
     assert "id=\"cronFormProfile\"" in panels
     assert "profile: profile" in panels
     assert "job.profile" in panels

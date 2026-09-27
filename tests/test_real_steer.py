@@ -846,7 +846,9 @@ class TestFrontendWiring:
         subprocess.run([node, "-e", script], check=True, capture_output=True, text=True)
 
     def test_send_busy_steer_accepts_file_only_input(self):
-        idx = self.msgs.find("if(S.busy||compressionRunning)")
+        # The busy branch carries the queue-drain gate (c322f769):
+        # `if((S.busy||compressionRunning)&&!queueDrainOwnsSend){`.
+        idx = self.msgs.find("if((S.busy||compressionRunning)&&!queueDrainOwnsSend)")
         assert idx >= 0
         block = self.msgs[idx:idx + 500]
         assert "if(text||S.pendingFiles.length)" in block, (

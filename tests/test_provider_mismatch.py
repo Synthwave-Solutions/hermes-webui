@@ -1596,9 +1596,15 @@ class TestFrontendModelProviderState:
         assert "_fallbackProvider" in provider_assignment
         assert "window._activeProvider" in body
         assert "S.session&&S.session.model_provider" in body
-        pos_explicit = body.index("newModelState.model_provider")
-        pos_active = body.index("window._activeProvider")
-        pos_prev = body.index("S.session&&S.session.model_provider")
+        # SynthPulse's configured default carries its provider as one route
+        # (59f968cb), which puts an earlier window._activeProvider in the
+        # model-state selection above the chain; the chain order itself is
+        # checked inside the fallback block.
+        assert "newModelState={model:window._defaultModel,model_provider:window._activeProvider||null};" in body
+        chain = body[body.index("if(newModelState&&newModelState.model){"):]
+        pos_explicit = chain.index("newModelState.model_provider")
+        pos_active = chain.index("window._activeProvider")
+        pos_prev = chain.index("S.session&&S.session.model_provider")
         assert pos_explicit < pos_active < pos_prev, (
             "Fallback chain order broken: explicit > _activeProvider > "
             "prev-session must hold so /api/session/new hits the fast "
