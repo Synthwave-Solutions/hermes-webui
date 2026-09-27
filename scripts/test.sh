@@ -75,14 +75,23 @@ missing_dev_deps() {
   "$1" - <<'PY'
 import importlib.util
 
+# One import name per requirement in requirements-dev.txt (including the
+# runtime requirements it pulls in), so a venv created before a requirement
+# was added still gets it installed.
 modules = [
+    "PIL",
     "cryptography",
+    "docx",
     "mcp",
+    "openpyxl",
+    "pptx",
     "pytest",
     "pytest_asyncio",
     "pytest_shard",
     "pytest_timeout",
+    "requests",
     "ruff",
+    "websockets",
     "yaml",
 ]
 missing = [name for name in modules if importlib.util.find_spec(name) is None]

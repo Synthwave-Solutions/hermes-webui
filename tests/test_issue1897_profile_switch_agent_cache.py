@@ -118,6 +118,11 @@ def test_same_session_profile_switch_rebuilds_agent_under_new_soul_home(tmp_path
             self._cached_system_prompt = (home / "SOUL.md").read_text(encoding="utf-8")
             constructed_agents.append(self)
 
+        def clear_interrupt(self):
+            # The real engine resets its interrupt state between turns; the
+            # WebUI only reuses a cached agent that honours this contract.
+            return True
+
         def run_conversation(self, **kwargs):
             prompts_used_for_runs.append(self._cached_system_prompt)
             homes_seen_during_runs.append(os.environ.get("HERMES_HOME"))

@@ -54,7 +54,7 @@ def test_profiles_match_default_alias_treated_as_root(monkeypatch):
     import api.profiles as p
     from api.routes import _profiles_match
 
-    monkeypatch.setattr(p, 'list_profiles_api', lambda: [
+    monkeypatch.setattr(p, 'list_profiles_api', lambda **_kw: [
         {'name': 'kinni', 'is_default': True, 'path': str(p._DEFAULT_HERMES_HOME)},
     ])
     p._invalidate_root_profile_cache()

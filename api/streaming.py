@@ -12281,6 +12281,7 @@ def _run_agent_streaming(
                 update_active_run(stream_id, phase="finalizing")
                 _last_resort_sync_from_core(s, stream_id, _agent_lock)
             _clear_thread_env()  # TD1: always clear thread-local context
+            # Each scope below was entered once, so it is left exactly once.
             if _streaming_cron_profile_home_token is not None:
                 _STREAMING_CRON_PROFILE_HOME.reset(_streaming_cron_profile_home_token)
                 _streaming_cron_profile_home_token = None
@@ -12344,6 +12345,11 @@ def _run_agent_streaming(
             # wakeup until another human turn.
 
         finally:
+            # Upstream drains deferred process wakeups here at turn teardown.
+            # This fork drains them in _drain_after_worker_retirement instead,
+            # when the last owner of the session retires: a wakeup turn started
+            # while this worker (or a leased cancellation callback) still owns
+            # the session would be refused.
             from api.worker_ownership import release as release_worker
             try:
                 try:

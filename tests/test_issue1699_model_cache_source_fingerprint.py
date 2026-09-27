@@ -146,6 +146,17 @@ def test_disk_models_cache_still_loads_when_auth_and_config_sources_are_unchange
     assert result == {**fresh_opencode, "aliases": {}}
 
 
+def _full_catalog(group):
+    """Featured models plus the catalog tail.
+
+    A catalog above the picker threshold keeps its first entries in
+    ``models`` and moves the rest to ``extra_models`` (#1567). The SynthPulse
+    OpenCode Go catalog is long enough that an appended model lands in the
+    tail, so a rebuilt catalog is recognised by looking at both.
+    """
+    return list(group.get("models") or []) + list(group.get("extra_models") or [])
+
+
 def test_memory_models_cache_invalidates_when_static_catalog_changes(tmp_path, monkeypatch):
     _configure_isolated_sources(tmp_path, monkeypatch, "opencode-go")
     stale_opencode = _valid_models_cache("opencode-go", "glm-5.1")
@@ -161,7 +172,7 @@ def test_memory_models_cache_invalidates_when_static_catalog_changes(tmp_path, m
     result = config.get_available_models()
 
     opencode_group = next(g for g in result["groups"] if g.get("provider_id") == "opencode-go")
-    assert any(m.get("id") == "new-catalog-model" for m in opencode_group["models"])
+    assert any(m.get("id") == "new-catalog-model" for m in _full_catalog(opencode_group))
 
 
 def test_disk_models_cache_invalidates_when_static_catalog_changes(tmp_path, monkeypatch):
@@ -179,4 +190,4 @@ def test_disk_models_cache_invalidates_when_static_catalog_changes(tmp_path, mon
 
     assert result != stale_opencode
     opencode_group = next(g for g in result["groups"] if g.get("provider_id") == "opencode-go")
-    assert any(m.get("id") == "new-disk-catalog-model" for m in opencode_group["models"])
+    assert any(m.get("id") == "new-disk-catalog-model" for m in _full_catalog(opencode_group))
