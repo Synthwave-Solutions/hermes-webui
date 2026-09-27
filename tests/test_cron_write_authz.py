@@ -1,4 +1,4 @@
-"""Cron create and update authorisation (program plan 3.1, package W0).
+"""Cron write authorisation (program plan 3.1, package W0).
 
 Before this fix ``POST /api/crons/update`` and ``/api/crons/create`` ran
 before the per-job scope guard and handed every body key to ``update_job``:
@@ -136,6 +136,7 @@ class _Store:
         self.jobs = _stored_jobs()
         self.creates = []
         self.updates = []
+        self.actions = []  # (action, job_id) for pause, resume, delete and run
         self.owner_kwarg = owner_kwarg
 
     def module(self):
@@ -187,7 +188,31 @@ class _Store:
 
         mod.get_job = get_job
         mod.update_job = update_job
+        def pause_job(job_id, reason=None):
+            if job_id not in store.jobs:
+                return None
+            store.actions.append(("pause", job_id))
+            store.jobs[job_id]["enabled"] = False
+            return copy.deepcopy(store.jobs[job_id])
+
+        def resume_job(job_id):
+            if job_id not in store.jobs:
+                return None
+            store.actions.append(("resume", job_id))
+            store.jobs[job_id]["enabled"] = True
+            return copy.deepcopy(store.jobs[job_id])
+
+        def remove_job(job_id):
+            if job_id not in store.jobs:
+                return False
+            store.actions.append(("delete", job_id))
+            del store.jobs[job_id]
+            return True
+
         mod.create_job = create_job
+        mod.pause_job = pause_job
+        mod.resume_job = resume_job
+        mod.remove_job = remove_job
         return mod
 
 
@@ -276,8 +301,22 @@ def env(monkeypatch, inject_policy):
     def create(email, body):
         return _post(email, "/api/crons/create", body)
 
+    # "Run now" starts a worker thread; the stand-in records the run instead.
+    def _run_handler(handler, body):
+        job_id = body.get("job_id", "")
+        if job_id not in state.store.jobs:
+            return routes.bad(handler, "Job not found", 404)
+        state.store.actions.append(("run", job_id))
+        return routes.j(handler, {"ok": True, "job_id": job_id, "status": "running"})
+
+    monkeypatch.setattr(routes, "_handle_cron_run", _run_handler)
+
+    def act(email, action, job_id):
+        return _post(email, f"/api/crons/{action}", {"job_id": job_id})
+
     state.update = update
     state.create = create
+    state.act = act
     state.install = _install
     return state
 
@@ -566,6 +605,115 @@ def test_governance_off_keeps_single_user_installs_unchanged(env, inject_policy)
     assert handler.status == 200, handler.body
     handler = env.update(None, {"job_id": "own", "owner_email": ""})
     assert handler.status == 400
+
+
+# ── Pause, resume, delete and run follow the same ownership rule ────────────
+# Before this fix those four routes only ran the scope guard, which admits a
+# job shared with the caller and every job in a profile they are granted: a
+# sharee could pause or delete the owner's task, and so could anyone holding
+# the profile grant. A run executes as the owner (owner_email) and delivers to
+# the owner's targets, so it is not the sharee's to trigger either.
+
+JOB_ACTIONS = ("pause", "resume", "delete", "run")
+
+
+@pytest.mark.parametrize("action", JOB_ACTIONS)
+def test_sharee_cannot_pause_resume_delete_or_run(env, action):
+    handler = env.act(SHAREE, action, "own")
+    assert handler.status == 403, handler.body
+    assert handler.body["reason"] == "cron_owner"
+    assert env.store.actions == []
+    assert "own" in env.store.jobs
+
+
+@pytest.mark.parametrize("action", JOB_ACTIONS)
+def test_profile_grant_non_owner_cannot_pause_resume_delete_or_run(env, action):
+    env.active = "alpha"  # OTHER is granted alpha, so the job is visible
+    handler = env.act(OTHER, action, "own")
+    assert handler.status == 403, handler.body
+    assert handler.body["reason"] == "cron_owner"
+    assert env.store.actions == []
+
+
+@pytest.mark.parametrize("action", JOB_ACTIONS)
+def test_out_of_scope_caller_still_gets_the_scope_refusal(env, action):
+    handler = env.act(OTHER, action, "own")  # root store, neither own nor shared
+    assert handler.status == 403
+    assert handler.body["reason"] == "cron_scope"
+    assert env.store.actions == []
+
+
+@pytest.mark.parametrize("action", JOB_ACTIONS)
+def test_owner_and_cron_admins_can_pause_resume_delete_and_run(env, action):
+    for email in (OWNER, ADMIN, BOOTSTRAP):
+        env.install(_Store())
+        handler = env.act(email, action, "own")
+        assert handler.status == 200, (email, handler.body)
+        assert env.store.actions == [(action, "own")], email
+
+
+def test_legacy_creator_and_stamped_owner_can_act(env):
+    env.active = "alpha"
+    assert env.act(OWNER, "pause", "legacy").status == 200
+    assert env.act(OTHER, "pause", "reowned").status == 200
+    # A stale origin stamp does not make OWNER the owner of OTHER's job.
+    assert env.act(OWNER, "delete", "reowned").status == 403
+    assert env.store.actions == [("pause", "legacy"), ("pause", "reowned")]
+
+
+def test_missing_job_still_answers_404(env):
+    for action in JOB_ACTIONS:
+        assert env.act(OWNER, action, "ghost").status == 404, action
+
+
+def test_report_only_lets_a_sharee_act_and_audits_it(env, inject_policy):
+    inject_policy({**POLICY, "mode": "report_only"})
+    handler = env.act(SHAREE, "pause", "own")
+    assert handler.status == 200, handler.body
+    assert env.store.actions == [("pause", "own")]
+    events = read_audit_events(10)
+    assert [e["event"] for e in events] == ["would_deny"]
+    assert events[0]["reason"] == "cron_owner"
+    assert events[0]["path"] == "/api/crons/pause"
+    assert events[0]["extra"]["job_id"] == "own"
+
+
+def test_governance_off_keeps_actions_unchanged(env, inject_policy):
+    inject_policy({"version": 1, "mode": "off", "default_effect": "deny"})
+    for action in JOB_ACTIONS:
+        env.install(_Store())
+        assert env.act(None, action, "own").status == 200, action
+        assert env.store.actions == [(action, "own")]
+
+
+def test_action_owner_check_does_not_deadlock_on_the_profile_lock(env, monkeypatch):
+    import threading
+
+    import api.profiles as profiles
+
+    monkeypatch.setattr(profiles, "_cron_env_lock", threading.Lock())
+    monkeypatch.setattr(profiles, "cron_profile_context", _REAL_CRON_PROFILE_CONTEXT)
+    results = {}
+
+    def _run(email, key):
+        results[key] = env.act(email, "pause", "own").status
+
+    for email, key in ((SHAREE, "sharee"), (OWNER, "owner")):
+        worker = threading.Thread(target=_run, args=(email, key), daemon=True)
+        worker.start()
+        worker.join(10)
+        assert not worker.is_alive(), f"{key}: cron action owner check deadlocked"
+    assert results == {"sharee": 403, "owner": 200}
+
+
+def test_owner_check_fails_closed_when_the_store_cannot_be_read(env, monkeypatch):
+    def _broken(job_id):
+        raise OSError("jobs.json unreadable")
+
+    monkeypatch.setattr(sys.modules["cron.jobs"], "get_job", _broken)
+    handler = env.act(SHAREE, "delete", "own")
+    assert handler.status == 403
+    assert env.store.actions == []
 
 
 # ── Value checks ────────────────────────────────────────────────────────────

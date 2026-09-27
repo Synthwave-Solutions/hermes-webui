@@ -16526,6 +16526,16 @@ def handle_post(handler, parsed) -> bool:
         if not caller_sees_cron_profile(handler, _get_active_profile_name() or "default",
                                         job_id=str((body or {}).get("job_id") or "")):
             return j(handler, {"error": "forbidden", "reason": "cron_scope"}, status=403)
+        # Seeing a job is not owning it: a sharee or a profile-grant holder
+        # may not pause, resume, delete or run someone else's task (W0).
+        from api.cron_scope import caller_may_act_on_cron_job
+        if not caller_may_act_on_cron_job(handler, str((body or {}).get("job_id") or ""),
+                                          path=parsed.path):
+            verb = "run" if parsed.path == "/api/crons/run" else "change"
+            return j(handler, {
+                "error": f"Only the owner of this task or a cron admin can {verb} it.",
+                "reason": "cron_owner",
+            }, status=403)
 
     if parsed.path == "/api/crons/delete":
         from api.profiles import cron_profile_context
@@ -24671,7 +24681,8 @@ def _normalize_cron_shared_with(value):
 # ── Cron write authorisation (POST /api/crons/create and /api/crons/update) ──
 # Both routes used to hand every body key to the engine, so any cron:write user
 # could edit someone else's task, point its delivery at any recipient or blank
-# the owner_email the engine runs it as. Every write passes _cron_write_allowed.
+# the owner_email the engine runs it as. Every write passes _cron_write_allowed;
+# pause, resume, delete and run pass cron_scope.caller_may_act_on_cron_job.
 
 # What static/panels.js sends: the emoji picker, the category popover and the
 # share dialog one field each, saveCronForm the whole form. Anything else,

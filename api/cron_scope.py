@@ -300,6 +300,45 @@ def caller_sees_cron_profile(handler, profile, job_id: str | None = None, job=No
         return False
 
 
+def caller_may_act_on_cron_job(handler, job_id: str, *, path: str) -> bool:
+    """Route hook for pause, resume, delete and run, after caller_sees_cron_profile.
+
+    Seeing a job (shared with the caller, or in a profile they are granted) is
+    not a licence to act on it: only its owner (identity_owns_cron_job) or a
+    ``cron:admin`` holder may pause, resume or delete it or run it now. A run
+    executes as the owner (``owner_email``) and delivers to the owner's
+    targets, so a sharee may not trigger one either. A job missing from the
+    active store passes (the handler answers 404). Under ``report_only`` a
+    refusal is audited as ``would_deny`` (reason ``cron_owner``) and allowed;
+    an unreadable store or an unexpected governance error refuses.
+
+    Runs outside cron_profile_context (the route enters it afterwards), so the
+    row lookup may take that non-reentrant lock itself.
+    """
+    try:
+        from api.governance.enforce import identity_has_permission
+
+        identity = _identity_for(handler)
+        if identity_has_permission(identity, CRON_ADMIN_PERMISSION):
+            return True
+        if not job_id:
+            return True
+        from api.profiles import cron_profile_context
+
+        with cron_profile_context():
+            try:
+                from cron.jobs import get_job
+            except ImportError:
+                return True  # no cron package: the handler cannot act either
+            job = get_job(str(job_id))
+        if job is None or identity_owns_cron_job(identity, job):
+            return True
+        return audit_write_would_deny(identity, path=path, reason="cron_owner", job_id=job_id)
+    except Exception:
+        logger.warning("cron owner check failed", exc_info=True)
+        return False
+
+
 def _row_profile(row) -> str:
     return str((row.get("owner_profile") if isinstance(row, dict) else None) or ROOT_PROFILE)
 
