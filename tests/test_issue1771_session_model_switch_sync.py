@@ -155,6 +155,8 @@ const window = { _botName: 'Hermes', _defaultModel: null, _activeProvider: null 
 function fetch(url, opts) { calls.fetches.push({url: String(url), body: opts && opts.body || ''}); return Promise.resolve({ok: true}); }
 
 for (const name of [
+  // SynthPulse normalizes the bot name in its own helper (50dd64f5).
+  'defaultAssistantDisplayName',
   'assistantDisplayName',
   '_topbarLoadedMessageCount', '_topbarMessageMetaText',
   '_getOptionProviderId', '_providerFromModelValue', '_modelStateForSelect',

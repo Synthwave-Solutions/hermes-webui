@@ -40,19 +40,27 @@ def test_warm_switch_restores_before_lightweight_async_validation():
 
 
 def test_cold_switch_uses_one_metadata_plus_messages_request():
+    # A cache miss keeps the current behavior (7c48f264, PERF_REPORT_SCENE.md):
+    # one metadata request, then the messages request through
+    # _ensureMessagesLoaded. The collapsed single-request "phase 2" this test
+    # first described was never built; it contradicts the two-request sequence
+    # pinned by test_cross_session_message_load_isolation.
     load = _block("async function loadSession(sid)", "// ── Handoff hint logic")
-    assert "messages=0&resolve_model=0" not in load
-    assert "messages=1&resolve_model=0&msg_limit=${_INITIAL_MSG_LIMIT}" in load
-    assert "_applyLoadedSessionMessages(data.session, sid);" in load
+    assert load.count("messages=0&resolve_model=0") == 1
+    assert "_ensureMessagesLoaded(sid," in load
+    assert load.index("const cachedScene") < load.index("messages=0&resolve_model=0")
 
 
 def test_draft_switch_waits_only_when_payload_changed():
     save_now = _block("function _saveComposerDraftNow", "// Restore composer draft")
     assert "_composerDraftPayloadSignature" in save_now
     assert "return Promise.resolve(false);" in save_now
+    # The switch awaits the draft save; an unchanged draft costs nothing because
+    # _saveComposerDraftNow returns Promise.resolve(false) without a POST
+    # (7c48f264). The await shape is also pinned by
+    # test_issue2543_named_context_session_switch.
     load = _block("async function loadSession(sid)", "const _keepStaleUntilLoaded")
-    assert "const draftSave = _saveComposerDraftNow" in load
-    assert "if (draftSave) await draftSave;" in load
+    assert "await _saveComposerDraftNow(currentSid" in load
 
 
 def test_sessions_changed_invalidates_target_scene():

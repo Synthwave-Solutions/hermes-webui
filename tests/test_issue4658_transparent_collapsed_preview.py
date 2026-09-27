@@ -29,6 +29,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from tests.helpers import js_block_end
 
 REPO_ROOT = Path(__file__).parent.parent.resolve()
 UI_JS_PATH = REPO_ROOT / "static" / "ui.js"
@@ -46,6 +47,15 @@ _FN_NAMES = [
     '_transparentToolStatus', '_transparentToolSummary',
     '_isMemorySave', '_isSkillUpdate', '_tcAction',
     'buildToolCard', '_decorateTransparentEventRow',
+    # Helpers the tool-card path calls. The old brace scanner used to pull these
+    # in by accident (it ran ~550 lines past _redactToolTargetLabel because of
+    # the quotes inside its regexes); list them explicitly now that extraction
+    # is exact.
+    '_toolFullCommandLabel', '_toolActionLabel', 'toolIcon',
+    '_toolWorklogSummaryLine', '_toolWorklogJoin', '_toolWorklogActionParts', '_toolWorklogSummary',
+    '_toolWorklogListEl', '_toolWorklogToolsEl', '_liveToolStepEl', '_directWorklogToolRows',
+    '_unwrapNestedToolGroups', '_toolGroupPrimaryKind', '_toolGroupIcon', '_syncToolRowsContainer',
+    '_syncToolWorklogToolGroup',
 ]
 
 
@@ -55,55 +65,10 @@ def _function_source(src: str, name: str) -> str:
         return ""
     brace = src.find("{", match.end())
     assert brace != -1, f"{name}() has no body"
-    depth = 1
-    i = brace + 1
-    in_string = None
-    escaped = False
-    in_line_comment = False
-    in_block_comment = False
-    while i < len(src) and depth:
-        ch = src[i]
-        nxt = src[i + 1] if i + 1 < len(src) else ""
-        if in_line_comment:
-            if ch == "\n":
-                in_line_comment = False
-            i += 1
-            continue
-        if in_block_comment:
-            if ch == "*" and nxt == "/":
-                in_block_comment = False
-                i += 2
-                continue
-            i += 1
-            continue
-        if in_string:
-            if escaped:
-                escaped = False
-            elif ch == "\\":
-                escaped = True
-            elif ch == in_string:
-                in_string = None
-            i += 1
-            continue
-        if ch == "/" and nxt == "/":
-            in_line_comment = True
-            i += 2
-            continue
-        if ch == "/" and nxt == "*":
-            in_block_comment = True
-            i += 2
-            continue
-        if ch in "'\"`":
-            in_string = ch
-            i += 1
-            continue
-        if ch == "{":
-            depth += 1
-        elif ch == "}":
-            depth -= 1
-        i += 1
-    assert depth == 0, f"{name}() body did not close"
-    return src[match.start():i]
+    # js_block_end skips strings, template literals and regex literals; a
+    # quote inside a regex (the secret-redaction patterns in
+    # _redactToolTargetLabel) used to throw a plain scanner off.
+    return src[match.start():js_block_end(src, brace)]
 
 
 _DRIVER_TEMPLATE = r"""

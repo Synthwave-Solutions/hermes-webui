@@ -92,6 +92,11 @@ const S = {{
 const currentSid = {json.dumps(current_sid)};
 const forceReload = {json.dumps(force_reload)};
 const opts = {json.dumps(opts or {})};
+// loadSession() captures the composer input generation on entry (7b2620b3)
+// and hands it to _restoreComposerDraft through the draft block below.
+const draftInputGeneration = Number.isFinite(opts.draftInputGeneration)
+  ? opts.draftInputGeneration
+  : (typeof _composerDraftInputGeneration === 'number' ? _composerDraftInputGeneration : null);
 function _composerDraftHasPayload(text, files) {{
   return !!(String(text || '') || (Array.isArray(files) && files.filter(Boolean).length));
 }}

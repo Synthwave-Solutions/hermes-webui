@@ -78,11 +78,14 @@ import importlib.util
 modules = [
     "cryptography",
     "mcp",
+    "PIL",
     "pytest",
     "pytest_asyncio",
     "pytest_shard",
     "pytest_timeout",
+    "requests",
     "ruff",
+    "websockets",
     "yaml",
 ]
 missing = [name for name in modules if importlib.util.find_spec(name) is None]

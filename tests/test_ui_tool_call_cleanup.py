@@ -8,6 +8,7 @@ import json
 import pathlib
 import re
 import subprocess
+from tests.helpers import live_sse_handler
 
 REPO = pathlib.Path(__file__).parent.parent
 UI_JS = (REPO / "static" / "ui.js").read_text(encoding="utf-8")
@@ -662,7 +663,7 @@ class TestToolCallGroupingStatic:
         assert "data-live-activity-current" in timer_fn, (
             "Elapsed timers should clear once an Activity group is no longer current."
         )
-        tool_start_segment = MESSAGES_JS.split("source.addEventListener('tool',e=>{", 1)[1].split("source.addEventListener('tool_complete'", 1)[0]
+        tool_start_segment = live_sse_handler(MESSAGES_JS, 'tool')
         assert "_resetAssistantSegment();" in tool_start_segment, (
             "Tool starts should reset the next assistant text segment without closing the current Activity burst."
         )

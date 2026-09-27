@@ -58,6 +58,7 @@ const LI_PATHS = {
   'paperclip':       '<path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.82-2.82l8.48-8.48"/>',
   'copy':            '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
   'rotate-ccw':      '<path d="M3 2v6h6"/><path d="M3 8a9 9 0 1 0 2.64-4.36L3 8"/>',
+  'rotate-cw':       '<path d="M21 2v6h-6"/><path d="M21 8a9 9 0 1 1-2.64-4.36L21 8"/>',
   'user':            '<path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/>',
   // File-type icons
   'image':           '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>',

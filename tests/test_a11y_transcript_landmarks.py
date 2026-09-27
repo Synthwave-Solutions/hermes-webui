@@ -27,7 +27,8 @@ def test_conversation_transcript_is_not_a_named_region():
 
 def test_latest_assistant_landmark_helper_is_named_but_not_focusable():
     helper = _function_body(UI_JS, "_setLatestAssistantTurnLandmark")
-    assert "Latest Hermes response" in helper
+    # SynthPulse branding names the landmark after the product (844071da).
+    assert "Latest SynthPulse response" in helper
     assert "setAttribute('role','region')" in helper
     assert "setAttribute('aria-label',label)" in helper
     assert "data-latest-assistant-response" in helper

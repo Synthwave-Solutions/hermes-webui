@@ -416,6 +416,18 @@ def test_render_messages_keeps_anchor_owned_turn_out_of_legacy_activity_rebuilds
     legacy_metadata_source = _function_source(
         _ui_js(), "_legacySettledFallbackHasToolMetadata"
     )
+    # Helpers SynthPulse's renderMessages calls: the render scroll snapshot
+    # (242bcc97), group-chat author lines, tool error states and the
+    # background task card. Evaluate the real ones when present.
+    snapshot_source = "\n".join(
+        _function_source(_ui_js(), name)
+        for name in (
+            "_messageScrollSnapshotForRender", "_groupAuthorLineHtml",
+            "_toolResultIsError", "_toolResultErrorsByTid",
+            "_processWakeupTestSummary", "_processWakeupOutcome",
+        )
+        if f"function {name}(" in _ui_js()
+    )
     script = textwrap.dedent(
         f"""
         class FakeClassList {{
@@ -693,6 +705,7 @@ def test_render_messages_keeps_anchor_owned_turn_out_of_legacy_activity_rebuilds
 
         eval({json.dumps(transparent_source)});
         eval({json.dumps(legacy_metadata_source)});
+        eval({json.dumps(snapshot_source)});
         eval({json.dumps(render_source)});
 
         const toolResult = {{ role: 'tool', tool_call_id: 'toolu_1', content: 'tool result' }};
