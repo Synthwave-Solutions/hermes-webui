@@ -80,12 +80,12 @@ import importlib.util
 # was added still gets it installed.
 modules = [
     "PIL",
+    "croniter",
     "cryptography",
     "docx",
     "mcp",
     "openpyxl",
     "pptx",
-    "PIL",
     "pytest",
     "pytest_asyncio",
     "pytest_shard",
