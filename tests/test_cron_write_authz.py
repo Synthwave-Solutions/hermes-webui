@@ -19,6 +19,7 @@ The rules pinned here:
   load, ``script``, ``no_agent`` and ``managed_by`` are cron admin only,
   ``shared_with`` only names people in the policy.
 * On create the owner and the origin are stamped from the signed-in identity.
+* The four job routes read ``job_id`` once, as a non-empty string.
 * ``report_only`` never enforces (it audits ``would_deny``), and installs with
   governance off behave as before.
 
@@ -45,6 +46,7 @@ from api.governance import loader  # noqa: E402
 from api.governance.audit import read_audit_events  # noqa: E402
 from api.governance.loader import parse_governance_policy  # noqa: E402
 from api.profiles import cron_profile_context as _REAL_CRON_PROFILE_CONTEXT  # noqa: E402
+from api.routes import _handle_cron_run as _REAL_HANDLE_CRON_RUN  # noqa: E402
 
 REPO = Path(__file__).resolve().parent.parent
 PANELS_JS = (REPO / "static" / "panels.js").read_text(encoding="utf-8")
@@ -344,6 +346,44 @@ def env(monkeypatch, inject_policy):
     state.act = act
     state.install = _install
     return state
+
+
+@pytest.fixture
+def run_env(env, monkeypatch, tmp_path):
+    """``env`` with the real Run now handler. The worker thread it starts is
+    recorded (job and homes) instead of running the job."""
+    import threading
+
+    import api.profiles as profiles
+    import api.routes as routes
+
+    monkeypatch.setattr(routes, "_handle_cron_run", _REAL_HANDLE_CRON_RUN)
+    store_home = tmp_path / "store"
+    store_home.mkdir()
+    monkeypatch.setattr(profiles, "get_active_hermes_home", lambda: store_home)
+    monkeypatch.setattr(routes, "_available_cron_profile_names", lambda: {"default", "alpha", "beta"})
+    env.store_home = store_home
+    env.runs = []
+    started = threading.Event()
+
+    def _tracked(job, profile_home=None, execution_profile_home=None, event_profile=None):
+        env.runs.append(SimpleNamespace(job=job, profile_home=profile_home,
+                                        execution_profile_home=execution_profile_home))
+        routes._mark_cron_done(job["id"])
+        started.set()
+
+    monkeypatch.setattr(routes, "_run_cron_tracked", _tracked)
+    act = env.act
+
+    def _act(email, action, job_id):
+        started.clear()
+        handler = act(email, action, job_id)
+        if action == "run" and handler.status == 200:
+            assert started.wait(5), "the Run now worker did not start"
+        return handler
+
+    env.act = _act
+    return env
 
 
 # The payloads static/panels.js sends today (emoji picker L1397, category
@@ -877,6 +917,62 @@ def test_real_engine_store_refuses_a_job_name_from_a_non_owner(tmp_path, monkeyp
     handler = _post(OWNER, "/api/crons/delete", {"job_id": job_id})
     assert handler.status == 200, handler.body
     assert jobs.get_job(job_id) is None
+
+
+# ── One reading of job_id for the guards and the handlers ──────────────────
+# The guards in handle_post read ``str(body.get("job_id") or "")``, so 0 and
+# False reached them as "no job" and passed, while the delete handler looked
+# up str(0) == "0" and removed that task. Only a non-empty string names a job
+# now, read once for both.
+
+# What str() made of each value: a task with that id would have been reached.
+_NON_STRING_IDS = [0, False, True, 1, 1.5, ["own"], {"id": "own"}, None, ""]
+
+
+def _plant_tasks_named_like(env, values):
+    for value in values:
+        key = str(value)
+        env.store.jobs[key] = dict(_stored_jobs()["own"], id=key, name=f"task {key}")
+
+
+@pytest.mark.parametrize("raw", _NON_STRING_IDS)
+@pytest.mark.parametrize("action", JOB_ACTIONS)
+def test_a_job_id_that_is_not_a_non_empty_string_is_refused(run_env, action, raw):
+    env = run_env
+    _plant_tasks_named_like(env, _NON_STRING_IDS)
+    before = copy.deepcopy(env.store.jobs)
+    for email in (OTHER, SHAREE, OWNER, ADMIN):
+        handler = env.act(email, action, raw)
+        assert handler.status == 400, (email, handler.body)
+    assert env.store.actions == [] and env.runs == []
+    assert env.store.jobs == before
+
+
+@pytest.mark.parametrize("raw", _NON_STRING_IDS)
+def test_update_job_id_must_be_a_non_empty_string(env, raw):
+    _plant_tasks_named_like(env, _NON_STRING_IDS)
+    for email in (OTHER, OWNER, ADMIN):
+        handler = env.update(email, {"job_id": raw, "emoji": "x"})
+        assert handler.status == 400, (email, handler.body)
+    assert env.store.updates == []
+
+
+@pytest.mark.parametrize("action", JOB_ACTIONS)
+def test_guards_and_handler_look_up_the_same_id(run_env, monkeypatch, action):
+    env = run_env
+    looked_up = []
+    store_get_job = sys.modules["cron.jobs"].get_job
+
+    def _get_job(job_id):
+        looked_up.append(job_id)
+        return store_get_job(job_id)
+
+    monkeypatch.setattr(sys.modules["cron.jobs"], "get_job", _get_job)
+    assert env.act(OWNER, action, "own").status == 200
+    assert looked_up and set(looked_up) == {"own"}, looked_up
+    assert all(type(job_id) is str for job_id in looked_up)
+    acted = env.store.actions or [("run", run.job["id"]) for run in env.runs]
+    assert acted == [(action, "own")]
 
 
 # ── Value checks ────────────────────────────────────────────────────────────

@@ -16522,18 +16522,22 @@ def handle_post(handler, parsed) -> bool:
     # api/cron_scope.py, which allows + audits would_deny under report_only).
     if parsed.path in ("/api/crons/delete", "/api/crons/run",
                        "/api/crons/pause", "/api/crons/resume"):
+        # The guards and the handlers read the id through one helper, so both
+        # look up the same exact job (W0).
+        _cron_job_id = _cron_body_job_id(body)
+        if _cron_job_id is None:
+            return bad(handler, "job_id required")
         # Both guards read the store: pin the agent's cron package first, so a
         # shadowing top-level ``cron`` package cannot answer for it.
         _ensure_agent_cron_import_path()
         from api.cron_scope import caller_sees_cron_profile
         if not caller_sees_cron_profile(handler, _get_active_profile_name() or "default",
-                                        job_id=str((body or {}).get("job_id") or "")):
+                                        job_id=_cron_job_id):
             return j(handler, {"error": "forbidden", "reason": "cron_scope"}, status=403)
         # Seeing a job is not owning it: a sharee or a profile-grant holder
         # may not pause, resume, delete or run someone else's task (W0).
         from api.cron_scope import caller_may_act_on_cron_job
-        if not caller_may_act_on_cron_job(handler, str((body or {}).get("job_id") or ""),
-                                          path=parsed.path):
+        if not caller_may_act_on_cron_job(handler, _cron_job_id, path=parsed.path):
             verb = "run" if parsed.path == "/api/crons/run" else "change"
             return j(handler, {
                 "error": f"Only the owner of this task or a cron admin can {verb} it.",
@@ -24853,7 +24857,7 @@ def _cron_write_allowed(handler, body, job_id=None):
         # The handler already holds cron_profile_context, so pass the loaded
         # row instead of letting the guard enter that lock again.
         if not cron_scope.caller_sees_cron_profile(
-                handler, _get_active_profile_name() or "default", job_id=str(job_id), job=job):
+                handler, _get_active_profile_name() or "default", job_id=job_id, job=job):
             return 403, {"error": "forbidden", "reason": "cron_scope"}
         if not cron_scope.identity_owns_cron_job(identity, job):
             refusal = _refuse("cron_owner", "Only the owner of this task or a cron admin can change it.")
@@ -25018,11 +25022,10 @@ def _handle_cron_delivery_options(handler):
 
 
 def _handle_cron_update(handler, body):
-    try:
-        require(body, "job_id")
-    except ValueError as e:
-        return bad(handler, str(e))
-    refusal = _cron_write_allowed(handler, body, job_id=body["job_id"])
+    job_id = _cron_body_job_id(body)
+    if job_id is None:
+        return bad(handler, "job_id required")
+    refusal = _cron_write_allowed(handler, body, job_id=job_id)
     if refusal is not None:
         status, payload = refusal
         return j(handler, payload, status=status)
@@ -25053,12 +25056,26 @@ def _handle_cron_update(handler, body):
     except ValueError as e:
         return bad(handler, str(e))
     try:
-        job = update_job(body["job_id"], updates)
+        job = update_job(job_id, updates)
     except ValueError as e:
         return bad(handler, str(e), 400)
     if not job:
         return bad(handler, "Job not found", 404)
     return j(handler, {"ok": True, "job": _cron_job_for_api(job)})
+
+
+def _cron_body_job_id(body):
+    """The ``job_id`` a cron job route acts on, or None when it names no job.
+
+    Only a non-empty string names a job. The pause, resume, delete and run
+    guards in handle_post and the handlers (update too) all read the id
+    through here, so every lookup of one request uses the same exact id: the
+    guards used to read ``str(body.get("job_id") or "")``, which turned 0 and
+    False into "no job" and let them through, while the delete handler then
+    looked up and removed the task whose id is str(0).
+    """
+    job_id = body.get("job_id") if isinstance(body, dict) else None
+    return job_id if isinstance(job_id, str) and job_id else None
 
 
 def _cron_job_by_id(job_id):
@@ -25076,11 +25093,10 @@ def _cron_job_by_id(job_id):
 
 
 def _handle_cron_delete(handler, body):
-    try:
-        require(body, "job_id")
-    except ValueError as e:
-        return bad(handler, str(e))
-    job = _cron_job_by_id(body["job_id"])
+    job_id = _cron_body_job_id(body)
+    if job_id is None:
+        return bad(handler, "job_id required")
+    job = _cron_job_by_id(job_id)
     if not job:
         return bad(handler, "Job not found", 404)
     from cron.jobs import remove_job
@@ -25092,8 +25108,8 @@ def _handle_cron_delete(handler, body):
 
 
 def _handle_cron_run(handler, body):
-    job_id = body.get("job_id", "")
-    if not job_id:
+    job_id = _cron_body_job_id(body)
+    if job_id is None:
         return bad(handler, "job_id required")
     from cron.jobs import get_job
 
@@ -25128,8 +25144,8 @@ def _handle_cron_run(handler, body):
 
 
 def _handle_cron_pause(handler, body):
-    job_id = body.get("job_id", "")
-    if not job_id:
+    job_id = _cron_body_job_id(body)
+    if job_id is None:
         return bad(handler, "job_id required")
     job = _cron_job_by_id(job_id)
     if not job:
@@ -25143,8 +25159,8 @@ def _handle_cron_pause(handler, body):
 
 
 def _handle_cron_resume(handler, body):
-    job_id = body.get("job_id", "")
-    if not job_id:
+    job_id = _cron_body_job_id(body)
+    if job_id is None:
         return bad(handler, "job_id required")
     job = _cron_job_by_id(job_id)
     if not job:

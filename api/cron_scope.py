@@ -307,8 +307,10 @@ def caller_may_act_on_cron_job(handler, job_id: str, *, path: str) -> bool:
     not a licence to act on it: only its owner (identity_owns_cron_job) or a
     ``cron:admin`` holder may pause, resume or delete it or run it now. A run
     executes as the owner (``owner_email``) and delivers to the owner's
-    targets, so a sharee may not trigger one either. A job missing from the
-    active store passes: the handlers look their job up by this same exact id
+    targets, so a sharee may not trigger one either. ``job_id`` is the id the
+    handlers act on (routes._cron_body_job_id: a non-empty string, anything
+    else is refused here too). A job missing from the active store passes:
+    the handlers look their job up by this same exact id
     (routes._cron_job_by_id, get_job) and answer 404, and never hand a job
     NAME to the engine, whose pause, resume and remove calls would resolve it
     to a row this check never saw. Under ``report_only`` a refusal is audited
@@ -323,10 +325,10 @@ def caller_may_act_on_cron_job(handler, job_id: str, *, path: str) -> bool:
     try:
         from api.governance.enforce import identity_has_permission
 
+        if not isinstance(job_id, str) or not job_id:
+            return False
         identity = _identity_for(handler)
         if identity_has_permission(identity, CRON_ADMIN_PERMISSION):
-            return True
-        if not job_id:
             return True
         from api.profiles import cron_profile_context
 
@@ -336,7 +338,7 @@ def caller_may_act_on_cron_job(handler, job_id: str, *, path: str) -> bool:
             except ImportError:
                 logger.warning("cron owner check: cron.jobs unavailable, refusing")
                 return False
-            job = get_job(str(job_id))
+            job = get_job(job_id)
         if job is None or identity_owns_cron_job(identity, job):
             return True
         return audit_write_would_deny(identity, path=path, reason="cron_owner", job_id=job_id)
