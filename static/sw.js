@@ -53,6 +53,20 @@ const SHELL_ASSETS = [
   './static/split.js' + VQ,
   './static/realtime_voice.js' + VQ,
   './static/outline.js' + VQ,
+  // Managed-service scaffold (plan Appendix E.1 and addendum AE-6): each
+  // file exists from Wave 0 on, so cache.addAll never fails on a missing
+  // one while the packages that fill them are built.
+  './static/cron-notify.css' + VQ,
+  './static/help-tour.css' + VQ,
+  './static/group-routing.css' + VQ,
+  './static/vendor/guida/0.2.0/guida.umd.js' + VQ,
+  './static/help-content.js' + VQ,
+  './static/help-tour.js' + VQ,
+  './static/error-reporter.js' + VQ,
+  './static/svg_visuals.js' + VQ,
+  './static/svg_visuals.css' + VQ,
+  './static/memory_inventory.js' + VQ,
+  './static/memory_inventory.css' + VQ,
   './static/vendor/smd.min.js' + VQ,
   './static/vendor/katex/0.16.22/katex.min.css' + VQ,
   './static/vendor/katex/0.16.22/katex.min.js' + VQ,

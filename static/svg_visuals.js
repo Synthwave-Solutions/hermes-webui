@@ -1,0 +1,1 @@
+// Inline SVG visuals in chat (A1). Placeholder from the managed-service scaffold; defines nothing.
