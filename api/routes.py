@@ -1642,7 +1642,7 @@ def _cron_output_content_window(text: str, limit: int = _CRON_OUTPUT_CONTENT_LIM
 
 
 
-def _cron_job_for_api(job: dict, _delivery_ledger: dict | None = None) -> dict:
+def _cron_job_for_api(job: dict, _delivery_ledger: dict | None = None, viewer: str | None = None) -> dict:
     """Return a cron job payload with optional UI settings normalized.
 
     Legacy jobs intentionally persist without ``profile`` so they keep the
@@ -1652,6 +1652,9 @@ def _cron_job_for_api(job: dict, _delivery_ledger: dict | None = None) -> dict:
     ``toast_notifications`` is a WebUI preference for completion toasts. Legacy
     jobs default to enabled so existing behavior is preserved unless a job is
     explicitly muted.
+
+    ``viewer`` is the signed-in email of the request, passed to the notify
+    seam in api/cron_notifications.py (plan 3.1).
     """
     payload = dict(job or {})
     payload.setdefault("profile", None)
@@ -1668,10 +1671,16 @@ def _cron_job_for_api(job: dict, _delivery_ledger: dict | None = None) -> dict:
             payload["last_delivery_error"] = delivery_error
     except Exception:
         logger.debug("cron delivery state unavailable for job %s", payload.get("id"))
+    try:
+        from api import cron_notifications
+
+        payload = cron_notifications.decorate_job(payload, viewer=viewer)
+    except Exception:
+        logger.debug("cron notify state unavailable for job %s", payload.get("id"), exc_info=True)
     return payload
 
 
-def _cron_jobs_for_api(jobs) -> list[dict]:
+def _cron_jobs_for_api(jobs, viewer: str | None = None) -> list[dict]:
     # One ledger read serves the whole list; each job annotation reuses it.
     try:
         from api.cron_webui_delivery import load_ledger
@@ -1679,7 +1688,17 @@ def _cron_jobs_for_api(jobs) -> list[dict]:
         ledger = load_ledger()
     except Exception:
         ledger = None
-    return [_cron_job_for_api(job, _delivery_ledger=ledger) for job in (jobs or [])]
+    return [_cron_job_for_api(job, _delivery_ledger=ledger, viewer=viewer) for job in (jobs or [])]
+
+
+def _cron_request_email(handler) -> str | None:
+    """The signed-in email of a cron request, or None (notify seams, plan 3.1)."""
+    try:
+        from api.ownership import request_owner_email
+
+        return request_owner_email(handler)
+    except Exception:
+        return None
 
 
 _AGENT_CRON_IMPORT_PATH_LOCK = threading.Lock()
@@ -1741,12 +1760,13 @@ def _list_profile_rows_without_counts(list_profiles_fn) -> list:
     return list_profiles_fn()
 
 
-def _cron_jobs_cross_profile(active_profile: str) -> tuple[list[dict], list[dict]]:
+def _cron_jobs_cross_profile(active_profile: str, viewer: str | None = None) -> tuple[list[dict], list[dict]]:
     """Return active-profile rows plus foreign rows for the Tasks panel.
 
     Row ownership is intentionally distinct from a cron job's persisted
     ``profile`` field. The persisted field controls where the job executes;
     ``owner_profile`` tells the UI which profile home the row came from.
+    ``viewer`` is passed through to the per-job notify seam.
     """
     from cron.jobs import list_jobs
     from api.profiles import (
@@ -1800,7 +1820,7 @@ def _cron_jobs_cross_profile(active_profile: str) -> tuple[list[dict], list[dict
         is_active = _profiles_match(owner_profile, active_profile)
         try:
             with cron_profile_context_for_home(home):
-                jobs = _cron_jobs_for_api(list_jobs(include_disabled=True))
+                jobs = _cron_jobs_for_api(list_jobs(include_disabled=True), viewer=viewer)
         except Exception:
             if not is_active:
                 continue
@@ -1953,12 +1973,27 @@ def _event_profile_for_cron_job(job: dict) -> str | None:
     return raw
 
 
-def _cron_job_subprocess_main(job, execution_profile_home, result_queue):
+def _cron_run_job_kwargs(run_job, run_kwargs) -> dict:
+    """The part of ``run_kwargs`` that ``run_job`` accepts (plan 3.1).
+
+    Manual runs pass the notify seam's extra keyword arguments (for example
+    ``trigger`` and ``trigger_actor``) only to engines whose ``run_job`` takes
+    them, so an older engine keeps working unchanged.
+    """
+    if not run_kwargs:
+        return {}
+    return {key: value for key, value in run_kwargs.items() if _callable_accepts_kwarg(run_job, key)}
+
+
+def _cron_job_subprocess_main(job, execution_profile_home, result_queue, run_kwargs=None):
     """Run one cron job inside a child process pinned to a profile home."""
     try:
         def _run():
             from cron.scheduler import run_job
 
+            extra = _cron_run_job_kwargs(run_job, run_kwargs)
+            if extra:
+                return run_job(job, **extra)
             return run_job(job)
 
         if execution_profile_home is None:
@@ -1992,7 +2027,7 @@ def _cron_subprocess_result_timeout_seconds(job):
     return 6 * 60 * 60.0
 
 
-def _run_cron_job_in_profile_subprocess(job, execution_profile_home):
+def _run_cron_job_in_profile_subprocess(job, execution_profile_home, run_kwargs=None):
     """Execute cron.scheduler.run_job without holding the parent cron env lock.
 
     cron.scheduler/cron.jobs still rely on process-global HERMES_HOME and module
@@ -2000,6 +2035,9 @@ def _run_cron_job_in_profile_subprocess(job, execution_profile_home):
     execution its own globals. The parent process only uses cron_profile_context
     for short metadata reads/writes and remains responsive to unrelated cron UI
     and API calls while the job runs.
+
+    ``run_kwargs`` are extra ``run_job`` keyword arguments from the notify seam
+    (api/cron_notifications.py); the child passes only those run_job accepts.
     """
     import multiprocessing
     import queue
@@ -2009,6 +2047,7 @@ def _run_cron_job_in_profile_subprocess(job, execution_profile_home):
     process = ctx.Process(
         target=_cron_job_subprocess_main,
         args=(job, execution_profile_home, result_queue),
+        kwargs={"run_kwargs": dict(run_kwargs)} if run_kwargs else {},
     )
     process.start()
 
@@ -2066,6 +2105,7 @@ def _run_cron_tracked(
     profile_home=None,
     execution_profile_home=None,
     event_profile=None,
+    actor=None,
 ):
     """Wrapper that tracks running state around cron.scheduler.run_job.
 
@@ -2073,9 +2113,14 @@ def _run_cron_tracked(
     ``execution_profile_home`` is the selected per-job profile used to load
     agent config/.env while running. When no job profile is selected, both homes
     are the same and legacy server-default behavior is preserved.
+
+    ``actor`` is the signed-in email of whoever pressed "Run now". The notify
+    seams in api/cron_notifications.py (plan 3.1) decide the extra run_job
+    arguments, whether the result is delivered, and how the run is recorded.
     """
     import importlib
 
+    from api import cron_notifications
     from cron.jobs import mark_job_run, save_job_output
 
     _cron_scheduler = importlib.import_module("cron.scheduler")
@@ -2095,9 +2140,15 @@ def _run_cron_tracked(
             return fn()
 
     try:
-        success, output, final_response, error = _run_cron_job_in_profile_subprocess(
-            job, execution_profile_home
-        )
+        run_kwargs = cron_notifications.manual_run_kwargs(job, actor=actor)
+        if run_kwargs:
+            success, output, final_response, error = _run_cron_job_in_profile_subprocess(
+                job, execution_profile_home, run_kwargs=run_kwargs
+            )
+        else:
+            success, output, final_response, error = _run_cron_job_in_profile_subprocess(
+                job, execution_profile_home
+            )
 
         # Persist output, deliver the same content the scheduled cron path would
         # send, and write run metadata back to the job's owning cron store even
@@ -2111,8 +2162,12 @@ def _run_cron_tracked(
                 else f"⚠️ Cron job '{job.get('name', job_id)}' failed:\n{error}"
             )
             should_deliver = bool(deliver_content)
-            if should_deliver and success and _silent_marker in deliver_content.strip().upper():
+            silent = bool(should_deliver and success and _silent_marker in deliver_content.strip().upper())
+            if silent:
                 should_deliver = False
+            should_deliver, delivery_outcome = cron_notifications.delivery_decision(
+                job, success=success, silent=silent, default=should_deliver
+            )
 
             delivery_error = None
             if should_deliver and _deliver_result is not None:
@@ -2129,14 +2184,13 @@ def _run_cron_tracked(
                 _success = False
                 _error = "Agent completed but produced empty response (model error, timeout, or misconfiguration)"
 
-            try:
-                mark_job_run(job_id, _success, _error, delivery_error=delivery_error)
-            except TypeError:
-                # Older/fake cron.jobs modules used by focused WebUI tests may
-                # not expose the newer delivery_error parameter. Real Hermes
-                # scheduler builds do, so this is only a compatibility shim for
-                # legacy test doubles and deployments.
-                mark_job_run(job_id, _success, _error)
+            # Older/fake cron.jobs modules used by focused WebUI tests may not
+            # expose the newer delivery_error parameter of mark_job_run; the
+            # recorder keeps that compatibility fallback.
+            cron_notifications.record_manual_outcome(
+                job_id, _success, _error,
+                delivery_error=delivery_error, outcome=delivery_outcome,
+            )
 
         _with_cron_home(profile_home, _persist_success)
     except Exception as e:
@@ -12555,6 +12609,39 @@ def _handle_projects_hub_detail(handler, parsed) -> bool:
     return j(handler, detail)
 
 
+_MODULE_ID_RE = re.compile(r"^[a-z][a-z0-9_]{2,39}$")
+
+
+def _enabled_modules_from_env() -> list[str] | None:
+    """``SP_ENABLED_MODULES`` as a list of module ids, or None when unset.
+
+    Scaffold parse (plan Appendix E.1): a comma list of catalogue ids
+    (``^[a-z][a-z0-9_]{2,39}$``) or ``*``. Malformed entries and repeats are
+    dropped; an unset or blank value gives None. The module catalogue
+    resolver of Appendix E.4 replaces this function.
+    """
+    raw = os.environ.get("SP_ENABLED_MODULES")
+    if raw is None or not raw.strip():
+        return None
+    modules: list[str] = []
+    for item in raw.split(","):
+        module_id = item.strip()
+        if (module_id == "*" or _MODULE_ID_RE.match(module_id)) and module_id not in modules:
+            modules.append(module_id)
+    return modules
+
+
+def _support_telemetry_enabled() -> bool:
+    """Whether the browser may send error reports to support (W7 seam)."""
+    try:
+        from api import ops_reporter
+
+        return bool(ops_reporter.browser_reporting_enabled())
+    except Exception:
+        logger.debug("support telemetry flag unavailable", exc_info=True)
+        return False
+
+
 def handle_get(handler, parsed) -> bool:
     """Handle all GET routes. Returns True if handled, False for 404."""
     from api.share_routes import handle_public as handle_public_share
@@ -13140,7 +13227,14 @@ def handle_get(handler, parsed) -> bool:
         except Exception:
             pass
         from api.governance.resource_scope import filter_settings
-        return j(handler, filter_settings(handler, settings))
+        payload = filter_settings(handler, settings)
+        # Managed-service facts (plan Appendix E.1), added after the settings
+        # filter because they describe this installation, not a stored
+        # setting: whether the browser may report errors to support (W7) and
+        # which modules are enabled (E.4 replaces the scaffold parse).
+        payload["support_telemetry"] = _support_telemetry_enabled()
+        payload["enabled_modules"] = _enabled_modules_from_env()
+        return j(handler, payload)
 
     if parsed.path == "/api/voice/realtime/capability":
         from api.realtime_voice import handle as handle_realtime_voice
@@ -14356,7 +14450,8 @@ def handle_get(handler, parsed) -> bool:
         _ensure_agent_cron_import_path()
         active_profile = _get_active_profile_name() or "default"
         try:
-            active_jobs, other_jobs = _cron_jobs_cross_profile(active_profile)
+            active_jobs, other_jobs = _cron_jobs_cross_profile(
+                active_profile, viewer=_cron_request_email(handler))
         except ModuleNotFoundError as exc:
             if exc.name in ("cron", "cron.jobs"):
                 return j(handler, {"jobs": [], "cron_unavailable": True})
@@ -14378,6 +14473,12 @@ def handle_get(handler, parsed) -> bool:
             "active_profile": active_profile,
             "other_profile_count": hidden_other_count,
         })
+
+    # The viewer's own notification settings (plan 3.1); the handler checks
+    # that each job is visible to the viewer.
+    if parsed.path == "/api/crons/notifications":
+        from api import cron_notifications
+        return cron_notifications.handle_notifications_get(handler, parsed)
 
     # The /api/crons/* GET detail routes below all serve the ACTIVE profile's
     # cron store, so one shared scope check on the active profile stops
@@ -14537,6 +14638,25 @@ def handle_get(handler, parsed) -> bool:
 
     if parsed.path == "/api/memory":
         return _handle_memory_read(handler, parsed)
+
+    # Personal memory self view (plan addendum AE-7): exact routes only, so an
+    # unknown /api/mnemo/ child stays unclassified and fails closed.
+    if parsed.path in ("/api/mnemo/scopes", "/api/mnemo/me/summary", "/api/mnemo/me/memories", "/api/mnemo/me/export", "/api/mnemo/me/settings"):
+        from api import mnemo_proxy
+        return mnemo_proxy.handle_get(handler, parsed)
+
+    # ── Managed-service routes (plan Appendix E.1) ──
+    # Organisation views: self routes in the catalog; each handler enforces
+    # delegated_scope() itself (plan 3.6).
+    if parsed.path in ("/api/org/overview", "/api/org/departments", "/api/org/people", "/api/org/approvals", "/api/org/usage"):
+        from api import org_api
+        return org_api.handle_get(handler, parsed)
+
+    # AG-UI replay of one run (plan 5.1): sessions:read, and the handler
+    # admits only the stream's owner or a current participant.
+    if parsed.path.startswith("/api/agui/runs/"):
+        from api import agui
+        return agui.handle_replay(handler, parsed)
 
     # ── Profile API (GET) ──
     if parsed.path == "/api/bots/knowledge":
@@ -15712,9 +15832,16 @@ def handle_post(handler, parsed) -> bool:
         )
         if error:
             return bad(handler, error, status=400)
-        from api.group_chat import validate_bots
+        from api.group_chat import apply_participants_extra, validate_bots
+        _participants_actor = _request_owner_email_for_new_session(handler)
         try:
-            requested_bots = validate_bots(body.get('bot_participants', getattr(s, 'bot_participants', [])), _request_owner_email_for_new_session(handler))
+            requested_bots = validate_bots(body.get('bot_participants', getattr(s, 'bot_participants', [])), _participants_actor)
+        except ValueError as exc:
+            return bad(handler, str(exc), status=400)
+        # Extra group settings such as a default bot (routing seam, plan 5.2);
+        # whatever it sets on the session is saved with the lists below.
+        try:
+            apply_participants_extra(s, body, _participants_actor)
         except ValueError as exc:
             return bad(handler, str(exc), status=400)
         with _get_session_agent_lock(sid):
@@ -16515,6 +16642,11 @@ def handle_post(handler, parsed) -> bool:
             _ensure_agent_cron_import_path()
             return _handle_cron_update(handler, body)
 
+    # Set or clear the viewer's own mute for one job (plan 3.1).
+    if parsed.path == "/api/crons/notifications":
+        from api import cron_notifications
+        return cron_notifications.handle_notifications_post(handler, body)
+
     # The cron mutation routes below act on the ACTIVE profile's cron store,
     # so they share the same governance scope guard as the GET detail routes:
     # a caller outside the active profile's scope must not read, execute or
@@ -16846,6 +16978,29 @@ def handle_post(handler, parsed) -> bool:
 
     if parsed.path == "/api/memory/write":
         return _handle_memory_write(handler, body)
+
+    # Personal memory self view (plan addendum AE-7b), behind the CSRF gate.
+    if parsed.path in ("/api/mnemo/me/memory/update", "/api/mnemo/me/memory/forget", "/api/mnemo/me/erase", "/api/mnemo/me/settings"):
+        from api import mnemo_proxy
+        return mnemo_proxy.handle_post(handler, parsed, body)
+
+    # ── Managed-service routes (plan Appendix E.1) ──
+    # Organisation mutations come with the Wave 2 scaffold; until then a
+    # write to an organisation view answers 405.
+    if parsed.path in ("/api/org/overview", "/api/org/departments", "/api/org/people", "/api/org/approvals", "/api/org/usage"):
+        from api import org_api
+        return org_api.handle_post(handler, parsed, body)
+
+    # Browser error reports for support (W7): self route, off unless support
+    # telemetry is on.
+    if parsed.path == "/api/client-errors":
+        from api import ops_reporter
+        return ops_reporter.handle_client_error(handler, body)
+
+    # Help and tour usage counts (W4): self route, counts only.
+    if parsed.path == "/api/help/events":
+        from api import help_events
+        return help_events.handle_post(handler, body)
 
     if parsed.path in {"/api/gateway/start", "/api/gateway/stop", "/api/gateway/restart"}:
         return _handle_gateway_lifecycle(handler, parsed.path.rsplit("/", 1)[-1], body)
@@ -22044,6 +22199,12 @@ def _handle_cron_recent(handler, parsed):
         except Exception:
             delivery_state_for_job = None
             _delivery_ledger = None
+        # Per-viewer in-app flags (plan 3.1): api/cron_notifications.py.
+        try:
+            from api import cron_notifications as _cron_notifications
+        except Exception:
+            _cron_notifications = None
+        _viewer = _cron_request_email(handler)
         completions = []
         for job in jobs:
             job_id = str(job.get("id", "") or "")
@@ -22081,6 +22242,12 @@ def _handle_cron_recent(handler, parsed):
                     if completion["status"] == "ok" and delivery_status == "failed":
                         completion["status"] = "error"
                         completion["status_detail"] = "delivery_failed"
+                if _cron_notifications is not None:
+                    try:
+                        completion = _cron_notifications.decorate_completion(
+                            completion, job, viewer=_viewer)
+                    except Exception:
+                        logger.debug("cron notify flags unavailable for job %s", job_id, exc_info=True)
                 completions.append(completion)
         latest_session_info = _latest_cron_session_info_for_jobs(
             [job.get("id", "") for job in jobs],
@@ -22861,6 +23028,17 @@ def _agent_runtime_barrier_response(
     return None
 
 
+class _ChatStartResponse(dict):
+    """The chat-start response the browser receives, as a plain JSON object.
+
+    ``execution_profile`` (the group bot the turn runs as) rides along as an
+    attribute, never as a key, so the group fan-out can pass it to the
+    routing seam (plan Appendix E.1) without changing the response body.
+    """
+
+    execution_profile = None
+
+
 def _start_chat_stream_for_session(
     s,
     *,
@@ -22891,7 +23069,8 @@ def _start_chat_stream_for_session(
     attachments = attachments or []
     # Groups always use the local worker below, where each turn is bound to
     # its human sender. Personal gateway chats keep their configured backend.
-    from api.group_chat import selected_bot
+    from api import group_chat as _group_chat
+    route_reason = None
     try:
         if continuation_ref:
             from api.governance.continuation import resolve as resolve_continuation
@@ -22900,7 +23079,9 @@ def _start_chat_stream_for_session(
                 raise PermissionError('Async continuation sender changed')
             execution_profile = authority.get('execution_profile')
         else:
-            execution_profile = selected_bot(s, msg, sender_identity or sender_email or getattr(s, 'owner_email', None))
+            # The bot and why it was chosen (group routing seam, plan 5.2).
+            execution_profile, route_reason = _group_chat.select_bot_with_reason(
+                s, msg, sender_identity or sender_email or getattr(s, 'owner_email', None))
     except (ValueError, PermissionError) as exc:
         return {'error': str(exc), '_status': 403}
     from api.bot_builder import allowed as _managed_bot_allowed
@@ -23053,6 +23234,10 @@ def _start_chat_stream_for_session(
     # #1932: mark stream as goal-related so the streaming hook evaluates the goal.
     if goal_related:
         STREAM_GOAL_RELATED[stream_id] = True
+    try:
+        _group_chat.remember_route_reason(stream_id, execution_profile, route_reason)
+    except Exception:
+        logger.debug("group route reason not recorded for stream %s", stream_id, exc_info=True)
     diag.stage("worker_thread_start") if diag else None
     worker_target = _run_gateway_chat_streaming if backend_is_gateway else _run_agent_streaming
     worker_kwargs = {"model_provider": model_provider, "goal_related": goal_related}
@@ -23088,13 +23273,14 @@ def _start_chat_stream_for_session(
             except Exception:
                 logger.debug("Failed to record gateway run-start failure for stream %s", stream_id, exc_info=True)
         raise
-    response = {
+    response = _ChatStartResponse({
         "stream_id": stream_id,
         "session_id": s.session_id,
         "pending_started_at": s.pending_started_at,
         "turn_id": journal_event.get("turn_id"),
         "title": s.title,
-    }
+    })
+    response.execution_profile = execution_profile
     if normalized_model:
         response["effective_model"] = model
     if model_provider:
@@ -23605,18 +23791,23 @@ def _fan_out_peer_turn(s, response, sender_email, msg, attachments) -> bool:
                 name = item
             if name:
                 names.append(str(name).rsplit("/", 1)[-1])
-        ch.emit(
-            "peer_turn_started",
-            {
-                "session_id": str(s.session_id),
-                "stream_id": stream_id,
-                "sender_email": str(sender_email or "").strip().lower(),
-                "message": str(msg or ""),
-                "attachments": names,
-                "pending_started_at": (response or {}).get("pending_started_at")
-                or getattr(s, "pending_started_at", None),
-            },
-        )
+        payload = {
+            "session_id": str(s.session_id),
+            "stream_id": stream_id,
+            "sender_email": str(sender_email or "").strip().lower(),
+            "message": str(msg or ""),
+            "attachments": names,
+            "pending_started_at": (response or {}).get("pending_started_at")
+            or getattr(s, "pending_started_at", None),
+        }
+        # Live bot identity for the other tabs (group routing seam, plan 5.2).
+        try:
+            from api import group_chat as _group_chat
+
+            payload.update(_group_chat.turn_started_extra(s, getattr(response, "execution_profile", None)) or {})
+        except Exception:
+            logger.debug("group turn extra fields unavailable for session %s", s.session_id, exc_info=True)
+        ch.emit("peer_turn_started", payload)
         return True
     except Exception:
         logger.debug("peer_turn_started fan-out failed for session %s", getattr(s, "session_id", "?"), exc_info=True)
@@ -24690,9 +24881,12 @@ def _normalize_cron_shared_with(value):
 # What static/panels.js sends: the emoji picker, the category popover and the
 # share dialog one field each, saveCronForm the whole form. Anything else,
 # including owner_email, origin, created_at and run state, is refused (400).
+# ``notify`` is accepted here and validated by the notify seam
+# (api/cron_notifications.py, plan 3.1), which refuses it until W1 fills it.
 _CRON_WRITE_FIELDS = frozenset({
     "name", "schedule", "prompt", "deliver", "profile", "model", "provider",
     "toast_notifications", "diagram", "emoji", "category", "shared_with",
+    "notify",
 })
 # Only a new task takes these (saveCronForm's create branch); an existing task
 # is paused and resumed through its own routes.
@@ -24706,6 +24900,25 @@ _CRON_MANAGED_BY_VALUES = frozenset({"synthwave", "client"})
 def _normalize_cron_managed_by(value):
     """``synthwave`` or ``client``; empty clears the marker."""
     return str(value or "").strip().lower() or None
+
+
+def _cron_notify_updates(value) -> dict:
+    """The job fields a ``notify`` value writes (plan 3.1, Appendix E.1).
+
+    api/cron_notifications.validate_notify_field normalizes the value or
+    raises ValueError (answered with 400). Writing ``notify`` also writes
+    ``toast_notifications`` for older clients: toasts stay on when the in-app
+    level is ``all`` or ``failures`` (legacy_toast_value in the notify policy).
+    """
+    from api import cron_notifications
+
+    notify = cron_notifications.validate_notify_field(value)
+    updates = {"notify": notify}
+    if isinstance(notify, dict) and "in_app" in notify:
+        from api._notify_policy_fallback import legacy_toast_value
+
+        updates["toast_notifications"] = legacy_toast_value(notify)
+    return updates
 
 
 def _cron_delivery_platforms():
@@ -24872,6 +25085,11 @@ def _cron_write_allowed(handler, body, job_id=None):
     if "managed_by" in body and _normalize_cron_managed_by(body["managed_by"]) not in (
             _CRON_MANAGED_BY_VALUES | {None}):
         return 400, {"error": "managed_by must be synthwave or client"}
+    if "notify" in body:
+        try:
+            _cron_notify_updates(body["notify"])
+        except ValueError as e:
+            return 400, {"error": str(e)}
 
     skills = body.get("skills") if creating else None
     if skills:
@@ -25005,6 +25223,9 @@ def _handle_cron_create(handler, body):
             post_create_updates["shared_with"] = _shared
         if "managed_by" in body:
             post_create_updates["managed_by"] = _normalize_cron_managed_by(body["managed_by"])
+        if "notify" in body:
+            # Already validated by _cron_write_allowed, before create_job ran.
+            post_create_updates.update(_cron_notify_updates(body["notify"]))
         if post_create_updates:
             job = update_job(job["id"], post_create_updates) or job
         return j(handler, {"ok": True, "job": _cron_job_for_api(job)})
@@ -25031,7 +25252,7 @@ def _handle_cron_update(handler, body):
     try:
         updates = {}
         for k, v in body.items():
-            if k == "job_id":
+            if k in ("job_id", "notify"):
                 continue
             if k == "profile":
                 target = _normalize_cron_profile_value(v)
@@ -25050,6 +25271,10 @@ def _handle_cron_update(handler, body):
                 updates[k] = _normalize_cron_managed_by(v)
             elif v is not None:
                 updates[k] = v
+        if "notify" in body:
+            # After the loop, so the toast mirror of notify wins over a stale
+            # toast_notifications in the same body.
+            updates.update(_cron_notify_updates(body["notify"]))
     except ValueError as e:
         return bad(handler, str(e))
     try:
@@ -25123,7 +25348,9 @@ def _handle_cron_run(handler, body):
     _profile_home = get_active_hermes_home()
     _execution_profile_home = _profile_home_for_cron_job(job)
     _event_profile = _event_profile_for_cron_job(job)
-    threading.Thread(target=_run_cron_tracked, args=(job, _profile_home, _execution_profile_home, _event_profile), daemon=True).start()
+    # Who pressed "Run now", taken from the session, never from the body.
+    _actor = _cron_request_email(handler)
+    threading.Thread(target=_run_cron_tracked, args=(job, _profile_home, _execution_profile_home, _event_profile), kwargs={"actor": _actor}, daemon=True).start()
     return j(handler, {"ok": True, "job_id": job_id, "status": "running"})
 
 

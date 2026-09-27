@@ -31,6 +31,8 @@ logger = logging.getLogger(__name__)
 MAX_PARTICIPANTS = 25
 
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+# A turn names its bot by starting with @bot-id.
+_MENTION_RE = re.compile(r'^\s*@([A-Za-z0-9][A-Za-z0-9_-]{0,63})(?=\s|$)')
 
 
 def _clean(value) -> str:
@@ -174,13 +176,64 @@ def selected_bot(session, message, actor) -> str | None:
             raise ValueError('No assigned bot is available for this project conversation')
     if not bots:
         return None
-    match = re.match(r'^\s*@([A-Za-z0-9][A-Za-z0-9_-]{0,63})(?=\s|$)', str(message or ''))
+    match = _MENTION_RE.match(str(message or ''))
     selected = match.group(1) if match else (bots[0] if len(bots) == 1 else None)
     if selected not in bots:
         raise ValueError('Choose one group bot by starting the message with @bot-id')
     if not bot_allowed(actor, selected):
         raise ValueError('The selected bot is not allowed for your account')
     return selected
+
+
+# ── Group routing seams (plan Appendix E.1) ──
+# api/routes.py calls these four around every group turn. The scaffold
+# versions only report what selected_bot already decided and keep nothing;
+# package W6 fills them (route reasons, a default bot per conversation and
+# the live bot identity of a turn).
+
+
+def select_bot_with_reason(session, message, actor) -> tuple:
+    """Return ``(bot, reason)`` for a turn.
+
+    ``bot`` is exactly what :func:`selected_bot` returns, and every error it
+    raises is raised unchanged. ``reason`` is ``"mention"`` when the message
+    names the bot with ``@bot-id``, ``"only_bot"`` when the conversation's
+    single bot was taken, and None when no bot was selected.
+    """
+    bot = selected_bot(session, message, actor)
+    if bot is None:
+        return None, None
+    match = _MENTION_RE.match(str(message or ''))
+    if match and match.group(1) == bot:
+        return bot, "mention"
+    return bot, "only_bot"
+
+
+def remember_route_reason(stream_id, bot, reason) -> None:
+    """Remember why the turn on ``stream_id`` went to ``bot``.
+
+    Called once the stream id exists. The stub keeps nothing.
+    """
+    return None
+
+
+def turn_started_extra(session, bot) -> dict:
+    """Extra fields for the ``peer_turn_started`` frame of a group turn.
+
+    ``bot`` is the bot the turn runs as, or None. The stub adds none.
+    """
+    return {}
+
+
+def apply_participants_extra(session, body, actor) -> None:
+    """Apply extra settings from ``POST /api/session/participants``.
+
+    Called after the request is validated and before the lists are saved;
+    whatever it sets on ``session`` is saved with them. A ValueError is
+    answered with 400 and nothing is saved. The stub ignores the body
+    (including ``default_bot``).
+    """
+    return None
 
 
 def known_emails() -> set:

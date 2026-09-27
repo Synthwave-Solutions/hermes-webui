@@ -825,6 +825,17 @@ def _webui_ephemeral_system_prompt(
             parts.append(shared_memory)
     parts.append(_WEBUI_PROGRESS_PROMPT)
     parts.append(_WEBUI_ARTIFACT_DELIVERY_PROMPT)
+    # Visual answers (plan addendum AE-5): empty unless the visuals setting
+    # is on, so the prompt is unchanged by default.
+    try:
+        from api import webui_visuals
+
+        visuals_prompt = webui_visuals.prompt_block(config_data)
+    except Exception:
+        logger.debug("webui visuals prompt unavailable", exc_info=True)
+        visuals_prompt = ""
+    if visuals_prompt:
+        parts.append(visuals_prompt)
     delivery_prompt = _webui_delivery_context_prompt(config_data)
     if delivery_prompt:
         parts.append(delivery_prompt)
