@@ -280,20 +280,6 @@ PERMISSION_RISKS = {
         "narrower": "mcp:read allows reviewing the connected services without changing them.",
         "depends_on": ("mcp:read",),
     },
-    "memory:read": {
-        "capability": "Read what the assistant has remembered.",
-        "data": "Saved notes about people, projects and preferences.",
-        "risks": (RISK_DATA_ACCESS,),
-        "narrower": "",
-        "depends_on": (),
-    },
-    "memory:write": {
-        "capability": "Add to and change what the assistant remembers.",
-        "data": "Saved notes about people, projects and preferences.",
-        "risks": (RISK_DATA_ACCESS,),
-        "narrower": "memory:read allows reading the notes without changing them.",
-        "depends_on": ("memory:read",),
-    },
     "model:read": {
         "capability": "See which models are available and which one is selected.",
         "data": "Model names and the current selection.",
@@ -332,6 +318,13 @@ PERMISSION_RISKS = {
     "profiles:read": {
         "capability": "See which working profiles exist and switch between the allowed ones.",
         "data": "Profile names and their settings.",
+        "risks": (),
+        "narrower": "",
+        "depends_on": (),
+    },
+    "self:read": {
+        "capability": "See your own requests and approvals.",
+        "data": "The access requests you made and what was decided about them.",
         "risks": (),
         "narrower": "",
         "depends_on": (),

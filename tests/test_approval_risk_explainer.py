@@ -515,7 +515,9 @@ def test_a_broken_explanation_never_stops_the_queue(isolated_home, as_user, monk
     as_user(BOOTSTRAP)
     _, handler = _call("/api/governance/approvals")
     assert handler.status == 200
-    assert handler.body["pending"][0]["explanation"] == {}
+    # Since 22742423 (6 Sep 2026) a row whose explanation cannot be composed
+    # says so in plain language instead of showing no detail block at all.
+    assert handler.body["pending"][0]["explanation"] == capability_risk.unavailable_explanation()
 
 
 # ── The screen itself ───────────────────────────────────────────────────────

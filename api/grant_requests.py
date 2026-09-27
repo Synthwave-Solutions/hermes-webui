@@ -89,7 +89,8 @@ GRANTABLE_PERMISSIONS = frozenset({
     "kanban:read",
     "logs:read",
     "mcp:read",
-    "memory:read",
+    # memory:read is gone: personal memory sits behind chat:use since
+    # 9933b751, so no WebUI route can be denied for it any more.
     "model:read",
     "plugins:read",
     "profiles:read",
