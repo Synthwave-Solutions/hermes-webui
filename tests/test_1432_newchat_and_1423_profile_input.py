@@ -103,7 +103,18 @@ class TestIssue1423ProfileFormAutocapitalize:
             rf'<input\s+[^>]*id="{re.escape(input_id)}"[^>]*>',
             src,
         )
-        return m.group(0) if m else None
+        if m:
+            return m.group(0)
+        if input_id == 'profileFormName':
+            # SynthPulse replaced the profile form with the guided bot builder
+            # (6cb8de88). Its Bot ID is the same lowercase identifier, rendered
+            # by idField() in bot-builder.js.
+            builder = _read('bot-builder.js')
+            assert "idField('Bot ID','builderName'" in builder, "Bot ID must use the identifier field"
+            fn = re.search(r"function idField\([^)]*\)\{(.*?)\n  \}", builder, re.S)
+            m = fn and re.search(r"<input [^>]*>", fn.group(1))
+            return m.group(0) if m else None
+        return None
 
     def test_profile_name_has_autocapitalize_none(self):
         html = self._profile_input_html('profileFormName')
@@ -132,6 +143,12 @@ class TestIssue1423ProfileFormAutocapitalize:
     def test_profile_baseurl_has_autocapitalize_none(self):
         """Base URL inputs are equally bad targets for autocapitalize."""
         html = self._profile_input_html('profileFormBaseUrl')
+        if html is None and "profileFormBaseUrl" not in _read('bot-builder.js'):
+            # The bot builder that replaced the profile form (6cb8de88) has no
+            # free-text base URL: model and provider come from the server's
+            # configuration. Guard that no untreated URL input slipped back in.
+            assert not re.search(r'<input\s+[^>]*id="profileFormBaseUrl"', _read('panels.js'))
+            return
         assert html, "profileFormBaseUrl input not found"
         assert 'autocapitalize="none"' in html, \
             f"profileFormBaseUrl missing autocapitalize=\"none\" (#1423)"

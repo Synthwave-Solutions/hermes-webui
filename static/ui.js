@@ -16909,7 +16909,7 @@ function renderMessages(options){
   if(window.SynthPulseSkillActivity) window.SynthPulseSkillActivity.sync(true);
   if(typeof _renderWorkspaceSendRecovery==='function') _renderWorkspaceSendRecovery();
   if(typeof refreshChatBots==='function') refreshChatBots();
-  _scheduleSessionProgress();
+  if(typeof _scheduleSessionProgress==='function') _scheduleSessionProgress();
   _lastMessageRenderAt=performance.now();
   const preserveScroll=!!(options&&options.preserveScroll);
   const virtualFallback=!!(options&&options._virtualFallback);
@@ -18687,7 +18687,7 @@ function _toolActionKind(tc){
   if(!n) return 'unknown';
   if(n==='subagent_progress'||n==='delegate_task') return 'delegate';
   // A shell call that starts a worker CLI is a delegation, not a command.
-  if((n.includes('terminal')||n.includes('shell')||n.includes('command'))&&_delegatedWorkerName(tc)) return 'delegate';
+  if((n.includes('terminal')||n.includes('shell')||n.includes('command'))&&typeof _delegatedWorkerName==='function'&&_delegatedWorkerName(tc)) return 'delegate';
   if(n.includes('skill')) return 'skill';
   if(n.includes('memory')) return 'memory';
   if(n.includes('terminal')||n.includes('shell')||n.includes('command')||n.includes('process')||n==='execute_code') return 'shell';
@@ -18760,7 +18760,7 @@ function _toolVisibleTargetLabel(tc, opts){
     return _shortToolLabel(text, opts.limit||112);
   }
   if(kind==='delegate'){
-    const worker=_delegatedWorkerName(tc);
+    const worker=typeof _delegatedWorkerName==='function'?_delegatedWorkerName(tc):'';
     if(worker) return _shortToolLabel(`${worker}: ${target}`, opts.limit||112);
   }
   if(kind==='skill'){

@@ -6,6 +6,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from tests.helpers import live_sse_handler
+
 REPO = Path(__file__).resolve().parent.parent
 ANCHORS_JS = REPO / "static" / "assistant_turn_anchors.js"
 MESSAGES_JS = REPO / "static" / "messages.js"
@@ -19,6 +21,13 @@ def _read(path: Path) -> str:
 
 
 def _event_listener_body(src: str, event_name: str) -> str:
+    # SynthPulse registers the tool handlers by name and defines them between
+    # the listeners (53620edd), so "up to the next listener" would swallow a
+    # handler that belongs to another event. Take each handler's exact extent.
+    try:
+        return live_sse_handler(src, event_name)
+    except AssertionError:
+        pass
     start = src.index(f"source.addEventListener('{event_name}'")
     end = src.find("\n    source.addEventListener(", start + 1)
     if end < 0:

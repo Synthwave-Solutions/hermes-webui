@@ -8,6 +8,7 @@ file rendered the plain text with CSS grammar. These tests pin both the feature
 and the fix.
 """
 from pathlib import Path
+from tests.helpers import js_block_end
 
 WORKSPACE_JS = (Path(__file__).resolve().parent.parent / "static" / "workspace.js").read_text(encoding="utf-8")
 
@@ -74,7 +75,14 @@ def test_plain_text_files_do_not_inherit_prior_file_highlighting():
     assert "pre.className=pre.className.replace(/\\blanguage-\\S+/g,'')" in helper, (
         "previewCode <pre> must have stale language-* classes stripped each render"
     )
-    # Guard 2: highlightElement gated on a truthy lang.
-    assert "if(lang&&typeof Prism!=='undefined'&&typeof Prism.highlightElement==='function')" in helper, (
-        "Prism.highlightElement must only run when a language was assigned"
-    )
+    # Guard 2: highlightElement gated on a truthy lang. SynthPulse also loads
+    # Prism on demand when it is not there yet (a0f22509), so it nests both
+    # highlight calls in one `if(lang){...}` block; every call must sit in it.
+    if "if(lang&&typeof Prism!=='undefined'&&typeof Prism.highlightElement==='function')" not in helper:
+        gate = helper.find("if(lang){")
+        assert gate != -1, "Prism.highlightElement must only run when a language was assigned"
+        gated = helper[gate:js_block_end(helper, gate + len("if(lang)"))]
+        # Count the calls, not the explanatory comment above them.
+        assert helper.count("Prism.highlightElement(codeEl") == gated.count("Prism.highlightElement(codeEl") > 0, (
+            "Prism.highlightElement must only run when a language was assigned"
+        )

@@ -18,6 +18,7 @@ dedicated _sessionStreamHiddenSid before closing).
 from __future__ import annotations
 
 from pathlib import Path
+from tests.helpers import js_function_source
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MESSAGES_JS = (REPO_ROOT / "static" / "messages.js").read_text(encoding="utf-8")
@@ -39,9 +40,9 @@ def test_gateway_sse_has_visibility_hook():
 def test_session_stream_has_visibility_hook():
     """startSessionStream installs a visibilitychange hook."""
     assert "_hermesSessionStreamVisibilityHook" in MESSAGES_JS
-    start_idx = MESSAGES_JS.find("function startSessionStream(sid)")
-    assert start_idx != -1
-    block = MESSAGES_JS[start_idx:start_idx + 2600]
+    # Whole function: fixed-size windows broke once SynthPulse added its
+    # split-view pane guard at the top of startSessionStream.
+    block = js_function_source(MESSAGES_JS, "startSessionStream")
     assert "visibilitychange" in block
     assert "document.hidden" in block
     # Must skip opening a new EventSource while the tab is hidden.
@@ -60,8 +61,7 @@ def test_session_stream_reopens_from_dedicated_var_not_nulled_id():
         "expected a dedicated holder var for the hidden-tab session id"
     )
 
-    start_idx = MESSAGES_JS.find("function startSessionStream(sid)")
-    block = MESSAGES_JS[start_idx:start_idx + 2200]
+    block = js_function_source(MESSAGES_JS, "startSessionStream")
 
     # On hide: capture the id, then stop.
     assert "_sessionStreamHiddenSid = _sessionStreamSessionId" in block
@@ -94,8 +94,7 @@ def test_session_stream_hidden_open_preserves_id_for_reopen():
     for a session loaded in a background tab. The hidden-skip path must set
     _sessionStreamHiddenSid = sid before returning.
     """
-    start_idx = MESSAGES_JS.find("function startSessionStream(sid)")
-    block = MESSAGES_JS[start_idx:start_idx + 2800]
+    block = js_function_source(MESSAGES_JS, "startSessionStream")
     # Find the hidden-tab early-return skip path (distinct from the in-hook
     # `if (document.hidden)` branch) and assert it preserves the id.
     hidden_idx = block.find("!== 'undefined' && document.hidden) {")

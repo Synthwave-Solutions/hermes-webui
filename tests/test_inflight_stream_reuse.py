@@ -4,6 +4,7 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
+from tests.helpers import live_sse_handler
 
 REPO_ROOT = Path(__file__).parent.parent
 MESSAGES_JS = (REPO_ROOT / "static" / "messages.js").read_text(encoding="utf-8")
@@ -208,8 +209,8 @@ def test_load_session_preserves_existing_worklog_content_without_destructive_fal
 
 def test_tool_events_are_guarded_against_stale_session_and_stream():
     """Delayed tool events from an old EventSource must not mutate the current session DOM."""
-    tool_handler = MESSAGES_JS.split("source.addEventListener('tool',e=>{", 1)[1].split("source.addEventListener('tool_complete'", 1)[0]
-    complete_handler = MESSAGES_JS.split("source.addEventListener('tool_complete',e=>{", 1)[1].split("source.addEventListener('approval'", 1)[0]
+    tool_handler = live_sse_handler(MESSAGES_JS, 'tool')
+    complete_handler = live_sse_handler(MESSAGES_JS, 'tool_complete')
     for handler in (tool_handler, complete_handler):
         assert "_terminalStateReached||_streamFinalized" in handler
         assert "S.session.session_id!==activeSid" in handler
@@ -799,11 +800,7 @@ def test_upsert_flags_orphan_complete_but_not_normal_start_complete():
 def test_tool_complete_handler_gates_segment_reset_on_orphan_flag():
     """The tool_complete SSE handler must only force a fresh segment for orphan
     completions (`_createdByComplete`), updating the card in place otherwise."""
-    handler_start = MESSAGES_JS.find("source.addEventListener('tool_complete'")
-    assert handler_start != -1
-    handler_end = MESSAGES_JS.find("source.addEventListener('approval'", handler_start)
-    assert handler_end != -1
-    handler = MESSAGES_JS[handler_start:handler_end]
+    handler = live_sse_handler(MESSAGES_JS, 'tool_complete')
     # The reset trio must live behind the orphan-flag branch.
     guard_pos = handler.find("if(tc._createdByComplete)")
     reset_pos = handler.find("_resetAssistantSegment()")

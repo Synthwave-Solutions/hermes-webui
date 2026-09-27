@@ -1,6 +1,7 @@
 """Regression tests for the WebUI /pet handoff."""
 
 import json
+import re
 from pathlib import Path
 import subprocess
 import tempfile
@@ -10,6 +11,11 @@ import textwrap
 REPO_ROOT = Path(__file__).resolve().parents[1]
 COMMANDS_JS = (REPO_ROOT / "static" / "commands.js").read_text(encoding="utf-8")
 MESSAGES_JS = (REPO_ROOT / "static" / "messages.js").read_text(encoding="utf-8")
+# The setup-guide link comes from one constant; SynthPulse points it at its own
+# site instead of the upstream companion repository (844071da).
+SETUP_GUIDE_URL = re.search(
+    r"const DESKTOP_COMPANION_SETUP_GUIDE_URL='([^']+)'", COMMANDS_JS
+).group(1)
 
 
 def _run_pet_js(
@@ -253,7 +259,7 @@ def test_pet_help_routes_to_install_guidance_when_companion_is_missing():
     message = result["result"]["message"]
     assert "Desktop Companion is not installed yet." in message
     assert "Settings -> Extensions -> Gallery -> Desktop Companion" in message
-    assert "https://github.com/franksong2702/hermes-webui-desktop-companion#after-gallery-install" in message
+    assert SETUP_GUIDE_URL in message
     assert "Desktop Companion app" in message
 
 
@@ -279,7 +285,7 @@ def test_pet_help_routes_to_enable_guidance_when_companion_is_disabled():
     assert "Desktop Companion is installed but disabled." in message
     assert "Enable it in Settings -> Extensions" in message
     assert "Desktop Companion app" in message
-    assert "https://github.com/franksong2702/hermes-webui-desktop-companion#after-gallery-install" in message
+    assert SETUP_GUIDE_URL in message
 
 
 def test_pet_help_routes_to_reload_and_start_guidance_when_adapter_status_is_missing():
@@ -456,7 +462,7 @@ def test_pet_help_falls_back_to_unavailable_guidance_when_hook_is_missing():
     assert "Desktop Companion is installed and connected" in message
     assert "/pet is not available yet in this Desktop Companion version" in message
     assert "Update the Desktop Companion app" in message
-    assert "https://github.com/franksong2702/hermes-webui-desktop-companion#after-gallery-install" in message
+    assert SETUP_GUIDE_URL in message
 
 
 def test_pet_help_routes_to_hook_error_guidance_when_hook_throws():
@@ -500,12 +506,13 @@ def test_pet_slash_intercept_bypasses_generic_agent_execution():
 
     assert [item["role"] for item in pet["messages"]] == ["user", "assistant"]
     assert "Desktop Companion is not installed yet." in pet["messages"][1]["content"]
-    assert "Hermes CLI-only command" not in pet["messages"][1]["content"]
+    assert "CLI-only command" not in pet["messages"][1]["content"]
     assert pet["commandExecCalls"] == []
     assert pet["remainingInput"] == ""
 
     assert [item["role"] for item in browser["messages"]] == ["user", "assistant"]
-    assert "`/browser` is a Hermes CLI-only command" in browser["messages"][1]["content"]
+    # SynthPulse wording: "is a CLI-only command and cannot run inside SynthPulse Control".
+    assert "`/browser` is a CLI-only command" in browser["messages"][1]["content"]
     assert browser["commandExecCalls"] == []
 
 

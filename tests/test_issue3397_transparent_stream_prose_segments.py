@@ -116,7 +116,12 @@ def test_render_messages_wires_ordered_parts_into_transparent_stream_and_skips_d
     assert "const partDisplayText=_transparentOrderedDisplayText(part.text);" in UI_JS
     assert "const partBodyHtml=_getCachedRender(partDisplayText,false);" in UI_JS
     assert "const transparentOrderedToolIds=new Set();" in UI_JS
-    assert "const toolCall=_transparentOrderedToolCall(part, rawIdx, transparentOrderedToolCallsByTid, transparentToolResultsByTid, transparentPersistedSnippetByTid);" in UI_JS
+    # SynthPulse also passes the per-tool error states so a failed tool renders
+    # as failed in the ordered stream (f117dc12).
+    assert (
+        "const toolCall=_transparentOrderedToolCall(part, rawIdx, transparentOrderedToolCallsByTid, transparentToolResultsByTid, transparentPersistedSnippetByTid);" in UI_JS
+        or "const toolCall=_transparentOrderedToolCall(part, rawIdx, transparentOrderedToolCallsByTid, transparentToolResultsByTid, transparentPersistedSnippetByTid, undefined, transparentToolErrorsByTid);" in UI_JS
+    )
     assert "if(part.toolUseId) transparentOrderedToolIds.add(part.toolUseId);" in UI_JS
     assert "if(tid&&transparentOrderedToolIds.has(tid)) continue;" in UI_JS
 

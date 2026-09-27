@@ -1,4 +1,5 @@
 from pathlib import Path
+from tests.helpers import live_sse_handler
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -8,9 +9,7 @@ CHANGELOG = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
 
 
 def _tool_complete_listener_block() -> str:
-    start = MESSAGES_JS.index("source.addEventListener('tool_complete'")
-    end = MESSAGES_JS.index("source.addEventListener('approval'", start)
-    return MESSAGES_JS[start:end]
+    return live_sse_handler(MESSAGES_JS, 'tool_complete')
 
 
 def test_tool_complete_notifies_on_persistent_state_writes():

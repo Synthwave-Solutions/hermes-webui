@@ -85,6 +85,7 @@ modules = [
     "mcp",
     "openpyxl",
     "pptx",
+    "PIL",
     "pytest",
     "pytest_asyncio",
     "pytest_shard",
