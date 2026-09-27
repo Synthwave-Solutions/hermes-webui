@@ -44,9 +44,12 @@ def _fixture_script() -> str:
         [
             "function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;');}",
             "function li(name,size){return '<svg data-icon=\"'+name+'\" style=\"width:11px;height:11px\"></svg>';}",
-            "function t(k){return k==='process_wakeup_label'?'Background wakeup':(k==='process_wakeup_matched'?'Watch pattern matched':k);}",
+            "const _T={process_wakeup_title_update:'Background task update',process_wakeup_result_watch:'Found what it was waiting for',process_wakeup_details:'Details',process_wakeup_matched:'Matched',process_wakeup_command:'Command'};",
+            "function t(k){return _T[k]||k;}",
             _extract_func("_parseProcessWakeupBody"),
             _extract_func("_processWakeupInfo"),
+            _extract_func("_processWakeupTestSummary"),
+            _extract_func("_processWakeupOutcome"),
             _extract_func("_processWakeupCardHtml"),
             """
             window.__renderWakeupCard = (pattern) => {

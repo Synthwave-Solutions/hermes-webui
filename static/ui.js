@@ -16756,32 +16756,91 @@ function _processWakeupInfo(m, text){
     output:parsed?parsed.output:null,
   };
 }
-function _processWakeupCardHtml(info, rawText, extras){
-  const isWatch=info.type==='watch_match';
-  const exitStr=info.exitCode==null?'':String(info.exitCode);
-  // Signal-killed processes report negative exit codes (subprocess returncode).
-  const exitKnown=/^-?\d+$/.test(exitStr);
-  const exitOk=exitStr==='0';
-  let chip;
-  if(isWatch){
-    chip=`<span class="process-wakeup-chip watch" title="${esc(t('process_wakeup_matched'))}">${li('eye',11)}<code title="${esc(String(info.pattern||''))}">${esc(String(info.pattern||''))}</code></span>`;
-  }else{
-    const cls=exitOk?'ok':(exitKnown?'fail':'neutral');
-    const icon=exitOk?li('check',11):(exitKnown?li('x',11):'');
-    chip=`<span class="process-wakeup-chip ${cls}">${icon}<span>exit ${esc(exitStr||'?')}</span></span>`;
+// Michael Ramirez, 27 Sep 2026: the collapsed card read like a terminal log
+// (an uppercase label, the raw command, an "exit 0" chip). It now says what
+// happened in plain words, "Background task complete" plus the result, and
+// keeps the command, exit code and output one click away under Details.
+//
+// A test run's own summary line is the most useful result there is, so it is
+// used when the output ends with one (pytest, Jest or Vitest, Playwright).
+function _processWakeupTestSummary(output){
+  const lines=String(output||'').split('\n')
+    .map(line=>line.replace(/^[=\s-]+|[=\s-]+$/g,''))
+    .filter(Boolean).slice(-40);
+  const count=(line,words)=>{
+    let total=0;
+    const re=new RegExp('(\\d+)\\s+(?:'+words+')\\b','gi');
+    let m;
+    while((m=re.exec(line))) total+=Number(m[1]);
+    return total;
+  };
+  for(const line of lines.slice().reverse()){
+    const pytest=/\b\d+\s+(?:passed|failed|errors?)\b.*\bin\s+\d+(?:\.\d+)?s\b/i.test(line);
+    const jestOrVitest=/^Tests:?\s+.*\b\d+\s+(?:passed|failed)\b/i.test(line);
+    const playwright=/^\d+\s+passed\s+\(\d/i.test(line);
+    if(!pytest&&!jestOrVitest&&!playwright) continue;
+    const passed=count(line,'passed');
+    // Playwright prints its failures on their own line above "N passed".
+    const failed=playwright
+      ?lines.filter(l=>/^\d+\s+failed\b/i.test(l)).reduce((n,l)=>n+count(l,'failed'),0)
+      :count(line,'failed|errors?');
+    if(passed||failed) return {passed,failed};
   }
-  const cmdHtml=info.command?`<code class="process-wakeup-cmd" title="${esc(info.command)}">${esc(info.command)}</code>`:'';
+  return null;
+}
+// Title, one-line result and state for a wakeup notice. `info` is null for a
+// notice the parser does not know (a delegation result, a watch notice); that
+// still gets a plain title, and its text stays under Details.
+function _processWakeupOutcome(info, rawText){
+  const type=String(info&&info.type||'');
+  if(type==='watch_match'){
+    return {state:'watch',title:t('process_wakeup_title_update'),result:t('process_wakeup_result_watch')};
+  }
+  if(type!=='completion'){
+    const finished=/\b(?:complete|completed|finished|exited|done)\b/i.test(String(rawText||''));
+    return {state:'neutral',title:t(finished?'process_wakeup_title_complete':'process_wakeup_title_update'),result:''};
+  }
+  const exitStr=info.exitCode==null?'':String(info.exitCode).trim();
+  const exitKnown=/^-?\d+$/.test(exitStr);
+  const failedExit=exitKnown&&exitStr!=='0';
+  // Trust the test summary only when it agrees with the exit code, so a
+  // cut-off Playwright summary can never call a failed run a success.
+  const tests=_processWakeupTestSummary(info.output);
+  if(tests&&(tests.failed>0)===failedExit){
+    return {
+      state:failedExit?'fail':'ok',
+      title:t(failedExit?'process_wakeup_title_failed':'process_wakeup_title_complete'),
+      result:tests.failed?t('process_wakeup_result_tests_failed',tests.failed,tests.passed):t('process_wakeup_result_tests_passed',tests.passed),
+    };
+  }
+  if(!exitKnown) return {state:'neutral',title:t('process_wakeup_title_complete'),result:''};
+  if(exitStr==='0') return {state:'ok',title:t('process_wakeup_title_complete'),result:t('process_wakeup_result_ok')};
+  // Signal-killed processes report negative exit codes (subprocess
+  // returncode); a shell reports SIGKILL/SIGTERM as 137/143.
+  if(exitStr.startsWith('-')||exitStr==='137'||exitStr==='143'){
+    return {state:'fail',title:t('process_wakeup_title_stopped'),result:t('process_wakeup_result_stopped')};
+  }
+  return {state:'fail',title:t('process_wakeup_title_failed'),result:t('process_wakeup_result_failed')};
+}
+function _processWakeupCardHtml(info, rawText, extras){
+  extras=extras||{};
+  const outcome=_processWakeupOutcome(info, rawText);
+  const icon={ok:'check',fail:'x',watch:'eye'}[outcome.state]||'clock';
+  const detail=info||{};
   // Preserve output byte-for-byte for the <pre>; trim ONLY for the
   // empty/non-empty decision so leading indentation and trailing blank lines
   // survive (#6350 review finding 1).
-  const outRaw=info.output!=null?String(info.output):String(rawText||'');
+  const outRaw=detail.output!=null?String(detail.output):String(rawText||'');
   const outHtml=outRaw.trim()?`<pre class="process-wakeup-text">${esc(outRaw)}</pre>`:'';
-  const cmdRow=info.command?`<div class="process-wakeup-cmd-row"><code>${esc(info.command)}</code></div>`:'';
-  // The collapsed watch chip truncates the pattern; surface the full,
-  // wrapping value in the expanded detail so touch/keyboard users can read it
-  // without relying on a hover tooltip (#6350 review finding 4).
-  const patternRow=(isWatch&&info.pattern)?`<div class="process-wakeup-pattern-row"><span class="process-wakeup-detail-key">${esc(t('process_wakeup_matched'))}</span><code>${esc(String(info.pattern))}</code></div>`:'';
-  return `<details class="process-wakeup-card"><summary class="process-wakeup-summary"><span class="process-wakeup-toggle">${li('chevron-right',12)}</span><span class="process-wakeup-label">${li('terminal',13)}<span>${esc(t('process_wakeup_label'))}</span></span>${cmdHtml}${chip}${extras.timeHtml||''}</summary><div class="process-wakeup-detail">${extras.filesHtml||''}${patternRow}${cmdRow}<div class="msg-body process-wakeup-body">${outHtml}</div>${extras.footHtml||''}</div></details>`;
+  const row=(cls,key,value)=>`<div class="${cls}"><span class="process-wakeup-detail-key">${esc(t(key))}</span><code>${esc(String(value))}</code></div>`;
+  const cmdRow=detail.command?row('process-wakeup-cmd-row','process_wakeup_command',detail.command):'';
+  // The full, wrapping pattern lives in the expanded detail so touch and
+  // keyboard users can read it without a hover tooltip (#6350 finding 4).
+  const patternRow=(detail.type==='watch_match'&&detail.pattern)?row('process-wakeup-pattern-row','process_wakeup_matched',detail.pattern):'';
+  const exitStr=detail.exitCode==null?'':String(detail.exitCode);
+  const exitRow=(detail.type==='completion'&&/^-?\d+$/.test(exitStr))?row('process-wakeup-exit-row','process_wakeup_exit_code',exitStr):'';
+  const resultHtml=outcome.result?`<span class="process-wakeup-result">${esc(outcome.result)}</span>`:'';
+  return `<details class="process-wakeup-card"><summary class="process-wakeup-summary"><span class="process-wakeup-status ${outcome.state}" aria-hidden="true">${li(icon,12)}</span><span class="process-wakeup-heading"><span class="process-wakeup-title">${esc(outcome.title)}</span>${resultHtml}</span>${extras.timeHtml||''}<span class="process-wakeup-more">${esc(t('process_wakeup_details'))}<span class="process-wakeup-toggle">${li('chevron-right',12)}</span></span></summary><div class="process-wakeup-detail">${extras.filesHtml||''}${cmdRow}${patternRow}${exitRow}<div class="msg-body process-wakeup-body">${outHtml}</div>${extras.footHtml||''}</div></details>`;
 }
 
 // Group conversations: name the writer above their message. Only rendered when
@@ -17368,22 +17427,14 @@ function renderMessages(options){
       let row=(_msgNodeRecycleEnabled||_msgNodeRecycleSameSession)?_recycleStash.get(rawIdx):null;
       if(row&&(!row.classList.contains('msg-row')||row.classList.contains('assistant-turn'))) row=null;
       const processText=String(rowDisplayContent||'').trim();
-      const processFootHtml=`<div class="msg-foot">${timeHtml}<span class="msg-actions">${copyBtn}</span></div>`;
-      // #6345: structured completions/watch-matches render as a collapsed
-      // summary card; anything unparseable keeps the raw notice below so the
-      // fallback is never worse than the old full-text dump.
+      // #6345, reworked 27 Sep 2026: every wakeup is one quiet summary row,
+      // "Background task complete" plus the result. A body the parser does
+      // not know gets the same row, with its full text under Details, so the
+      // fallback never dumps the raw notice into the conversation.
       const wakeupInfo=_processWakeupInfo(m, processText);
-      let noticeClass='process-wakeup-notice';
-      let noticeInnerHtml;
-      if(wakeupInfo){
-        noticeClass+=' process-wakeup-notice-card';
-        const exitStr=wakeupInfo.exitCode==null?'':String(wakeupInfo.exitCode);
-        if(wakeupInfo.type==='completion'&&/^-?\d+$/.test(exitStr)&&exitStr!=='0') noticeClass+=' process-wakeup-fail';
-        noticeInnerHtml=_processWakeupCardHtml(wakeupInfo, processText, {timeHtml, filesHtml, footHtml:`<div class="msg-foot"><span class="msg-actions">${copyBtn}</span></div>`});
-      }else{
-        const processTextHtml=processText?`<pre class="process-wakeup-text">${esc(processText)}</pre>`:'';
-        noticeInnerHtml=`<div class="process-wakeup-label">${li('terminal',13)}<span>${esc(t('process_wakeup_label'))}</span></div>${filesHtml}<div class="msg-body process-wakeup-body">${processTextHtml}</div>${processFootHtml}`;
-      }
+      const wakeupState=_processWakeupOutcome(wakeupInfo, processText).state;
+      const noticeClass=`process-wakeup-notice process-wakeup-notice-card process-wakeup-${wakeupState}`;
+      const noticeInnerHtml=_processWakeupCardHtml(wakeupInfo, processText, {timeHtml, filesHtml, footHtml:`<div class="msg-foot"><span class="msg-actions">${copyBtn}</span></div>`});
       const nextRowHtml=`<div class="${noticeClass}">${noticeInnerHtml}</div>`;
       if(row){
         row.className='msg-row process-wakeup-row';

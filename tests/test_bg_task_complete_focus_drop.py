@@ -192,24 +192,64 @@ def _toast_block() -> str:
     return body[start : end_marker + len("} catch (_) {}")]
 
 
+def _toast_helper_body() -> str:
+    js = _read_messages_js()
+    start = js.index("function _bgTaskToastText(")
+    end = js.index("\nfunction ", start + 1)
+    return js[start:end]
+
+
 def test_toast_block_uses_only_minimal_payload_fields():
-    """Per Rc-2 the toast copy may reference ONLY ``d.task_id`` and the
-    optional ``d.summary`` — never ``d.command`` or ``d.exit_code`` (those
-    fields are not guaranteed on the minimal payload shipped by the server)."""
+    """Per Rc-2 the toast copy may read ONLY the optional ``d.summary`` from
+    the minimal payload, never ``d.command`` or ``d.exit_code`` (those fields
+    are not guaranteed on the payload shipped by the server). Since 27 Sep
+    2026 the copy is built by ``_bgTaskToastText``."""
     block = _toast_block()
-    assert "d.task_id" in block, "toast must reference d.task_id"
-    assert "d.summary" in block, "toast must reference d.summary"
-    assert "d.command" not in block, "toast must NOT reference d.command (Rc-2)"
-    assert "d.exit_code" not in block, "toast must NOT reference d.exit_code (Rc-2)"
-
-
-def test_toast_template_pins_copy():
-    """The toast template (P-bc §3.3 Q-c-1 verbatim) wraps the task id in the
-    8-char prefix and falls back to ``''`` (empty tail — just ``Task <id> done``)
-    when ``d.summary`` is absent. Pin both literals so a future drift in copy is
-    caught loud."""
-    block = _toast_block()
-    assert "slice(0, 8)" in block
-    assert "slice(0, 80)" in block
-    assert "Task ${tid} done${tail}" in block
+    assert "_bgTaskToastText(d, sid)" in block
     assert "2600" in block, "toast duration must be 2600ms per Q-c-1"
+    helper = _toast_helper_body()
+    assert "d.summary" in helper
+    assert "d.command" not in helper and "d.command" not in block
+    assert "d.exit_code" not in helper and "d.exit_code" not in block
+
+
+def test_toast_copy_is_plain_language():
+    """The toast says what the chat notice says ("Background task complete",
+    failed, stopped or update) plus which chat, never the process id or the
+    raw ``[IMPORTANT: ...]`` summary line."""
+    import json
+    import shutil
+    import subprocess
+
+    node = shutil.which("node")
+    if node is None:
+        import pytest
+        pytest.skip("node not on PATH")
+    driver = (
+        "const T={process_wakeup_title_complete:'Background task complete',"
+        "process_wakeup_title_failed:'Background task failed',"
+        "process_wakeup_title_stopped:'Background task stopped',"
+        "process_wakeup_title_update:'Background task update'};"
+        "function t(k){return T[k]||k;}"
+        "const _allSessions=[{session_id:'s1',title:'IvCB Old v1'}];"
+        + _toast_helper_body()
+        + ";const cases=["
+        "[{summary:'IMPORTANT: Background process proc_0bafdc997c60 completed (exit_code=0).'},'s1'],"
+        "[{summary:'IMPORTANT: Background process proc_1 completed (exit_code=3).'},'s1'],"
+        "[{summary:'IMPORTANT: Background process proc_2 completed (exit_code=-9).'},'s1'],"
+        "[{summary:'IMPORTANT: Background process w1 matched watch pattern \\\"ERR\\\".'},'s1'],"
+        "[{task_id:'proc_9'},'unknown-session'],"
+        "];process.stdout.write(JSON.stringify(cases.map(([d,sid])=>_bgTaskToastText(d,sid))));"
+    )
+    out = subprocess.run([node, "-e", driver], text=True, capture_output=True, timeout=30, check=False)
+    assert out.returncode == 0, out.stderr
+    texts = json.loads(out.stdout)
+    assert texts == [
+        "Background task complete · IvCB Old v1",
+        "Background task failed · IvCB Old v1",
+        "Background task stopped · IvCB Old v1",
+        "Background task update · IvCB Old v1",
+        "Background task complete",
+    ]
+    for text in texts:
+        assert "proc_" not in text and "IMPORTANT" not in text

@@ -8232,6 +8232,26 @@ function stopSessionStream() {
 // a toast. The diagnostic ack POST still fires for both focused and
 // unfocused viewers so the server receives the delivery/cleanup signal;
 // the focus gate suppresses UI noise only.
+// The toast used to read "Task proc_1a2b done: IMPORTANT: Background process
+// proc_1a2b... completed (exit_code=0)." (Michael Ramirez, 27 Sep 2026). It
+// now says the same thing as the notice in the chat, plus which chat it is.
+function _bgTaskToastText(d, sid) {
+  const summary = String((d && d.summary) || '');
+  const exit = summary.match(/exit(?:_code=| code )(-?\d+)/i);
+  let key = 'process_wakeup_title_complete';
+  if (/matched watch pattern/i.test(summary)) key = 'process_wakeup_title_update';
+  else if (exit && (exit[1].startsWith('-') || exit[1] === '137' || exit[1] === '143')) key = 'process_wakeup_title_stopped';
+  else if (exit && exit[1] !== '0') key = 'process_wakeup_title_failed';
+  const title = (typeof t === 'function') ? t(key) : 'Background task complete';
+  let chat = '';
+  try {
+    const rows = (typeof _allSessions !== 'undefined' && Array.isArray(_allSessions)) ? _allSessions : [];
+    const row = rows.find(s => s && s.session_id === sid);
+    chat = row && row.title ? String(row.title).trim() : '';
+  } catch (_) {}
+  return chat ? `${title} · ${chat.length > 60 ? chat.slice(0, 59) + '…' : chat}` : title;
+}
+
 function _handleBgTaskCompleteEvent(e, expectedSid, opts) {
   try {
     const d = JSON.parse(e.data || '{}');
@@ -8250,9 +8270,7 @@ function _handleBgTaskCompleteEvent(e, expectedSid, opts) {
     } else {
       // T4 drop-when-focused: suppress toast only; ack below still fires.
       try {
-        const tid = (d.task_id || '').slice(0, 8) || '?';
-        const tail = d.summary ? `: ${String(d.summary).slice(0, 80)}` : '';
-        showToast(`Task ${tid} done${tail}`, 2600);
+        showToast(_bgTaskToastText(d, sid), 2600);
       } catch (_) {}
     }
 

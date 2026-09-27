@@ -194,8 +194,10 @@ def test_process_wakeup_uses_compact_status_row_not_normal_user_bubble():
     assert "process-wakeup-row" in process_branch
     assert "process-wakeup-notice" in process_branch
     assert "data-role='process_wakeup'" in process_branch or "dataset.role='process_wakeup'" in process_branch
-    assert "${filesHtml}" in process_branch
-    assert "t('process_wakeup_label')" in process_branch
+    # Attachments ride into the card (shown in its detail section).
+    assert "{timeHtml, filesHtml," in process_branch
+    # The row is built by the plain-language card for every wakeup (27 Sep 2026).
+    assert "_processWakeupCardHtml(" in process_branch
     assert "Background wakeup" not in process_branch
     assert "const rowDisplayContent=displayContent;" in ui
     assert "const rowDisplayContent=isProcessWakeup?content:displayContent;" not in ui
@@ -203,9 +205,8 @@ def test_process_wakeup_uses_compact_status_row_not_normal_user_bubble():
     assert ".process-wakeup-row" in STYLE_CSS
     assert ".process-wakeup-notice" in STYLE_CSS
     assert ".process-wakeup-text" in STYLE_CSS
-    notice_rule = STYLE_CSS[
-        STYLE_CSS.index(".process-wakeup-notice{") : STYLE_CSS.index(".process-wakeup-label{")
-    ]
+    notice_start = STYLE_CSS.index(".process-wakeup-notice{")
+    notice_rule = STYLE_CSS[notice_start : STYLE_CSS.index("}", notice_start) + 1]
     assert "margin:8px 0 8px var(--msg-rail)" in notice_rule
     assert "max-width:min(var(--msg-max),760px)" in notice_rule
     assert "margin-left:30px" not in notice_rule

@@ -563,7 +563,7 @@ window.__registerHermesLocale('en', {
     // Text that was reaching the screen as a raw key: 81 identifiers were
     // used with t() but never defined, so the UI printed things like
     // "process_wakeup_label" where a sentence belonged (29 Aug 2026).
-    bg_complete: 'Background task finished',
+    bg_complete: 'Background task complete',
     bg_label: 'Ran in the background:',
     bg_no_answer: 'The background task finished without an answer.',
     btw_done: 'Side question answered',
@@ -613,8 +613,23 @@ window.__registerHermesLocale('en', {
     model_badge_selected: 'Selected',
     open_in_vscode: 'Open in VS Code',
     open_in_vscode_failed: 'Could not open VS Code',
-    process_wakeup_label: 'Background task finished',
+    process_wakeup_label: 'Background task complete',
     process_wakeup_matched: 'Matched',
+    // Background task notice in plain words (27 Sep 2026): a title, the
+    // result, and the technical detail only under Details.
+    process_wakeup_title_complete: 'Background task complete',
+    process_wakeup_title_failed: 'Background task failed',
+    process_wakeup_title_stopped: 'Background task stopped',
+    process_wakeup_title_update: 'Background task update',
+    process_wakeup_result_ok: 'Finished successfully',
+    process_wakeup_result_failed: 'Finished with an error',
+    process_wakeup_result_stopped: 'Stopped before it finished',
+    process_wakeup_result_watch: 'Found what it was waiting for',
+    process_wakeup_result_tests_passed: (passed) => `${passed} test${passed === 1 ? '' : 's'} passed`,
+    process_wakeup_result_tests_failed: (failed, passed) => `${failed} test${failed === 1 ? '' : 's'} failed, ${passed} passed`,
+    process_wakeup_details: 'Details',
+    process_wakeup_command: 'Command',
+    process_wakeup_exit_code: 'Exit code',
     profile_concept_desc_profiles: 'Who the assistant is: its tools, access, memory and skills.',
     profile_concept_desc_together: 'A bot can work in any workspace. Switching one never switches the other.',
     profile_concept_desc_workspaces: 'Where it works: the folder its commands and file edits run in.',

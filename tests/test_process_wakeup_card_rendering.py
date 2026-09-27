@@ -6,6 +6,11 @@ Behavioral coverage for the three ui.js helpers behind the card:
 and ``_processWakeupCardHtml`` (the ``<details>`` card markup). Structural
 integration with the render loop is pinned by
 tests/test_process_wakeup_rendering.py.
+
+Reworked 27 Sep 2026: the collapsed row now says "Background task complete"
+(or failed, stopped, update) plus the result in plain words
+(``_processWakeupOutcome``, ``_processWakeupTestSummary``); the command, exit
+code and output live only in the expanded detail.
 """
 
 import json
@@ -63,6 +68,8 @@ function t(key, ...args){
 
 eval(extractFunc('_parseProcessWakeupBody'));
 eval(extractFunc('_processWakeupInfo'));
+eval(extractFunc('_processWakeupTestSummary'));
+eval(extractFunc('_processWakeupOutcome'));
 eval(extractFunc('_processWakeupCardHtml'));
 
 const okBody = '[IMPORTANT: Background process proc_1 completed (exit_code=0).\nCommand: npm run build\nOutput:\nall good]';
@@ -75,6 +82,17 @@ const wsBody = '[IMPORTANT: Background process p completed (exit_code=0).\nComma
 // Finding 2: output that legitimately ends with the suppression phrasing must
 // be preserved intact (not lifted into a suppression field and dropped).
 const supLikeBody = '[IMPORTANT: Background process w9 matched watch pattern "ERR".\nCommand: tail\nMatched output:\nreal log\n(3 earlier matches were suppressed by rate limit)]';
+
+const pytestPassBody = '[IMPORTANT: Background process p4 completed (exit_code=0).\nCommand: pytest -q\nOutput:\n........\n45 passed, 2 warnings in 3.21s]';
+const pytestFailBody = '[IMPORTANT: Background process p5 completed (exit_code=1).\nCommand: pytest -q\nOutput:\nFAILED tests/test_a.py::test_x\n=========== 2 failed, 43 passed in 4.10s ===========]';
+const pytestErrorBody = '[IMPORTANT: Background process p6 completed (exit_code=1).\nCommand: pytest -q\nOutput:\n1 failed, 1 error in 0.52s]';
+// A summary that disagrees with the exit code is not trusted.
+const disagreeBody = '[IMPORTANT: Background process p7 completed (exit_code=1).\nCommand: pytest -q\nOutput:\n45 passed in 3.00s\nTraceback: teardown crashed]';
+const playwrightBody = '[IMPORTANT: Background process p8 completed (exit_code=1).\nCommand: npx playwright test\nOutput:\n  2 failed\n    [chromium] › login.spec.ts:12:5 › logs in\n  40 passed (1.2m)]';
+const jestBody = '[IMPORTANT: Background process p9 completed (exit_code=0).\nCommand: npm test\nOutput:\nTests:       12 passed, 12 total]';
+const sigtermBody = '[IMPORTANT: Background process p10 completed (exit_code=143).\nCommand: node server.js\nOutput:\n]';
+const unknownDone = '[ASYNC DELEGATION BATCH COMPLETE: d1]\nA background fan-out of 2 subagent(s) finished.';
+const unknownUpdate = '[IMPORTANT: Watch patterns disabled for process w2 after too many matches]';
 
 const okInfo = _processWakeupInfo({}, okBody);
 const failInfo = _processWakeupInfo({}, failBody);
@@ -94,7 +112,23 @@ const metaOverParse = _processWakeupInfo(
 
 const extras = {timeHtml: '<span class="msg-time">14:32</span>', filesHtml: '', footHtml: '<div class="msg-foot"></div>'};
 
+const outcome = (body) => _processWakeupOutcome(_processWakeupInfo({}, body), body);
+
 process.stdout.write(JSON.stringify({
+  okOutcome: outcome(okBody),
+  failOutcome: outcome(failBody),
+  signalOutcome: outcome(signalBody),
+  sigtermOutcome: outcome(sigtermBody),
+  watchOutcome: outcome(watchBody),
+  pytestPassOutcome: outcome(pytestPassBody),
+  pytestFailOutcome: outcome(pytestFailBody),
+  pytestErrorOutcome: outcome(pytestErrorBody),
+  disagreeOutcome: outcome(disagreeBody),
+  playwrightOutcome: outcome(playwrightBody),
+  jestOutcome: outcome(jestBody),
+  unknownDoneOutcome: outcome(unknownDone),
+  unknownUpdateOutcome: outcome(unknownUpdate),
+  unknownCard: _processWakeupCardHtml(null, unknownDone, extras),
   okInfo, failInfo, watchInfo, metaOnlyInfo,
   metaOverParseTaskId: metaOverParse.taskId,
   unparseableIsNull: _processWakeupInfo({}, 'plain text') === null,
@@ -182,40 +216,92 @@ def test_server_meta_is_authoritative_and_covers_unparseable_bodies():
     assert "some future format" in result["metaOnlyCard"]
 
 
-def test_card_markup_collapsed_by_default_with_exit_chip():
+def _summary(card):
+    return card.split("</summary>", 1)[0]
+
+
+def _detail(card):
+    return card.split("</summary>", 1)[1]
+
+
+def test_card_is_a_collapsed_plain_language_row():
     result = _run_driver()
 
     ok_card = result["okCard"]
     assert ok_card.startswith('<details class="process-wakeup-card">')
     assert "open" not in ok_card.split(">", 1)[0]
-    assert 'class="process-wakeup-chip ok"' in ok_card
-    assert "exit 0" in ok_card
-    assert "npm run build" in ok_card
+    summary = _summary(ok_card)
+    # What happened, in words: a title and the result. No command, no exit
+    # chip, no terminal icon in the collapsed row.
+    assert "process_wakeup_title_complete" in summary
+    assert "process_wakeup_result_ok" in summary
+    assert 'class="process-wakeup-status ok"' in summary
+    assert 'data-icon="check"' in summary
+    assert "npm run build" not in summary
+    assert "exit 0" not in summary
+    assert "process-wakeup-chip" not in ok_card
+    assert 'data-icon="terminal"' not in ok_card
     assert "[IMPORTANT" not in ok_card
-    assert 'data-icon="chevron-right"' in ok_card
-    assert 'data-icon="terminal"' in ok_card
-    assert "process_wakeup_label" in ok_card
-    assert '<span class="msg-time">14:32</span>' in ok_card
+    assert "process_wakeup_details" in summary
+    assert 'data-icon="chevron-right"' in summary
+    assert '<span class="msg-time">14:32</span>' in summary
+    # The technical detail is one click away.
+    detail = _detail(ok_card)
+    assert "process_wakeup_command" in detail and "npm run build" in detail
+    assert "process_wakeup_exit_code" in detail and "<code>0</code>" in detail
+    assert "all good" in detail
 
-    fail_card = result["failCard"]
-    assert 'class="process-wakeup-chip fail"' in fail_card
-    assert "exit 3" in fail_card
+    fail_summary = _summary(result["failCard"])
+    assert 'class="process-wakeup-status fail"' in fail_summary
+    assert "process_wakeup_title_failed" in fail_summary
+    assert "<code>3</code>" in _detail(result["failCard"])
 
-    # Signal-killed processes report negative returncodes; still a failure.
-    signal_card = result["signalCard"]
-    assert 'class="process-wakeup-chip fail"' in signal_card
-    assert "exit -9" in signal_card
+    # Signal-killed processes report negative returncodes: stopped, not failed.
+    signal_summary = _summary(result["signalCard"])
+    assert 'class="process-wakeup-status fail"' in signal_summary
+    assert "process_wakeup_title_stopped" in signal_summary
 
     watch_card = result["watchCard"]
-    assert 'class="process-wakeup-chip watch"' in watch_card
-    assert "ERROR.*timeout" in watch_card
-    # No separate suppression line anymore; the note rides in the output pre.
+    assert 'class="process-wakeup-status watch"' in _summary(watch_card)
+    assert "process_wakeup_title_update" in _summary(watch_card)
+    assert "ERROR.*timeout" not in _summary(watch_card)
+    # Finding 4: the full pattern is readable in the expanded detail row.
+    assert "process-wakeup-pattern-row" in _detail(watch_card)
+    assert "ERROR.*timeout" in _detail(watch_card)
     assert "process_wakeup_suppressed" not in watch_card
-    # Finding 4: the full pattern is rendered in the expanded detail (a
-    # dedicated pattern row), not only inside the collapsed chip's hover title.
-    assert "process-wakeup-pattern-row" in watch_card
-    # Pattern appears twice: once in the collapsed chip, once in the detail row.
-    assert watch_card.count("ERROR.*timeout") >= 2
+    # A watch match has no exit code row.
+    assert "process-wakeup-exit-row" not in watch_card
+
+
+def test_outcome_reads_the_result_in_plain_words():
+    result = _run_driver()
+
+    assert result["okOutcome"] == {"state": "ok", "title": "process_wakeup_title_complete", "result": "process_wakeup_result_ok"}
+    assert result["failOutcome"]["state"] == "fail"
+    assert result["failOutcome"]["result"] == "process_wakeup_result_failed"
+    assert result["signalOutcome"]["title"] == "process_wakeup_title_stopped"
+    assert result["sigtermOutcome"]["title"] == "process_wakeup_title_stopped"
+    assert result["watchOutcome"] == {"state": "watch", "title": "process_wakeup_title_update", "result": "process_wakeup_result_watch"}
+
+    # A test run's own summary is the result.
+    assert result["pytestPassOutcome"]["result"] == "process_wakeup_result_tests_passed:45"
+    assert result["pytestPassOutcome"]["state"] == "ok"
+    assert result["pytestFailOutcome"]["result"] == "process_wakeup_result_tests_failed:2,43"
+    assert result["pytestFailOutcome"]["title"] == "process_wakeup_title_failed"
+    assert result["pytestErrorOutcome"]["result"] == "process_wakeup_result_tests_failed:2,0"
+    assert result["jestOutcome"]["result"] == "process_wakeup_result_tests_passed:12"
+    # Playwright prints failures on their own line; they must be counted.
+    assert result["playwrightOutcome"]["result"] == "process_wakeup_result_tests_failed:2,40"
+    # A summary that disagrees with the exit code is never trusted.
+    assert result["disagreeOutcome"]["result"] == "process_wakeup_result_failed"
+
+    # Unknown notices get a plain title and keep their text under Details.
+    assert result["unknownDoneOutcome"] == {"state": "neutral", "title": "process_wakeup_title_complete", "result": ""}
+    assert result["unknownUpdateOutcome"]["title"] == "process_wakeup_title_update"
+    unknown_card = result["unknownCard"]
+    assert "ASYNC DELEGATION BATCH COMPLETE" not in _summary(unknown_card)
+    assert "ASYNC DELEGATION BATCH COMPLETE" in _detail(unknown_card)
+    assert 'data-icon="clock"' in _summary(unknown_card)
 
 
 def test_card_escapes_command_and_output():
@@ -236,19 +322,19 @@ def test_render_branch_and_css_wire_the_card_variant():
     branch = ui[branch_start:branch_end]
 
     assert "_processWakeupInfo(m, processText)" in branch
-    assert "process-wakeup-notice-card" in branch
-    assert "process-wakeup-fail" in branch
-    # The raw-notice fallback must survive for unparseable bodies.
-    assert "process-wakeup-text" in branch
-    assert "t('process_wakeup_label')" in branch
+    assert "_processWakeupOutcome(wakeupInfo, processText)" in branch
+    assert "process-wakeup-notice-card process-wakeup-${wakeupState}" in branch
+    # Every wakeup, parseable or not, renders through the one card; the raw
+    # notice is never dumped into the conversation any more.
+    assert "_processWakeupCardHtml(wakeupInfo, processText" in branch
+    assert "<pre class=\"process-wakeup-text\">" not in branch
 
     assert ".process-wakeup-card{" in STYLE_CSS
-    assert ".process-wakeup-chip.ok{" in STYLE_CSS
-    assert ".process-wakeup-chip.fail{" in STYLE_CSS
+    assert ".process-wakeup-status.ok{" in STYLE_CSS
+    assert ".process-wakeup-status.fail{" in STYLE_CSS
     assert ".process-wakeup-notice.process-wakeup-fail{" in STYLE_CSS
     assert ".process-wakeup-detail pre.process-wakeup-text{max-height" in STYLE_CSS
-    # #6350 finding 3: watch chip shrinks, summary wraps, mobile gets a 44px target.
-    assert ".process-wakeup-chip.watch{flex:0 1 auto;min-width:0;}" in STYLE_CSS
+    # #6350 finding 3: summary wraps, mobile gets a 44px target.
     base_summary = re.search(r"\.process-wakeup-card>summary\{[^}]*\}", STYLE_CSS)
     assert base_summary and "flex-wrap:wrap" in base_summary.group(0)
     assert "@media(max-width:700px){.process-wakeup-card>summary{min-height:44px;}}" in STYLE_CSS
