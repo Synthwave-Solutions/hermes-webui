@@ -2139,12 +2139,13 @@ class _cron_policy_file_pin:
     """Pin the WebUI governance policy file (``HERMES_WEBUI_GOVERNANCE_POLICY``)
     to the one the request decided with, restored on exit.
 
-    The cron create, update and run routes enter it inside cron_profile_context
-    (_cron_request_policy_path), so their checks keep reading that file while
-    HERMES_HOME points at the profile's home; the context's lock serialises the
-    pin with every other cron route. A Run now child enters it with the file
-    from its plan, so it cannot read another file through a HERMES_HOME it
-    inherited while a cron profile context had swapped it.
+    The cron create, update, run and resume routes enter it inside
+    cron_profile_context (_cron_request_policy_path), so their checks keep
+    reading that file while HERMES_HOME points at the profile's home; the
+    context's lock serialises the pin with every other cron route. A Run now
+    child enters it with the file from its plan, so it cannot read another
+    file through a HERMES_HOME it inherited while a cron profile context had
+    swapped it.
     """
 
     _ENV = "HERMES_WEBUI_GOVERNANCE_POLICY"
@@ -16858,7 +16859,10 @@ def handle_post(handler, parsed) -> bool:
     if parsed.path == "/api/crons/resume":
         from api.profiles import cron_profile_context
 
-        with cron_profile_context():
+        # Resume decides who may leave a task ownerless (a cron admin) inside
+        # the swap, like create, update and run.
+        _cron_policy = _cron_request_policy_path()
+        with cron_profile_context(), _cron_policy_file_pin(_cron_policy):
             _ensure_agent_cron_import_path()
             return _handle_cron_resume(handler, body)
 
@@ -24979,7 +24983,9 @@ def _normalize_cron_shared_with(value):
 # Both routes used to hand every body key to the engine, so any cron:write user
 # could edit someone else's task, point its delivery at any recipient or blank
 # the owner_email the engine runs it as. Every write passes _cron_write_allowed;
-# pause, resume, delete and run pass cron_scope.caller_may_act_on_cron_job.
+# pause, resume, delete and run pass cron_scope.caller_may_act_on_cron_job. A
+# task without an owner gets its creator as owner with their first update or
+# resume (_cron_ownerless_task_stamp).
 
 # What static/panels.js sends: the emoji picker, the category popover and the
 # share dialog one field each, saveCronForm the whole form. Anything else,
@@ -25219,7 +25225,8 @@ def _cron_write_allowed(handler, body, job_id=None):
     the allowlist, the value shapes or the people check. Installs with
     governance off resolve every caller as cron admin (identity_has_permission
     fails open there), and report_only audits a 403 as would_deny instead of
-    enforcing.
+    enforcing. An update of a task without an owner is decided after this
+    (_cron_ownerless_task_stamp).
     """
     creating = job_id is None
     path = "/api/crons/create" if creating else "/api/crons/update"
@@ -25321,6 +25328,68 @@ def _cron_write_allowed(handler, body, job_id=None):
         if unknown:
             return 400, {"error": f"shared_with: not in the people directory: {', '.join(unknown)}"}
     return None
+
+
+def _cron_owner_email_writable() -> bool:
+    """Whether the engine's update_job takes ``owner_email``: the live
+    engine's does, the engine identity fix (E0) makes it immutable."""
+    try:
+        import importlib
+
+        jobs = importlib.import_module("cron.jobs")
+    except Exception:
+        return False
+    return "owner_email" not in getattr(jobs, "_IMMUTABLE_JOB_FIELDS", frozenset())
+
+
+def _cron_ownerless_task_stamp(handler, path, *, job=None, job_id=None):
+    """What an update or resume of a task (``job``, or the one ``job_id``
+    names) must write with it when the task has no ``owner_email``. Returns
+    ``(stamp, refusal)``.
+
+    A Tasks panel task from before the owner stamp belongs to its WebUI
+    creator (cron_scope.identity_owns_cron_job), but the live engine's
+    scheduler fires a task without an owner with nothing bound: a governed
+    creator's edit or resume would make its next fire run with unrestricted
+    tools. When that creator, not a cron admin, changes it:
+
+    - on an engine whose update_job takes owner_email, ``stamp`` is
+      ``{"owner_email": <caller>}``, written in the same update (a resume
+      writes it before the task is enabled), so every fire is governed as
+      the creator, as a new task's is (_handle_cron_create);
+    - an engine that refuses owner_email (the identity fix) refuses an
+      ownerless agent fire under enforce itself, which its
+      ``run_job_governed`` marks: nothing to stamp;
+    - on an engine with neither, ``refusal`` is a 403 (reason
+      ``cron_run_ungoverned``, as Run now refuses an unbound run); under
+      report_only it is audited as would_deny and the change goes ahead.
+
+    Cron admins (everyone with governance off) may leave a task ownerless,
+    as they may run one unbound (_cron_run_plan), and a caller who does not
+    own the task (let through by report_only) never becomes its owner.
+    """
+    if _cron_admin_allowed(handler):
+        return {}, None
+    if job is None:
+        from cron.jobs import get_job
+
+        job = get_job(job_id)
+    if not isinstance(job, dict) or str(job.get("owner_email") or "").strip():
+        return {}, None
+    import api.cron_scope as cron_scope
+    from api.governance.enforce import _request_identity
+
+    identity = _request_identity(handler)
+    if not cron_scope.identity_owns_cron_job(identity, job):
+        return {}, None
+    if _cron_owner_email_writable():
+        return {"owner_email": str(identity.get("email") or "").strip().lower()}, None
+    if _cron_governed_run_available():
+        return {}, None
+    return {}, _cron_write_refusal(
+        identity, path, "cron_run_ungoverned",
+        "This task has no owner, so its runs would not be governed. Ask a cron admin to change it.",
+        str(job.get("id") or ""))
 
 
 def _handle_cron_create(handler, body):
@@ -25430,6 +25499,10 @@ def _handle_cron_update(handler, body):
         return j(handler, payload, status=status)
     from cron.jobs import update_job
 
+    stamp, refusal = _cron_ownerless_task_stamp(handler, "/api/crons/update", job_id=job_id)
+    if refusal is not None:
+        status, payload = refusal
+        return j(handler, payload, status=status)
     try:
         updates = {}
         for k, v in body.items():
@@ -25454,6 +25527,8 @@ def _handle_cron_update(handler, body):
                 updates[k] = v
     except ValueError as e:
         return bad(handler, str(e))
+    # The owner goes in with the change, never after it.
+    updates.update(stamp)
     try:
         job = update_job(job_id, updates)
     except ValueError as e:
@@ -25627,8 +25702,14 @@ def _handle_cron_resume(handler, body):
     job = _cron_job_by_id(job_id)
     if not job:
         return bad(handler, "Job not found", 404)
-    from cron.jobs import resume_job
+    stamp, refusal = _cron_ownerless_task_stamp(handler, "/api/crons/resume", job=job)
+    if refusal is not None:
+        return j(handler, refusal[1], status=refusal[0])
+    from cron.jobs import resume_job, update_job
 
+    if stamp:
+        # Before the task is enabled, so it is never scheduled without it.
+        update_job(job["id"], stamp)
     result = resume_job(job["id"])
     if result:
         return j(handler, {"ok": True, "job": result})

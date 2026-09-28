@@ -20,6 +20,9 @@ The rules pinned here:
   could load, ``script``, ``no_agent`` and ``managed_by`` are cron admin only,
   ``shared_with`` only names people in the policy.
 * On create the owner and the origin are stamped from the signed-in identity.
+  A task without an owner gets its creator as owner with their first update
+  or resume where the engine takes the stamp; where it cannot and cannot
+  govern the run either, that change is refused.
 * The four job routes read ``job_id`` once, as a non-empty string.
 * Run now runs governed: through the engine's ``run_job_governed`` when it
   has one, otherwise bound to the owner's governance like a chat turn, and
@@ -164,6 +167,12 @@ class _Store:
             return copy.deepcopy(job) if job is not None else None
 
         def update_job(job_id, updates):
+            # Like the engine: fields named in _IMMUTABLE_JOB_FIELDS (only
+            # "id" on the live engine, the identity fields as well on E0)
+            # are refused.
+            immutable = set(getattr(mod, "_IMMUTABLE_JOB_FIELDS", ())).intersection(updates or {})
+            if immutable:
+                raise ValueError(f"Cron job field(s) cannot be updated: {', '.join(sorted(immutable))}")
             if job_id not in store.jobs:
                 return None
             store.updates.append((job_id, copy.deepcopy(updates)))
@@ -407,6 +416,18 @@ def _engine_has_run_job_governed(monkeypatch, present=True):
                             lambda job, *, reason, **kwargs: None, raising=False)
     else:
         monkeypatch.delattr(scheduler, "run_job_governed", raising=False)
+
+
+# cron.jobs._IMMUTABLE_JOB_FIELDS on an engine with the identity fix (E0); the
+# live engine's is {"id"}.
+E0_IMMUTABLE_JOB_FIELDS = frozenset({"id", "owner_email", "origin", "created_at"})
+
+
+def _engine_identity_fields_immutable(monkeypatch):
+    """Make the fake engine's update_job refuse owner_email, origin and
+    created_at, as the engine with the identity fix (E0) does."""
+    monkeypatch.setattr(sys.modules["cron.jobs"], "_IMMUTABLE_JOB_FIELDS",
+                        E0_IMMUTABLE_JOB_FIELDS, raising=False)
 
 
 # The payloads static/panels.js sends today (emoji picker L1397, category
@@ -832,6 +853,147 @@ def test_the_agent_cron_package_is_pinned_before_the_guards_read_the_store(env, 
     assert order.index("pin") < order.index("lookup"), order
 
 
+# ── An ownerless task gets its owner with its creator's first change ────────
+# A Tasks panel task from before the owner stamp has an empty owner_email; its
+# creator owns it through the task's WebUI origin (identity_owns_cron_job).
+# The live engine's scheduler fires a task without an owner with nothing bound
+# (_governed_as_job_owner just yields), so the creator, a governed non-admin,
+# could rewrite its prompt, skills, schedule, model or delivery, or resume it,
+# and the next scheduled fire ran that with unrestricted tools; Run now
+# already refuses to run unbound for a non-admin. The creator's change now
+# stamps them as the owner in the same write (a resume: before the task is
+# enabled). An engine whose update_job refuses owner_email (the identity fix,
+# E0) refuses ownerless agent fires under enforce itself, which its
+# run_job_governed marks, so nothing is stamped there; an engine that can do
+# neither refuses the change. Cron admins' changes stamp nothing.
+
+LEGACY_TASK_PAYLOADS = [
+    pytest.param(_emoji_payload("legacy"), id="emoji"),
+    pytest.param(_category_payload("legacy"), id="category"),
+    pytest.param(_share_payload("legacy", [SHAREE]), id="share"),
+    pytest.param(_form_update_payload("legacy", prompt="do anything", schedule="every 1m"), id="form"),
+]
+
+
+@pytest.mark.parametrize("payload", LEGACY_TASK_PAYLOADS)
+def test_the_creators_update_stamps_an_ownerless_task(env, payload):
+    handler = env.update(OWNER, payload)
+    assert handler.status == 200, handler.body
+    # One write: the change never lands without the owner.
+    assert len(env.store.updates) == 1
+    job_id, updates = env.store.updates[0]
+    assert job_id == "legacy"
+    assert updates["owner_email"] == OWNER
+    assert env.store.jobs["legacy"]["owner_email"] == OWNER
+    for key in set(payload) - {"job_id"}:
+        assert key in updates, key
+
+
+def test_the_creators_resume_stamps_an_ownerless_task_before_enabling_it(env, monkeypatch):
+    env.store.jobs["legacy"]["enabled"] = False
+    jobs_module = sys.modules["cron.jobs"]
+    resume_job = jobs_module.resume_job
+    owner_at_resume = []
+
+    def _resume(job_id):
+        owner_at_resume.append(env.store.jobs[job_id]["owner_email"])
+        return resume_job(job_id)
+
+    monkeypatch.setattr(jobs_module, "resume_job", _resume)
+    handler = env.act(OWNER, "resume", "legacy")
+    assert handler.status == 200, handler.body
+    assert owner_at_resume == [OWNER]
+    assert env.store.updates == [("legacy", {"owner_email": OWNER})]
+    assert env.store.actions == [("resume", "legacy")]
+    assert env.store.jobs["legacy"]["enabled"] is True
+
+
+def test_pause_delete_and_a_stamped_task_stamp_nothing(env):
+    assert env.act(OWNER, "pause", "legacy").status == 200
+    assert env.update(OWNER, _form_update_payload("own")).status == 200
+    assert env.act(OWNER, "resume", "own").status == 200
+    assert env.act(OWNER, "delete", "legacy").status == 200
+    assert all("owner_email" not in updates for _, updates in env.store.updates)
+    assert env.store.jobs["own"]["owner_email"] == OWNER
+
+
+def test_a_cron_admins_change_leaves_an_ownerless_task_ownerless(env, inject_policy):
+    for email in (ADMIN, BOOTSTRAP):
+        env.install(_Store())
+        env.store.jobs["legacy"]["enabled"] = False
+        assert env.update(email, _form_update_payload("legacy")).status == 200, email
+        assert env.act(email, "resume", "legacy").status == 200, email
+        assert env.store.jobs["legacy"]["owner_email"] == "", email
+        assert all("owner_email" not in updates for _, updates in env.store.updates), email
+    inject_policy({"version": 1, "mode": "off", "default_effect": "deny"})
+    env.install(_Store())
+    env.store.jobs["legacy"]["enabled"] = False
+    assert env.update(None, _form_update_payload("legacy")).status == 200
+    assert env.act(None, "resume", "legacy").status == 200
+    assert env.store.jobs["legacy"]["owner_email"] == ""
+
+
+def test_report_only_never_makes_a_non_owner_the_owner(env, inject_policy):
+    inject_policy({**POLICY, "mode": "report_only"})
+    env.active = "alpha"  # OTHER sees the task through the profile grant
+    env.store.jobs["legacy"]["enabled"] = False
+    assert env.update(OTHER, _emoji_payload("legacy")).status == 200
+    assert env.act(OTHER, "resume", "legacy").status == 200
+    assert env.store.jobs["legacy"]["owner_email"] == ""
+    assert [e["reason"] for e in read_audit_events(10)] == ["cron_owner", "cron_owner"]
+    # The creator's own change is stamped under report_only as well.
+    assert env.update(OWNER, _emoji_payload("legacy")).status == 200
+    assert env.store.jobs["legacy"]["owner_email"] == OWNER
+
+
+def test_an_engine_that_governs_ownerless_fires_needs_no_stamp(env, monkeypatch):
+    _engine_identity_fields_immutable(monkeypatch)
+    _engine_has_run_job_governed(monkeypatch)
+    env.store.jobs["legacy"]["enabled"] = False
+    handler = env.update(OWNER, _form_update_payload("legacy"))
+    assert handler.status == 200, handler.body
+    handler = env.act(OWNER, "resume", "legacy")
+    assert handler.status == 200, handler.body
+    assert env.store.jobs["legacy"]["owner_email"] == ""
+    assert env.store.jobs["legacy"]["enabled"] is True
+    assert all("owner_email" not in updates for _, updates in env.store.updates)
+
+
+def test_an_engine_that_can_neither_stamp_nor_govern_refuses_the_change(env, monkeypatch):
+    _engine_identity_fields_immutable(monkeypatch)
+    _engine_has_run_job_governed(monkeypatch, present=False)
+    env.store.jobs["legacy"]["enabled"] = False
+    before = copy.deepcopy(env.store.jobs)
+    for handler in (env.update(OWNER, _form_update_payload("legacy")),
+                    env.update(OWNER, _emoji_payload("legacy")),
+                    env.act(OWNER, "resume", "legacy")):
+        assert handler.status == 403, handler.body
+        assert handler.body["reason"] == "cron_run_ungoverned"
+    assert env.store.jobs == before
+    assert env.store.updates == [] and env.store.actions == []
+    # The creator's stamped tasks, a pause, and cron admins are unaffected.
+    assert env.update(OWNER, _emoji_payload("own")).status == 200
+    assert env.act(OWNER, "pause", "legacy").status == 200
+    assert env.update(ADMIN, _emoji_payload("legacy")).status == 200
+    assert env.act(ADMIN, "resume", "legacy").status == 200
+
+
+def test_report_only_audits_an_ungoverned_change_instead(env, monkeypatch, inject_policy):
+    inject_policy({**POLICY, "mode": "report_only"})
+    _engine_identity_fields_immutable(monkeypatch)
+    _engine_has_run_job_governed(monkeypatch, present=False)
+    env.store.jobs["legacy"]["enabled"] = False
+    assert env.update(OWNER, _emoji_payload("legacy")).status == 200
+    assert env.act(OWNER, "resume", "legacy").status == 200
+    events = read_audit_events(10)  # newest first
+    assert [(e["event"], e["reason"], e["path"]) for e in events] == [
+        ("would_deny", "cron_run_ungoverned", "/api/crons/resume"),
+        ("would_deny", "cron_run_ungoverned", "/api/crons/update"),
+    ]
+    assert env.store.jobs["legacy"]["owner_email"] == ""
+    assert env.store.jobs["legacy"]["enabled"] is True
+
+
 @pytest.fixture
 def real_store(tmp_path, monkeypatch, inject_policy):
     """The engine's own cron.jobs in a temporary store, driven through the
@@ -871,6 +1033,47 @@ def real_store(tmp_path, monkeypatch, inject_policy):
         return handler
 
     return SimpleNamespace(jobs=jobs, post=post)
+
+
+@pytest.mark.parametrize("identity_fixed,governed_runs,expected", [
+    pytest.param(False, False, "stamped", id="live-engine"),
+    pytest.param(True, True, "unstamped", id="identity-fixed-engine"),
+    pytest.param(True, False, "refused", id="neither"),
+])
+def test_real_engine_store_and_an_ownerless_task(real_store, monkeypatch, identity_fixed,
+                                                 governed_runs, expected):
+    """Against the engine's own cron.jobs: the stamp goes in with the change
+    in one update_job call, and before resume_job enables the task."""
+    jobs, post = real_store.jobs, real_store.post
+    scheduler = pytest.importorskip("cron.scheduler")
+    monkeypatch.setattr(jobs, "_IMMUTABLE_JOB_FIELDS",
+                        E0_IMMUTABLE_JOB_FIELDS if identity_fixed else frozenset({"id"}))
+    if governed_runs:
+        monkeypatch.setattr(scheduler, "run_job_governed", lambda job, **kwargs: None, raising=False)
+    else:
+        monkeypatch.delattr(scheduler, "run_job_governed", raising=False)
+    legacy = {"platform": "webui", "chat_id": "sess-legacy", "user_id": OWNER}
+    edited = jobs.create_job(prompt="ping", schedule="every 1h", name="Edited", origin=legacy)
+    resumed = jobs.create_job(prompt="ping", schedule="every 1h", name="Resumed", origin=legacy)
+    assert str(edited.get("owner_email") or "") == str(resumed.get("owner_email") or "") == ""
+    assert post(OWNER, "/api/crons/pause", {"job_id": resumed["id"]}).status == 200
+    assert jobs.get_job(resumed["id"])["enabled"] is False
+    before = jobs.JOBS_FILE.read_bytes()
+
+    update = post(OWNER, "/api/crons/update", {"job_id": edited["id"], "prompt": "do anything"})
+    resume = post(OWNER, "/api/crons/resume", {"job_id": resumed["id"]})
+    if expected == "refused":
+        assert (update.status, resume.status) == (403, 403), (update.body, resume.body)
+        assert jobs.JOBS_FILE.read_bytes() == before
+        return
+    assert (update.status, resume.status) == (200, 200), (update.body, resume.body)
+    owner = OWNER if expected == "stamped" else ""
+    stored = jobs.get_job(edited["id"])
+    assert stored["prompt"] == "do anything"
+    assert str(stored.get("owner_email") or "") == owner
+    stored = jobs.get_job(resumed["id"])
+    assert stored["enabled"] is True
+    assert str(stored.get("owner_email") or "") == owner
 
 
 # ── A job name must not slip past the owner guard ───────────────────────────
@@ -2084,6 +2287,20 @@ def test_update_on_a_named_profile_keeps_the_request_policy(env, monkeypatch):
     assert "HERMES_WEBUI_GOVERNANCE_POLICY" not in os.environ
     # The owner's own edit still goes through.
     assert env.update(OWNER, _category_payload("own")).status == 200
+
+
+def test_resume_on_a_named_profile_keeps_the_request_policy(env, monkeypatch):
+    """Resume decides whether the caller is a cron admin (the ownerless task
+    stamp) inside the swap, so it keeps the request's policy too."""
+    import os
+
+    _policy_file, alpha = _root_policy_file(monkeypatch)
+    _swap_to(env, monkeypatch, alpha)
+    env.store.jobs["legacy"]["enabled"] = False
+    handler = env.act(OWNER, "resume", "legacy")
+    assert handler.status == 200, handler.body
+    assert env.store.jobs["legacy"]["owner_email"] == OWNER
+    assert "HERMES_WEBUI_GOVERNANCE_POLICY" not in os.environ
 
 
 def test_create_on_a_named_profile_keeps_the_request_policy(env, monkeypatch):
