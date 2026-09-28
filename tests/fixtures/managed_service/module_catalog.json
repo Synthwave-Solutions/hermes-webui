@@ -92,10 +92,10 @@
             "name": "ingress"
           }
         ],
-        "router_profiles": [
-          "omniroute",
-          "llmproxy"
-        ],
+        "router_profiles": {
+          "omniroute": "omniroute",
+          "litellm": "llmproxy"
+        },
         "toggles": [
           {
             "env": "SP_DOCUMENT_TOOLS",
@@ -123,8 +123,13 @@
             "id": "documents",
             "planned": true,
             "env_keys": [
-              "SP_OPS_TOOL_SERVER_DOCUMENTS_ENABLED",
-              "SP_OPS_TOOL_SERVER_DOCUMENTS_URL"
+              "SP_OPS_TOOL_SERVER_DOCUMENTS_URL",
+              "SP_OPS_TOOL_SERVER_DOCUMENTS_NAME",
+              "SP_OPS_TOOL_SERVER_DOCUMENTS_AUTH",
+              "SP_OPS_TOOL_SERVER_DOCUMENTS_TOKEN_FILE",
+              "SP_OPS_TOOL_SERVER_DOCUMENTS_HEADER",
+              "SP_OPS_TOOL_SERVER_DOCUMENTS_GROUPS",
+              "SP_OPS_TOOL_SERVER_DOCUMENTS_ENABLED"
             ],
             "what": "document tools server (3.14, O4)"
           }
@@ -174,11 +179,14 @@
           "kind": "volume_tar",
           "service": "omniroute",
           "volume": "omniroute-data",
+          "profile": "omniroute",
           "what": "router state",
           "existing": true,
           "exclude": [
-            "router call-log request and response bodies (3.12 design 4: never in a backup)"
-          ]
+            "call_logs/**",
+            "log_archives/**"
+          ],
+          "exclude_what": "router call-log request and response bodies and their archives (3.12 design 4: never in a backup); globs relative to the volume root"
         }
       ],
       "probes": [
@@ -443,8 +451,13 @@
           {
             "id": "rag",
             "env_keys": [
-              "SP_OPS_TOOL_SERVER_RAG_ENABLED",
-              "SP_OPS_TOOL_SERVER_RAG_URL"
+              "SP_OPS_TOOL_SERVER_RAG_URL",
+              "SP_OPS_TOOL_SERVER_RAG_NAME",
+              "SP_OPS_TOOL_SERVER_RAG_AUTH",
+              "SP_OPS_TOOL_SERVER_RAG_TOKEN_FILE",
+              "SP_OPS_TOOL_SERVER_RAG_HEADER",
+              "SP_OPS_TOOL_SERVER_RAG_GROUPS",
+              "SP_OPS_TOOL_SERVER_RAG_ENABLED"
             ],
             "what": "knowledge base tool server, started in host mode (K1)"
           }
