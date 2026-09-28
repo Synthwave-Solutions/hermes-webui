@@ -8,8 +8,9 @@ any ``cron:write`` user could edit someone else's scheduled task, rewrite its
 
 The rules pinned here:
 
-* Only the fields the Tasks panel sends are accepted; identity fields, run
-  state and anything unknown give 400.
+* Only the fields the Tasks panel sends are accepted, each in the shape the
+  panel sends it (for cron admins too); identity fields, run state, anything
+  unknown and a wrong shape give 400.
 * The per-job scope guard runs first, then ownership: the owner or a cron
   admin may edit, a sharee may not. The same ownership rule covers pause,
   resume, delete and run, which are reached through the same scope guard.
@@ -831,6 +832,47 @@ def test_the_agent_cron_package_is_pinned_before_the_guards_read_the_store(env, 
     assert order.index("pin") < order.index("lookup"), order
 
 
+@pytest.fixture
+def real_store(tmp_path, monkeypatch, inject_policy):
+    """The engine's own cron.jobs in a temporary store, driven through the
+    real handle_post dispatcher on the default profile."""
+    import api.governance.enforce as enforce
+    import api.profiles as profiles
+    import api.routes as routes
+
+    jobs = pytest.importorskip("cron.jobs")
+    if not routes._callable_accepts_kwarg(jobs.create_job, "owner_email"):
+        pytest.skip("engine create_job predates owner_email")
+    monkeypatch.setattr(jobs, "CRON_DIR", tmp_path / "cron")
+    monkeypatch.setattr(jobs, "JOBS_FILE", tmp_path / "cron" / "jobs.json")
+    monkeypatch.setattr(jobs, "OUTPUT_DIR", tmp_path / "cron" / "output")
+    monkeypatch.setattr(jobs, "_compute_provider_model_snapshots", lambda **k: (None, None), raising=False)
+    try:
+        import cron.notepad as notepad
+        monkeypatch.setattr(notepad, "NOTEPAD_FILE", tmp_path / "cron" / "notepad.db")
+    except ImportError:
+        pass
+    monkeypatch.setattr(routes, "_get_active_profile_name", lambda: "default")
+    monkeypatch.setattr(routes, "_check_csrf", lambda _handler: True)
+    monkeypatch.setattr(
+        routes, "_guard_request_session_visibility",
+        lambda handler, parsed, body=None, method="POST": True,
+    )
+    monkeypatch.setattr(routes, "_ensure_agent_cron_import_path", lambda: None)
+    monkeypatch.setattr(profiles, "cron_profile_context", nullcontext)
+    inject_policy(POLICY)
+
+    def post(email, path, body):
+        identity = _identity(email)
+        monkeypatch.setattr(enforce, "_request_identity", lambda handler: identity)
+        monkeypatch.setattr(routes, "read_body", lambda _handler: copy.deepcopy(body))
+        handler = _JSONHandler()
+        assert routes.handle_post(handler, SimpleNamespace(path=path, query="")) is not False
+        return handler
+
+    return SimpleNamespace(jobs=jobs, post=post)
+
+
 # ── A job name must not slip past the owner guard ───────────────────────────
 # The engine's pause_job, resume_job and remove_job resolve a job NAME as well
 # as an id (resolve_job_ref), while both guards look the job up by id. Before
@@ -998,6 +1040,61 @@ def test_guards_and_handler_look_up_the_same_id(run_env, monkeypatch, action):
 
 
 # ── Value checks ────────────────────────────────────────────────────────────
+
+# Every allowlisted field has one shape, for cron admins too: the text fields
+# (what saveCronForm and the popovers send) are strings, model, provider and
+# profile a string or null (the form clears a pin with null), and
+# toast_notifications a boolean. Before this check any JSON value reached
+# update_job: an owner could store a list as their task's name, after which
+# the engine's resolve_job_ref raised on every lookup by name in that store,
+# so pausing, resuming or removing anyone's task by name there failed.
+_BAD_VALUE_SHAPES = [
+    ("name", ["x"]), ("name", {"a": 1}), ("name", 1), ("name", None),
+    ("prompt", ["summarise"]), ("prompt", {"a": 1}),
+    ("schedule", ["every 1h"]), ("schedule", {"kind": "interval", "minutes": 0}),
+    ("deliver", ["telegram:1"]), ("deliver", {"telegram": "1"}), ("deliver", None),
+    ("diagram", {"a": 1}), ("emoji", ["📬"]), ("category", {"a": 1}),
+    ("model", ["gpt-allowed"]), ("model", 1), ("provider", {"a": 1}), ("profile", ["alpha"]),
+    ("toast_notifications", "no"), ("toast_notifications", 0), ("toast_notifications", None),
+]
+
+
+@pytest.mark.parametrize("field,value", _BAD_VALUE_SHAPES)
+def test_value_shapes_are_checked_for_everyone(env, field, value):
+    for email in (OWNER, ADMIN, BOOTSTRAP):
+        handler = env.update(email, {"job_id": "own", field: value})
+        assert handler.status == 400, (email, handler.body)
+        assert field in handler.body["error"], (email, handler.body)
+        handler = env.create(email, _form_create_payload(**{field: value}))
+        assert handler.status == 400, (email, handler.body)
+        assert field in handler.body["error"], (email, handler.body)
+    assert env.store.updates == [] and env.store.creates == []
+    assert env.store.jobs == _stored_jobs()
+
+
+def test_the_panels_value_shapes_pass(env):
+    """What the Tasks panel sends, including a cleared model pin (null) and
+    an unticked toast box."""
+    handler = env.update(OWNER, _form_update_payload(
+        "own", model=None, provider=None, toast_notifications=False, diagram="", emoji="", category=""))
+    assert handler.status == 200, handler.body
+    handler = env.create(OWNER, _form_create_payload(model=None, provider=None, profile=None,
+                                                     toast_notifications=False))
+    assert handler.status == 200, handler.body
+
+
+def test_real_engine_name_lookups_survive_a_refused_name(real_store):
+    jobs, post = real_store.jobs, real_store.post
+    handler = post(OWNER, "/api/crons/create", _form_create_payload(
+        name="Owner task", model=None, provider=None, skills=[]))
+    assert handler.status == 200, handler.body
+    job_id = handler.body["job"]["id"]
+    before = jobs.JOBS_FILE.read_bytes()
+    for body in ({"job_id": job_id, "name": ["x"]},
+                 {"job_id": job_id, "schedule": {"kind": "interval", "minutes": 0}}):
+        assert post(OWNER, "/api/crons/update", body).status == 400
+    assert jobs.JOBS_FILE.read_bytes() == before
+    assert jobs.resolve_job_ref("owner task")["id"] == job_id
 
 @pytest.mark.parametrize("deliver", ["telegram:12345", "slack:#general", "all", "origin,telegram:1", "discord"])
 def test_deliver_outside_the_callers_options_is_forbidden(env, deliver):

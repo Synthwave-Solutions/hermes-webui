@@ -24992,6 +24992,17 @@ _CRON_WRITE_FIELDS = frozenset({
 # Only a new task takes this (saveCronForm's create branch); an existing task
 # is paused and resumed through its own routes.
 _CRON_CREATE_ONLY_FIELDS = frozenset({"enabled"})
+# The one shape each of those fields may have, cron admins included (400
+# otherwise): what the Tasks panel sends. A list stored as a task's name
+# broke the engine's lookups by name (resolve_job_ref) for its whole store.
+# model, provider and profile also take null: the form clears a model pin
+# with it. skills, shared_with, enabled and the admin fields are checked
+# where their values are.
+_CRON_STRING_FIELDS = frozenset({
+    "name", "prompt", "schedule", "deliver", "diagram", "emoji", "category",
+})
+_CRON_STRING_OR_NULL_FIELDS = frozenset({"model", "provider", "profile"})
+_CRON_BOOLEAN_FIELDS = frozenset({"toast_notifications"})
 # A no_agent script runs without any governance, and managed_by decides who is
 # told when a task fails, so only cron admins may set them.
 _CRON_ADMIN_FIELDS = frozenset({"script", "no_agent", "managed_by"})
@@ -25001,6 +25012,21 @@ _CRON_MANAGED_BY_VALUES = frozenset({"synthwave", "client"})
 def _normalize_cron_managed_by(value):
     """``synthwave`` or ``client``; empty clears the marker."""
     return str(value or "").strip().lower() or None
+
+
+def _cron_value_shape_error(body):
+    """The 400 message for the first field of ``body`` whose value has the
+    wrong shape (_CRON_STRING_FIELDS and the two sets after it), else None."""
+    for key in sorted(_CRON_STRING_FIELDS.intersection(body)):
+        if not isinstance(body[key], str):
+            return f"{key} must be a string"
+    for key in sorted(_CRON_STRING_OR_NULL_FIELDS.intersection(body)):
+        if body[key] is not None and not isinstance(body[key], str):
+            return f"{key} must be a string or null"
+    for key in sorted(_CRON_BOOLEAN_FIELDS.intersection(body)):
+        if not isinstance(body[key], bool):
+            return f"{key} must be true or false"
+    return None
 
 
 def _cron_delivery_platforms():
@@ -25186,13 +25212,14 @@ def _cron_write_allowed(handler, body, job_id=None):
     is written. Returns None when the write may go ahead, otherwise the
     ``(status, payload)`` refusal to send.
 
-    Order: the field allowlist (400); for an update the per-job scope guard,
-    then ownership (403: the owner or a cron admin may edit, a sharee may
-    not); then the values (skills by the chat rule, deliver, model). Cron
-    admins skip ownership and the value grants, never the allowlist, the value
-    shapes or the people check. Installs with governance off
-    resolve every caller as cron admin (identity_has_permission fails open
-    there), and report_only audits a 403 as would_deny instead of enforcing.
+    Order: the field allowlist and the value shapes (400); for an update the
+    per-job scope guard, then ownership (403: the owner or a cron admin may
+    edit, a sharee may not); then the values (skills by the chat rule,
+    deliver, model). Cron admins skip ownership and the value grants, never
+    the allowlist, the value shapes or the people check. Installs with
+    governance off resolve every caller as cron admin (identity_has_permission
+    fails open there), and report_only audits a 403 as would_deny instead of
+    enforcing.
     """
     creating = job_id is None
     path = "/api/crons/create" if creating else "/api/crons/update"
@@ -25201,6 +25228,9 @@ def _cron_write_allowed(handler, body, job_id=None):
     refused = sorted(str(key) for key in body if key not in accepted)
     if refused:
         return 400, {"error": f"Field not allowed: {', '.join(refused)}"}
+    shape_error = _cron_value_shape_error(body)
+    if shape_error:
+        return 400, {"error": shape_error}
 
     from api.governance.enforce import _request_identity
 
