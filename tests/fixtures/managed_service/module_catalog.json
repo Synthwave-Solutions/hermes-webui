@@ -1,0 +1,806 @@
+{
+  "catalog_version": 1,
+  "display_denylist": [
+    "n8n",
+    "OmniRoute",
+    "LangGraph",
+    "Hermes",
+    "LiteLLM",
+    "RAGFlow",
+    "Langfuse",
+    "OpenWebUI",
+    "OpenDesign",
+    "OpenNotebook",
+    "DocuSeal",
+    "OpenWhispr",
+    "OpenWispr",
+    "Fireflies",
+    "Meetily",
+    "Vexa",
+    "OpenBot",
+    "Nango",
+    "SurrealDB",
+    "Elasticsearch",
+    "MinIO",
+    "Valkey",
+    "Mnemosyne",
+    "mnemo-hub"
+  ],
+  "unavailable_reasons": [
+    {
+      "code": "arch",
+      "meaning": "the installation's CPU architecture is not supported by the module",
+      "i18n_key": "modules_reason_arch"
+    },
+    {
+      "code": "hosting_model",
+      "meaning": "the catalogue hosting entry excludes the installation's hosting model",
+      "i18n_key": "modules_reason_hosting_model"
+    },
+    {
+      "code": "requires",
+      "meaning": "a required module is not active",
+      "i18n_key": "modules_reason_requires"
+    },
+    {
+      "code": "not_confirmed",
+      "meaning": "the module is not confirmed (D31) or its lifecycle does not allow it here",
+      "i18n_key": "modules_reason_not_confirmed"
+    },
+    {
+      "code": "placement",
+      "meaning": "no allowed placement fits (size, companion or public host missing)",
+      "i18n_key": "modules_reason_placement"
+    }
+  ],
+  "shared_profiles": {
+    "speech": {
+      "profile": "speech",
+      "planned": true,
+      "placement": "core",
+      "architectures": [
+        "amd64"
+      ],
+      "ram_budget_mb": 1536,
+      "measured": false,
+      "notes": "OpenAI-compatible transcription endpoint on the installation (faster-whisper, CPU); counted once when several modules use it"
+    }
+  },
+  "modules": [
+    {
+      "id": "workspace",
+      "tier": "standard",
+      "lifecycle": "available",
+      "confirmed": true,
+      "name": {
+        "nl": "Werkplek en AI-medewerkers",
+        "en": "Workspace and AI assistants"
+      },
+      "summary": {
+        "nl": "Chat, AI-medewerkers, projecten, geplande taken, vaardigheden en geheugen op één plek.",
+        "en": "Chat, AI assistants, projects, scheduled tasks, skills and memory in one place."
+      },
+      "components": {
+        "core_container": true,
+        "profiles": [
+          {
+            "name": "webui"
+          },
+          {
+            "name": "ingress"
+          }
+        ],
+        "router_profiles": [
+          "omniroute",
+          "llmproxy"
+        ],
+        "toggles": [],
+        "tool_servers": [],
+        "desktop_app": null,
+        "notes": "core container (engine, agent fleet, memory hub, dashboard, message queue, nightly jobs, backup, health, secrets), the WebUI, exactly one router profile chosen by llm.router in the render, ingress, brand assets, reporter"
+      },
+      "requires": [],
+      "conflicts": [],
+      "architectures": [
+        "amd64",
+        "arm64"
+      ],
+      "placement": {
+        "default": "core",
+        "allowed": [
+          "core"
+        ]
+      },
+      "ram_budget_mb": 5400,
+      "ram_breakdown_mb": {
+        "core": 2560,
+        "webui": 1800,
+        "router": 1024
+      },
+      "measured": true,
+      "model_usage": {
+        "level": "high",
+        "consumers": "every chat, task and skill"
+      },
+      "backup": [
+        {
+          "kind": "volume_tar",
+          "service": "core",
+          "volume": "synthpulse-data",
+          "what": "engine home",
+          "existing": true
+        },
+        {
+          "kind": "volume_tar",
+          "service": "webui",
+          "volume": "synthpulse-webui",
+          "what": "WebUI state",
+          "existing": true
+        },
+        {
+          "kind": "volume_tar",
+          "service": "omniroute",
+          "volume": "omniroute-data",
+          "what": "router state",
+          "existing": true
+        }
+      ],
+      "probes": [
+        {
+          "service": "core",
+          "check": "compose_healthcheck",
+          "profile": null
+        },
+        {
+          "service": "webui",
+          "check": "http",
+          "url": "http://webui:8787/health",
+          "profile": "webui"
+        },
+        {
+          "service": "omniroute",
+          "check": "compose_healthcheck",
+          "profile": "omniroute"
+        },
+        {
+          "service": "litellm",
+          "check": "http",
+          "url": "http://litellm:4000/health/liveliness",
+          "profile": "llmproxy"
+        }
+      ],
+      "app_link": null,
+      "licence": "Synthwave platform: engine fork (MIT upstream), WebUI, router (per its own licence)",
+      "dpa": "Chats, files and memories on the installation; model providers per routing profile (EU route on request); the client's own connectors",
+      "hosting": {
+        "client_cloud": {},
+        "synthwave_eu_cloud": {},
+        "on_premise": {}
+      }
+    },
+    {
+      "id": "group_chat",
+      "tier": "standard",
+      "lifecycle": "available",
+      "confirmed": true,
+      "name": {
+        "nl": "Groepsgesprekken met AI-medewerkers",
+        "en": "Group chats with AI assistants"
+      },
+      "summary": {
+        "nl": "Collega's en meerdere AI-medewerkers in één gesprek, ook in Teams, Slack en WhatsApp.",
+        "en": "Colleagues and several AI assistants in one conversation, also in Teams, Slack and WhatsApp."
+      },
+      "components": {
+        "core_container": false,
+        "profiles": [],
+        "toggles": [],
+        "tool_servers": [],
+        "desktop_app": null,
+        "notes": "WebUI group chat (5.2) and the gateway chat channels; never module-gated"
+      },
+      "requires": [
+        "workspace"
+      ],
+      "conflicts": [],
+      "architectures": [
+        "amd64",
+        "arm64"
+      ],
+      "placement": {
+        "default": "core",
+        "allowed": [
+          "core"
+        ]
+      },
+      "ram_budget_mb": 0,
+      "measured": true,
+      "model_usage": {
+        "level": "medium",
+        "consumers": "assistant turns in group conversations"
+      },
+      "backup": [],
+      "backup_covered_by": "workspace",
+      "probes": [],
+      "app_link": null,
+      "licence": "Synthwave platform",
+      "dpa": "Messages stored like chats; external channels are the client's own tenants (WhatsApp adds Meta)",
+      "hosting": {
+        "client_cloud": {},
+        "synthwave_eu_cloud": {},
+        "on_premise": {}
+      }
+    },
+    {
+      "id": "design_studio",
+      "tier": "standard",
+      "lifecycle": "available",
+      "confirmed": true,
+      "name": {
+        "nl": "Ontwerpstudio",
+        "en": "Design studio"
+      },
+      "summary": {
+        "nl": "Documenten, presentaties en afbeeldingen in je eigen huisstijl.",
+        "en": "Documents, presentations and images in your own house style."
+      },
+      "components": {
+        "core_container": false,
+        "profiles": [
+          {
+            "name": "opendesign"
+          }
+        ],
+        "toggles": [],
+        "tool_servers": [],
+        "desktop_app": null,
+        "notes": "profile opendesign"
+      },
+      "requires": [
+        "workspace"
+      ],
+      "conflicts": [],
+      "architectures": [
+        "amd64",
+        "arm64"
+      ],
+      "placement": {
+        "default": "core",
+        "allowed": [
+          "core"
+        ]
+      },
+      "ram_budget_mb": 512,
+      "measured": false,
+      "model_usage": {
+        "level": "medium",
+        "consumers": "design generation through the router"
+      },
+      "backup": [
+        {
+          "kind": "volume_tar",
+          "service": "opendesign",
+          "volume": "synthpulse-opendesign",
+          "what": "design studio volume"
+        }
+      ],
+      "probes": [
+        {
+          "service": "opendesign",
+          "check": "http",
+          "url": "http://opendesign:8289/",
+          "profile": "opendesign"
+        }
+      ],
+      "app_link": "design",
+      "licence": "OpenDesign (Synthwave build)",
+      "dpa": "Documents and images on the installation; image generation provider only if enabled",
+      "hosting": {
+        "client_cloud": {},
+        "synthwave_eu_cloud": {},
+        "on_premise": {}
+      }
+    },
+    {
+      "id": "workflows",
+      "tier": "standard",
+      "lifecycle": "available",
+      "confirmed": true,
+      "name": {
+        "nl": "Workflows",
+        "en": "Workflows"
+      },
+      "summary": {
+        "nl": "Processen die automatisch tussen je systemen lopen, door ons gebouwd en beheerd.",
+        "en": "Processes that run automatically between your systems, built and run by us."
+      },
+      "components": {
+        "core_container": false,
+        "profiles": [
+          {
+            "name": "n8n"
+          },
+          {
+            "name": "pgdb"
+          }
+        ],
+        "toggles": [],
+        "tool_servers": [],
+        "desktop_app": null,
+        "notes": "profiles n8n and pgdb, the error workflow (C5); selling it needs D30; the editor tile follows D35"
+      },
+      "requires": [
+        "workspace"
+      ],
+      "conflicts": [],
+      "architectures": [
+        "amd64",
+        "arm64"
+      ],
+      "placement": {
+        "default": "core",
+        "allowed": [
+          "core"
+        ]
+      },
+      "ram_budget_mb": 512,
+      "measured": true,
+      "model_usage": {
+        "level": "low",
+        "consumers": "AI steps through the router"
+      },
+      "backup": [
+        {
+          "kind": "pg_dump",
+          "service": "postgres",
+          "database_env": "N8N_DB_NAME",
+          "database_default": "n8n",
+          "user_env": "N8N_DB_USER",
+          "user_default": "n8n",
+          "what": "workflow database"
+        }
+      ],
+      "probes": [
+        {
+          "service": "n8n",
+          "check": "http",
+          "url": "http://n8n:5678/healthz",
+          "profile": "n8n"
+        },
+        {
+          "service": "postgres",
+          "check": "compose_healthcheck",
+          "profile": "pgdb"
+        }
+      ],
+      "app_link": "workflows",
+      "licence": "n8n Sustainable Use License (D30 decides managed hosting)",
+      "dpa": "Data flows to the client's systems as the workflows define; credentials encrypted on the installation",
+      "hosting": {
+        "client_cloud": {},
+        "synthwave_eu_cloud": {},
+        "on_premise": {}
+      }
+    },
+    {
+      "id": "knowledge_base",
+      "tier": "advanced",
+      "lifecycle": "pilot",
+      "confirmed": false,
+      "name": {
+        "nl": "Kennisbank op je eigen documenten",
+        "en": "Knowledge base on your own documents"
+      },
+      "summary": {
+        "nl": "Doorzoek de documenten van je organisatie en krijg antwoorden met bronnen.",
+        "en": "Search your organisation's documents and get answers with sources."
+      },
+      "components": {
+        "core_container": false,
+        "profiles": [
+          {
+            "name": "rag"
+          }
+        ],
+        "toggles": [],
+        "tool_servers": [
+          {
+            "id": "rag",
+            "env_keys": [
+              "SP_OPS_TOOL_SERVER_RAG_ENABLED",
+              "SP_OPS_TOOL_SERVER_RAG_URL"
+            ],
+            "what": "knowledge base tool server, started in host mode (K1)"
+          }
+        ],
+        "desktop_app": null,
+        "notes": "profile rag (RAGFlow with its search index, database, object store and cache) and the rag tool server; vm.max_map_count 262144; index heap 1 GB"
+      },
+      "requires": [
+        "workspace"
+      ],
+      "conflicts": [],
+      "architectures": [
+        "amd64"
+      ],
+      "placement": {
+        "default": "companion",
+        "allowed": [
+          "companion",
+          "core"
+        ]
+      },
+      "cloud_placements": {
+        "azure": [
+          "companion"
+        ]
+      },
+      "ram_budget_mb": 8192,
+      "measured": true,
+      "model_usage": {
+        "level": "high",
+        "consumers": "embeddings at the first ingest, retrieval plus answer per question"
+      },
+      "backup": [
+        {
+          "kind": "mysqldump",
+          "service": "ragflow-mysql",
+          "database_default": "rag_flow",
+          "what": "knowledge base database"
+        },
+        {
+          "kind": "volume_tar",
+          "service": "ragflow-minio",
+          "volume": "ragflow-minio",
+          "what": "object store"
+        }
+      ],
+      "backup_notes": "the search index (ragflow-es) is rebuilt after a restore, never backed up",
+      "probes": [
+        {
+          "service": "ragflow",
+          "check": "http",
+          "url": "http://ragflow:9380/v1/system/healthz",
+          "profile": "rag"
+        },
+        {
+          "service": "ragflow-es",
+          "check": "compose_healthcheck",
+          "profile": "rag"
+        },
+        {
+          "service": "ragflow-mysql",
+          "check": "compose_healthcheck",
+          "profile": "rag"
+        },
+        {
+          "service": "ragflow-minio",
+          "check": "compose_healthcheck",
+          "profile": "rag"
+        },
+        {
+          "service": "ragflow-redis",
+          "check": "compose_healthcheck",
+          "profile": "rag"
+        }
+      ],
+      "app_link": null,
+      "licence": "RAGFlow Apache-2.0",
+      "dpa": "Copies of documents and their index on the (companion) installation; embedding provider through the router, EU route recommended",
+      "hosting": {
+        "client_cloud": {
+          "note": "companion by default; mandatory companion on Azure"
+        },
+        "synthwave_eu_cloud": {
+          "note": "companion VM (12 to 16 GB, 150 GB) or PRO2-M for the core"
+        },
+        "on_premise": {
+          "min_core_ram_mb": 32768,
+          "or_placement": "companion",
+          "gpu": "none",
+          "note": "one host with 32 GB, or a second client VM with 12 to 16 GB and 150 GB"
+        }
+      }
+    },
+    {
+      "id": "notebook",
+      "tier": "advanced",
+      "lifecycle": "pilot",
+      "confirmed": false,
+      "name": {
+        "nl": "Onderzoeksnotitieboek",
+        "en": "Research notebook"
+      },
+      "summary": {
+        "nl": "Verzamel bronnen, maak notities en krijg samenvattingen, ook als audio.",
+        "en": "Collect sources, take notes and get summaries, also as audio."
+      },
+      "components": {
+        "core_container": false,
+        "profiles": [
+          {
+            "name": "opennotebook"
+          }
+        ],
+        "toggles": [],
+        "tool_servers": [],
+        "desktop_app": null,
+        "notes": "profile opennotebook (app plus its database); an SSO front before any client use (M2)"
+      },
+      "requires": [
+        "workspace"
+      ],
+      "conflicts": [],
+      "architectures": [
+        "amd64"
+      ],
+      "placement": {
+        "default": "core",
+        "allowed": [
+          "core"
+        ]
+      },
+      "ram_budget_mb": 2048,
+      "measured": false,
+      "model_usage": {
+        "level": "medium",
+        "consumers": "summaries; audio summaries high"
+      },
+      "backup": [
+        {
+          "kind": "volume_tar",
+          "service": "opennotebook-surreal",
+          "volume": "opennotebook-surreal",
+          "what": "notebook database volume"
+        }
+      ],
+      "probes": [
+        {
+          "service": "opennotebook",
+          "check": "http",
+          "url": "http://opennotebook:5055/health",
+          "profile": "opennotebook"
+        },
+        {
+          "service": "opennotebook-surreal",
+          "check": "compose_healthcheck",
+          "profile": "opennotebook"
+        }
+      ],
+      "app_link": "notebook",
+      "licence": "Open Notebook MIT",
+      "dpa": "Sources and notes on the installation; text-to-speech provider for audio summaries",
+      "hosting": {
+        "client_cloud": {},
+        "synthwave_eu_cloud": {},
+        "on_premise": {}
+      }
+    },
+    {
+      "id": "e_signing",
+      "tier": "advanced",
+      "lifecycle": "pilot",
+      "confirmed": false,
+      "name": {
+        "nl": "Digitaal ondertekenen",
+        "en": "Digital signing"
+      },
+      "summary": {
+        "nl": "Laat documenten digitaal ondertekenen met een volledig ondertekeningsverslag.",
+        "en": "Have documents signed digitally with a complete signing record."
+      },
+      "components": {
+        "core_container": false,
+        "profiles": [
+          {
+            "name": "docuseal"
+          }
+        ],
+        "toggles": [],
+        "tool_servers": [],
+        "desktop_app": null,
+        "notes": "profile docuseal (app plus the signing service); public HTTPS host sign.<domain> under the D2 rules; a mail route"
+      },
+      "requires": [
+        "workspace"
+      ],
+      "conflicts": [],
+      "architectures": [
+        "amd64",
+        "arm64"
+      ],
+      "placement": {
+        "default": "core",
+        "allowed": [
+          "core"
+        ]
+      },
+      "ram_budget_mb": 256,
+      "measured": true,
+      "model_usage": {
+        "level": "none",
+        "consumers": "nothing"
+      },
+      "backup": [
+        {
+          "kind": "sqlite",
+          "service": "docuseal",
+          "volume": "docuseal-data",
+          "what": "signing database (online backup)"
+        }
+      ],
+      "backup_notes": "signed documents are the client's legal records and are never purged automatically",
+      "probes": [
+        {
+          "service": "docuseal",
+          "check": "http",
+          "url": "http://docuseal:3000/",
+          "profile": "docuseal"
+        },
+        {
+          "service": "docuseal-esign",
+          "check": "http",
+          "url": "http://docuseal-esign:3000/",
+          "profile": "docuseal"
+        }
+      ],
+      "app_link": "sign",
+      "licence": "DocuSeal AGPL-3.0, used unmodified",
+      "dpa": "Signers' names, email and IP addresses, signatures and audit trails; mail relay as sub-processor",
+      "hosting": {
+        "client_cloud": {
+          "public_host": "sign",
+          "note": "needs a public IP or the client's gateway for sign.<domain>"
+        },
+        "synthwave_eu_cloud": {
+          "public_host": "sign",
+          "note": "sign.<domain> on Synthwave's ingress"
+        },
+        "on_premise": {
+          "public_host": "sign",
+          "client_published": true,
+          "note": "only when the client publishes sign.<domain> through its own reverse proxy"
+        }
+      }
+    },
+    {
+      "id": "dictation",
+      "tier": "advanced",
+      "lifecycle": "pilot",
+      "confirmed": false,
+      "name": {
+        "nl": "Dicteren in elke applicatie",
+        "en": "Dictation in every application"
+      },
+      "summary": {
+        "nl": "Dicteer tekst op je laptop in elke applicatie; je spraak wordt in de EU verwerkt en niet bewaard.",
+        "en": "Dictate text on your laptop in any application; your speech is processed in the EU and not stored."
+      },
+      "components": {
+        "core_container": false,
+        "profiles": [
+          {
+            "name": "speech",
+            "planned": true,
+            "shared": "speech"
+          }
+        ],
+        "toggles": [],
+        "tool_servers": [],
+        "desktop_app": "OpenWhispr (MIT), rolled out by the client's device management",
+        "notes": "desktop app plus the organisation's speech service (profile speech, planned; or an EU speech provider through the router)"
+      },
+      "requires": [
+        "workspace"
+      ],
+      "conflicts": [],
+      "architectures": [
+        "amd64"
+      ],
+      "placement": {
+        "default": "desktop",
+        "allowed": [
+          "desktop"
+        ]
+      },
+      "ram_budget_mb": 0,
+      "measured": false,
+      "ram_notes": "the speech service budget (shared_profiles.speech) is counted once; 0 with an EU speech provider",
+      "model_usage": {
+        "level": "low",
+        "consumers": "speech minutes; no model spend when transcription runs on the installation"
+      },
+      "backup": [],
+      "backup_notes": "nothing is stored",
+      "probes": [
+        {
+          "service": "speech",
+          "check": "http",
+          "url": "http://speech:8000/health",
+          "profile": "speech",
+          "planned": true
+        }
+      ],
+      "app_link": null,
+      "licence": "OpenWhispr MIT",
+      "dpa": "Voice audio goes only to the speech service and is not stored by default; an EU speech provider is a sub-processor if used",
+      "hosting": {
+        "client_cloud": {},
+        "synthwave_eu_cloud": {},
+        "on_premise": {
+          "gpu": "optional",
+          "note": "speech on the host, CPU; an NVIDIA runtime is optional (T16 gpu: nvidia)"
+        }
+      }
+    },
+    {
+      "id": "meeting_notes",
+      "tier": "advanced",
+      "lifecycle": "pilot",
+      "confirmed": false,
+      "name": {
+        "nl": "Vergaderverslagen",
+        "en": "Meeting notes"
+      },
+      "summary": {
+        "nl": "Verslagen, besluiten en actiepunten van elke vergadering, opgenomen op je eigen laptop.",
+        "en": "Minutes, decisions and actions from every meeting, recorded on your own laptop."
+      },
+      "components": {
+        "core_container": false,
+        "profiles": [
+          {
+            "name": "speech",
+            "planned": true,
+            "shared": "speech"
+          }
+        ],
+        "toggles": [],
+        "tool_servers": [],
+        "desktop_app": "Meetily Community (MIT), rolled out by the client's device management",
+        "notes": "desktop app; the WebUI Meetings page and upload route (M5b); profile speech (planned) for uploaded recordings only"
+      },
+      "requires": [
+        "workspace"
+      ],
+      "conflicts": [],
+      "architectures": [
+        "amd64",
+        "arm64"
+      ],
+      "desktop_platforms": [
+        "macos-arm64",
+        "windows-x64-avx2"
+      ],
+      "placement": {
+        "default": "desktop",
+        "allowed": [
+          "desktop"
+        ]
+      },
+      "ram_budget_mb": 0,
+      "measured": true,
+      "ram_notes": "0 on the server; uploads share the speech service (shared_profiles.speech, counted once)",
+      "model_usage": {
+        "level": "medium",
+        "consumers": "one summary per meeting through the router"
+      },
+      "backup": [
+        {
+          "kind": "volume_tar",
+          "planned": true,
+          "what": "stored minutes (M5b)"
+        }
+      ],
+      "probes": [],
+      "app_link": null,
+      "licence": "Meetily Community MIT",
+      "dpa": "Audio and transcripts stay on the laptop; only transcript text goes to the organisation's router for the summary; consent notice and DPIA (D6)",
+      "hosting": {
+        "client_cloud": {},
+        "synthwave_eu_cloud": {},
+        "on_premise": {}
+      }
+    }
+  ]
+}

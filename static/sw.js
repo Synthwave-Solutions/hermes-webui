@@ -67,6 +67,10 @@ const SHELL_ASSETS = [
   './static/svg_visuals.css' + VQ,
   './static/memory_inventory.js' + VQ,
   './static/memory_inventory.css' + VQ,
+  // Modules page and Apps launcher (plan Appendix E.4.2), filled by W12.
+  './static/modules.js' + VQ,
+  './static/modules.css' + VQ,
+  './static/module-content.js' + VQ,
   './static/vendor/smd.min.js' + VQ,
   './static/vendor/katex/0.16.22/katex.min.css' + VQ,
   './static/vendor/katex/0.16.22/katex.min.js' + VQ,

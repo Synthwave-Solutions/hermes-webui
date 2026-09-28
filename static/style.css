@@ -5146,6 +5146,10 @@ main.main > #mainPlugin{display:none;}
 
 /* Sidebar tab visibility — hide nav-tab and matching rail-btn when toggled off by user */
 .nav-tab-hidden{display:none!important;}
+/* Module surfaces (plan 3.7, Appendix E.4.2) start hidden in the markup and
+   only static/modules.js reveals them; the hidden attribute must win over
+   the display rules of .nav-tab and the titlebar buttons. */
+[data-module-gated][hidden]{display:none!important;}
 
 /* Tab visibility chips in Settings > Appearance */
 .tab-visibility-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;}

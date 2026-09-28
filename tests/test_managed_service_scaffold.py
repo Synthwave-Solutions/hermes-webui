@@ -99,6 +99,13 @@ WAVE1_SELF_ROUTES = (
     "/api/org/usage",
 )
 ORG_ROUTES = WAVE1_SELF_ROUTES[3:]
+# Modules page and Apps launcher (plan Appendix E.4.2), filled by W12.
+MODULE_ROUTES = (
+    ("GET", "/api/org/modules"),
+    ("POST", "/api/org/modules/request"),
+    ("GET", "/api/apps"),
+)
+MODULE_PLACEHOLDERS = ("static/modules.js", "static/modules.css", "static/module-content.js")
 MNEMO_GET_ROUTES = (
     "/api/mnemo/scopes",
     "/api/mnemo/me/summary",
@@ -177,6 +184,41 @@ I18N_KEYS = (
     "mnemo_rate_limited",
 )
 LOCALES = ("cs", "de", "en", "es", "fr", "it", "ja", "ko", "pl", "pt", "ru", "tr", "vi", "zh", "zh-Hant")
+
+# Keys the orchestrator adds before Wave 1 (plan Appendix E.4.2 and later
+# seams), with their exact English values in every locale.
+SEAM_I18N = {
+    # E.4.2: the Modules page and the Apps launcher (W12).
+    "modules_nav": "Modules",
+    "modules_title": "Modules",
+    "modules_intro": "What your organisation has and what you can add.",
+    "modules_included_heading": "Included in your service",
+    "modules_advanced_heading": "Available modules",
+    "modules_status_included": "Included",
+    "modules_status_active": "Active",
+    "modules_status_requested": "Requested",
+    "modules_status_setting_up": "Being set up",
+    "modules_status_available": "Available",
+    "modules_status_not_available": "Not available here",
+    "modules_price_on_request": "Price on request",
+    "modules_uses_model_budget": "Uses your model budget",
+    "modules_no_model_budget": "Does not use your model budget",
+    "modules_request_button": "Request this module",
+    "modules_request_contact": "Ask your Synthwave contact to add this module.",
+    "modules_request_preview_title": "What we send",
+    "modules_request_note_label": "Note (optional)",
+    "modules_request_sent": "Request sent. We will send you a proposal.",
+    "modules_request_partner": "Ask your partner to add this module.",
+    "apps_button": "Apps",
+    "apps_button_title": "Open your apps",
+    "apps_empty": "No apps available yet.",
+    "apps_open": "Open {0}",
+    "modules_reason_arch": "Not available on this server type.",
+    "modules_reason_hosting_model": "Not available where your platform runs.",
+    "modules_reason_requires": "Needs another module first.",
+    "modules_reason_not_confirmed": "Not offered yet.",
+    "modules_reason_placement": "Needs extra server capacity first.",
+}
 
 
 # ── Harness ────────────────────────────────────────────────────────────────
@@ -487,45 +529,112 @@ def test_stub_dispatch_calls_each_seam_with_the_request(dispatch, monkeypatch):
     assert seen[6][1] == ({"job_id": "j"},)
 
 
+def test_module_routes_are_self_routes_and_answer_404(dispatch):
+    for method, path in MODULE_ROUTES:
+        assert path in _SELF_ROUTES, path
+        assert route_permission(path, method) is None, path
+        result, handler = (dispatch.get(path) if method == "GET" else dispatch.post(path, {"module": "notebook"}))
+        assert result is False and handler.status is None, path
+    from api import apps_launcher, org_modules
+
+    assert org_modules.handle_get(_Handler(), None) is False
+    assert org_modules.handle_request(_Handler(), {"module": "notebook"}) is False
+    assert apps_launcher.handle_get(_Handler(), None) is False
+
+
+def test_module_route_dispatch_calls_each_stub_with_the_request(dispatch, monkeypatch):
+    from api import apps_launcher, org_modules
+
+    seen = []
+    monkeypatch.setattr(org_modules, "handle_get", lambda h, parsed: seen.append(("org_get", parsed.path)) or False)
+    monkeypatch.setattr(org_modules, "handle_request", lambda h, body: seen.append(("request", body)) or False)
+    monkeypatch.setattr(apps_launcher, "handle_get", lambda h, parsed: seen.append(("apps", parsed.path)) or False)
+    dispatch.get("/api/org/modules")
+    dispatch.post("/api/org/modules/request", {"module": "notebook", "note": "x"})
+    dispatch.get("/api/apps")
+    assert seen == [("org_get", "/api/org/modules"), ("request", {"module": "notebook", "note": "x"}),
+                    ("apps", "/api/apps")]
+
+
+def test_modules_is_a_member_panel_without_a_permission_of_its_own():
+    from api.governance.nav import MEMBER_PANELS, PANEL_PERMISSIONS
+
+    assert "modules" in MEMBER_PANELS and "modules" not in PANEL_PERMISSIONS
+
+
 # ── /api/settings ───────────────────────────────────────────────────────────
 
-def test_enabled_modules_scaffold_parse(monkeypatch):
-    import api.routes as routes
+STANDARD_MODULES = ["workspace", "group_chat", "design_studio", "workflows"]
+# Installation facts GET /api/settings adds after the settings filter (E.1,
+# E.4.2 and E.5.2); nothing else in the response may change.
+SETTINGS_FACTS = ("support_telemetry", "enabled_modules", "modules_source", "module_nav")
+
+
+@pytest.fixture
+def fresh_modules(monkeypatch):
+    from api import modules
 
     monkeypatch.delenv("SP_ENABLED_MODULES", raising=False)
-    assert routes._enabled_modules_from_env() is None
-    for blank in ("", "  ", " , "):
-        monkeypatch.setenv("SP_ENABLED_MODULES", blank)
-        assert routes._enabled_modules_from_env() in (None, [])
-    monkeypatch.setenv("SP_ENABLED_MODULES", " workflows,knowledge_base ,Bad-Id,ab,workflows,*")
-    assert routes._enabled_modules_from_env() == ["workflows", "knowledge_base", "*"]
+    modules.clear_cache()
+    yield modules
+    modules.clear_cache()
 
 
-def test_settings_adds_only_the_two_managed_service_facts(dispatch, monkeypatch):
+def test_settings_adds_only_the_managed_service_facts(dispatch, monkeypatch, fresh_modules):
     import api.routes as routes
     from api import ops_reporter
 
-    monkeypatch.delenv("SP_ENABLED_MODULES", raising=False)
     _, handler = dispatch.get("/api/settings")
     assert handler.status == 200
     payload = handler.body
     assert payload["support_telemetry"] is False
-    assert payload["enabled_modules"] is None
+    # E.4.2: always a list, the Standard set when SP_ENABLED_MODULES is unset.
+    assert payload["enabled_modules"] == STANDARD_MODULES
+    assert payload["modules_source"] == "default"
+    assert payload["module_nav"] == {
+        "hidden_panels": ["knowledge", "meetings"],
+        "hidden_settings_sections": [],
+        "hidden_composer_controls": [],
+        "apps": [{"module": "design_studio", "app": "design"}, {"module": "workflows", "app": "workflows"}],
+    }
 
-    monkeypatch.setenv("SP_ENABLED_MODULES", "workflows")
+    monkeypatch.setenv("SP_ENABLED_MODULES", "knowledge_base")
     monkeypatch.setattr(ops_reporter, "browser_reporting_enabled", lambda: True)
     _, handler = dispatch.get("/api/settings")
     changed = handler.body
-    assert changed["support_telemetry"] is True and changed["enabled_modules"] == ["workflows"]
-    # Everything else is what the handler returned before the seam.
-    assert {k: v for k, v in changed.items() if k not in ("support_telemetry", "enabled_modules")} == \
-        {k: v for k, v in payload.items() if k not in ("support_telemetry", "enabled_modules")}
+    assert changed["support_telemetry"] is True
+    assert changed["enabled_modules"] == STANDARD_MODULES + ["knowledge_base"]
+    assert changed["modules_source"] == "env"
+    assert changed["module_nav"]["hidden_panels"] == ["meetings"]
+    # Everything else is what the handler returned before the seams.
+    assert {k: v for k, v in changed.items() if k not in SETTINGS_FACTS} == \
+        {k: v for k, v in payload.items() if k not in SETTINGS_FACTS}
+
+    for garbage in ("", "Bad Id", "*"):
+        monkeypatch.setenv("SP_ENABLED_MODULES", garbage)
+        _, handler = dispatch.get("/api/settings")
+        assert handler.body["enabled_modules"] == STANDARD_MODULES, garbage
 
     def broken():
         raise RuntimeError("reporter unavailable")
 
     monkeypatch.setattr(ops_reporter, "browser_reporting_enabled", broken)
     assert routes._support_telemetry_enabled() is False
+
+
+def test_settings_save_drops_the_installation_facts(dispatch, monkeypatch, fresh_modules):
+    import api.routes as routes
+
+    seen = []
+    monkeypatch.setattr(routes, "save_settings", lambda body: seen.append(dict(body)) or dict(body))
+    import api.settings_scope as settings_scope
+
+    monkeypatch.setattr(settings_scope, "settings_write_denial_for", lambda handler, body: seen.append(("check", dict(body))) and None)
+    facts = {"enabled_modules": ["knowledge_base"], "modules_source": "hq", "module_nav": {"apps": []}}
+    dispatch.post("/api/settings", dict(facts, send_key="enter"))
+    assert seen[0] == ("check", {"send_key": "enter"})
+    assert seen[1] == {"send_key": "enter"}
+    assert set(routes._SETTINGS_READ_ONLY_FACTS) >= set(facts)
 
 
 # ── Cron notify seams ─────────────────────────────────────────────────────────
@@ -970,10 +1079,87 @@ def test_index_html_loads_the_scaffold_assets_in_place():
         assert at(script) < boot, script
 
 
+def test_module_placeholders_define_only_their_documented_no_ops():
+    css = (REPO / "static/modules.css").read_text(encoding="utf-8").splitlines()
+    assert len(css) == 1 and css[0].startswith("/* ") and css[0].endswith(" */")
+    for path in ("static/modules.js", "static/module-content.js"):
+        lines = (REPO / path).read_text(encoding="utf-8").splitlines()
+        assert len(lines) == 2 and lines[0].startswith("// "), path
+
+
+@needs_node
+def test_module_placeholders_reveal_nothing():
+    script = r"""
+const fs=require('fs'),vm=require('vm');
+const ctx={window:{}};ctx.self=ctx.window;vm.createContext(ctx);
+for(const path of ['static/module-content.js','static/modules.js'])vm.runInContext(fs.readFileSync(path,'utf8'),ctx);
+const w=ctx.window;
+const applied=w.SynthPulseModules.apply({enabled_modules:['knowledge_base']});
+process.stdout.write(JSON.stringify({keys:Object.keys(w).sort(),apps:Object.keys(w.SynthPulseModules),
+  applied:applied===undefined,content:w.SynthPulseModuleContent}));
+"""
+    out = json.loads(_node(script))
+    assert out == {"keys": ["SynthPulseModuleContent", "SynthPulseModules"], "apps": ["apply"], "applied": True,
+                   "content": {"version": 1, "locales": {"en": {}, "nl": {}}}}
+
+
+def test_module_surfaces_start_hidden_in_the_markup():
+    html = (STATIC / "index.html").read_text(encoding="utf-8")
+    gated = re.findall(r"<[a-z]+\b[^>]*\bdata-module-gated\b[^>]*>", html)
+    assert len(gated) == 3, gated
+    for tag in gated:
+        assert re.search(r"\shidden(\s|>)", tag), tag
+    nav = [tag for tag in gated if 'data-panel="modules"' in tag]
+    assert len(nav) == 2 and any("rail-btn" in tag for tag in nav)
+    assert sum('id="btnApps"' in tag for tag in gated) == 1
+    assert html.count('<div class="panel-view" id="panelModules"></div>') == 1
+    style = (STATIC / "style.css").read_text(encoding="utf-8")
+    assert "[data-module-gated][hidden]{display:none!important;}" in style
+
+    def tag(path):
+        if path.endswith(".css"):
+            return f'<link rel="stylesheet" href="static/{path}?v=__WEBUI_VERSION__">'
+        return f'<script src="static/{path}?v=__WEBUI_VERSION__" defer></script>'
+
+    for path in ("modules.css", "module-content.js", "modules.js"):
+        assert html.count(tag(path)) == 1, path
+    assert html.index(tag("modules.css")) < html.index("</head>")
+    panels, boot = html.index(tag("panels.js")), html.index(tag("boot.js"))
+    assert panels < html.index(tag("module-content.js")) < html.index(tag("modules.js")) < boot
+
+
+def test_panels_js_carries_the_module_seams():
+    src = (STATIC / "panels.js").read_text(encoding="utf-8")
+    assert "window._moduleHiddenNav = window._moduleHiddenNav || [];" in src
+    order = re.search(r"const _MEMBER_NAV_ORDER = \[([^\]]*)\]", src).group(1)
+    assert "'modules'" in order
+    start = src.index("async function switchPanel(name, opts = {}) {")
+    assert "const nextPanel = _panelGatedByModule(name || 'chat') ? 'chat' : (name || 'chat');" in src[start:start + 200]
+    assert "window._moduleHiddenNav" in _js_function(src, "_applyTabVisibility")
+    assert "[data-module-gated][data-panel=" in _js_function(src, "_renderTabVisibilityChips")
+
+
+@needs_node
+def test_switch_panel_falls_back_to_chat_for_a_module_panel():
+    src = (STATIC / "panels.js").read_text(encoding="utf-8")
+    script = _js_function(src, "_panelGatedByModule") + r"""
+const gated=new Set(['modules']);
+globalThis.window={_moduleHiddenNav:['knowledge']};
+globalThis.document={querySelector:(sel)=>{const m=/data-panel="([^"]+)"/.exec(sel);return m&&gated.has(m[1])?{}:null;}};
+const out={};
+for(const p of ['chat','settings','tasks','modules','knowledge','meetings',''])out[p]=_panelGatedByModule(p);
+window._moduleHiddenNav='junk';out.junk=_panelGatedByModule('knowledge');
+process.stdout.write(JSON.stringify(out));
+"""
+    out = json.loads(_node(script))
+    assert out == {"chat": False, "settings": False, "tasks": False, "modules": True, "knowledge": True,
+                   "meetings": False, "": False, "junk": False}
+
+
 def test_service_worker_precaches_every_scaffold_asset():
     sw = (STATIC / "sw.js").read_text(encoding="utf-8")
     shell = sw[sw.index("const SHELL_ASSETS"):sw.index("];", sw.index("const SHELL_ASSETS"))]
-    for path in JS_PLACEHOLDERS + CSS_PLACEHOLDERS:
+    for path in JS_PLACEHOLDERS + CSS_PLACEHOLDERS + MODULE_PLACEHOLDERS:
         entry = "'./" + path + "' + VQ,"
         assert shell.count(entry) == 1, path
         assert (REPO / path).is_file(), path
@@ -989,7 +1175,7 @@ def test_every_shell_asset_exists():
 
 # ── i18n ─────────────────────────────────────────────────────────────────────
 
-def _locale_values(code):
+def _locale_values(code, keys=I18N_KEYS):
     """The scaffold keys of one locale bundle, read from its source.
 
     The scaffold writes each key once as a plain single-quoted string, so the
@@ -997,7 +1183,7 @@ def _locale_values(code):
     """
     text = (STATIC / "i18n" / f"{code}.js").read_text(encoding="utf-8")
     values = {}
-    for key in I18N_KEYS:
+    for key in keys:
         found = re.findall(r"^[ \t]*" + key + r"[ \t]*:[ \t]*('(?:[^'\\\n]|\\.)*'),?[ \t]*$", text, re.M)
         assert len(found) == 1, (code, key, found)
         values[key] = ast.literal_eval(found[0])
@@ -1017,6 +1203,18 @@ def test_scaffold_i18n_keys_are_in_every_locale_with_the_english_value():
         assert _locale_values(code) == english, code
     for value in english.values():
         assert "\u2013" not in value and "\u2014" not in value
+
+
+def test_seam_i18n_keys_are_in_every_locale_with_the_english_value():
+    assert len(SEAM_I18N) == len(set(SEAM_I18N)) and not set(SEAM_I18N) & set(I18N_KEYS)
+    for code in LOCALES:
+        assert _locale_values(code, tuple(SEAM_I18N)) == SEAM_I18N, code
+    for value in SEAM_I18N.values():
+        assert "\u2013" not in value and "\u2014" not in value
+    from api.modules import DISPLAY_DENYLIST
+    for key, value in SEAM_I18N.items():
+        for denied in DISPLAY_DENYLIST:
+            assert denied.lower() not in value.lower(), (key, denied)
 
 
 @needs_node

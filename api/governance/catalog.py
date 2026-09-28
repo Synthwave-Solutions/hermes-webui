@@ -78,6 +78,12 @@ _SELF_ROUTES: frozenset[str] = frozenset({
     "/api/org/people",
     "/api/org/approvals",
     "/api/org/usage",
+    # Modules page and Apps launcher (plan 3.7, Appendix E.4.2): the Modules
+    # handlers enforce delegated_scope() themselves; the launcher lists only
+    # the caller's own app tiles from the rendered module links.
+    "/api/org/modules",
+    "/api/org/modules/request",
+    "/api/apps",
 })
 
 

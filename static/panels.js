@@ -367,8 +367,19 @@ function _syncMobileSidebarPanelFromMainView(){
   return panel;
 }
 
+// Module gate (plan 3.7, Appendix E.4.2): a panel an inactive module hides
+// (window._moduleHiddenNav, filled by static/modules.js) or whose nav element
+// still carries data-module-gated and hidden is never opened. Chat and
+// settings are never gated.
+function _panelGatedByModule(panel){
+  if(!panel||panel==='chat'||panel==='settings')return false;
+  const moduleHidden=Array.isArray(window._moduleHiddenNav)?window._moduleHiddenNav:[];
+  if(moduleHidden.indexOf(panel)!==-1)return true;
+  return !!document.querySelector('[data-module-gated][hidden][data-panel="'+panel+'"]');
+}
+
 async function switchPanel(name, opts = {}) {
-  const nextPanel = name || 'chat';
+  const nextPanel = _panelGatedByModule(name || 'chat') ? 'chat' : (name || 'chat');
   const prevPanel = _currentPanel;
   // ── Desktop sidebar collapse toggle (rail-click only) ──
   // If the click came from a rail icon AND we're on desktop, the rail icon
@@ -8449,11 +8460,14 @@ function _applyTabOrder(order){
 // being a dead end. The APIs behind each panel stay the real gate; this is
 // presentation only, and it can never REVEAL a panel, only hide one.
 window._govHiddenNav = window._govHiddenNav || [];
+// Panels of inactive modules (plan 3.7, Appendix E.4.2). static/modules.js
+// fills it from /api/settings module_nav; like _govHiddenNav it can only hide.
+window._moduleHiddenNav = window._moduleHiddenNav || [];
 window._navAudience = 'member';
 window._capabilityNavigation = false;
 // Navigation order agreed with Michaël (20 Sep 2026): daily work first, then
 // admin surfaces. Also the default order of the markup in index.html.
-const _MEMBER_NAV_ORDER = ['profiles', 'tasks', 'skills', 'projects', 'memory', 'integrations', 'workspaces', 'kanban', 'files', 'todos', 'insights', 'approvals', 'governance', 'logs'];
+const _MEMBER_NAV_ORDER = ['profiles', 'tasks', 'skills', 'projects', 'memory', 'integrations', 'workspaces', 'kanban', 'files', 'todos', 'insights', 'approvals', 'modules', 'governance', 'logs'];
 function _canUseFeature(permission){
   const me=window.__GOV_ME__;
   if(!me)return false;
@@ -8511,6 +8525,8 @@ function _applyTabVisibility(hidden){
   hidden=_sanitizeTabPanelList(hidden);
   const govHidden=Array.isArray(window._govHiddenNav)?window._govHiddenNav:[];
   if(govHidden.length) hidden=hidden.concat(govHidden.filter(p=>hidden.indexOf(p)===-1));
+  const moduleHidden=Array.isArray(window._moduleHiddenNav)?window._moduleHiddenNav:[];
+  if(moduleHidden.length) hidden=hidden.concat(moduleHidden.filter(p=>hidden.indexOf(p)===-1));
   _applyTabOrder(window._navAudience==='member'&&!window._capabilityNavigation?_MEMBER_NAV_ORDER:_getTabOrder());
   // Hide/unhide all [data-panel] elements (sidebar-nav buttons + rail buttons)
   document.querySelectorAll('[data-panel]').forEach(function(el){
@@ -8538,6 +8554,8 @@ function _renderTabVisibilityChips(){
   var panels=_orderedSidebarPanels();
   container.innerHTML='';
   panels.forEach(function(panel){
+    // Module panels are shown by static/modules.js, never by a chip.
+    if(document.querySelector('[data-module-gated][data-panel="'+panel+'"]'))return;
     var tab=document.querySelector('.rail .rail-btn.nav-tab[data-panel="'+panel+'"]')
       ||document.querySelector('.sidebar-nav .nav-tab[data-panel="'+panel+'"]');
     var label=(tab&&(tab.dataset.tooltip||tab.dataset.label))||panel;

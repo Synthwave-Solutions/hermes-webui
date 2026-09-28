@@ -12895,26 +12895,34 @@ def _handle_projects_hub_detail(handler, parsed) -> bool:
     return j(handler, detail)
 
 
-_MODULE_ID_RE = re.compile(r"^[a-z][a-z0-9_]{2,39}$")
+def _module_settings_facts() -> dict:
+    """The module facts GET /api/settings returns (plan 3.7, Appendix E.4.2).
 
-
-def _enabled_modules_from_env() -> list[str] | None:
-    """``SP_ENABLED_MODULES`` as a list of module ids, or None when unset.
-
-    Scaffold parse (plan Appendix E.1): a comma list of catalogue ids
-    (``^[a-z][a-z0-9_]{2,39}$``) or ``*``. Malformed entries and repeats are
-    dropped; an unset or blank value gives None. The module catalogue
-    resolver of Appendix E.4 replaces this function.
+    ``enabled_modules`` is always a list: the resolved active set, the
+    Standard set when ``SP_ENABLED_MODULES`` is unset, invalid or cannot be
+    read. ``modules_source`` says where it came from (env, default, hq or
+    invalid) and ``module_nav`` what the browser hides and offers.
     """
-    raw = os.environ.get("SP_ENABLED_MODULES")
-    if raw is None or not raw.strip():
-        return None
-    modules: list[str] = []
-    for item in raw.split(","):
-        module_id = item.strip()
-        if (module_id == "*" or _MODULE_ID_RE.match(module_id)) and module_id not in modules:
-            modules.append(module_id)
-    return modules
+    from api import modules
+
+    state = modules.current_state()
+    return {
+        "enabled_modules": list(state.active),
+        "modules_source": state.source,
+        "module_nav": modules.nav_view(state),
+    }
+
+
+# Installation facts GET /api/settings adds after the settings filter. They
+# are read-only: a settings save drops them before anything else sees the body.
+_SETTINGS_READ_ONLY_FACTS = ("enabled_modules", "modules_source", "module_nav")
+
+
+def _drop_settings_facts(body) -> None:
+    """Remove the read-only installation facts from a settings save body."""
+    if isinstance(body, dict):
+        for key in _SETTINGS_READ_ONLY_FACTS:
+            body.pop(key, None)
 
 
 def _support_telemetry_enabled() -> bool:
@@ -13517,9 +13525,9 @@ def handle_get(handler, parsed) -> bool:
         # Managed-service facts (plan Appendix E.1), added after the settings
         # filter because they describe this installation, not a stored
         # setting: whether the browser may report errors to support (W7) and
-        # which modules are enabled (E.4 replaces the scaffold parse).
+        # which modules are enabled, from the module resolver (E.4.2).
         payload["support_telemetry"] = _support_telemetry_enabled()
-        payload["enabled_modules"] = _enabled_modules_from_env()
+        payload.update(_module_settings_facts())
         return j(handler, payload)
 
     if parsed.path == "/api/voice/realtime/capability":
@@ -14937,6 +14945,15 @@ def handle_get(handler, parsed) -> bool:
     if parsed.path in ("/api/org/overview", "/api/org/departments", "/api/org/people", "/api/org/approvals", "/api/org/usage"):
         from api import org_api
         return org_api.handle_get(handler, parsed)
+
+    # Modules page and Apps launcher (plan 3.7, Appendix E.4.2): self routes
+    # in the catalog; the Modules handler enforces delegated_scope() itself.
+    if parsed.path == "/api/org/modules":
+        from api import org_modules
+        return org_modules.handle_get(handler, parsed)
+    if parsed.path == "/api/apps":
+        from api import apps_launcher
+        return apps_launcher.handle_get(handler, parsed)
 
     # AG-UI replay of one run (plan 5.1): sessions:read, and the handler
     # admits only the stream's owner or a current participant.
@@ -17290,6 +17307,11 @@ def handle_post(handler, parsed) -> bool:
         from api import org_api
         return org_api.handle_post(handler, parsed, body)
 
+    # A module request from the Modules page (plan 3.7, Appendix E.4.2).
+    if parsed.path == "/api/org/modules/request":
+        from api import org_modules
+        return org_modules.handle_request(handler, body)
+
     # Browser error reports for support (W7): self route, off unless support
     # telemetry is on.
     if parsed.path == "/api/client-errors":
@@ -17530,6 +17552,7 @@ def handle_post(handler, parsed) -> bool:
         return j(handler, {"ok": acknowledge(body.get("id"))})
 
     if parsed.path == "/api/settings":
+        _drop_settings_facts(body)  # read-only installation facts (E.4.2)
         # Appearance self-service (26 Aug 2026 report): the route catalog now
         # admits this POST with config:read; this body-sink guard keeps every
         # non-cosmetic settings write on config:write exactly as before while
