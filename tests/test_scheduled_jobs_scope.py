@@ -624,6 +624,10 @@ def test_identity_sees_cron_row_uses_store_profile_for_unlabelled_rows(inject_po
 
 
 def test_mutation_routes_pass_job_id_to_scope_guard():
+    # The guard gets the id the handlers act on, read once as a non-empty
+    # string (routes._cron_body_job_id); str(body.get("job_id") or "") turned
+    # 0 and False into "no job" (behaviour: tests/test_cron_write_authz.py).
     marker = 'caller_sees_cron_profile(handler, _get_active_profile_name() or "default",\n' \
-             '                                        job_id=str((body or {}).get("job_id") or ""))'
+             '                                        job_id=_cron_job_id)'
     assert marker in ROUTES
+    assert "_cron_job_id = _cron_body_job_id(body)" in ROUTES

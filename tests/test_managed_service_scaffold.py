@@ -763,7 +763,8 @@ def test_run_now_passes_the_session_email_as_actor(cron_env, monkeypatch):
     started = threading.Event()
     seen = []
 
-    def tracked(job, profile_home=None, execution_profile_home=None, event_profile=None, actor=None):
+    def tracked(job, profile_home=None, execution_profile_home=None, event_profile=None, run_plan=None,
+                actor=None):
         seen.append((job["id"], actor))
         routes._mark_cron_done(job["id"])
         started.set()
