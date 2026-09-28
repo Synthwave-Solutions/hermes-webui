@@ -8,9 +8,9 @@
 #
 # Sections
 #   client_yaml  Render input (C5): a complete clients/acme/client.yaml. The
-#                installation, organization, departments and support blocks
-#                are the new managed-service blocks; the rest is the minimum
-#                the current renderer needs.
+#                installation, organization, departments, support, modules
+#                (package) and hosting blocks are the new managed-service
+#                blocks; the rest is the minimum the current renderer needs.
 #   expected     What every side derives from client_yaml:
 #                  policy_sections       the installation, organization and
 #                                        departments sections of the rendered
@@ -53,12 +53,23 @@ client_yaml:
     hostname_label: "acme-pulse"
     timezone: "Europe/Amsterdam"
   deploy:
-    cloud: "compose"
-    compliant: false
+    cloud: "scaleway"
+    compliant: true
     size: "standard"
   modules:
-    profiles:
-      - n8n
+    package: standard
+    profiles: []
+  hosting:
+    model: synthwave_eu_cloud
+    cloud: scaleway
+    region: nl-ams
+    compliant: true
+    access: tailnet
+    account:
+      scaleway_project_id: "00000000-0000-4000-8000-000000000001"
+    backup:
+      local: object_storage
+      offsite: synthwave_eu
   identity:
     google_workspace_domain: "acme.example"
     admins:
