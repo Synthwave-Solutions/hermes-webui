@@ -2475,4 +2475,13 @@ window.__registerHermesLocale('ja', {
     modules_reason_requires: 'Needs another module first.',
     modules_reason_not_confirmed: 'Not offered yet.',
     modules_reason_placement: 'Needs extra server capacity first.',
+    // -- Module connections (program plan Appendix E.5.2). --
+    // English values until translated; W12 uses the modules_ keys, N3 the other two.
+    modules_works_with: 'Works with',
+    modules_connection_active: 'Connected',
+    modules_connection_off: 'Not switched on',
+    modules_connection_needs_module: 'Available with {0}',
+    modules_connection_consent_note: 'Only with the consent of the people involved',
+    channels_hook_on_save_neutral: 'On save the webhook is published on your platform\'s public address and the URL appears on the card. Enter that URL at the provider.',
+    integrations_connect_not_configured: 'Connecting apps is not set up on this platform yet. Ask your administrator.',
   });

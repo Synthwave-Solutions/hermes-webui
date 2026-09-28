@@ -12902,20 +12902,24 @@ def _module_settings_facts() -> dict:
     Standard set when ``SP_ENABLED_MODULES`` is unset, invalid or cannot be
     read. ``modules_source`` says where it came from (env, default, hq or
     invalid) and ``module_nav`` what the browser hides and offers.
+    ``enabled_connections`` (Appendix E.5.2) lists the active module
+    connections, empty unless ``SP_ENABLED_CONNECTIONS`` is rendered.
     """
-    from api import modules
+    from api import module_connections, modules
 
     state = modules.current_state()
     return {
         "enabled_modules": list(state.active),
         "modules_source": state.source,
         "module_nav": modules.nav_view(state),
+        # E.5.2: always a list, empty unless SP_ENABLED_CONNECTIONS is set.
+        "enabled_connections": list(module_connections.current_state().active),
     }
 
 
 # Installation facts GET /api/settings adds after the settings filter. They
 # are read-only: a settings save drops them before anything else sees the body.
-_SETTINGS_READ_ONLY_FACTS = ("enabled_modules", "modules_source", "module_nav")
+_SETTINGS_READ_ONLY_FACTS = ("enabled_modules", "modules_source", "module_nav", "enabled_connections")
 
 
 def _drop_settings_facts(body) -> None:

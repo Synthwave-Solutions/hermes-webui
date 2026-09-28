@@ -218,7 +218,18 @@ SEAM_I18N = {
     "modules_reason_requires": "Needs another module first.",
     "modules_reason_not_confirmed": "Not offered yet.",
     "modules_reason_placement": "Needs extra server capacity first.",
+    # E.5.2: module connections (W12) and the neutral channel copy (N3).
+    "modules_works_with": "Works with",
+    "modules_connection_active": "Connected",
+    "modules_connection_off": "Not switched on",
+    "modules_connection_needs_module": "Available with {0}",
+    "modules_connection_consent_note": "Only with the consent of the people involved",
+    "channels_hook_on_save_neutral": "On save the webhook is published on your platform's public address and the URL appears on the card. Enter that URL at the provider.",
+    "integrations_connect_not_configured": "Connecting apps is not set up on this platform yet. Ask your administrator.",
 }
+# E.5.3 and E.6.1: network and identity product names never appear in copy.
+NETWORK_IDENTITY_NAMES = ("Tailscale", "NetBird", "Headscale", "Keycloak", "oauth2-proxy", "WireGuard",
+                          "Nubus", "Univention", "noVNC", "TigerVNC", "Xvnc", "Xfce", "Funnel")
 
 
 # ── Harness ────────────────────────────────────────────────────────────────
@@ -567,7 +578,7 @@ def test_modules_is_a_member_panel_without_a_permission_of_its_own():
 STANDARD_MODULES = ["workspace", "group_chat", "design_studio", "workflows"]
 # Installation facts GET /api/settings adds after the settings filter (E.1,
 # E.4.2 and E.5.2); nothing else in the response may change.
-SETTINGS_FACTS = ("support_telemetry", "enabled_modules", "modules_source", "module_nav")
+SETTINGS_FACTS = ("support_telemetry", "enabled_modules", "modules_source", "module_nav", "enabled_connections")
 
 
 @pytest.fixture
@@ -575,6 +586,7 @@ def fresh_modules(monkeypatch):
     from api import modules
 
     monkeypatch.delenv("SP_ENABLED_MODULES", raising=False)
+    monkeypatch.delenv("SP_ENABLED_CONNECTIONS", raising=False)
     modules.clear_cache()
     yield modules
     modules.clear_cache()
@@ -597,8 +609,11 @@ def test_settings_adds_only_the_managed_service_facts(dispatch, monkeypatch, fre
         "hidden_composer_controls": [],
         "apps": [{"module": "design_studio", "app": "design"}, {"module": "workflows", "app": "workflows"}],
     }
+    # E.5.2: always a list, empty unless SP_ENABLED_CONNECTIONS is set.
+    assert payload["enabled_connections"] == []
 
     monkeypatch.setenv("SP_ENABLED_MODULES", "knowledge_base")
+    monkeypatch.setenv("SP_ENABLED_CONNECTIONS", "assistant_knowledge,minutes_to_knowledge")
     monkeypatch.setattr(ops_reporter, "browser_reporting_enabled", lambda: True)
     _, handler = dispatch.get("/api/settings")
     changed = handler.body
@@ -606,6 +621,7 @@ def test_settings_adds_only_the_managed_service_facts(dispatch, monkeypatch, fre
     assert changed["enabled_modules"] == STANDARD_MODULES + ["knowledge_base"]
     assert changed["modules_source"] == "env"
     assert changed["module_nav"]["hidden_panels"] == ["meetings"]
+    assert changed["enabled_connections"] == ["assistant_knowledge"]
     # Everything else is what the handler returned before the seams.
     assert {k: v for k, v in changed.items() if k not in SETTINGS_FACTS} == \
         {k: v for k, v in payload.items() if k not in SETTINGS_FACTS}
@@ -630,7 +646,8 @@ def test_settings_save_drops_the_installation_facts(dispatch, monkeypatch, fresh
     import api.settings_scope as settings_scope
 
     monkeypatch.setattr(settings_scope, "settings_write_denial_for", lambda handler, body: seen.append(("check", dict(body))) and None)
-    facts = {"enabled_modules": ["knowledge_base"], "modules_source": "hq", "module_nav": {"apps": []}}
+    facts = {"enabled_modules": ["knowledge_base"], "modules_source": "hq", "module_nav": {"apps": []},
+             "enabled_connections": ["module_map"]}
     dispatch.post("/api/settings", dict(facts, send_key="enter"))
     assert seen[0] == ("check", {"send_key": "enter"})
     assert seen[1] == {"send_key": "enter"}
@@ -1213,7 +1230,7 @@ def test_seam_i18n_keys_are_in_every_locale_with_the_english_value():
         assert "\u2013" not in value and "\u2014" not in value
     from api.modules import DISPLAY_DENYLIST
     for key, value in SEAM_I18N.items():
-        for denied in DISPLAY_DENYLIST:
+        for denied in DISPLAY_DENYLIST + NETWORK_IDENTITY_NAMES:
             assert denied.lower() not in value.lower(), (key, denied)
 
 
