@@ -1885,4 +1885,11 @@ window.__registerHermesLocale('fr', {
     modules_connection_consent_note: 'Only with the consent of the people involved',
     channels_hook_on_save_neutral: 'On save the webhook is published on your platform\'s public address and the URL appears on the card. Enter that URL at the provider.',
     integrations_connect_not_configured: 'Connecting apps is not set up on this platform yet. Ask your administrator.',
+    // -- Revision 6 seams (program plan Appendix E.7.1). --
+    // English values until translated; A6 uses the mnemo_ keys, R3 voice_live_unavailable.
+    mnemo_filter_review: 'Needs your review',
+    mnemo_trust_inferred: 'Inferred by your assistant',
+    mnemo_trust_imported: 'Imported',
+    mnemo_status_outdated: 'Outdated',
+    voice_live_unavailable: 'Live voice is not available on this platform.',
   });

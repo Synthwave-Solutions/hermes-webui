@@ -83,6 +83,9 @@ _REGISTRY_ROWS = (
                route_prefixes=("/api/dictation/",)),
     ModuleSpec("meeting_notes", ADVANCED, requires=("workspace",),
                panels=("meetings",), route_prefixes=("/api/meetings/",)),
+    # E.7.1: a desktop module with its key route; no panel and no app tile.
+    ModuleSpec("office_apps", ADVANCED, requires=("workspace",),
+               route_prefixes=("/api/office-apps/",)),
 )
 REGISTRY: dict[str, ModuleSpec] = {spec.id: spec for spec in _REGISTRY_ROWS}
 MODULE_IDS: tuple[str, ...] = tuple(REGISTRY)
@@ -95,7 +98,7 @@ DISPLAY_DENYLIST: tuple[str, ...] = (
     "n8n", "OmniRoute", "LangGraph", "Hermes", "LiteLLM", "RAGFlow", "Langfuse",
     "OpenWebUI", "OpenDesign", "OpenNotebook", "DocuSeal", "OpenWhispr", "OpenWispr",
     "Fireflies", "Meetily", "Vexa", "OpenBot", "Nango", "SurrealDB", "Elasticsearch",
-    "MinIO", "Valkey", "Mnemosyne", "mnemo-hub",
+    "MinIO", "Valkey", "Mnemosyne", "mnemo-hub", "GenOffice", "Genspark",
 )
 UNAVAILABLE_REASONS: tuple[str, ...] = ("arch", "hosting_model", "requires", "not_confirmed", "placement")
 

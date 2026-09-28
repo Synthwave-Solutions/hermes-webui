@@ -39,6 +39,7 @@ ADVANCED_PREFIXES = {
     "e_signing": "/api/signing/",
     "dictation": "/api/dictation/",
     "meeting_notes": "/api/meetings/",
+    "office_apps": "/api/office-apps/",
 }
 CLIENT_POLICY = {"version": 1, "mode": "off"}
 HQ_POLICY = {"version": 1, "mode": "off", "installation": {"kind": "hq"}}
@@ -106,6 +107,7 @@ def test_catalogue_fixture_matches_its_pin():
 
 def test_registry_ids_tiers_and_requirements_equal_the_catalogue():
     rows = CATALOG["modules"]
+    assert len(rows) == 10 and len(modules.MODULE_IDS) == 10
     assert modules.MODULE_IDS == tuple(row["id"] for row in rows)
     for row in rows:
         spec = modules.REGISTRY[row["id"]]
@@ -245,6 +247,7 @@ def test_nav_view_hides_inactive_module_panels_and_offers_active_tiles():
     }
     everything = modules.nav_view(_state("*", HQ_POLICY))
     assert everything["hidden_panels"] == []
+    assert not any(tile["module"] == "office_apps" for tile in everything["apps"])
     assert [tile["app"] for tile in everything["apps"]] == ["design", "workflows", "notebook", "sign"]
 
 
@@ -277,8 +280,10 @@ def test_gate_lets_an_active_module_route_through(monkeypatch):
     assert proceed is False and handler.body["module"] == "notebook"
 
 
-def test_gate_through_a_fake_route_on_the_real_dispatcher(monkeypatch):
-    """A route M1 would add is reached only once its module is active."""
+@pytest.mark.parametrize("module_id,path", [("knowledge_base", "/api/knowledge/fake"),
+                                             ("office_apps", "/api/office-apps/fake")])
+def test_gate_through_a_fake_route_on_the_real_dispatcher(monkeypatch, module_id, path):
+    """A route M1 or O4 would add is reached only once its module is active."""
     import api.routes as routes
 
     _use_policy(CLIENT_POLICY)
@@ -286,7 +291,7 @@ def test_gate_through_a_fake_route_on_the_real_dispatcher(monkeypatch):
     seen = []
 
     def with_fake_route(handler, parsed):
-        if parsed.path == "/api/knowledge/fake":
+        if parsed.path == path:
             seen.append(parsed.path)
             handler.send_response(200)
             return True
@@ -294,15 +299,17 @@ def test_gate_through_a_fake_route_on_the_real_dispatcher(monkeypatch):
 
     monkeypatch.setattr(routes, "handle_get", with_fake_route)
 
-    def request(path):
+    def request():
         proceed, handler = _gate(path)
         if proceed:
             routes.handle_get(handler, urlparse("http://localhost" + path))
         return handler
 
-    assert request("/api/knowledge/fake").status == 403 and seen == []
-    monkeypatch.setenv("SP_ENABLED_MODULES", "knowledge_base")
-    assert request("/api/knowledge/fake").status == 200 and seen == ["/api/knowledge/fake"]
+    handler = request()
+    assert handler.status == 403 and seen == []
+    assert handler.body == {"error": "module_inactive", "module": module_id}
+    monkeypatch.setenv("SP_ENABLED_MODULES", module_id)
+    assert request().status == 200 and seen == [path]
 
 
 def test_an_exception_inside_resolution_closes_every_advanced_prefix(monkeypatch):

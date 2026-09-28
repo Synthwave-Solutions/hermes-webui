@@ -24,7 +24,9 @@
     "MinIO",
     "Valkey",
     "Mnemosyne",
-    "mnemo-hub"
+    "mnemo-hub",
+    "GenOffice",
+    "Genspark"
   ],
   "unavailable_reasons": [
     {
@@ -94,8 +96,39 @@
           "omniroute",
           "llmproxy"
         ],
-        "toggles": [],
-        "tool_servers": [],
+        "toggles": [
+          {
+            "env": "SP_DOCUMENT_TOOLS",
+            "planned": true,
+            "what": "document tools for assistants (3.14, O4)"
+          },
+          {
+            "env": "SP_LIVE_OFFICE",
+            "planned": true,
+            "what": "Live office (3.15, O3)"
+          },
+          {
+            "env": "SP_LIVE_OFFICE_TEAM",
+            "planned": true,
+            "what": "Live office team view (3.15, O3)"
+          },
+          {
+            "env": "SP_LIVE_OFFICE_DIR",
+            "planned": true,
+            "what": "Live office state directory (3.15, O3)"
+          }
+        ],
+        "tool_servers": [
+          {
+            "id": "documents",
+            "planned": true,
+            "env_keys": [
+              "SP_OPS_TOOL_SERVER_DOCUMENTS_ENABLED",
+              "SP_OPS_TOOL_SERVER_DOCUMENTS_URL"
+            ],
+            "what": "document tools server (3.14, O4)"
+          }
+        ],
         "desktop_app": null,
         "notes": "core container (engine, agent fleet, memory hub, dashboard, message queue, nightly jobs, backup, health, secrets), the WebUI, exactly one router profile chosen by llm.router in the render, ingress, brand assets, reporter"
       },
@@ -142,7 +175,10 @@
           "service": "omniroute",
           "volume": "omniroute-data",
           "what": "router state",
-          "existing": true
+          "existing": true,
+          "exclude": [
+            "router call-log request and response bodies (3.12 design 4: never in a backup)"
+          ]
         }
       ],
       "probes": [
@@ -796,6 +832,65 @@
       "app_link": null,
       "licence": "Meetily Community MIT",
       "dpa": "Audio and transcripts stay on the laptop; only transcript text goes to the organisation's router for the summary; consent notice and DPIA (D6)",
+      "hosting": {
+        "client_cloud": {},
+        "synthwave_eu_cloud": {},
+        "on_premise": {}
+      }
+    },
+    {
+      "id": "office_apps",
+      "tier": "advanced",
+      "lifecycle": "pilot",
+      "confirmed": false,
+      "name": {
+        "nl": "Kantoorprogramma's met AI",
+        "en": "Office apps with AI"
+      },
+      "summary": {
+        "nl": "Documenten, spreadsheets, presentaties en pdf-bestanden op je laptop schrijven en bewerken met een AI-assistent die de eigen AI-dienst van je organisatie gebruikt.",
+        "en": "Write and edit documents, spreadsheets, presentations and PDF files on your laptop with an AI assistant that uses your organisation's own AI service."
+      },
+      "components": {
+        "core_container": false,
+        "profiles": [],
+        "toggles": [],
+        "tool_servers": [],
+        "desktop_app": "a Synthwave-signed, rebranded build of GenOffice or the HermesOffice fork (Apache-2.0; M6a decides, D60), rolled out by the client's device management",
+        "notes": "provider fixed to the organisation's model gateway at ai.<domain> with a per-user key from the WebUI; analytics, updaters, cloud sign-in and third-party search off"
+      },
+      "requires": [
+        "workspace"
+      ],
+      "conflicts": [],
+      "architectures": [
+        "amd64",
+        "arm64"
+      ],
+      "desktop_platforms": [
+        "macos-arm64",
+        "windows-x64"
+      ],
+      "desktop_platforms_measured": false,
+      "placement": {
+        "default": "desktop",
+        "allowed": [
+          "desktop"
+        ]
+      },
+      "ram_budget_mb": 0,
+      "measured": false,
+      "ram_notes": "server: nothing beyond the gateway; laptop platforms from M6a",
+      "model_usage": {
+        "level": "medium",
+        "consumers": "the assistant inside the apps, through the gateway"
+      },
+      "backup": [],
+      "backup_notes": "documents stay on the laptop under the client's device management",
+      "probes": [],
+      "app_link": null,
+      "licence": "GenOffice or HermesOffice fork, Apache-2.0 (D60)",
+      "dpa": "Documents stay on the laptop; only what the user sends to the assistant goes through the organisation's gateway and is traced with metadata only; no telemetry",
       "hosting": {
         "client_cloud": {},
         "synthwave_eu_cloud": {},
