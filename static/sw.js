@@ -67,6 +67,9 @@ const SHELL_ASSETS = [
   './static/svg_visuals.css' + VQ,
   './static/memory_inventory.js' + VQ,
   './static/memory_inventory.css' + VQ,
+  // Memory explorer (plan Appendix E.7.5.1), filled by A13.
+  './static/memory_dashboard.js' + VQ,
+  './static/memory_dashboard.css' + VQ,
   // Modules page and Apps launcher (plan Appendix E.4.2), filled by W12.
   './static/modules.js' + VQ,
   './static/modules.css' + VQ,
@@ -150,6 +153,11 @@ self.addEventListener('fetch', (event) => {
   ) {
     return; // let browser handle normally
   }
+
+  // The vendored Memory explorer (plan Appendix E.7.5.1) always goes to the
+  // network untouched: its frame document is never cached as './' and never
+  // replaces the app shell.
+  if (url.pathname.includes('/static/vendor/mnemosyne-dashboard/')) return;
 
   // Page navigations must be network-first. A stale cached './' response can
   // otherwise hide the server's 302-to-login after auth expiry, or ignore a

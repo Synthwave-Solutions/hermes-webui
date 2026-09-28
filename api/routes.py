@@ -12966,6 +12966,8 @@ def handle_get(handler, parsed) -> bool:
         # starts with "/static/" (its required prefix). _serve_static enforces
         # its own path-traversal sandbox via Path.resolve()+relative_to().
         stripped = parsed._replace(path=parsed.path[len("/session"):])
+        if stripped.path.startswith(_MEMDASH_VENDOR_PREFIX):
+            return _serve_memdash_vendor(handler, stripped)
         return _serve_static(handler, stripped)
 
     # Firefox Android resolves <link rel="manifest"> against the page URL
@@ -13578,6 +13580,11 @@ def handle_get(handler, parsed) -> bool:
         from api.extensions import serve_extension_static
 
         return serve_extension_static(handler, parsed)
+
+    # The vendored Memory explorer (plan Appendix E.7.5.1) is served only by
+    # its own handler, with its own CSP, never by the generic static handler.
+    if parsed.path.startswith(_MEMDASH_VENDOR_PREFIX):
+        return _serve_memdash_vendor(handler, parsed)
 
     if parsed.path.startswith("/static/"):
         return _serve_static(handler, parsed)
@@ -14942,6 +14949,11 @@ def handle_get(handler, parsed) -> bool:
     if parsed.path in ("/api/mnemo/scopes", "/api/mnemo/me/summary", "/api/mnemo/me/memories", "/api/mnemo/me/export", "/api/mnemo/me/settings"):
         from api import mnemo_proxy
         return mnemo_proxy.handle_get(handler, parsed)
+    # Memory explorer (plan Appendix E.7.5.1): exact routes only, so an
+    # unknown /api/memdash/ child stays unclassified and fails closed.
+    if parsed.path in ("/api/memdash/banks", "/api/memdash/v1/view", "/api/memdash/access-log"):
+        from api import memdash
+        return memdash.handle_get(handler, parsed)
 
     # ── Managed-service routes (plan Appendix E.1) ──
     # Organisation views: self routes in the catalog; each handler enforces
@@ -17303,6 +17315,10 @@ def handle_post(handler, parsed) -> bool:
     if parsed.path in ("/api/mnemo/me/memory/update", "/api/mnemo/me/memory/forget", "/api/mnemo/me/erase", "/api/mnemo/me/settings"):
         from api import mnemo_proxy
         return mnemo_proxy.handle_post(handler, parsed, body)
+    # Memory explorer (plan Appendix E.7.5.1), behind the CSRF gate.
+    if parsed.path in ("/api/memdash/v1/action", "/api/memdash/access-log/seen", "/api/memdash/notice"):
+        from api import memdash
+        return memdash.handle_post(handler, parsed, body)
 
     # ── Managed-service routes (plan Appendix E.1) ──
     # Organisation mutations come with the Wave 2 scaffold; until then a
@@ -18724,6 +18740,18 @@ _STATIC_CACHE: dict = {}
 _STATIC_CACHE_LOCK = threading.Lock()
 
 
+_MEMDASH_VENDOR_PREFIX = "/static/vendor/mnemosyne-dashboard/"
+
+
+def _serve_memdash_vendor(handler, parsed):
+    """The vendored Memory explorer document and its assets (plan Appendix
+    E.7.5.1): api/memdash_static.py serves them with their CSP (A13); until
+    it does, or for anything it refuses, the answer is the static 404."""
+    from api import memdash_static
+
+    return memdash_static.serve(handler, parsed) or j(handler, {"error": "not found"}, status=404)
+
+
 def _serve_static(handler, parsed):
     static_root = api_config.get_static_root().resolve()
     # Strip the leading '/static/' prefix, then resolve and sandbox
@@ -18733,6 +18761,14 @@ def _serve_static(handler, parsed):
         static_file.relative_to(static_root)
     except ValueError:
         return j(handler, {"error": "not found"}, status=404)
+    # The vendored Memory explorer tree is never served here, whatever path
+    # spelling resolves into it (plan Appendix E.7.5.1): only
+    # _serve_memdash_vendor sends it, with its own CSP.
+    try:
+        static_file.relative_to(static_root / _MEMDASH_VENDOR_PREFIX[len("/static/"):].rstrip("/"))
+        return j(handler, {"error": "not found"}, status=404)
+    except ValueError:
+        pass
     if not static_file.exists() or not static_file.is_file():
         return j(handler, {"error": "not found"}, status=404)
     ext = static_file.suffix.lower()

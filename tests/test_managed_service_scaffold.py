@@ -106,6 +106,10 @@ MODULE_ROUTES = (
     ("GET", "/api/apps"),
 )
 MODULE_PLACEHOLDERS = ("static/modules.js", "static/modules.css", "static/module-content.js")
+# Memory explorer (plan Appendix E.7.5.1, revision 6.1), filled by A13.
+MEMDASH_GET_ROUTES = ("/api/memdash/banks", "/api/memdash/v1/view", "/api/memdash/access-log")
+MEMDASH_POST_ROUTES = ("/api/memdash/v1/action", "/api/memdash/access-log/seen", "/api/memdash/notice")
+MEMDASH_VENDOR = "/static/vendor/mnemosyne-dashboard/"
 MNEMO_GET_ROUTES = (
     "/api/mnemo/scopes",
     "/api/mnemo/me/summary",
@@ -124,6 +128,7 @@ MNEMO_ROUTES = tuple(dict.fromkeys(MNEMO_GET_ROUTES + MNEMO_POST_ROUTES))
 JS_PLACEHOLDERS = (
     "static/svg_visuals.js",
     "static/memory_inventory.js",
+    "static/memory_dashboard.js",
     "static/help-content.js",
     "static/help-tour.js",
     "static/error-reporter.js",
@@ -132,6 +137,7 @@ JS_PLACEHOLDERS = (
 CSS_PLACEHOLDERS = (
     "static/svg_visuals.css",
     "static/memory_inventory.css",
+    "static/memory_dashboard.css",
     "static/cron-notify.css",
     "static/help-tour.css",
     "static/group-routing.css",
@@ -142,6 +148,7 @@ SEAM_GLOBALS = (
     "renderSvgVisualBlocks",
     "enhanceSvgMediaCards",
     "SynthPulseMemoryExtensions",
+    "SynthPulseMemoryDashboard",
 )
 
 # Plan Appendix G (W2, W4, W6) and addendum Appendix AG (A1, A6).
@@ -232,6 +239,61 @@ SEAM_I18N = {
     "mnemo_trust_imported": "Imported",
     "mnemo_status_outdated": "Outdated",
     "voice_live_unavailable": "Live voice is not available on this platform.",
+    # E.7.5.1 (revision 6.1): the Memory explorer (A13).
+    "memdash_section_label": "Memory explorer",
+    "memdash_section_tooltip": "Explore your memories and how they connect",
+    "memdash_access_section_label": "Who viewed my memories",
+    "memdash_access_section_tooltip": "Administrators who viewed or changed your memories, and when",
+    "memdash_picker_label": "Memories of",
+    "memdash_picker_me": "My memories",
+    "memdash_picker_group_people": "People in {0}",
+    "memdash_picker_group_assistants": "Assistants",
+    "memdash_picker_group_shared": "Shared and other stores",
+    "memdash_picker_search": "Search people",
+    "memdash_store_last_write": "Last change {0}",
+    "memdash_open_other_title": "Open {0}'s memories?",
+    "memdash_open_other_body": "You are about to view another person's memories. This is recorded, and {0} can see that you viewed them and when.",
+    "memdash_reason_label": "Reason (shown to {0})",
+    "memdash_reason_support": "Helping with a support question",
+    "memdash_reason_safety": "Keeping the service safe",
+    "memdash_reason_quality": "Checking memory quality",
+    "memdash_reason_asked": "{0} asked me to",
+    "memdash_reason_other": "Other reason",
+    "memdash_reason_none": "No reason given",
+    "memdash_open": "Open",
+    "memdash_viewing_banner": "You are viewing {0}'s memories. This view is recorded and shown to {0}.",
+    "memdash_back_to_mine": "Back to my memories",
+    "memdash_fullscreen": "Full screen",
+    "memdash_exit_fullscreen": "Exit full screen",
+    "memdash_readonly_note": "You can view these memories but not change them.",
+    "memdash_edit_reason_title": "Why are you changing this memory?",
+    "memdash_changes_unavailable": "Changes are not available yet.",
+    "memdash_unavailable": "Memory explorer is not available right now. Try again later.",
+    "memdash_coverage_note": "This view shows conversation memories, connections and structured memory. The complete list, including facts and summaries, is under What SynthPulse remembers about me.",
+    "memdash_access_empty": "Nobody else has viewed your memories.",
+    "memdash_access_row": "{0} viewed your memories",
+    "memdash_access_row_changed": "{0} changed {1} of your memories",
+    "memdash_access_row_forgot": "{0} deleted {1} of your memories",
+    "memdash_access_when": "{0} to {1}",
+    "memdash_access_detail": "{0} views, {1} memories opened, {2} searches",
+    "memdash_access_reason": "Reason: {0}",
+    "memdash_access_role_platform": "Service administrator",
+    "memdash_access_role_org": "Organisation administrator",
+    "memdash_access_new": "{0} new",
+    "memdash_licences": "Open source licences",
+    "memdash_notice_title": "Your assistant remembers",
+    "memdash_notice_body_org_and_platform": "SynthPulse remembers useful things from your chats, such as preferences, decisions and project details, so you do not have to repeat them. You can see, change and delete what it remembers under Memory. Administrators of your organisation and the Synthwave team that runs this service can also view your memories, for example to help you or to keep the service safe. Every view is recorded, and under Memory, Who viewed my memories, you can see who viewed your memories and when.",
+    "memdash_notice_body_org_only": "SynthPulse remembers useful things from your chats, such as preferences, decisions and project details, so you do not have to repeat them. You can see, change and delete what it remembers under Memory. Administrators of your organisation can also view your memories, for example to help you or to keep the service safe. Every view is recorded, and under Memory, Who viewed my memories, you can see who viewed your memories and when.",
+    "memdash_notice_body_platform_only": "SynthPulse remembers useful things from your chats, such as preferences, decisions and project details, so you do not have to repeat them. You can see, change and delete what it remembers under Memory. Administrators of this service can also view your memories, for example to help you or to keep the service safe. Every view is recorded, and under Memory, Who viewed my memories, you can see who viewed your memories and when.",
+    "memdash_notice_ok": "Got it",
+    "memdash_notice_manage": "Manage memories",
+}
+# E.7.5.1: three A6 values changed for the Memory explorer (E.7.3's values
+# for these keys are not applied).
+MNEMO_CHANGED_VALUES = {
+    "mnemo_section_tooltip": "Visible to you and to administrators",
+    "mnemo_badge_only_you": "Not shared",
+    "mnemo_intro": "SynthPulse keeps short facts from your chats so it can help you better. You can see, change and delete them here. Administrators can also view them when needed; every view is recorded and listed under Who viewed my memories. Your notes above are files you edit yourself; the list below is what the assistant remembered.",
 }
 # E.5.3 and E.6.1: network and identity product names never appear in copy.
 NETWORK_IDENTITY_NAMES = ("Tailscale", "NetBird", "Headscale", "Keycloak", "oauth2-proxy", "WireGuard",
@@ -577,6 +639,126 @@ def test_modules_is_a_member_panel_without_a_permission_of_its_own():
     from api.governance.nav import MEMBER_PANELS, PANEL_PERMISSIONS
 
     assert "modules" in MEMBER_PANELS and "modules" not in PANEL_PERMISSIONS
+
+
+# ── Memory explorer (plan Appendix E.7.5.1) ─────────────────────────────────
+
+def test_memdash_stubs_answer_like_unknown_routes():
+    from api import memdash, memdash_access_log, memdash_static
+
+    assert memdash.handle_get(_Handler(), None) is False
+    assert memdash.handle_post(_Handler(), None, {"x": 1}) is False
+    assert memdash_static.serve(_Handler(), None) is False
+    assert memdash_access_log.rows_for_subject("member@example.test") == []
+
+
+def test_memdash_routes_resolve_chat_use_and_unknown_children_fail_closed(inject_policy):
+    for path in MEMDASH_GET_ROUTES + MEMDASH_POST_ROUTES:
+        for method in ("GET", "POST"):
+            assert route_permission(path, method) == "chat:use", (path, method)
+        assert path not in _SELF_ROUTES, path
+    for path in ("/api/memdash/unknown", "/api/memdash", "/api/memdash/v1", "/api/memdash/banks/x",
+                 "/api/memdash/v1/view/x", "/api/memdash/access-log/other"):
+        for method in ("GET", "POST", "DELETE"):
+            assert route_permission(path, method) is None, (path, method)
+    inject_policy(POLICY)
+    member, outsider = _identity(MEMBER), _identity(OUTSIDER)
+    for path in MEMDASH_GET_ROUTES:
+        assert evaluate_request(member, "GET", path).allow, path
+        decision = evaluate_request(outsider, "GET", path)
+        assert (decision.allow, decision.reason) == (False, "permission_not_allowed"), path
+    for path in MEMDASH_POST_ROUTES:
+        assert evaluate_request(member, "POST", path).allow, path
+    decision = evaluate_request(member, "GET", "/api/memdash/unknown")
+    assert (decision.allow, decision.reason) == (False, "unknown_route")
+    # The vendored document keeps the class of every other static path.
+    assert evaluate_request(None, "GET", MEMDASH_VENDOR + "index.html").reason == "non_api"
+
+
+def test_memdash_routes_answer_404_for_a_chat_user(dispatch, monkeypatch):
+    from api import memdash
+
+    for path in MEMDASH_GET_ROUTES:
+        result, handler = dispatch.get(path)
+        assert result is False and handler.status is None, path
+    for path in MEMDASH_POST_ROUTES:
+        result, handler = dispatch.post(path, {"ref": "me"})
+        assert result is False and handler.status is None, path
+    seen = []
+    monkeypatch.setattr(memdash, "handle_get", lambda h, parsed: seen.append(("get", parsed.path)) or False)
+    monkeypatch.setattr(memdash, "handle_post", lambda h, parsed, body: seen.append(("post", parsed.path, body)) or False)
+    dispatch.get("/api/memdash/banks")
+    dispatch.post("/api/memdash/notice", {"ack": True})
+    assert seen == [("get", "/api/memdash/banks"), ("post", "/api/memdash/notice", {"ack": True})]
+
+
+def test_vendored_memdash_path_never_reaches_the_generic_static_handler(dispatch, monkeypatch, tmp_path):
+    import api.config as api_config
+    import api.routes as routes
+    from api import memdash_static
+
+    static_root = tmp_path / "static"
+    vendor = static_root / "vendor" / "mnemosyne-dashboard"
+    vendor.mkdir(parents=True)
+    (vendor / "index.html").write_text("<html>frame</html>", encoding="utf-8")
+    (static_root / "ok.css").write_text("body{}", encoding="utf-8")
+    monkeypatch.setattr(api_config, "get_static_root", lambda: static_root)
+    generic = []
+    real_serve_static = routes._serve_static
+
+    def spy(handler, parsed):
+        generic.append(parsed.path)
+        return real_serve_static(handler, parsed)
+
+    monkeypatch.setattr(routes, "_serve_static", spy)
+    for path in (MEMDASH_VENDOR + "index.html", MEMDASH_VENDOR, "/session" + MEMDASH_VENDOR + "index.html"):
+        result, handler = dispatch.get(path)
+        assert handler.status == 404 and handler.body == {"error": "not found"}, path
+    assert generic == []
+    # Other spellings that resolve into the tree reach the generic handler,
+    # which refuses them too.
+    for path in ("/static/vendor/./mnemosyne-dashboard/index.html",
+                 "/static/x/../vendor/mnemosyne-dashboard/index.html",
+                 "/static/vendor//mnemosyne-dashboard/index.html"):
+        result, handler = dispatch.get(path)
+        assert handler.status == 404 and b"frame" not in handler.raw, path
+    result, handler = dispatch.get("/static/ok.css")
+    assert handler.status == 200
+    # The seam is wired: A13's serve() decides for the vendored prefix.
+    served = []
+    monkeypatch.setattr(memdash_static, "serve", lambda h, parsed: served.append(parsed.path) or True)
+    dispatch.get(MEMDASH_VENDOR + "index.html")
+    dispatch.get("/session" + MEMDASH_VENDOR + "app.js")
+    assert served == [MEMDASH_VENDOR + "index.html", MEMDASH_VENDOR + "app.js"]
+
+
+@needs_node
+def test_service_worker_leaves_the_vendored_memdash_path_to_the_network():
+    sw = (STATIC / "sw.js").read_text(encoding="utf-8")
+    fetch = sw[sw.index("self.addEventListener('fetch'"):]
+    bypass = "if (url.pathname.includes('/static/vendor/mnemosyne-dashboard/')) return;"
+    assert fetch.count(bypass) == 1
+    assert fetch.index(bypass) < fetch.index("if (event.request.mode === 'navigate')")
+    script = r"""
+const fs=require('fs'),vm=require('vm');
+const listeners={};
+const self={location:{origin:'https://app.test'},addEventListener:(t,f)=>{listeners[t]=f;},
+  skipWaiting:()=>{},clients:{claim:()=>{}}};
+const ctx={self,caches:{keys:async()=>[],open:async()=>({addAll:async()=>{},put:async()=>{}}),match:async()=>undefined},
+  fetch:async()=>({status:200,redirected:false,clone(){return this;}}),Request:function(r){return r;},
+  URL,Promise,console};
+vm.createContext(ctx);vm.runInContext(fs.readFileSync('static/sw.js','utf8'),ctx);
+const out={};
+for(const [name,url,mode] of [['frame','https://app.test/static/vendor/mnemosyne-dashboard/index.html','navigate'],
+                              ['sub','https://app.test/hermes/static/vendor/mnemosyne-dashboard/app.js','no-cors'],
+                              ['page','https://app.test/','navigate']]){
+  let responded=false;
+  listeners.fetch({request:{url,mode,method:'GET'},respondWith:()=>{responded=true;}});
+  out[name]=responded;
+}
+process.stdout.write(JSON.stringify(out));
+"""
+    assert json.loads(_node(script)) == {"frame": False, "sub": False, "page": True}
 
 
 # ── /api/settings ───────────────────────────────────────────────────────────
@@ -1097,6 +1279,8 @@ def test_index_html_loads_the_scaffold_assets_in_place():
     # Addendum AE-6: immediately before ui.js, immediately after panels.js.
     assert tag("svg_visuals.css") + "\n" + tag("svg_visuals.js") + "\n" + tag("ui.js") in html
     assert tag("panels.js") + "\n" + tag("memory_inventory.css") + "\n" + tag("memory_inventory.js") in html
+    # E.7.5.1: immediately after the AE-6 memory_inventory.js tag.
+    assert tag("memory_inventory.js") + "\n" + tag("memory_dashboard.css") + "\n" + tag("memory_dashboard.js") in html
     boot = at("boot.js")
     for script in ("vendor/guida/0.2.0/guida.umd.js", "help-content.js", "help-tour.js", "error-reporter.js"):
         assert at(script) < boot, script
@@ -1222,6 +1406,8 @@ def test_scaffold_i18n_keys_are_in_every_locale_with_the_english_value():
     assert english["help_whats_new_title"] == "What's new"
     assert english["mnemo_forget_all_type"] == "Type FORGET to confirm"
     assert english["cron_notify_me_off_admin"] == "Off (admin setting)"
+    for key, value in MNEMO_CHANGED_VALUES.items():
+        assert english[key] == value, key
     for code in LOCALES:
         assert _locale_values(code) == english, code
     for value in english.values():

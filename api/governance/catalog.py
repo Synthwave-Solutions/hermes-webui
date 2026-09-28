@@ -210,6 +210,17 @@ ROUTE_CATALOG: tuple[RouteRule, ...] = (
     RouteRule("/api/personalities",       "config:read", match="exact"),
     RouteRule("/api/personality",         "config:write", "config:write"),
     RouteRule("/api/prompts",             "config:read", "config:write", match="exact"),
+    # Memory explorer (plan Appendix E.7.5.1): exact rules and no /api/memdash
+    # prefix rule, so an unknown child route stays unclassified and fails
+    # closed. The handlers (A13) decide whose stores a caller may open. The
+    # vendored /static/vendor/mnemosyne-dashboard/ path is a static path like
+    # every other one.
+    RouteRule("/api/memdash/banks", "chat:use", match="exact"),
+    RouteRule("/api/memdash/v1/view", "chat:use", match="exact"),
+    RouteRule("/api/memdash/v1/action", "chat:use", "chat:use", match="exact"),
+    RouteRule("/api/memdash/access-log", "chat:use", match="exact"),
+    RouteRule("/api/memdash/access-log/seen", "chat:use", "chat:use", match="exact"),
+    RouteRule("/api/memdash/notice", "chat:use", "chat:use", match="exact"),
     # Personal memory self view (plan addendum AE-8): the signed-in person's
     # own memories only. Exact rules and no /api/mnemo prefix rule, so an
     # unknown child route stays unclassified and fails closed.
