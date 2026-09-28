@@ -1458,15 +1458,52 @@ def _configured_model_ids(raw_models: object) -> list[str]:
         return []
 
     model_ids: list[str] = []
+    seen: set[str] = set()
     for item in candidates:
         if isinstance(item, dict):
             candidate = item.get("id") or item.get("model") or item.get("name")
         else:
             candidate = item
         model_id = str(candidate or "").strip()
-        if model_id and model_id not in model_ids:
+        # A set keeps this linear: the governance model filter calls it once per
+        # catalogue model, so a list membership test made /api/models cubic.
+        if model_id and model_id not in seen:
+            seen.add(model_id)
             model_ids.append(model_id)
     return model_ids
+
+
+_CONFIGURED_MODEL_ID_SET_CACHE: dict[tuple, frozenset] = {}
+_CONFIGURED_MODEL_ID_SET_CACHE_MAX = 32
+_CONFIGURED_MODEL_ID_SET_CACHE_LOCK = threading.Lock()
+
+
+def _configured_model_id_set(raw_models: object) -> frozenset[str]:
+    """Set form of ``_configured_model_ids`` for membership checks, cached.
+
+    ``resolve_model_provider`` runs once per catalogue model inside the
+    governance model filter, and a custom provider can list thousands of
+    models. Lists of dicts are not cached.
+    """
+    if isinstance(raw_models, dict):
+        raw_key = tuple(k for k in raw_models if isinstance(k, str))
+    elif isinstance(raw_models, list) and all(isinstance(item, str) for item in raw_models):
+        raw_key = tuple(raw_models)
+    else:
+        return frozenset(_configured_model_ids(raw_models))
+    # Keyed on the content (a C-level tuple hash), so a list mutated in place
+    # can never return a stale set.
+    key = (type(raw_models).__name__, raw_key)
+    with _CONFIGURED_MODEL_ID_SET_CACHE_LOCK:
+        hit = _CONFIGURED_MODEL_ID_SET_CACHE.get(key)
+    if hit is not None:
+        return hit
+    result = frozenset(_configured_model_ids(raw_models))
+    with _CONFIGURED_MODEL_ID_SET_CACHE_LOCK:
+        if len(_CONFIGURED_MODEL_ID_SET_CACHE) >= _CONFIGURED_MODEL_ID_SET_CACHE_MAX:
+            _CONFIGURED_MODEL_ID_SET_CACHE.clear()
+        _CONFIGURED_MODEL_ID_SET_CACHE[key] = result
+    return result
 
 
 def _configured_model_options(raw_models: object) -> list[dict[str, str]]:
@@ -2513,7 +2550,7 @@ def _model_id_declared_in_config(model_id: str, config_provider: str | None) -> 
         if str(model_cfg.get("default") or "").strip() == model:
             return True
         _declared = model_cfg.get("models")
-        if model in _configured_model_ids(_declared):
+        if model in _configured_model_id_set(_declared):
             return True
     # Named custom:<slug> — scan its custom_providers[] entry for a verbatim id.
     prov = str(config_provider or "").strip().lower()
@@ -2526,7 +2563,7 @@ def _model_id_declared_in_config(model_id: str, config_provider: str | None) -> 
                 continue
             if str(entry.get("model") or "").strip() == model:
                 return True
-            if model in _configured_model_ids(entry.get("models")):
+            if model in _configured_model_id_set(entry.get("models")):
                 return True
     return False
 
@@ -2790,7 +2827,7 @@ def resolve_model_provider(model_id: str, *, explicitly_picked: bool = False) ->
                     continue
                 if _canon_config_provider == "copilot":
                     continue  # copilot.models is a settings map, not an allowlist
-                _provider_models_set.update(_configured_model_ids(_pdef.get('models')))
+                _provider_models_set.update(_configured_model_id_set(_pdef.get('models')))
     _skip_custom_providers = (
         _is_explicit_non_custom_provider
         and (
@@ -2808,11 +2845,10 @@ def resolve_model_provider(model_id: str, *, explicitly_picked: bool = False) ->
             entry_model = (entry.get('model') or '').strip()
             entry_name = (entry.get('name') or '').strip()
             entry_base_url = (entry.get('base_url') or '').strip()
-            entry_model_ids = set()
-            if entry_model:
-                entry_model_ids.add(entry_model)
-            entry_model_ids.update(_configured_model_ids(entry.get('models')))
-            if entry_name and model_id in entry_model_ids:
+            if entry_name and (
+                (entry_model and model_id == entry_model)
+                or model_id in _configured_model_id_set(entry.get('models'))
+            ):
                 provider_hint = _custom_provider_slug_from_name(entry_name)
                 return model_id, provider_hint, entry_base_url or None
 
@@ -2845,7 +2881,7 @@ def resolve_model_provider(model_id: str, *, explicitly_picked: bool = False) ->
             # own providers: entry may match; skip all other slugs.
             if _skip_custom_providers and _canonicalise_provider_id(slug) != _active_slug:
                 continue
-            if target in _configured_model_ids(pdef.get('models')):
+            if target in _configured_model_id_set(pdef.get('models')):
                 p_base_url = str(pdef.get('base_url') or '').strip()
                 return model_id, slug, p_base_url or None
 
