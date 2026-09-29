@@ -5271,7 +5271,12 @@ def _get_claude_code_sessions(projects_dir, *, max_files, max_file_bytes) -> lis
     never read during test runs.
     """
     from api import claude_sidebar_cache as sidebar_cache
-    cache_path = _cfg.STATE_DIR / "claude-sidebar-index.json"
+    # One index per projects dir: callers with a different dir (tests, tools,
+    # dashboards) must not overwrite the service's index and force a full
+    # re-parse of every transcript on its next start.
+    _root = Path(projects_dir).expanduser() if projects_dir is not None else _default_claude_code_projects_dir()
+    _root_id = hashlib.sha256(str(_root).encode('utf-8')).hexdigest()[:10]
+    cache_path = _cfg.STATE_DIR / f"claude-sidebar-index-{_root_id}.json"
     cached = sidebar_cache.load(cache_path)
     fresh = {}
     sessions = []
