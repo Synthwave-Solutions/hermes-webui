@@ -62,6 +62,30 @@ def _warm_model_catalog() -> None:
         print(f"[prewarm] model catalog warm failed: {e!r}", flush=True)
 
 
+def _warm_cli_sessions() -> None:
+    # 4. Agent (state.db) session scan behind /api/sessions. Cold it reads a
+    # multi-GB SQLite file; without this the first sidebar request after a
+    # restart pays 5 s warm-cache and far more when the page cache is cold.
+    try:
+        from api.config import load_settings
+
+        settings = load_settings() or {}
+        if not bool(settings.get("show_cli_sessions")):
+            print("[prewarm] cli sessions disabled in settings; skipped", flush=True)
+            return
+        from api import models
+
+        t = time.time()
+        rows = models.get_cli_sessions(
+            source_filter=settings.get("agent_session_source_filter"),
+            all_profiles=False,
+            include_claude_code=bool(settings.get("show_claude_code_sessions")),
+        )
+        print(f"[prewarm] cli sessions warm ({len(rows or [])} sessions, {time.time()-t:.1f}s)", flush=True)
+    except Exception as e:
+        print(f"[prewarm] cli sessions warm failed: {e!r}", flush=True)
+
+
 def _warm_profile_rows() -> None:
     # 3. Profile rows + bot metadata (every dropdown and the boot sequence ask
     # for these; the first build parses 21 configs and kicks off the skill
@@ -88,6 +112,7 @@ def start_prewarm_thread() -> bool:
     # Network discovery and local transcript projection are independent.
     threading.Thread(target=_warm_model_catalog, name="webui-prewarm-models", daemon=True).start()
     threading.Thread(target=_warm_profile_rows, name="webui-prewarm-profiles", daemon=True).start()
+    threading.Thread(target=_warm_cli_sessions, name="webui-prewarm-cli", daemon=True).start()
     t = threading.Thread(target=_run, name="webui-prewarm", daemon=True)
     t.start()
     return True
