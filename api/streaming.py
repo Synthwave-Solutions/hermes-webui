@@ -5542,9 +5542,21 @@ def _merge_display_messages_after_agent_result(previous_display, previous_contex
             insert_at += 1
         candidates = candidates[:insert_at] + [current_user_msg] + candidates[insert_at:]
 
+    seen_reasoning_rows = {
+        _reasoning_row_signature(m)
+        for m in merged
+        if isinstance(m, dict) and m.get('_row_id') is not None and _is_reasoning_only_assistant_message(m)
+    }
     for msg in candidates:
         if _is_context_compression_marker(msg):
             continue
+        if isinstance(msg, dict) and msg.get('_row_id') is not None and _is_reasoning_only_assistant_message(msg):
+            # Thinking rows have no text identity, so the seen-set below cannot
+            # catch a replayed copy. A state.db row id is unique per row.
+            row_sig = _reasoning_row_signature(msg)
+            if row_sig in seen_reasoning_rows:
+                continue
+            seen_reasoning_rows.add(row_sig)
         key = _message_identity(msg)
         is_current_user_turn = _looks_like_current_user_turn(msg, msg_text)
         if (

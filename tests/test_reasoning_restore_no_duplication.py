@@ -90,3 +90,18 @@ def test_restore_still_reinserts_thinking_row_when_history_lines_up():
 
     assert [m["role"] for m in restored] == ["user", "assistant", "assistant", "user", "assistant"]
     assert restored[1]["_length_continuation_fragment"] is True
+
+
+def test_merge_drops_replayed_thinking_row_with_same_state_db_row_id():
+    display = _display_with_fragments(2)
+    context = [{"role": "user", "content": "q1", "timestamp": 2}]
+    result = copy.deepcopy(context) + [
+        copy.deepcopy(display[1]),
+        {"role": "user", "content": "next"},
+        {"role": "assistant", "content": "reply"},
+    ]
+
+    merged = _merge_display_messages_after_agent_result(display, context, result, "next")
+
+    assert _fragment_count(merged) == 2
+    assert [m["content"] for m in merged if m["role"] != "assistant" or m["content"]][-2:] == ["next", "reply"]
