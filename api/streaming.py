@@ -4498,19 +4498,54 @@ def _restore_display_reasoning_metadata(previous_messages, updated_messages):
         return updated_messages
     prev_safe = _api_safe_message_positions(previous_messages)
     safe_indices = {idx for idx, _ in prev_safe}
+    present_rows = {}
+    for msg in updated_messages:
+        if _is_reasoning_only_assistant_message(msg):
+            sig = _reasoning_row_signature(msg)
+            present_rows[sig] = present_rows.get(sig, 0) + 1
     inserted_reasoning_only = 0
     for prev_idx, prev_msg in enumerate(previous_messages):
         if _is_empty_partial_activity_message(prev_msg):
             continue
         if prev_idx in safe_indices or not _is_reasoning_only_assistant_message(prev_msg):
             continue
-        safe_pos = sum(1 for idx, _ in prev_safe if idx < prev_idx) + inserted_reasoning_only
+        sig = _reasoning_row_signature(prev_msg)
+        if present_rows.get(sig):
+            present_rows[sig] -= 1
+            continue
+        safe_before = sum(1 for idx, _ in prev_safe if idx < prev_idx)
+        safe_pos = safe_before + inserted_reasoning_only
         existing = updated_messages[safe_pos] if safe_pos < len(updated_messages) else None
         if isinstance(existing, dict) and _is_reasoning_only_assistant_message(existing):
+            continue
+        # The position is only meaningful while the agent history still lines up
+        # with the transcript. After context compaction it does not: inserting
+        # anyway appends every old thinking row again on each turn.
+        preceding_ok = (
+            safe_before > 0
+            and 0 < safe_pos <= len(updated_messages)
+            and _message_replay_key(previous_messages[prev_safe[safe_before - 1][0]])
+            == _message_replay_key(updated_messages[safe_pos - 1])
+        )
+        following_ok = (
+            safe_before < len(prev_safe)
+            and safe_pos < len(updated_messages)
+            and _message_replay_key(previous_messages[prev_safe[safe_before][0]])
+            == _message_replay_key(updated_messages[safe_pos])
+        )
+        if not (preceding_ok or following_ok):
             continue
         updated_messages.insert(safe_pos, copy.deepcopy(prev_msg))
         inserted_reasoning_only += 1
     return updated_messages
+
+
+def _reasoning_row_signature(msg):
+    return (
+        msg.get('timestamp'),
+        msg.get('_row_id'),
+        str(msg.get('reasoning') or msg.get('reasoning_content') or ''),
+    )
 
 
 def _session_context_messages(session):
