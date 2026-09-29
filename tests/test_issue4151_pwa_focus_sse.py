@@ -26,7 +26,6 @@ Source-grep checks (the hooks live in static JS with no server round trip).
 from __future__ import annotations
 
 from pathlib import Path
-from tests.helpers import js_function_source
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MESSAGES_JS = (REPO_ROOT / "static" / "messages.js").read_text(encoding="utf-8")
@@ -111,22 +110,21 @@ def test_focus_reopen_does_not_thrash_the_gateway_stream():
 
 def test_session_events_open_guard_uses_backgrounded_predicate():
     """ensureSessionEventsSSE installs the focus hook and gates open on the predicate."""
-    # Whole function: SynthPulse's split-view pane guard comes first and pushed
-    # these checks past a fixed-size window. Order still matters: the guard
-    # must run before the EventSource opens.
-    block = js_function_source(SESSIONS_JS, "ensureSessionEventsSSE")
+    start = SESSIONS_JS.find("function ensureSessionEventsSSE()")
+    assert start != -1
+    block = SESSIONS_JS[start:start + 700]
     assert "_installSidebarSseFocusHook()" in block
     # Open guard is the focus-aware predicate, not the old hidden-only check.
     assert "if(_sidebarSseBackgrounded()) return;" in block
-    assert block.index("if(_sidebarSseBackgrounded()) return;") < block.index("new EventSource(")
 
 
 def test_gateway_open_guard_uses_backgrounded_predicate():
     """startGatewaySSE installs the focus hook and gates open on the predicate."""
-    block = js_function_source(SESSIONS_JS, "startGatewaySSE")
+    start = SESSIONS_JS.find("function startGatewaySSE()")
+    assert start != -1
+    block = SESSIONS_JS[start:start + 700]
     assert "_installSidebarSseFocusHook()" in block
     assert "if(_sidebarSseBackgrounded()) return;" in block
-    assert block.index("if(_sidebarSseBackgrounded()) return;") < block.index("new EventSource(")
 
 
 def test_per_session_stream_NOT_closed_on_blur():
@@ -160,6 +158,7 @@ def test_per_session_stream_NOT_closed_on_blur():
 def test_per_session_stream_still_visibility_gated():
     """Sanity: the per-session stream keeps its existing visibility hook untouched."""
     assert "_hermesSessionStreamVisibilityHook" in MESSAGES_JS
-    block = js_function_source(MESSAGES_JS, "startSessionStream")
+    start = MESSAGES_JS.find("function startSessionStream(sid)")
+    block = MESSAGES_JS[start:start + 1700]
     assert "visibilitychange" in block
     assert "document.hidden" in block

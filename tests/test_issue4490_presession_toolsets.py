@@ -19,19 +19,7 @@ PANELS_JS = (REPO / "static" / "panels.js").read_text(encoding="utf-8")
 
 def _function_body(src: str, signature: str) -> str:
     start = src.index(signature)
-    # Skip the parameter list first: a default such as `options={}` holds
-    # braces that are not the function body.
-    paren = src.index("(", start)
-    depth = 0
-    for i in range(paren, len(src)):
-        if src[i] == "(":
-            depth += 1
-        elif src[i] == ")":
-            depth -= 1
-            if depth == 0:
-                paren_close = i
-                break
-    brace = src.index("{", paren_close)
+    brace = src.index("{", start)
     depth = 0
     for i in range(brace, len(src)):
         if src[i] == "{":

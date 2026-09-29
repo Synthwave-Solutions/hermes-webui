@@ -20,12 +20,5 @@ def test_admin_delivery_does_not_hold_registry_lock(tmp_path, monkeypatch):
         return True
     monkeypatch.setattr(grant_requests, '_notify_admins_of_request', deliver)
     assert grant_requests.ingest_spool() == 1
-    # Since 09f09e2d (14 Sep 2026) the administrators are notified from the
-    # automatic-review thread, after the reviewer leaves the row to them, so
-    # wait for that thread instead of expecting a synchronous call.
-    import time
-    deadline = time.monotonic() + 5
-    while not completed_during_delivery and time.monotonic() < deadline:
-        time.sleep(0.02)
     assert completed_during_delivery == [True]
     assert observed == ['pending'], 'External delivery must not block registry readers/decisions'

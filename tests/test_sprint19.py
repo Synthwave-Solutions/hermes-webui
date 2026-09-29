@@ -59,8 +59,7 @@ def test_login_page_served():
         html = r.read().decode()
         assert r.status == 200
         assert "Sign in" in html
-        # Product-branded login page (80f13c9e, 12 Jul 2026).
-        assert "SynthPulse Control" in html
+        assert "Hermes" in html
         assert 'src="static/login.js?v=' in html
         assert 'src="/static/login.js"' not in html
 
@@ -89,9 +88,7 @@ def test_security_headers_on_json():
     d, status, headers = get("/api/auth/status")
     assert status == 200
     assert headers.get("X-Content-Type-Options") == "nosniff"
-    # SAMEORIGIN since the split view (05a4329a, 17 Aug 2026) frames the app
-    # itself; cross-origin framing stays blocked.
-    assert headers.get("X-Frame-Options") == "SAMEORIGIN"
+    assert headers.get("X-Frame-Options") == "DENY"
     assert headers.get("Referrer-Policy") == "same-origin"
 
 

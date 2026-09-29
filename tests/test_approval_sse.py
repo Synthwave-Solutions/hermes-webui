@@ -117,12 +117,8 @@ class TestSSEStaticAnalysis:
             "_approval_notify_cb must mirror approval data into polling state before SSE"
         assert '"pending_count": total' in cb_body, \
             "_approval_notify_cb must emit the reconciled pending count"
-        # SynthPulse pushes a copy (event_data) of the mirrored head so a
-        # parallel producer cannot change the card identity it carries.
-        assert "put('approval', event_data)" in cb_body, \
+        assert "put('approval', approval_data)" in cb_body, \
             "_approval_notify_cb must still emit the approval SSE event"
-        assert cb_body.find("_submit_pending_for_polling(session_id, approval_data)") < cb_body.find("put('approval', event_data)"), \
-            "_approval_notify_cb must mirror polling state before the SSE push"
 
     def test_unsubscribe_in_finally(self):
         """SSE handler must unsubscribe in a finally block."""

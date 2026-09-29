@@ -27,7 +27,6 @@ import textwrap
 from pathlib import Path
 
 import pytest
-from tests._i18n_source import monolithic_i18n_source
 
 ROOT = Path(__file__).resolve().parents[1]
 UI_JS = (ROOT / "static" / "ui.js").read_text(encoding="utf-8")
@@ -296,8 +295,8 @@ def test_label_uses_i18n_with_fallback():
     body = _function_body(UI_JS, "_tOrDefault")
     assert "v!==key" in body
     assert "show_earlier_step_one: 'Show 1 earlier step'" in (
-        monolithic_i18n_source()
+        (ROOT / "static" / "i18n.js").read_text(encoding="utf-8")
     )
     assert "show_earlier_steps: 'Show {0} earlier steps'" in (
-        monolithic_i18n_source()
+        (ROOT / "static" / "i18n.js").read_text(encoding="utf-8")
     )

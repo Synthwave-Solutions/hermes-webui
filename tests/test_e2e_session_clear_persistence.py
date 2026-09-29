@@ -32,16 +32,13 @@ def test_clear_blocks_state_replay_and_pre_clear_backup_recovery(monkeypatch, tm
     assert models.merge_session_messages_append_only(
         after.messages, old_messages, truncation_watermark=after.truncation_watermark,
         truncation_boundary=after.truncation_boundary) == []
-    # Upstream #5532: once the empty state is verified on disk, clear removes
-    # the stale pre-clear backup, so startup recovery has nothing to restore.
-    assert not after.path.with_suffix('.json.bak').exists()
     status = inspect_session_recovery_status(after.path)
-    assert status['recommend'] == 'no_backup'
+    assert status['recommend'] == 'no_action'
+    assert status['intentional_clear_truncate'] is True
     after.save()
     reloaded = Session.load(before.session_id)
     assert reloaded.clear_generation == after.clear_generation
-    assert reloaded.messages == []
-    assert inspect_session_recovery_status(reloaded.path)['recommend'] == 'no_backup'
+    assert inspect_session_recovery_status(reloaded.path)['recommend'] == 'no_action'
 
 
 def test_clear_resets_stale_pending_and_compressed_context(monkeypatch, tmp_path):

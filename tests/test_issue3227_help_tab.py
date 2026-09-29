@@ -1,10 +1,9 @@
 from pathlib import Path
-from tests._i18n_source import monolithic_i18n_source
 
 ROOT = Path(__file__).resolve().parents[1]
 INDEX_HTML = (ROOT / "static" / "index.html").read_text(encoding="utf-8")
 PANELS_JS  = (ROOT / "static" / "panels.js").read_text(encoding="utf-8")
-I18N_JS    = monolithic_i18n_source()
+I18N_JS    = (ROOT / "static" / "i18n.js").read_text(encoding="utf-8")
 STYLE_CSS  = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
 
 LOCALE_COUNT = 15  # en, it, ja, ru, es, de, zh, zh-Hant, pt, ko, fr, tr, pl, vi, cs
@@ -18,9 +17,8 @@ def test_help_nav_button_present():
 
 def test_help_pane_present():
     assert 'id="settingsPaneHelp"' in INDEX_HTML
-    # SynthPulse points Help at its own site and organisation (commit 844071da).
-    assert 'href="https://synthwave.solutions/"' in INDEX_HTML
-    assert 'href="https://github.com/Synthwave-Solutions"' in INDEX_HTML
+    assert 'href="https://get-hermes.ai/"' in INDEX_HTML
+    assert 'href="https://github.com/nesquena/hermes-webui/issues"' in INDEX_HTML
 
 
 def test_help_pane_links_are_outbound():

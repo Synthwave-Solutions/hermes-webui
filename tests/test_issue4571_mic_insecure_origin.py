@@ -7,12 +7,11 @@ browser permission was denied.
 """
 from pathlib import Path
 import re
-from tests._i18n_source import monolithic_i18n_source
 
 
 ROOT = Path(__file__).resolve().parents[1]
 BOOT_JS = (ROOT / "static" / "boot.js").read_text(encoding="utf-8")
-I18N_JS = monolithic_i18n_source()
+I18N_JS = (ROOT / "static" / "i18n.js").read_text(encoding="utf-8")
 
 
 def _locale_count() -> int:

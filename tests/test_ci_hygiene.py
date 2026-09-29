@@ -18,14 +18,8 @@ def test_github_actions_quotes_pyyaml_version_specifier():
     workflow = ROOT / ".github" / "workflows" / "tests.yml"
     text = workflow.read_text(encoding="utf-8")
 
+    assert '"pyyaml>=6.0"' in text or "'pyyaml>=6.0'" in text
     assert "pip install pyyaml>=6.0" not in text
-    # SynthPulse installs pyyaml through requirements.txt (7a560531, 6 Sep
-    # 2026), where the version specifier never reaches the shell.
-    if "pip install -r requirements.txt" in text:
-        requirements = (ROOT / "requirements.txt").read_text(encoding="utf-8").lower()
-        assert "pyyaml>=6.0" in requirements
-    else:
-        assert '"pyyaml>=6.0"' in text or "'pyyaml>=6.0'" in text
 
 
 def test_pytest_integration_marker_is_registered():
@@ -213,7 +207,5 @@ def test_local_test_runner_rejects_venv_without_accepted_python_path(tmp_path):
 def test_live_model_success_log_is_debug_not_default_console_log():
     ui = (ROOT / "static" / "ui.js").read_text(encoding="utf-8")
 
-    # The log prefix follows the SynthPulse branding (50dd64f5, 12 Sep 2026).
-    assert "console.debug('[synthpulse] Live models loaded" in ui
-    assert "console.log('[synthpulse] Live models loaded" not in ui
+    assert "console.debug('[hermes] Live models loaded" in ui
     assert "console.log('[hermes] Live models loaded" not in ui

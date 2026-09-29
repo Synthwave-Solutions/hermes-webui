@@ -12,14 +12,13 @@ shape moved.
 """
 
 from pathlib import Path
-from tests._i18n_source import monolithic_i18n_source
 
 
 ROOT = Path(__file__).resolve().parents[1]
 INDEX_HTML = (ROOT / "static" / "index.html").read_text(encoding="utf-8")
 UI_JS = (ROOT / "static" / "ui.js").read_text(encoding="utf-8")
 STYLE_CSS = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
-I18N_JS = monolithic_i18n_source()
+I18N_JS = (ROOT / "static" / "i18n.js").read_text(encoding="utf-8")
 
 
 # ── Original filtering behavior (must stay green) ────────────────────────

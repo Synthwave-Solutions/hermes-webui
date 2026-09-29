@@ -694,12 +694,6 @@ function _persistentToastHasWriteIntent(name, text){
   if(/\b(read|list|view|search|lookup|get|fetch|load|usage|toggle|delete|remove)\b/.test(nameWords))return false;
   if(/\b(no|not|nothing)\s+(?:was\s+)?(?:saved|updated|created|written|stored|changed)\b/.test(haystack))return false;
   if(/\b(?:unchanged|skipped|dry[- ]run|failed|error)\b/.test(haystack))return false;
-  // A governance refusal or a staged (unapproved) change saved nothing, even
-  // though the tool arguments say "create". Reported by Michael on 20 Sep
-  // 2026: the toast said the skill was created while skill_manage had been
-  // blocked, so the Skills library never showed it.
-  if(/not_allowed|not allowed|denied|blocked|forbidden|refused|rejected|requires approval|pending_id|"staged"\s*:\s*true/.test(haystack))return false;
-  if(/"success"\s*:\s*false/.test(haystack))return false;
   return /\b(save|saved|write|wrote|written|update|updated|create|created|store|stored|persist|persisted|remember|remembered)\b/.test(haystack);
 }
 
@@ -1433,10 +1427,7 @@ async function send(){
         }
       }
     const defaultMessageMode=window._defaultMessageMode||'steer';
-      // Group conversations: someone else's running turn is never steered or
-      // interrupted from here; the message waits and becomes your own turn.
-      const _peerTurn=typeof _peerTurnIsRunning==='function'&&_peerTurnIsRunning();
-      if(defaultMessageMode==='steer'&&S.activeStreamId&&!_peerTurn&&typeof _trySteer==='function'){
+      if(defaultMessageMode==='steer'&&S.activeStreamId&&typeof _trySteer==='function'){
         // Real steer: clear the input first so the user gets immediate
         // feedback, then ship the steer payload via /api/chat/steer.
         // _trySteer captures the owner session/files before awaiting uploads,
@@ -1448,7 +1439,7 @@ async function send(){
         await _trySteer(text, /*explicitSteer=*/false);
         // _trySteer clears staged files only after /api/chat/steer accepts, and
         // only when the visible session still matches the captured owner sid.
-      } else if(defaultMessageMode==='interrupt'&&!_peerTurn){
+      } else if(defaultMessageMode==='interrupt'){
         // Queue the message, then cancel so drain re-sends it.
         const _modelState=_chatPayloadModelState();
         queueSessionMessage(S.session.session_id,{text,files:[...S.pendingFiles],model:_modelState.model,model_provider:_modelState.model_provider,profile:S.activeProfile||'default'});
@@ -1463,15 +1454,13 @@ async function send(){
         }
       } else {
         // Default: queue mode (current behavior). Also the fallback for
-        // 'steer' mode when no stream is active or _trySteer is unavailable,
-        // and for any message sent during someone else's group-chat turn.
+        // 'steer' mode when no stream is active or _trySteer is unavailable.
         const _modelState=_chatPayloadModelState();
         queueSessionMessage(S.session.session_id,{text,files:[...S.pendingFiles],model:_modelState.model,model_provider:_modelState.model_provider,profile:S.activeProfile||'default'});
         _clearComposerAfterQueuedSelectionSend(S.session&&S.session.session_id);
         S.pendingFiles=[];renderTray();
         updateQueueBadge(S.session.session_id);
-        if(_peerTurn) showToast(t('group_turn_queued'),3000);
-        else showToast(`Queued: "${text.slice(0,40)}${text.length>40?'…':''}"`,2000);
+        showToast(`Queued: "${text.slice(0,40)}${text.length>40?'…':''}"`,2000);
       }
     }
     return;
@@ -8101,7 +8090,6 @@ function startSessionStream(sid) {
         if (sender && me && sender === me) return;
         const streamId = String(d.stream_id || '');
         if (!streamId) return;
-        _rememberPeerTurn(streamId);
         if (S.activeStreamId === streamId) return;
         const isCurrent = (typeof _isSessionCurrentPane === 'function')
           ? _isSessionCurrentPane(sid)
@@ -8244,42 +8232,6 @@ function stopSessionStream() {
 // a toast. The diagnostic ack POST still fires for both focused and
 // unfocused viewers so the server receives the delivery/cleanup signal;
 // the focus gate suppresses UI noise only.
-// Group conversations (27 Sep 2026): stream ids of turns other people
-// started, from the peer_turn_started frame. While one of those runs, what
-// you send waits in the queue instead of steering or interrupting their turn,
-// which runs under their access, not yours. The server refuses such a steer
-// too (fallback "peer_turn"), which covers a tab that missed the frame.
-const _peerTurnStreamIds = new Set();
-function _rememberPeerTurn(streamId) {
-  if (!streamId) return;
-  _peerTurnStreamIds.add(String(streamId));
-  if (_peerTurnStreamIds.size > 64) _peerTurnStreamIds.delete(_peerTurnStreamIds.values().next().value);
-}
-function _peerTurnIsRunning() {
-  const sid = (typeof S !== 'undefined' && S && S.activeStreamId) || '';
-  return !!(sid && _peerTurnStreamIds.has(String(sid)));
-}
-
-// The toast used to read "Task proc_1a2b done: IMPORTANT: Background process
-// proc_1a2b... completed (exit_code=0)." (Michael Ramirez, 27 Sep 2026). It
-// now says the same thing as the notice in the chat, plus which chat it is.
-function _bgTaskToastText(d, sid) {
-  const summary = String((d && d.summary) || '');
-  const exit = summary.match(/exit(?:_code=| code )(-?\d+)/i);
-  let key = 'process_wakeup_title_complete';
-  if (/matched watch pattern/i.test(summary)) key = 'process_wakeup_title_update';
-  else if (exit && (exit[1].startsWith('-') || exit[1] === '137' || exit[1] === '143')) key = 'process_wakeup_title_stopped';
-  else if (exit && exit[1] !== '0') key = 'process_wakeup_title_failed';
-  const title = (typeof t === 'function') ? t(key) : 'Background task complete';
-  let chat = '';
-  try {
-    const rows = (typeof _allSessions !== 'undefined' && Array.isArray(_allSessions)) ? _allSessions : [];
-    const row = rows.find(s => s && s.session_id === sid);
-    chat = row && row.title ? String(row.title).trim() : '';
-  } catch (_) {}
-  return chat ? `${title} · ${chat.length > 60 ? chat.slice(0, 59) + '…' : chat}` : title;
-}
-
 function _handleBgTaskCompleteEvent(e, expectedSid, opts) {
   try {
     const d = JSON.parse(e.data || '{}');
@@ -8298,7 +8250,9 @@ function _handleBgTaskCompleteEvent(e, expectedSid, opts) {
     } else {
       // T4 drop-when-focused: suppress toast only; ack below still fires.
       try {
-        showToast(_bgTaskToastText(d, sid), 2600);
+        const tid = (d.task_id || '').slice(0, 8) || '?';
+        const tail = d.summary ? `: ${String(d.summary).slice(0, 80)}` : '';
+        showToast(`Task ${tid} done${tail}`, 2600);
       } catch (_) {}
     }
 

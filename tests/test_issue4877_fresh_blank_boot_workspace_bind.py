@@ -9,7 +9,6 @@ import textwrap
 from pathlib import Path
 
 import pytest
-from tests.helpers import js_block_end
 
 ROOT = Path(__file__).resolve().parents[1]
 BOOT_JS = ROOT / "static" / "boot.js"
@@ -168,20 +167,9 @@ def test_no_saved_session_branch_restores_panel_pref_before_bind_attempt():
 def test_ephemeral_blank_session_branch_restores_panel_pref_before_bind_attempt():
     src = BOOT_JS.read_text(encoding="utf-8")
     marker = "if(S.session && (S.session.message_count||0) === 0 && !_restoredInFlight && !_restoredHasDraft){"
-    # SynthPulse only drops a restored *personal scratch* session this way
-    # (group and project chats stay, de098a2b), and bails out first if the user already
-    # navigated elsewhere, so take the branch's exact block, not the text up to
-    # its first `return;`.
-    synthpulse_marker = (
-        "if(_isRestoredPersonalScratchSession(S.session, urlSession) && "
-        "(S.session.message_count||0) === 0 && !_restoredInFlight && !_restoredHasDraft){"
-    )
-    if marker not in src and synthpulse_marker in src:
-        marker = synthpulse_marker
     marker_idx = src.find(marker)
     assert marker_idx >= 0, "ephemeral blank-session path not found"
-    block_end = js_block_end(src, marker_idx + len(marker) - 1)
-    return_idx = src.rfind("return;", marker_idx, block_end)
+    return_idx = src.find("return;", marker_idx)
     assert return_idx > marker_idx, "ephemeral blank-session path must still return early"
     segment = src[marker_idx:return_idx]
     eph_pref = "if(_ephPanelPref&&!_isCompactWorkspaceViewport()) _workspacePanelMode='browse';"

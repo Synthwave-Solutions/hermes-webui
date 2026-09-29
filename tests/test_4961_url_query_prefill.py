@@ -157,17 +157,12 @@ console.log(JSON.stringify(result));
         "if(savedSidebarOnlyState&&savedSidebarOnlyState.sidebarOnly){",
         saved_state_pos,
     )
-    load_pos = BOOT_JS.find("loadSession(saved, {preserveActiveInput:true")
+    load_pos = BOOT_JS.find("await loadSession(saved, {preserveActiveInput:true});")
     assert prefill_guard >= 0
     assert saved_state_pos >= 0
     assert saved_guard > saved_state_pos
     assert prefill_guard > saved_guard
     assert load_pos > prefill_guard
-
-
-# The boot restore call is anchored on its shared prefix: SynthPulse starts the
-# restore with the draft input generation, records the restore generation and
-# only then awaits it (7b2620b3), instead of `await loadSession(saved, {...});`.
 
 
 def test_fresh_default_workspace_bind_skips_prefill_draft_boot():
@@ -355,7 +350,7 @@ console.log(JSON.stringify({
         first_await_pos,
     )
     new_pos = BOOT_JS.find("await newSession(true);", active_profile_pos)
-    load_pos = BOOT_JS.find("loadSession(saved, {preserveActiveInput:true", active_profile_pos)
+    load_pos = BOOT_JS.find("await loadSession(saved, {preserveActiveInput:true});", active_profile_pos)
     saved_pos = BOOT_JS.find("const saved=urlSession||savedLocal;")
     check_pos = BOOT_JS.find("await checkInflightOnBoot(saved);", load_pos)
     apply_pos = BOOT_JS.find("await _finalizeComposerPrefillOnBoot(prefillIntent);", check_pos)

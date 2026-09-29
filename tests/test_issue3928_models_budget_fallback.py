@@ -14,16 +14,6 @@ import api.config as cfg
 import api.profiles as profiles
 
 
-def _served(payload):
-    """What a cache read serves for a published catalog.
-
-    Upstream's fast-tier annotation (restored after the 5 Aug merge) adds
-    ``supports_fast_tier`` to OpenAI-family models on every cache read; the
-    published cache itself stays unannotated.
-    """
-    return cfg._annotate_fast_tier_model_groups(copy.deepcopy(payload))
-
-
 @pytest.fixture
 def gated_catalog_rebuild(monkeypatch):
     """A real detached rebuild, released even when a foreground assertion fails."""
@@ -72,7 +62,7 @@ def test_catalog_follower_returns_within_own_budget_while_provider_stays_blocked
     assert len(calls) == 1
     release.set()
     assert published.wait(1)
-    assert cfg.get_available_models() == _served(live)
+    assert cfg.get_available_models() == live
     assert len(calls) == 1
 
 
@@ -169,7 +159,7 @@ def test_interrupted_catalog_caller_does_not_orphan_shared_worker(
     assert len(calls) == 1
     release.set()
     assert published.wait(1)
-    assert cfg.get_available_models() == _served(live)
+    assert cfg.get_available_models() == live
     assert len(calls) == 1
 
 

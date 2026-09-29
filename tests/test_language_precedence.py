@@ -3,11 +3,10 @@ import pathlib
 import re
 import subprocess
 import textwrap
-from tests._i18n_source import monolithic_i18n_source, monolithic_i18n_path
 
 
 REPO_ROOT = pathlib.Path(__file__).parent.parent.resolve()
-I18N_JS = monolithic_i18n_source()
+I18N_JS = (REPO_ROOT / "static" / "i18n.js").read_text(encoding="utf-8")
 BOOT_JS = (REPO_ROOT / "static" / "boot.js").read_text(encoding="utf-8")
 PANELS_JS = (REPO_ROOT / "static" / "panels.js").read_text(encoding="utf-8")
 
@@ -18,7 +17,7 @@ def _run_i18n_case(script_expr: str) -> dict:
         f"""
         const fs = require('fs');
         const vm = require('vm');
-        const src = fs.readFileSync({json.dumps(monolithic_i18n_path())}, 'utf8');
+        const src = fs.readFileSync({json.dumps(str(REPO_ROOT / "static" / "i18n.js"))}, 'utf8');
         const storage = {{}};
         const ctx = {{
           localStorage: {{

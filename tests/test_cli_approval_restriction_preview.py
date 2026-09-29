@@ -24,7 +24,4 @@ def test_cli_review_restrictions_survive_managed_access_without_granting_command
     access = resolve_effective_access(policy, GovernanceSubject(email="qa@example.test"))
     assert access.grants.cli_approval_commands == frozenset({"git", "touch"})
     assert "touch" not in access.grants.cli_commands
-    # Blacklist accounts are default-allow since c3ede8f8 (11 Sep 2026): they
-    # carry the operational wildcard on top of the role grant. The approval
-    # selector itself still never becomes an explicit command grant.
-    assert access.grants.cli_commands == (frozenset({"*", "printf"}) if mode == "blacklist" else frozenset())
+    assert access.grants.cli_commands == (frozenset({"printf"}) if mode == "blacklist" else frozenset())

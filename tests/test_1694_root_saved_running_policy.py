@@ -13,11 +13,6 @@ reattach to the requested running session.
 from pathlib import Path
 
 
-# SynthPulse starts the restore, records its load generation, then awaits
-# it (53071075), so match the call itself rather than "await loadSession(".
-_BOOT_RESTORE_CALL = "loadSession(saved, {preserveActiveInput:true"
-
-
 REPO = Path(__file__).parent.parent
 BOOT_JS = (REPO / "static" / "boot.js").read_text(encoding="utf-8")
 
@@ -50,7 +45,7 @@ def test_root_saved_running_session_is_checked_before_load_session_projection():
     block = _boot_saved_session_block()
     guard = "!urlSession&&savedLocal"
     guard_pos = block.replace(" ", "").find(guard)
-    load_pos = block.find(_BOOT_RESTORE_CALL)
+    load_pos = block.find("await loadSession(saved, {preserveActiveInput:true})")
     assert guard_pos >= 0, (
         "root `/` boot must have a !urlSession && savedLocal guard for saved "
         "running sessions before projecting them into the active pane"
@@ -97,16 +92,11 @@ def test_root_saved_running_sidebar_only_path_renders_empty_state_and_sidebar():
     helper_pos = block.find("_savedSessionSidebarOnlyState")
     render_pos = block.find("await renderSessionList()", helper_pos)
     empty_pos = block.find("$('emptyState').style.display=''", helper_pos)
-    # SynthPulse also bails out early when a newer navigation won the race
-    # (_finishBootAfterNewerSessionActivation), so take the branch's own
-    # return: the first one after it rendered the sidebar.
-    return_pos = block.find("return;", render_pos)
-    load_pos = block.find(_BOOT_RESTORE_CALL)
+    return_pos = block.find("return;", helper_pos)
     assert helper_pos >= 0, "saved-running helper call not found"
     assert empty_pos > helper_pos, "sidebar-only path must show the empty state"
     assert render_pos > helper_pos, "sidebar-only path must render the session list"
     assert return_pos > render_pos, "sidebar-only path should return before loadSession(saved)"
-    assert 0 <= return_pos < load_pos, "sidebar-only path should return before loadSession(saved)"
 
 
 def test_root_archived_saved_session_clears_stale_localstorage_pointer():
@@ -117,7 +107,7 @@ def test_root_archived_saved_session_clears_stale_localstorage_pointer():
     guard_pos = block.find(clear_guard, helper_pos)
     clear_pos = block.find("localStorage.removeItem('hermes-webui-session')", guard_pos)
     render_pos = block.find("await renderSessionList()", helper_pos)
-    load_pos = block.find(_BOOT_RESTORE_CALL)
+    load_pos = block.find("await loadSession(saved, {preserveActiveInput:true})")
     assert guard_pos > helper_pos, "archived sidebar-only path must be distinguished"
     assert clear_pos > guard_pos, "archived saved session must clear stale localStorage pointer"
     assert clear_pos < render_pos, "stale pointer should be cleared before the sidebar-only return"

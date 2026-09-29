@@ -29,35 +29,12 @@ often").  Confirmed live on the dev server: 23 of 75 sessions had
 `context_length=0` + `input_tokens > 128K`, all rendering >100%.
 """
 import json
-import sys
-from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 from urllib.parse import urlparse
 
 ROUTES = Path(__file__).resolve().parent.parent / "api" / "routes.py"
 UI_JS = Path(__file__).resolve().parent.parent / "static" / "ui.js"
-
-
-@contextmanager
-def _fake_model_metadata(module):
-    """Swap in a fake agent.model_metadata for the call, and only that module.
-
-    patch.dict("sys.modules", ...) restores the whole dict on exit, which also
-    evicts every module first imported during the route call (governance,
-    resource scope). Later tests then re-import fresh copies and their
-    monkeypatches no longer reach the code under test.
-    """
-    missing = object()
-    saved = sys.modules.get("agent.model_metadata", missing)
-    sys.modules["agent.model_metadata"] = module
-    try:
-        yield module
-    finally:
-        if saved is missing:
-            sys.modules.pop("agent.model_metadata", None)
-        else:
-            sys.modules["agent.model_metadata"] = saved
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -94,15 +71,6 @@ class TestIssue1436BackendFallback:
         s.pending_user_message = None
         s.pending_attachments = []
         s.pending_started_at = None
-        # SynthPulse session fields that a bare MagicMock would fake as truthy:
-        # an ordinary personal chat is not a shared project chat and has no
-        # owner, participants or profile pin (project and group access gates).
-        s.project_id = None
-        s.project_shared = False
-        s.owner_email = None
-        s.participants = []
-        s.bot_participants = []
-        s.profile = None
         # compact() returns a dict that gets merged with the response.
         s.compact.return_value = {
             "session_id": "test-1436",
@@ -137,7 +105,7 @@ class TestIssue1436BackendFallback:
         # Patch import so `from agent.model_metadata import ...` resolves to our fake.
         with patch("api.routes.get_session", return_value=session_obj), \
              patch("api.routes.j", side_effect=fake_j), \
-             _fake_model_metadata(fake_module):
+             patch.dict("sys.modules", {"agent.model_metadata": fake_module}):
             routes.handle_get(handler, parsed)
         return captured
 
@@ -179,7 +147,7 @@ class TestIssue1436BackendFallback:
 
         with patch("api.routes.get_session", return_value=s), \
              patch("api.routes.j", side_effect=fake_j), \
-             _fake_model_metadata(fake_module):
+             patch.dict("sys.modules", {"agent.model_metadata": fake_module}):
             routes.handle_get(handler, parsed)
 
         body = captured["data"]["session"]
@@ -228,7 +196,7 @@ class TestIssue1436BackendFallback:
              patch("api.routes.get_session", return_value=s), \
              patch("api.routes.resolve_trusted_workspace", return_value="/tmp"), \
              patch("api.routes.j", side_effect=fake_j), \
-             _fake_model_metadata(fake_module):
+             patch.dict("sys.modules", {"agent.model_metadata": fake_module}):
             routes.handle_post(handler, parsed)
 
         assert s.model == "deepseek-v4-pro"
@@ -268,7 +236,7 @@ class TestIssue1436BackendFallback:
 
         with patch("api.routes.get_session", return_value=s), \
              patch("api.routes.j", side_effect=fake_j), \
-             _fake_model_metadata(fake_module):
+             patch.dict("sys.modules", {"agent.model_metadata": fake_module}):
             routes.handle_get(handler, parsed)
 
         # First positional arg should be the model name; second is base_url ("")
@@ -299,7 +267,7 @@ class TestIssue1436BackendFallback:
 
         with patch("api.routes.get_session", return_value=s), \
              patch("api.routes.j", side_effect=fake_j), \
-             _fake_model_metadata(fake_module):
+             patch.dict("sys.modules", {"agent.model_metadata": fake_module}):
             routes.handle_get(handler, parsed)
 
         # When model is empty, fallback either isn't called OR returns no value
@@ -331,7 +299,7 @@ class TestIssue1436BackendFallback:
 
         with patch("api.routes.get_session", return_value=s), \
              patch("api.routes.j", side_effect=fake_j), \
-             _fake_model_metadata(fake_module):
+             patch.dict("sys.modules", {"agent.model_metadata": fake_module}):
             routes.handle_get(handler, parsed)  # must not raise
 
         body = captured["data"]["session"]

@@ -2,7 +2,6 @@
 
 import re
 from pathlib import Path
-from tests._i18n_source import monolithic_i18n_source
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -13,7 +12,7 @@ def read(relative_path: str) -> str:
 
 
 def test_manual_update_instruction_exists_in_every_locale():
-    source = monolithic_i18n_source()
+    source = read("static/i18n.js")
     assert source.count("settings_update_manual_docker:") == 15
 
     values = re.findall(r"settings_update_manual_docker:\s*'([^']*)'", source)

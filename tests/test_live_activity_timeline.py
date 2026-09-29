@@ -8,7 +8,6 @@ family.
 import pathlib
 import shutil
 import subprocess
-from tests.helpers import live_sse_handler
 
 
 REPO = pathlib.Path(__file__).parent.parent
@@ -282,7 +281,7 @@ def test_tool_event_flushes_pending_text_before_inserting_activity():
     segment above it a frame later, which looks like process text was inserted
     before an already-visible Activity row.
     """
-    tool_handler = live_sse_handler(MESSAGES_JS, 'tool')
+    tool_handler = MESSAGES_JS.split("source.addEventListener('tool',e=>{", 1)[1].split("source.addEventListener('tool_complete'", 1)[0]
     flush_pos = tool_handler.find("_flushPendingSegmentRender({force:true});")
     append_pos = tool_handler.find("appendLiveToolCard(tc")
     assert flush_pos != -1 and append_pos != -1
@@ -325,7 +324,7 @@ def test_tool_event_does_not_create_blank_text_segment_without_pending_text():
     above every Activity group, making Live Stream look unstable during long
     polling turns.
     """
-    tool_handler = live_sse_handler(MESSAGES_JS, 'tool')
+    tool_handler = MESSAGES_JS.split("source.addEventListener('tool',e=>{", 1)[1].split("source.addEventListener('tool_complete'", 1)[0]
     upsert_pos = tool_handler.find("const tc=upsertLiveToolCall(d,'start');")
     guard_pos = tool_handler.find("String(pendingDisplayText||'').trim()")
     force_pos = tool_handler.find("ensureAssistantRow(true);")
@@ -337,7 +336,7 @@ def test_tool_event_does_not_create_blank_text_segment_without_pending_text():
 
 def test_orphan_tool_complete_does_not_create_blank_text_segment_without_pending_text():
     """An orphan tool_complete should not manufacture an empty assistant segment."""
-    complete_handler = live_sse_handler(MESSAGES_JS, 'tool_complete')
+    complete_handler = MESSAGES_JS.split("source.addEventListener('tool_complete',e=>{", 1)[1].split("source.addEventListener('approval'", 1)[0]
     orphan_branch = complete_handler.split("if(tc._createdByComplete){", 1)[1].split("} else {", 1)[0]
     guard_pos = orphan_branch.find("String(pendingDisplayText||'').trim()")
     force_pos = orphan_branch.find("ensureAssistantRow(true);")

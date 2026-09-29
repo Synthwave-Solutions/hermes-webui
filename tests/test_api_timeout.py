@@ -196,9 +196,7 @@ def test_api_has_default_timeout_and_per_call_override_contract():
     assert "timeoutMs" in body, "api() must accept opts.timeoutMs as a per-call override"
     assert "timeoutToast" in body, "api() must let passive callers suppress timeout toasts"
 
-    # SynthPulse raised the default from upstream's 30s to 120s on purpose
-    # (80f13c9e, gateway timeout tuning); a bounded default is the contract.
-    assert "120000" in body, "api() must default browser API calls to a bounded 120s timeout"
+    assert "30000" in body, "api() must default browser API calls to a 30s timeout"
     assert "AbortController" in body, "api() must abort hung fetches with AbortController"
     assert "delete fetchOpts.timeoutMs" in body, "api() must strip timeoutMs before calling fetch()"
     assert "delete fetchOpts.timeoutToast" in body, "api() must strip timeoutToast before calling fetch()"

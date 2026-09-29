@@ -1,35 +1,17 @@
-"""Tests for #1100 — Prism.js SRI integrity check no longer blocks theme CSS.
-
-SynthPulse loads Prism lazily on the first code block (ensurePrism in
-static/ui.js) instead of from static/index.html. The same guarantees are
-checked wherever the assets are declared.
-"""
+"""Tests for #1100 — Prism.js SRI integrity check no longer blocks theme CSS."""
 import re
-
-
-def _index_prism_link():
-    with open("static/index.html") as f:
-        return re.search(r'<link[^>]*id="prism-theme"[^>]*>', f.read())
-
-
-def _lazy_prism_loader():
-    with open("static/ui.js") as f:
-        src = f.read()
-    start = src.find("function ensurePrism(")
-    assert start != -1, "Prism must be declared in index.html or loaded by ensurePrism()"
-    end = src.find("\nfunction ", start + 1)
-    return src[start:end]
 
 
 def test_prism_theme_link_has_no_integrity():
     """The prism-tomorrow.min.css link must not have an integrity attribute."""
-    m = _index_prism_link()
-    if m is None:
-        loader = _lazy_prism_loader()
-        assert "link.id='prism-theme'" in loader, "prism-theme link must exist"
-        assert "integrity" not in loader.split("_prismLoadPromise=")[0], \
-            "prism-theme link must not have integrity attribute (causes intermittent failures)"
-        return
+    with open("static/index.html") as f:
+        src = f.read()
+    # Find the prism-theme link tag
+    m = re.search(
+        r'<link[^>]*id="prism-theme"[^>]*>',
+        src
+    )
+    assert m, "prism-theme link must exist"
     link_tag = m.group(0)
     assert "integrity=" not in link_tag, \
         "prism-theme link must not have integrity attribute (causes intermittent failures)"
@@ -37,13 +19,13 @@ def test_prism_theme_link_has_no_integrity():
 
 def test_prism_theme_link_has_crossorigin():
     """The prism-theme link should still have crossorigin for CORS."""
-    m = _index_prism_link()
-    if m is None:
-        loader = _lazy_prism_loader()
-        assert "link.id='prism-theme'" in loader, "prism-theme link must exist"
-        assert "link.crossOrigin='anonymous'" in loader, \
-            "prism-theme link should still have crossorigin attribute"
-        return
+    with open("static/index.html") as f:
+        src = f.read()
+    m = re.search(
+        r'<link[^>]*id="prism-theme"[^>]*>',
+        src
+    )
+    assert m, "prism-theme link must exist"
     link_tag = m.group(0)
     assert "crossorigin" in link_tag, \
         "prism-theme link should still have crossorigin attribute"
@@ -57,17 +39,7 @@ def test_prism_theme_version_pinned():
         r'<link[^>]*id="prism-theme"[^>]*href="([^"]*)"[^>]*>',
         src
     )
-    if m is None:
-        loader = _lazy_prism_loader()
-        hrefs = re.findall(r"https://cdn\.jsdelivr\.net/npm/prismjs[^'\"]*/themes/[^'\"]+", loader)
-        assert hrefs, "prism-theme link must have href"
-        for href in hrefs:
-            assert "@1.29.0" in href, f"Prism CSS version must be pinned, found href: {href}"
-        # The lazy link must follow the current theme, like _setResolvedTheme.
-        assert "classList.contains('dark')" in loader
-        assert any(h.endswith("prism.min.css") for h in hrefs)
-        assert any(h.endswith("prism-tomorrow.min.css") for h in hrefs)
-        return
+    assert m, "prism-theme link must have href"
     href = m.group(1)
     assert "@1.29.0" in href, \
         f"Prism CSS version must be pinned, found href: {href}"
@@ -77,14 +49,6 @@ def test_prism_js_still_has_integrity():
     """Prism JS files should keep SRI — they are less affected by CDN edge issues."""
     with open("static/index.html") as f:
         src = f.read()
-    if "prism-core.min.js" not in src:
-        # Lazy loader: each script is loaded with its sha384 SRI hash.
-        src = _lazy_prism_loader()
-        assert re.search(r"prism-core\.min\.js'\s*,\s*'sha384-", src), \
-            "prism-core.min.js should still have integrity attribute"
-        assert re.search(r"prism-autoloader\.min\.js'\s*,\s*'sha384-", src), \
-            "prism-autoloader.min.js should still have integrity attribute"
-        return
     # prism-core.min.js
     assert re.search(r'prism-core\.min\.js[^>]*integrity=', src), \
         "prism-core.min.js should still have integrity attribute"

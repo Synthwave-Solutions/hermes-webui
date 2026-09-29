@@ -67,15 +67,13 @@ def test_notification_click_open_window_remains_no_reusable_client_fallback():
 
 def test_test_notification_without_sid_still_targets_current_page_for_reuse():
     assert "const url=sid?`${location.origin}${_sessionUrlForSid(sid)}`:location.href;" in MESSAGES_SRC
-    # SynthPulse branding (844071da) names the test notification after itself.
-    assert "sendBrowserNotification('SynthPulse test','Notifications are ready.',{force:true});" in (
+    assert "sendBrowserNotification('Hermes test','Notifications are ready.',{force:true});" in (
         ROOT / "static" / "index.html"
     ).read_text(encoding="utf-8")
 
 
 def test_service_worker_update_delivery_keeps_versioned_no_store_route():
-    # SynthPulse branding (844071da) renamed the versioned shell cache.
-    assert "const CACHE_NAME = 'synthpulse-shell-__WEBUI_VERSION__';" in SW_SRC
+    assert "const CACHE_NAME = 'hermes-shell-__WEBUI_VERSION__';" in SW_SRC
     assert "self.skipWaiting();" in SW_SRC
     assert "self.clients.claim();" in SW_SRC
 

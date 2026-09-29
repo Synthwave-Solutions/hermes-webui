@@ -785,16 +785,19 @@ function _intgStopPolling() {
 // ── Disconnect flow ───────────────────────────────────────────────────────
 
 async function _intgDisconnect(connectionId, providerConfigKey) {
-  // ui.js (showConfirmDialog) always loads before this file, so the app's own
-  // dialog is used here like everywhere else, never the browser's native one.
-  const ok = await showConfirmDialog({
-    title: _intgT('integrations_disconnect_title', 'Disconnect service'),
-    message: _intgT('integrations_disconnect_message', 'Remove this connection? Anything using it stops working until you reconnect.')
-      + '\n\n' + connectionId,
-    confirmLabel: _intgT('integrations_disconnect', 'Disconnect'),
-    danger: true,
-    focusCancel: true,
-  });
+  let ok = true;
+  if (typeof showConfirmDialog === 'function') {
+    ok = await showConfirmDialog({
+      title: _intgT('integrations_disconnect_title', 'Disconnect service'),
+      message: _intgT('integrations_disconnect_message', 'Remove this connection? Anything using it stops working until you reconnect.')
+        + '\n\n' + connectionId,
+      confirmLabel: _intgT('integrations_disconnect', 'Disconnect'),
+      danger: true,
+      focusCancel: true,
+    });
+  } else {
+    ok = window.confirm(_intgT('integrations_disconnect_message', 'Remove this connection?'));
+  }
   if (!ok) return;
   try {
     await api('/api/integrations/connections/' + encodeURIComponent(connectionId)
@@ -979,14 +982,7 @@ function _chAllowAllEnv(key) {
 }
 
 async function chDisable(key) {
-  const ok = await showConfirmDialog({
-    title: _intgT('channels_disable', 'Disconnect'),
-    message: _chLabel(key) + ': ' + _intgT('channels_disable', 'Disconnect') + '?',
-    confirmLabel: _intgT('channels_disable', 'Disconnect'),
-    danger: true,
-    focusCancel: true,
-  });
-  if (!ok) return;
+  if (!confirm(_chLabel(key) + ': ' + _intgT('channels_disable', 'Disconnect') + '?')) return;
   try {
     const r = await api('/api/gateway/channels/disable', { method: 'POST', body: JSON.stringify({ platform: key }), timeoutToast: false });
     if (!r || !r.ok) throw new Error((r && r.error) || '');
@@ -1175,14 +1171,7 @@ async function chSaveMyBot(key) {
   } catch (e) { showToast((e && e.message) || _intgT('channels_failed', 'Channel action failed.')); }
 }
 async function chRemoveMyBot(key) {
-  const ok = await showConfirmDialog({
-    title: _intgT('mychannels_remove_bot', 'Remove bot'),
-    message: _intgT('mychannels_remove_bot', 'Remove bot') + '?',
-    confirmLabel: _intgT('mychannels_remove_bot', 'Remove bot'),
-    danger: true,
-    focusCancel: true,
-  });
-  if (!ok) return;
+  if (!confirm(_intgT('mychannels_remove_bot', 'Remove bot') + '?')) return;
   try {
     const r = await api('/api/me/channels/bot', { method: 'POST', timeoutToast: false, body: JSON.stringify({ platform: key || 'telegram', remove: true }) });
     if (!r || !r.ok) throw new Error((r && r.error) || '');

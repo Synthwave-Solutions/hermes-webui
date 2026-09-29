@@ -68,14 +68,7 @@ def test_gateway_queue_item_carries_per_event_id_with_legacy_fallback():
     """Gateway-backed WebUI chat must preserve the same live cursor invariant."""
     put_def_idx = GATEWAY_CHAT_PY.find("def put_gateway_event(event, data):")
     assert put_def_idx != -1, "put_gateway_event(event, data) not found"
-    # Bound by the nested function itself (it ends at the next line indented
-    # like its `def`): SynthPulse persists gateway failures inside it, which
-    # makes it longer than a fixed 1800-character window.
-    rest = GATEWAY_CHAT_PY[put_def_idx:]
-    body_end = rest.find("\n    ", 1)
-    while body_end != -1 and rest[body_end + 5:body_end + 6] in (" ", "\n"):
-        body_end = rest.find("\n    ", body_end + 1)
-    put_body = rest[:body_end] if body_end != -1 else rest
+    put_body = GATEWAY_CHAT_PY[put_def_idx:put_def_idx + 1800]
     assert 'queue_item = (event, data, event_id) if event_id and hasattr(q, "subscribe_with_snapshot") else (event, data)' in put_body, (
         "Gateway live events must carry their own event_id for StreamChannel "
         "subscribers while preserving legacy queue compatibility"

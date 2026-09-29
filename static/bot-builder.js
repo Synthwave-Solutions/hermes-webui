@@ -31,13 +31,6 @@
       '<textarea id="'+id+'" rows="8">'+esc(value)+'</textarea>':
       '<input id="'+id+'" value="'+esc(value)+'" autocomplete="off">')+'</label>';
   }
-  // The bot ID is a lowercase identifier. Keep phone keyboards and desktop
-  // spellcheck from capitalizing or "correcting" it (#1423, which the old
-  // profile form handled before this builder replaced it).
-  function idField(label,id,value=''){
-    return '<label class="bot-builder-field" for="'+id+'">'+esc(label)+
-      '<input id="'+id+'" value="'+esc(value)+'" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" required></label>';
-  }
   function choices(label,key,rows){
     const chosen=state.config[key]||[];
     rows=[...(rows||[])];
@@ -83,7 +76,7 @@
     const headerSave=input('btnSaveProfileDetail');if(headerSave)headerSave.style.display='none';
     let content='';
     if(step===0){
-      content=idField('Bot ID','builderName',c.name)+field('Display name','builderTitle',c.title)+
+      content=field('Bot ID','builderName',c.name)+field('Display name','builderTitle',c.title)+
         field('What does this bot help with?','builderDescription',c.description,true)+
         '<label class="bot-builder-field">Profile photo<input id="builderPhoto" type="file" accept="image/png,image/jpeg,image/webp"></label>'+
         '<p>PNG, JPEG or WebP up to 10 MB. Resized before saving.</p>'+

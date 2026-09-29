@@ -8,13 +8,9 @@ def test_profiles_route_returns_active_profile(monkeypatch):
 
     expected_profiles = [{"name": "default", "is_default": True}]
 
-    monkeypatch.setattr(profiles, "list_profiles_api", lambda **_kw: expected_profiles)
+    monkeypatch.setattr(profiles, "list_profiles_api", lambda: expected_profiles)
     monkeypatch.setattr(profiles, "get_active_profile_name", lambda: "default")
     monkeypatch.setattr(routes, "_is_isolated_profile_mode", lambda: False)
-    # SynthPulse merges each profile's bot metadata into its row.
-    import api.bot_metadata as bot_metadata
-
-    monkeypatch.setattr(bot_metadata, "read_profile", lambda name: {"bot": {"name": f"{name}-bot"}})
     monkeypatch.setattr(
         routes,
         "j",
@@ -26,7 +22,7 @@ def test_profiles_route_returns_active_profile(monkeypatch):
     assert response == {
         "status": 200,
         "payload": {
-            "profiles": [{**expected_profiles[0], "bot": {"name": "default-bot"}}],
+            "profiles": expected_profiles,
             "active": "default",
             "single_profile_mode": False,
         },

@@ -12,7 +12,6 @@ Run:
 import os
 import re
 import unittest
-from tests._i18n_source import monolithic_i18n_file
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -20,7 +19,7 @@ from tests._i18n_source import monolithic_i18n_file
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 INDEX_HTML = os.path.join(BASE_DIR, "static", "index.html")
 STYLE_CSS = os.path.join(BASE_DIR, "static", "style.css")
-I18N_JS = str(monolithic_i18n_file())
+I18N_JS = os.path.join(BASE_DIR, "static", "i18n.js")
 
 
 def _read(path):

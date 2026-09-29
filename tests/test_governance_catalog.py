@@ -58,11 +58,8 @@ def test_route_catalog_maps_core_endpoint_families():
         ("/api/kanban/board", "GET", "sessions:read"),
         ("/api/logs", "GET", "logs:read"),
         ("/api/insights/summary", "GET", "analytics:read"),
-        # Personal memory is the caller's own private documents (073713d1,
-        # docs/personal-context.md): chat access permits editing one's own
-        # documents without granting bot configuration access.
-        ("/api/memory", "GET", "chat:use"),
-        ("/api/memory/write", "POST", "chat:use"),
+        ("/api/memory", "GET", "memory:read"),
+        ("/api/memory/write", "POST", "memory:write"),
         ("/api/health", "GET", "status:read"),
         ("/api/health/restart", "POST", "system:ops"),
         ("/api/system/info", "GET", "system:read"),

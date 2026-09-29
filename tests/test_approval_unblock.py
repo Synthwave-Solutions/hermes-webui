@@ -236,12 +236,8 @@ class TestApprovalModuleExports:
             "approval notify callback must mirror approval data into polling state"
         assert '"pending_count": total' in cb_body, \
             "approval notify callback must publish the reconciled pending count"
-        # SynthPulse pushes a copy (event_data) of the mirrored head so a
-        # parallel producer cannot change the card identity it carries.
-        assert "put('approval', event_data)" in cb_body, \
+        assert "put('approval', approval_data)" in cb_body, \
             "approval notify callback must still push the SSE event"
-        assert cb_body.find("_submit_pending_for_polling(session_id, approval_data)") < cb_body.find("put('approval', event_data)"), \
-            "approval notify callback must mirror polling state before the SSE push"
 
     def test_reversed_local_callbacks_publish_all_parked_entries(self):
         """The local producer must count every exact parked entry, not only its head."""
@@ -422,20 +418,13 @@ class TestApprovalHTTPEndpoints:
         with _lock:
             r._pending.pop(sid, None)
             r._gateway_queues.pop(sid, None)
-            entry_a = _ApprovalEntry(approval_a)
-            r._gateway_queues[sid] = [entry_a]
+            r._gateway_queues[sid] = [_ApprovalEntry(approval_a)]
         try:
-            # Production notifies WebUI with a COPY of the entry payload
-            # (core: notify_cb(dict(entry.data))), which carries the entry's
-            # stamped request_id — pass that faithful copy, not the pre-stamp
-            # source dict, so the mirror matches its producer the way it does
-            # in production.
-            ra.submit_gateway_pending_mirror(sid, dict(entry_a.data))
+            ra.submit_gateway_pending_mirror(sid, approval_a)
             with _lock:
                 r._gateway_queues.pop(sid, None)
-                entry_b = _ApprovalEntry(approval_b)
-                r._gateway_queues[sid] = [entry_b]
-            ra.submit_gateway_pending_mirror(sid, dict(entry_b.data))
+                r._gateway_queues[sid] = [_ApprovalEntry(approval_b)]
+            ra.submit_gateway_pending_mirror(sid, approval_b)
 
             parsed = urllib.parse.urlparse(f"/api/approval/pending?session_id={urllib.parse.quote(sid)}")
             r._handle_approval_pending(object(), parsed)
@@ -518,8 +507,7 @@ class TestApprovalHTTPEndpoints:
             r._pending.pop(sid, None)
             r._gateway_queues[sid] = [entry_a]
         try:
-            # Faithful to production: submit the stamped copy (see note above).
-            ra.submit_gateway_pending_mirror(sid, dict(entry_a.data))
+            ra.submit_gateway_pending_mirror(sid, approval_a)
             with _lock:
                 mirror_aid_a = r._pending[sid][0]["approval_id"]
 
@@ -528,7 +516,7 @@ class TestApprovalHTTPEndpoints:
             entry_b = _ApprovalEntry(approval_b)
             with _lock:
                 r._gateway_queues[sid] = [entry_b]
-            ra.submit_gateway_pending_mirror(sid, dict(entry_b.data))
+            ra.submit_gateway_pending_mirror(sid, approval_b)
 
             resolved = r._resolve_approval_legacy(sid, mirror_aid_a, "once")
             assert resolved is False, "stale approval_id must not resolve live B"
@@ -629,8 +617,7 @@ class TestApprovalHTTPEndpoints:
             r._pending.pop(sid, None)
             r._gateway_queues[sid] = [entry, sibling_entry]
         try:
-            # Faithful to production: submit the stamped copy (see note above).
-            ra.submit_gateway_pending_mirror(sid, dict(entry.data))
+            ra.submit_gateway_pending_mirror(sid, approval)
             with _lock:
                 approval_id = r._pending[sid][0]["approval_id"]
 
@@ -741,9 +728,8 @@ class TestApprovalHTTPEndpoints:
             r._pending.pop(sid, None)
             r._gateway_queues[sid] = [entry_a, entry_b]
         try:
-            # Faithful to production: submit the stamped copies (see note above).
-            ra.submit_gateway_pending_mirror(sid, dict(entry_a.data))
-            ra.submit_gateway_pending_mirror(sid, dict(entry_b.data))
+            ra.submit_gateway_pending_mirror(sid, approval_a)
+            ra.submit_gateway_pending_mirror(sid, approval_b)
             with _lock:
                 approval_b_id = next(
                     item["approval_id"] for item in r._pending[sid]

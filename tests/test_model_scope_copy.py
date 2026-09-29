@@ -1,5 +1,4 @@
 from pathlib import Path
-from tests._i18n_source import monolithic_i18n_source
 
 
 REPO = Path(__file__).resolve().parent.parent
@@ -23,7 +22,7 @@ def test_composer_model_dropdown_has_scope_advisory():
 
 def test_model_selection_toast_describes_conversation_scope():
     boot = read("static/boot.js")
-    i18n = monolithic_i18n_source()
+    i18n = read("static/i18n.js")
 
     assert "model_scope_toast" in boot
     assert "Applies to this conversation from your next message." in i18n
@@ -34,7 +33,7 @@ def test_model_selection_toast_describes_conversation_scope():
 
 def test_settings_default_model_copy_describes_new_conversations():
     html = read("static/index.html")
-    i18n = monolithic_i18n_source()
+    i18n = read("static/i18n.js")
 
     assert 'data-i18n="settings_desc_model"' in html
     assert "Used for new conversations. Existing conversations keep their selected model." in html

@@ -33,28 +33,10 @@ class TestLiveReasoningTextResetOnTool:
 
     def _tool_listener_body(self):
         """Extract the full tool listener body between the tool and
-        tool_complete addEventListener calls.
-
-        SynthPulse registers a named handler (handleLiveToolEvent, reused for
-        projected sub-agent events); then the body is that function's body.
-        """
+        tool_complete addEventListener calls."""
         src = read('static/messages.js')
         tool_start = src.find("source.addEventListener('tool'")
         assert tool_start >= 0, "tool listener not found"
-        named = re.match(r"source\.addEventListener\('tool',\s*([A-Za-z_$][\w$]*)\s*\)", src[tool_start:])
-        if named:
-            fn_start = src.find(f"function {named.group(1)}(")
-            assert fn_start >= 0, f"named tool handler {named.group(1)} not found"
-            brace = src.index("{", fn_start)
-            depth = 0
-            for i in range(brace, len(src)):
-                if src[i] == "{":
-                    depth += 1
-                elif src[i] == "}":
-                    depth -= 1
-                    if depth == 0:
-                        return src[fn_start:i + 1]
-            raise AssertionError("named tool handler body did not close")
         tool_complete_start = src.find(
             "source.addEventListener('tool_complete'", tool_start + 1,
         )

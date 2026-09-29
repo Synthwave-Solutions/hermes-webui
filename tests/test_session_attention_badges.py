@@ -11,7 +11,6 @@ if str(REPO_ROOT) not in sys.path:
 
 import api.profiles as profiles
 import api.routes as routes
-from tests._i18n_source import monolithic_i18n_source
 
 
 class _FakeHandler:
@@ -251,7 +250,7 @@ def test_session_sidebar_renders_attention_badge_and_semantic_classes():
     assert "s.attention" in sessions_js
     assert "_sessionAttentionState(s) ||" in sessions_js
 
-    i18n_js = monolithic_i18n_source()
+    i18n_js = (REPO_ROOT / "static" / "i18n.js").read_text(encoding="utf-8")
     assert "session_attention_approval" in i18n_js
     assert "session_attention_clarify" in i18n_js
     assert "session_attention_approval_title" in i18n_js

@@ -30,11 +30,6 @@ def files(tmp_path, monkeypatch):
     monkeypatch.setattr(routes, "get_session", lambda sid: session)
     monkeypatch.setattr(routes, "get_session_for_file_ops", lambda sid: session)
     monkeypatch.setattr("api.personal_context.ensure_actor_path", lambda *a: None)
-    # Register the temporary folder as a saved workspace, the way a person
-    # adds one in Settings. pytest's tmp_path lives under /tmp, outside the
-    # home directory, so without this the trusted-workspace check (rightly)
-    # refuses it and the test depended on where pytest put tmp_path.
-    monkeypatch.setattr("api.workspace.load_workspaces", lambda *a, **k: [{"path": str(tmp_path), "name": "test"}])
     return tmp_path, who
 
 

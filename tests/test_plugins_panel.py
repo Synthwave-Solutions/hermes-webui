@@ -5,7 +5,6 @@ import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 from urllib.parse import urlparse
-from tests._i18n_source import monolithic_i18n_source
 
 
 def read(path: str) -> str:
@@ -265,8 +264,7 @@ class TestPluginsSettingsUi:
 
         assert 'id="pluginsList"' in html
         assert 'id="pluginsEmpty"' in html
-        # SynthPulse product naming (docs/product-name.md): no Hermes in UI copy.
-        assert "No runtime plugins are currently visible" in html
+        assert "No Hermes plugins are currently visible" in html
 
     def test_plugins_panel_fetches_api_and_renders_hook_badges_safely(self):
         js = read("static/panels.js")
@@ -573,7 +571,7 @@ class TestPluginCollisionDetection:
         assert "plugin.enabled===false" in segment
 
     def test_plugins_panel_i18n_strings_present(self):
-        i18n = monolithic_i18n_source()
+        i18n = read("static/i18n.js")
 
         assert "plugins_active_provider:" in i18n
         assert "plugins_provider_no_hooks:" in i18n

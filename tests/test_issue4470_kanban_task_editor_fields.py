@@ -6,12 +6,11 @@ import shutil
 import subprocess
 from pathlib import Path
 import pytest
-from tests._i18n_source import monolithic_i18n_source
 
 ROOT = Path(__file__).resolve().parents[1]
 INDEX_HTML = (ROOT / "static" / "index.html").read_text(encoding="utf-8")
 PANELS_JS = (ROOT / "static" / "panels.js").read_text(encoding="utf-8")
-I18N_JS = monolithic_i18n_source()
+I18N_JS = (ROOT / "static" / "i18n.js").read_text(encoding="utf-8")
 KANBAN_BRIDGE = (ROOT / "api" / "kanban_bridge.py").read_text(encoding="utf-8")
 
 NODE = shutil.which("node")

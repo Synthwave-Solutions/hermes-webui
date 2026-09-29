@@ -1,5 +1,4 @@
 import pathlib
-from tests._i18n_source import monolithic_i18n_source
 
 
 REPO = pathlib.Path(__file__).parent.parent
@@ -40,15 +39,14 @@ def test_onboarding_js_exposes_bootstrap_hooks():
 def test_onboarding_uses_i18n_helpers():
     html = read("static/index.html")
     js = read("static/onboarding.js")
-    i18n = monolithic_i18n_source()
+    i18n = read("static/i18n.js")
     assert 'data-i18n="onboarding_title"' in html
     assert 'data-i18n="onboarding_continue"' in html
     assert "t('onboarding_step_system_title')" in js
     assert "t('onboarding_step_setup_title')" in js
     assert "t('onboarding_complete')" in js
-    # SynthPulse product naming (docs/product-name.md): no Hermes in UI copy.
-    assert "onboarding_title: 'Welcome to SynthPulse Control'" in i18n
-    assert "onboarding_title: 'Bienvenido a SynthPulse Control'" in i18n
+    assert "onboarding_title: 'Welcome to Hermes Web UI'" in i18n
+    assert "onboarding_title: 'Bienvenido a Hermes Web UI'" in i18n
 
 
 def test_onboarding_provider_notice_uses_i18n_key():

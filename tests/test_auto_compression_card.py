@@ -13,7 +13,6 @@ from api.streaming import (
     _restore_reasoning_metadata,
     _sanitize_messages_for_api,
 )
-from tests._i18n_source import monolithic_i18n_source
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -820,13 +819,12 @@ def test_auto_compression_running_card_completes_on_followup_live_events():
     assert "message:'Context auto-compressed'" in helper
     assert "appendLiveCompressionCard({" in helper
 
-    # SynthPulse names the tool handlers (handleLiveToolEvent and
-    # handleLiveToolCompleteEvent, 53620edd) so sub-agent lifecycle events can
-    # reuse them; live_sse_handler returns the handler for either shape.
-    from tests.helpers import live_sse_handler
-
     for event_name in ("token", "interim_assistant", "reasoning", "tool", "tool_complete"):
-        block = live_sse_handler(src, event_name)
+        start = src.find(f"source.addEventListener('{event_name}'")
+        assert start != -1, f"{event_name} listener not found"
+        end = src.find("source.addEventListener(", start + 1)
+        assert end != -1, f"{event_name} listener end not found"
+        block = src[start:end]
         assert "_completeAutomaticCompressionOnLiveProgress(activeSid)" in block
         assert "settleLiveCompressionCards" not in block
         assert "clearCompressionUi()" not in block
@@ -1136,7 +1134,7 @@ def test_reference_message_inserted_before_future_assistant_anchor():
 
 def test_frontend_uses_context_engine_metadata_for_indexed_context_copy():
     src = _read("static/ui.js")
-    i18n = monolithic_i18n_source()
+    i18n = _read("static/i18n.js")
 
     assert "function _compressionEngineForSession" in src
     assert "S.session.compression_anchor_engine" in src

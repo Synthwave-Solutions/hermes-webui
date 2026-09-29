@@ -2,10 +2,9 @@
 
 import re
 from pathlib import Path
-from tests._i18n_source import monolithic_i18n_source
 
 ROOT = Path(__file__).resolve().parent.parent
-I18N_JS = monolithic_i18n_source()
+I18N_JS = (ROOT / "static" / "i18n.js").read_text(encoding="utf-8")
 PANELS_JS = (ROOT / "static" / "panels.js").read_text(encoding="utf-8")
 
 PROFILE_CONCEPT_KEYS = [

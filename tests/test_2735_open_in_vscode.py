@@ -25,12 +25,11 @@ import re
 import sys
 import urllib.error
 import urllib.request
-from tests._i18n_source import monolithic_i18n_file
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 ROUTES = ROOT / "api" / "routes.py"
 UI = ROOT / "static" / "ui.js"
-I18N = monolithic_i18n_file()
+I18N = ROOT / "static" / "i18n.js"
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from conftest import TEST_BASE  # noqa: E402

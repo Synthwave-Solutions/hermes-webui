@@ -15,7 +15,6 @@ import os
 import pathlib
 import urllib.error
 import urllib.request
-from tests._i18n_source import monolithic_i18n_source
 
 REPO = pathlib.Path(__file__).parent.parent
 
@@ -131,7 +130,7 @@ def _split_locales(i18n_src):
 
 def test_i18n_password_env_var_locked_in_all_locales():
     """Every locale must define the password_env_var_locked banner string."""
-    src = monolithic_i18n_source()
+    src = _read('static/i18n.js')
     blocks = _split_locales(src)
     missing = [loc for loc in LOCALES if loc not in blocks
                or 'password_env_var_locked:' not in blocks[loc]]
@@ -141,7 +140,7 @@ def test_i18n_password_env_var_locked_in_all_locales():
 
 def test_i18n_password_env_var_locked_placeholder_in_all_locales():
     """Every locale must define the password_env_var_locked_placeholder string."""
-    src = monolithic_i18n_source()
+    src = _read('static/i18n.js')
     blocks = _split_locales(src)
     missing = [loc for loc in LOCALES
                if loc not in blocks
@@ -152,7 +151,7 @@ def test_i18n_password_env_var_locked_placeholder_in_all_locales():
 
 def test_i18n_locked_string_mentions_env_var_name_in_all_locales():
     """Each locale's banner must literally mention HERMES_WEBUI_PASSWORD so users can find it."""
-    src = monolithic_i18n_source()
+    src = _read('static/i18n.js')
     blocks = _split_locales(src)
     for loc in LOCALES:
         block = blocks.get(loc, '')

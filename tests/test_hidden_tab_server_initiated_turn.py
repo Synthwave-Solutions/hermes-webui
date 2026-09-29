@@ -114,10 +114,7 @@ def test_hidden_poll_started_on_both_hidden_paths():
 
     # Path 2: inside startSessionStream's hidden early-return skip.
     start_idx = MESSAGES_JS.find("function startSessionStream(sid)")
-    # Bound the search by the function itself rather than a fixed window: the
-    # SynthPulse version of startSessionStream is longer than upstream's.
-    end_idx = MESSAGES_JS.find("\nfunction ", start_idx + 1)
-    block = MESSAGES_JS[start_idx:end_idx if end_idx != -1 else len(MESSAGES_JS)]
+    block = MESSAGES_JS[start_idx:start_idx + 2900]
     skip_idx = block.find("!== 'undefined' && document.hidden) {")
     assert skip_idx != -1
     skip_block = block[skip_idx:skip_idx + 400]

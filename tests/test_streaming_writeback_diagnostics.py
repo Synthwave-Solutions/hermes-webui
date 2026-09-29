@@ -84,11 +84,8 @@ def test_stream_writeback_diagnostics_cover_final_writeback_stages():
     for stage in expected_stages:
         assert f'_stream_writeback_stage(_writeback_timings, "{stage}")' in src
 
-    # SynthPulse group chats stamp the answering bot as author inside the
-    # same timed save stage, right before the save.
     assert (
         'with _stream_writeback_stage(_writeback_timings, "session_save"):\n'
-        '                    _stamp_group_bot_author(s, msg_text, execution_profile)\n'
         '                    s.save()'
     ) in src
     assert src.index('with _stream_writeback_stage(_writeback_timings, "session_save")') < src.index(

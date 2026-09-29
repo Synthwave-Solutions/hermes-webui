@@ -11,11 +11,6 @@ Covers:
 import pathlib
 import re
 
-# SynthPulse starts the restore, records its load generation, then awaits
-# it (53071075), so match the call itself rather than "await loadSession(".
-_BOOT_RESTORE_CALL = "loadSession(saved, {preserveActiveInput:true"
-
-
 REPO_ROOT = pathlib.Path(__file__).parent.parent
 STYLE_CSS = (REPO_ROOT / "static" / "style.css").read_text(encoding="utf-8")
 BOOT_JS   = (REPO_ROOT / "static" / "boot.js").read_text(encoding="utf-8")
@@ -126,7 +121,7 @@ def test_576_panel_restore_gated_on_workspace():
 
 def test_576_restore_happens_after_load_session():
     """boot.js: loadSession() must come before the panel restore guard."""
-    load_pos    = BOOT_JS.find(_BOOT_RESTORE_CALL)
+    load_pos    = BOOT_JS.find("await loadSession(saved, {preserveActiveInput:true})")
     restore_pos = BOOT_JS.find("panelPref")
     assert load_pos != -1, "loadSession call not found in boot.js"
     assert restore_pos != -1, "workspace panel restore guard not found"

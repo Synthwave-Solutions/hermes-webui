@@ -16,7 +16,6 @@ import pathlib
 import pytest
 
 from tests.conftest import requires_agent_modules
-from tests._i18n_source import monolithic_i18n_source
 
 TEST_BASE = f"http://127.0.0.1:{os.environ.get('HERMES_WEBUI_TEST_PORT', '8788')}"
 
@@ -49,7 +48,7 @@ def style_css():
 
 @pytest.fixture(scope="module")
 def i18n_js():
-    return monolithic_i18n_source()
+    return _read_static_file("i18n.js")
 
 
 def _get(path, expect_ok=True):

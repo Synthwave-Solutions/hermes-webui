@@ -4,14 +4,13 @@ Quota chip default state is now OFF (per Nathan's directive 2026-05-16, immediat
 after the stage-371 release of #2082). Users opt in via Settings → Preferences.
 """
 from pathlib import Path
-from tests._i18n_source import monolithic_i18n_file
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 INDEX = REPO_ROOT / "static" / "index.html"
 PANELS = REPO_ROOT / "static" / "panels.js"
 UI_JS = REPO_ROOT / "static" / "ui.js"
 BOOT = REPO_ROOT / "static" / "boot.js"
-I18N = monolithic_i18n_file()
+I18N = REPO_ROOT / "static" / "i18n.js"
 CONFIG = REPO_ROOT / "api" / "config.py"
 
 

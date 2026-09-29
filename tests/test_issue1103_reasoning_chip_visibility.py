@@ -16,9 +16,7 @@ def test_boot_call_before_session_load():
     """fetchReasoningChip() should be called before session load in boot sequence."""
     with open("static/boot.js") as f:
         src = f.read()
-    # SynthPulse starts the restore, records its generation and then awaits it
-    # (7b2620b3), so anchor on the call's shared prefix.
-    boot_marker = "loadSession(saved, {preserveActiveInput:true"
+    boot_marker = "await loadSession(saved, {preserveActiveInput:true});"
     boot_pos = src.index(boot_marker)
     fetch_pos = src.index("fetchReasoningChip()", src.index("_profileQueryIntentFromLocation"))
     assert fetch_pos < boot_pos, \

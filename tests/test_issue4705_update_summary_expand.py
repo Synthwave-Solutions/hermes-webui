@@ -9,13 +9,6 @@ STYLE_CSS = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
 
 class TestIssue4705UpdateSummaryExpand:
     def test_summary_panel_has_expand_control(self):
-        if 'id="updateSummaryPanel"' not in INDEX_HTML:
-            # The summary panel lived inside the update banner, which SynthPulse
-            # removed on purpose (ae53fb3a). Guard that no half of it lingers.
-            assert 'id="updateBanner"' not in INDEX_HTML
-            assert 'id="updateSummaryToolbar"' not in INDEX_HTML
-            assert 'id="btnUpdateSummaryExpand"' not in INDEX_HTML
-            return
         assert 'id="updateSummaryToolbar"' in INDEX_HTML
         assert 'id="btnUpdateSummaryExpand"' in INDEX_HTML
         assert 'id="updateSummaryScroll"' in INDEX_HTML

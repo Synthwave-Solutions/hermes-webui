@@ -88,13 +88,6 @@ def _extract_function(source: str, name: str) -> str:
 
 
 LOAD_SESSION_SRC = _extract_function(SESSIONS_SRC, "loadSession")
-# SynthPulse slims metadata-only session responses; loadSession asks for the
-# runtime journal snapshot explicitly (d1b208d0).
-METADATA_INCLUDE = (
-    "&include=journal_snapshot"
-    if "&messages=0&resolve_model=0&include=journal_snapshot" in LOAD_SESSION_SRC
-    else ""
-)
 ENSURE_MESSAGES_LOADED_SRC = _extract_function(SESSIONS_SRC, "_ensureMessagesLoaded")
 INFLIGHT_HAS_VISIBLE_STATE_SRC = _extract_function(SESSIONS_SRC, "_inflightHasVisibleLiveState")
 SELECT_LIVE_RECOVERY_INFLIGHT_SRC = _extract_function(SESSIONS_SRC, "_selectLiveRecoveryInflight")
@@ -441,7 +434,7 @@ const API_ATLAS_RELOAD_MSGS = {
 
 function buildMessageUrl(sid, mode, suffix='') {
   const base = `/api/session?session_id=${encodeURIComponent(sid)}&messages=${mode}&resolve_model=0`;
-  if (mode === 0) return base + '__METADATA_INCLUDE__';
+  if (mode === 0) return base;
   return `${base}&msg_limit=${_messageReloadLimitForSession()}&expand_renderable=1${suffix}`;
 }
 
@@ -617,9 +610,6 @@ def test_loadsession_cross_session_ordering_and_stale_reject_behavior(tmp_path):
         )
         .replace("__LOAD_SESSION_SRC__", LOAD_SESSION_SRC)
         .replace("__ENSURE_MESSAGES_LOADED_SRC__", ENSURE_MESSAGES_LOADED_SRC)
-        # Queue the exact metadata URL loadSession requests, or the harness
-        # waits for a request that never comes.
-        .replace("__METADATA_INCLUDE__", METADATA_INCLUDE)
     )
     body = _run_node(script, tmp_path)
 
@@ -640,13 +630,13 @@ def test_loadsession_cross_session_ordering_and_stale_reject_behavior(tmp_path):
         )
 
     # 1) Cross-session ordering: old (Beacon) loads first, but user advances to Atlas.
-    assert cross["apiCalls"][0] == "/api/session?session_id=sid-beacon&messages=0&resolve_model=0" + METADATA_INCLUDE, (
+    assert cross["apiCalls"][0] == "/api/session?session_id=sid-beacon&messages=0&resolve_model=0", (
         "first API call should target old session's metadata"
     )
     assert cross["apiCalls"][1] == "/api/session?session_id=sid-beacon&messages=1&resolve_model=0&msg_limit=2&expand_renderable=1", (
         "beacon transcript request should queue before atlas metadata resolves"
     )
-    assert cross["apiCalls"][2] == "/api/session?session_id=sid-atlas&messages=0&resolve_model=0" + METADATA_INCLUDE, (
+    assert cross["apiCalls"][2] == "/api/session?session_id=sid-atlas&messages=0&resolve_model=0", (
         "second API call should target atlas metadata while stale beacon messages are in flight"
     )
     assert cross["apiCalls"][3] == "/api/session?session_id=sid-atlas&messages=1&resolve_model=0&msg_limit=2&expand_renderable=1", (
@@ -659,13 +649,13 @@ def test_loadsession_cross_session_ordering_and_stale_reject_behavior(tmp_path):
 
     # 2) Observed idle-path race with no INFLIGHT: stale Beacon transcript returns
     #    before Atlas metadata, but ownership guard must still force Atlas fetch+swap.
-    assert observed["apiCalls"][0] == "/api/session?session_id=sid-beacon&messages=0&resolve_model=0" + METADATA_INCLUDE, (
+    assert observed["apiCalls"][0] == "/api/session?session_id=sid-beacon&messages=0&resolve_model=0", (
         "idle-path race should start from old Beacon metadata"
     )
     assert observed["apiCalls"][1] == "/api/session?session_id=sid-beacon&messages=1&resolve_model=0&msg_limit=2&expand_renderable=1", (
         "Beacon transcript call should remain queued before Atlas metadata under observed race"
     )
-    assert observed["apiCalls"][2] == "/api/session?session_id=sid-atlas&messages=0&resolve_model=0" + METADATA_INCLUDE, (
+    assert observed["apiCalls"][2] == "/api/session?session_id=sid-atlas&messages=0&resolve_model=0", (
         "Atlas metadata must start while Beacon continuation returns stale"
     )
     assert observed["apiCalls"][3] == "/api/session?session_id=sid-atlas&messages=1&resolve_model=0&msg_limit=2&expand_renderable=1", (

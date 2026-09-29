@@ -1,7 +1,6 @@
 from pathlib import Path
 
 from api import config
-from tests._i18n_source import monolithic_i18n_source
 
 
 def _models_with_cfg(model_cfg=None, fallback_providers=None, custom_providers=None, active_provider=None):
@@ -101,7 +100,7 @@ def test_ui_badge_lookup_prefers_row_provider_for_duplicate_model_ids():
 def test_configured_model_group_label_has_i18n_key():
     """The Configured model group must not render the raw i18n key."""
     root = Path(__file__).resolve().parent.parent
-    i18n = monolithic_i18n_source()
+    i18n = (root / "static" / "i18n.js").read_text(encoding="utf-8")
 
     locale_count = i18n.count("_lang:")
     key_count = i18n.count("model_group_configured:")

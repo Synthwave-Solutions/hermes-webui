@@ -1,6 +1,5 @@
 """Tests for issue #483 — inline diff/patch viewer."""
 import pytest
-from tests._i18n_source import monolithic_i18n_path
 
 
 class TestFencedDiffRenderer:
@@ -104,7 +103,7 @@ class TestDiffI18n:
     """i18n keys for diff viewer."""
 
     def test_diff_loading_key_in_all_locales(self):
-        with open(monolithic_i18n_path(), "r", encoding="utf-8") as f:
+        with open("static/i18n.js", "r", encoding="utf-8") as f:
             content = f.read()
         count = content.count("diff_loading")
         assert count >= 8, f"diff_loading found {count} times, expected >= 8 (one per locale)"

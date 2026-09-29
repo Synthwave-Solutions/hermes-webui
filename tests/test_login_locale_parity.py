@@ -32,11 +32,10 @@ import re
 import sys
 
 import pytest
-from tests._i18n_source import monolithic_i18n_file
 
 
 REPO = Path(__file__).resolve().parent.parent
-I18N_PATH = monolithic_i18n_file()
+I18N_PATH = REPO / "static" / "i18n.js"
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

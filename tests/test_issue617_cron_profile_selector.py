@@ -7,7 +7,6 @@ import types
 from pathlib import Path
 
 import pytest
-from tests._i18n_source import monolithic_i18n_source
 
 REPO = Path(__file__).resolve().parent.parent
 
@@ -215,13 +214,10 @@ def test_manual_cron_run_uses_execution_profile_but_persists_to_owning_store(mon
 def test_cron_profile_selector_source_hooks_present():
     panels = (REPO / "static" / "panels.js").read_text(encoding="utf-8")
     css = (REPO / "static" / "style.css").read_text(encoding="utf-8")
-    i18n = monolithic_i18n_source()
+    i18n = (REPO / "static" / "i18n.js").read_text(encoding="utf-8")
 
     assert "async function loadCronProfiles()" in panels
-    # SynthPulse loads profile lists through the fast listing without cold
-    # skill counts (210c661b); the selector still fetches the profiles API.
-    loader = panels.split("async function loadCronProfiles()", 1)[1].split("\nfunction ", 1)[0]
-    assert "api('/api/profiles?fast=1')" in loader
+    assert "api('/api/profiles')" in panels
     assert "id=\"cronFormProfile\"" in panels
     assert "profile: profile" in panels
     assert "job.profile" in panels

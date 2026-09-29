@@ -18,7 +18,6 @@ from tests.conftest import TEST_STATE_DIR
 
 REPO_ROOT = pathlib.Path(__file__).parent.parent.resolve()
 from tests._pytest_port import BASE
-from tests._i18n_source import monolithic_i18n_source
 
 
 def _read(rel_path: str) -> str:
@@ -229,7 +228,7 @@ class TestI18nProviderMismatch:
 
     def test_all_locales_have_warning_key(self):
         """provider_mismatch_warning must appear in all locales."""
-        src = monolithic_i18n_source()
+        src = _read("static/i18n.js")
         locale_count = len(self._locale_names(src))
         count = self._count_key(src, "provider_mismatch_warning")
         assert count >= locale_count, (
@@ -239,7 +238,7 @@ class TestI18nProviderMismatch:
 
     def test_all_locales_have_label_key(self):
         """provider_mismatch_label must appear in all locales."""
-        src = monolithic_i18n_source()
+        src = _read("static/i18n.js")
         locale_count = len(self._locale_names(src))
         count = self._count_key(src, "provider_mismatch_label")
         assert count >= locale_count, (
@@ -248,7 +247,7 @@ class TestI18nProviderMismatch:
 
     def test_warning_is_function_in_en(self):
         """English provider_mismatch_warning must be a function (m, p) => ..."""
-        src = monolithic_i18n_source()
+        src = _read("static/i18n.js")
         # Find the en block
         en_start = src.find("\n  en: {")
         es_start = src.find("\n  es: {")
@@ -264,7 +263,7 @@ class TestI18nProviderMismatch:
 
     def test_spanish_locale_key_coverage(self):
         """Spanish locale must have the new keys (parity with English)."""
-        src = monolithic_i18n_source()
+        src = _read("static/i18n.js")
         es_start = src.find("\n  es: {")
         de_start = src.find("\n  de: {")
         es_block = src[es_start:de_start]
@@ -1596,15 +1595,9 @@ class TestFrontendModelProviderState:
         assert "_fallbackProvider" in provider_assignment
         assert "window._activeProvider" in body
         assert "S.session&&S.session.model_provider" in body
-        # SynthPulse's configured default carries its provider as one route
-        # (59f968cb), which puts an earlier window._activeProvider in the
-        # model-state selection above the chain; the chain order itself is
-        # checked inside the fallback block.
-        assert "newModelState={model:window._defaultModel,model_provider:window._activeProvider||null};" in body
-        chain = body[body.index("if(newModelState&&newModelState.model){"):]
-        pos_explicit = chain.index("newModelState.model_provider")
-        pos_active = chain.index("window._activeProvider")
-        pos_prev = chain.index("S.session&&S.session.model_provider")
+        pos_explicit = body.index("newModelState.model_provider")
+        pos_active = body.index("window._activeProvider")
+        pos_prev = body.index("S.session&&S.session.model_provider")
         assert pos_explicit < pos_active < pos_prev, (
             "Fallback chain order broken: explicit > _activeProvider > "
             "prev-session must hold so /api/session/new hits the fast "

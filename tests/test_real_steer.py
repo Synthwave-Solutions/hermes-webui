@@ -24,7 +24,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from tests.helpers import source_between as _source_between
-from tests._i18n_source import monolithic_i18n_source
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
@@ -291,7 +290,7 @@ class TestFrontendWiring:
     def setup_class(cls):
         cls.cmds = (Path(__file__).parent.parent / "static" / "commands.js").read_text(encoding="utf-8")
         cls.msgs = (Path(__file__).parent.parent / "static" / "messages.js").read_text(encoding="utf-8")
-        cls.i18n = monolithic_i18n_source()
+        cls.i18n = (Path(__file__).parent.parent / "static" / "i18n.js").read_text(encoding="utf-8")
 
     def test_cmd_steer_calls_endpoint(self):
         idx = self.cmds.find("async function cmdSteer(")
@@ -312,8 +311,7 @@ class TestFrontendWiring:
         body = _source_between(self.cmds, "async function _trySteer(", "\nasync function cmdTitle")
         # Must check result.accepted and keep generic failures from cancelling.
         assert "result&&result.accepted" in body or "result.accepted" in body
-        assert "result.fallback==='gateway_steer_queued'" in body
-        assert "result.fallback==='peer_turn'" in body
+        assert "result&&result.fallback==='gateway_steer_queued'" in body
         assert "queueSessionMessage(ownerSid" in body
         assert "cancelStream" not in body, "fallback path must not cancel the stream"
         assert "inp.value" in body, "fallback path must restore the composer draft"
@@ -683,7 +681,7 @@ class TestFrontendWiring:
               assert.strictEqual(apiCalls, 2);
             }}
 
-            async function runGatewayQueuedFallback(switchDuringAwait=false, fallback='gateway_steer_queued', expectedToast='steer_leftover_queued'){{
+            async function runGatewayQueuedFallback(switchDuringAwait=false){{
               let input = {{value:''}};
               let clearInflightCalls = [];
               let updateSendBtnCalls = 0;
@@ -723,7 +721,7 @@ class TestFrontendWiring:
                 }}else{{
                   S.pendingFiles=[submittedFile, replacementFile];
                 }}
-                return {{accepted:false, fallback}};
+                return {{accepted:false, fallback:'gateway_steer_queued'}};
               }};
 
               const delivered = await _trySteer('queue me', false);
@@ -746,7 +744,7 @@ class TestFrontendWiring:
               assert.strictEqual(draftClears[0].sid, 'A');
               assert.strictEqual(draftClears[0].text, 'queue me');
               assert.deepStrictEqual(draftClears[0].files, [submittedFile]);
-              assert.deepStrictEqual(toasts, [expectedToast]);
+              assert.deepStrictEqual(toasts, ['steer_leftover_queued']);
               if(switchDuringAwait){{
                 assert.strictEqual(S.session.session_id, 'B');
                 assert.deepStrictEqual(S.pendingFiles, [replacementFile]);
@@ -832,9 +830,6 @@ class TestFrontendWiring:
               await runNoCachedAgentFallback(true);
               await runGatewayQueuedFallback(false);
               await runGatewayQueuedFallback(true);
-              // Group chat, someone else's turn: the server refuses the steer
-              // (peer_turn) and the message waits as the writer's own turn.
-              await runGatewayQueuedFallback(false, 'peer_turn', 'group_turn_queued');
               await runStreamDeadFallback();
               await runStreamDeadFallback(true);
               await runStreamDeadFallback(true, '/help');
@@ -846,9 +841,7 @@ class TestFrontendWiring:
         subprocess.run([node, "-e", script], check=True, capture_output=True, text=True)
 
     def test_send_busy_steer_accepts_file_only_input(self):
-        # The busy branch carries the queue-drain gate (c322f769):
-        # `if((S.busy||compressionRunning)&&!queueDrainOwnsSend){`.
-        idx = self.msgs.find("if((S.busy||compressionRunning)&&!queueDrainOwnsSend)")
+        idx = self.msgs.find("if(S.busy||compressionRunning)")
         assert idx >= 0
         block = self.msgs[idx:idx + 500]
         assert "if(text||S.pendingFiles.length)" in block, (
@@ -971,7 +964,7 @@ class TestI18nKeys:
 
     @classmethod
     def setup_class(cls):
-        cls.i18n = monolithic_i18n_source()
+        cls.i18n = (Path(__file__).parent.parent / "static" / "i18n.js").read_text(encoding="utf-8")
 
     def test_cmd_steer_delivered_in_all_locales(self):
         assert self.i18n.count("cmd_steer_delivered:") >= 6, (

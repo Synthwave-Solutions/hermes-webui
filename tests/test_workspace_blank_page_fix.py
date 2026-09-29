@@ -8,7 +8,6 @@ Fixes:
 """
 import pathlib
 import re
-from tests._i18n_source import monolithic_i18n_source
 
 REPO = pathlib.Path(__file__).parent.parent
 
@@ -67,16 +66,8 @@ class TestBootJsProfileDefaultWorkspace:
         # Find the assignment specifically — it uses 's.default_workspace'
         ws_assign_idx = src.find('S._profileDefaultWorkspace=s.default_workspace')
         assert ws_assign_idx != -1, "S._profileDefaultWorkspace assignment not found in boot.js"
-        # The assignment must be in the same settings-fetch block. SynthPulse
-        # applies the server tab order and visibility inside that block too
-        # (20 Sep 2026), so check the block itself rather than a distance.
-        from tests.helpers import js_block_end
-
-        try_idx = src.rfind("try{", 0, settings_idx)
-        assert try_idx != -1, "settings fetch is not inside a try block"
-        block = src[try_idx:js_block_end(src, try_idx + len("try"))]
-        assert "await api('/api/settings')" in block
-        assert "S._profileDefaultWorkspace=s.default_workspace" in block, (
+        # The assignment must be in the same settings-fetch block (within a few hundred chars)
+        assert abs(ws_assign_idx - settings_idx) < 1000, (
             "S._profileDefaultWorkspace must be set in the same settings-fetch block"
         )
 
@@ -269,7 +260,7 @@ class TestNewChatOnWorkspaceSwitchOptIn:
         assert 'id="settingsNewChatOnWorkspaceSwitch"' in html, (
             "the Settings checkbox for the opt-in must exist"
         )
-        i18n = monolithic_i18n_source()
+        i18n = read('static/i18n.js')
         for key in (
             'settings_label_new_chat_on_workspace_switch',
             'settings_desc_new_chat_on_workspace_switch',

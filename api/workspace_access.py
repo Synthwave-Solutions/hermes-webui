@@ -5,9 +5,7 @@ or a symlink cannot bypass a private child; an unowned child cannot erase a
 parent's ACL. Legacy unowned roots and existing admin recovery stay compatible.
 This is application authorization, not an OS sandbox for host execution.
 """
-import errno
 import json
-import os
 import time
 import threading
 from pathlib import Path
@@ -44,23 +42,6 @@ _RESOLVED_ROOT_CACHE_LOCK = threading.Lock()
 _RESOLVED_ROOT_TTL_SECONDS = 30.0
 
 
-def _resolve_scope_path(raw_path) -> Path:
-    """Resolve *raw_path*; a symlink loop anywhere in it fails closed.
-
-    Python 3.13 made non-strict Path.resolve() return the unresolved link for
-    a loop instead of raising RuntimeError, which turned "membership
-    unavailable" into a silent allow. os.stat still reports ELOOP; a path that
-    simply does not exist yet stays resolvable.
-    """
-    resolved = Path(raw_path).expanduser().resolve()
-    try:
-        os.stat(resolved)
-    except OSError as exc:
-        if exc.errno == errno.ELOOP:
-            raise RuntimeError("Symlink loop") from None
-    return resolved
-
-
 def _resolved_root(raw_path) -> Path:
     key = str(raw_path)
     now = time.monotonic()
@@ -68,7 +49,7 @@ def _resolved_root(raw_path) -> Path:
         hit = _RESOLVED_ROOT_CACHE.get(key)
         if hit is not None and hit[0] > now:
             return hit[1]
-    resolved = _resolve_scope_path(key)
+    resolved = Path(key).expanduser().resolve()
     with _RESOLVED_ROOT_CACHE_LOCK:
         if len(_RESOLVED_ROOT_CACHE) > 4096:
             _RESOLVED_ROOT_CACHE.clear()
@@ -82,7 +63,7 @@ def ensure_scope_access(scope, path, *, entries=None):
     inside_any = False
     member_of_any = False
     try:
-        target = _resolve_scope_path(path)
+        target = Path(path).expanduser().resolve()
         for entry in load_acl_entries() if entries is None else entries:
             emails = entry_emails(entry)
             if not emails:

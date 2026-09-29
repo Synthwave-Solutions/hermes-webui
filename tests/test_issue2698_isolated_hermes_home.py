@@ -464,7 +464,7 @@ class TestProfileMutationsInIsolatedMode:
         monkeypatch.setenv("HERMES_BASE_HOME", "")
         monkeypatch.setattr(_profiles_mod, "_DEFAULT_HERMES_HOME", temp_hermes_home)
         monkeypatch.setattr(_profiles_mod, "_INITIAL_HERMES_HOME", str(isolated_default))
-        monkeypatch.setattr(_profiles_mod, "list_profiles_api", lambda **_kw: [])
+        monkeypatch.setattr(_profiles_mod, "list_profiles_api", lambda: [])
 
         result = switch_profile("default", process_wide=False)
 
@@ -587,6 +587,4 @@ def test_profiles_panel_hides_delete_controls_in_single_profile_mode():
     panels_js = (Path(__file__).resolve().parents[1] / "static" / "panels.js").read_text(encoding="utf-8")
 
     assert "const singleProfileMode = !!(_profilesCache && _profilesCache.single_profile_mode);" in panels_js
-    # SynthPulse (3a45e172) also hides it without the profiles:admin feature;
-    # single-profile mode still hides it on its own.
-    assert "if (isDefault || singleProfileMode || !_canUseFeature('profiles:admin')) hide(delBtn); else show(delBtn);" in panels_js
+    assert "if (isDefault || singleProfileMode) hide(delBtn); else show(delBtn);" in panels_js

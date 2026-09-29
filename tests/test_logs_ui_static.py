@@ -1,12 +1,11 @@
 import pathlib
 import re
-from tests._i18n_source import monolithic_i18n_source
 
 REPO = pathlib.Path(__file__).parent.parent
 INDEX = (REPO / "static" / "index.html").read_text(encoding="utf-8")
 PANELS = (REPO / "static" / "panels.js").read_text(encoding="utf-8")
 CSS = (REPO / "static" / "style.css").read_text(encoding="utf-8")
-I18N = monolithic_i18n_source()
+I18N = (REPO / "static" / "i18n.js").read_text(encoding="utf-8")
 
 
 def _function_body(src: str, name: str) -> str:

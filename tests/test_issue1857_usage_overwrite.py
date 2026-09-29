@@ -84,11 +84,6 @@ def test_stream_completion_overwrites_session_usage_with_latest_turn(cleanup_tes
             base_url=None,
             api_key=None,
             platform=None,
-            # SynthPulse always passes the turn's principal and the personal
-            # context isolation flags (no silent fallback when unsupported).
-            user_id=None,
-            skip_context_files=False,
-            load_soul_identity=False,
             quiet_mode=False,
             enabled_toolsets=None,
             fallback_model=None,

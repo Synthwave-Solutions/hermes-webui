@@ -16,7 +16,6 @@ import urllib.error
 
 import api.config as config
 import api.profiles as profiles
-from tests._i18n_source import monolithic_i18n_source
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -76,7 +75,7 @@ def test_budget_dom_classes_in_style_css():
 
 
 def test_budget_i18n_keys_in_i18n_js():
-    src = monolithic_i18n_source()
+    src = _read("static/i18n.js")
     for key in (
         "provider_cost_budget_label",
         "provider_cost_budget_pct",

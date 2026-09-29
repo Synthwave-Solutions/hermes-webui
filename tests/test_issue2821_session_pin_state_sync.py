@@ -42,9 +42,7 @@ def test_session_field_helper_reads_dicts_and_objects():
 
 def test_pin_limit_snapshot_counts_index_dict_entries():
     assert "def _session_counts_toward_pin_quota(session)" in ROUTES_PY
-    # Since 27 Sep 2026 each row is first read as the pinning person sees it
-    # (api/session_pins.py), then filtered through the same quota helper.
-    assert "_session_counts_toward_pin_quota(viewed)" in ROUTES_PY
+    assert "_session_counts_toward_pin_quota(existing)" in ROUTES_PY
     assert "_hide_from_default_sidebar(row)" in ROUTES_PY
     # #3288 replaced the set-of-ids snapshot with a visible-lineage row snapshot.
     # The load-bearing invariant this test guards is unchanged: the persisted pin
@@ -56,8 +54,7 @@ def test_pin_limit_snapshot_counts_index_dict_entries():
     assert end != -1, "persisted pin snapshot should be computed before LOCK"
     persisted_snapshot = ROUTES_PY[start:end]
     # The snapshot must filter via the shared quota helper, not raw getattr checks.
-    assert "project_row(existing, pin_viewer)" in persisted_snapshot
-    assert "_session_counts_toward_pin_quota(viewed)" in persisted_snapshot
+    assert "_session_counts_toward_pin_quota(existing)" in persisted_snapshot
     assert 'getattr(existing, "pinned", False)' not in persisted_snapshot
     assert 'getattr(existing, "archived", False)' not in persisted_snapshot
     # The authoritative count collapses continuation siblings to visible lineages.

@@ -215,28 +215,16 @@ def test_session_new_worktree_fallback_workspace_is_resolved(tmp_path, monkeypat
         return repo
 
     monkeypatch.setattr(routes, "resolve_trusted_workspace", fake_resolve)
-
-    # SynthPulse (0ded2005): without an explicit workspace the route asks the
-    # access-aware resolver for one the caller may use; the shared
-    # last-workspace is only a hint, never taken raw.
-    import api.workspace_access as workspace_access
-
-    def fake_implicit(handler, preferred=None):
-        seen["resolved"].append("implicit")
-        return str(repo)
-
-    monkeypatch.setattr(workspace_access, "resolve_implicit_workspace", fake_implicit)
-
-    def fake_create(workspace):
-        seen["worktree_base"] = workspace
-        return {
+    monkeypatch.setattr(
+        worktrees,
+        "create_worktree_for_workspace",
+        lambda workspace: {
             "path": str(worktree),
             "branch": "hermes/hermes-route",
             "repo_root": str(repo),
             "created_at": 321.0,
-        }
-
-    monkeypatch.setattr(worktrees, "create_worktree_for_workspace", fake_create)
+        },
+    )
     captured = {}
     monkeypatch.setattr(
         routes,
@@ -249,8 +237,7 @@ def test_session_new_worktree_fallback_workspace_is_resolved(tmp_path, monkeypat
 
     assert routes.handle_post(object(), SimpleNamespace(path="/api/session/new")) is True
 
-    assert seen["resolved"] == ["implicit"]
-    assert seen["worktree_base"] == str(repo)
+    assert seen["resolved"] == [str(repo)]
     assert captured["status"] == 200
     session = captured["payload"]["session"]
     assert session["workspace"] == str(worktree.resolve())

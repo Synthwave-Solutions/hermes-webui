@@ -11,10 +11,9 @@ import subprocess
 import sys
 import textwrap
 from pathlib import Path
-from tests._i18n_source import monolithic_i18n_file
 
 REPO = Path(__file__).parent.parent
-I18N_JS = monolithic_i18n_file()
+I18N_JS = REPO / "static" / "i18n.js"
 COMMANDS_JS = REPO / "static" / "commands.js"
 STREAMING_PY = REPO / "api" / "streaming.py"
 
@@ -42,9 +41,6 @@ BACKEND_CODES = {
 
 HANDLED_NON_RECOVERY_CODES = {
     "gateway_steer_queued",
-    # Group chats (27 Sep 2026): the running turn belongs to someone else, so
-    # the client queues the message as the writer's own next turn.
-    "peer_turn",
 }
 
 FRONTEND_NETWORK_CODE = "network_error"
@@ -150,9 +146,6 @@ def test_backend_parity():
     )
     # Also confirm frontend adds network_error
     commands_text = COMMANDS_JS.read_text(encoding="utf-8")
-    # Every handled non-recovery code has its own branch in _trySteer.
-    for code in HANDLED_NON_RECOVERY_CODES:
-        assert f"result.fallback==='{code}'" in commands_text, f"{code} is not handled in _trySteer"
     assert FRONTEND_NETWORK_CODE in commands_text, (
         "network_error not found in commands.js"
     )

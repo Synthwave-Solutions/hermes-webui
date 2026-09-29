@@ -23,7 +23,6 @@ from api.config import (
 )
 from api.governance.catalog import _ANON_ROUTES, _SELF_ROUTES, route_permission
 from api.models import Session, new_session
-from tests._i18n_source import monolithic_i18n_source
 
 REPO = Path(__file__).resolve().parents[1]
 ROUTES = (REPO / "api" / "routes.py").read_text(encoding="utf-8")
@@ -390,7 +389,7 @@ def test_mode_segments_remain_explicit_and_sync_on_locale_change():
     assert 'id="chatModeNormal"' in index_html
     assert 'id="chatModeSuper"' in index_html
     assert 'id="composerChatModeLabel"' not in index_html
-    i18n_js = monolithic_i18n_source()
+    i18n_js = (REPO / "static" / "i18n.js").read_text(encoding="utf-8")
     apply_dom = i18n_js[i18n_js.index("function applyLocaleToDOM()") :]
     assert "syncChatModeChip()" in apply_dom[: apply_dom.index("\n}")]
 

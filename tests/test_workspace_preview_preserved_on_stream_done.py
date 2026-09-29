@@ -1,7 +1,6 @@
 """Regression: workspace file preview must survive background file-tree refresh on chat done."""
 
 from pathlib import Path
-from tests.helpers import live_sse_handler
 
 
 REPO = Path(__file__).resolve().parent.parent
@@ -73,7 +72,10 @@ def test_turn_mutation_tracking_reloads_open_preview():
 
 
 def test_tool_complete_tracks_workspace_mutations_for_preview_reload():
-    block = live_sse_handler(MESSAGES_JS, 'tool_complete')
+    tool_complete_idx = MESSAGES_JS.find("source.addEventListener('tool_complete'")
+    assert tool_complete_idx != -1
+    end = MESSAGES_JS.find("source.addEventListener('approval'", tool_complete_idx)
+    block = MESSAGES_JS[tool_complete_idx:end]
     assert "noteWorkspaceMutationsFromToolCall" in block
     assert "refreshOpenPreviewIfMutated" in block
 

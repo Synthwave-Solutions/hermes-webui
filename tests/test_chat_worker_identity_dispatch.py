@@ -18,21 +18,12 @@ def test_actual_worker_dispatch_keywords_match_original_sender(
     dispatch = routes._start_chat_stream_for_session
     tree = ast.parse(inspect.getsource(dispatch))
     body = tree.body[0].body
-
-    def assign_index(name, after=0):
-        return next(i for i, node in enumerate(body[after:], after) if isinstance(node, ast.Assign)
-                    and any(isinstance(target, ast.Name) and target.id == name
-                            for target in node.targets))
-
-    # The backend is decided once, before the stale-runtime barrier and before
-    # any pending state is registered, so the barrier and the dispatch act on
-    # the same value. Execute the real statements in order: resolving the
-    # gateway setting, the governed backend decision, and the worker dispatch.
-    resolve = next(i for i, node in enumerate(body) if isinstance(node, ast.If)
-                   and "external_runtime_owned is None" in ast.unparse(node.test))
-    decision = assign_index("backend_is_gateway")
-    start = assign_index("worker_target", decision)
-    end = assign_index("thr", start)
+    start = next(i for i, node in enumerate(body) if isinstance(node, ast.Assign)
+                 and any(isinstance(target, ast.Name) and target.id == "backend_is_gateway"
+                         for target in node.targets))
+    end = next(i for i, node in enumerate(body[start:], start) if isinstance(node, ast.Assign)
+               and any(isinstance(target, ast.Name) and target.id == "thr"
+                       for target in node.targets))
     captured = {}
 
     def thread(**kwargs):
@@ -69,8 +60,7 @@ def test_actual_worker_dispatch_keywords_match_original_sender(
         "threading": SimpleNamespace(Thread=thread),
         "stream_id": "run",
     }
-    statements = [body[resolve], body[decision], *body[start:end + 1]]
-    exec(compile(ast.Module(body=statements, type_ignores=[]),
+    exec(compile(ast.Module(body=body[start:end + 1], type_ignores=[]),
                  "<actual worker dispatch>", "exec"), namespace)
 
     assert captured["kwargs"]["sender_email"] == identity["email"]

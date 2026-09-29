@@ -1,14 +1,13 @@
 """Regression coverage for PWA-backed browser notifications (#3196)."""
 
 from pathlib import Path
-from tests._i18n_source import monolithic_i18n_source
 
 ROOT = Path(__file__).resolve().parents[1]
 MESSAGES_JS = (ROOT / "static" / "messages.js").read_text(encoding="utf-8")
 SW_JS = (ROOT / "static" / "sw.js").read_text(encoding="utf-8")
 INDEX_HTML = (ROOT / "static" / "index.html").read_text(encoding="utf-8")
 PANELS_JS = (ROOT / "static" / "panels.js").read_text(encoding="utf-8")
-I18N_JS = monolithic_i18n_source()
+I18N_JS = (ROOT / "static" / "i18n.js").read_text(encoding="utf-8")
 CHANGELOG = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
 
 DESKTOP_BACKGROUND_NOTIFICATION_NAMES = (
@@ -123,8 +122,7 @@ def test_settings_expose_permission_and_test_controls():
     assert 'id="notificationPermissionButtonWrap"' in INDEX_HTML
     assert 'id="notificationPermissionButton"' in INDEX_HTML
     assert "requestNotificationPermission()" in INDEX_HTML
-    # SynthPulse product naming (docs/product-name.md): no Hermes in UI copy.
-    assert "sendBrowserNotification('SynthPulse test'" in INDEX_HTML
+    assert "sendBrowserNotification('Hermes test'" in INDEX_HTML
     assert "{force:true}" in INDEX_HTML
     assert "function updateNotificationPermissionStatus" in PANELS_JS
     assert "const btn=$('notificationPermissionButton');" in PANELS_JS

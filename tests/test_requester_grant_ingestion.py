@@ -1,6 +1,4 @@
 """A requester's pending route denials are visible before any admin queue visit."""
-import threading
-
 import pytest
 
 from api import approvals, grant_requests
@@ -14,15 +12,6 @@ def notifications(monkeypatch):
     return events
 
 
-def _settle_auto_reviews(timeout=5.0):
-    """Admins are notified from the automatic-review thread (09f09e2d), so a
-    check right after ingestion raced it and failed now and then. Wait for
-    every running review to finish before asserting who was notified."""
-    for thread in threading.enumerate():
-        if thread.name == 'grant-auto-review' and thread is not threading.current_thread():
-            thread.join(timeout)
-
-
 def test_requester_read_ingests_only_own_denial_without_admin_visit(as_user, notifications):
     assert grant_requests.record_route_denial('viewer@example.test', '/api/skills')
     assert grant_requests.record_route_denial('other@example.test', '/api/skills/usage')
@@ -34,11 +23,9 @@ def test_requester_read_ingests_only_own_denial_without_admin_visit(as_user, not
     assert [(row['key'], row['status']) for row in response.body['requests']] == [
         ('viewer@example.test|route|/api/skills', 'pending')]
     assert approvals.get('grant', 'other@example.test|route|/api/skills/usage') is None
-    _settle_auto_reviews()
     assert notifications == ['viewer@example.test']
     _, repeated = _call('/api/governance/approvals/mine')
     assert repeated.body['requests'] == response.body['requests']
-    _settle_auto_reviews()
     assert notifications == ['viewer@example.test']
 
 
@@ -61,6 +48,5 @@ def test_admin_ingestion_still_collects_every_owner(notifications):
     for email in ['viewer@example.test', 'other@example.test']:
         assert grant_requests.record_route_denial(email, '/api/skills')
     assert grant_requests.ingest_spool() == 2
-    _settle_auto_reviews()
     assert sorted(notifications) == ['other@example.test', 'viewer@example.test']
     assert len(approvals.list_all(kinds=['grant'])) == 2

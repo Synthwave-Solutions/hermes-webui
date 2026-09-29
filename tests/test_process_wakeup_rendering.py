@@ -14,13 +14,12 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from tests._i18n_source import monolithic_i18n_source
 
 
 ROOT = Path(__file__).resolve().parents[1]
 UI_JS_PATH = ROOT / "static" / "ui.js"
 STYLE_CSS = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
-I18N_JS = monolithic_i18n_source()
+I18N_JS = (ROOT / "static" / "i18n.js").read_text(encoding="utf-8")
 NODE = shutil.which("node")
 
 pytestmark = pytest.mark.skipif(NODE is None, reason="node not on PATH")
@@ -195,10 +194,8 @@ def test_process_wakeup_uses_compact_status_row_not_normal_user_bubble():
     assert "process-wakeup-row" in process_branch
     assert "process-wakeup-notice" in process_branch
     assert "data-role='process_wakeup'" in process_branch or "dataset.role='process_wakeup'" in process_branch
-    # Attachments ride into the card (shown in its detail section).
-    assert "{timeHtml, filesHtml," in process_branch
-    # The row is built by the plain-language card for every wakeup (27 Sep 2026).
-    assert "_processWakeupCardHtml(" in process_branch
+    assert "${filesHtml}" in process_branch
+    assert "t('process_wakeup_label')" in process_branch
     assert "Background wakeup" not in process_branch
     assert "const rowDisplayContent=displayContent;" in ui
     assert "const rowDisplayContent=isProcessWakeup?content:displayContent;" not in ui
@@ -206,8 +203,9 @@ def test_process_wakeup_uses_compact_status_row_not_normal_user_bubble():
     assert ".process-wakeup-row" in STYLE_CSS
     assert ".process-wakeup-notice" in STYLE_CSS
     assert ".process-wakeup-text" in STYLE_CSS
-    notice_start = STYLE_CSS.index(".process-wakeup-notice{")
-    notice_rule = STYLE_CSS[notice_start : STYLE_CSS.index("}", notice_start) + 1]
+    notice_rule = STYLE_CSS[
+        STYLE_CSS.index(".process-wakeup-notice{") : STYLE_CSS.index(".process-wakeup-label{")
+    ]
     assert "margin:8px 0 8px var(--msg-rail)" in notice_rule
     assert "max-width:min(var(--msg-max),760px)" in notice_rule
     assert "margin-left:30px" not in notice_rule
@@ -230,5 +228,4 @@ def test_process_wakeup_label_key_exists_in_all_locales():
         assert re.search(r"\bprocess_wakeup_label\s*:", block), (
             f"process_wakeup_label missing from locale {name}"
         )
-    # Plain-language background task notice (27 Sep 2026).
-    assert "process_wakeup_label: 'Background task complete'" in I18N_JS
+    assert "process_wakeup_label:'Background wakeup'" in I18N_JS

@@ -2,7 +2,7 @@
 import copy
 import pytest
 import api.config as cfg
-from tests.test_issue3928_models_budget_fallback import _served, gated_catalog_rebuild, isolate_models_catalog_state
+from tests.test_issue3928_models_budget_fallback import gated_catalog_rebuild, isolate_models_catalog_state
 
 @pytest.mark.parametrize("stale_disk", [False, True])
 def test_pending_flag_until_detached_catalog_publishes(monkeypatch, gated_catalog_rebuild, stale_disk):
@@ -22,7 +22,7 @@ def test_pending_flag_until_detached_catalog_publishes(monkeypatch, gated_catalo
     release.set()
     assert published.wait(1)
     complete = cfg.get_available_models()
-    assert complete == _served(live)  # cache reads carry the fast-tier annotation
+    assert complete == live
     assert not complete.get("refresh_pending")
     assert len(calls) == 1
 

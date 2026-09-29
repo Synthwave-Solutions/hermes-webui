@@ -1,11 +1,10 @@
 from pathlib import Path
-from tests._i18n_source import monolithic_i18n_source
 
 
 REPO = Path(__file__).resolve().parents[1]
 UI_JS = (REPO / "static" / "ui.js").read_text(encoding="utf-8")
 PANELS_JS = (REPO / "static" / "panels.js").read_text(encoding="utf-8")
-I18N_JS = monolithic_i18n_source()
+I18N_JS = (REPO / "static" / "i18n.js").read_text(encoding="utf-8")
 INDEX_HTML = (REPO / "static" / "index.html").read_text(encoding="utf-8")
 
 
@@ -93,8 +92,7 @@ def test_toolsets_affordance_i18n_keys_exist_in_locale_blocks():
     for key in keys:
         assert I18N_JS.count(f"{key}:") >= 8, f"missing locale entries for {key}"
     assert "session_toolsets_custom:'Custom override'" in I18N_JS
-    # SynthPulse calls profiles bots in the interface copy.
-    assert "session_toolsets_desc:'Use active bot defaults or choose a custom toolset list for this session'" in I18N_JS
+    assert "session_toolsets_desc:'Use active profile defaults or choose a custom toolset list for this session'" in I18N_JS
 
 
 def test_toolsets_dropdown_distinguishes_failed_catalog_loads_from_loading():

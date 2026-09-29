@@ -41,9 +41,7 @@ def test_session_switch_updates_url_path_for_tab_local_anchor():
 
 def test_boot_prefers_url_session_over_local_storage_session():
     assert "const urlSession=(typeof _sessionIdFromLocation==='function')?_sessionIdFromLocation():null;" in BOOT_JS
-    # A SynthPulse split-view pane never restores the tab's last session from
-    # localStorage; each pane opens the session its URL names (040b6bd7).
-    assert "const savedLocal=window.__HERMES_PANE_MODE?null:localStorage.getItem('hermes-webui-session');" in BOOT_JS
+    assert "const savedLocal=localStorage.getItem('hermes-webui-session');" in BOOT_JS
     assert "const saved=urlSession||savedLocal;" in BOOT_JS
     assert "const savedSidebarOnlyState=(!urlSession&&savedLocal)" in BOOT_JS
     assert "? await _savedSessionSidebarOnlyState(savedLocal)" in BOOT_JS

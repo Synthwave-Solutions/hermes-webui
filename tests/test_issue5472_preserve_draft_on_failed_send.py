@@ -85,12 +85,7 @@ def test_send_captures_immutable_snapshot_before_rewrites_and_upload():
 def test_error_branch_restores_original_snapshot_not_mutated_payload():
     start = MESSAGES_JS.find("S.messages.push({role:'assistant',content:`**Error:** ${errMsg}`});")
     assert start != -1, "the /api/chat/start error branch must still push an Error turn"
-    # The whole error branch, up to its return: a fixed 1100-char window broke
-    # once SynthPulse marked a failed queue-drain send (keeping its queue entry)
-    # ahead of the restore.
-    end = MESSAGES_JS.find("\n    return;\n  }", start)
-    assert end != -1, "the error branch must still end with its return"
-    window = MESSAGES_JS[start:end]
+    window = MESSAGES_JS[start:start + 1100]
     assert (
         "_restoreComposerDraftAfterFailedSend(_failedSendDraftText, _failedSendFilesSnapshot, activeSid, _composerDraftClearPromise);"
         in window

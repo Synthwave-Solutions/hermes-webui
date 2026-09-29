@@ -9,9 +9,6 @@ pytest-asyncio
 pytest-shard
 ruff
 mcp<2
-# hermes-agent's cron engine (cron/jobs.py) parses cron expressions with
-# croniter; the cron editor tests exercise that real engine.
-croniter
 # Optional Office parsers — runtime-optional (commented in requirements.txt), but
 # installed here so the workspace Office-preview tests (tests/test_issue540_*.py)
 # run under the documented ./scripts/test.sh entry point. These files

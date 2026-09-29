@@ -23,7 +23,6 @@ import pathlib
 import re
 import json
 import subprocess
-from tests.helpers import js_function_source
 
 REPO = pathlib.Path(__file__).parent.parent
 MESSAGES_JS = (REPO / "static" / "messages.js").read_text(encoding="utf-8")
@@ -58,17 +57,7 @@ def extract_fn(src, name, *, brace_depth=1):
 
 
 def extract_event_handler(src, event_name):
-    """Return the text of a source.addEventListener('<event_name>', ...) block.
-
-    A listener registered with a named handler (SynthPulse names the tool
-    handlers so sub-agent lifecycle events can reuse them, 53620edd) resolves
-    to that handler's function source.
-    """
-    named = re.search(
-        rf"source\.addEventListener\('{re.escape(event_name)}',\s*([A-Za-z_$][\w$]*)\s*\)", src
-    )
-    if named:
-        return js_function_source(src, named.group(1))
+    """Return the text of a source.addEventListener('<event_name>', ...) block."""
     pattern = rf"source\.addEventListener\('{re.escape(event_name)}'"
     m = re.search(pattern, src)
     if not m:

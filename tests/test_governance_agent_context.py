@@ -104,13 +104,8 @@ def test_managed_binding_rejects_engine_control_roundtrip_drift(inject_policy, m
     from copy import deepcopy
     from dataclasses import replace
     raw = deepcopy(POLICY)
-    # A blacklist account is default-allow and has no role ceiling
-    # (c3ede8f8); the ceiling round-trip is checked on a managed whitelist.
-    mode = "whitelist" if dropped == "role_ceiling" else "blacklist"
-    raw["users"][FREELANCER].update(access_level="elevated", access_mode=mode,
+    raw["users"][FREELANCER].update(access_level="elevated", access_mode="blacklist",
         approval={"mode": "manual", "prompt": ""})
-    if mode == "whitelist":
-        raw["users"][FREELANCER]["grants"] = deepcopy(POLICY["roles"]["freelancer"]["grants"])
     policy = inject_policy(raw)
     module = _real_agent_module()
     original = module.context_from_env_payload

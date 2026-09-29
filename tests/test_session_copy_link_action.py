@@ -4,12 +4,11 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from tests._i18n_source import monolithic_i18n_source
 
 ROOT = Path(__file__).resolve().parents[1]
 SESSIONS_JS_PATH = ROOT / "static" / "sessions.js"
 SESSIONS_JS = SESSIONS_JS_PATH.read_text(encoding="utf-8")
-I18N_JS = monolithic_i18n_source()
+I18N_JS = (ROOT / "static" / "i18n.js").read_text(encoding="utf-8")
 UI_JS = (ROOT / "static" / "ui.js").read_text(encoding="utf-8")
 MESSAGES_JS = (ROOT / "static" / "messages.js").read_text(encoding="utf-8")
 NODE = shutil.which("node")

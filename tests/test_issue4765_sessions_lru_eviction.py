@@ -112,16 +112,10 @@ def _insert(sid_session):
 # ─────────────────────────── config knob ────────────────────────────────────
 
 def test_default_sessions_cache_cap_is_100():
-    """The shipped no-override session cache default (#6351).
-
-    SynthPulse keeps 32 full sessions resident, bounded first by a 150 MB
-    estimated-size cap: multi-MB sidecars expand a lot after JSON parsing, so
-    upstream's 100 was unsafe for this host's memory.
-    """
+    """The shipped no-override session cache default is 100 (#6351)."""
     from api import config as _cfg
 
-    assert _cfg.DEFAULT_SESSIONS_CACHE_MAX == 32
-    assert _cfg.DEFAULT_SESSION_CACHE_BYTES == 150 * 1024 * 1024
+    assert _cfg.DEFAULT_SESSIONS_CACHE_MAX == 100
 
 
 def test_cache_cap_reads_config_yaml_key():

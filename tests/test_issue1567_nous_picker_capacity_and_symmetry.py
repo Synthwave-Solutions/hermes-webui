@@ -578,19 +578,7 @@ class TestFrontendExtrasContract:
         # robust against minor refactors of surrounding code.
         idx = src.find("async function populateModelDropdown")
         assert idx != -1
-        # Read the whole function body (brace-matched from after the parameter
-        # list) rather than a fixed window: the SynthPulse version starts with
-        # extra guard code, which pushed the hydration past 3000 characters.
-        open_brace = src.index("{", src.index(")", idx))
-        depth = 0
-        for end in range(open_brace, len(src)):
-            if src[end] == "{":
-                depth += 1
-            elif src[end] == "}":
-                depth -= 1
-                if depth == 0:
-                    break
-        body = src[idx : end + 1]
+        body = src[idx : idx + 3000]
         assert "extra_models" in body, (
             "populateModelDropdown must hydrate _dynamicModelLabels from "
             "g.extra_models so a model selected outside the featured set "

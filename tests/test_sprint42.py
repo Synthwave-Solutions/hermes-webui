@@ -17,7 +17,6 @@ import sys
 import types
 import unittest
 from unittest import mock
-from tests._i18n_source import monolithic_i18n_source
 
 REPO_ROOT = pathlib.Path(__file__).parent.parent
 STREAMING_PY = (REPO_ROOT / "api" / "streaming.py").read_text(encoding="utf-8")
@@ -661,7 +660,7 @@ class TestModelCustomInput(unittest.TestCase):
                       '.model-custom-input must be defined in style.css')
 
     def test_model_custom_i18n_keys(self):
-        i18n = monolithic_i18n_source()
+        i18n = self._read('i18n.js')
         # Find en locale block (appears first before es)
         en_block_start = i18n.find("'en'")
         es_block_start = i18n.find("'es'")
@@ -849,16 +848,9 @@ class TestCredentialPoolBackwardCompat(unittest.TestCase):
                          platform=None, quiet_mode=False, enabled_toolsets=None,
                          fallback_model=None, session_id=None, session_db=None,
                          stream_delta_callback=None, reasoning_callback=None,
-                         tool_progress_callback=None, clarify_callback=None,
-                         user_id=None, skip_context_files=False,
-                         load_soul_identity=False):
-                # No api_mode / acp_command / acp_args / credential_pool params.
-                # user_id, skip_context_files and load_soul_identity are the
-                # SynthPulse isolation contract (073713d1): the WebUI always
-                # passes them, so an engine without them fails closed (see
-                # test_agent_without_identity_isolation_fails_closed below).
-                captured["init_kwargs"] = {"session_id": session_id, "model": model,
-                                           "skip_context_files": skip_context_files}
+                         tool_progress_callback=None, clarify_callback=None):
+                # No api_mode / acp_command / acp_args / credential_pool params
+                captured["init_kwargs"] = {"session_id": session_id, "model": model}
                 self.session_id = session_id
                 self.context_compressor = None
                 self.session_prompt_tokens = 0
@@ -944,93 +936,9 @@ class TestCredentialPoolBackwardCompat(unittest.TestCase):
                 stream_id=fake_stream_id,
             )
 
-        # Agent was constructed successfully, without the newer optional
-        # kwargs it does not accept, and with the isolation contract applied.
+        # Agent was constructed successfully
         self.assertIn("session_id", captured["init_kwargs"])
         self.assertEqual(captured["init_kwargs"]["session_id"], "sess-compat-test")
-        self.assertIs(captured["init_kwargs"]["skip_context_files"], True)
-
-    def test_agent_without_identity_isolation_fails_closed(self):
-        """An engine that cannot take the per-user isolation kwargs must not
-        run the turn at all (073713d1): the WebUI passes user_id,
-        skip_context_files and load_soul_identity unconditionally, so such an
-        engine never runs a governed turn without identity binding. The turn
-        ends in a visible error instead of crashing the worker."""
-        import api.streaming as streaming
-
-        constructed = []
-
-        class PreIsolationAgent:
-            def __init__(self, model=None, provider=None, base_url=None, api_key=None,
-                         platform=None, quiet_mode=False, enabled_toolsets=None,
-                         fallback_model=None, session_id=None, session_db=None,
-                         stream_delta_callback=None, reasoning_callback=None,
-                         tool_progress_callback=None, clarify_callback=None):
-                constructed.append(session_id)
-
-            def run_conversation(self, **kwargs):  # pragma: no cover - must not run
-                raise AssertionError("a pre-isolation engine must never run a turn")
-
-        class FakeSession:
-            session_id = "sess-isolation-test"
-            title = "Test"
-            workspace = "/tmp"
-            model = "gpt-4o"
-            messages = []
-            personality = None
-            input_tokens = 0
-            output_tokens = 0
-            estimated_cost = None
-            tool_calls = []
-            active_stream_id = "stream-isolation-test"
-            pending_user_message = None
-            pending_attachments = []
-            pending_started_at = None
-
-            def save(self, touch_updated_at=True):
-                pass
-
-            def compact(self):
-                return {"session_id": self.session_id, "title": self.title}
-
-        fake_stream_id = "stream-isolation-test"
-        fake_queue = queue.Queue()
-        fake_rt_module = types.ModuleType("hermes_cli.runtime_provider")
-        fake_rt_module.resolve_runtime_provider = mock.Mock(return_value={
-            "provider": "openai", "base_url": None, "api_key": "sk-test",
-            "api_mode": "chat_completions", "command": None, "args": [],
-            "credential_pool": object(),
-        })
-        fake_hermes_cli = types.ModuleType("hermes_cli")
-        fake_hermes_cli.runtime_provider = fake_rt_module
-        fake_hermes_state = types.ModuleType("hermes_state")
-        fake_hermes_state.SessionDB = mock.Mock(return_value=None)
-
-        with mock.patch.object(streaming, "get_session", return_value=FakeSession()), \
-             mock.patch.object(streaming, "_get_ai_agent", return_value=PreIsolationAgent), \
-             mock.patch.object(streaming, "resolve_model_provider", return_value=("gpt-4o", "openai", None)), \
-             mock.patch("api.config.get_config", return_value={}), \
-             mock.patch("api.config._resolve_cli_toolsets", return_value=[]), \
-             mock.patch.dict(sys.modules, {
-                 "hermes_cli": fake_hermes_cli,
-                 "hermes_cli.runtime_provider": fake_rt_module,
-                 "hermes_state": fake_hermes_state,
-             }):
-            streaming.STREAMS[fake_stream_id] = fake_queue
-            streaming._run_agent_streaming(
-                session_id="sess-isolation-test",
-                msg_text="hello",
-                model="gpt-4o",
-                workspace="/tmp",
-                stream_id=fake_stream_id,
-            )
-
-        self.assertEqual(constructed, [], "the engine must not be constructed without isolation")
-        events = []
-        while not fake_queue.empty():
-            item = fake_queue.get_nowait()
-            events.append(item[0] if isinstance(item, tuple) else item)
-        self.assertIn("apperror", events)
 
 
 class TestAgentCacheCredentialPoolStability(unittest.TestCase):

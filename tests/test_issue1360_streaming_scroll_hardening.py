@@ -102,10 +102,6 @@ def test_queue_pill_click_respects_manual_unpin_even_when_idle():
 def test_idle_render_preserves_manual_unpin_until_explicit_bottom():
     render_body = _extract_function(UI_JS, "renderMessages")
     scroll_helper = _extract_function(UI_JS, "_scrollAfterMessageRender")
-    # SynthPulse moved the capture into _messageScrollSnapshotForRender
-    # (242bcc97), which renderMessages calls with the same inputs.
-    if "_messageScrollSnapshotForRender(preserveScroll,options)" in render_body.replace(" ", ""):
-        render_body = _extract_function(UI_JS, "_messageScrollSnapshotForRender")
 
     assert "preserveScroll||_messageUserUnpinned" in render_body.replace(" ", ""), (
         "renderMessages() must capture a scroll snapshot whenever the reader is "

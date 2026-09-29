@@ -222,14 +222,6 @@ def _stub_route_session(*, context_length=1_000_000, threshold_tokens=500_000, m
     s.output_tokens = 0
     s.read_only = False
     s._loaded_metadata_only = False
-    # Session fields added for project collaboration and group chats. A bare
-    # MagicMock would answer them with a truthy mock and read as a shared
-    # project conversation the caller is not a member of.
-    s.project_shared = False
-    s.project_id = None
-    s.participants = []
-    s.bot_participants = []
-    s.owner_email = None
     s.compact.return_value = {
         "session_id": s.session_id,
         "title": s.title,

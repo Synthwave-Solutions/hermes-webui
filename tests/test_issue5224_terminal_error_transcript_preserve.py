@@ -101,11 +101,6 @@ function buildRuntime() {
   ];
   globalThis._isActiveSession = () => scenario.isActiveSession !== false;
   globalThis._isSessionCurrentPane = () => scenario.isSessionCurrentPane !== false;
-  // SynthPulse guards the recovery path with the stream's own attachment
-  // check (_liveStreamAttachmentIsCurrent: this stream is still the live one
-  // for the current pane); in this single-stream runtime that reduces to:
-  globalThis._isAttachmentCurrent = () =>
-    globalThis._isSessionCurrentPane(activeSid) && globalThis.S.activeStreamId === streamId;
   globalThis._isSessionActivelyViewed = () => !!scenario.isSessionActivelyViewed;
   globalThis._closeSource = () => calls.push('closeSource');
   globalThis._clearStreamEndRecovery = () => calls.push('clearStreamEndRecovery');

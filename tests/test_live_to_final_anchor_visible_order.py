@@ -6,7 +6,6 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from tests._i18n_source import monolithic_i18n_source
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -15,7 +14,7 @@ UI_JS = (ROOT / "static" / "ui.js").read_text(encoding="utf-8")
 SESSIONS_JS = (ROOT / "static" / "sessions.js").read_text(encoding="utf-8")
 ROUTES_PY = (ROOT / "api" / "routes.py").read_text(encoding="utf-8")
 STYLE_CSS = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
-I18N_JS = monolithic_i18n_source()
+I18N_JS = (ROOT / "static" / "i18n.js").read_text(encoding="utf-8")
 NODE = shutil.which("node")
 
 
@@ -48,23 +47,12 @@ def _function_body(src, name):
 
 
 def _event_listener_body(src, event_name):
-    import re
-    from tests.helpers import js_function_source
-
     marker = f"source.addEventListener('{event_name}',e=>{{"
     start = src.find(marker)
     if start == -1:
         marker = f"es.addEventListener('{event_name}', e => {{"
         start = src.find(marker)
-    if start == -1:
-        # SynthPulse names the live tool handlers so sub-agent lifecycle
-        # events reuse them (53620edd):
-        # source.addEventListener('tool',handleLiveToolEvent).
-        named = re.search(
-            rf"source\.addEventListener\('{re.escape(event_name)}',\s*([A-Za-z_$][\w$]*)\s*\)", src
-        )
-        assert named, f"{event_name} listener not found"
-        return js_function_source(src, named.group(1))
+    assert start != -1, f"{event_name} listener not found"
     brace = src.find("{", start)
     depth = 0
     for idx in range(brace, len(src)):
@@ -73,19 +61,7 @@ def _event_listener_body(src, event_name):
         elif src[idx] == "}":
             depth -= 1
             if depth == 0:
-                body = src[brace + 1:idx]
-                # The group chat work moved the server_turn_started body into
-                # _onServerTurnStarted(sid, d) so peer_turn_started can reuse
-                # it; a listener that only parses and delegates is read
-                # through to that function.
-                delegate = re.fullmatch(
-                    r"\s*try\s*\{\s*const d = JSON\.parse\(e\.data \|\| '\{\}'\);\s*"
-                    r"([A-Za-z_$][\w$]*)\(sid, d\);\s*\}\s*catch\s*\(_\)\s*\{\s*\}\s*",
-                    body,
-                )
-                if delegate:
-                    return js_function_source(src, delegate.group(1))
-                return body
+                return src[brace + 1:idx]
     raise AssertionError(f"{event_name} listener did not close")
 
 

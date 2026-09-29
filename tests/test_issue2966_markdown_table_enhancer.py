@@ -1,6 +1,5 @@
 import re
 from pathlib import Path
-from tests._i18n_source import monolithic_i18n_source
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -11,7 +10,7 @@ def _read_static(name):
 
 
 def _locale_blocks():
-    text = monolithic_i18n_source()
+    text = _read_static("i18n.js")
     matches = list(re.finditer(r"^  '?([A-Za-z]{2}(?:-[A-Za-z]+)?)'?: \{", text, re.M))
     assert matches, "could not find locale blocks"
     blocks = {}

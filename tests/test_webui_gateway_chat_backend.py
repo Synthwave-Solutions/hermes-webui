@@ -24,7 +24,6 @@ from api.gateway_chat import (
     webui_chat_backend_mode,
     webui_gateway_chat_enabled,
 )
-from tests._i18n_source import monolithic_i18n_source
 
 
 def test_gateway_chat_backend_is_default_off_for_truthy_values():
@@ -242,7 +241,7 @@ def test_frontend_renders_gateway_auth_error_with_specific_label():
 
 
 def test_gateway_auth_label_i18n_key_exists_for_every_locale():
-    src = monolithic_i18n_source()
+    src = Path("static/i18n.js").read_text(encoding="utf-8")
     locale_names = [
         match.group("quoted") or match.group("plain")
         for match in re.finditer(

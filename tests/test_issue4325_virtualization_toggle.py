@@ -15,14 +15,13 @@ import json
 from pathlib import Path
 
 import pytest
-from tests._i18n_source import monolithic_i18n_file
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 INDEX = REPO_ROOT / "static" / "index.html"
 PANELS = REPO_ROOT / "static" / "panels.js"
 BOOT = REPO_ROOT / "static" / "boot.js"
 UI = REPO_ROOT / "static" / "ui.js"
-I18N = monolithic_i18n_file()
+I18N = REPO_ROOT / "static" / "i18n.js"
 CONFIG = REPO_ROOT / "api" / "config.py"
 
 

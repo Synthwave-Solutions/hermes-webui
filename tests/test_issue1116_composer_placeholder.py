@@ -1,6 +1,5 @@
 """Tests for #1116 — composer placeholder reflects active profile name."""
 import re
-from tests._i18n_source import monolithic_i18n_source
 
 
 def _src(name: str) -> str:
@@ -37,10 +36,8 @@ class TestComposerPlaceholderProfile:
         m = re.search(r'function assistantDisplayName\(\)\{.*?\n\}', src, re.DOTALL)
         assert m, "assistantDisplayName function must exist"
         body = m.group(0)
-        # SynthPulse resolves the default name through defaultAssistantDisplayName
-        # (docs/product-name.md; behaviour covered by test_product_name_display).
-        assert "defaultAssistantDisplayName(window._botName)" in body, \
-            "assistantDisplayName must fall back to the saved bot name for the default profile"
+        assert "window._botName||'Hermes'" in body, \
+            "assistantDisplayName must use window._botName or 'Hermes' for the default profile"
 
     def test_chat_surfaces_use_shared_assistant_display_name(self):
         """Chat rows, titles, notifications, and cancel copy must honor profile overrides."""
@@ -67,14 +64,13 @@ class TestComposerPlaceholderProfile:
     def test_settings_copy_names_default_assistant_scope(self):
         """The preference copy must say that only the default profile is renamed."""
         index_src = _src("index.html")
-        i18n_src = monolithic_i18n_source()
+        i18n_src = _src("i18n.js")
         assert "Default assistant name" in index_src
         assert "Used for the default profile only. Other profiles use their own profile names." in index_src
         assert "settings_label_bot_name: 'Default assistant name'" in i18n_src
-        # SynthPulse calls profiles bots in the interface copy.
         assert (
-            "settings_desc_bot_name: 'Used for the default bot only. "
-            "Other bots use their own bot names.'"
+            "settings_desc_bot_name: 'Used for the default profile only. "
+            "Other profiles use their own profile names.'"
         ) in i18n_src
 
     def test_switchToProfile_calls_applyBotName(self):

@@ -147,8 +147,7 @@ global.switchToProfile = async (name) => {
   const profilePos = bootSrc.indexOf("const profileIntent=(typeof _profileQueryIntentFromLocation==='function')?_profileQueryIntentFromLocation():null;");
   const renderPos = bootSrc.indexOf("await renderSessionList();", profilePos);
   const savedPos = bootSrc.indexOf("const saved=urlSession||savedLocal;", profilePos);
-  // The fork also passes draftInputGeneration (53071075), so match the call prefix.
-  const loadPos = bootSrc.indexOf("loadSession(saved, {preserveActiveInput:true", profilePos);
+  const loadPos = bootSrc.indexOf("await loadSession(saved, {preserveActiveInput:true});", profilePos);
   const consumePos = bootSrc.indexOf("if(typeof _consumeProfileQueryParamFromLocation==='function') _consumeProfileQueryParamFromLocation();", profilePos);
   const completedPos = bootSrc.indexOf("_profileSwitchCompleted=await switchToProfile(profileIntent.name)===true;", profilePos);
   const changedPos = bootSrc.indexOf("_profileSwitchChangedProfile=", completedPos);

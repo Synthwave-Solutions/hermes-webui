@@ -41,15 +41,10 @@ def _free_port() -> int:
 
 class _HealthHandler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):  # noqa: N802
-        body = b'{"status": "ok"}'
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
-        # The real /health response carries Content-Length (api/helpers.j).
-        # Without it the client reads to EOF, and OpenSSL 3 reports the
-        # server's close without close_notify as an error (curl exit 56).
-        self.send_header("Content-Length", str(len(body)))
         self.end_headers()
-        self.wfile.write(body)
+        self.wfile.write(b'{"status": "ok"}')
 
     def log_message(self, *args):  # suppress server log noise during tests
         pass

@@ -41,27 +41,6 @@ def _read(rel_path: str) -> str:
     return (REPO_ROOT / rel_path).read_text(encoding="utf-8")
 
 
-def _new_session_body(src: str) -> str:
-    """The whole newSession() function, brace-matched.
-
-    Fixed-size windows kept breaking as the function grew (pre-session toolset
-    staging #4490, the SynthPulse configured-provider route 59f968cb); reading
-    the complete body keeps these checks about the fallback chain itself.
-    """
-    idx = src.find("async function newSession(flash, options={}){")
-    assert idx != -1, "newSession() must be defined in static/sessions.js"
-    open_brace = src.index("{", src.index(")", idx))
-    depth = 0
-    for end in range(open_brace, len(src)):
-        if src[end] == "{":
-            depth += 1
-        elif src[end] == "}":
-            depth -= 1
-            if depth == 0:
-                return src[idx:end + 1]
-    raise AssertionError("newSession() body did not close")
-
-
 # ---------------------------------------------------------------------------
 # Client-side: source-shape check that the fallback is wired in newSession().
 # ---------------------------------------------------------------------------
@@ -72,7 +51,9 @@ class TestClientFallbackSourceShape:
 
     def test_active_provider_fallback_present(self):
         src = _read("static/sessions.js")
-        body = _new_session_body(src)
+        idx = src.find("async function newSession(flash, options={}){")
+        assert idx != -1
+        body = src[idx:idx + 6000]
         assert "window._activeProvider" in body, (
             "newSession() must consult window._activeProvider when the dropdown "
             "did not yield a truthy model_provider (cold boot, empty "
@@ -81,7 +62,8 @@ class TestClientFallbackSourceShape:
 
     def test_previous_session_fallback_present(self):
         src = _read("static/sessions.js")
-        body = _new_session_body(src)
+        idx = src.find("async function newSession(flash, options={}){")
+        body = src[idx:idx + 6000]
         assert "S.session&&S.session.model_provider" in body, (
             "newSession() must fall back to the previous session's "
             "model_provider when neither the dropdown nor window._activeProvider "
@@ -91,10 +73,8 @@ class TestClientFallbackSourceShape:
     def test_fallback_chain_order(self):
         """Fallback order: explicit > _activeProvider > prev-session > null."""
         src = _read("static/sessions.js")
-        # Anchor on the fallback chain: the configured-default branch above it
-        # legitimately names window._activeProvider as the configured route.
-        body = _new_session_body(src)
-        body = body[body.index("if(newModelState&&newModelState.model){"):]
+        idx = src.find("async function newSession(flash, options={}){")
+        body = src[idx:idx + 6000]
         explicit = body.find("newModelState.model_provider")
         active = body.find("window._activeProvider")
         prev = body.find("S.session&&S.session.model_provider")
@@ -108,7 +88,11 @@ class TestClientFallbackSourceShape:
     def test_issue_referenced_in_source(self):
         """Future readers should be able to trace this back to the issue."""
         src = _read("static/sessions.js")
-        body = _new_session_body(src)
+        idx = src.find("async function newSession(flash, options={}){")
+        # Window covers the model-fallback region of newSession(); the function
+        # has grown over time (e.g. pre-session toolset staging #4490), so keep
+        # the window comfortably larger than the fallback block it guards.
+        body = src[idx:idx + 5000]
         assert "#2518" in body, (
             "newSession()'s fallback comment should reference #2518 so the "
             "follow-up provenance survives future refactors."
@@ -228,7 +212,9 @@ def _provider_assignment_in_new_session() -> str:
     referencing ``reqBody.model_provider`` cannot confuse it.
     """
     src = _read("static/sessions.js")
-    body = _new_session_body(src)
+    idx = src.find("async function newSession(flash, options={}){")
+    assert idx != -1, "newSession() must be defined in static/sessions.js"
+    body = src[idx : idx + 7000]
     guard_start = body.find("const _bareModel")
     assert guard_start != -1, (
         "newSession() must declare a 'const _bareModel' guard for the "

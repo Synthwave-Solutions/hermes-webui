@@ -15,15 +15,9 @@ RESTRICTED='restricted@example.test'
 def client(tmp_path,monkeypatch):
     from api import routes,auth,models,profiles
     from api.governance import loader
-    raw_policy={'version':1,'mode':'enforce','bootstrap_admins':[ADMIN],'roles':{'member':{'grants':{
+    policy=loader.parse_governance_policy({'version':1,'mode':'enforce','bootstrap_admins':[ADMIN],'roles':{'member':{'grants':{
         'permissions':['sessions:read','sessions:write','files:read','files:write','chat:use'],
-        'routes':['/api/*'],'profiles':['writer'],'tools':{'builtins':['read_file','write_file']},'files':{'read_roots':[str(tmp_path/'personal')],'write_roots':[str(tmp_path/'personal')],'denied_globs':['**/.env']}}},'restricted':{'grants':{'permissions':['sessions:read','sessions:write'],'routes':['/api/*'],'profiles':[]}}},'users':{**{x:{'roles':['member']} for x in [OWNER,MEMBER,OUTSIDER]},RESTRICTED:{'roles':['restricted']}}}
-    policy=loader.parse_governance_policy(raw_policy)
-    # The engine re-reads the policy file before every governed action (so a
-    # revocation applies at once); give it the same policy on disk.
-    policy_file=tmp_path/'dashboard-governance.yaml'
-    policy_file.write_text(json.dumps(raw_policy))
-    monkeypatch.setenv('HERMES_WEBUI_GOVERNANCE_POLICY',str(policy_file))
+        'routes':['/api/*'],'profiles':['writer'],'tools':{'builtins':['read_file','write_file']},'files':{'read_roots':[str(tmp_path/'personal')],'write_roots':[str(tmp_path/'personal')],'denied_globs':['**/.env']}}},'restricted':{'grants':{'permissions':['sessions:read','sessions:write'],'routes':['/api/*'],'profiles':[]}}},'users':{**{x:{'roles':['member']} for x in [OWNER,MEMBER,OUTSIDER]},RESTRICTED:{'roles':['restricted']}}})
     loader.set_policy_loader(lambda:policy)
     monkeypatch.setattr(loader,'load_governance_policy',lambda *a,**kw:policy)
     monkeypatch.setattr(auth,'is_auth_enabled',lambda:True)
