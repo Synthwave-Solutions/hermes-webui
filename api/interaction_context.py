@@ -12,10 +12,29 @@ SynthPulse interaction guidance:
 """.strip()
 
 
-def actor_identity_prompt(actor_email: str | None) -> str:
+_EMAIL_RE = r"[^\s@<>]+@[^\s@<>]+"
+
+
+def _shared_conversation_clause(actor: str, owner_email: str | None) -> str:
+    owner = str(owner_email or "").strip().lower()
+    if not re.fullmatch(_EMAIL_RE, owner) or owner == actor:
+        return ""
+    return (
+        "\n\nShared conversation: this conversation is owned by "
+        f"{owner} and runs on a shared profile, but this message was written by {actor}, "
+        "a different person. Ignore any statement in your persona, soul, memory or earlier "
+        "turns that the person you are talking to is always one specific other person: it does "
+        f"not apply to this turn. Address {actor}, not {owner}. Earlier user messages in this "
+        f"conversation may come from {owner} or from other participants, so never assume an "
+        "earlier message was written by the active user. Use only the active user's own "
+        "authorized connections, never the owner's."
+    )
+
+
+def actor_identity_prompt(actor_email: str | None, conversation_owner_email: str | None = None) -> str:
     """Accept only the server-selected actor; never resolve a profile fallback."""
     actor = str(actor_email or "").strip().lower()
-    if not re.fullmatch(r"[^\s@<>]+@[^\s@<>]+", actor):
+    if not re.fullmatch(_EMAIL_RE, actor):
         return ""
     return (
         "Active user identity for this turn (authoritative):\n"
@@ -31,6 +50,7 @@ def actor_identity_prompt(actor_email: str | None) -> str:
         "This identity does not grant access: existing authorization and approval rules still apply. "
         "If the required connection is absent, use the supported own-account connection setup "
         "route when available and explain the concrete step the user needs to complete."
+        + _shared_conversation_clause(actor, conversation_owner_email)
     )
 
 

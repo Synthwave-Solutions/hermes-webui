@@ -740,6 +740,7 @@ def _webui_ephemeral_system_prompt(
     surface_context: Optional[dict] = None,
     config_data: Optional[dict] = None,
     actor_email: Optional[str] = None,
+    conversation_owner_email: Optional[str] = None,
 ) -> str:
     """Build WebUI-only runtime instructions that are not persisted to history."""
     parts = []
@@ -772,7 +773,7 @@ def _webui_ephemeral_system_prompt(
         parts.append(preference_prompt)
     # Identity comes from the authenticated turn sender, never personality,
     # recalled memory or the selected (possibly shared) execution profile.
-    identity_prompt = actor_identity_prompt(actor_email)
+    identity_prompt = actor_identity_prompt(actor_email, conversation_owner_email)
     if identity_prompt:
         parts.append(identity_prompt)
     return "\n\n".join(part for part in parts if part)
@@ -8745,6 +8746,7 @@ def _run_agent_streaming(
                 },
                 config_data=_cfg,
                 actor_email=_turn_principal,
+                conversation_owner_email=getattr(s, 'owner_email', None),
             )
             _pending_started_at = getattr(s, 'pending_started_at', None)
             # Normal chat-start sets pending_started_at before spawning this thread;
