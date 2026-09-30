@@ -8494,6 +8494,8 @@ def _run_agent_streaming(
             if ephemeral:
                 with _run_timing_stage('agent_constructor'):
                     agent = _AIAgent(**_agent_kwargs)
+                    from api.personal_mnemosyne import attach as _attach_personal_memory
+                    agent = _attach_personal_memory(agent, _turn_identity, s, msg_text)
                 logger.debug('[webui] Created ephemeral agent for session %s', session_id)
             else:
                 import hashlib as _hashlib
@@ -8620,6 +8622,8 @@ def _run_agent_streaming(
                 else:
                     with _run_timing_stage('agent_constructor'):
                         agent = _AIAgent(**_agent_kwargs)
+                        from api.personal_mnemosyne import attach as _attach_personal_memory
+                        agent = _attach_personal_memory(agent, _turn_identity, s, msg_text)
                     # Register the new agent with the memory lifecycle so
                     # its commit_memory_session() can be found later.
                     try:
@@ -8822,6 +8826,10 @@ def _run_agent_streaming(
             _agent_msg_text = msg_text
             if _process_notifications:
                 _agent_msg_text = "\n\n".join([*_process_notifications, msg_text]).strip()
+            # Cached agents retain their memory manager, but each sync must save
+            # this person's raw words rather than injected workspace context.
+            if getattr(agent, '_memory_manager', None) is not None:
+                agent._memory_manager.raw_user_content = msg_text
             user_message = _build_native_multimodal_message(workspace_ctx, _agent_msg_text, attachments, workspace, cfg=_cfg)
             _persistent_state_before = _persistent_state_snapshot(_profile_home, str(_personal_root))
             _run_conversation_kwargs = dict(
@@ -9243,6 +9251,8 @@ def _run_agent_streaming(
                             if 'credential_pool' in _agent_params:
                                 _agent_kwargs['credential_pool'] = _heal_rt.get('credential_pool')
                             agent = _AIAgent(**_agent_kwargs)
+                            from api.personal_mnemosyne import attach as _attach_personal_memory
+                            agent = _attach_personal_memory(agent, _turn_identity, s, msg_text)
                             with STREAMS_LOCK:
                                 AGENT_INSTANCES[stream_id] = agent
                             from api.config import SESSION_AGENT_CACHE as _SAC, SESSION_AGENT_CACHE_LOCK as _SAC_L
@@ -10353,6 +10363,8 @@ def _run_agent_streaming(
                     if 'credential_pool' in _agent_params:
                         _heal_kwargs['credential_pool'] = _heal_rt.get('credential_pool')
                     _heal_agent = _AIAgent(**_heal_kwargs)
+                    from api.personal_mnemosyne import attach as _attach_personal_memory
+                    _heal_agent = _attach_personal_memory(_heal_agent, _turn_identity, s, msg_text)
                     with STREAMS_LOCK:
                         AGENT_INSTANCES[stream_id] = _heal_agent
                     from api.config import SESSION_AGENT_CACHE as _SAC2, SESSION_AGENT_CACHE_LOCK as _SAC2_L

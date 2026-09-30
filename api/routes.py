@@ -20704,6 +20704,11 @@ def _handle_memory_read(handler, parsed=None):
         identity = _request_identity(handler)
         sid = parse_qs(parsed.query or "").get("session_id", [""])[0] if parsed else ""
         session = personal_context.session_for(identity, sid)
+        params = parse_qs(parsed.query or "") if parsed else {}
+        if params.get("section", [""])[0] == "mnemosyne":
+            from api import personal_mnemosyne
+            return j(handler, personal_mnemosyne.listing(
+                identity, query=params.get("q", [""])[0], offset=params.get("offset", [0])[0]))
         values = personal_context.read(identity, session)
         paths = personal_context.paths(identity, session)
         shared = personal_context.shared_project_context(identity, session)
@@ -25689,6 +25694,12 @@ def _handle_memory_write(handler, body):
     try:
         identity = _request_identity(handler)
         session = personal_context.session_for(identity, body.get("session_id"))
+        if body.get("section") == "mnemosyne":
+            from api import personal_mnemosyne
+            try:
+                return j(handler, personal_mnemosyne.mutate(identity, body))
+            except personal_mnemosyne.Conflict as exc:
+                return bad(handler, str(exc), 409)
         target = personal_context.write(identity, body.get("section"), body.get("content"), session)
         return j(handler, {"ok": True, "section": body["section"], "path": str(target), "scope": "personal"})
     except PermissionError as exc:

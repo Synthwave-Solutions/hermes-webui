@@ -5858,7 +5858,8 @@ let _memoryData = null;
 let _memoryRequestEpoch = 0;
 let _memoryLoadedContext = null;
 function _memoryContext() {
-  return JSON.stringify([S.session && S.session.session_id || '', S.activeProfile || 'default']);
+  const actor = typeof window !== 'undefined' && window.__GOV_ME__ ? window.__GOV_ME__.email || '' : '';
+  return JSON.stringify([actor, S.session && S.session.session_id || '', S.activeProfile || 'default']);
 }
 let _notesSourcesData = null;
 let _notesSearchResults = [];
@@ -5866,10 +5867,11 @@ let _notesSelectedSource = 'joplin';
 let _notesPreviewNote = null;
 let _notesSearchError = '';
 let _notesSearchLoading = false;
-let _currentMemorySection = null; // 'memory' | 'user' | 'soul' | 'project_context' | 'external_notes'
+let _currentMemorySection = 'mnemosyne'; // 'memory' | 'user' | 'soul' | 'project_context' | 'external_notes'
 let _memoryMode = 'empty'; // 'empty' | 'read' | 'edit'
 
 const MEMORY_SECTIONS = [
+  { key: 'mnemosyne', label: 'Saved memories', iconKey: 'brain', readOnly: true },
   { key: 'memory', labelKey: 'my_notes', emptyKey: 'no_notes_yet', iconKey: 'brain' },
   { key: 'user',   labelKey: 'user_profile', emptyKey: 'no_profile_yet', iconKey: 'user' },
   { key: 'soul', label: 'Personal agent preferences', empty: 'How should agents work with you? This does not change a shared bot persona.', iconKey: 'sparkles' },
@@ -6006,6 +6008,20 @@ function _renderExternalNotesSources() {
 }
 
 function _renderMemoryDetail(section) {
+  if (section === 'mnemosyne') {
+    const body = $('memoryDetailBody');
+    $('memoryDetailTitle').textContent = 'Saved memories';
+    body.style.display = '';
+    $('memoryDetailEmpty').style.display = 'none';
+    _memoryMode = 'read';
+    _setMemoryHeaderButtons('read');
+    window.PersonalMemories.render(body, {
+      api, context: _memoryContext, sessionId: S.session && S.session.session_id || '',
+      active: () => _currentMemorySection === 'mnemosyne',
+      confirm: () => showConfirmDialog({title:'Delete memory?', message:'This memory will no longer be used in future replies. Existing chats stay unchanged.', confirmLabel:'Delete', danger:true, focusCancel:true})
+    });
+    return;
+  }
   if (section === 'external_notes') {
     _renderExternalNotesSources();
     return;
