@@ -899,7 +899,7 @@ def _message_role(message):
 
 
 def _find_top_level_json_key(text, key):
-    """Return the byte offset of a top-level JSON object key, if present."""
+    """Return the character offset of a top-level JSON object key, if present."""
     depth = 0
     i = 0
     n = len(text)
@@ -907,25 +907,16 @@ def _find_top_level_json_key(text, key):
         ch = text[i]
         if ch == '"':
             start = i
-            i += 1
-            escaped = False
-            chars = []
-            while i < n:
-                c = text[i]
-                if escaped:
-                    chars.append(c)
-                    escaped = False
-                elif c == '\\':
-                    escaped = True
-                elif c == '"':
-                    break
-                else:
-                    chars.append(c)
-                i += 1
-            if i >= n:
-                return None
-            if depth == 1 and ''.join(chars) == key:
-                j = i + 1
+            # The stdlib JSON scanner skips long summaries in C instead of
+            # allocating a Python list entry for every character. It also
+            # handles escaped quotes and Unicode escapes correctly.
+            try:
+                value, end = json.decoder.scanstring(text, i + 1)
+            except ValueError:
+                return None  # A chunk may end in the middle of a string.
+            i = end - 1
+            if depth == 1 and value == key:
+                j = end
                 while j < n and text[j] in ' \t\r\n':
                     j += 1
                 if j < n and text[j] == ':':
