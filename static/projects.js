@@ -294,9 +294,10 @@ async function _projCreateSharedAction() {
 // One creation intent survives retries and page refreshes in this tab. The
 // server scopes its reference to the authenticated actor and selected project.
 const _projConversationRequests = new Map();
-function _projStartSharedConversation(projectId) {
+function _projStartSharedConversation(projectId, preferredBot = null) {
   const pid = String(projectId || '');
-  if (_projConversationRequests.has(pid)) return _projConversationRequests.get(pid);
+  const requestScope = JSON.stringify([pid, preferredBot]);
+  if (_projConversationRequests.has(requestScope)) return _projConversationRequests.get(requestScope);
   const generation = typeof _loadSessionGeneration === 'number' ? ++_loadSessionGeneration : null;
   const panel = typeof _currentPanel === 'string' ? _currentPanel : null;
   const stillInPanel = () => panel === null || _currentPanel === panel;
@@ -306,9 +307,13 @@ function _projStartSharedConversation(projectId) {
     if (!project || project.project_id !== pid || !project.collaboration) {
       throw new Error(_projT('project_chat_reload', 'Reload the project before creating a conversation.'));
     }
-    const usable = (project.bot_participants || []).filter(id => !(project.unavailable_bots || []).includes(id));
+    let usable = (project.bot_participants || []).filter(id => !(project.unavailable_bots || []).includes(id));
     if (!usable.length) throw new Error(_projT('project_chat_no_bot', 'No project bot is available to your account. Ask the project owner to assign an available bot.'));
-    const storageKey = 'synthpulse-project-conversation:' + pid;
+    if (preferredBot) {
+      if (!usable.includes(preferredBot)) throw new Error(_projT('project_chat_no_bot', 'The selected bot is not available in this project.'));
+      usable = [preferredBot, ...usable.filter(id => id !== preferredBot)];
+    }
+    const storageKey = 'synthpulse-project-conversation:' + pid + (preferredBot ? ':' + preferredBot : '');
     let requestId;
     try {
       requestId = sessionStorage.getItem(storageKey);
@@ -353,8 +358,8 @@ function _projStartSharedConversation(projectId) {
     if (_projSelectedId === pid) Promise.resolve(_projOpen(pid)).catch(() => {});
     return result.session;
   })();
-  _projConversationRequests.set(pid, operation);
-  operation.finally(() => _projConversationRequests.delete(pid)).catch(() => {});
+  _projConversationRequests.set(requestScope, operation);
+  operation.finally(() => _projConversationRequests.delete(requestScope)).catch(() => {});
   return operation;
 }
 

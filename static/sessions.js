@@ -1550,7 +1550,7 @@ async function newSession(flash, options={}){
   const sharedProject=typeof _allProjects!=='undefined' && _allProjects.find(p=>p.project_id===requestedProject && p.collaboration);
   if(sharedProject && typeof _projStartSharedConversation==='function'){
     _setNewSessionPending(true);
-    _newSessionInFlight=_projStartSharedConversation(sharedProject.project_id);
+    _newSessionInFlight=_projStartSharedConversation(sharedProject.project_id, S.activeProfile || 'default');
     try { return await _newSessionInFlight; }
     catch(error){
       if(typeof showToast==='function') showToast(String(error.message||error));

@@ -278,7 +278,7 @@ def handle(handler, path, body=None, query=None):
                     if not existing.path.exists():
                         existing.save()  # Retry a first save that failed before commit.
                     return {'ok': True, 'replayed': True, 'session': existing.compact()}
-            session = models.new_session(workspace=project['workspace'], profile=project.get('profile'),
+            session = models.new_session(workspace=project['workspace'], profile=bots[0],
                                          project_id=pid, session_id=reserved_id)
             session.owner_email = actor; session.project_shared = True
             session.bot_participants = bots

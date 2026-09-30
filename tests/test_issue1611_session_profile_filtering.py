@@ -209,8 +209,8 @@ def test_static_sessions_js_switches_profile_before_opening_all_profiles_row():
     assert "await _openSidebarSession(childSession, {skipLineageResolve:true});" in src
 
 
-def test_static_all_profiles_toggle_is_persisted_and_not_reset_by_profile_switch():
-    """The all-profiles toggle is a shared navigation preference, not per-profile state."""
+def test_static_bot_selection_resets_persisted_all_profiles_toggle():
+    """Explicit aggregate browsing is available, but selecting a bot restores its scope."""
     from pathlib import Path
 
     repo_root = Path(__file__).parent.parent
@@ -225,7 +225,7 @@ def test_static_all_profiles_toggle_is_persisted_and_not_reset_by_profile_switch
 
     switch_start = panels_src.index("async function switchToProfile(name) {")
     switch_body = panels_src[switch_start:panels_src.index("function openProfileCreate", switch_start)]
-    assert "_showAllProfiles = false" not in switch_body
+    assert "_setShowAllProfiles(false)" in switch_body
 
 
 # ── SHOULD-FIX #2: profile filter must run BEFORE messaging-source dedupe ──

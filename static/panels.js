@@ -7778,7 +7778,13 @@ async function switchToProfile(name) {
   // already on this profile, so paths like activateCurrentProfile() (which
   // doesn't pre-check) can't flash a skeleton→restore for a click that changes
   // nothing. (#4662 Opus gate)
-  if (name && name === S.activeProfile) return true;
+  if (name && name === S.activeProfile) {
+    if (typeof _showAllProfiles !== 'undefined' && _showAllProfiles) {
+      _setShowAllProfiles(false);
+      await renderSessionList({deferWhileInteracting:false});
+    }
+    return true;
+  }
   S._pendingSessionToolsets=null;
   S._pendingChatMode=null;S._pendingParticipants=null;
   // Profile switches are per-client cookie/TLS scoped, so a running stream in
@@ -7965,8 +7971,19 @@ async function switchToProfile(name) {
     }
 
     // ── Session ────────────────────────────────────────────────────────────
-    // Keep the all-profiles sidebar scope sticky across profile switches. It is
-    // a navigation preference shared by the browser session, not a per-profile flag.
+    // Selecting a bot means browsing that bot. Opening a concrete row from
+    // the explicit aggregate view retains that browsing context.
+    if (!_openingExistingSidebarSession) {
+      if (typeof _setShowAllProfiles === 'function') _setShowAllProfiles(false);
+      const selectedProject = typeof _allProjects !== 'undefined' && _allProjects
+        ? _allProjects.find(project => project.project_id === _activeProject) : null;
+      if (selectedProject) {
+        const compatible = selectedProject.collaboration
+          ? (selectedProject.bot_participants || []).includes(targetActiveProfile)
+          : _profileMatchesActiveProfile(selectedProject.profile, targetActiveProfile);
+        if (!compatible && typeof _setActiveProjectFilter === 'function') _setActiveProjectFilter(null);
+      }
+    }
     if (typeof animateNextSessionListRefresh === 'function') animateNextSessionListRefresh();
 
     if (sessionInProgress && _openingExistingSidebarSession) {

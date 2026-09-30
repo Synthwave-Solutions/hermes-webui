@@ -33,3 +33,45 @@ from response text.
 Group uploads use the same authenticated session visibility check as opening the
 chat and recheck current membership. A different process-wide active bot does
 not prevent an authorized participant from attaching a file.
+
+## Chats belong to a bot and a project
+
+Selecting a bot restores the sidebar to that bot's conversations, including when
+“All profiles” was previously enabled. Selecting the already active bot also
+restores that filter. The project chips narrow this bot's list further. A
+project filter is retained when the selected bot can use that project; otherwise
+it is cleared. Existing unassigned chats stay unassigned.
+
+Sharing a conversation or project grants access but does not place that chat in
+every bot's list. The explicit all-profiles view and project hub remain ways to
+browse across bots. Opening a specific chat from that aggregate view retains the
+aggregate browsing context. Group recipient mentions still select who answers
+inside the current group; they do not move that conversation to another bot.
+
+New project conversations persist the selected bot as their primary profile and
+the selected project ID. The sidebar's New Chat flow validates the selected bot
+against the project's currently available bots. Project creation retries are
+separate for each project/bot choice, so retrying does not silently adopt a chat
+created for a different bot.
+
+Older shared project conversations sometimes stored the project's general
+presentation profile instead of a participating bot. Outside isolated-profile
+mode, their sidebar projection uses the first participating bot when the stored
+profile is not a participant. This is a read-only projection, not a migration of
+history, workspace, project membership, or permissions. Isolated-profile mode
+retains the original stored-profile boundary.
+
+Verification: `tests/test_selected_bot_chat_scope.py`,
+`tests/test_project_conversation_creation.py`, and the existing project/scope
+suites exercise server filtering, persisted bot/project identity, current
+membership and retry behavior. `node tests/selected_bot_scope_browser.cjs`
+exercises the actual roster, profile switch and project partitioner against an
+isolated API fixture at 1360px and 390px; it covers selected/already-selected
+bots, failed switches and project retention/clearing. The new regressions fail
+against the previous implementation.
+
+Baseline limitations: the neighboring profile-filter suite has five existing
+failures (default-alias and 404/409 expectations). The old session-new fixture
+has two missing-save failures, and the engine file-scope integration test is
+blocked by `governance_review_unavailable`. These reproduce unchanged before
+this patch; no authorization rule is weakened to make those tests pass.

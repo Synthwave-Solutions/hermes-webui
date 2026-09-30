@@ -118,7 +118,7 @@
         if (!S._bootReady || preparing) return;
         if (contextKey() !== key) { window.refreshChatBots(); return; }
         if (group) { if (!input) return; input.value = address(input.value, p.name); input.dispatchEvent(new Event('input', {bubbles:true})); input.focus(); paint(); }
-        else if (p.name !== S.activeProfile) { button.disabled = true; try { await switchToProfile(p.name); } catch (err) { showToast(err.message); } finally { window.refreshChatBots(); } }
+        else if (p.name !== S.activeProfile || (typeof _showAllProfiles !== 'undefined' && _showAllProfiles)) { button.disabled = true; try { await switchToProfile(p.name); } catch (err) { showToast(err.message); } finally { button.disabled = false; window.refreshChatBots(); } }
       };
       items.appendChild(button);
     }

@@ -5,7 +5,7 @@ function scene(storage=new Map()){
  const x={storage,posts:[],loads:[],switches:[],_loadSessionGeneration:0,_currentPanel:'projects',console,Map,Promise,crypto,
   sessionStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)}};
  x.api=async(url,options)=>{
-  if(url.includes('hub/detail'))return {project:{project_id:'team',collaboration:true,bot_participants:['writer']}};
+  if(url.includes('hub/detail'))return {project:{project_id:'team',collaboration:true,bot_participants:x.bots||['writer']}};
   x.posts.push(JSON.parse(options.body));
   if(x.failure)throw x.failure;
   if(x.blockPost)await new Promise(resolve=>x.finishPost=resolve);
@@ -31,5 +31,12 @@ async function until(predicate){for(let i=0;i<30&&!predicate();i++)await new Pro
   if(navigation==='session')x._loadSessionGeneration++;else x._currentPanel='settings';
   x['finish'+stage]();await p;assert.deepEqual(x.switches,[],stage+' '+navigation+' must keep newer navigation');
  }
- console.log('9 project creation JavaScript scenarios passed');
+ x=scene();x.bots=['writer','reviewer'];await x._projStartSharedConversation('team','reviewer');
+ assert.deepEqual(x.posts[0].bot_participants,['reviewer','writer']);
+ x=scene();await assert.rejects(x._projStartSharedConversation('team','outsider'));assert.equal(x.posts.length,0);
+ x=scene();x.bots=['writer','reviewer'];x.failure=new Error('offline');
+ await assert.rejects(x._projStartSharedConversation('team','writer'));
+ await assert.rejects(x._projStartSharedConversation('team','reviewer'));
+ assert.notEqual(x.posts[0].request_id,x.posts[1].request_id);
+ console.log('12 project creation JavaScript scenarios passed');
 })().catch(error=>{console.error(error);process.exitCode=1});

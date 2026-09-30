@@ -122,8 +122,9 @@ def test_sidebar_builder_reads_once_across_owner_and_other_profile_passes(projec
         active_profile="default", all_profiles=False, show_cli_sessions=False,
         show_previous_messaging_sessions=False, show_cron_sessions=False, owner_scope=ALICE,
     )
-    assert {row["session_id"] for row in payload["sessions"]} == {row["session_id"] for row in source[:40]}
-    assert payload["other_profile_count"] == 0
+    # Membership grants access, but the default bot must not list writer chats.
+    assert payload["sessions"] == []
+    assert payload["other_profile_count"] == 40
     assert len(calls) == 1
 
 

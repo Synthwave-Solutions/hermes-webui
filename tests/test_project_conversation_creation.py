@@ -258,3 +258,16 @@ def test_slow_agent_eviction_does_not_block_other_project_work(client, monkeypat
             release.set()
         assert deleting.result(timeout=5)[0] == 200
     assert not (models.SESSION_DIR / (sid + '.json')).exists()
+
+
+def test_project_chat_belongs_to_its_selected_bot_and_project(client):
+    from api import models
+    project = create(client)
+    status, response = client(MEMBER, '/api/projects/chat', {
+        'project_id': project['project_id'], 'bot_participants': ['writer'], 'request_id': KEY,
+    })
+    assert status == 200, response
+    session = models.Session.load(response['session']['session_id'])
+    assert session.profile == 'writer'
+    assert session.project_id == project['project_id']
+    assert session.project_shared is True

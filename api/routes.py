@@ -2724,15 +2724,25 @@ def _build_session_list_cache_payload(
     # to its own profile, leaving that profile with zero rows for that
     # source. Filter first so the dedupe operates only within the active
     # profile's rows.
+    # Legacy project conversations inherited the project's presentation
+    # profile, which may not be one of their bots. Project only a navigation
+    # owner here; never rewrite persisted conversations while listing them.
+    if not _is_isolated_profile_mode():
+        merged = [
+            {**row, "profile": row["bot_participants"][0]}
+            if row.get("project_shared") and isinstance(row.get("bot_participants"), list)
+            and row["bot_participants"] and isinstance(row["bot_participants"][0], str)
+            and row.get("profile") not in row["bot_participants"] else row
+            for row in merged
+        ]
     diag_stage("profile_scope")
     if all_profiles:
         scoped = merged
         other_profile_count = 0
     else:
-        from api.group_chat import shared_profile_visible
-        scoped = [s for s in merged if _profiles_match(s.get("profile"), active_profile)
-                  or (not _is_isolated_profile_mode() and owner_scope not in (None, 'all')
-                      and (shared_profile_visible(s, owner_scope) or _project_row_access(s) is True))]
+        # Sharing grants access; it does not make a conversation belong to
+        # every bot. The explicit aggregate view remains available above.
+        scoped = [s for s in merged if _profiles_match(s.get("profile"), active_profile)]
         other_profile_count = 0 if _is_isolated_profile_mode() else len(merged) - len(scoped)
     diag_stage("messaging_dedupe")
     archived_scoped = _keep_latest_messaging_session_per_source(
