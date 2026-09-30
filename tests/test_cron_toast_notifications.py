@@ -11,7 +11,7 @@ from types import SimpleNamespace
 
 REPO = Path(__file__).resolve().parents[1]
 PANELS_JS = (REPO / "static" / "panels.js").read_text(encoding="utf-8")
-I18N_JS = (REPO / "static" / "i18n.js").read_text(encoding="utf-8")
+I18N_JS = (REPO / "static" / "i18n" / "en.js").read_text(encoding="utf-8")
 
 
 class _JSONHandler:

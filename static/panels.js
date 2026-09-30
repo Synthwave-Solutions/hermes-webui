@@ -25,6 +25,7 @@ let _skillsData = null; // cached skills list
 let _cronList = null; // cached cron jobs (array)
 let _currentCronDetail = null; // full cron job object
 let _currentCronDetailKey = '';
+const _cronNotificationSaves = new Set();
 let _cronMode = 'empty'; // 'empty' | 'read' | 'create' | 'edit'
 let _cronPreFormDetail = null; // snapshot of prior selection when entering a form
 let _showAllCronProfiles = false;
@@ -1602,6 +1603,50 @@ function _cronAgentPromptCardHtml(job){
       </div>`;
 }
 
+async function toggleCurrentCronNotifications(button){
+  const job = _currentCronDetail;
+  if (!job || job.read_only || _cronMode !== 'read') return;
+  const key = _cronJobKey(job);
+  if (_cronNotificationSaves.has(key)) return;
+  const profile = S.activeProfile || 'default';
+  const enabled = job.toast_notifications === false;
+  _cronNotificationSaves.add(key);
+  button.disabled = true;
+  button.setAttribute('aria-busy', 'true');
+  try {
+    const result = await api('/api/crons/update', {
+      method: 'POST',
+      body: JSON.stringify({job_id: job.id, toast_notifications: enabled}),
+    });
+    if (!result.ok || !result.job) throw new Error(result.error || 'Could not save notifications');
+    // A late response must not change another task or profile's controls.
+    if ((S.activeProfile || 'default') !== profile) return;
+    const saved = result.job.toast_notifications !== false;
+    job.toast_notifications = saved;
+    for (const row of (_cronList || [])) {
+      if (_cronJobKey(row) === key) row.toast_notifications = saved;
+    }
+    if (_currentCronDetail && _currentCronDetailKey === key) {
+      _currentCronDetail.toast_notifications = saved;
+      const current = $('cronDetailNotifications');
+      if (current && _cronMode === 'read') {
+        current.setAttribute('aria-checked', String(saved));
+        current.textContent = t(saved ? 'cron_toast_notifications_enabled' : 'cron_toast_notifications_disabled');
+      }
+    }
+  } catch (error) {
+    showToast((t('error_prefix') || 'Error: ') + error.message);
+  } finally {
+    _cronNotificationSaves.delete(key);
+    button.disabled = false;
+    button.removeAttribute('aria-busy');
+    if ((S.activeProfile || 'default') === profile && _currentCronDetailKey === key) {
+      const current = $('cronDetailNotifications');
+      if (current) current.disabled = !!_currentCronDetail.read_only;
+    }
+  }
+}
+
 function _renderCronDetail(job){
   _disposeCronSkillPicker();
   _currentCronDetail = job;
@@ -1676,7 +1721,8 @@ function _renderCronDetail(job){
         <div class="detail-row"><div class="detail-row-label">${esc(t('cron_mode_label') || 'Mode')}</div><div class="detail-row-value"><span class="detail-badge cron-mode-badge ${isNoAgent ? 'script' : 'agent'}" id="cronJobMode">${esc(cronJobMode)}</span>${modelProvider ? ` <code>${modelProvider}</code>` : ''}</div></div>
         ${showOwnerRow ? `<div class="detail-row"><div class="detail-row-label">Owner profile</div><div class="detail-row-value"><span class="detail-badge active" title="${esc(ownerProfileTitle)}">${esc(ownerProfileLabel)}</span></div></div>` : ''}
         <div class="detail-row"><div class="detail-row-label">${esc(t('cron_profile_label') || 'Profile')}</div><div class="detail-row-value"><span class="detail-badge active" title="${esc(profileTitle)}">${esc(profileLabel)}</span></div></div>
-        <div class="detail-row"><div class="detail-row-label">${esc(t('cron_toast_notifications_label') || 'Completion toasts')}</div><div class="detail-row-value"><span class="detail-badge ${toastNotifications ? 'active' : ''}">${esc(toastNotifications ? (t('cron_toast_notifications_enabled') || 'Enabled') : (t('cron_toast_notifications_disabled') || 'Disabled'))}</span></div></div>
+        <div class="detail-row"><div class="detail-row-label">${esc(t('cron_toast_notifications_label') || 'Completion toasts')}</div><div class="detail-row-value"><button type="button" id="cronDetailNotifications" class="cron-btn cron-notification-toggle" role="switch" aria-checked="${toastNotifications}" aria-label="${esc(t('cron_toast_notifications_label') || 'Notifications')}" aria-describedby="cronDetailNotificationsHint" ${isReadOnly || _cronNotificationSaves.has(_cronJobKey(job)) ? 'disabled' : ''} onclick="toggleCurrentCronNotifications(this)">${esc(toastNotifications ? (t('cron_toast_notifications_enabled') || 'Enabled') : (t('cron_toast_notifications_disabled') || 'Disabled'))}</button></div></div>
+        <div id="cronDetailNotificationsHint" class="detail-form-hint">${esc(t('cron_toast_notifications_hint') || 'Show a pop-up when this task finishes. Task execution and delivery stay unchanged.')}</div>
         ${skillsRow}
         ${lastError}
       </div>
