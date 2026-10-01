@@ -5871,6 +5871,7 @@ let _currentMemorySection = 'mnemosyne'; // 'memory' | 'user' | 'soul' | 'projec
 let _memoryMode = 'empty'; // 'empty' | 'read' | 'edit'
 
 const MEMORY_SECTIONS = [
+  { key: 'company', label: 'Company memory', iconKey: 'building', readOnly: true },
   { key: 'mnemosyne', label: 'Saved memories', iconKey: 'brain', readOnly: true },
   { key: 'memory', labelKey: 'my_notes', emptyKey: 'no_notes_yet', iconKey: 'brain' },
   { key: 'user',   labelKey: 'user_profile', emptyKey: 'no_profile_yet', iconKey: 'user' },
@@ -6008,16 +6009,16 @@ function _renderExternalNotesSources() {
 }
 
 function _renderMemoryDetail(section) {
-  if (section === 'mnemosyne') {
+  if (section === 'mnemosyne' || section === 'company') {
     const body = $('memoryDetailBody');
-    $('memoryDetailTitle').textContent = 'Saved memories';
+    $('memoryDetailTitle').textContent = section === 'company' ? 'Company memory' : 'Saved memories';
     body.style.display = '';
     $('memoryDetailEmpty').style.display = 'none';
     _memoryMode = 'read';
     _setMemoryHeaderButtons('read');
     window.PersonalMemories.render(body, {
-      api, context: _memoryContext, sessionId: S.session && S.session.session_id || '',
-      active: () => _currentMemorySection === 'mnemosyne',
+      api, section, context: _memoryContext, sessionId: section === 'company' ? '' : S.session && S.session.session_id || '',
+      active: () => _currentMemorySection === section,
       confirm: () => showConfirmDialog({title:'Delete memory?', message:'This memory will no longer be used in future replies. Existing chats stay unchanged.', confirmLabel:'Delete', danger:true, focusCancel:true})
     });
     return;
@@ -8241,6 +8242,7 @@ async function loadMemory(force) {
     if (epoch !== _memoryRequestEpoch || context !== _memoryContext()) return;
     _memoryData = data;
     _memoryLoadedContext = context;
+    if (_currentMemorySection === 'company' && !data.company_memory_enabled) _currentMemorySection = 'mnemosyne';
     if (_currentMemorySection === 'shared_project_context' && !data.shared_project_context) _currentMemorySection = null;
     if (_currentMemorySection === 'external_notes' && !data.external_notes_enabled) {
       _currentMemorySection = null;
@@ -8251,6 +8253,7 @@ async function loadMemory(force) {
     if (panel) {
       panel.innerHTML = '';
       for (const s of MEMORY_SECTIONS) {
+        if (s.key === 'company' && !data.company_memory_enabled) continue;
         if (s.key === 'shared_project_context' && !data.shared_project_context) continue;
         if (s.key === 'external_notes' && !_memoryData.external_notes_enabled) continue;
         const el = document.createElement('button');
@@ -8258,7 +8261,7 @@ async function loadMemory(force) {
         el.className = 'side-menu-item';
         if (_currentMemorySection === s.key) el.classList.add('active');
         el.innerHTML = `${li(s.iconKey,16)}<span>${esc(_memorySectionLabel(s))}</span>`;
-        el.title = s.key === 'shared_project_context' ? 'Shared with project members · Read only' : s.key === 'external_notes' ? 'Connected notes sources' : 'Only you';
+        el.title = s.key === 'company' ? 'All agents can use this knowledge · Admin management' : s.key === 'shared_project_context' ? 'Shared with project members · Read only' : s.key === 'external_notes' ? 'Connected notes sources' : 'Only you';
         el.onclick = () => openMemorySection(s.key, el);
         panel.appendChild(el);
       }

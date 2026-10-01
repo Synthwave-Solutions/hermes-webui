@@ -20702,9 +20702,13 @@ def _handle_memory_read(handler, parsed=None):
     from api.governance.enforce import _request_identity
     try:
         identity = _request_identity(handler)
-        sid = parse_qs(parsed.query or "").get("session_id", [""])[0] if parsed else ""
-        session = personal_context.session_for(identity, sid)
         params = parse_qs(parsed.query or "") if parsed else {}
+        if params.get("section", [""])[0] == "company":
+            from api import company_memory
+            return j(handler, company_memory.listing(identity,
+                query=params.get("q", [""])[0], offset=params.get("offset", [0])[0]))
+        sid = params.get("session_id", [""])[0]
+        session = personal_context.session_for(identity, sid)
         if params.get("section", [""])[0] == "mnemosyne":
             from api import personal_mnemosyne
             return j(handler, personal_mnemosyne.listing(
@@ -20716,7 +20720,8 @@ def _handle_memory_read(handler, parsed=None):
         for key, path in paths.items():
             payload[key + "_path"] = str(path)
             payload[key + "_mtime"] = path.stat().st_mtime if path.exists() else None
-        payload.update(scope="personal", legacy_shared_data_preserved=True,
+        from api.company_memory import is_admin as _company_admin
+        payload.update(company_memory_enabled=_company_admin(identity), scope="personal", legacy_shared_data_preserved=True,
                        shared_project_context=_redact_text(shared["content"]),
                        shared_project_context_path=shared["path"],
                        shared_project_context_name=shared["name"],
@@ -25693,6 +25698,13 @@ def _handle_memory_write(handler, body):
     from api.governance.enforce import _request_identity
     try:
         identity = _request_identity(handler)
+        if body.get("section") == "company":
+            from api import company_memory
+            from api.personal_mnemosyne import Conflict
+            try:
+                return j(handler, company_memory.mutate(identity, body))
+            except Conflict as exc:
+                return bad(handler, str(exc), 409)
         session = personal_context.session_for(identity, body.get("session_id"))
         if body.get("section") == "mnemosyne":
             from api import personal_mnemosyne

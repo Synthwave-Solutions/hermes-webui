@@ -3,6 +3,8 @@ window.PersonalMemories = (() => {
   let generation = 0;
   function render(body, options) {
     const context = options.context();
+    const company = options.section === 'company';
+    const section = company ? 'company' : 'mnemosyne';
     const gen = ++generation;
     let request = 0, offset = 0, query = '';
     const root = document.createElement('div');
@@ -15,7 +17,7 @@ window.PersonalMemories = (() => {
       parent.appendChild(element);
       return element;
     };
-    make('p', 'Only you can view and edit these memories. Private chats share your personal memory. Memories from a shared chat are used only in that chat.');
+    make('p', company ? 'All agents can use this company knowledge. Only admins can manage it. Automatic consolidation preserves your edits and keeps deleted topics suppressed.' : 'Only you can view and edit these memories. Private chats share your personal memory. Memories from a shared chat are used only in that chat.');
     const form = make('form');
     form.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px';
     const search = make('input', '', form);
@@ -34,10 +36,16 @@ window.PersonalMemories = (() => {
       const seq = ++request;
       status.textContent = 'Loading memories…'; list.replaceChildren(); prev.disabled = next.disabled = true;
       try {
-        const params = new URLSearchParams({section:'mnemosyne', q:query, offset:String(offset), session_id:options.sessionId});
+        const params = new URLSearchParams({section, q:query, offset:String(offset), session_id:options.sessionId});
         const data = await options.api('/api/memory?' + params);
         if (!live() || seq !== request) return;
         status.textContent = data.total ? `${data.total} saved memories` : 'No saved memories yet. New completed chats will add memories here.';
+        if (company) {
+          const state = data.consolidation || {};
+          status.textContent = `${data.total} company memories · ${state.pending || 0} sources pending`;
+          if (state.last_success) status.textContent += ' · Last consolidated: ' + new Date(state.last_success).toLocaleString();
+          if (state.last_error) status.textContent += ' · Consolidation will retry (' + state.last_error + ')';
+        }
         for (const item of data.items) card(item);
         prev.disabled = offset === 0; next.disabled = offset + data.limit >= data.total;
       } catch (err) {
@@ -47,7 +55,7 @@ window.PersonalMemories = (() => {
     function card(item) {
       const article = make('article', '', list); article.className = 'notes-source-card';
       const meta = make('p', '', article); meta.className = 'memory-detail-mtime';
-      meta.textContent = `${item.scope === 'private' ? 'Private chats' : 'Shared chat only'} · ${new Date(item.timestamp).toLocaleString()}`;
+      meta.textContent = company ? `${item.category} · ${item.sources} sources · ${item.manual ? 'Admin correction protected' : 'Automatically consolidated'}` : `${item.scope === 'private' ? 'Private chats' : 'Shared chat only'} · ${new Date(item.timestamp).toLocaleString()}`;
       const content = make('p', item.content, article); content.style.cssText = 'white-space:pre-wrap;overflow-wrap:anywhere';
       const controls = make('div', '', article); controls.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap';
       const edit = make('button', 'Edit', controls), del = make('button', 'Delete', controls);
@@ -57,7 +65,7 @@ window.PersonalMemories = (() => {
         if (!live()) return false;
         try {
           await options.api('/api/memory/write', {method:'POST', body:JSON.stringify({
-            section:'mnemosyne', session_id:options.sessionId, bank:item.bank, id:item.id,
+            section, session_id:options.sessionId, bank:item.bank, id:item.id,
             revision:item.revision, operation, ...(operation === 'edit' ? {content:value} : {})
           })});
           if (live()) await load();

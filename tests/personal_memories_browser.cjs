@@ -46,6 +46,27 @@ const fs=require('fs'),assert=require('node:assert/strict');
   // A late request from the previously selected chat cannot restore its data.
   await p.evaluate(()=>{options.api=()=>new Promise(resolve=>window.late=resolve);PersonalMemories.render(document.getElementById('memoryDetailBody'),options);current='second';document.getElementById('memoryDetailBody').replaceChildren();late({items,total:items.length,limit:50});});
   assert.equal(await p.locator('#memoryDetailBody').textContent(),'');
-  console.log('PASS personal memories:',width);await p.close();
+  await p.evaluate(()=>{
+   current='company';fail=false;
+   items=[{id:'d'.repeat(32),bank:'company',revision:'c1',scope:'company',category:'process',manual:1,sources:3,content:'Company documentation uses Notion.'}];
+   options.section='company';options.sessionId='';
+   options.api=async(url,opts)=>{
+    if(opts){const b=JSON.parse(opts.body);requests.push(b);items[0].content=b.content;return {ok:true};}
+    if(!url.includes('section=company'))throw Error('Wrong memory section');
+    return {items,total:items.length,limit:50,consolidation:{pending:'40'}};
+   };
+   document.getElementById('memoryDetailTitle').textContent='Company memory';
+   PersonalMemories.render(document.getElementById('memoryDetailBody'),options);
+  });
+  await p.getByRole('status').filter({hasText:'1 company memories'}).waitFor();
+  await p.getByText('process · 3 sources · Admin correction protected').waitFor();
+  assert.equal(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  if(process.env.MEMORY_SCREENSHOTS)await p.screenshot({path:process.env.MEMORY_SCREENSHOTS+'/company-after-'+width+'.png'});
+  await p.getByRole('button',{name:'Edit',exact:true}).click();
+  await p.getByRole('textbox',{name:'Memory content'}).fill('Updated company documentation.');
+  await p.getByRole('button',{name:'Save',exact:true}).click();
+  await p.getByText('Updated company documentation.',{exact:true}).waitFor();
+  assert.equal(await p.evaluate(()=>requests.at(-1).section),'company');
+  console.log('PASS personal + company memories:',width);await p.close();
  }}finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exit(1)});

@@ -146,6 +146,10 @@ def ensure_actor_path(identity, path, session=None):
     """Additional file-API privacy guard; this never grants filesystem access."""
     from api.config import STATE_DIR
     target = Path(path).resolve()
+    company_root = (Path(STATE_DIR) / "company_memory").resolve()
+    if target == company_root or target.is_relative_to(company_root):
+        from api.company_memory import require_admin
+        require_admin(identity)
     private_root = (Path(STATE_DIR) / "personal_context").resolve()
     if target == private_root or private_root.is_relative_to(target):
         raise PermissionError("File access would include private personal context")

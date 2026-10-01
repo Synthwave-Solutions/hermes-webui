@@ -1,0 +1,12 @@
+[Unit]
+Description=Refresh SynthPulse company memory automatically
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=2min
+AccuracySec=15s
+Persistent=true
+Unit=company-memory.service
+
+[Install]
+WantedBy=timers.target
