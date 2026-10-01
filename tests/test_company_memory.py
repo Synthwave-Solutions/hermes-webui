@@ -35,6 +35,12 @@ with patch.object(loader,'get_policy',return_value=policy):
  # Unsupported or sensitive claims never reach the shared bank.
  assert c.validate_proposals([proposal(quote='Invented unsupported source')],{source['source_id']:source})==[]
  assert c.validate_proposals([proposal(content='My private medical salary information')],{source['source_id']:source})==[]
+ observation=proposal(content='Waargenomen werkwijze: processen worden in Notion vastgelegd.')
+ observation['kind']='observed_practice'
+ assert c.validate_proposals([observation],{source['source_id']:source})==[]
+ second=dict(source,source_id='other-source',origin_actor='another-person',chat='different-chat')
+ observation['evidence'].append({'source_id':'other-source','quote':second['content']})
+ assert len(c.validate_proposals([observation],{source['source_id']:source,'other-source':second}))==1
  assert run(1,extractor=lambda batch,catalog:[proposal()])['updated_topics']==1
  assert 'Notion' in c.recall('Notion')
  # Another person's agent can recall only the shared fact, not the author's

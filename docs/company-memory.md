@@ -22,7 +22,10 @@ or failed responses do not checkpoint their sources and retry next pass. Each
 fact requires an exact supporting quote from the supplied input, an allowed
 business category, company scope and confidence of at least 0.9. The extraction
 prompt excludes private, client-specific, project-specific and sensitive data,
-as well as questions, proposed tasks and speculation. Additional code rejects
+as well as isolated questions, proposed tasks and speculation. Repeated consistent
+business requests can support a qualified observed practice only when at least
+two different people or conversations supply supporting evidence. Such records
+start with “Waargenomen werkwijze:” and are not represented as official policy. Additional code rejects
 sensitive patterns and content altered by credential redaction. As with any
 model-based summary, admins should correct any factual errors they notice.
 

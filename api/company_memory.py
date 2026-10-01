@@ -162,6 +162,13 @@ def validate_proposals(proposals, sources):
                 valid.append(source)
         if not valid:
             continue
+        kind = proposal.get('kind', 'stated_fact')
+        if kind not in ('stated_fact', 'observed_practice'):
+            continue
+        if kind == 'observed_practice':
+            origins = {(s.get('origin_actor'),s.get('chat')) for s in valid if s.get('origin_actor')}
+            if len(origins) < 2 or not content.startswith('Waargenomen werkwijze:'):
+                continue
         clean = personal._content(content)
         if clean != content:
             continue
