@@ -21679,7 +21679,7 @@ def start_session_turn(
         model=model,
         model_provider=model_provider,
         normalized_model=normalized_model,
-        source="process_wakeup",
+        source="bot_delegation" if continuation_kwargs and authority.get("bot_delegation") else "process_wakeup",
         route="start_session_turn",
         **continuation_kwargs,
     )

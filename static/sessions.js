@@ -2854,10 +2854,10 @@ function _setSessionSourceFilter(filter) {
 }
 
 function _restoreSessionSourceFilter() {
-  try {
-    const raw = localStorage.getItem('hermes-session-source-filter');
-    if (raw === 'cli' || raw === 'webui') _sessionSourceFilter = raw;
-  } catch (_e) {}
+  // The chat sidebar no longer exposes a CLI source switch. Clear the old
+  // preference so returning users always land in their WebUI conversations.
+  _sessionSourceFilter = 'webui';
+  try { localStorage.removeItem('hermes-session-source-filter'); } catch (_e) {}
 }
 
 function _normalizeMessageForCliImportComparison(message) {
@@ -7935,18 +7935,6 @@ function renderSessionListFromCache(){
   const referenceRaw=_sessionSourceFilter==='cli'?cliReferenceRaw:webuiReferenceRaw;
   const isCliView=_sessionSourceFilter==='cli';
   const sessions=_renderSidebarRowsFromRawSessions(sessionsRaw, [...referenceRaw, ..._scopedSidebarReferenceRows(isCliView)]);
-  // Server-provided source bucket counts are authoritative for the current
-  // payload. When present, skip the expensive cross-bucket render/count pass;
-  // null is a deliberate "not computed" sentinel consumed only by
-  // _sessionSourceTabCount's fallback path below.
-  const renderedWebuiSessionCount=_serverWebuiSessionCount===null
-    ? _renderSidebarRowsFromRawSessions(webuiSessionsRaw, [...webuiReferenceRaw, ..._scopedSidebarReferenceRows(false)]).length
-    : null;
-  const renderedCliSessionCount=_serverCliSessionCount===null
-    ? _renderSidebarRowsFromRawSessions(cliSessionsRaw, [...cliReferenceRaw, ..._scopedSidebarReferenceRows(true)]).length
-    : null;
-  const webuiSessionTabCount=_sessionSourceTabCount('webui', renderedWebuiSessionCount, renderedCliSessionCount);
-  const cliSessionTabCount=_sessionSourceTabCount('cli', renderedWebuiSessionCount, renderedCliSessionCount);
   _syncSidebarExpansionForActiveSession(sessions, activeSidForSidebar);
   const list=$('sessionList');
   const animateRefresh=_sessionListRefreshAnimationPending;
@@ -7987,21 +7975,6 @@ function renderSessionListFromCache(){
   if(_sessionListLoadError){
     const note=_renderSessionListLoadErrorNote();
     if(note) list.appendChild(note);
-  }
-  if(window._showCliSessions || cliSessionCount>0){
-    const sourceTabs=document.createElement('div');
-    sourceTabs.className='session-source-tabs';
-    for(const filter of ['webui','cli']){
-      const count=filter==='cli'?cliSessionTabCount:webuiSessionTabCount;
-      const btn=document.createElement('button');
-      btn.type='button';
-      btn.className='session-source-tab'+(_sessionSourceFilter===filter?' active':'');
-      btn.textContent=_sessionSourceLabel(filter,count);
-      btn.setAttribute('aria-pressed', _sessionSourceFilter===filter?'true':'false');
-      btn.onclick=()=>_setSessionSourceFilter(filter);
-      sourceTabs.appendChild(btn);
-    }
-    list.appendChild(sourceTabs);
   }
   // Project filter bar — show when there are real projects OR there are
   // unassigned sessions (so the Unassigned chip has something to filter to).
@@ -8100,8 +8073,25 @@ function renderSessionListFromCache(){
     addBtn.title='New project';
     addBtn.onclick=(e)=>{e.stopPropagation();_startProjectCreate(bar,addBtn);};
     bar.appendChild(addBtn);
-    list.appendChild(bar);
+    const section=document.createElement('details');
+    section.className='sidebar-projects-section';
+    const preferenceKey='synpulse:sidebar-projects-collapsed:'+String((window.__GOV_ME__||{}).email||'local');
+    let collapsed=false;
+    try{collapsed=localStorage.getItem(preferenceKey)==='1';}catch(_){}
+    section.open=!collapsed;
+    const heading=document.createElement('summary');
+    heading.className='sidebar-projects-heading';
+    const title=document.createElement('span');
+    title.dataset.i18n='tab_projects';
+    title.textContent=t('tab_projects');
+    heading.appendChild(title);
+    section.append(heading,bar);
+    section.addEventListener('toggle',()=>{
+      try{localStorage.setItem(preferenceKey,section.open?'0':'1');}catch(_){}
+    });
+    list.appendChild(section);
   }
+  if(typeof mountSidebarBots==='function') mountSidebarBots(list);
   // Profile filter toggle (show sessions from other profiles).
   // Cross-profile rows live SERVER-SIDE behind ?all_profiles=1, so the toggle
   // must trigger a refetch — there's no client-cached aggregate to slice through.

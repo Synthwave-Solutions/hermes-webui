@@ -90,6 +90,28 @@ class Handler(BaseHTTPRequestHandler):
             rules=str(review.get('administrator_rules',''))
             review_decision='approve' if 'QA_ALLOW_ONLY' in rules else 'deny' if 'QA_DENY_ONLY' in rules else 'manual'
             answer=json.dumps({'decision':review_decision,'reason':'Deterministic QA review for this synthetic action.','confidence':.99})
+        elif 'QA_BOT_HANDOFF_RECEIVER' in last:
+            valid_profile = 'QA_BOT_RESEARCH' in system_text
+            valid_history = any('QA_BOT_HANDOFF_START' in str(m.get('content', '')) for m in messages)
+            answer = 'QA_BOT_HANDOFF_DONE' if valid_profile and valid_history else 'QA_BOT_HANDOFF_CONTEXT_ERROR'
+        elif 'QA_BOT_HANDOFF_START' in last:
+            results = [m.get('content', '') for m in messages[last_index+1:] if m.get('role') == 'tool']
+            if data.get('tools') and ('Bot team directory for this turn' not in system_text or 'Research bot for QA' not in system_text):
+                answer = 'QA_BOT_AWARENESS_MISSING'
+            elif results:
+                answer = 'QA_BOT_HANDOFF_QUEUED: ' + str(results[-1])
+            elif 'delegate_to_bot' in json.dumps(data.get('tools', [])):
+                direct = any(t.get('function', {}).get('name') == 'delegate_to_bot' for t in data.get('tools', []))
+                arguments = {'action': 'delegate', 'bot': 'qa-research',
+                             'task': 'QA_BOT_HANDOFF_RECEIVER: report a short result here.'}
+                if not direct:
+                    arguments = {'name': 'delegate_to_bot', 'arguments': arguments}
+                tool_calls = [{'id': 'qa-bot-handoff-' + str(time.time_ns()), 'type': 'function',
+                    'function': {'name': 'delegate_to_bot' if direct else 'tool_call',
+                                 'arguments': json.dumps(arguments)}}]
+                answer = ''
+            else:
+                answer = 'QA_BOT_HANDOFF_TOOL_MISSING: ' + json.dumps([t.get('function', {}).get('name') for t in data.get('tools', [])])
         elif clarify_origin and any(tool.get('function', {}).get('name') == 'clarify' for tool in data.get('tools', [])):
             clarify_marker = clarify_origin.split('QA_CLARIFY_FLOW|', 1)[1].splitlines()[0].strip()
             if not re.fullmatch(r'[a-z0-9-]+', clarify_marker):

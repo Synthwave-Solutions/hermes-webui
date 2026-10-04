@@ -843,3 +843,41 @@ Configurable assistant display name, thinking/reasoning block display, and a log
 ```
 git@github.com:nesquena/hermes-webui.git
 ```
+
+### SynthPulse chat navigation
+
+The chat sidebar has collapsible **Projects** and **Bots** sections. Each remembers
+its expanded state per signed-in user. Bots lists the entire authorized catalog,
+including bots outside the current group conversation; selecting one switches
+the active bot directly without opening the Bots management page.
+The WebUI/CLI session buttons are omitted; reload clears an older CLI filter.
+Kanban is omitted from desktop and mobile navigation for every role.
+
+### Bot-to-bot tasks in the same chat
+
+Add both bots to a conversation, use Super mode, and ask the active bot to hand
+a concrete task to another participant. For example: “Ask the research bot to
+check these sources and reply here.” With the `delegation` toolset permitted,
+`delegate_to_bot` lists authorized participants and queues one handoff per turn.
+The tool can also be discovered through the engine's tool-search catalog.
+Each turn receives a fresh directory of the user's accessible bots, with their
+configured descriptions, toolsets and selected skills. Current chat participants
+are distinguished from specialists the user must add first. `action=list` also
+returns participant capability cards. These descriptions are not permission
+grants; private prompts, memories and credentials are never copied into the
+directory. Bots without a description are explicitly marked as unspecified.
+The recipient runs after the sending bot successfully finishes, using its own
+profile/model and the existing conversation history. Its request is labeled
+with the sending and receiving bots; its answer appears in the same chat.
+
+Each handoff retains the initiating human's authority and previous permission
+ceilings, and checks current chat/project membership and bot access again.
+Chains stop after four handoffs. Cancelling or failing the sending turn cancels
+its queued task. A failed start is reported in the chat.
+
+The server owns the dispatcher and stores task states in
+`STATE_DIR/bot-delegations/queue.sqlite3`; conversation messages remain in the
+existing session store. Atomic claims prevent duplicate dispatch. On restart,
+ready tasks resume, but uncertain in-flight tasks are marked interrupted and
+reported rather than replayed. Rollback: wait for active chats to finish, revert
+the delegation changes, and restart the WebUI; retain the queue for diagnosis.

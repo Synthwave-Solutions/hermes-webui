@@ -101,7 +101,7 @@ def main():
             'routes': ['*'], 'files': {'read_roots': [str(workspace)], 'write_roots': [str(workspace)]},
             'workspaces': [str(workspace)], 'models': {'providers': ['*'], 'models': ['*']},
             'skills': {'view': ['*'], 'load': ['*']},
-            'tools': {'toolsets': ['file', 'delegation', 'todo'], 'builtins': ['read_file','write_file','delegate_task','todo']},
+            'tools': {'toolsets': ['file', 'delegation', 'todo'], 'builtins': ['read_file','write_file','delegate_task','delegate_to_bot','todo']},
         }}},
         'users': {u + '@example.test': {'roles': ['member']} for u in users if u not in {'admin', 'denied'}},
     }

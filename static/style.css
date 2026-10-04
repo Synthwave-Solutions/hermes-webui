@@ -8238,3 +8238,22 @@ html[data-nav-audience="member"]:not([data-advanced-chat-controls="1"]) #compose
 .cron-notification-toggle{min-height:44px;min-width:88px;}
 .cron-notification-toggle[aria-checked="true"]{color:var(--text);border-color:var(--accent);}
 .cron-notification-toggle:disabled{opacity:.55;cursor:default;}
+
+.sidebar-projects-section{flex-shrink:0;margin:0 0 8px;}
+.sidebar-projects-heading{display:flex;align-items:center;gap:8px;min-height:44px;padding:10px 12px;color:var(--text);font-size:13px;font-weight:600;cursor:pointer;list-style:none;box-sizing:border-box;}
+.sidebar-projects-heading::-webkit-details-marker{display:none;}
+.sidebar-projects-heading::before{content:'›';font-size:18px;line-height:1;transition:transform .15s;}
+.sidebar-projects-section[open]>.sidebar-projects-heading::before,.sidebar-bots-section[open]>.sidebar-projects-heading::before{transform:rotate(90deg);}
+.sidebar-projects-heading:hover{background:var(--hover-bg);}
+.sidebar-projects-heading:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;}
+
+.sidebar-bots-section{flex-shrink:0;margin:0 0 8px;}
+.sidebar-bot-items{display:flex;flex-direction:column;gap:4px;padding:0 10px 8px;}
+.sidebar-bot-item{display:flex;align-items:center;gap:8px;width:100%;min-height:44px;padding:6px 10px;border:1px solid transparent;border-radius:8px;background:transparent;color:var(--text);font:inherit;font-size:13px;text-align:left;cursor:pointer;box-sizing:border-box;}
+.sidebar-bot-item:hover{background:var(--hover-bg);}
+.sidebar-bot-item[aria-pressed="true"]{background:var(--accent-bg);border-color:var(--border2);color:var(--accent-text);font-weight:600;}
+.sidebar-bot-item:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;}
+.sidebar-bot-item:disabled{opacity:.6;cursor:wait;}
+.sidebar-bot-item svg,.sidebar-bot-item img{width:28px;height:28px;flex-shrink:0;margin-right:0!important;}
+.sidebar-bot-item span{min-width:0;overflow-wrap:anywhere;}
+.sidebar-bots-state{padding:8px 10px;color:var(--muted);font-size:12px;}

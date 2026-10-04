@@ -690,6 +690,13 @@ def main() -> None:
         print(f'[!!] WARNING: cache pre-warm failed to start: {e}', flush=True)
 
     try:
+        from api.bot_delegation import start_dispatcher
+        start_dispatcher()
+    except Exception:
+        import logging as _bot_logging
+        _bot_logging.getLogger(__name__).exception('Bot handoff dispatcher could not start')
+
+    try:
         from api.background_process import start_drain_thread
         if start_drain_thread():
             print('[ok] bg_task_complete drain thread started', flush=True)

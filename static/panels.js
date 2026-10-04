@@ -8454,7 +8454,7 @@ window._navAudience = 'member';
 window._capabilityNavigation = false;
 // Navigation order agreed with Michaël (20 Sep 2026): daily work first, then
 // admin surfaces. Also the default order of the markup in index.html.
-const _MEMBER_NAV_ORDER = ['profiles', 'tasks', 'skills', 'projects', 'memory', 'integrations', 'workspaces', 'kanban', 'files', 'todos', 'insights', 'approvals', 'governance', 'logs'];
+const _MEMBER_NAV_ORDER = ['tasks', 'skills', 'projects', 'profiles', 'memory', 'integrations', 'workspaces', 'files', 'todos', 'insights', 'approvals', 'governance', 'logs'];
 function _canUseFeature(permission){
   const me=window.__GOV_ME__;
   if(!me)return false;

@@ -94,7 +94,58 @@
     if (menuRows.length) input.setAttribute('aria-activedescendant','chatMentionOption-' + menuIndex);
     else { input.removeAttribute('aria-activedescendant'); const empty = document.createElement('span'); empty.textContent = tx('chat_mentions_empty', 'No matching people or bots'); popup.appendChild(empty); }
   }
+  let sidebarSwitchPending = false;
+  window.mountSidebarBots = function (list) {
+    const nav = document.querySelector('.rail .nav-tab[data-panel="profiles"]');
+    if (!nav) return;
+    const section = document.createElement('details');
+    section.id = 'sidebarBots'; section.className = 'sidebar-bots-section'; section.dataset.panel = 'profiles';
+    section.classList.toggle('nav-tab-hidden', nav.classList.contains('nav-tab-hidden'));
+    const pref = 'synpulse:sidebar-bots-collapsed:' + (actor() || 'local');
+    try { section.open = localStorage.getItem(pref) === '0'; } catch (_) {}
+    const heading = document.createElement('summary'); heading.className = 'sidebar-projects-heading';
+    heading.textContent = tx('tab_profiles', 'Bots');
+    const items = document.createElement('div'); items.id = 'sidebarBotItems'; items.className = 'sidebar-bot-items';
+    section.append(heading, items);
+    section.addEventListener('toggle', () => {
+      try { localStorage.setItem(pref, section.open ? '0' : '1'); } catch (_) {}
+    });
+    list.appendChild(section); paintSidebarBots();
+  };
+  function paintSidebarBots() {
+    const items = document.getElementById('sidebarBotItems'); if (!items) return;
+    // The navigation shows the entire authorized catalog, not just the bots
+    // participating in the currently open group conversation.
+    const rows = profiles.filter(p => p && typeof p.name === 'string' && p.visible !== false);
+    const signature = JSON.stringify([actor(), rows, loading, S._bootReady, S.activeProfile, sidebarSwitchPending]);
+    if (items.dataset.state === signature) return;
+    items.dataset.state = signature; items.replaceChildren();
+    for (const p of rows) {
+      const button = document.createElement('button'); button.type = 'button'; button.className = 'sidebar-bot-item';
+      button.dataset.sidebarBot = p.name; button.setAttribute('aria-pressed', String(S.activeProfile === p.name));
+      button.disabled = loading || !S._bootReady || sidebarSwitchPending;
+      button.innerHTML = botAvatarHtml(p);
+      const label = document.createElement('span'); label.textContent = botDisplayName(p); button.appendChild(label);
+      button.onclick = async () => {
+        if (loading || !S._bootReady || sidebarSwitchPending) return;
+        sidebarSwitchPending = true; paintSidebarBots();
+        try { await switchToProfile(p.name); }
+        catch (error) { showToast(error.message); }
+        finally { sidebarSwitchPending = false; window.refreshChatBots(); paintSidebarBots(); }
+      };
+      items.appendChild(button);
+    }
+    if (!rows.length) {
+      const state = document.createElement('span'); state.className = 'sidebar-bots-state'; state.setAttribute('role', 'status');
+      state.textContent = loading ? tx('chat_bots_loading', 'Loading bots…') : tx('chat_bots_unavailable', 'No available bots'); items.appendChild(state);
+    }
+    if (catalogRetry && !loading) {
+      const retryButton = document.createElement('button'); retryButton.type = 'button'; retryButton.className = 'sidebar-bot-item';
+      retryButton.textContent = tx('retry', 'Retry'); retryButton.onclick = () => window.refreshChatBots(); items.appendChild(retryButton);
+    }
+  }
   function paint() {
+    paintSidebarBots();
     const host = document.getElementById('composerWrap');
     if (!host) return;
     let bar = document.getElementById('chatBotRoster');

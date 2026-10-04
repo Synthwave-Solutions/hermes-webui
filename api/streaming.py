@@ -4832,6 +4832,8 @@ def _stamp_group_bot_author(session, msg_text, profile) -> None:
                      and _message_text(messages[i].get('content')).strip() == ' '.join(str(msg_text).split())), None)
     if boundary is None:
         return
+    from api.bot_delegation import stamp_request
+    stamp_request(session, messages[boundary])
     label = profile
     try:
         from api.bot_metadata import read_profile
@@ -4853,6 +4855,11 @@ def _stamp_group_message_author(session, msg_text, sender_email) -> None:
     written once: a turn already carrying an author is left alone, so a replay
     or a self-heal cannot reattribute somebody else's message.
     """
+    from api.bot_delegation import stamp_request
+    messages = getattr(session, "messages", None) or []
+    idx = _find_current_user_turn(messages, msg_text)
+    if idx is not None and stamp_request(session, messages[idx]):
+        return
     author = str(sender_email or "").strip().lower()
     if not author or not getattr(session, "participants", None):
         return
@@ -7158,10 +7165,14 @@ def _run_agent_streaming(
     _metering_thread = threading.Thread(target=_metering_ticker, daemon=True)
     _metering_thread.start()
 
+    _bot_turn_terminal = [None]
+
     def put(event, data):
         # If cancelled, drop all further events except the cancel event itself
         if cancel_event.is_set() and event not in ('cancel', 'error'):
             return
+        if event in ('done', 'cancel', 'error', 'apperror'):
+            _bot_turn_terminal[0] = event
         event_id = None
         if run_journal is not None:
             try:
@@ -7240,6 +7251,7 @@ def _run_agent_streaming(
     _turn_session_identity_tokens = None
     _governance_turn_token = None
     _continuation_turn_tokens = None
+    _bot_delegation_token = None
     _streaming_cron_profile_home_token = None
     _personal_memory_token = None
     _profile_home_context = None
@@ -7357,6 +7369,11 @@ def _run_agent_streaming(
             )
         elif continuation_ref:
             raise PermissionError('Async continuation requires its authenticated initiator')
+        from api import bot_delegation
+        _bot_delegation_token = bot_delegation.bind_turn(
+            s, str(execution_profile or getattr(s, 'profile', None) or 'default'),
+            stream_id, continuation_ref)
+        bot_delegation.register_tool()
         # Conversation chat mode (Michael Ramirez, 28 Aug 2026), read once per
         # turn from the live session object rather than from the sidecar: a
         # brand-new conversation has no sidecar on disk yet (no write until the
@@ -8752,6 +8769,12 @@ def _run_agent_streaming(
                 actor_email=_turn_principal,
                 conversation_owner_email=getattr(s, 'owner_email', None),
             )
+            # Refreshed even for a cached agent; never persist the roster into
+            # SOUL.md, memory, or the shared conversation transcript.
+            _bot_awareness = bot_delegation.awareness_prompt(
+                s, _turn_identity, execution_profile or getattr(s, 'profile', None) or 'default')
+            if _bot_awareness:
+                agent.ephemeral_system_prompt += '\n\n' + _bot_awareness
             _pending_started_at = getattr(s, 'pending_started_at', None)
             # Normal chat-start sets pending_started_at before spawning this thread;
             # fallback to now only for recovered/legacy flows where that marker is absent
@@ -10541,6 +10564,16 @@ def _run_agent_streaming(
             # turn on this thread leaks no grants. Same lifecycle slot as the
             # session-identity restore above.
             from api.governance.continuation import end_turn as end_continuation_turn
+            from api import bot_delegation
+            try:
+                if _bot_delegation_token is not None or continuation_ref:
+                    bot_delegation.finish_turn(
+                        stream_id, _bot_turn_terminal[0] == 'done' and not cancel_event.is_set(),
+                        continuation_ref, s)
+            except Exception:
+                logger.exception('Could not settle bot handoff state')
+            finally:
+                bot_delegation.reset_turn(_bot_delegation_token)
             end_continuation_turn(_continuation_turn_tokens)
             reset_governed_agent_turn(_governance_turn_token)
             try:

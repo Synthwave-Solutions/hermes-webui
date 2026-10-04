@@ -16790,6 +16790,10 @@ function _processWakeupCardHtml(info, rawText, extras){
 function _groupAuthorLineHtml(message){
   try{
     if(typeof S==='undefined'||!S||!S.session) return '';
+    if(message&&message.role==='user'&&message.bot_delegation){
+      const handoff=message.bot_delegation;
+      return `<div class="msg-author"><span class="msg-author-name">${esc(String(handoff.from||''))} → ${esc(String(handoff.to||''))}</span></div>`;
+    }
     const people=S.session.participants;
     if(!Array.isArray(people)||!people.length) return '';
     if(!message||message.role!=='user') return '';
@@ -17238,6 +17242,9 @@ function renderMessages(options){
       _prevSepKey=_key;
     }
     let content=m.content||'';
+    if(m.role==='user'&&m.bot_delegation&&typeof m.bot_delegation.task==='string'){
+      content=m.bot_delegation.task;
+    }
     let thinkingText='';
     let orderedTransparentParts=_transparentStreamOrderedParts(m);
     if(Array.isArray(content)){

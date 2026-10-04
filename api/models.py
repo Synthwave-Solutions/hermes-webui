@@ -6634,6 +6634,8 @@ def _session_messages_have_prefix(messages, prefix) -> bool:
 
 
 _SESSION_MESSAGE_DISPLAY_METADATA_KEYS = (
+    "bot_delegation",
+    "bot_delegation_failure",
     "bot_profile",
     "bot_name",
     "_turnDuration",
