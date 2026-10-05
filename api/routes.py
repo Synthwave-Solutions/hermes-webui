@@ -22480,12 +22480,18 @@ def _selected_profile_snapshot_updates(
 
     try:
         from api.profiles import profile_env_for_background_worker
-        from cron.jobs import _compute_provider_model_snapshots
+        import cron.jobs as cron_jobs
     except Exception:
         logger.warning(
             "Selected-profile cron snapshot repair unavailable; saving ambient snapshots",
             exc_info=True,
         )
+        return {}
+    _compute_provider_model_snapshots = getattr(cron_jobs, "_compute_provider_model_snapshots", None)
+    if _compute_provider_model_snapshots is None:
+        # Newer engines dropped create-time model snapshots: an unpinned job
+        # follows the main agent model of its profile when it fires, so there
+        # is no ambient snapshot to repair.
         return {}
 
     try:

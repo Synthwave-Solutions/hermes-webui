@@ -167,6 +167,29 @@ class NativeWireAgent(TitleAgent):
         return {"max_tokens": value}
 
 
+@pytest.fixture
+def cold_reasoning_catalog(monkeypatch):
+    """Pin the engine's reasoning-capability catalog to "unknown".
+
+    Newer engines consult a process-wide OpenRouter/Nous catalog cache before
+    sending a reasoning disable (a reasoning-mandatory route omits it). Any
+    earlier picker or pricing fetch in the same process warms that cache from
+    the live catalog, so pin it cold to keep these synthetic wire contracts
+    independent of test order and network. No-op on engines without it.
+    """
+    try:
+        from hermes_cli import models_reasoning_caps as caps
+    except ImportError:
+        return
+    for name in ("openrouter_model_reasoning_capabilities", "nous_model_reasoning_capabilities"):
+        if hasattr(caps, name):
+            monkeypatch.setattr(caps, name, lambda *_a, **_k: None)
+    for name in ("warm_openrouter_reasoning_caps_async", "warm_nous_reasoning_caps_async"):
+        if hasattr(caps, name):
+            monkeypatch.setattr(caps, name, lambda *_a, **_k: None)
+
+
+@pytest.mark.usefixtures("cold_reasoning_catalog")
 @pytest.mark.parametrize("provider,model,base_url,api_mode,expected_reasoning", [
     ("custom", "codex/gpt-6-astra", "https://gateway.invalid/v1", "chat_completions", None),
     ("openai", "gpt-5.6", "https://api.openai.com/v1", "chat_completions", None),

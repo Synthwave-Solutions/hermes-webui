@@ -100,8 +100,16 @@ def test_native_late_review_keeps_actor_and_counts_structured_success(activity, 
         finally:
             done.set()
     monkeypatch.setattr(native, "_run_review_in_thread", run_review)
+    # Newer engines split the defer decision (``_spawn_background_review``) from
+    # the spawn itself (``_spawn_background_review_now`` + preempted-review
+    # requeue); carry those real methods onto the stub when the engine has them.
+    stub_type = type("ReviewAgentStub", (SimpleNamespace,), {
+        name: getattr(AIAgent, name)
+        for name in ("_spawn_background_review_now", "_maybe_requeue_preempted_review",
+                     "_REVIEW_REQUEUE_MAX_ATTEMPTS")
+        if hasattr(AIAgent, name)})
     with activity.turn_scope("a@example.test", "run-a", "profile-a", "chat-a"):
-        AIAgent._spawn_background_review(SimpleNamespace(), [], review_skills=True)
+        AIAgent._spawn_background_review(stub_type(), [], review_skills=True)
         assert started.wait(5)
     with activity.turn_scope("b@example.test", "run-b", "profile-b", "chat-b"):
         release.set()
@@ -189,8 +197,10 @@ def test_actual_native_create_patch_batch_and_failure_observed_without_provider(
     (home / "config.yaml").write_text("{}\n")
     monkeypatch.setenv("HERMES_HOME", str(home))
     # Disable outbound sync transport; tool storage and successful result
-    # generation, autonomous preflight and file guards remain native.
-    monkeypatch.setattr(manager, "_maybe_debounced_sync_push", lambda *args: None)
+    # generation, autonomous preflight and file guards remain native. Newer
+    # engines removed Skill Sync from core, so there is nothing to disable.
+    if hasattr(manager, "_maybe_debounced_sync_push"):
+        monkeypatch.setattr(manager, "_maybe_debounced_sync_push", lambda *args: None)
     monkeypatch.setattr(manager, "SKILLS_DIR", manager._SKILLS_DIR_AT_IMPORT)
     token = hermes_constants.set_hermes_home_override(home)
     origin = skill_provenance.set_current_write_origin("background_review")

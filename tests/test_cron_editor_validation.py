@@ -17,7 +17,10 @@ def test_invalid_editor_schedule_is_400_and_preserves_existing_job(tmp_path, mon
     monkeypatch.setattr(jobs, 'CRON_DIR', tmp_path / 'cron')
     monkeypatch.setattr(jobs, 'JOBS_FILE', tmp_path / 'cron' / 'jobs.json')
     monkeypatch.setattr(jobs, 'OUTPUT_DIR', tmp_path / 'cron' / 'output')
-    monkeypatch.setattr(jobs, '_compute_provider_model_snapshots', lambda **k: ('qa', 'qa'))
+    # Engines that still snapshot the global model at create time resolve the
+    # provider here; newer ones follow the main model at fire time instead.
+    if hasattr(jobs, '_compute_provider_model_snapshots'):
+        monkeypatch.setattr(jobs, '_compute_provider_model_snapshots', lambda **k: ('qa', 'qa'))
     job = jobs.create_job(prompt='Synthetic editor validation', schedule='every 2h', deliver='local')
     before = jobs.JOBS_FILE.read_bytes()
     handler = SimpleNamespace(status=None, wfile=io.BytesIO())

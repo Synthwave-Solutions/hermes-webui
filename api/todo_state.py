@@ -52,6 +52,10 @@ from typing import Any, Callable, Iterable, Optional, Sequence
 
 logger = logging.getLogger(__name__)
 
+# The engine renamed the tool from ``todo`` to ``todo_list``; accept both so the panel keeps
+# updating on either engine version.
+TODO_TOOL_NAMES = frozenset({"todo", "todo_list"})
+
 
 # Bumped when the on-wire payload shape changes in a non-additive way.
 # Additive fields (e.g. timestamps, tags) keep VERSION at 1.
@@ -249,7 +253,7 @@ def emit_todo_state(
     stream_id: Optional[str],
     source: str = "tool",
 ) -> bool:
-    """Emit a ``todo_state`` SSE event when ``name == 'todo'``.
+    """Emit a ``todo_state`` SSE event for the todo tool (``todo``, renamed ``todo_list`` upstream).
 
     Returns ``True`` if an event was emitted, ``False`` otherwise.
     Always swallows internal errors — emission must never break tool
@@ -257,7 +261,7 @@ def emit_todo_state(
 
     Args:
         put: streaming queue callback; signature ``put(event, data)``.
-        name: tool name from the callback. Skipped when not ``'todo'``.
+        name: tool name from the callback. Skipped unless it is a todo tool name.
         function_result: raw tool result (JSON string or dict).
         session_id: tag so the frontend can filter cross-session events.
         stream_id: tag so SSE replay can dedupe by stream.
@@ -269,7 +273,7 @@ def emit_todo_state(
     before emission (see :func:`_redact_snapshot`); if redaction fails the
     event is dropped (fail-closed) rather than leaking an unredacted payload.
     """
-    if name != "todo":
+    if name not in TODO_TOOL_NAMES:
         return False
     try:
         snapshot = parse_todo_tool_result(function_result)

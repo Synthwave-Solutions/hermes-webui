@@ -50,16 +50,38 @@ class _HealthHandler(http.server.BaseHTTPRequestHandler):
         pass
 
 
+class _TLSHTTPServer(http.server.HTTPServer):
+    """Wraps each accepted connection, like server.py's ``get_request``.
+
+    Wrapping the listening socket instead breaks once an in-process engine
+    import has injected truststore into ``ssl.SSLContext``: truststore's
+    ``wrap_socket`` verifies peer certs right after wrapping, which needs a
+    connected socket.
+    """
+
+    ssl_context: ssl.SSLContext | None = None
+
+    def get_request(self):
+        request, client_address = self.socket.accept()
+        try:
+            return self.ssl_context.wrap_socket(request, server_side=True), client_address
+        except Exception:
+            request.close()
+            raise
+
+
 class _Server:
     """Minimal /health server, optionally TLS-wrapped, on a background thread."""
 
     def __init__(self, cert: str | None = None, key: str | None = None):
         self.port = _free_port()
-        self.httpd = http.server.HTTPServer(("127.0.0.1", self.port), _HealthHandler)
         if cert and key:
+            self.httpd = _TLSHTTPServer(("127.0.0.1", self.port), _HealthHandler)
             ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
             ctx.load_cert_chain(cert, key)
-            self.httpd.socket = ctx.wrap_socket(self.httpd.socket, server_side=True)
+            self.httpd.ssl_context = ctx
+        else:
+            self.httpd = http.server.HTTPServer(("127.0.0.1", self.port), _HealthHandler)
         self.thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)
 
     def __enter__(self):
