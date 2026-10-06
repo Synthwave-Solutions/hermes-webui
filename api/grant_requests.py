@@ -505,6 +505,26 @@ def drop_from_spool(spool_key: str) -> None:
         logger.debug("grant request spool drop failed: %s", exc)
 
 
+def _secret_glob_values(value: str) -> list[str]:
+    """Allow-glob entries for an approved secret path, in the form the engine matches.
+
+    The engine compares absolute paths with fnmatch, so a literal ``~/...`` never
+    matched and a bare directory only matched the directory itself, never the
+    files in it: an approved folder kept raising file_denied_glob (Yaser, IvCB
+    and CCC key folders, 05-10-2026). Expand ``~`` to the real home and add
+    ``<dir>/**`` for a directory (an existing one, or a request ending in ``/``).
+    """
+    import os, pwd
+    raw = value.strip()
+    home = pwd.getpwuid(os.getuid()).pw_dir
+    path = home + raw[1:] if raw == "~" or raw.startswith("~/") else raw
+    is_dir = raw.endswith("/") or os.path.isdir(path)
+    path = path.rstrip("/") or "/"
+    if any(ch in path for ch in "*?["):
+        return [path]
+    return [path, path + "/**"] if is_dir else [path]
+
+
 def apply_grant_to_policy(raw: dict, payload: dict) -> tuple[str, str] | None:
     """Apply an approved grant request to the raw policy document in place.
 
@@ -523,6 +543,9 @@ def apply_grant_to_policy(raw: dict, payload: dict) -> tuple[str, str] | None:
         # allowlist is refused here even when something upstream offered it.
         return None
     section, subkeys = target
+    values = [value]
+    if gkind == "secret_glob":
+        values = _secret_glob_values(value)
     users = raw.setdefault("users", {})
     user = users.get(email)
     if user is None:
@@ -540,9 +563,10 @@ def apply_grant_to_policy(raw: dict, payload: dict) -> tuple[str, str] | None:
         sec = grants.setdefault(section, {})
         for sub in subkeys:
             lst = sec.setdefault(sub, [])
-            if value not in lst:
-                lst.append(value)
-                added.append(f"{section}.{sub}+{value}")
+            for item in values:
+                if item not in lst:
+                    lst.append(item)
+                    added.append(f"{section}.{sub}+{item}")
         # An MCP server grant is useless without a tool allowance.
         if gkind == "mcp":
             tools = sec.setdefault("tools", {})
