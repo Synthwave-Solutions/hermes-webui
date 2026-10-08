@@ -4570,13 +4570,17 @@ def _static_models_catalog_without_live_probes() -> dict:
         canonical_to_raw_provider_key: dict[str, str] = {}
         providers_cfg = _get_providers_cfg()
 
+        configured_model_id_sets: dict[str, set[str]] = {}
+
         def _append_model_id(provider_id: str | None, model_id: object) -> None:
             pid = _canonicalise_provider_id(provider_id)
             mid = str(model_id or "").strip()
             if not pid or not mid:
                 return
             configured_model_ids.setdefault(pid, [])
-            if mid not in configured_model_ids[pid]:
+            seen = configured_model_id_sets.setdefault(pid, set())
+            if mid not in seen:
+                seen.add(mid)
                 configured_model_ids[pid].append(mid)
 
         if active_provider:
@@ -4665,14 +4669,17 @@ def _static_models_catalog_without_live_probes() -> dict:
             detected_providers.add(provider_slug)
 
             configured_ids: list[str] = []
+            configured_seen: set[str] = set()
             model_id = str(entry.get("model") or "").strip()
             if model_id:
                 configured_ids.append(model_id)
+                configured_seen.add(model_id)
             raw_models = entry.get("models")
             if isinstance(raw_models, dict):
                 for key in raw_models:
-                    if isinstance(key, str) and key.strip() and key.strip() not in configured_ids:
+                    if isinstance(key, str) and key.strip() and key.strip() not in configured_seen:
                         configured_ids.append(key.strip())
+                        configured_seen.add(key.strip())
             elif isinstance(raw_models, list):
                 for item in raw_models:
                     if isinstance(item, dict):
@@ -4681,8 +4688,9 @@ def _static_models_catalog_without_live_probes() -> dict:
                         ).strip()
                     else:
                         candidate = str(item or "").strip()
-                    if candidate and candidate not in configured_ids:
+                    if candidate and candidate not in configured_seen:
                         configured_ids.append(candidate)
+                        configured_seen.add(candidate)
 
             for configured_id in configured_ids:
                 label = _get_label_for_model(configured_id, [])
@@ -6603,24 +6611,29 @@ def get_available_models(*, prefer_cache: bool = False, force_refresh: bool = Fa
 
                 # Collect configured model IDs as a fallback/sticky entry after live discovery.
                 _cp_model_ids: list[str] = []
+                _cp_model_seen: set[str] = set()
                 _cp_model = _cp.get("model", "")
                 if _cp_model:
                     _cp_model_ids.append(_cp_model)
+                    _cp_model_seen.add(_cp_model)
                 _cp_models_dict = _cp.get("models")
                 if isinstance(_cp_models_dict, dict):
                     for _m_id in _cp_models_dict:
-                        if isinstance(_m_id, str) and _m_id.strip() and _m_id not in _cp_model_ids:
+                        if isinstance(_m_id, str) and _m_id.strip() and _m_id not in _cp_model_seen:
                             _cp_model_ids.append(_m_id.strip())
+                            _cp_model_seen.add(_m_id.strip())
                 elif isinstance(_cp_models_dict, list):
                     for _item in _cp_models_dict:
                         if isinstance(_item, str):
                             _mid = _item.strip()
-                            if _mid and _mid not in _cp_model_ids:
+                            if _mid and _mid not in _cp_model_seen:
                                 _cp_model_ids.append(_mid)
+                                _cp_model_seen.add(_mid)
                         elif isinstance(_item, dict):
                             _mid = str(_item.get("id") or _item.get("model") or _item.get("name") or "").strip()
-                            if _mid and _mid not in _cp_model_ids:
+                            if _mid and _mid not in _cp_model_seen:
                                 _cp_model_ids.append(_mid)
+                                _cp_model_seen.add(_mid)
 
                 for _cp_model in _cp_model_ids:
                     _dedup_key = f"{_slug}:{_cp_model}" if _slug else _cp_model

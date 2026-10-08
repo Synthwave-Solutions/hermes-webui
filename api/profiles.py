@@ -2187,7 +2187,6 @@ def _build_profile_rows_fast(*, deferred_counts=False, isolated=None, include_sk
         from hermes_cli.profiles import (
             _get_default_hermes_home,
             _get_profiles_root,
-            _read_config_model,
             _check_gateway_running,
             _PROFILE_ID_RE as _UPSTREAM_PROFILE_ID_RE,
         )
@@ -2196,7 +2195,16 @@ def _build_profile_rows_fast(*, deferred_counts=False, isolated=None, include_sk
 
     def _row(home: Path, name: str, is_default: bool) -> dict:
         try:
-            model, provider = _read_config_model(home)
+            from api.config import load_profile_yaml_cached
+
+            model_config = load_profile_yaml_cached(home / "config.yaml").get("model", {})
+            if isinstance(model_config, str):
+                model, provider = model_config, None
+            elif isinstance(model_config, dict):
+                model = model_config.get("default") or model_config.get("model")
+                provider = model_config.get("provider")
+            else:
+                model, provider = None, None
         except Exception:
             model, provider = None, None
         try:

@@ -1680,3 +1680,15 @@ of a full transcript parse on every status or skill-activity poll. A file change
 invalidates the facts; replacements during a read are not cached. Each call
 still compares against the current in-memory transcript and scene state. The
 cache retains at most 128 entries and no message bodies or Session objects.
+
+### Large model catalogs and profile metadata reads
+
+The static and live model catalogs preserve declaration order in lists but use
+companion sets for membership checks, including the static per-provider model
+accumulator. This keeps configured-catalog deduplication linear for gateways
+that advertise thousands of models. The profile picker reads model/provider
+metadata through `load_profile_yaml_cached`, sharing the existing path and
+file-stat keyed raw YAML cache with session preparation. Config edits invalidate
+the parse on the next read; profile paths remain separate, and cached dictionaries
+are copied before use. These optimizations do not change model routing, resource
+authorization, session persistence, or streaming state.
