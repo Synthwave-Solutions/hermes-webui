@@ -144,6 +144,22 @@
       retryButton.textContent = tx('retry', 'Retry'); retryButton.onclick = () => window.refreshChatBots(); items.appendChild(retryButton);
     }
   }
+  function paintDraftState() {
+    const input = document.getElementById('msg');
+    const draft = input ? input.value : '';
+    const mention = /^\s*@([A-Za-z0-9][A-Za-z0-9_-]{0,63})(?=\s|$)/.exec(draft);
+    const group = ((S.session || {}).bot_participants || []).length > 0;
+    const buttons = document.querySelectorAll('#chatBotRosterItems [data-bot]');
+    for (const button of buttons) {
+      const selected = String(group ? (mention ? mention[1] === button.dataset.bot : buttons.length === 1) : S.activeProfile === button.dataset.bot);
+      if (button.getAttribute('aria-pressed') !== selected) button.setAttribute('aria-pressed', selected);
+      const disabled = loading || !S._bootReady || preparing || (!group && !!S.busy);
+      if (button.disabled !== disabled) button.disabled = disabled;
+    }
+    const hint = document.getElementById('chatMentionHint');
+    const hidden = !preparing && !!collapsed() && !/(?:^|\s)@/.test(draft);
+    if (hint && hint.hidden !== hidden) hint.hidden = hidden;
+  }
   function paint() {
     paintSidebarBots();
     const host = document.getElementById('composerWrap');
@@ -161,8 +177,6 @@
     for (const p of rows) {
       const button = document.createElement('button'); button.type = 'button'; button.className = 'chat-bot-recipient'; button.dataset.bot = p.name;
       const input = document.getElementById('msg');
-      const mention = /^\s*@([A-Za-z0-9][A-Za-z0-9_-]{0,63})(?=\s|$)/.exec(input ? input.value : '');
-      button.setAttribute('aria-pressed',String(group ? (mention ? mention[1] === p.name : rows.length === 1) : S.activeProfile === p.name));
       button.title = '@' + p.name; button.disabled = loading || !S._bootReady || preparing || (!group && !!S.busy);
       button.innerHTML = botAvatarHtml(p); const name = document.createElement('span'); name.textContent = botDisplayName(p); button.appendChild(name);
       button.onclick = async () => {
@@ -176,8 +190,7 @@
     if (!rows.length) { const state = document.createElement('span'); state.className = 'chat-bot-roster-state'; state.setAttribute('role','status'); state.textContent = loading ? tx('chat_bots_loading', 'Loading bots…') : tx('chat_bots_unavailable', 'No available bots'); items.appendChild(state); }
     let hint = document.getElementById('chatMentionHint');
     if (!hint) { hint = document.createElement('div'); hint.id = 'chatMentionHint'; hint.className = 'chat-mention-hint'; host.appendChild(hint); }
-    const draft = (document.getElementById('msg') || {}).value || '';
-    hint.hidden = !preparing && !!collapsed() && !/(?:^|\s)@/.test(draft);
+    paintDraftState();
     hint.textContent = preparing ? tx('chat_mentions_preparing', 'Preparing recipients…') : tx('chat_mentions_hint', '@ people: new group from private chat. First @ bot responds.');
   }
   window.refreshChatBots = function () {
@@ -248,7 +261,7 @@
     } catch (error) { showToast(error.message || tx('chat_mentions_error', 'Could not prepare recipients. Your draft is kept.')); return false; }
     finally { preparing = false; input.readOnly = oldReadOnly; paint(); }
   };
-  document.addEventListener('input', event => { if (event.target && event.target.id === 'msg') { menuIndex = 0; paint(); paintMenu(); } });
+  document.addEventListener('input', event => { if (event.target && event.target.id === 'msg') { menuIndex = 0; paintDraftState(); paintMenu(); } });
   document.addEventListener('focusin', event => { if (event.target && event.target.id === 'msg') paintMenu(); });
   document.addEventListener('keydown', event => {
     if (!event.target || event.target.id !== 'msg' || !menuRange || event.isComposing || event.keyCode === 229) return;

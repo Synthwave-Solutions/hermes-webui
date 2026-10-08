@@ -1692,3 +1692,7 @@ file-stat keyed raw YAML cache with session preparation. Config edits invalidate
 the parse on the next read; profile paths remain separate, and cached dictionaries
 are copied before use. These optimizations do not change model routing, resource
 authorization, session persistence, or streaming state.
+
+Composer input events update recipient selection and mention-hint visibility in
+place. The bot roster is rebuilt only on roster or UI state refreshes, preserving
+button identity and avoiding avatar/DOM reconstruction for ordinary keystrokes.
