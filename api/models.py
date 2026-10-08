@@ -3064,6 +3064,48 @@ def _anchor_scene_records_updated_at(session) -> float:
     return latest
 
 
+# Keep only immutable freshness facts, never transcript or Session objects.
+# Key by full path and file identity so same IDs in different stores stay isolated.
+_SESSION_FRESHNESS_FACTS = collections.OrderedDict()
+_SESSION_FRESHNESS_FACTS_LOCK = threading.Lock()
+_SESSION_FRESHNESS_FACTS_MAX = 128
+
+
+def _sidecar_stat_signature(path):
+    st = path.stat()
+    return (st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns, st.st_ctime_ns)
+
+
+def _session_disk_freshness_facts(sid):
+    if not is_safe_session_id(sid):
+        return None
+    path = SESSION_DIR / f'{sid}.json'
+    key = str(path.absolute())
+    signature = _sidecar_stat_signature(path)
+    with _SESSION_FRESHNESS_FACTS_LOCK:
+        entry = _SESSION_FRESHNESS_FACTS.get(key)
+        if entry is not None and entry[0] == signature:
+            _SESSION_FRESHNESS_FACTS.move_to_end(key)
+            return entry[1]
+    metadata = Session.load_metadata_only(sid)
+    if metadata is None:
+        return None
+    facts = (
+        _parse_nonnegative_int(getattr(metadata, '_metadata_message_count', None)),
+        frozenset(_anchor_scene_record_keys(metadata)),
+        _anchor_scene_records_updated_at(metadata),
+    )
+    # A concurrent writer or legacy self-heal may replace the file during read.
+    # Use the observed facts for this call, but never cache them under newer bytes.
+    if _sidecar_stat_signature(path) == signature:
+        with _SESSION_FRESHNESS_FACTS_LOCK:
+            _SESSION_FRESHNESS_FACTS[key] = (signature, facts)
+            _SESSION_FRESHNESS_FACTS.move_to_end(key)
+            while len(_SESSION_FRESHNESS_FACTS) > _SESSION_FRESHNESS_FACTS_MAX:
+                _SESSION_FRESHNESS_FACTS.popitem(last=False)
+    return facts
+
+
 def _cached_session_lags_disk(cached) -> bool:
     """Return True when a cached full session is older than its sidecar.
 
@@ -3079,25 +3121,24 @@ def _cached_session_lags_disk(cached) -> bool:
     if not sid:
         return False
     try:
-        disk_meta = Session.load_metadata_only(sid)
+        facts = _session_disk_freshness_facts(sid)
     except Exception:
         return False
-    if disk_meta is None:
+    if facts is None:
         return False
+    disk_count, disk_scene_keys, disk_scene_updated_at = facts
     cached_count = len(getattr(cached, 'messages', None) or [])
-    disk_count = _parse_nonnegative_int(getattr(disk_meta, '_metadata_message_count', None))
     if disk_count is None:
         disk_count = _lookup_index_message_count(sid)
     if disk_count is not None and disk_count > cached_count:
         return True
     if not getattr(cached, 'active_stream_id', None) and not getattr(cached, 'pending_user_message', None):
         cached_scene_keys = _anchor_scene_record_keys(cached)
-        disk_scene_keys = _anchor_scene_record_keys(disk_meta)
         if disk_scene_keys and not disk_scene_keys.issubset(cached_scene_keys):
             return True
         if (
             disk_scene_keys
-            and _anchor_scene_records_updated_at(disk_meta) > _anchor_scene_records_updated_at(cached)
+            and disk_scene_updated_at > _anchor_scene_records_updated_at(cached)
         ):
             return True
     return False

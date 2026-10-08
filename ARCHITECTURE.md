@@ -1669,3 +1669,14 @@ current conversation membership and emits only fixed prompt guidance through
 `api/interaction_context.py`; this state never grants access or changes approvals,
 profile configuration, or chat ownership. See
 [the scope and persistence contract](docs/interaction-preferences.md).
+
+### Sidecar freshness checks
+
+Repeated cached-session reads retain a bounded set of disk freshness facts
+(message count and scene key/timestamp fingerprint), keyed by the full sidecar
+path and its device, inode, size, nanosecond modification and change times.
+Unchanged large legacy sidecars therefore need only one metadata parse instead
+of a full transcript parse on every status or skill-activity poll. A file change
+invalidates the facts; replacements during a read are not cached. Each call
+still compares against the current in-memory transcript and scene state. The
+cache retains at most 128 entries and no message bodies or Session objects.
