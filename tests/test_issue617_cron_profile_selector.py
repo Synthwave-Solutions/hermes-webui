@@ -102,7 +102,7 @@ def test_cron_create_api_persists_profile_and_returns_it(monkeypatch):
     assert body["ok"] is True
     assert body["job"]["profile"] == "research"
     assert calls[0][0] == "create"
-    assert calls[1] == ("update", "job617", {"profile": "research"})
+    assert calls[1] == ("update", "job617", {"profile": "research", "notify": {"in_app": "all", "delivery": "all"}, "toast_notifications": True})
 
 
 def test_cron_create_api_rejects_unknown_profile_before_persisting(monkeypatch):
@@ -214,10 +214,10 @@ def test_manual_cron_run_uses_execution_profile_but_persists_to_owning_store(mon
 def test_cron_profile_selector_source_hooks_present():
     panels = (REPO / "static" / "panels.js").read_text(encoding="utf-8")
     css = (REPO / "static" / "style.css").read_text(encoding="utf-8")
-    i18n = (REPO / "static" / "i18n.js").read_text(encoding="utf-8")
+    i18n = (REPO / "static" / "i18n" / "en.js").read_text(encoding="utf-8")
 
     assert "async function loadCronProfiles()" in panels
-    assert "api('/api/profiles')" in panels
+    assert "api('/api/profiles?fast=1')" in panels
     assert "id=\"cronFormProfile\"" in panels
     assert "profile: profile" in panels
     assert "job.profile" in panels

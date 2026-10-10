@@ -1,0 +1,33 @@
+import {test,expect,open,api,auth} from './fixtures';
+test.use({user:'alice'});
+async function selectTask(p:any,name:string){const item=p.locator('.cron-item').filter({hasText:name});if(!await item.isVisible())await p.locator('summary').filter({hasText:'Paused'}).click();await item.click();}
+test('task notifications persist and a colleague can mute only their own view',async({page,browser},info)=>{
+ const name='QA notification ownership '+Date.now();await open(page,'tasks');
+ const made=await api(page,'/api/crons/create',{name,prompt:'Synthetic paused notification test',schedule:'0 9 * * *',deliver:'local',enabled:false,category:'Monitoring',shared_with:['bob@example.test']});
+ expect(made.status).toBe(200);const id=made.body.job.id;
+ expect(made.body.job.notify).toEqual({in_app:'failures',delivery:'all'});
+ await page.reload();await page.locator('.rail-btn[data-panel="tasks"]').click();
+ await selectTask(page,name);
+ await page.locator('.cron-notify-meta button').click();
+ await expect(page.locator('#cronPopNotifyInApp')).toHaveValue('failures');
+ await page.locator('#cronPopNotifyInApp').selectOption('quiet');
+ await page.locator('.cron-notify-dialog').getByRole('button',{name:'Save',exact:true}).click();
+ await expect.poll(async()=>((await api(page,'/api/crons')).body.jobs.find((j:any)=>j.id===id)).notify.in_app).toBe('quiet');
+ await page.reload();await page.locator('.rail-btn[data-panel="tasks"]').click();await selectTask(page,name);
+ await page.locator('.cron-notify-meta button').click();await expect(page.locator('#cronPopNotifyInApp')).toHaveValue('quiet');
+ await page.screenshot({path:info.outputPath('notifications-desktop.png')});
+ await page.setViewportSize({width:390,height:844});await page.screenshot({path:info.outputPath('notifications-mobile.png')});
+ await page.locator('.cron-notify-dialog').getByRole('button',{name:'Cancel',exact:true}).click();
+ const bob=await browser.newContext({baseURL:auth.base_url});
+ await bob.route('**/*',r=>['127.0.0.1','localhost'].includes(new URL(r.request().url()).hostname)?r.continue():r.abort());
+ await bob.addCookies([{name:auth.cookie_name,value:auth.cookies.bob,url:auth.base_url,httpOnly:true,sameSite:'Lax'}]);
+ const colleague=await bob.newPage();await open(colleague,'tasks');await selectTask(colleague,name);
+ await expect(colleague.locator('#btnEditTaskDetail')).not.toBeVisible();
+ expect((await api(colleague,'/api/crons/update',{job_id:id,name:'Not permitted'})).status).toBe(403);
+ await colleague.locator('.cron-notify-mute-btn').click();
+ await expect(colleague.locator('.cron-notify-mute-btn')).toHaveText('Unmute for me');
+ const theirs=(await api(colleague,'/api/crons')).body.jobs.find((j:any)=>j.id===id);
+ const own=(await api(page,'/api/crons')).body.jobs.find((j:any)=>j.id===id);
+ expect(theirs.my_notify).toBe('quiet');expect(own.my_notify).toBeNull();expect(own.notify.in_app).toBe('quiet');
+ await bob.close();expect((await api(page,'/api/crons/delete',{job_id:id})).status).toBe(200);
+});

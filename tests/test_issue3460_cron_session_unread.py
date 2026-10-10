@@ -515,6 +515,7 @@ function showToast(...args) {{ toastCalls.push(args); }}
 function t(...args) {{ return args.join('|'); }}
 function updateCronBadge() {{ badgeUpdates += 1; }}
 function _markSessionCompletionUnreadIfBackground(sid, count) {{ markCalls.push([sid, count]); }}
+eval(extractFunc('_cronCompletionFlags'));
 eval(extractFunc('startCronPolling'));
 (async() => {{
   startCronPolling();
@@ -539,4 +540,68 @@ eval(extractFunc('startCronPolling'));
         "markCalls": [["cron_job3460_20260610_070000", 12]],
         "toastCalls": [],
         "badgeUpdates": 1,
+    }
+
+
+def test_cron_polling_follows_per_viewer_flags_for_unread_markers():
+    """Plan 3.1: "Never" keeps the badge and the unread marker without a toast;
+    a successful run under "Only failures" and a silent run mark nothing."""
+    script = f"""
+const fs = require('fs');
+const src = fs.readFileSync({json.dumps(str(PANELS_JS_PATH))}, 'utf8');
+function extractFunc(name) {{
+  const re = new RegExp('function\\\\s+' + name + '\\\\s*\\\\(');
+  const start = src.search(re);
+  if (start < 0) throw new Error(name + ' not found');
+  let i = src.indexOf('{{', start);
+  let depth = 1; i++;
+  while (depth > 0 && i < src.length) {{
+    if (src[i] === '{{') depth++;
+    else if (src[i] === '}}') depth--;
+    i++;
+  }}
+  return src.slice(start, i);
+}}
+let _cronPollSince = 10;
+let _cronPollTimer = null;
+let _cronUnreadCount = 0;
+let _cronPollGeneration = 0;
+const _cronNewJobIds = new Set();
+const markCalls = [];
+const toastCalls = [];
+const desktopCalls = [];
+global.document = {{ hidden: false }};
+global.setInterval = (fn, _ms) => {{ global.__tick = fn; return 1; }};
+async function api(_url) {{
+  return {{ completions: [
+    {{ job_id: 'never', session_id: 'cron_never_1', message_count: 4, name: 'Never', status: 'success', completed_at: 21, toast: false, badge: true, desktop: false, silent: false }},
+    {{ job_id: 'failures', session_id: 'cron_failures_1', message_count: 2, name: 'Only failures', status: 'success', completed_at: 22, toast: false, badge: false, desktop: false, silent: false }},
+    {{ job_id: 'silent', session_id: 'cron_silent_1', message_count: 1, name: 'Monitor', status: 'success', completed_at: 23, toast: true, badge: true, desktop: false, silent: true }},
+    {{ job_id: 'broken', session_id: 'cron_broken_1', message_count: 6, name: 'Broken', status: 'error', completed_at: 24, toast: true, badge: true, desktop: true, silent: false }}
+  ] }};
+}}
+function showToast(...args) {{ toastCalls.push(args[0]); }}
+function sendBrowserNotification(title) {{ desktopCalls.push(title); }}
+function t(...args) {{ return args.join('|'); }}
+function updateCronBadge() {{}}
+function _markSessionCompletionUnreadIfBackground(sid, count) {{ markCalls.push([sid, count]); }}
+eval(extractFunc('_cronCompletionFlags'));
+eval(extractFunc('startCronPolling'));
+(async() => {{
+  startCronPolling();
+  await global.__tick();
+  console.log(JSON.stringify({{ since: _cronPollSince, unreadJobs: Array.from(_cronNewJobIds), markCalls, toastCalls, desktopCalls }}));
+}})().catch(err => {{
+  console.error(err);
+  process.exit(1);
+}});
+"""
+    payload = _run_node(script)
+
+    assert payload == {
+        "since": 24,
+        "unreadJobs": ["never", "broken"],
+        "markCalls": [["cron_never_1", 4], ["cron_broken_1", 6]],
+        "toastCalls": ["cron_completion_status|Broken|status_failed"],
+        "desktopCalls": ["Broken"],
     }

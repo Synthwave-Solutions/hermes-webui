@@ -531,6 +531,15 @@ def test_cron_form_save_payload_still_uses_visible_raw_schedule_only():
     assert "cronFormSchedulePreset" not in save_block
     assert "const schedule=schEl.value.trim();" in save_block
     assert "const updates = {job_id: _editingCronId, schedule, profile: profile, toast_notifications: toastNotifications}" in panels
+    # Plan 3.1: the payload carries the notification levels. toast_notifications
+    # follows "Notify me" for older clients; notify is sent on create and, on an
+    # edit, only when a level changed, never while the backend lacks it.
+    assert "cronFormToastNotifications" not in save_block
+    assert "const notify=_cronNotifyFromControls('cronForm', notifyBase);" in save_block
+    assert "const toastNotifications=_cronLegacyToast(notify.in_app);" in save_block
+    assert "if (_cronNotifySupported && _cronNotifyChanged(notify, notifyBase)) updates.notify = notify;" in save_block
+    assert "const body={schedule,prompt,deliver,profile: profile, toast_notifications: toastNotifications};" in save_block
+    assert "if(_cronNotifySupported) body.notify=notify;" in save_block
 
 
 def test_cron_form_i18n_has_preset_keys():

@@ -650,6 +650,9 @@ def install_cron_scheduler_profile_isolation() -> None:
     if original is None or getattr(original, '_webui_profile_isolated', False):
         return
 
+    from functools import wraps
+
+    @wraps(original)
     def _webui_profile_isolated_run_job(job, *args, **kwargs):
         # Manual WebUI runs already enter cron_profile_context_for_home before
         # calling run_job. Avoid nesting the non-reentrant env lock or changing

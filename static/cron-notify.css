@@ -1,0 +1,42 @@
+/* Scheduled task notification settings (plan 3.1): the "Notifications"
+   fieldset and the "Only send when it fails" checkbox in the task form, the
+   bell chip in the detail meta bar with its popover, the notifications row of
+   the detail card and the muted bell on list rows. Tokens only, so light and
+   dark follow the theme. */
+
+/* Task form */
+.cron-notify-fieldset{border:1px solid var(--border);border-radius:var(--sp-radius,10px);padding:10px 12px 12px;margin:0;min-width:0;}
+.cron-notify-fieldset > legend{font-size:12px;font-weight:600;color:var(--muted);padding:0 4px;letter-spacing:.01em;}
+.cron-notify-field{display:flex;flex-direction:column;gap:6px;}
+.cron-notify-field > label{font-size:12px;font-weight:500;color:var(--muted);letter-spacing:.01em;}
+.cron-notify-field select:disabled{opacity:.7;cursor:not-allowed;}
+.cron-notify-deliver-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;}
+.cron-notify-deliver-row > select{flex:1 1 220px;min-width:0;}
+.detail-form-row label.detail-form-check.cron-notify-failures-only{flex:0 1 auto;white-space:normal;}
+/* .detail-form-check sets display:flex, which would override [hidden]. */
+.cron-notify-failures-only[hidden]{display:none !important;}
+.cron-notify-delivery-off{display:flex;flex-direction:column;gap:6px;flex:1 1 100%;}
+.cron-notify-note{font-size:11px;line-height:1.5;color:var(--muted);}
+.cron-notify-managed{color:var(--text-secondary,var(--muted));}
+
+/* Detail card and meta bar */
+.cron-notify-badges{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+.cron-notify-row .cron-notify-note{margin-top:4px;}
+.detail-badge.cron-notify-muted-badge{display:inline-flex;align-items:center;gap:4px;}
+.cron-notify-chip{display:inline-flex;align-items:center;gap:4px;}
+.cron-notify-chip.is-muted{color:var(--muted);}
+.cron-notify-chip svg,.detail-badge.cron-notify-muted-badge svg{flex-shrink:0;}
+
+/* List row */
+.cron-notify-muted-icon{display:inline-flex;align-items:center;color:var(--muted);flex-shrink:0;}
+
+/* Popover (the category popover's dialog) */
+.cron-notify-dialog .detail-form-row{margin-top:12px;}
+.cron-notify-dialog .detail-form-row .detail-form-hint{margin-top:2px;}
+.cron-notify-dialog .cron-share-actions{flex-wrap:wrap;}
+.cron-notify-dialog .cron-notify-mine{margin-right:auto;}
+
+@media (max-width:640px){
+  .cron-notify-deliver-row > select{flex-basis:100%;}
+  .cron-notify-dialog .cron-notify-mine{margin-right:0;flex:1 1 100%;}
+}

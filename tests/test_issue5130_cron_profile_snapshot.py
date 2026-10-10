@@ -10,6 +10,12 @@ from pathlib import Path
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def _snapshot_test_identity(monkeypatch):
+    from api import ownership
+    monkeypatch.setattr(ownership, "request_owner_email", lambda handler: None)
+
+
 class _JSONHandler:
     def __init__(self):
         self.status = None
@@ -133,7 +139,7 @@ def test_cron_create_recomputes_unpinned_provider_snapshot_under_selected_profil
     assert calls[2] == (
         "update",
         "job5130",
-        {"profile": "research", "provider_snapshot": "openai-codex"},
+        {"profile": "research", "provider_snapshot": "openai-codex", "notify": {"in_app": "all", "delivery": "all"}, "toast_notifications": True},
     )
     assert profile_events == [
         ("enter", "research", "cron create snapshot", True),
@@ -157,7 +163,10 @@ def test_cron_create_with_blank_profile_keeps_ambient_snapshot_semantics(monkeyp
 
     cron_jobs = types.ModuleType("cron.jobs")
     cron_jobs.create_job = lambda **kwargs: calls.append(("create", kwargs)) or dict(created)
-    cron_jobs.update_job = lambda *args, **kwargs: pytest.fail("blank profile should not update the job")
+    def update_job(job_id, updates):
+        assert updates == {"notify": {"in_app": "all", "delivery": "all"}, "toast_notifications": True}
+        return {**created, **updates}
+    cron_jobs.update_job = update_job
     cron_jobs._compute_provider_model_snapshots = (
         lambda **kwargs: pytest.fail("blank profile should not recompute snapshots")
     )
@@ -268,7 +277,7 @@ def test_cron_create_with_explicit_provider_and_model_skips_snapshot_override(mo
                 "provider": "openai-codex",
             },
         ),
-        ("update", "job5130", {"profile": "research"}),
+        ("update", "job5130", {"profile": "research", "notify": {"in_app": "all", "delivery": "all"}, "toast_notifications": True}),
     ]
 
 
@@ -359,7 +368,7 @@ def test_cron_create_with_explicit_provider_recomputes_only_model_snapshot(monke
                 "no_agent": False,
             },
         ),
-        ("update", "job5130", {"profile": "research", "model_snapshot": "gpt-5.5"}),
+        ("update", "job5130", {"profile": "research", "model_snapshot": "gpt-5.5", "notify": {"in_app": "all", "delivery": "all"}, "toast_notifications": True}),
     ]
     assert profile_events == [
         ("enter", "research", "cron create snapshot", True),

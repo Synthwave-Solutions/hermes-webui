@@ -272,7 +272,7 @@ def test_the_interim_reader_is_off_with_a_hub_url_or_outside_hq(env, monkeypatch
     elif case == "no_installation":
         env.set_policy(H.hq_policy())
     else:
-        env.set_policy(H.hq_policy(installation={"kind": "managed"}))
+        env.set_policy(H.hq_policy(installation={"kind": "client"}))
     env.as_user(H.ADA, "Ada Lovelace")
     banks = env.banks()
     assert banks["enabled"] and banks["available"] is False and banks["stores"] == []

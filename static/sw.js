@@ -28,6 +28,8 @@ const SHELL_ASSETS = [
   './static/assistant_turn_anchors.js' + VQ,
   './static/svg_visuals.js' + VQ,
   './static/svg_visuals.css' + VQ,
+  './static/cron-notify.css' + VQ,
+  './static/error-reporter.js' + VQ,
   './static/group-routing.css' + VQ,
   './static/help-content.js' + VQ,
   './static/help-tour.js' + VQ,

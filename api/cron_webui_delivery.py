@@ -36,6 +36,16 @@ fell back to ``local`` because WebUI has no gateway channel) get the run
 output posted. Jobs that deliver to an external platform are not mirrored,
 but an external delivery FAILURE recorded by the engine is posted into the
 originating conversation as an actionable notice.
+
+Per-job notify settings (plan 3.1): the job's ``notify.delivery`` level gates
+every post, as the engine gates its own delivery. ``failures`` mutes the post
+of a successful run, ``off`` mutes every post; a muted run is recorded as
+``suppressed_muted`` and reported as ``muted``. A silent run (``[SILENT]``,
+or a monitor tick with no change) posts nothing, whatever the level. Until
+the engine records muted and silent outcomes itself (its ``mark_job_run``
+taking ``delivery_outcome``), the WebUI's Run now records them in this ledger
+too (``record_run_outcome``), so the Tasks panel shows "Muted" instead of
+"Delivered" for those runs.
 """
 
 from __future__ import annotations
@@ -43,11 +53,14 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import threading
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
+
+from api._notify_policy_fallback import OUTCOME_MUTED as _POLICY_OUTCOME_MUTED
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +106,11 @@ OUTCOME_SILENT = "suppressed_silent"
 OUTCOME_SKIPPED_EXTERNAL = "skipped_external"
 OUTCOME_EXTERNAL_FAILED = "external_delivery_failed"
 OUTCOME_SKIPPED_STALE = "skipped_stale"
+# The job's notify.delivery level muted the run (the engine's own value).
+OUTCOME_MUTED = _POLICY_OUTCOME_MUTED
+
+# Outcomes the WebUI's Run now may record for a run (record_run_outcome).
+RUN_NOW_OUTCOMES = frozenset({OUTCOME_MUTED, OUTCOME_SILENT})
 
 
 # -- Ledger ------------------------------------------------------------------
@@ -257,6 +275,29 @@ def _is_silent_response(text: str) -> bool:
     return lines[0].lower() in _SILENCE_TOKENS or lines[-1].lower() in _SILENCE_TOKENS
 
 
+# A monitor tick whose source did not change writes a run record without a
+# Response section: "**Status:** no_change (agent run suppressed)". Its final
+# response is the engine's silence marker, so it is a silent run.
+_MONITOR_NO_CHANGE_RE = re.compile(r"^\*\*Status:\*\*\s*no_change\b", re.MULTILINE)
+
+
+def _has_response_heading(text: str) -> bool:
+    return any(
+        line.startswith("## Response") or line.startswith("# Response")
+        for line in (text or "").split("\n")
+    )
+
+
+def output_is_silent(text: str) -> bool:
+    """Whether a cron output file records a silent run: its response is a
+    silence token, or it is a monitor tick with no change (no response)."""
+    if text is None:
+        return False
+    if _is_silent_response(_extract_response_body(text)):
+        return True
+    return not _has_response_heading(text) and bool(_MONITOR_NO_CHANGE_RE.search(text))
+
+
 def _extract_response_body(text: str) -> str:
     """Return the agent response from a cron output .md file.
 
@@ -274,16 +315,17 @@ def _extract_response_body(text: str) -> str:
     return body.strip()
 
 
-def _latest_output_response(
-    home: Path, job_id: str, run_dt: Optional[datetime] = None
+def latest_output_text(
+    job_output_dir: Path, run_dt: Optional[datetime] = None
 ) -> str | None:
-    """Read the newest output file's response body for *job_id*, or None.
+    """Read the newest output file in *job_output_dir* (one job's output
+    directory), or None.
 
     When *run_dt* is known, an output file written long before the run is
     rejected so an errored run that produced no file cannot repost an earlier
     run's body.
     """
-    out_dir = Path(home) / "cron" / "output" / str(job_id)
+    out_dir = Path(job_output_dir)
     try:
         files = sorted(out_dir.glob("*.md"), key=lambda f: f.stat().st_mtime, reverse=True)
     except OSError:
@@ -297,7 +339,7 @@ def _latest_output_response(
             except OSError:
                 return None
         try:
-            return _extract_response_body(f.read_text(encoding="utf-8", errors="replace"))
+            return f.read_text(encoding="utf-8", errors="replace")
         except Exception:
             logger.debug("cron delivery bridge: unreadable output file %s", f)
     return None
@@ -481,6 +523,43 @@ def _parse_run_at(value: Any) -> Optional[datetime]:
     return dt
 
 
+parse_run_at = _parse_run_at
+
+
+# -- Notify settings (plan 3.1) ---------------------------------------------
+
+def _notify_policy():
+    """The notify policy without importing the engine from this thread."""
+    try:
+        from api.cron_notifications import notify_policy
+
+        return notify_policy(import_engine=False)
+    except Exception:
+        from api import _notify_policy_fallback
+
+        return _notify_policy_fallback
+
+
+def _notify_mutes(job: dict, *, success: bool) -> bool:
+    """True when the job's ``notify.delivery`` level mutes a post about a
+    run that succeeded (``success``) or failed. Jobs without notify deliver
+    everything, as before."""
+    policy = _notify_policy()
+    status = str(job.get("last_status") or "").strip().lower()
+    alert_kind = status if status in policy.ALERT_KINDS else None
+    try:
+        deliver, _outcome = policy.should_deliver(job, success=success, alert_kind=alert_kind)
+    except Exception:
+        logger.debug("cron delivery bridge: notify policy failed for %s", job.get("id"), exc_info=True)
+        return False
+    return not deliver
+
+
+def _engine_muted(job: dict) -> bool:
+    """The engine recorded that its notify gate muted this run (E1)."""
+    return str(job.get("last_delivery_outcome") or "") == OUTCOME_MUTED
+
+
 def _load_jobs_from_home(home: Path) -> list[dict]:
     """Read cron jobs from *home* without engine imports or cron locks."""
     path = Path(home) / "cron" / "jobs.json"
@@ -548,6 +627,37 @@ def process_jobs_once(
     return actions
 
 
+def record_run_outcome(job: dict, outcome: str, *, error: str | None = None) -> bool:
+    """Record ``outcome`` for the job's latest run (its ``last_run_at``).
+
+    Used by the WebUI's Run now for muted and silent runs while the engine
+    cannot record them itself (plan 3.1). The entry is the run's watermark,
+    so the bridge never posts that run into the originating conversation,
+    and ``delivery_state_for_job`` reports it. A corrupt ledger on disk is
+    left for the bridge tick to rebuild (only the in-memory watermark is
+    set), so this write can never turn a damaged ledger into one that
+    replays the fresh window. Returns True when the entry reached disk.
+    """
+    if outcome not in RUN_NOW_OUTCOMES:
+        raise ValueError(f"unsupported run outcome: {outcome}")
+    job_id = str(job.get("id") or "")
+    if not job_id or not job.get("last_run_at"):
+        return False
+    session_id = _webui_origin_session_id(job)
+    with _ledger_lock:
+        ledger, ledger_corrupt = _load_ledger_state()
+        jobs_map = ledger.setdefault("jobs", {})
+        for jid, entry in _MEMORY_WATERMARKS.items():
+            jobs_map[jid] = dict(entry)
+        if ledger_corrupt:
+            _record_outcome(ledger, job, outcome=outcome, error=error, session_id=session_id)
+            _MEMORY_WATERMARKS[job_id] = dict(ledger["jobs"][job_id])
+            return False
+        return _record_and_persist(
+            ledger, job, outcome=outcome, error=error, session_id=session_id
+        )
+
+
 def _process_one_job(
     job: dict, ledger: dict, home: Path, now_dt: datetime, *,
     ledger_corrupt: bool = False,
@@ -607,25 +717,38 @@ def _process_one_job(
     if not _job_wants_webui_delivery(job):
         engine_delivery_error = job.get("last_delivery_error")
         if run_ok and not engine_delivery_error:
-            # External delivery succeeded; do not duplicate it in the chat.
-            outcome = OUTCOME_SKIPPED_EXTERNAL
+            # External delivery succeeded, or the engine's notify gate muted
+            # it; either way nothing is duplicated into the chat.
+            outcome = OUTCOME_MUTED if _engine_muted(job) else OUTCOME_SKIPPED_EXTERNAL
         elif not run_ok:
-            text = build_update_text(
-                job, body=None, run_ok=False, run_error=job.get("last_error")
-            )
-            outcome = OUTCOME_DELIVERED
+            if _engine_muted(job) or _notify_mutes(job, success=False):
+                outcome = OUTCOME_MUTED
+            else:
+                text = build_update_text(
+                    job, body=None, run_ok=False, run_error=job.get("last_error")
+                )
+                outcome = OUTCOME_DELIVERED
         else:
-            text = build_external_failure_text(job, str(engine_delivery_error))
+            # The engine tried an external delivery and it failed. The
+            # notice counts as a failure alert: only delivery "off" keeps it
+            # out of the conversation, and the failure stays recorded.
             outcome = OUTCOME_EXTERNAL_FAILED
             error = str(engine_delivery_error)
+            if not _notify_mutes(job, success=False):
+                text = build_external_failure_text(job, str(engine_delivery_error))
     else:
         if run_ok:
-            body = _latest_output_response(home, job_id, run_dt)
-            if body is not None and _is_silent_response(body):
+            output = latest_output_text(Path(home) / "cron" / "output" / job_id, run_dt)
+            body = None if output is None else _extract_response_body(output)
+            if output is not None and output_is_silent(output):
                 outcome = OUTCOME_SILENT
+            elif _engine_muted(job) or _notify_mutes(job, success=True):
+                outcome = OUTCOME_MUTED
             else:
                 text = build_update_text(job, body=body, run_ok=True, run_error=None)
                 outcome = OUTCOME_DELIVERED
+        elif _engine_muted(job) or _notify_mutes(job, success=False):
+            outcome = OUTCOME_MUTED
         else:
             text = build_update_text(
                 job, body=None, run_ok=False, run_error=job.get("last_error")
@@ -679,6 +802,9 @@ def delivery_state_for_job(job: dict, ledger: dict | None = None) -> tuple[str, 
     The WebUI ledger is authoritative for WebUI-origin jobs: the engine's own
     delivery attempt for those ALWAYS fails ("unknown platform 'webui'"), so
     its ``last_delivery_error`` is noise once the bridge has delivered.
+
+    ``muted`` means the job's notify delivery level kept the run from being
+    delivered (plan 3.1). Jobs that only save their output stay ``local``.
     """
     if ledger is None:
         ledger = load_ledger()
@@ -697,6 +823,8 @@ def delivery_state_for_job(job: dict, ledger: dict | None = None) -> tuple[str, 
                 return "delivered", None
             if outcome == OUTCOME_SILENT:
                 return "silent", None
+            if outcome == OUTCOME_MUTED:
+                return "muted", None
             if outcome == OUTCOME_SKIPPED_STALE:
                 return "skipped", None
             if outcome == OUTCOME_SKIPPED_EXTERNAL:
@@ -707,10 +835,23 @@ def delivery_state_for_job(job: dict, ledger: dict | None = None) -> tuple[str, 
         # The bridge has not processed this run yet.
         return "pending", None
 
+    local_only = _deliver_tokens(job) in ([], ["local"])
+    if not local_only:
+        # Muted or silent (plan 3.1): a Run now the engine could not record
+        # itself is in the ledger for exactly this run; an engine with the
+        # notify gate records a muted run on the job.
+        if entry and entry.get("run_at") == job.get("last_run_at"):
+            outcome = str(entry.get("outcome") or "")
+            if outcome == OUTCOME_MUTED:
+                return "muted", None
+            if outcome == OUTCOME_SILENT:
+                return "silent", None
+        if _engine_muted(job):
+            return "muted", None
     deliver_error = job.get("last_delivery_error")
     if deliver_error:
         return "failed", str(deliver_error)
-    if _deliver_tokens(job) in ([], ["local"]):
+    if local_only:
         return "local", None
     return "delivered", None
 

@@ -444,3 +444,204 @@ def test_non_webui_origin_jobs_are_ignored(bridge_env):
     assert cwd.process_jobs_once([job], home=bridge_env.home) == []
     ledger = cwd.load_ledger()
     assert "job10" not in ledger["jobs"]
+
+
+# -- Notify settings (plan 3.1, package W1) ----------------------------------
+#
+# The job's notify.delivery level gates every post the bridge makes, as the
+# engine gates its own delivery: "failures" mutes the post of a successful
+# run, "off" mutes every post. A muted run is recorded as suppressed_muted
+# and reported as "muted". Jobs without notify behave as before.
+
+NOTIFY_FAILURES = {"in_app": "all", "delivery": "failures"}
+NOTIFY_OFF = {"in_app": "all", "delivery": "off"}
+
+
+def test_only_send_when_it_fails_mutes_a_successful_run(bridge_env):
+    sid = "cwdmute0001"
+    _write_session(bridge_env, sid)
+    _write_output(bridge_env, "jobm1", "all green, nothing to do")
+    job = _job("jobm1", sid, _now_iso(), notify=NOTIFY_FAILURES)
+
+    actions = cwd.process_jobs_once([job], home=bridge_env.home)
+    assert [a["outcome"] for a in actions] == [cwd.OUTCOME_MUTED]
+    assert cwd.OUTCOME_MUTED == "suppressed_muted"
+    assert len(_read_session(bridge_env, sid)["messages"]) == 1
+    assert cwd.delivery_state_for_job(job) == ("muted", None)
+    # Handled once: the next tick does not post it either.
+    assert cwd.process_jobs_once([job], home=bridge_env.home) == []
+
+
+def test_only_send_when_it_fails_still_delivers_a_failure(bridge_env):
+    sid = "cwdmute0002"
+    _write_session(bridge_env, sid)
+    job = _job("jobm2", sid, _now_iso(), status="error", last_error="boom", notify=NOTIFY_FAILURES)
+
+    actions = cwd.process_jobs_once([job], home=bridge_env.home)
+    assert [a["outcome"] for a in actions] == [cwd.OUTCOME_DELIVERED]
+    assert "boom" in _read_session(bridge_env, sid)["messages"][-1]["content"]
+    assert cwd.delivery_state_for_job(job) == ("delivered", None)
+
+
+def test_delivery_off_mutes_failures_too(bridge_env):
+    sid = "cwdmute0003"
+    _write_session(bridge_env, sid)
+    failed = _job("jobm3", sid, _now_iso(), status="error", last_error="boom", notify=NOTIFY_OFF)
+    external = _job("jobm4", sid, _now_iso(), status="error", last_error="boom",
+                    deliver="telegram:1", notify=NOTIFY_OFF)
+
+    actions = cwd.process_jobs_once([failed, external], home=bridge_env.home)
+    assert [a["outcome"] for a in actions] == [cwd.OUTCOME_MUTED, cwd.OUTCOME_MUTED]
+    assert len(_read_session(bridge_env, sid)["messages"]) == 1
+    assert cwd.delivery_state_for_job(failed) == ("muted", None)
+
+
+def test_external_failure_notice_follows_the_delivery_level(bridge_env):
+    sid = "cwdmute0005"
+    _write_session(bridge_env, sid)
+    failures_only = _job("jobm5", sid, _now_iso(), status="error", last_error="boom",
+                         deliver="telegram:1", notify=NOTIFY_FAILURES)
+    assert [a["outcome"] for a in cwd.process_jobs_once([failures_only], home=bridge_env.home)] == [
+        cwd.OUTCOME_DELIVERED]
+    assert "boom" in _read_session(bridge_env, sid)["messages"][-1]["content"]
+
+    # The engine's delivery failed: with delivery off nothing is posted, but
+    # the failure stays recorded and visible.
+    failed_delivery = _job("jobm6", sid, _now_iso(), deliver="telegram:1", notify=NOTIFY_OFF,
+                           last_delivery_error="telegram said no")
+    actions = cwd.process_jobs_once([failed_delivery], home=bridge_env.home)
+    assert [a["outcome"] for a in actions] == [cwd.OUTCOME_EXTERNAL_FAILED]
+    assert len(_read_session(bridge_env, sid)["messages"]) == 2
+    assert cwd.delivery_state_for_job(failed_delivery) == ("failed", "telegram said no")
+
+
+def test_engine_muted_external_run_is_reported_as_muted(bridge_env):
+    sid = "cwdmute0007"
+    _write_session(bridge_env, sid)
+    job = _job("jobm7", sid, _now_iso(), deliver="telegram:1", notify=NOTIFY_FAILURES,
+               last_delivery_outcome="suppressed_muted")
+
+    actions = cwd.process_jobs_once([job], home=bridge_env.home)
+    assert [a["outcome"] for a in actions] == [cwd.OUTCOME_MUTED]
+    assert cwd.delivery_state_for_job(job) == ("muted", None)
+    # Without the engine's record an external success is not claimed muted:
+    # an engine without the notify gate delivered it.
+    plain = _job("jobm8", sid, _now_iso(), deliver="telegram:1", notify=NOTIFY_FAILURES)
+    assert [a["outcome"] for a in cwd.process_jobs_once([plain], home=bridge_env.home)] == [
+        cwd.OUTCOME_SKIPPED_EXTERNAL]
+
+
+def test_silent_output_wins_over_muted(bridge_env):
+    sid = "cwdmute0009"
+    _write_session(bridge_env, sid)
+    _write_output(bridge_env, "jobm9", "[SILENT]")
+    job = _job("jobm9", sid, _now_iso(), notify=NOTIFY_FAILURES)
+    assert [a["outcome"] for a in cwd.process_jobs_once([job], home=bridge_env.home)] == [cwd.OUTCOME_SILENT]
+
+
+def test_unchanged_monitor_tick_is_silent_and_not_posted(bridge_env):
+    """A monitor tick with no change used to be posted as a run update."""
+    sid = "cwdmonitor1"
+    _write_session(bridge_env, sid)
+    out_dir = bridge_env.home / "cron" / "output" / "jobmon"
+    out_dir.mkdir(parents=True)
+    (out_dir / "tick.md").write_text(
+        "# Cron Job: watch\n\n**Job ID:** jobmon\n**Run Time:** now\n**Mode:** monitor\n"
+        "**Status:** no_change (agent run suppressed)\n",
+        encoding="utf-8",
+    )
+    job = _job("jobmon", sid, _now_iso())
+
+    actions = cwd.process_jobs_once([job], home=bridge_env.home)
+    assert [a["outcome"] for a in actions] == [cwd.OUTCOME_SILENT]
+    assert len(_read_session(bridge_env, sid)["messages"]) == 1
+    assert cwd.delivery_state_for_job(job) == ("silent", None)
+
+
+def test_output_is_silent_only_for_silence_tokens_and_unchanged_monitors():
+    assert cwd.output_is_silent("## Response\n\n[SILENT]\n")
+    assert cwd.output_is_silent("## Response\n\nreport\n\nSILENT\n")
+    assert cwd.output_is_silent("**Mode:** monitor\n**Status:** no_change (agent run suppressed)\n")
+    assert not cwd.output_is_silent("## Response\n\n**Status:** no_change was reported by the source\n")
+    assert not cwd.output_is_silent("**Status:** changed\n")
+    assert not cwd.output_is_silent("")
+    assert not cwd.output_is_silent(None)
+
+
+def test_run_now_muted_record_keeps_the_bridge_from_posting(bridge_env):
+    sid = "cwdmanual01"
+    _write_session(bridge_env, sid)
+    _write_output(bridge_env, "jobrn1", "report from a manual run")
+    job = _job("jobrn1", sid, _now_iso(), notify=NOTIFY_FAILURES)
+
+    assert cwd.record_run_outcome(job, cwd.OUTCOME_MUTED) is True
+    assert cwd.load_ledger()["jobs"]["jobrn1"]["outcome"] == cwd.OUTCOME_MUTED
+    assert cwd.process_jobs_once([job], home=bridge_env.home) == []
+    assert len(_read_session(bridge_env, sid)["messages"]) == 1
+    assert cwd.delivery_state_for_job(job) == ("muted", None)
+
+
+def test_run_now_record_for_other_jobs_reports_muted_and_silent(bridge_env):
+    muted = {"id": "ext1", "deliver": "telegram:1", "last_run_at": _now_iso(), "last_status": "ok"}
+    silent = {"id": "ext2", "deliver": "telegram:1", "last_run_at": _now_iso(), "last_status": "ok"}
+    local = {"id": "ext3", "deliver": "local", "last_run_at": _now_iso(), "last_status": "ok"}
+    for job, outcome in ((muted, cwd.OUTCOME_MUTED), (silent, cwd.OUTCOME_SILENT), (local, cwd.OUTCOME_MUTED)):
+        assert cwd.record_run_outcome(job, outcome) is True
+    assert cwd.delivery_state_for_job(muted) == ("muted", None)
+    assert cwd.delivery_state_for_job(silent) == ("silent", None)
+    # A task that only saves its output stays "local".
+    assert cwd.delivery_state_for_job(local) == ("local", None)
+    # An engine with the notify gate records muted on the job itself.
+    engine = {"id": "ext4", "deliver": "telegram:1", "last_run_at": _now_iso(),
+              "last_delivery_outcome": "suppressed_muted"}
+    assert cwd.delivery_state_for_job(engine) == ("muted", None)
+
+
+def test_run_now_record_rejects_other_outcomes_and_runless_jobs(bridge_env):
+    with pytest.raises(ValueError):
+        cwd.record_run_outcome({"id": "x", "last_run_at": _now_iso()}, cwd.OUTCOME_DELIVERED)
+    assert cwd.record_run_outcome({"id": "x"}, cwd.OUTCOME_MUTED) is False
+    assert cwd.record_run_outcome({"last_run_at": _now_iso()}, cwd.OUTCOME_MUTED) is False
+    assert cwd.load_ledger()["jobs"] == {}
+
+
+def test_run_now_record_never_rewrites_a_corrupt_ledger(bridge_env):
+    sid = "cwdmanual02"
+    _write_session(bridge_env, sid)
+    _write_output(bridge_env, "jobrn2", "fresh run inside the window")
+    fresh = _job("jobrn2", sid, _now_iso())
+    muted = _job("jobrn3", sid, _now_iso(), notify=NOTIFY_FAILURES)
+    ledger_file = bridge_env.state_dir / cwd.LEDGER_FILENAME
+    ledger_file.write_text("{not json", encoding="utf-8")
+
+    assert cwd.record_run_outcome(muted, cwd.OUTCOME_MUTED) is False
+    assert ledger_file.read_text(encoding="utf-8") == "{not json"
+    assert cwd.delivery_state_for_job(muted) == ("muted", None)
+    # The bridge still treats the damaged ledger as damaged: no replay.
+    actions = cwd.process_jobs_once([fresh, muted], home=bridge_env.home)
+    assert [a["outcome"] for a in actions] == [cwd.OUTCOME_SKIPPED_STALE]
+    assert len(_read_session(bridge_env, sid)["messages"]) == 1
+
+
+def test_recent_route_reports_a_muted_webui_run(bridge_env, monkeypatch):
+    sid = "cwdmute0010"
+    _write_session(bridge_env, sid)
+    _write_output(bridge_env, "jobm10", "fine")
+    job = _job("jobm10", sid, _now_iso(), notify=NOTIFY_FAILURES)
+    cwd.process_jobs_once([job], home=bridge_env.home)
+
+    import api.routes as routes
+
+    cron_pkg = types.ModuleType("cron")
+    cron_pkg.__path__ = []
+    cron_jobs = types.ModuleType("cron.jobs")
+    cron_jobs.list_jobs = lambda include_disabled=True: [job]
+    monkeypatch.setitem(sys.modules, "cron", cron_pkg)
+    monkeypatch.setitem(sys.modules, "cron.jobs", cron_jobs)
+    monkeypatch.setattr(routes, "_latest_cron_session_info_for_jobs", lambda job_ids, completed_job_ids=None: {})
+
+    handler = _JSONHandler()
+    routes._handle_cron_recent(handler, SimpleNamespace(query="since=0"))
+    (completion,) = _payload(handler)["completions"]
+    assert completion["delivery_status"] == "muted"
+    assert completion["status"] == "ok"

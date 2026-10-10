@@ -61,6 +61,13 @@ _SELF_ROUTES: frozenset[str] = frozenset({
     # to ASK. The install itself stays gated on an admin decision, and the
     # role's route allowlist still applies (a role without /api/mcp/* or
     # /api/integrations/* in routes cannot reach these at all).
+    "/api/crons/notifications",
+    "/api/client-errors",
+    "/api/org/overview",
+    "/api/org/departments",
+    "/api/org/people",
+    "/api/org/approvals",
+    "/api/org/usage",
     "/api/help/events",
     "/api/mcp/servers/request",
     "/api/mcp/requests",

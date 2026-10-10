@@ -34,7 +34,7 @@ from typing import Any, Iterator
 
 from . import loader
 from .audit import append_audit_event
-from .models import GovernanceSubject
+from .models import GovernanceSubject, is_agent_stripped_permission
 from .resolver import resolve_effective_access
 
 logger = logging.getLogger(__name__)
@@ -81,6 +81,34 @@ def _identity_groups(identity: Any) -> tuple[str, ...]:
     return ()
 
 
+def _without_control_plane(access):
+    """``access`` without granted control-plane permissions (plan 3.6, 3.11).
+
+    Organisation, billing, department, support and bot screen rights belong
+    to the person at the WebUI, never to an agent acting for them, so an
+    agent turn carries none of them: they leave the permissions, the grant
+    set, the role ceiling and the permission sources. ``a2a:`` stays, the
+    engine's own A2A gate needs it. Denies are kept as they are: they only
+    ever narrow, and dropping one could widen an engine that does not yet
+    reserve these namespaces itself.
+    """
+    if access is None:
+        return None
+    from dataclasses import replace
+
+    def keep(values):
+        return frozenset(v for v in values if not is_agent_stripped_permission(v))
+
+    grants = replace(access.grants, permissions=keep(access.grants.permissions))
+    role_ceiling = access.role_ceiling
+    if role_ceiling is not None:
+        role_ceiling = replace(role_ceiling, permissions=keep(role_ceiling.permissions))
+    sources = {name: value for name, value in dict(access.permission_sources or {}).items()
+               if not is_agent_stripped_permission(name)}
+    return replace(access, permissions=keep(access.permissions), grants=grants,
+                   role_ceiling=role_ceiling, permission_sources=sources)
+
+
 def _translate_context(agent_mod, policy, email: str, groups: tuple[str, ...],
                        active_profile: str, session_id: str, request_id: str):
     """Resolve access with the WEBUI resolver and bridge it to agent types.
@@ -94,7 +122,9 @@ def _translate_context(agent_mod, policy, email: str, groups: tuple[str, ...],
     added agent-side fails loudly here (AttributeError, caught by the caller
     per mode) instead of silently dropping grants.
     """
-    subject = GovernanceSubject(email=email, groups=groups)
+    from .enforce import stamped_org_id
+
+    subject = GovernanceSubject(email=email, groups=groups, org_id=stamped_org_id(policy))
     access = resolve_effective_access(policy, subject)
     from api.bot_builder import access_ceiling
     from dataclasses import replace
@@ -104,6 +134,11 @@ def _translate_context(agent_mod, policy, email: str, groups: tuple[str, ...],
         if role_ceiling is not None:
             role_ceiling = replace(role_ceiling, profiles=role_ceiling.profiles | {active_profile})
         access = replace(access, profiles=access.profiles | {active_profile}, role_ceiling=role_ceiling)
+    # Plan 3.6: no control-plane permission crosses into the agent. Stripped
+    # before serialization, so the round-trip checks below compare the
+    # stripped values on both sides.
+    access = _without_control_plane(access)
+    ceiling = _without_control_plane(ceiling)
     shim = SimpleNamespace(
         access=access,
         active_profile=str(active_profile or "default"),

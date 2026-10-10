@@ -24,6 +24,12 @@ delivery uses its own attempt timestamp for bounded retries on later incidents;
 continuous incident activity cannot postpone that retry forever. Diagnostics live
 in this store, which is served by an administrator-gated route, so the user
 message stays free of internals without losing anything for the admin.
+
+On a managed installation each fresh incident (not a deduplicated repeat) is
+also handed to the ops reporter (``api/ops_reporter.py``, plan 3.3), which
+queues it for the central control plane when operational telemetry is on.
+That hand-off is independent of the local store and of the admin alert, and
+it never raises.
 """
 from __future__ import annotations
 
@@ -319,6 +325,8 @@ def record_capacity_event(kind, provider=None, model=None, detail="", source="")
                 state["in_flight"] = True
         result["notified"] = result["recorded"] and not result["deduplicated"]
         result["event_id"] = event_id
+        if not result["deduplicated"]:
+            _report_incident(kind, provider, source)
         if not dispatch:
             return result
         # A successfully stored in-app alert counts as a notification.
@@ -348,6 +356,17 @@ def record_capacity_event(kind, provider=None, model=None, detail="", source="")
     except Exception:
         logger.warning("capacity alert record failed", exc_info=True)
         return result
+
+
+def _report_incident(kind: str, provider: str, source) -> None:
+    """Hand a fresh incident to the central ops reporter (W7). Never raises;
+    the reporter itself decides whether operational telemetry is on."""
+    try:
+        from api import ops_reporter
+
+        ops_reporter.report_capacity(kind, provider, source=source)
+    except Exception:
+        logger.debug("capacity incident report failed", exc_info=True)
 
 
 def _dispatch_external(event: dict) -> tuple[bool, str]:

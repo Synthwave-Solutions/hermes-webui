@@ -242,7 +242,7 @@ def test_a_stale_edit_gives_409(env):
 
 
 def test_a_staff_guest_on_a_client_installation_sends_the_guest_claim(env, monkeypatch):
-    env.set_policy(H.hq_policy(installation={"kind": "managed"}, organization={"id": "org_acme", "name": "Acme"}))
+    env.set_policy(H.hq_policy(installation={"kind": "client"}, organization={"id": "org_acme", "name": "Acme"}))
     monkeypatch.setattr(env.scope, "_staff_guest_checker", lambda identity: identity.get("email") == H.MICHAEL)
     env.hub.visible = lambda bank, claims: claims.get("guest") is True or bank["owner_email"] == claims.get("sub")
     env.as_user(H.MICHAEL, "Michael")

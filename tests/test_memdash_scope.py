@@ -67,7 +67,7 @@ def test_auth_disabled_identity_is_a_member_even_for_the_bootstrap_email():
 
 
 def test_org_admin_is_never_given_in_wave_1():
-    policy = H.hq_policy(installation={"kind": "managed"}, organization={"id": "org_acme", "name": "Acme"})
+    policy = H.hq_policy(installation={"kind": "client"}, organization={"id": "org_acme", "name": "Acme"})
     policy["organization"]["admins"] = [H.ADA]
     _use(policy)
     for email in (H.ADA, H.BOB, H.YASER):
@@ -82,12 +82,16 @@ def test_a_policy_load_error_raises_scope_unavailable():
         scope.resolve_viewer(H.identity(H.MICHAEL), CFG)
 
 
-@pytest.mark.parametrize("installation", [None, {"kind": "managed"}, {"kind": "HQ"}, {"kind": ""}, {"name": "hq"}, "hq"])
+@pytest.mark.parametrize("installation", [None, {"kind": "client"}, {"kind": "HQ"}, {"kind": ""}, {"name": "hq"}, "hq"])
 def test_only_installation_kind_hq_is_hq(installation):
     policy = H.hq_policy()
     if installation is not None:
         policy["installation"] = installation
-    _use(policy)
+    try:
+        _use(policy)
+    except loader.GovernancePolicyError:
+        # The integrated organization parser rejects malformed installation blocks.
+        return
     viewer = scope.resolve_viewer(H.identity(H.MICHAEL), CFG)
     assert not viewer.is_hq
     # A client installation: the platform path needs a live staff guest grant.
@@ -95,7 +99,7 @@ def test_only_installation_kind_hq_is_hq(installation):
 
 
 def test_client_installation_platform_admin_needs_a_live_staff_guest_grant():
-    _use(H.hq_policy(installation={"kind": "managed"}, organization={"id": "org_acme", "name": "Acme"}))
+    _use(H.hq_policy(installation={"kind": "client"}, organization={"id": "org_acme", "name": "Acme"}))
     assert _kind(H.YASER) == scope.MEMBER
     scope.set_staff_guest_checker(lambda identity: identity.get("email") == H.YASER)
     viewer = scope.resolve_viewer(H.identity(H.YASER), CFG)

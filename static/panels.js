@@ -30,6 +30,15 @@ let _cronMode = 'empty'; // 'empty' | 'read' | 'create' | 'edit'
 let _cronPreFormDetail = null; // snapshot of prior selection when entering a form
 let _showAllCronProfiles = false;
 let _cronOtherProfileCount = 0;
+// Scheduled task notifications (plan 3.1): whether the backend serves notify,
+// the revision and levels of the viewer's own mutes (GET
+// /api/crons/notifications), the levels the open form started from, and the
+// open notification popover.
+let _cronNotifySupported = false;
+let _cronNotifyRevision = null;
+let _cronNotifyMine = {};
+let _cronFormNotifyBase = null;
+let _cronNotifyOverlay = null;
 let _currentWorkspaceDetail = null; // { path, name, is_default }
 let _workspaceMode = 'empty'; // 'empty' | 'read' | 'create' | 'edit'
 let _workspacePreFormDetail = null;
@@ -1034,10 +1043,15 @@ async function loadCrons(animate) {
     refreshBtn.disabled = true;
   }
   try {
+    // The viewer's own mutes and their revision load next to the list, which
+    // never waits for them. Either answer shows that the backend serves
+    // notify: that request (404 before it) or a task carrying notify.
+    _loadCronNotifyState().then(served => { if (served) _cronNotifySupported = true; });
     await loadCronProfiles();
     const allProfilesQS = _showAllCronProfiles ? '?all_profiles=1' : '';
     const data = await api('/api/crons' + allProfilesQS);
     _cronList = data.jobs || [];
+    if (_cronList.some(job => !!(job && job.notify && typeof job.notify === 'object'))) _cronNotifySupported = true;
     _cronOtherProfileCount = Number(data.other_profile_count || 0);
     if (_showAllCronProfiles && !_cronList.some(job => job && job.read_only)) {
       _showAllCronProfiles = false;
@@ -1073,6 +1087,7 @@ async function loadCrons(animate) {
           ${isNewRun ? '<span class="cron-new-dot" title="New run"></span>' : ''}
           ${job.emoji ? `<span class="cron-emoji" aria-hidden="true">${esc(job.emoji)}</span>` : isAgentMode ? '<span class="cron-agent-badge" title="Agent mode">🤖</span>' : `<span class="cron-script-badge" title="${esc(t('cron_script_badge_title') || 'Script job (no agent)')}">📜</span>`}
           <span class="cron-name" title="${esc(job.name)}">${esc(job.name)}</span>
+          ${_cronNotifyListIconHtml(job)}
           <span class="cron-profile-badge" title="${esc(ownerProfileTitle)}">${esc(ownerProfileLabel)}</span>
           ${Array.isArray(job.shared_with) && job.shared_with.length ? `<span class="cron-shared-badge" title="${esc((t('cron_shared_with_label') || 'Shared with') + ': ' + job.shared_with.join(', '))}">${esc(t('cron_shared_badge') || 'shared')}</span>` : ''}
           <span class="cron-status ${status.listClass}">${esc(status.label)}</span>
@@ -1330,7 +1345,7 @@ function _cronSharedRowHtml(job){
   const chips = shared.length
     ? shared.map(e => `<span class="cron-share-chip" title="${esc(e)}">${esc(String(e).split('@')[0])}</span>`).join('')
     : `<span style="color:var(--muted)">${esc(t('cron_share_nobody') || 'Not shared')}</span>`;
-  const btn = job.read_only ? '' : `<button type="button" class="cron-btn cron-share-btn" onclick="openCronShareDialog('${esc(job.id)}')">${esc(t('cron_share_button') || 'Share')}</button>`;
+  const btn = !_cronCanEdit(job) ? '' : `<button type="button" class="cron-btn cron-share-btn" onclick="openCronShareDialog('${esc(job.id)}')">${esc(t('cron_share_button') || 'Share')}</button>`;
   return `<div class="detail-row"><div class="detail-row-label">${esc(t('cron_shared_with_label') || 'Shared with')}</div><div class="detail-row-value cron-share-value">${chips}${btn}</div></div>`;
 }
 
@@ -1353,27 +1368,67 @@ function _cronEmojiGridHtml(onPick){
   return _CRON_EMOJI_GROUPS.map(([label, list]) => `<div class="cron-emoji-group"><div class="cron-emoji-group-title">${esc(label)}</div><div class="cron-emoji-picks">${list.split(/\s+/).filter(Boolean).map(e => `<button type="button" class="cron-emoji-pick" onclick="${prefix}'${e}')" aria-label="${e}">${e}</button>`).join('')}</div></div>`).join('');
 }
 
+// ── Task edit rights ─────────────────────────────────────────────────────────
+// Only the owner of a task or a cron admin may change, run, pause, resume or
+// delete it (the server answers 403 otherwise); people it is shared with see
+// it and its output. The server's can_edit wins when it sends one. Without
+// the signed-in identity the server stays the only gate.
+function _cronIsCronAdmin(){
+  const me = (typeof window !== 'undefined' && window.__GOV_ME__) || null;
+  if (!me || typeof me !== 'object') return false;
+  if (me.method === 'auth_disabled' || me.mode === 'off' || me.is_bootstrap_admin === true) return true;
+  const features = me.feature_permissions;
+  if (features && Object.prototype.hasOwnProperty.call(features, 'cron:admin')) return features['cron:admin'] === true;
+  const permissions = Array.isArray(me.permissions) ? me.permissions : [];
+  return permissions.includes('*') || permissions.includes('cron:*') || permissions.includes('cron:admin');
+}
+function _cronCanEdit(job){
+  if (!job || job.read_only) return false;
+  if (typeof job.can_edit === 'boolean') return job.can_edit;
+  const me = (typeof window !== 'undefined' && window.__GOV_ME__) || null;
+  if (!me || typeof me !== 'object') return true;
+  // report_only records a refused change and lets it through.
+  if (me.mode === 'report_only' || _cronIsCronAdmin()) return true;
+  const email = String(me.email || '').trim().toLowerCase();
+  if (!email) return false;
+  const owner = String(job.owner_email || '').trim().toLowerCase();
+  if (owner) return owner === email;
+  const origin = job.origin && typeof job.origin === 'object' ? job.origin : null;
+  if (!origin || String(origin.platform || '').trim().toLowerCase() !== 'webui') return false;
+  const stamped = String(origin.user_id || '').trim().toLowerCase();
+  // An unstamped WebUI task belongs to the owner of its conversation, which
+  // only the server can check.
+  return stamped ? stamped === email : true;
+}
+function _cronCanCreate(){
+  const me = (typeof window !== 'undefined' && window.__GOV_ME__) || null;
+  if (!me || typeof me !== 'object' || typeof _canUseFeature !== 'function') return true;
+  return _canUseFeature('cron:write');
+}
+
 function _cronMetaBarHtml(job){
+  const canEdit = _cronCanEdit(job);
   const shared = Array.isArray(job.shared_with) ? job.shared_with : [];
   const chips = shared.map(e => `<span class="cron-share-chip" title="${esc(e)}">${esc(String(e).split('@')[0])}</span>`).join('');
-  const shareLink = job.read_only ? '' : `<button type="button" class="cron-link-btn" onclick="openCronShareDialog('${esc(job.id)}')">${esc(shared.length ? (t('cron_share_edit') || 'Change sharing') : (t('cron_share_button_long') || 'Share with colleagues'))}</button>`;
+  const shareLink = !canEdit ? '' : `<button type="button" class="cron-link-btn" onclick="openCronShareDialog('${esc(job.id)}')">${esc(shared.length ? (t('cron_share_edit') || 'Change sharing') : (t('cron_share_button_long') || 'Share with colleagues'))}</button>`;
   const owner = job.origin && job.origin.user_id ? String(job.origin.user_id).split('@')[0] : '';
   const category = String(job.category || '').trim();
-  const categoryLink = job.read_only ? '' : `<button type="button" class="cron-link-btn" onclick="openCronCategoryPopover('${esc(job.id)}')">${esc(category ? (t('cron_category_change') || 'Change') : (t('cron_category_set') || 'Set category'))}</button>`;
+  const categoryLink = !canEdit ? '' : `<button type="button" class="cron-link-btn" onclick="openCronCategoryPopover('${esc(job.id)}')">${esc(category ? (t('cron_category_change') || 'Change') : (t('cron_category_set') || 'Set category'))}</button>`;
   return `<div class="cron-meta-bar">
       <span class="cron-meta-item"><span class="cron-meta-label">${esc(t('cron_category_label') || 'Category')}</span>${category ? `<span class="cron-share-chip cron-category-chip">${esc(category)}</span>` : `<span class="cron-meta-muted">${esc(t('cron_category_none') || 'No category')}</span>`}${categoryLink}</span>
       <span class="cron-meta-item"><span class="cron-meta-label">${esc(t('cron_shared_with_label') || 'Shared with')}</span>${chips || `<span class="cron-meta-muted">${esc(t('cron_share_nobody') || 'nobody yet')}</span>`}${shareLink}</span>
+      ${_cronNotifyMetaHtml(job)}
       ${owner ? `<span class="cron-meta-item"><span class="cron-meta-label">${esc(t('cron_owner_label') || 'Owner')}</span><span class="cron-share-chip">${esc(owner)}</span></span>` : ''}
     </div>`;
 }
-function shareCurrentCron(){ if (_currentCronDetail && !_currentCronDetail.read_only) openCronShareDialog(_currentCronDetail.id); }
+function shareCurrentCron(){ if (_currentCronDetail && _cronCanEdit(_currentCronDetail)) openCronShareDialog(_currentCronDetail.id); }
 
 let _cronEmojiOverlay = null;
 function _closeCronEmojiPopover(){ if (_cronEmojiOverlay) { _cronEmojiOverlay.remove(); _cronEmojiOverlay = null; } document.removeEventListener('keydown', _cronEmojiEscape, true); }
 function _cronEmojiEscape(e){ if (e.key === 'Escape') { e.preventDefault(); _closeCronEmojiPopover(); } }
 function openCronEmojiPopover(jobId){
   const job = (_cronList || []).find(j => String(j.id) === String(jobId)) || _currentCronDetail;
-  if (!job || job.read_only) return;
+  if (!job || !_cronCanEdit(job)) return;
   _closeCronEmojiPopover();
   const overlay = document.createElement('div');
   overlay.className = 'cron-share-overlay';
@@ -1480,7 +1535,7 @@ function _closeCronCategoryPopover(){ if (_cronCategoryOverlay) { _cronCategoryO
 function _cronCategoryEscape(e){ if (e.key === 'Escape') { e.preventDefault(); _closeCronCategoryPopover(); } }
 function openCronCategoryPopover(jobId){
   const job = (_cronList || []).find(j => String(j.id) === String(jobId)) || _currentCronDetail;
-  if (!job || job.read_only) return;
+  if (!job || !_cronCanEdit(job)) return;
   _closeCronCategoryPopover();
   const overlay = document.createElement('div');
   overlay.className = 'cron-share-overlay';
@@ -1509,6 +1564,300 @@ async function _saveCronCategory(jobId, category){
   } catch (e) { showToast((t('error_prefix') || 'Error: ') + e.message, 5000, 'error'); }
 }
 
+// ── Scheduled task notifications (plan 3.1) ──────────────────────────────────
+// A task has one notify field with two levels. in_app decides the toast,
+// badge, unread marker and desktop notification of a run ("Notify me");
+// delivery decides whether a run's output goes to the "Deliver output to"
+// target ("Only send when it fails"). The level "off" is set by the API and
+// cron admins only and is shown read-only. GET /api/crons returns notify
+// resolved per task, plus my_notify (the viewer's own mute) and
+// support_notified; GET /api/crons/notifications returns the viewer's mutes
+// with the revision their POST needs. Until the backend serves notify, the
+// form keeps writing only toast_notifications (Every run or Never).
+const _CRON_NOTIFY_IN_APP_LEVELS = ['all', 'failures', 'quiet', 'off'];
+const _CRON_NOTIFY_DELIVERY_LEVELS = ['all', 'failures', 'off'];
+const _CRON_NOTIFY_IN_APP_CHOICES = ['all', 'failures', 'quiet'];
+const _CRON_NOTIFY_IN_APP_KEYS = { all: 'cron_notify_me_all', failures: 'cron_notify_me_failures', quiet: 'cron_notify_me_never', off: 'cron_notify_me_off_admin' };
+const _CRON_NOTIFY_RANK = { off: 0, quiet: 1, failures: 2, all: 3 };
+const _CRON_NOTIFY_SVG_OPEN = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">';
+const _CRON_BELL_SVG = _CRON_NOTIFY_SVG_OPEN + '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>';
+const _CRON_BELL_OFF_SVG = _CRON_NOTIFY_SVG_OPEN + '<path d="M8.7 3A6 6 0 0 1 18 8a21.3 21.3 0 0 0 .6 5"/><path d="M17 17H3s3-2 3-9a4.67 4.67 0 0 1 .3-1.7"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path d="m2 2 20 20"/></svg>';
+
+function _cronNotifyLevel(value, levels, fallback){
+  const level = String(value == null ? '' : value).trim().toLowerCase();
+  return levels.includes(level) ? level : fallback;
+}
+// The task's own levels. A task without notify reads as before: toasts on
+// unless toast_notifications is false, delivery always.
+function _cronNotifyOf(job){
+  const legacyInApp = job && job.toast_notifications === false ? 'quiet' : 'all';
+  const notify = job && job.notify && typeof job.notify === 'object' ? job.notify : null;
+  if (!notify) return { in_app: legacyInApp, delivery: 'all', source: 'legacy' };
+  const source = String(job.notify_source || notify.source || 'explicit').trim().toLowerCase() === 'legacy' ? 'legacy' : 'explicit';
+  return {
+    in_app: _cronNotifyLevel(notify.in_app, _CRON_NOTIFY_IN_APP_LEVELS, legacyInApp),
+    delivery: _cronNotifyLevel(notify.delivery, _CRON_NOTIFY_DELIVERY_LEVELS, 'all'),
+    source,
+  };
+}
+// New tasks: every run, delivery always; Monitoring tasks only on failures.
+function _cronDefaultNotify(category){
+  return { in_app: String(category || '').trim() === 'Monitoring' ? 'failures' : 'all', delivery: 'all' };
+}
+// toast_notifications that older clients and servers read.
+function _cronLegacyToast(inApp){ return inApp === 'all' || inApp === 'failures'; }
+function _cronNotifyChanged(next, base){
+  return !base || next.in_app !== base.in_app || next.delivery !== base.delivery;
+}
+// The viewer's own in-app level for a task, or null when they set none.
+function _cronMyNotifyLevel(job){
+  if (!job) return null;
+  let level = null;
+  if (Object.prototype.hasOwnProperty.call(job, 'my_notify')) {
+    const mine = job.my_notify;
+    level = mine && typeof mine === 'object' ? mine.in_app : mine;
+  } else if (Object.prototype.hasOwnProperty.call(_cronNotifyMine, String(job.id))) {
+    level = _cronNotifyMine[String(job.id)];
+  }
+  return _cronNotifyLevel(level, _CRON_NOTIFY_IN_APP_LEVELS, null);
+}
+function _cronNotifyMutedForMe(job){
+  const mine = _cronMyNotifyLevel(job);
+  return mine === 'quiet' || mine === 'off';
+}
+// A personal level only lowers the task's level for that viewer.
+function _cronEffectiveInApp(job){
+  const level = _cronNotifyOf(job).in_app;
+  const mine = _cronMyNotifyLevel(job);
+  return mine && _CRON_NOTIFY_RANK[mine] < _CRON_NOTIFY_RANK[level] ? mine : level;
+}
+function _cronNotifyMineFromPayload(jobs){
+  const out = {};
+  const put = (id, value) => {
+    const level = _cronNotifyLevel(value && typeof value === 'object' ? value.in_app : value, _CRON_NOTIFY_IN_APP_LEVELS, null);
+    if (id != null && String(id) && level) out[String(id)] = level;
+  };
+  if (Array.isArray(jobs)) jobs.forEach(row => { if (row && typeof row === 'object') put(row.job_id != null ? row.job_id : row.id, row); });
+  else if (jobs && typeof jobs === 'object') Object.keys(jobs).forEach(id => put(id, jobs[id]));
+  return out;
+}
+// GET /api/crons/notifications: true when the backend serves notify.
+async function _loadCronNotifyState(){
+  try {
+    const data = await api('/api/crons/notifications', { timeoutToast: false, redirect401: false });
+    if (!data || typeof data !== 'object' || !Object.prototype.hasOwnProperty.call(data, 'revision')) return false;
+    _cronNotifyRevision = data.revision;
+    _cronNotifyMine = _cronNotifyMineFromPayload(data.jobs);
+    return true;
+  } catch (_e) {
+    return false;
+  }
+}
+
+// Muted bell on a list row: this viewer gets no toast for the task.
+function _cronNotifyListIconHtml(job){
+  const level = _cronEffectiveInApp(job);
+  if (level !== 'quiet' && level !== 'off') return '';
+  const label = esc(t('cron_notify_muted'));
+  return `<span class="cron-notify-muted-icon" title="${label}" aria-label="${label}" role="img">${_CRON_BELL_OFF_SVG}</span>`;
+}
+// "Notify me": the task's in-app level; "Off (admin setting)" is read-only.
+function _cronNotifyInAppSelectHtml(notify, id){
+  const label = `<label for="${id}">${esc(t('cron_notify_me_label'))}</label>`;
+  if (notify.in_app === 'off') {
+    return `${label}<select id="${id}" disabled data-level="off"><option value="off" selected>${esc(t('cron_notify_me_off_admin'))}</option></select>`;
+  }
+  const choices = _cronNotifySupported ? _CRON_NOTIFY_IN_APP_CHOICES : ['all', 'quiet'];
+  const current = choices.includes(notify.in_app) ? notify.in_app : 'all';
+  const options = choices.map(level => `<option value="${level}"${level === current ? ' selected' : ''}>${esc(t(_CRON_NOTIFY_IN_APP_KEYS[level]))}</option>`).join('');
+  return `${label}<select id="${id}" data-level="${esc(notify.in_app)}">${options}</select>`;
+}
+// "Only send when it fails", shown beside the delivery target. With delivery
+// off (an admin setting) the notice and the warning replace it.
+function _cronNotifyDeliveryHtml(notify, id, deliver){
+  if (!_cronNotifySupported) return '';
+  if (notify.delivery === 'off') {
+    return `<div class="cron-notify-delivery-off" data-level="off"><div class="cron-notify-note">${esc(t('cron_notify_delivery_off_notice'))}</div><div class="detail-form-warning">${esc(t('cron_notify_delivery_off_warning'))}</div></div>`;
+  }
+  const target = deliver === undefined ? null : String(deliver || '').trim();
+  const hidden = target !== null && (!target || target === 'local');
+  return `<label class="detail-form-check cron-notify-failures-only" for="${id}"${hidden ? ' hidden' : ''}><input type="checkbox" id="${id}"${notify.delivery === 'failures' ? ' checked' : ''}><span>${esc(t('cron_notify_delivery_failures_only'))}</span></label>`;
+}
+function _cronNotifyHintsHtml(supportNotified){
+  return `<div class="detail-form-hint cron-notify-hint">${esc(t('cron_notify_hint'))}</div>`
+    + (supportNotified ? `<div class="detail-form-hint cron-notify-managed">${esc(t('cron_notify_hint_managed'))}</div>` : '');
+}
+// The levels the controls with this id prefix show; controls that are
+// missing, hidden by an admin setting or read-only keep the base level.
+function _cronNotifyFromControls(prefix, base){
+  const inAppEl = $(prefix + 'NotifyInApp');
+  const failuresEl = $(prefix + 'NotifyDeliveryFailures');
+  const inApp = inAppEl && !inAppEl.disabled ? _cronNotifyLevel(inAppEl.value, _CRON_NOTIFY_IN_APP_CHOICES, base.in_app) : base.in_app;
+  const delivery = failuresEl && base.delivery !== 'off' ? (failuresEl.checked ? 'failures' : 'all') : base.delivery;
+  return { in_app: inApp, delivery };
+}
+// The checkbox only matters when output goes somewhere.
+function _syncCronNotifyDeliveryControl(){
+  const sel = $('cronFormDeliver');
+  const box = $('cronFormNotifyDeliveryFailures');
+  const wrap = box && typeof box.closest === 'function' ? box.closest('.cron-notify-failures-only') : null;
+  if (!sel || !wrap) return;
+  const target = String(sel.value || '').trim();
+  wrap.hidden = !target || target === 'local';
+}
+function _cronNotifyFieldsetHtml(notify, supportNotified){
+  return `<fieldset class="detail-form-row cron-notify-fieldset" data-tour="tasks-notify">
+          <legend>${esc(t('cron_notify_legend'))}</legend>
+          <div class="cron-notify-field">${_cronNotifyInAppSelectHtml(notify, 'cronFormNotifyInApp')}</div>
+          ${_cronNotifyHintsHtml(supportNotified)}
+        </fieldset>`;
+}
+// Detail view: one row with the levels, the viewer's mute and the notes.
+function _cronNotifyDetailRowHtml(job){
+  const notify = _cronNotifyOf(job);
+  const quiet = notify.in_app === 'quiet' || notify.in_app === 'off';
+  const badges = [`<span class="detail-badge ${quiet ? '' : 'active'}">${esc(t(_CRON_NOTIFY_IN_APP_KEYS[notify.in_app]))}</span>`];
+  if (notify.delivery === 'failures') badges.push(`<span class="detail-badge">${esc(t('cron_notify_delivery_failures_only'))}</span>`);
+  if (_cronNotifyMutedForMe(job)) badges.push(`<span class="detail-badge cron-notify-muted-badge">${_CRON_BELL_OFF_SVG}${esc(t('cron_notify_muted'))}</span>`);
+  const notes = [];
+  if (notify.delivery === 'off') notes.push(`<div class="cron-notify-note">${esc(t('cron_notify_delivery_off_notice'))}</div>`);
+  if (job.support_notified === true) notes.push(`<div class="cron-notify-note cron-notify-managed">${esc(t('cron_notify_hint_managed'))}</div>`);
+  return `<div class="detail-row cron-notify-row"><div class="detail-row-label">${esc(t('cron_notify_legend'))}</div><div class="detail-row-value"><div class="cron-notify-badges">${badges.join('')}</div>${notes.join('')}</div></div>`;
+}
+// Meta bar: the bell chip. Owners and cron admins open the popover; people
+// the task is shared with mute or unmute it for themselves.
+function _cronNotifyMetaHtml(job){
+  const notify = _cronNotifyOf(job);
+  const quiet = notify.in_app === 'quiet' || notify.in_app === 'off';
+  const mine = _cronMyNotifyLevel(job);
+  const levelChip = `<span class="cron-share-chip cron-notify-chip" data-level="${esc(notify.in_app)}">${quiet ? _CRON_BELL_OFF_SVG : _CRON_BELL_SVG}<span>${esc(t(_CRON_NOTIFY_IN_APP_KEYS[notify.in_app]))}</span></span>`;
+  const mutedChip = _cronNotifyMutedForMe(job) ? `<span class="cron-share-chip cron-notify-chip is-muted">${_CRON_BELL_OFF_SVG}<span>${esc(t('cron_notify_muted'))}</span></span>` : '';
+  let action = '';
+  if (!job.read_only && _cronCanEdit(job)) {
+    action = `<button type="button" class="cron-link-btn" onclick="openCronNotifyPopover('${esc(job.id)}')">${esc(t('cron_notify_chip_change'))}</button>`;
+  } else if (!job.read_only && _cronNotifySupported) {
+    action = `<button type="button" class="cron-link-btn cron-notify-mute-btn" onclick="toggleCronNotifyMute('${esc(job.id)}')">${esc(t(mine ? 'cron_notify_unmute_for_me' : 'cron_notify_mute_for_me'))}</button>`;
+  }
+  return `<span class="cron-meta-item cron-notify-meta" data-tour="tasks-notify"><span class="cron-meta-label">${esc(t('cron_notify_legend'))}</span>${levelChip}${mutedChip}${action}</span>`;
+}
+
+function _closeCronNotifyPopover(){ if (_cronNotifyOverlay) { _cronNotifyOverlay.remove(); _cronNotifyOverlay = null; } document.removeEventListener('keydown', _cronNotifyEscape, true); }
+function _cronNotifyEscape(e){ if (e.key === 'Escape') { e.preventDefault(); _closeCronNotifyPopover(); } }
+function _findCronNotifyJob(jobId){
+  return (_cronList || []).find(j => String(j.id) === String(jobId)) || (_currentCronDetail && String(_currentCronDetail.id) === String(jobId) ? _currentCronDetail : null);
+}
+function openCronNotifyPopover(jobId){
+  const job = _findCronNotifyJob(jobId);
+  if (!job || !_cronCanEdit(job)) return;
+  _closeCronNotifyPopover();
+  const notify = _cronNotifyOf(job);
+  const mine = _cronMyNotifyLevel(job);
+  const mineBtn = _cronNotifySupported
+    ? `<button type="button" class="cron-btn cron-notify-mine" onclick="toggleCronNotifyMute('${esc(job.id)}')">${esc(t(mine ? 'cron_notify_unmute_for_me' : 'cron_notify_mute_for_me'))}</button>`
+    : '';
+  const overlay = document.createElement('div');
+  overlay.className = 'cron-share-overlay';
+  overlay.innerHTML = `<div class="cron-share-dialog detail-card cron-notify-dialog" role="dialog" aria-modal="true" aria-labelledby="cronNotifyTitle" data-tour="tasks-notify">
+      <div class="detail-card-title" id="cronNotifyTitle">${esc(t('cron_notify_legend'))}</div>
+      <div class="detail-form-row cron-notify-field">${_cronNotifyInAppSelectHtml(notify, 'cronPopNotifyInApp')}</div>
+      <div class="detail-form-row">${_cronNotifyDeliveryHtml(notify, 'cronPopNotifyDeliveryFailures', job.deliver || 'local')}${_cronNotifyHintsHtml(job.support_notified === true)}</div>
+      <div id="cronNotifyPopError" class="detail-form-error" style="display:none"></div>
+      <div class="cron-share-actions">
+        ${mineBtn}
+        <button type="button" class="cron-btn" onclick="_closeCronNotifyPopover()">${esc(t('cancel'))}</button>
+        <button type="button" class="cron-btn run" onclick="_saveCronNotify('${esc(job.id)}')">${esc(t('save'))}</button>
+      </div>
+    </div>`;
+  overlay.addEventListener('click', e => { if (e.target === overlay) _closeCronNotifyPopover(); });
+  document.body.appendChild(overlay);
+  _cronNotifyOverlay = overlay;
+  document.addEventListener('keydown', _cronNotifyEscape, true);
+  const first = overlay.querySelector('#cronPopNotifyInApp');
+  if (first && !first.disabled) first.focus();
+}
+async function _saveCronNotify(jobId){
+  const job = _findCronNotifyJob(jobId);
+  if (!job) return;
+  const base = _cronNotifyOf(job);
+  const next = _cronNotifyFromControls('cronPop', base);
+  if (!_cronNotifyChanged(next, base)) { _closeCronNotifyPopover(); return; }
+  const payload = { job_id: job.id, toast_notifications: _cronLegacyToast(next.in_app) };
+  if (_cronNotifySupported) payload.notify = { in_app: next.in_app, delivery: next.delivery };
+  try {
+    await api('/api/crons/update', { method: 'POST', body: JSON.stringify(payload) });
+    _closeCronNotifyPopover();
+    showToast(t('cron_notify_saved'));
+    await loadCrons();
+  } catch (e) {
+    const err = _cronNotifyOverlay && _cronNotifyOverlay.querySelector('#cronNotifyPopError');
+    if (err) { err.textContent = t('error_prefix') + e.message; err.style.display = ''; }
+    else showToast(t('error_prefix') + e.message, 5000, 'error');
+  }
+}
+// "Mute for me" and "Unmute for me": the viewer's own level, never the task's.
+async function toggleCronNotifyMute(jobId){
+  const job = _findCronNotifyJob(jobId);
+  if (!job || job.read_only || !_cronNotifySupported) return;
+  const level = _cronMyNotifyLevel(job) ? null : 'quiet';
+  try {
+    if (_cronNotifyRevision === null) await _loadCronNotifyState();
+    const res = await api('/api/crons/notifications', { method: 'POST', body: JSON.stringify({ job_id: job.id, in_app: level, revision: _cronNotifyRevision }) });
+    if (res && typeof res === 'object' && Object.prototype.hasOwnProperty.call(res, 'revision')) _cronNotifyRevision = res.revision;
+    if (level) _cronNotifyMine[String(job.id)] = level;
+    else delete _cronNotifyMine[String(job.id)];
+    for (const row of [...(_cronList || []), _currentCronDetail]) {
+      if (row && String(row.id) === String(job.id)) row.my_notify = level;
+    }
+    _closeCronNotifyPopover();
+    showToast(t('cron_notify_saved'));
+    await loadCrons();
+  } catch (e) {
+    if (e && e.status === 409) {
+      showToast(t('cron_notify_conflict'), 5000, 'error');
+      _loadCronNotifyState();
+      return;
+    }
+    showToast(t('error_prefix') + ((e && e.message) || ''), 5000, 'error');
+  }
+}
+// A copy is a new task of the viewer: admin-only levels fall back to the
+// defaults unless the viewer is a cron admin.
+function _cronDuplicateNotify(job, isAdmin){
+  const notify = _cronNotifyOf(job);
+  if (isAdmin) return { in_app: notify.in_app, delivery: notify.delivery };
+  const defaults = _cronDefaultNotify(job && job.category);
+  return {
+    in_app: notify.in_app === 'off' ? defaults.in_app : notify.in_app,
+    delivery: notify.delivery === 'off' ? defaults.delivery : notify.delivery,
+  };
+}
+// Completion flags of GET /api/crons/recent. Without toast, badge, desktop
+// and silent (older servers) toast_notifications decides the toast and every
+// run keeps its badge and unread marker. A silent run is history only.
+function _cronCompletionFlags(c){
+  const has = key => !!c && typeof c[key] === 'boolean';
+  if (has('toast') || has('badge') || has('desktop') || has('silent')) {
+    const silent = c.silent === true;
+    return { toast: !silent && c.toast === true, badge: !silent && c.badge !== false, desktop: !silent && c.desktop === true, silent };
+  }
+  return { toast: !!c && c.toast_notifications !== false, badge: true, desktop: false, silent: false };
+}
+// Task form: the delivery checkbox follows the target; a new task follows
+// its category's default level until the viewer picks one.
+function _bindCronNotifyFormControls(isEdit){
+  const deliverSel = $('cronFormDeliver');
+  if (deliverSel && typeof deliverSel.addEventListener === 'function') deliverSel.addEventListener('change', _syncCronNotifyDeliveryControl);
+  const inAppEl = $('cronFormNotifyInApp');
+  const categoryEl = $('cronFormCategory');
+  if (isEdit || _cronIsDuplicate || !inAppEl || !categoryEl || inAppEl.disabled) return;
+  inAppEl.addEventListener('change', () => { inAppEl.dataset.touched = '1'; });
+  categoryEl.addEventListener('change', () => {
+    if (inAppEl.dataset.touched === '1' || !_cronNotifySupported) return;
+    inAppEl.value = _cronDefaultNotify(categoryEl.value).in_app;
+  });
+}
+// ── End of scheduled task notifications ──────────────────────────────────────
+
 let _cronShareOverlay = null;
 function _closeCronShareDialog(){
   if (_cronShareOverlay) { _cronShareOverlay.remove(); _cronShareOverlay = null; }
@@ -1518,7 +1867,7 @@ function _cronShareEscape(e){ if (e.key === 'Escape') { e.preventDefault(); _clo
 
 async function openCronShareDialog(jobId){
   const job = (_cronList || []).find(j => String(j.id) === String(jobId)) || _currentCronDetail;
-  if (!job) return;
+  if (!job || !_cronCanEdit(job)) return;
   _closeCronShareDialog();
   const overlay = document.createElement('div');
   overlay.className = 'cron-share-overlay';
@@ -1655,7 +2004,8 @@ function _renderCronDetail(job){
   const body = $('taskDetailBody');
   const empty = $('taskDetailEmpty');
   if (!title || !body) return;
-  title.innerHTML = (job.read_only
+  const canEdit = _cronCanEdit(job);
+  title.innerHTML = (!canEdit
       ? (job.emoji ? `<span class="cron-title-emoji">${esc(job.emoji)}</span>` : '')
       : `<button type="button" class="cron-title-emoji-btn ${job.emoji ? '' : 'empty'}" onclick="openCronEmojiPopover('${esc(job.id)}')" title="${esc(t('cron_emoji_change') || 'Change emoji')}">${esc(job.emoji || '🙂')}</button>`)
     + `<span class="cron-title-text">${esc(job.name || job.schedule_display || '(unnamed)')}</span>`;
@@ -1684,7 +2034,7 @@ function _renderCronDetail(job){
   const croniterHint = job.last_error && /croniter/i.test(job.last_error)
     ? `<p>${esc(t('cron_attention_croniter_hint'))}</p>`
     : '';
-  const attentionBanner = !isReadOnly && attention ? `
+  const attentionBanner = canEdit && attention ? `
       <div class="detail-alert cron-attention-panel">
         <div class="detail-alert-title">${esc(t('cron_status_needs_attention'))}</div>
         <p>${esc(t('cron_attention_desc'))}</p>
@@ -1700,7 +2050,9 @@ function _renderCronDetail(job){
         <div class="detail-alert-title">Read-only from another profile</div>
         <p>Switch to ${esc(ownerProfileLabel)} to run, edit, or inspect live status and output for this cron job.</p>
       </div>` : '';
-  const toastNotifications = job.toast_notifications !== false;
+  const deliveryMuted = job.delivery_status === 'muted'
+    ? ` <span class="detail-badge cron-notify-muted-badge">${_CRON_BELL_OFF_SVG}${esc(t('cron_notify_muted'))}</span>`
+    : '';
   const outputTitle = _cronOutputTitle(job);
   const skillsRow = isNoAgent ? '' : `<div class="detail-row"><div class="detail-row-label">${esc(t('cron_skills_label') || 'Skills')}</div><div class="detail-row-value">${esc(skills)}</div></div>`;
   const instructionCard = isNoAgent ? _cronScriptCardHtml(job) : _cronAgentPromptCardHtml(job);
@@ -1717,12 +2069,11 @@ function _renderCronDetail(job){
         <div class="detail-row"><div class="detail-row-label">Schedule</div><div class="detail-row-value"><code>${esc(schedule)}</code></div></div>
         <div class="detail-row"><div class="detail-row-label">${esc(t('cron_next'))}</div><div class="detail-row-value">${esc(nextRun)}</div></div>
         <div class="detail-row"><div class="detail-row-label">${esc(t('cron_last'))}</div><div class="detail-row-value">${esc(lastRun)}</div></div>
-        <div class="detail-row"><div class="detail-row-label">Deliver</div><div class="detail-row-value">${esc(deliver)}</div></div>
+        <div class="detail-row"><div class="detail-row-label">Deliver</div><div class="detail-row-value">${esc(deliver)}${deliveryMuted}</div></div>
         <div class="detail-row"><div class="detail-row-label">${esc(t('cron_mode_label') || 'Mode')}</div><div class="detail-row-value"><span class="detail-badge cron-mode-badge ${isNoAgent ? 'script' : 'agent'}" id="cronJobMode">${esc(cronJobMode)}</span>${modelProvider ? ` <code>${modelProvider}</code>` : ''}</div></div>
         ${showOwnerRow ? `<div class="detail-row"><div class="detail-row-label">Owner profile</div><div class="detail-row-value"><span class="detail-badge active" title="${esc(ownerProfileTitle)}">${esc(ownerProfileLabel)}</span></div></div>` : ''}
         <div class="detail-row"><div class="detail-row-label">${esc(t('cron_profile_label') || 'Profile')}</div><div class="detail-row-value"><span class="detail-badge active" title="${esc(profileTitle)}">${esc(profileLabel)}</span></div></div>
-        <div class="detail-row"><div class="detail-row-label">${esc(t('cron_toast_notifications_label') || 'Completion toasts')}</div><div class="detail-row-value"><button type="button" id="cronDetailNotifications" class="cron-btn cron-notification-toggle" role="switch" aria-checked="${toastNotifications}" aria-label="${esc(t('cron_toast_notifications_label') || 'Notifications')}" aria-describedby="cronDetailNotificationsHint" ${isReadOnly || _cronNotificationSaves.has(_cronJobKey(job)) ? 'disabled' : ''} onclick="toggleCurrentCronNotifications(this)">${esc(toastNotifications ? (t('cron_toast_notifications_enabled') || 'Enabled') : (t('cron_toast_notifications_disabled') || 'Disabled'))}</button></div></div>
-        <div id="cronDetailNotificationsHint" class="detail-form-hint">${esc(t('cron_toast_notifications_hint') || 'Show a pop-up when this task finishes. Task execution and delivery stay unchanged.')}</div>
+        ${_cronNotifyDetailRowHtml(job)}
         ${skillsRow}
         ${lastError}
       </div>
@@ -1758,6 +2109,13 @@ function _setCronHeaderButtons(mode, job) {
     if (header) header.style.display = 'flex';
     if (job && job.read_only) {
       [runBtn,pauseBtn,resumeBtn,editBtn,shareBtn,dupBtn,delBtn,cancelBtn,saveBtn].forEach(hide);
+      return;
+    }
+    if (job && !_cronCanEdit(job)) {
+      // Shared with the viewer: running, pausing, editing, sharing and
+      // deleting are the owner's (403 otherwise); a copy of their own is not.
+      [runBtn,pauseBtn,resumeBtn,editBtn,shareBtn,delBtn,cancelBtn,saveBtn].forEach(hide);
+      if (_cronCanCreate()) show(dupBtn); else hide(dupBtn);
       return;
     }
     show(shareBtn);
@@ -1951,6 +2309,11 @@ function duplicateCurrentCron(){
   _cronMode = 'create';
   _cronIsDuplicate = true;
   _cronSelectedSkills = Array.isArray(job.skills) ? [...job.skills] : [];
+  // A copy is a new task of the viewer, checked like any create: a custom
+  // delivery target or a skill outside their grants would answer 403, so
+  // only a cron admin keeps those (the deliver select and the skill filter
+  // below drop them for everyone else).
+  const isCronAdmin = _cronIsCronAdmin();
   // Deduplicate name: append "(copy)", "(copy 2)", "(copy 3)" etc.
   const baseName = job.name || '';
   let dupName = baseName + ' (copy)';
@@ -1969,6 +2332,7 @@ function duplicateCurrentCron(){
     deliver: job.deliver || 'local',
     profile: job.profile || '',
     toast_notifications: job.toast_notifications !== false,
+    notify: _cronDuplicateNotify(job, isCronAdmin),
     no_agent: !!job.no_agent,
     script: job.script || '',
     model: job.model || '',
@@ -1977,10 +2341,18 @@ function duplicateCurrentCron(){
     emoji: job.emoji || '',
     isEdit: false,
   });
-  if (!_cronSkillsCache) {
-    api('/api/skills').then(d=>{_cronSkillsCache=d.skills||[]; _bindCronSkillPicker();}).catch(()=>{});
-  } else {
+  const keepGrantedSkills = () => {
+    if (!isCronAdmin && _cronIsDuplicate && _cronMode === 'create') {
+      const granted = new Set((_cronSkillsCache || []).map(s => s && s.name).filter(Boolean));
+      _cronSelectedSkills = _cronSelectedSkills.filter(name => granted.has(name));
+      _renderCronSkillTags();
+    }
     _bindCronSkillPicker();
+  };
+  if (!_cronSkillsCache) {
+    api('/api/skills').then(d=>{_cronSkillsCache=d.skills||[]; keepGrantedSkills();}).catch(()=>{});
+  } else {
+    keepGrantedSkills();
   }
 }
 async function deleteCurrentCron(){
@@ -2010,7 +2382,7 @@ function openCronCreate(){
   _cronMode = 'create';
   _cronIsDuplicate = false;
   _cronSelectedSkills = [];
-  _renderCronForm({ name:'', schedule:'0 9 * * *', prompt:'', deliver:'local', profile:'', toast_notifications:true, model:'', provider:'', isEdit:false });
+  _renderCronForm({ name:'', schedule:'0 9 * * *', prompt:'', deliver:'local', profile:'', toast_notifications:true, notify:_cronDefaultNotify(''), model:'', provider:'', isEdit:false });
   _cronSkillsCache = null;
   api('/api/skills').then(d=>{_cronSkillsCache=d.skills||[]; _bindCronSkillPicker();}).catch(()=>{});
   loadCronProfiles().then(()=>_refreshCronProfileSelect('')).catch(()=>{});
@@ -2029,6 +2401,8 @@ function openCronEdit(job){
     deliver: job.deliver || 'local',
     profile: job.profile || '',
     toast_notifications: job.toast_notifications !== false,
+    notify: _cronNotifyOf(job),
+    support_notified: job.support_notified === true,
     no_agent: !!job.no_agent,
     script: job.script || '',
     model: job.model || '',
@@ -2046,14 +2420,19 @@ function openCronEdit(job){
   loadCronProfiles().then(()=>_refreshCronProfileSelect(job.profile || '')).catch(()=>{});
 }
 
-function _renderCronForm({ name, schedule, prompt, deliver, profile, toast_notifications=true, no_agent=false, script='', model='', provider='', diagram='', emoji='', category='', isEdit }){
+function _renderCronForm({ name, schedule, prompt, deliver, profile, toast_notifications=true, notify=null, support_notified=false, no_agent=false, script='', model='', provider='', diagram='', emoji='', category='', isEdit }){
   _disposeCronSkillPicker();
   const title = $('taskDetailTitle');
   const body = $('taskDetailBody');
   const empty = $('taskDetailEmpty');
   if (!body || !title) return;
   const isNoAgent = !!no_agent;
-  const toastNotifications = toast_notifications !== false;
+  // The levels the form starts from; saveCronForm writes notify only when
+  // they change, so a task without notify keeps behaving as before.
+  const notifyState = _cronNotifyOf(notify && typeof notify === 'object'
+    ? { notify, toast_notifications }
+    : { toast_notifications });
+  _cronFormNotifyBase = { in_app: notifyState.in_app, delivery: notifyState.delivery };
   title.textContent = isEdit ? (t('edit') + ' · ' + (name || schedule || t('scheduled_jobs'))) : t('new_job');
   const promptBlock = isNoAgent ? '' : `
         <div class="detail-form-row">
@@ -2151,9 +2530,12 @@ function _renderCronForm({ name, schedule, prompt, deliver, profile, toast_notif
         </div>
         <div class="detail-form-row">
           <label for="cronFormDeliver">${esc(t('cron_deliver_label') || 'Deliver output to')}</label>
-          <select id="cronFormDeliver">
-            <option value="" disabled>loading...</option>
-          </select>
+          <div class="cron-notify-deliver-row">
+            <select id="cronFormDeliver">
+              <option value="" disabled>loading...</option>
+            </select>
+            ${_cronNotifyDeliveryHtml(notifyState, 'cronFormNotifyDeliveryFailures', deliver)}
+          </div>
         </div>
         <div class="detail-form-row">
           <label for="cronFormProfile">${esc(t('cron_profile_label') || 'Profile')}</label>
@@ -2169,13 +2551,7 @@ function _renderCronForm({ name, schedule, prompt, deliver, profile, toast_notif
           </select>
           <div class="detail-form-hint">${esc(isNoAgent ? (t('cron_model_no_agent_hint') || 'No-agent jobs run the configured script directly; model is unused.') : (t('cron_model_hint') || 'Use the profile default model at run time, or pin this job to a specific provider/model.'))}</div>
         </div>
-        <div class="detail-form-row">
-          <label for="cronFormToastNotifications">${esc(t('cron_toast_notifications_label') || 'Completion toasts')}</label>
-          <label class="detail-form-check" for="cronFormToastNotifications">
-            <input type="checkbox" id="cronFormToastNotifications" ${toastNotifications ? 'checked' : ''}>
-            <span>${esc(t('cron_toast_notifications_hint') || 'Show a toast when this cron finishes.')}</span>
-          </label>
-        </div>
+        ${_cronNotifyFieldsetHtml(notifyState, support_notified === true)}
         ${skillsBlock}
         <div id="cronFormError" class="detail-form-error" style="display:none"></div>
       </form>
@@ -2183,7 +2559,8 @@ function _renderCronForm({ name, schedule, prompt, deliver, profile, toast_notif
   body.style.display = '';
   if (empty) empty.style.display = 'none';
   _setCronHeaderButtons(isEdit ? 'edit' : 'create');
-  _populateCronDeliverOptions(deliver, isEdit);
+  _bindCronNotifyFormControls(isEdit);
+  _populateCronDeliverOptions(deliver, isEdit || _cronIsCronAdmin());
   _populateCronFormModelSelect(model, provider, isNoAgent);
   if (!isNoAgent) _renderCronSkillTags();
   _initCronSchedulePresetControls();
@@ -2192,7 +2569,10 @@ function _renderCronForm({ name, schedule, prompt, deliver, profile, toast_notif
   if (focusEl) focusEl.focus();
 }
 
-async function _populateCronDeliverOptions(selectedValue, isEdit) {
+// keepCustom: an edit or a cron admin keeps a target outside the offered
+// options (shown with a star); a copy made by anyone else falls back to local,
+// because the server refuses such a target on create (403).
+async function _populateCronDeliverOptions(selectedValue, keepCustom) {
   var sel = $('cronFormDeliver');
   if (!sel) return;
   sel.disabled = true;
@@ -2211,16 +2591,22 @@ async function _populateCronDeliverOptions(selectedValue, isEdit) {
       sel.appendChild(opt);
     }
     if (selectedValue && !sel.querySelector('option[value="' + CSS.escape(selectedValue) + '"]')) {
-      var opt = document.createElement('option');
-      opt.value = selectedValue;
-      opt.textContent = selectedValue + ' *';
-      opt.selected = true;
-      sel.prepend(opt);
+      if (keepCustom) {
+        var opt = document.createElement('option');
+        opt.value = selectedValue;
+        opt.textContent = selectedValue + ' *';
+        opt.selected = true;
+        sel.prepend(opt);
+      } else {
+        var local = sel.querySelector('option[value="local"]');
+        if (local) local.selected = true;
+      }
     }
   } catch (e) {
     sel.innerHTML = '<option value="local">Local (save output only)</option>';
   }
   sel.disabled = false;
+  _syncCronNotifyDeliveryControl();
 }
 
 async function _populateCronFormModelSelect(selectedModel, selectedProvider, disabled){
@@ -2400,7 +2786,6 @@ async function saveCronForm(){
   const promptEl=$('cronFormPrompt');
   const delivEl=$('cronFormDeliver');
   const profileEl=$('cronFormProfile');
-  const toastEl=$('cronFormToastNotifications');
   const diagramEl=$('cronFormDiagram');
   const emojiEl=$('cronFormEmoji');
   const categoryEl=$('cronFormCategory');
@@ -2413,7 +2798,11 @@ async function saveCronForm(){
   const prompt=promptEl ? promptEl.value.trim() : '';
   const deliver=delivEl?delivEl.value:'local';
   const profile=profileEl?profileEl.value:'';
-  const toastNotifications=toastEl?!!toastEl.checked:true;
+  // "Notify me" and "Only send when it fails" (plan 3.1). toast_notifications
+  // keeps older servers and clients in step with the in-app level.
+  const notifyBase=_cronFormNotifyBase||{in_app:'all',delivery:'all'};
+  const notify=_cronNotifyFromControls('cronForm', notifyBase);
+  const toastNotifications=_cronLegacyToast(notify.in_app);
   const diagram=diagramEl?diagramEl.value.trim():'';
   const emoji=emojiEl?emojiEl.value.trim():'';
   const category=categoryEl?String(categoryEl.value||'').trim():'';
@@ -2427,6 +2816,9 @@ async function saveCronForm(){
     if (_editingCronId) {
       const updates = {job_id: _editingCronId, schedule, profile: profile, toast_notifications: toastNotifications};
       if (!isNoAgent) updates.prompt = prompt;
+      // Only a changed level is written, so an untouched task keeps its
+      // stored notify (or none).
+      if (_cronNotifySupported && _cronNotifyChanged(notify, notifyBase)) updates.notify = notify;
       if (diagramEl) updates.diagram = diagram;
       if (emojiEl) updates.emoji = emoji;
       if (categoryEl) updates.category = category;
@@ -2456,6 +2848,7 @@ async function saveCronForm(){
       return;
     }
     const body={schedule,prompt,deliver,profile: profile, toast_notifications: toastNotifications};
+    if(_cronNotifySupported) body.notify=notify;
     if(_cronIsDuplicate) body.enabled=false;
     if(name)body.name=name;
     if(diagram)body.diagram=diagram;
@@ -13752,17 +14145,28 @@ window.addEventListener('hermes:cron_created', () => {
 function startCronPolling(){
   if(_cronPollTimer) return;
   _cronPollTimer=setInterval(async()=>{
-    if(document.hidden) return;  // don't poll when tab is in background
+    // A background tab only polls for the desktop notifications the viewer
+    // turned on (a hidden tab is when they matter).
+    if(document.hidden && !(typeof window!=='undefined' && window._notificationsEnabled)) return;
     try{
       const pollGeneration=_cronPollGeneration;
       const data=await api(`/api/crons/recent?since=${_cronPollSince}`);
       if(pollGeneration!==_cronPollGeneration) return;
       if(data.completions&&data.completions.length>0){
         for(const c of data.completions){
-          if(c.toast_notifications !== false){
-            showToast(t('cron_completion_status', c.name, c.status==='error' ? t('status_failed') : t('status_completed')),4000);
+          // Per-viewer flags (plan 3.1): toast, badge (with the unread
+          // markers), desktop and silent; _cronCompletionFlags falls back to
+          // toast_notifications when a server does not send them.
+          const flags=_cronCompletionFlags(c);
+          const statusText=t('cron_completion_status', c.name, c.status==='error' ? t('status_failed') : t('status_completed'));
+          if(flags.toast){
+            showToast(statusText,4000);
+          }
+          if(flags.desktop && typeof sendBrowserNotification==='function'){
+            sendBrowserNotification(c.name, statusText, c.session_id ? {sid:c.session_id} : {});
           }
           _cronPollSince=Math.max(_cronPollSince,c.completed_at);
+          if(!flags.badge) continue;
           if(c.job_id) _cronNewJobIds.add(String(c.job_id));
           if(c.session_id && typeof _markSessionCompletionUnreadIfBackground === 'function'){
             const activeProfile=(typeof S!=='undefined'&&S&&S.activeProfile)||'default';

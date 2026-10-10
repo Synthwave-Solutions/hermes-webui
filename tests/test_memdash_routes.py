@@ -465,7 +465,7 @@ def test_a_platform_admin_passes_every_organisation(hub_env, monkeypatch, bank):
 
 
 def test_a_client_installation_platform_admin_needs_a_live_staff_guest_grant(hub_env, monkeypatch):
-    hub_env.set_policy(H.hq_policy(installation={"kind": "managed"}, organization={"id": "org_acme", "name": "Acme"}))
+    hub_env.set_policy(H.hq_policy(installation={"kind": "client"}, organization={"id": "org_acme", "name": "Acme"}))
     hub_env.as_user(H.MICHAEL, "Michael")
     ada = _hub_ref("acme-ada")
     banks = hub_env.banks()
@@ -477,7 +477,7 @@ def test_a_client_installation_platform_admin_needs_a_live_staff_guest_grant(hub
 
 
 def test_the_interim_reader_is_refused_on_a_client_installation(env):
-    env.set_policy(H.hq_policy(installation={"kind": "managed"}, organization={"id": "org_acme", "name": "Acme"}))
+    env.set_policy(H.hq_policy(installation={"kind": "client"}, organization={"id": "org_acme", "name": "Acme"}))
     env.as_user(H.ADA)
     assert env.banks()["available"] is False
     assert env.view("me", "stats").status == 503
@@ -525,7 +525,7 @@ def test_the_notice_is_required_until_acknowledged(env):
 
 
 def test_the_notice_names_the_administrators_that_apply_on_a_client_installation(hub_env):
-    hub_env.set_policy(H.hq_policy(installation={"kind": "managed"}, organization={"id": "org_acme", "name": "Acme"}))
+    hub_env.set_policy(H.hq_policy(installation={"kind": "client"}, organization={"id": "org_acme", "name": "Acme"}))
     hub_env.as_user(H.ADA)
     assert hub_env.banks()["notice"]["variant"] == "org_and_platform"
     hub_env.configure(view_platform_admins=False)

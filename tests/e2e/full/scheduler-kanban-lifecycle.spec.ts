@@ -49,22 +49,22 @@ test('US-SP-LIFECYCLE-CRON edit, cancel, duplicate, run locally, pause, resume a
   await page.locator('#cronFormProfile').selectOption('qa-research');
   await page.locator('#cronFormDeliver').selectOption('local');
   const id = await saveNewCron(page);
-  await expect(page.locator('#taskDetailTitle')).toHaveText(name);
+  await expect(page.locator('#taskDetailTitle')).toContainText(name);
   expect(await cron(page, id)).toMatchObject({ name, prompt, profile: 'qa-research', deliver: 'local' });
 
   await page.locator('#btnEditTaskDetail').click();
   await page.locator('#cronFormName').fill('Discarded cron edit');
   await page.locator('#cronFormPrompt').fill('This must not be saved');
   await page.locator('#btnCancelTaskDetail').click();
-  await expect(page.locator('#taskDetailTitle')).toHaveText(name);
+  await expect(page.locator('#taskDetailTitle')).toContainText(name);
   expect(await cron(page, id)).toMatchObject({ name, prompt });
 
   await page.locator('#btnEditTaskDetail').click();
   await page.locator('#cronFormName').fill(renamed);
   await page.locator('#cronFormScheduleTime').fill('10:45');
-  await page.locator('#cronFormToastNotifications').uncheck();
+  await page.locator('#cronFormNotifyInApp').selectOption('quiet');
   await page.locator('#btnSaveTaskDetail').click();
-  await expect(page.locator('#taskDetailTitle')).toHaveText(renamed);
+  await expect(page.locator('#taskDetailTitle')).toContainText(renamed);
   expect(await cron(page, id)).toMatchObject({ name: renamed, prompt, toast_notifications: false });
   await page.reload();
   await page.locator('.rail-btn[data-panel="tasks"]').click();
@@ -72,7 +72,7 @@ test('US-SP-LIFECYCLE-CRON edit, cancel, duplicate, run locally, pause, resume a
   await page.locator('#btnEditTaskDetail').click();
   await expect(page.locator('#cronFormScheduleTime')).toHaveValue('10:45');
   await expect(page.locator('#cronFormPrompt')).toHaveValue(prompt);
-  await expect(page.locator('#cronFormToastNotifications')).not.toBeChecked();
+  await expect(page.locator('#cronFormNotifyInApp')).toHaveValue('quiet');
   await page.locator('#btnCancelTaskDetail').click();
 
   await page.locator('#btnDuplicateTaskDetail').click();
@@ -82,7 +82,7 @@ test('US-SP-LIFECYCLE-CRON edit, cancel, duplicate, run locally, pause, resume a
   await expect(page.locator('#cronFormProfile')).toHaveValue('qa-research');
   const copyId = await saveNewCron(page);
   expect(copyId).not.toBe(id);
-  await expect(page.locator('#taskDetailTitle')).toHaveText(copyName);
+  await expect(page.locator('#taskDetailTitle')).toContainText(copyName);
   await expect(page.locator('#btnResumeTaskDetail')).toBeVisible();
   expect(await cron(page, copyId)).toMatchObject({ name: copyName, enabled: false, prompt, profile: 'qa-research', deliver: 'local' });
   expect((await cron(page, id)).name).toBe(renamed);

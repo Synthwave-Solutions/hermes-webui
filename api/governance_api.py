@@ -24,7 +24,9 @@ from api.governance.audit import append_audit_event, read_audit_events
 from api.governance.enforce import subject_from_identity
 from api.governance.loader import (
     GovernancePolicyError,
+    PolicyImmutableFieldError,
     get_policy,
+    immutable_field_changes,
     parse_governance_policy,
     policy_etag,
     policy_mutation_lock,
@@ -44,7 +46,10 @@ _AUDIT_LIMIT_MAX = 500
 
 # Whitelist of keys accepted in group/user policy entries (the rest of the
 # schema is owned by the full-document POST /api/governance/policy replace).
-_GROUP_ENTRY_KEYS = frozenset({"description", "sso_groups", "roles", "grants"})
+_GROUP_ENTRY_KEYS = frozenset({"description", "sso_groups", "roles", "grants", "delegable", "external"})
+# Group flags of plan 2.5 that an editor unaware of them must not drop: a
+# group update without the key keeps the stored value (send false to clear).
+_GROUP_KEPT_FLAGS = ("delegable", "external")
 _USER_ENTRY_KEYS = frozenset({"description", "roles", "groups", "grants", "deny", "access_level", "access_mode", "approval"})
 
 
@@ -289,6 +294,33 @@ def _reject_bootstrap_admin_deny(handler, policy, email: str, entry: dict) -> bo
     return False
 
 
+def _refuse_immutable_change(handler, before_raw, after_raw) -> bool:
+    """True (after a 400) when a write would add, change or remove a
+    render-stamped field (``organization.id``, ``installation.kind``).
+
+    Plan 3.6: the installation render stamps both; no policy write in this
+    app may touch them, bootstrap admins included. save_governance_policy
+    refuses the same writes as a last line.
+    """
+    changed = immutable_field_changes(before_raw, after_raw)
+    if not changed:
+        return False
+    _send_immutable_refusal(handler, changed[0])
+    return True
+
+
+def _send_immutable_refusal(handler, field_name: str) -> None:
+    j(
+        handler,
+        {
+            "error": "immutable_field",
+            "field": field_name,
+            "message": f"{field_name} is set by the installation setup and cannot be changed here",
+        },
+        status=400,
+    )
+
+
 def _audit_policy_change(
     subject: GovernanceSubject,
     mode: str,
@@ -339,12 +371,20 @@ def _mutate_policy(handler, parsed, subject: GovernanceSubject, *, op: str, targ
         except GovernancePolicyError as exc:
             j(handler, {"error": "policy_error", "message": str(exc)}, status=500)
             return True
-        raw = _policy_raw(current_policy)
+        # A deep copy: ``mutate`` may edit nested sections in place, and a
+        # refused edit must not leave its changes in the cached policy.
+        raw = deepcopy(_policy_raw(current_policy))
         old_etag = policy_etag(raw)
         if not _check_if_match(handler, raw):
             return True
+        # Snapshot the render-stamped fields before ``mutate`` edits ``raw``
+        # (plan 3.6: organization.id and installation.kind never change
+        # through this path).
+        stamped_before = deepcopy({key: raw.get(key) for key in ("organization", "installation")})
         result = mutate(raw)
         if result is None:
+            return True
+        if _refuse_immutable_change(handler, stamped_before, raw):
             return True
         before, after = result
         sync_needed = op != "user_delete"
@@ -359,6 +399,9 @@ def _mutate_policy(handler, parsed, subject: GovernanceSubject, *, op: str, targ
             )
         try:
             save_governance_policy(raw)
+        except PolicyImmutableFieldError as exc:
+            _send_immutable_refusal(handler, exc.field)
+            return True
         except GovernancePolicyError as exc:
             j(handler, {"error": "invalid_policy", "message": str(exc)}, status=400)
             return True
@@ -393,7 +436,15 @@ def _mutate_policy(handler, parsed, subject: GovernanceSubject, *, op: str, targ
 # ── GET endpoints ────────────────────────────────────────────────────────────
 
 def _handle_me(handler, parsed, policy, subject, access) -> bool:
-    """Self route: any authenticated caller. Never includes claims or tokens."""
+    """Self route: any authenticated caller. Never includes claims or tokens.
+
+    ``delegated_scope`` (plan 3.6) is the caller's organisation designation:
+    ``{"scope": "platform" | "org" | "billing" | "none"}`` or
+    ``{"scope": "department", "departments": [<keys>]}``. Clients use it to
+    decide which organisation views to offer; the /api/org/* handlers check it
+    again on every request.
+    """
+    from api.governance.delegation import delegated_scope
     from api.governance.nav import feature_permissions
 
     j(
@@ -420,6 +471,7 @@ def _handle_me(handler, parsed, policy, subject, access) -> bool:
             # APIs stay the real enforcement.
             "hidden_nav": _hidden_nav(access, policy),
             "nav_audience": _nav_audience(access, policy),
+            "delegated_scope": delegated_scope(policy, subject).to_dict(),
         },
     )
     return True
@@ -529,9 +581,15 @@ def _handle_policy_replace(handler, parsed, policy, subject, access) -> bool:
                 )
                 return True
 
+        if _refuse_immutable_change(handler, current, body):
+            return True
+
         before = _policy_summary(current)
         try:
             save_governance_policy(body)
+        except PolicyImmutableFieldError as exc:
+            _send_immutable_refusal(handler, exc.field)
+            return True
         except GovernancePolicyError as exc:
             j(handler, {"error": "invalid_policy", "message": str(exc)}, status=400)
             return True
@@ -663,9 +721,14 @@ def _handle_group_update(handler, parsed, policy, subject, access) -> bool:
             j(handler, {"error": "not_found", "message": f"unknown group: {name}"}, status=404)
             return None
         before = groups.get(name)
-        groups[name] = entry
+        updated = dict(entry)
+        if isinstance(before, dict):
+            for flag in _GROUP_KEPT_FLAGS:
+                if flag not in updated and flag in before:
+                    updated[flag] = before[flag]
+        groups[name] = updated
         raw["groups"] = groups
-        return before, entry
+        return before, updated
 
     return _mutate_policy(handler, parsed, subject, op="group_update", target=name, mutate=mutate)
 
@@ -1670,6 +1733,6 @@ def handle_governance_api(handler, parsed, method: str) -> bool:
     except GovernancePolicyError as exc:
         j(handler, {"error": "policy_error", "message": str(exc)}, status=500)
         return True
-    subject = subject_from_identity(_caller_identity(handler))
+    subject = subject_from_identity(_caller_identity(handler), policy)
     access = resolve_effective_access(policy, subject)
     return route_func(handler, parsed, policy, subject, access)

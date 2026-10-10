@@ -18,8 +18,58 @@ def grant_matches(values, value: str, *, path: bool = False) -> bool:
                for pattern in values)
 
 
+# Reserved permission namespaces (plan 3.6 and 3.11). Organisation, billing,
+# department and support designations, A2A calls and the bot screen are
+# control-plane rights: a wildcard grant ("*", or a glob that does not name
+# the namespace) never reaches them, so an elevated blacklist account holding
+# the operational wildcard does not silently inherit them. Inside the
+# namespace a glob still works ("a2a:call:*"), except for "screen:", which is
+# granted only by an entry that names the permission exactly.
+RESERVED_NAMESPACES = ("org:", "billing:", "departments:", "support:", "a2a:", "screen:")
+EXACT_ONLY_NAMESPACES = ("screen:",)
+# What an agent turn never carries: every reserved namespace except "a2a:",
+# which the engine's own A2A gate needs (plan 3.6).
+AGENT_STRIPPED_NAMESPACES = ("org:", "billing:", "departments:", "support:", "screen:")
+
+
+def reserved_namespace(value: str) -> str:
+    """The reserved namespace ``value`` belongs to, or "" when it is ordinary.
+
+    Case-insensitive, so a differently cased name cannot slip past the rule.
+    """
+    lowered = str(value or "").strip().lower()
+    for namespace in RESERVED_NAMESPACES:
+        if lowered.startswith(namespace):
+            return namespace
+    return ""
+
+
+def is_agent_stripped_permission(value: str) -> bool:
+    return reserved_namespace(value) in AGENT_STRIPPED_NAMESPACES
+
+
+def permission_matches(values, value: str) -> bool:
+    """Positive permission match that keeps wildcards out of reserved names.
+
+    Ordinary names match like ``grant_matches``. A reserved name matches only
+    a pattern that itself starts with the same namespace, and an exact-only
+    namespace ("screen:") matches only the identical name. Denies keep using
+    ``grant_matches``: a broad deny still denies a reserved name.
+    """
+    namespace = reserved_namespace(value)
+    if not namespace:
+        return grant_matches(values, value)
+    if namespace in EXACT_ONLY_NAMESPACES:
+        return any(str(pattern) == value for pattern in values)
+    return any(str(pattern).lower().startswith(namespace) and fnmatchcase(value, str(pattern))
+               for pattern in values)
+
+
 def intersect_grants(grants: "GrantSet", ceiling: "GrantSet") -> "GrantSet":
-    def intersect(left, right, path=False):
+    def intersect(left, right, path=False, permissions=False):
+        if permissions:
+            return frozenset(v for v in left if permission_matches(right, v)) | frozenset(
+                v for v in right if permission_matches(left, v))
         return frozenset(v for v in left if grant_matches(right, v, path=path)) | frozenset(
             v for v in right if grant_matches(left, v, path=path))
     values = {}
@@ -36,7 +86,8 @@ def intersect_grants(grants: "GrantSet", ceiling: "GrantSet") -> "GrantSet":
                 if grant_matches(grants.mcp_servers, server) and grant_matches(ceiling.mcp_servers, server)
             }
         else:
-            values[f.name] = intersect(a, b, f.name in {"file_read_roots", "file_write_roots", "cli_workdir_roots"})
+            values[f.name] = intersect(a, b, f.name in {"file_read_roots", "file_write_roots", "cli_workdir_roots"},
+                                       permissions=f.name == "permissions")
     return GrantSet(**values)
 
 
@@ -279,6 +330,9 @@ class GovernanceRole:
     name: str
     grants: GrantSet = field(default_factory=GrantSet)
     description: str = ""
+    # Set by a platform admin: an organisation or department admin may hand
+    # this role out (plan 2.5, 3.6). Absent means not delegable.
+    delegable: bool = False
 
 
 @dataclass(frozen=True)
@@ -288,6 +342,35 @@ class GovernanceGroup:
     grants: GrantSet = field(default_factory=GrantSet)
     sso_groups: frozenset[str] = field(default_factory=frozenset)
     description: str = ""
+    delegable: bool = False
+    # A client or freelancer group on a shared installation (plan 2.5). A
+    # policy with an external group never carries an organization block.
+    external: bool = False
+
+
+INSTALLATION_KINDS = frozenset({"client", "hq"})
+
+
+@dataclass(frozen=True)
+class GovernanceOrganization:
+    """The policy's ``organization`` block (plan 2.5), rendered from client.yaml."""
+
+    id: str
+    name: str = ""
+    admins: tuple[str, ...] = ()
+    billing_admins: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class GovernanceDepartment:
+    """One ``departments.<key>`` entry (plan 2.5)."""
+
+    key: str
+    name: str = ""
+    group: str = ""
+    admins: tuple[str, ...] = ()
+    assignable_roles: tuple[str, ...] = ()
+    assignable_groups: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -319,6 +402,12 @@ class GovernancePolicy:
     groups: dict[str, GovernanceGroup] = field(default_factory=dict)
     users: dict[str, GovernanceUser] = field(default_factory=dict)
     raw: dict[str, Any] = field(default_factory=dict)
+    # Managed-service sections (plan 2.5), validated by the loader. An empty
+    # installation_kind means the policy has no installation block, which
+    # counts as a client installation everywhere; only "hq" is HQ.
+    installation_kind: str = ""
+    organization: GovernanceOrganization | None = None
+    departments: dict[str, GovernanceDepartment] = field(default_factory=dict)
 
     @property
     def enabled(self) -> bool:
@@ -327,6 +416,10 @@ class GovernancePolicy:
     @property
     def enforce(self) -> bool:
         return self.mode == "enforce"
+
+    @property
+    def is_hq(self) -> bool:
+        return self.installation_kind == "hq"
 
 
 @dataclass(frozen=True)
@@ -390,10 +483,18 @@ class EffectiveAccess:
             return False
         if grant_matches(getattr(self.deny, dimension), value, path=path):
             return False
-        if self.role_ceiling is not None and not grant_matches(getattr(self.role_ceiling, dimension), value, path=path):
+        # A reserved permission (org:, billing:, departments:, support:, a2a:,
+        # screen:) is never reached by a wildcard, not in the ceiling and not
+        # in the grant (plan 3.6); a broad deny above still denies it.
+        if dimension == "permissions":
+            def matches(values, candidate, *, path=False):
+                return permission_matches(values, candidate)
+        else:
+            matches = grant_matches
+        if self.role_ceiling is not None and not matches(getattr(self.role_ceiling, dimension), value, path=path):
             return False
         values = getattr(self, dimension) if dimension in {"permissions", "profiles", "routes"} else getattr(self.grants, dimension)
-        return grant_matches(values, value, path=path)
+        return matches(values, value, path=path)
 
     def configuration_denies_file(self, *paths: str) -> bool:
         """A technical-data exception cannot reopen a specific sensitive deny.

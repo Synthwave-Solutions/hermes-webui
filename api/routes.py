@@ -1559,7 +1559,7 @@ def _cron_output_content_window(text: str, limit: int = _CRON_OUTPUT_CONTENT_LIM
 
 
 
-def _cron_job_for_api(job: dict, _delivery_ledger: dict | None = None) -> dict:
+def _cron_job_for_api(job: dict, _delivery_ledger: dict | None = None, viewer: str | None = None) -> dict:
     """Return a cron job payload with optional UI settings normalized.
 
     Legacy jobs intentionally persist without ``profile`` so they keep the
@@ -1569,6 +1569,9 @@ def _cron_job_for_api(job: dict, _delivery_ledger: dict | None = None) -> dict:
     ``toast_notifications`` is a WebUI preference for completion toasts. Legacy
     jobs default to enabled so existing behavior is preserved unless a job is
     explicitly muted.
+
+    ``viewer`` is the signed-in email of the request, passed to the notify
+    seam in api/cron_notifications.py (plan 3.1).
     """
     payload = dict(job or {})
     payload.setdefault("profile", None)
@@ -1585,10 +1588,16 @@ def _cron_job_for_api(job: dict, _delivery_ledger: dict | None = None) -> dict:
             payload["last_delivery_error"] = delivery_error
     except Exception:
         logger.debug("cron delivery state unavailable for job %s", payload.get("id"))
+    try:
+        from api import cron_notifications
+
+        payload = cron_notifications.decorate_job(payload, viewer=viewer)
+    except Exception:
+        logger.debug("cron notify state unavailable for job %s", payload.get("id"), exc_info=True)
     return payload
 
 
-def _cron_jobs_for_api(jobs) -> list[dict]:
+def _cron_jobs_for_api(jobs, viewer: str | None = None) -> list[dict]:
     # One ledger read serves the whole list; each job annotation reuses it.
     try:
         from api.cron_webui_delivery import load_ledger
@@ -1596,7 +1605,17 @@ def _cron_jobs_for_api(jobs) -> list[dict]:
         ledger = load_ledger()
     except Exception:
         ledger = None
-    return [_cron_job_for_api(job, _delivery_ledger=ledger) for job in (jobs or [])]
+    return [_cron_job_for_api(job, _delivery_ledger=ledger, viewer=viewer) for job in (jobs or [])]
+
+
+def _cron_request_email(handler) -> str | None:
+    """The signed-in email of a cron request, or None (notify seams, plan 3.1)."""
+    try:
+        from api.ownership import request_owner_email
+
+        return request_owner_email(handler)
+    except Exception:
+        return None
 
 
 _AGENT_CRON_IMPORT_PATH_LOCK = threading.Lock()
@@ -1658,12 +1677,13 @@ def _list_profile_rows_without_counts(list_profiles_fn) -> list:
     return list_profiles_fn()
 
 
-def _cron_jobs_cross_profile(active_profile: str) -> tuple[list[dict], list[dict]]:
+def _cron_jobs_cross_profile(active_profile: str, viewer: str | None = None) -> tuple[list[dict], list[dict]]:
     """Return active-profile rows plus foreign rows for the Tasks panel.
 
     Row ownership is intentionally distinct from a cron job's persisted
     ``profile`` field. The persisted field controls where the job executes;
     ``owner_profile`` tells the UI which profile home the row came from.
+    ``viewer`` is passed through to the per-job notify seam.
     """
     from cron.jobs import list_jobs
     from api.profiles import (
@@ -1717,7 +1737,7 @@ def _cron_jobs_cross_profile(active_profile: str) -> tuple[list[dict], list[dict
         is_active = _profiles_match(owner_profile, active_profile)
         try:
             with cron_profile_context_for_home(home):
-                jobs = _cron_jobs_for_api(list_jobs(include_disabled=True))
+                jobs = _cron_jobs_for_api(list_jobs(include_disabled=True), viewer=viewer)
         except Exception:
             if not is_active:
                 continue
@@ -1870,26 +1890,283 @@ def _event_profile_for_cron_job(job: dict) -> str | None:
     return raw
 
 
-def _cron_job_subprocess_main(job, execution_profile_home, result_queue):
-    """Run one cron job inside a child process pinned to a profile home."""
+class _CronRunRefused(Exception):
+    """Governance did not let a Run now job run (W0).
+
+    ``refusal`` is the plain-language reason; ``recorded`` says whether it is
+    already on the job, so the parent does not record it twice. Nothing ran,
+    so there is no output and nothing to deliver.
+    """
+
+    def __init__(self, refusal, *, recorded=False):
+        super().__init__(refusal)
+        self.refusal = str(refusal)
+        self.recorded = bool(recorded)
+
+
+class _CronRunFailed(Exception):
+    """The engine's governed entry point ran the job and the run raised."""
+
+
+_CRON_RUN_OWNERLESS_REFUSAL = (
+    "Not run: this task has no owner, so there are no access rights to run it "
+    "under. A cron admin can run it."
+)
+_CRON_RUN_POLICY_REFUSAL = (
+    "Not run: the access policy could not be read, so this task cannot be "
+    "checked. An administrator must fix the policy before it can run."
+)
+
+
+def _cron_same_home(first, second) -> bool:
     try:
-        def _run():
-            from cron.scheduler import run_job
+        return Path(first).expanduser().resolve(strict=False) == Path(second).expanduser().resolve(strict=False)
+    except Exception:
+        return str(first) == str(second)
 
-            return run_job(job)
 
-        if execution_profile_home is None:
-            result = _run()
-        else:
-            from api.profiles import cron_profile_context_for_home
+def _cron_run_governed_entry(job, execution_profile_home, store_home=None, run_kwargs=None):
+    """Run ``job`` through the engine's governed entry point, if it has one.
 
-            with cron_profile_context_for_home(execution_profile_home):
-                result = _run()
+    Returns None when the engine has no ``cron.scheduler.run_job_governed``
+    (feature detected by name), otherwise what ``run_job`` returned. That
+    entry point (engine identity fix, E0) applies the gate every scheduled
+    fire goes through: the run is bound to the owner's governance, and under
+    ``enforce`` an ownerless agent job, or an owner whose grants cannot be
+    resolved, is refused. Raises _CronRunRefused for a refusal and
+    _CronRunFailed when the run raised.
+
+    The gate reads the policy of the ACTIVE cron store, so it runs in the
+    store that holds the job (``store_home``), like a scheduled fire of that
+    store, and records a refusal there. The job itself runs in its execution
+    profile: when that is another home, the entry point's run_job call leaves
+    the store for it (this child process runs this one job, so replacing
+    cron.scheduler.run_job here touches nothing else). Without a
+    ``store_home`` the gate runs in the execution profile and the parent
+    records a refusal in the owning store. ``run_kwargs`` are the notify
+    seam's extra run_job arguments; the entry point hands the ones run_job
+    accepts to it (_cron_run_job_kwargs).
+    """
+    import importlib
+    from contextlib import nullcontext
+
+    from api.profiles import cron_profile_context_for_home
+
+    gate_home = store_home if store_home is not None else execution_profile_home
+    gate = cron_profile_context_for_home(gate_home) if gate_home is not None else nullcontext()
+    gate.__enter__()
+    in_gate = [True]
+
+    def _leave_gate():
+        if in_gate[0]:
+            in_gate[0] = False
+            gate.__exit__(None, None, None)
+
+    ran_in_execution_profile = []
+    try:
+        scheduler = importlib.import_module("cron.scheduler")
+        entry = getattr(scheduler, "run_job_governed", None)
+        if not callable(entry):
+            return None
+        original_run_job = scheduler.run_job
+        switch_home = (
+            store_home is not None
+            and execution_profile_home is not None
+            and not _cron_same_home(store_home, execution_profile_home)
+        )
+        if switch_home:
+            def _run_job_in_execution_profile(run_job_arg, *args, **kwargs):
+                ran_in_execution_profile.append(True)
+                _leave_gate()
+                with cron_profile_context_for_home(execution_profile_home):
+                    return original_run_job(run_job_arg, *args, **kwargs)
+
+            scheduler.run_job = _run_job_in_execution_profile
+        extra = _cron_run_job_kwargs(original_run_job, run_kwargs)
+        try:
+            outcome = entry(job, reason="manual", record_refusal=store_home is not None, **extra)
+        finally:
+            if switch_home:
+                scheduler.run_job = original_run_job
+    finally:
+        _leave_gate()
+
+    status = str(getattr(outcome, "outcome", "") or "")
+    if status == "ran":
+        if switch_home and not ran_in_execution_profile:
+            logger.warning("Manual cron run of %s ran in its store, not its execution profile",
+                           (job or {}).get("id", "?"))
+        return (
+            bool(getattr(outcome, "success", False)),
+            getattr(outcome, "output", "") or "",
+            getattr(outcome, "final_response", "") or "",
+            getattr(outcome, "error", None),
+        )
+    if status == "refused":
+        refusal = getattr(outcome, "refusal", None) or getattr(outcome, "error", None) or "Not run."
+        raise _CronRunRefused(refusal, recorded=bool(getattr(outcome, "refusal_recorded", False)))
+    raise _CronRunFailed(str(getattr(outcome, "error", "") or f"unexpected run outcome {status!r}"))
+
+
+def _cron_bind_run_governance(job, run_plan):
+    """Bind the governance a Run now executes under on an engine WITHOUT
+    ``run_job_governed``. Returns a token for _reset_cron_run_governance
+    (None: nothing bound); raises _CronRunRefused.
+
+    ``run_plan`` (from _cron_run_plan) names who the run executes as
+    (``run_as``: the job's owner, or the caller who created a job made before
+    the owner stamp) and whether a run with nobody to bind may go ahead
+    (``unbound_allowed``: only when a cron admin asked for it). Without a
+    plan the job's owner_email is bound and an ownerless job runs unbound, as
+    the engine's own scheduler runs it.
+
+    The binding is the one a chat turn uses for its sender
+    (api.governance.agent_context.bind_governed_agent_turn): nothing bound for
+    a bootstrap admin or with governance off, unrestricted but audited when
+    the context cannot be built under report_only, refused under enforce. An
+    unreadable policy refuses.
+    """
+    if run_plan is None:
+        run_as = str((job or {}).get("owner_email") or "").strip().lower()
+        unbound_allowed = True
+        profile = str((job or {}).get("profile") or "").strip() or "default"
+    else:
+        run_as = str(run_plan.get("run_as") or "").strip().lower()
+        unbound_allowed = run_plan.get("unbound_allowed") is True
+        profile = str(run_plan.get("profile") or "").strip() or "default"
+    if not run_as:
+        if unbound_allowed:
+            return None
+        raise _CronRunRefused(_CRON_RUN_OWNERLESS_REFUSAL)
+
+    from api.governance import loader
+    from api.governance.agent_context import GovernanceBindingError, bind_governed_agent_turn
+
+    try:
+        loader.get_policy()
+    except Exception:
+        logger.warning("Manual cron run: governance policy unreadable, refusing", exc_info=True)
+        raise _CronRunRefused(_CRON_RUN_POLICY_REFUSAL) from None
+    try:
+        return bind_governed_agent_turn(
+            run_as, active_profile=profile, session_id=str((job or {}).get("id") or ""))
+    except GovernanceBindingError as exc:
+        raise _CronRunRefused(f"Not run: {exc}") from None
+
+
+def _reset_cron_run_governance(token) -> None:
+    if token is None:
+        return
+    from api.governance.agent_context import reset_governed_agent_turn
+
+    reset_governed_agent_turn(token)
+
+
+def _cron_request_policy_path() -> str:
+    """The governance policy file this request was admitted with.
+
+    Read before cron_profile_context swaps HERMES_HOME to the active profile's
+    home: without ``HERMES_WEBUI_GOVERNANCE_POLICY`` the loader reads the file
+    under HERMES_HOME, and for a named profile without a file of its own that
+    is governance off, which would make every caller a cron admin (W0).
+    """
+    from api.governance.loader import resolve_policy_path
+
+    return str(resolve_policy_path())
+
+
+class _cron_policy_file_pin:
+    """Pin the WebUI governance policy file (``HERMES_WEBUI_GOVERNANCE_POLICY``)
+    to the one the request decided with, restored on exit.
+
+    The cron create, update, run and resume routes enter it inside
+    cron_profile_context (_cron_request_policy_path), so their checks keep
+    reading that file while HERMES_HOME points at the profile's home; the
+    context's lock serialises the pin with every other cron route. A Run now
+    child enters it with the file from its plan, so it cannot read another
+    file through a HERMES_HOME it inherited while a cron profile context had
+    swapped it.
+    """
+
+    _ENV = "HERMES_WEBUI_GOVERNANCE_POLICY"
+
+    def __init__(self, path):
+        self._path = str(path or "")
+
+    def __enter__(self):
+        self._previous = os.environ.get(self._ENV)
+        if self._path:
+            os.environ[self._ENV] = self._path
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        if self._path:
+            if self._previous is None:
+                os.environ.pop(self._ENV, None)
+            else:
+                os.environ[self._ENV] = self._previous
+        return False
+
+
+def _cron_run_job_kwargs(run_job, run_kwargs) -> dict:
+    """The part of ``run_kwargs`` that ``run_job`` accepts (plan 3.1).
+
+    Manual runs pass the notify seam's extra keyword arguments (for example
+    ``trigger`` and ``trigger_actor``) only to engines whose ``run_job`` takes
+    them, so an older engine keeps working unchanged.
+    """
+    if not run_kwargs:
+        return {}
+    return {key: value for key, value in run_kwargs.items() if _callable_accepts_kwarg(run_job, key)}
+
+
+def _cron_job_subprocess_main(job, execution_profile_home, result_queue, run_plan=None, run_kwargs=None):
+    """Run one cron job inside a child process pinned to a profile home.
+
+    The run is governed (W0). An engine with ``cron.scheduler.run_job_governed``
+    runs it through that entry point, gated in the store that holds the job
+    (_cron_run_governed_entry). On an engine without it the child binds the
+    governance the request decided (``run_plan``, _cron_run_plan) the way a
+    chat turn binds its sender's, and never runs a job with nothing bound for
+    a caller who is not a cron admin (_cron_bind_run_governance). A refusal
+    goes back as ``("refused", refusal, recorded)``. Either way run_job gets
+    the notify seam's ``run_kwargs`` it accepts (_cron_run_job_kwargs).
+    """
+    try:
+        plan = run_plan if isinstance(run_plan, dict) else None
+        with _cron_policy_file_pin((plan or {}).get("governance_policy")):
+            result = _cron_run_governed_entry(
+                job, execution_profile_home, (plan or {}).get("store_home"), run_kwargs=run_kwargs)
+            if result is None:
+                token = _cron_bind_run_governance(job, plan)
+                try:
+                    def _run():
+                        from cron.scheduler import run_job
+
+                        extra = _cron_run_job_kwargs(run_job, run_kwargs)
+                        if extra:
+                            return run_job(job, **extra)
+                        return run_job(job)
+
+                    if execution_profile_home is None:
+                        result = _run()
+                    else:
+                        from api.profiles import cron_profile_context_for_home
+
+                        with cron_profile_context_for_home(execution_profile_home):
+                            result = _run()
+                finally:
+                    _reset_cron_run_governance(token)
         result_queue.put(("ok", result))
+    except _CronRunRefused as refused:
+        result_queue.put(("refused", refused.refusal, refused.recorded))
+    except _CronRunFailed as failed:
+        result_queue.put(("error", str(failed), ""))
     except BaseException as exc:  # pragma: no cover - surfaced in parent
         import traceback
 
         result_queue.put(("error", f"{type(exc).__name__}: {exc}", traceback.format_exc()))
+
 
 
 def _cron_subprocess_result_timeout_seconds(job):
@@ -1909,24 +2186,28 @@ def _cron_subprocess_result_timeout_seconds(job):
     return 6 * 60 * 60.0
 
 
-def _run_cron_job_in_profile_subprocess(job, execution_profile_home):
+def _run_cron_job_in_profile_subprocess(job, execution_profile_home, run_plan=None, run_kwargs=None):
     """Execute cron.scheduler.run_job without holding the parent cron env lock.
 
     cron.scheduler/cron.jobs still rely on process-global HERMES_HOME and module
     constants, so running the job body in a child process gives each long cron
     execution its own globals. The parent process only uses cron_profile_context
     for short metadata reads/writes and remains responsive to unrelated cron UI
-    and API calls while the job runs.
+    and API calls while the job runs. Raises _CronRunRefused when governance
+    did not let the job run (``run_plan``: _cron_run_plan).
+
+    ``run_kwargs`` are extra ``run_job`` keyword arguments from the notify seam
+    (api/cron_notifications.py); the child passes only those run_job accepts.
     """
     import multiprocessing
     import queue
 
     ctx = multiprocessing.get_context("spawn")
     result_queue = ctx.Queue(maxsize=1)
-    process = ctx.Process(
-        target=_cron_job_subprocess_main,
-        args=(job, execution_profile_home, result_queue),
-    )
+    args = (job, execution_profile_home, result_queue, run_plan)
+    if run_kwargs:
+        args += (dict(run_kwargs),)
+    process = ctx.Process(target=_cron_job_subprocess_main, args=args)
     process.start()
 
     result_timeout = _cron_subprocess_result_timeout_seconds(job)
@@ -1970,6 +2251,8 @@ def _run_cron_job_in_profile_subprocess(job, execution_profile_home):
 
     if status == "ok":
         return payload[0]
+    if status == "refused":
+        raise _CronRunRefused(payload[0], recorded=bool(payload[1]) if len(payload) > 1 else False)
 
     message = payload[0]
     traceback_text = payload[1] if len(payload) > 1 else ""
@@ -1978,11 +2261,14 @@ def _run_cron_job_in_profile_subprocess(job, execution_profile_home):
     raise RuntimeError(message)
 
 
+
 def _run_cron_tracked(
     job,
     profile_home=None,
     execution_profile_home=None,
     event_profile=None,
+    run_plan=None,
+    actor=None,
 ):
     """Wrapper that tracks running state around cron.scheduler.run_job.
 
@@ -1990,9 +2276,17 @@ def _run_cron_tracked(
     ``execution_profile_home`` is the selected per-job profile used to load
     agent config/.env while running. When no job profile is selected, both homes
     are the same and legacy server-default behavior is preserved.
+    ``run_plan`` is who the run executes as (_cron_run_plan). A run governance
+    refused is recorded on the job in its owning store unless the engine
+    already did, without output or delivery (_record_cron_run_refusal).
+
+    ``actor`` is the signed-in email of whoever pressed "Run now". The notify
+    seams in api/cron_notifications.py (plan 3.1) decide the extra run_job
+    arguments, whether the result is delivered, and how the run is recorded.
     """
     import importlib
 
+    from api import cron_notifications
     from cron.jobs import mark_job_run, save_job_output
 
     _cron_scheduler = importlib.import_module("cron.scheduler")
@@ -2012,8 +2306,16 @@ def _run_cron_tracked(
             return fn()
 
     try:
+        # Only the arguments in use are passed, so a runner without the
+        # governance plan or the notify seam keeps its old call.
+        subprocess_kwargs = {}
+        if run_plan is not None:
+            subprocess_kwargs["run_plan"] = run_plan
+        run_kwargs = cron_notifications.manual_run_kwargs(job, actor=actor)
+        if run_kwargs:
+            subprocess_kwargs["run_kwargs"] = run_kwargs
         success, output, final_response, error = _run_cron_job_in_profile_subprocess(
-            job, execution_profile_home
+            job, execution_profile_home, **subprocess_kwargs
         )
 
         # Persist output, deliver the same content the scheduled cron path would
@@ -2028,8 +2330,12 @@ def _run_cron_tracked(
                 else f"⚠️ Cron job '{job.get('name', job_id)}' failed:\n{error}"
             )
             should_deliver = bool(deliver_content)
-            if should_deliver and success and _silent_marker in deliver_content.strip().upper():
+            silent = bool(should_deliver and success and _silent_marker in deliver_content.strip().upper())
+            if silent:
                 should_deliver = False
+            should_deliver, delivery_outcome = cron_notifications.delivery_decision(
+                job, success=success, silent=silent, default=should_deliver
+            )
 
             delivery_error = None
             if should_deliver and _deliver_result is not None:
@@ -2046,16 +2352,23 @@ def _run_cron_tracked(
                 _success = False
                 _error = "Agent completed but produced empty response (model error, timeout, or misconfiguration)"
 
-            try:
-                mark_job_run(job_id, _success, _error, delivery_error=delivery_error)
-            except TypeError:
-                # Older/fake cron.jobs modules used by focused WebUI tests may
-                # not expose the newer delivery_error parameter. Real Hermes
-                # scheduler builds do, so this is only a compatibility shim for
-                # legacy test doubles and deployments.
-                mark_job_run(job_id, _success, _error)
+            # Older/fake cron.jobs modules used by focused WebUI tests may not
+            # expose the newer delivery_error parameter of mark_job_run; the
+            # recorder keeps that compatibility fallback.
+            cron_notifications.record_manual_outcome(
+                job_id, _success, _error,
+                delivery_error=delivery_error, outcome=delivery_outcome,
+            )
 
         _with_cron_home(profile_home, _persist_success)
+    except _CronRunRefused as refused:
+        refusal = refused.refusal
+        logger.warning("Manual cron run of job %s refused: %s", job_id, refusal)
+        if not refused.recorded:
+            try:
+                _with_cron_home(profile_home, lambda: _record_cron_run_refusal(job_id, refusal))
+            except Exception:
+                logger.warning("Failed to record the refused manual cron run of %s", job_id, exc_info=True)
     except Exception as e:
         logger.exception("Manual cron run failed for job %s", job_id)
         try:
@@ -2065,6 +2378,36 @@ def _run_cron_tracked(
     finally:
         _mark_cron_done(job_id)
         _publish_session_list_changed("cron_complete", profile=event_profile)
+
+
+
+def _record_cron_run_refusal(job_id, refusal):
+    """Record a refused Run now on the job in the active cron store.
+
+    A refusal is not a run: only the outcome is recorded, and the schedule,
+    state, enabled flag and repeat count are left alone. The engine's
+    ``mark_job_refused(consume_occurrence=False)`` does exactly that. An engine
+    without it (the live one) gets the same fields through ``update_job``:
+    its ``mark_job_run`` counts a run, so a refused Run now of a one-shot
+    would use up its only run and complete it without running it.
+    """
+    import cron.jobs as cron_jobs
+
+    mark_job_refused = getattr(cron_jobs, "mark_job_refused", None)
+    if callable(mark_job_refused):
+        return mark_job_refused(job_id, refusal, consume_occurrence=False)
+    job = cron_jobs.get_job(job_id)
+    if job is None:
+        return False
+    try:
+        streak = int(job.get("failure_streak") or 0)
+    except (TypeError, ValueError):
+        streak = 0
+    return cron_jobs.update_job(job_id, {
+        "last_status": "blocked_config",
+        "last_error": refusal,
+        "failure_streak": streak + 1,
+    }) is not None
 
 _PROVIDER_ALIASES = {
     "claude": "anthropic",
@@ -11851,6 +12194,10 @@ def handle_get(handler, parsed) -> bool:
     if governance_api.handle_governance_api(handler, parsed, "GET"):
         return True
 
+    if parsed.path in ("/api/org/overview", "/api/org/departments", "/api/org/people", "/api/org/approvals", "/api/org/usage"):
+        from api import org_api
+        return org_api.handle_get(handler, parsed)
+
     if parsed.path.startswith(("/static/vendor/mnemosyne-dashboard/", "/session/static/vendor/mnemosyne-dashboard/")):
         return _serve_memdash_vendor(handler, parsed)
 
@@ -12316,7 +12663,9 @@ def handle_get(handler, parsed) -> bool:
         return j(handler, get_provider_cost_history(provider_id, days))
 
     if parsed.path == "/api/settings":
-        settings = load_settings()
+        settings = dict(load_settings())
+        from api import ops_reporter
+        settings["support_telemetry"] = bool(ops_reporter.browser_reporting_enabled())
         # The caller's own theme/skin/font size beat the instance default
         # (per-user appearance store, 27 Aug 2026; api/settings_scope.py).
         from api.settings_scope import overlay_user_appearance
@@ -13445,7 +13794,8 @@ def handle_get(handler, parsed) -> bool:
         _ensure_agent_cron_import_path()
         active_profile = _get_active_profile_name() or "default"
         try:
-            active_jobs, other_jobs = _cron_jobs_cross_profile(active_profile)
+            active_jobs, other_jobs = _cron_jobs_cross_profile(
+                active_profile, viewer=_cron_request_email(handler))
         except ModuleNotFoundError as exc:
             if exc.name in ("cron", "cron.jobs"):
                 return j(handler, {"jobs": [], "cron_unavailable": True})
@@ -13467,6 +13817,12 @@ def handle_get(handler, parsed) -> bool:
             "active_profile": active_profile,
             "other_profile_count": hidden_other_count,
         })
+
+    # The viewer's own notification settings (plan 3.1); the handler checks
+    # that each job is visible to the viewer.
+    if parsed.path == "/api/crons/notifications":
+        from api import cron_notifications
+        return cron_notifications.handle_notifications_get(handler, parsed)
 
     # The /api/crons/* GET detail routes below all serve the ACTIVE profile's
     # cron store, so one shared scope check on the active profile stops
@@ -14035,6 +14391,10 @@ def handle_post(handler, parsed) -> bool:
     if parsed.path == "/api/tts":
         return _handle_tts(handler, parsed)
 
+    if parsed.path == "/api/client-errors":
+        from api import ops_reporter
+        return ops_reporter.handle_client_error(handler, None)
+
     if parsed.path == "/api/client-events/log":
         if diag:
             diag.stage("read_client_event_body")
@@ -14063,6 +14423,10 @@ def handle_post(handler, parsed) -> bool:
     from api.workspace_access import guard_session_request as guard_workspace_request
     if not guard_workspace_request(handler, parsed, body):
         return True
+
+    if parsed.path in ("/api/org/overview", "/api/org/departments", "/api/org/people", "/api/org/approvals", "/api/org/usage"):
+        from api import org_api
+        return org_api.handle_post(handler, parsed, body)
 
     if parsed.path in ("/api/memdash/v1/action", "/api/memdash/access-log/seen", "/api/memdash/notice"):
         from api import memdash
@@ -15391,19 +15755,29 @@ def handle_post(handler, parsed) -> bool:
     # ── Cron API (POST) ──
     # See GET-side comment above: wrap in cron_profile_context so writes go
     # to the TLS-active profile's jobs.json instead of the process default.
+    # The write checks and the Run now plan decide inside that context, so
+    # they keep the policy file the request was admitted with: resolved
+    # before the swap, pinned while the context holds its lock (W0).
     if parsed.path == "/api/crons/create":
         from api.profiles import cron_profile_context
 
-        with cron_profile_context():
+        _cron_policy = _cron_request_policy_path()
+        with cron_profile_context(), _cron_policy_file_pin(_cron_policy):
             _ensure_agent_cron_import_path()
             return _handle_cron_create(handler, body)
 
     if parsed.path == "/api/crons/update":
         from api.profiles import cron_profile_context
 
-        with cron_profile_context():
+        _cron_policy = _cron_request_policy_path()
+        with cron_profile_context(), _cron_policy_file_pin(_cron_policy):
             _ensure_agent_cron_import_path()
             return _handle_cron_update(handler, body)
+
+    # Set or clear the viewer's own mute for one job (plan 3.1).
+    if parsed.path == "/api/crons/notifications":
+        from api import cron_notifications
+        return cron_notifications.handle_notifications_post(handler, body)
 
     # The cron mutation routes below act on the ACTIVE profile's cron store,
     # so they share the same governance scope guard as the GET detail routes:
@@ -15412,10 +15786,27 @@ def handle_post(handler, parsed) -> bool:
     # api/cron_scope.py, which allows + audits would_deny under report_only).
     if parsed.path in ("/api/crons/delete", "/api/crons/run",
                        "/api/crons/pause", "/api/crons/resume"):
+        # The guards and the handlers read the id through one helper, so both
+        # look up the same exact job (W0).
+        _cron_job_id = _cron_body_job_id(body)
+        if _cron_job_id is None:
+            return bad(handler, "job_id required")
+        # Both guards read the store: pin the agent's cron package first, so a
+        # shadowing top-level ``cron`` package cannot answer for it.
+        _ensure_agent_cron_import_path()
         from api.cron_scope import caller_sees_cron_profile
         if not caller_sees_cron_profile(handler, _get_active_profile_name() or "default",
-                                        job_id=str((body or {}).get("job_id") or "")):
+                                        job_id=_cron_job_id):
             return j(handler, {"error": "forbidden", "reason": "cron_scope"}, status=403)
+        # Seeing a job is not owning it: a sharee or a profile-grant holder
+        # may not pause, resume, delete or run someone else's task (W0).
+        from api.cron_scope import caller_may_act_on_cron_job
+        if not caller_may_act_on_cron_job(handler, _cron_job_id, path=parsed.path):
+            verb = "run" if parsed.path == "/api/crons/run" else "change"
+            return j(handler, {
+                "error": f"Only the owner of this task or a cron admin can {verb} it.",
+                "reason": "cron_owner",
+            }, status=403)
 
     if parsed.path == "/api/crons/delete":
         from api.profiles import cron_profile_context
@@ -15427,7 +15818,8 @@ def handle_post(handler, parsed) -> bool:
     if parsed.path == "/api/crons/run":
         from api.profiles import cron_profile_context
 
-        with cron_profile_context():
+        _cron_policy = _cron_request_policy_path()
+        with cron_profile_context(), _cron_policy_file_pin(_cron_policy):
             _ensure_agent_cron_import_path()
             return _handle_cron_run(handler, body)
 
@@ -15441,7 +15833,10 @@ def handle_post(handler, parsed) -> bool:
     if parsed.path == "/api/crons/resume":
         from api.profiles import cron_profile_context
 
-        with cron_profile_context():
+        # Resume decides who may leave a task ownerless (a cron admin) inside
+        # the swap, like create, update and run.
+        _cron_policy = _cron_request_policy_path()
+        with cron_profile_context(), _cron_policy_file_pin(_cron_policy):
             _ensure_agent_cron_import_path()
             return _handle_cron_resume(handler, body)
 
@@ -15938,6 +16333,7 @@ def handle_post(handler, parsed) -> bool:
         return j(handler, {"ok": acknowledge(body.get("id"))})
 
     if parsed.path == "/api/settings":
+        body.pop("support_telemetry", None)
         # Appearance self-service (26 Aug 2026 report): the route catalog now
         # admits this POST with config:read; this body-sink guard keeps every
         # non-cosmetic settings write on config:write exactly as before while
@@ -20489,6 +20885,12 @@ def _handle_cron_recent(handler, parsed):
         except Exception:
             delivery_state_for_job = None
             _delivery_ledger = None
+        # Per-viewer in-app flags (plan 3.1): api/cron_notifications.py.
+        try:
+            from api import cron_notifications as _cron_notifications
+        except Exception:
+            _cron_notifications = None
+        _viewer = _cron_request_email(handler)
         completions = []
         for job in jobs:
             job_id = str(job.get("id", "") or "")
@@ -20526,6 +20928,12 @@ def _handle_cron_recent(handler, parsed):
                     if completion["status"] == "ok" and delivery_status == "failed":
                         completion["status"] = "error"
                         completion["status_detail"] = "delivery_failed"
+                if _cron_notifications is not None:
+                    try:
+                        completion = _cron_notifications.decorate_completion(
+                            completion, job, viewer=_viewer)
+                    except Exception:
+                        logger.debug("cron notify flags unavailable for job %s", job_id, exc_info=True)
                 completions.append(completion)
         latest_session_info = _latest_cron_session_info_for_jobs(
             [job.get("id", "") for job in jobs],
@@ -22671,6 +23079,444 @@ def _normalize_cron_shared_with(value):
     return out[:25]
 
 
+# ── Cron write authorisation (POST /api/crons/create and /api/crons/update) ──
+# Both routes used to hand every body key to the engine, so any cron:write user
+# could edit someone else's task, point its delivery at any recipient or blank
+# the owner_email the engine runs it as. Every write passes _cron_write_allowed;
+# pause, resume, delete and run pass cron_scope.caller_may_act_on_cron_job. A
+# task without an owner gets its creator as owner with their first update or
+# resume (_cron_ownerless_task_stamp).
+
+# What static/panels.js sends: the emoji picker, the category popover and the
+# share dialog one field each, saveCronForm the whole form. Anything else,
+# including owner_email, origin, created_at and run state, is refused (400).
+_CRON_WRITE_FIELDS = frozenset({
+    "name", "schedule", "prompt", "deliver", "profile", "model", "provider",
+    "toast_notifications", "diagram", "emoji", "category", "shared_with",
+    "skills", "notify",
+})
+# Only a new task takes this (saveCronForm's create branch); an existing task
+# is paused and resumed through its own routes.
+_CRON_CREATE_ONLY_FIELDS = frozenset({"enabled"})
+# The one shape each of those fields may have, cron admins included (400
+# otherwise): what the Tasks panel sends. A list stored as a task's name
+# broke the engine's lookups by name (resolve_job_ref) for its whole store.
+# model, provider and profile also take null: the form clears a model pin
+# with it. skills, shared_with, enabled and the admin fields are checked
+# where their values are.
+_CRON_STRING_FIELDS = frozenset({
+    "name", "prompt", "schedule", "deliver", "diagram", "emoji", "category",
+})
+_CRON_STRING_OR_NULL_FIELDS = frozenset({"model", "provider", "profile"})
+_CRON_BOOLEAN_FIELDS = frozenset({"toast_notifications"})
+# A no_agent script runs without any governance, and managed_by decides who is
+# told when a task fails, so only cron admins may set them.
+_CRON_ADMIN_FIELDS = frozenset({"script", "no_agent", "managed_by"})
+_CRON_MANAGED_BY_VALUES = frozenset({"synthwave", "client"})
+
+
+def _normalize_cron_managed_by(value):
+    """``synthwave`` or ``client``; empty clears the marker."""
+    return str(value or "").strip().lower() or None
+
+
+def _cron_value_shape_error(body):
+    """The 400 message for the first field of ``body`` whose value has the
+    wrong shape (_CRON_STRING_FIELDS and the two sets after it), else None."""
+    for key in sorted(_CRON_STRING_FIELDS.intersection(body)):
+        if not isinstance(body[key], str):
+            return f"{key} must be a string"
+    for key in sorted(_CRON_STRING_OR_NULL_FIELDS.intersection(body)):
+        if body[key] is not None and not isinstance(body[key], str):
+            return f"{key} must be a string or null"
+    for key in sorted(_CRON_BOOLEAN_FIELDS.intersection(body)):
+        if not isinstance(body[key], bool):
+            return f"{key} must be true or false"
+    return None
+
+
+def _cron_notify_updates(value, *, handler=None, job=None) -> dict:
+    """The job fields a ``notify`` value writes (plan 3.1, Appendix E.1).
+
+    api/cron_notifications.validate_notify_field normalizes the value or
+    raises ValueError (answered with 400). Writing ``notify`` also writes
+    ``toast_notifications`` for older clients: toasts stay on when the in-app
+    level is ``all`` or ``failures`` (legacy_toast_value in the notify policy).
+    """
+    from api import cron_notifications
+
+    notify = cron_notifications.validate_notify_field(value, is_admin=_cron_admin_allowed(handler) if handler is not None else None, job=job)
+    updates = {"notify": notify}
+    if isinstance(notify, dict) and "in_app" in notify:
+        from api._notify_policy_fallback import legacy_toast_value
+
+        updates["toast_notifications"] = legacy_toast_value(notify)
+    return updates
+
+
+def _cron_delivery_platforms():
+    """The delivery choices GET /api/crons/delivery-options offers. They are
+    also the only ``deliver`` values a non-admin may write: a free-form target
+    such as ``telegram:<chat id>`` would send a task's output to anyone."""
+    try:
+        from cron.scheduler import _KNOWN_DELIVERY_PLATFORMS
+    except Exception:
+        _KNOWN_DELIVERY_PLATFORMS = frozenset()
+    platforms = [
+        {"value": "local", "label": "Local (save output only)"},
+        {"value": "origin", "label": "Origin (reply to creator)"}
+    ]
+    for name in sorted(_KNOWN_DELIVERY_PLATFORMS):
+        platforms.append({"value": name, "label": name.capitalize()})
+    return platforms
+
+
+def _cron_grant_access(handler):
+    """The caller's effective grants for the cron value checks, or None when
+    governance is off. Unlike resource_scope.access_for this also resolves
+    under report_only, so a would-be refusal reaches _cron_write_refusal and
+    is audited as would_deny instead of passing unseen."""
+    from api.governance.enforce import _request_identity, subject_from_identity
+    from api.governance.loader import get_policy
+    from api.governance.resolver import resolve_effective_access
+
+    policy = get_policy()
+    if not policy.enabled:
+        return None
+    return resolve_effective_access(policy, subject_from_identity(_request_identity(handler)))
+
+
+def _cron_model_pin_allowed(handler, model, provider) -> bool:
+    """Whether the caller's model grants cover pinning this model/provider.
+    Fails closed when the policy cannot be resolved."""
+    try:
+        from api.governance.resource_scope import allowed, model_allowed
+
+        access = _cron_grant_access(handler)
+        if access is None:
+            return True
+        if model:
+            return model_allowed(access, model, provider or "")
+        from api.config import _resolve_provider_alias
+
+        return allowed(access, "model_providers", _resolve_provider_alias(str(provider)))
+    except Exception:
+        logger.warning("cron model grant check failed", exc_info=True)
+        return False
+
+
+def _cron_skills_outside_grants(handler, skills) -> list[str]:
+    """The names in ``skills`` a chat turn of the caller could not load.
+
+    The scheduler injects every skill of a job into its prompt through
+    skill_view, outside the tool gates (cron/scheduler.py _build_job_prompt),
+    so a task must not carry a skill its creator could not load in a chat.
+    Same rule as chat: the governance context a chat turn of the caller binds
+    (agent_context.bind_governed_agent_turn, on the caller's active profile,
+    so a managed bot's skill selection applies as well), checked by the
+    engine's own skill_view gates (tool_allowed_for_context for the tool,
+    tool_arguments_allowed_for_context for the name, which also matches a
+    category path by its last segment). Each name is checked as given and in
+    its normalized form (lower case, spaces as hyphens). The rule is evaluated
+    as enforced, so under report_only a refusal is audited as would_deny.
+    Governance off: every skill. Fails closed: every name is reported when the
+    context cannot be built or checked, or a chat turn would run unbound.
+    """
+    names = list(dict.fromkeys(str(name).strip() for name in skills if str(name).strip()))
+    if not names:
+        return []
+    try:
+        from api.governance.loader import get_policy
+
+        if not get_policy().enabled:
+            return []
+        ctx = _cron_caller_chat_context(handler)
+        if ctx is None:
+            return names
+        from hermes_cli.dashboard_governance.tool_policy import (
+            tool_allowed_for_context,
+            tool_arguments_allowed_for_context,
+        )
+
+        ctx = _cron_context_as_enforced(ctx)
+        if not tool_allowed_for_context(ctx, "skill_view", _cron_skill_tool_registry()).allowed:
+            return names
+        outside = []
+        for name in names:
+            forms = dict.fromkeys((name, name.lower().replace(" ", "-")))
+            if not all(tool_arguments_allowed_for_context(ctx, "skill_view", {"name": form}).allowed
+                       for form in forms):
+                outside.append(name)
+        return outside
+    except Exception:
+        logger.warning("cron skill grant check failed", exc_info=True)
+        return names
+
+
+def _cron_caller_chat_context(handler):
+    """The engine governance context a chat turn of the caller runs under, or
+    None when such a turn would run unbound. Bound and reset on this thread
+    only for the duration of the lookup."""
+    from api.governance.agent_context import bind_governed_agent_turn, reset_governed_agent_turn
+    from api.governance.enforce import _request_identity
+
+    token = bind_governed_agent_turn(
+        _request_identity(handler), active_profile=_get_active_profile_name() or "default")
+    if token is None:
+        return None
+    try:
+        from hermes_cli.dashboard_governance.context import current_governance_context
+
+        return current_governance_context()
+    finally:
+        reset_governed_agent_turn(token)
+
+
+def _cron_context_as_enforced(ctx):
+    """``ctx`` with its access (and bot ceiling) evaluated as under enforce."""
+    from dataclasses import replace
+
+    def _enforced(access):
+        if access is None or getattr(access, "mode", "enforce") == "enforce":
+            return access
+        return replace(access, mode="enforce")
+
+    updates = {"access": _enforced(ctx.access)}
+    if getattr(ctx, "bot_access_ceiling", None) is not None:
+        updates["bot_access_ceiling"] = _enforced(ctx.bot_access_ceiling)
+    return replace(ctx, **updates)
+
+
+def _cron_skill_tool_registry():
+    """The engine tool registry with skill_view registered."""
+    from tools.registry import registry
+
+    if registry.get_entry("skill_view") is None:
+        import tools.skills_tool  # noqa: F401  (registers skill_view)
+    return registry
+
+
+def _cron_job_skill_names(job) -> set[str]:
+    """The skills stored on ``job`` (``skills``, or the legacy ``skill``)."""
+    if not isinstance(job, dict):
+        return set()
+    raw = job.get("skills")
+    if raw is None:
+        raw = [job.get("skill")]
+    elif isinstance(raw, str):
+        raw = [raw]
+    return {str(name).strip() for name in raw if str(name or "").strip()}
+
+
+def _cron_people_outside_policy(emails) -> list[str]:
+    """The addresses in ``emails`` the governance policy does not know (its
+    users and bootstrap admins, the list GET /api/people offers). Empty when
+    governance is off: those installs have no directory to check against."""
+    from api.governance.loader import get_policy
+
+    policy = get_policy()
+    if not policy.enabled:
+        return []
+    known = {str(email).strip().lower() for email in (policy.users or {})}
+    known |= {str(email).strip().lower() for email in (policy.bootstrap_admins or ())}
+    return sorted(email for email in emails if email not in known)
+
+
+def _cron_write_refusal(identity, path, reason, message, job_id=""):
+    """A 403 for a governed cron write, or None under report_only, which
+    audits the refusal as would_deny and lets the write through."""
+    import api.cron_scope as cron_scope
+
+    if cron_scope.audit_write_would_deny(identity, path=path, reason=reason, job_id=job_id):
+        return None
+    return 403, {"error": message, "reason": reason}
+
+
+def _cron_write_allowed(handler, body, job_id=None):
+    """Authorise one cron create (``job_id`` None) or update before anything
+    is written. Returns None when the write may go ahead, otherwise the
+    ``(status, payload)`` refusal to send.
+
+    Order: the field allowlist and the value shapes (400); for an update the
+    per-job scope guard, then ownership (403: the owner or a cron admin may
+    edit, a sharee may not); then the values (skills by the chat rule,
+    deliver, model). Cron admins skip ownership and the value grants, never
+    the allowlist, the value shapes or the people check. Installs with
+    governance off resolve every caller as cron admin (identity_has_permission
+    fails open there), and report_only audits a 403 as would_deny instead of
+    enforcing. An update of a task without an owner is decided after this
+    (_cron_ownerless_task_stamp).
+    """
+    creating = job_id is None
+    path = "/api/crons/create" if creating else "/api/crons/update"
+    accepted = _CRON_WRITE_FIELDS | _CRON_ADMIN_FIELDS | (
+        _CRON_CREATE_ONLY_FIELDS if creating else {"job_id"})
+    refused = sorted(str(key) for key in body if key not in accepted)
+    if refused:
+        return 400, {"error": f"Field not allowed: {', '.join(refused)}"}
+    shape_error = _cron_value_shape_error(body)
+    if shape_error:
+        return 400, {"error": shape_error}
+
+    from api.governance.enforce import _request_identity
+
+    identity = _request_identity(handler)
+    is_admin = _cron_admin_allowed(handler)
+    job = None
+    if not creating and (not is_admin or "shared_with" in body):
+        from cron.jobs import get_job
+
+        job = get_job(job_id)
+        if job is None:
+            return 404, {"error": "Job not found"}
+
+    def _refuse(reason, message):
+        return _cron_write_refusal(identity, path, reason, message, job_id or "")
+
+    if not creating and not is_admin:
+        import api.cron_scope as cron_scope
+
+        # The handler already holds cron_profile_context, so pass the loaded
+        # row instead of letting the guard enter that lock again.
+        if not cron_scope.caller_sees_cron_profile(
+                handler, _get_active_profile_name() or "default", job_id=job_id, job=job):
+            return 403, {"error": "forbidden", "reason": "cron_scope"}
+        if not cron_scope.identity_owns_cron_job(identity, job):
+            refusal = _refuse("cron_owner", "Only the owner of this task or a cron admin can change it.")
+            if refusal:
+                return refusal
+
+    admin_fields = sorted(_CRON_ADMIN_FIELDS.intersection(body))
+    if admin_fields and not is_admin:
+        refusal = _refuse("cron_admin_field", f"Only a cron admin can set {', '.join(admin_fields)}.")
+        if refusal:
+            return refusal
+    if body.get("script") is not None and not isinstance(body["script"], str):
+        return 400, {"error": "script must be a string"}
+    if "no_agent" in body and not isinstance(body["no_agent"], bool):
+        return 400, {"error": "no_agent must be a boolean"}
+    if "managed_by" in body and _normalize_cron_managed_by(body["managed_by"]) not in (
+            _CRON_MANAGED_BY_VALUES | {None}):
+        return 400, {"error": "managed_by must be synthwave or client"}
+    if "notify" in body:
+        try:
+            _cron_notify_updates(body["notify"], handler=handler, job=job)
+        except ValueError as e:
+            return 400, {"error": str(e)}
+
+    skills = body.get("skills")
+    if skills is not None:
+        if not isinstance(skills, list) or not all(isinstance(name, str) for name in skills):
+            return 400, {"error": "skills must be a list of skill names"}
+        # A skill already on the task is not a new one: saving it back is fine.
+        stored = _cron_job_skill_names(job)
+        new_skills = [name for name in skills if name.strip() and name.strip() not in stored]
+        denied = [] if is_admin or not new_skills else _cron_skills_outside_grants(handler, new_skills)
+        if denied:
+            refusal = _refuse("cron_skill", f"These skills are not available to you: {', '.join(denied)}.")
+            if refusal:
+                return refusal
+
+    if not is_admin and body.get("deliver") is not None:
+        # The engine reads an empty deliver as local (_normalize_deliver_value).
+        deliver = str(body["deliver"]).strip() or "local"
+        stored = None if job is None else str(job.get("deliver") or "").strip()
+        # Saving the stored target back unchanged is not a new target.
+        if deliver != stored and deliver not in {p["value"] for p in _cron_delivery_platforms()}:
+            refusal = _refuse("cron_deliver", "This delivery target is not available to you.")
+            if refusal:
+                return refusal
+
+    if not is_admin and ("model" in body or "provider" in body):
+        stored_pin = (None, None) if job is None else (job.get("model") or None, job.get("provider") or None)
+        model = (body.get("model") or None) if "model" in body else stored_pin[0]
+        provider = (body.get("provider") or None) if "provider" in body else stored_pin[1]
+        if ((model or provider) and (model, provider) != stored_pin
+                and not _cron_model_pin_allowed(handler, model, provider)):
+            refusal = _refuse("cron_model", "This model is not available to you.")
+            if refusal:
+                return refusal
+
+    if "shared_with" in body:
+        try:
+            people = _normalize_cron_shared_with(body["shared_with"])
+            already = set(_normalize_cron_shared_with((job or {}).get("shared_with")))
+        except ValueError as e:
+            return 400, {"error": str(e)}
+        try:
+            # Someone already on the task may stay after leaving the directory.
+            unknown = _cron_people_outside_policy(email for email in people if email not in already)
+        except Exception:
+            logger.warning("cron share check: governance policy unavailable", exc_info=True)
+            return 503, {"error": "People directory is unavailable. Please try again."}
+        if unknown:
+            return 400, {"error": f"shared_with: not in the people directory: {', '.join(unknown)}"}
+    return None
+
+
+
+def _cron_owner_email_writable() -> bool:
+    """Whether the engine's update_job takes ``owner_email``: the live
+    engine's does, the engine identity fix (E0) makes it immutable."""
+    try:
+        import importlib
+
+        jobs = importlib.import_module("cron.jobs")
+    except Exception:
+        return False
+    return "owner_email" not in getattr(jobs, "_IMMUTABLE_JOB_FIELDS", frozenset())
+
+
+def _cron_ownerless_task_stamp(handler, path, *, job=None, job_id=None):
+    """What an update or resume of a task (``job``, or the one ``job_id``
+    names) must write with it when the task has no ``owner_email``. Returns
+    ``(stamp, refusal)``.
+
+    A Tasks panel task from before the owner stamp belongs to its WebUI
+    creator (cron_scope.identity_owns_cron_job), but the live engine's
+    scheduler fires a task without an owner with nothing bound: a governed
+    creator's edit or resume would make its next fire run with unrestricted
+    tools. When that creator, not a cron admin, changes it:
+
+    - on an engine whose update_job takes owner_email, ``stamp`` is
+      ``{"owner_email": <caller>}``, written in the same update (a resume
+      writes it before the task is enabled), so every fire is governed as
+      the creator, as a new task's is (_handle_cron_create);
+    - an engine that refuses owner_email (the identity fix) refuses an
+      ownerless agent fire under enforce itself, which its
+      ``run_job_governed`` marks: nothing to stamp;
+    - on an engine with neither, ``refusal`` is a 403 (reason
+      ``cron_run_ungoverned``, as Run now refuses an unbound run); under
+      report_only it is audited as would_deny and the change goes ahead.
+
+    Cron admins (everyone with governance off) may leave a task ownerless,
+    as they may run one unbound (_cron_run_plan), and a caller who does not
+    own the task (let through by report_only) never becomes its owner.
+    """
+    if _cron_admin_allowed(handler):
+        return {}, None
+    if job is None:
+        from cron.jobs import get_job
+
+        job = get_job(job_id)
+    if not isinstance(job, dict) or str(job.get("owner_email") or "").strip():
+        return {}, None
+    import api.cron_scope as cron_scope
+    from api.governance.enforce import _request_identity
+
+    identity = _request_identity(handler)
+    if not cron_scope.identity_owns_cron_job(identity, job):
+        return {}, None
+    if _cron_owner_email_writable():
+        return {"owner_email": str(identity.get("email") or "").strip().lower()}, None
+    if _cron_governed_run_available():
+        return {}, None
+    return {}, _cron_write_refusal(
+        identity, path, "cron_run_ungoverned",
+        "This task has no owner, so its runs would not be governed. Ask a cron admin to change it.",
+        str(job.get("id") or ""))
+
+
 def _handle_cron_create(handler, body):
     try:
         require(body, "prompt", "schedule")
@@ -22678,6 +23524,10 @@ def _handle_cron_create(handler, body):
             raise ValueError("enabled must be a boolean")
     except ValueError as e:
         return bad(handler, str(e))
+    refusal = _cron_write_allowed(handler, body)
+    if refusal is not None:
+        status, payload = refusal
+        return j(handler, payload, status=status)
     try:
         from cron.jobs import create_job, update_job
 
@@ -22687,21 +23537,61 @@ def _handle_cron_create(handler, body):
         toast_notifications = body.get("toast_notifications") is not False
         requested_model = body.get("model") or None
         requested_provider = body.get("provider") or None
-        from api.ownership import request_owner_email
-        _creator = request_owner_email(handler)
-        job = create_job(
-            owner_email=_creator,
-            origin={"platform": "webui", "chat_id": None, "user_id": _creator} if _creator else None,
-            prompt=body["prompt"],
-            schedule=body["schedule"],
-            name=body.get("name") or None,
-            deliver=body.get("deliver") or "local",
-            skills=body.get("skills") or [],
-            model=requested_model,
-            provider=requested_provider,
-            **({"enabled": body["enabled"]} if "enabled" in body else {}),
-        )
+        # Stamp the creator, as chat-created jobs already are, so completion
+        # notifications and the ownership rule in api/cron_scope.py reach the
+        # person who scheduled it from the Tasks panel, and every run is
+        # governed as them (owner_email). No stamp without a signed-in email
+        # (password/auth-off installs keep the shared view).
+        try:
+            from api.ownership import request_owner_email
+
+            _creator = request_owner_email(handler)
+        except Exception:
+            _creator = None
+        create_kwargs = {
+            "prompt": body["prompt"],
+            "schedule": body["schedule"],
+            "name": body.get("name") or None,
+            "deliver": body.get("deliver") or "local",
+            "skills": body.get("skills") or [],
+            "model": requested_model,
+            "provider": requested_provider,
+        }
+        if "enabled" in body:
+            create_kwargs["enabled"] = body["enabled"]
+        for _key in ("script", "no_agent"):  # cron admins only, see _cron_write_allowed
+            if _key in body:
+                create_kwargs[_key] = body[_key]
         post_create_updates = {}
+        if _creator:
+            # Identity goes in at creation: the engine's update_job refuses
+            # owner_email and origin once they are immutable. Engines whose
+            # create_job has no owner_email kwarg take it right after.
+            create_kwargs["origin"] = {"platform": "webui", "chat_id": None, "user_id": _creator}
+            if _callable_accepts_kwarg(create_job, "owner_email"):
+                create_kwargs["owner_email"] = _creator
+            else:
+                post_create_updates["owner_email"] = _creator
+        _category = _normalize_cron_category(body.get("category")) or _cron_category_from_prompt(body.get("prompt"))
+        if "notify" in body:
+            notification_updates = _cron_notify_updates(body["notify"], handler=handler)
+        else:
+            from api import cron_notifications
+            notification_updates = cron_notifications.notify_for_new_job(_category)
+            if body.get("toast_notifications") is False:
+                notification_updates = _cron_notify_updates({"in_app": "quiet", "delivery": notification_updates["notify"]["delivery"]}, handler=handler)
+        # A due task must carry its delivery policy in its first stored record.
+        # Older engines keep the compatible post-create metadata path.
+        import inspect
+        try:
+            create_parameters = inspect.signature(create_job).parameters
+        except (TypeError, ValueError):
+            create_parameters = {}
+        for key, value in {"notify": notification_updates["notify"], "category": _category,
+                           "managed_by": _normalize_cron_managed_by(body.get("managed_by"))}.items():
+            if key in create_parameters:
+                create_kwargs[key] = value
+        job = create_job(**create_kwargs)
         if profile is not None:
             post_create_updates["profile"] = profile
             post_create_updates.update(
@@ -22729,6 +23619,9 @@ def _handle_cron_create(handler, body):
         _shared = _normalize_cron_shared_with(body.get("shared_with"))
         if _shared:
             post_create_updates["shared_with"] = _shared
+        if "managed_by" in body:
+            post_create_updates["managed_by"] = _normalize_cron_managed_by(body["managed_by"])
+        post_create_updates.update(notification_updates)
         if post_create_updates:
             job = update_job(job["id"], post_create_updates) or job
         return j(handler, {"ok": True, "job": _cron_job_for_api(job)})
@@ -22738,30 +23631,27 @@ def _handle_cron_create(handler, body):
 
 def _handle_cron_delivery_options(handler):
     """Return available delivery platforms for cron jobs."""
-    try:
-        from cron.scheduler import _KNOWN_DELIVERY_PLATFORMS
-    except Exception:
-        _KNOWN_DELIVERY_PLATFORMS = frozenset()
-    platforms = [
-        {"value": "local", "label": "Local (save output only)"},
-        {"value": "origin", "label": "Origin (reply to creator)"}
-    ]
-    for name in sorted(_KNOWN_DELIVERY_PLATFORMS):
-        platforms.append({"value": name, "label": name.capitalize()})
-    return j(handler, {"platforms": platforms})
+    return j(handler, {"platforms": _cron_delivery_platforms()})
 
 
 def _handle_cron_update(handler, body):
-    try:
-        require(body, "job_id")
-    except ValueError as e:
-        return bad(handler, str(e))
+    job_id = _cron_body_job_id(body)
+    if job_id is None:
+        return bad(handler, "job_id required")
+    refusal = _cron_write_allowed(handler, body, job_id=job_id)
+    if refusal is not None:
+        status, payload = refusal
+        return j(handler, payload, status=status)
     from cron.jobs import update_job
 
+    stamp, refusal = _cron_ownerless_task_stamp(handler, "/api/crons/update", job_id=job_id)
+    if refusal is not None:
+        status, payload = refusal
+        return j(handler, payload, status=status)
     try:
         updates = {}
         for k, v in body.items():
-            if k == "job_id":
+            if k in ("job_id", "notify"):
                 continue
             if k == "profile":
                 target = _normalize_cron_profile_value(v)
@@ -22776,12 +23666,21 @@ def _handle_cron_update(handler, body):
                 updates[k] = _normalize_cron_category(v)
             elif k == "shared_with":
                 updates[k] = _normalize_cron_shared_with(v)
+            elif k == "managed_by":
+                updates[k] = _normalize_cron_managed_by(v)
             elif v is not None:
                 updates[k] = v
+        if "notify" in body:
+            # After the loop, so the toast mirror of notify wins over a stale
+            # toast_notifications in the same body.
+            from cron.jobs import get_job
+            updates.update(_cron_notify_updates(body["notify"], handler=handler, job=get_job(job_id)))
     except ValueError as e:
         return bad(handler, str(e))
+    # The owner goes in with the change, never after it.
+    updates.update(stamp)
     try:
-        job = update_job(body["job_id"], updates)
+        job = update_job(job_id, updates)
     except ValueError as e:
         return bad(handler, str(e), 400)
     if not job:
@@ -22789,28 +23688,63 @@ def _handle_cron_update(handler, body):
     return j(handler, {"ok": True, "job": _cron_job_for_api(job)})
 
 
+
+def _cron_body_job_id(body):
+    """The ``job_id`` a cron job route acts on, or None when it names no job.
+
+    Only a non-empty string names a job. The pause, resume, delete and run
+    guards in handle_post and the handlers (update too) all read the id
+    through here, so every lookup of one request uses the same exact id: the
+    guards used to read ``str(body.get("job_id") or "")``, which turned 0 and
+    False into "no job" and let them through, while the delete handler then
+    looked up and removed the task whose id is str(0).
+    """
+    job_id = body.get("job_id") if isinstance(body, dict) else None
+    return job_id if isinstance(job_id, str) and job_id else None
+
+
+def _cron_job_by_id(job_id):
+    """The active store's job whose id is exactly ``job_id``, else None.
+
+    Pause, resume and delete look their job up by id before they act, as run
+    and update do. The engine's pause_job, resume_job and remove_job also
+    accept a job NAME (cron.jobs.resolve_job_ref), but the scope and owner
+    guards in api/cron_scope.py match ids only, so a name could reach a task
+    the caller does not own. The engine call then gets the canonical id.
+    """
+    from cron.jobs import get_job
+
+    return get_job(str(job_id))
+
+
 def _handle_cron_delete(handler, body):
-    try:
-        require(body, "job_id")
-    except ValueError as e:
-        return bad(handler, str(e))
+    job_id = _cron_body_job_id(body)
+    if job_id is None:
+        return bad(handler, "job_id required")
+    job = _cron_job_by_id(job_id)
+    if not job:
+        return bad(handler, "Job not found", 404)
     from cron.jobs import remove_job
 
-    ok = remove_job(body["job_id"])
+    ok = remove_job(job["id"])
     if not ok:
         return bad(handler, "Job not found", 404)
-    return j(handler, {"ok": True, "job_id": body["job_id"]})
+    return j(handler, {"ok": True, "job_id": job["id"]})
 
 
 def _handle_cron_run(handler, body):
-    job_id = body.get("job_id", "")
-    if not job_id:
+    job_id = _cron_body_job_id(body)
+    if job_id is None:
         return bad(handler, "job_id required")
     from cron.jobs import get_job
 
     job = get_job(job_id)
     if not job:
         return bad(handler, "Job not found", 404)
+    # Who the run executes as is decided here, where the caller is known (W0).
+    run_plan, refusal = _cron_run_plan(handler, job)
+    if refusal is not None:
+        return j(handler, refusal[1], status=refusal[0])
     # Prevent double-run: reject if the job is already tracked as running
     already_running, elapsed = _is_cron_running(job_id)
     if already_running:
@@ -22834,29 +23768,103 @@ def _handle_cron_run(handler, body):
     _profile_home = get_active_hermes_home()
     _execution_profile_home = _profile_home_for_cron_job(job)
     _event_profile = _event_profile_for_cron_job(job)
-    threading.Thread(target=_run_cron_tracked, args=(job, _profile_home, _execution_profile_home, _event_profile), daemon=True).start()
+    run_plan["store_home"] = str(_profile_home)
+    # Who pressed "Run now", taken from the session, never from the body.
+    _actor = _cron_request_email(handler)
+    threading.Thread(target=_run_cron_tracked, args=(job, _profile_home, _execution_profile_home, _event_profile),
+                     kwargs={"run_plan": run_plan, "actor": _actor}, daemon=True).start()
     return j(handler, {"ok": True, "job_id": job_id, "status": "running"})
 
 
+
+def _cron_governed_run_available() -> bool:
+    """Whether the running engine has ``cron.scheduler.run_job_governed``."""
+    try:
+        import importlib
+
+        scheduler = importlib.import_module("cron.scheduler")
+    except Exception:
+        return False
+    return callable(getattr(scheduler, "run_job_governed", None))
+
+
+def _cron_run_plan(handler, job):
+    """Decide, on the request, who a Run now of ``job`` executes as.
+
+    Returns ``(plan, None)`` or ``(None, (status, payload))`` to refuse. The
+    plan travels to the child process (_cron_job_subprocess_main) as plain
+    data:
+
+    - ``run_as``: the job's owner_email; for a job from before that stamp,
+      the caller when they created it (cron_scope.identity_owns_cron_job);
+      empty for an ownerless job a cron admin runs.
+    - ``unbound_allowed``: the caller is a cron admin (every caller is when
+      governance is off), so a job with nobody to bind may run unbound, as
+      the engine's scheduler runs it.
+    - ``profile``: the profile the run executes in, for the binding.
+    - ``governance_policy``: the policy file these decisions were read from.
+    - ``store_home``: added by the handler, the store that holds the job.
+
+    An engine with ``run_job_governed`` gates the run itself (the owner's
+    governance, ownerless agent jobs refused under enforce); the plan is only
+    its fallback. On an engine without it the WebUI binds the governance, so
+    only a cron admin or the job's owner may start a run at all, under
+    report_only too: the WebUI cannot evaluate the engine's gate for anyone
+    else, and a run must never go unbound for a non-admin.
+    """
+    import api.cron_scope as cron_scope
+    from api.governance.enforce import _request_identity
+    from api.governance.loader import resolve_policy_path
+
+    identity = _request_identity(handler)
+    is_admin = _cron_admin_allowed(handler)
+    owns = cron_scope.identity_owns_cron_job(identity, job)
+    if not (is_admin or owns) and not _cron_governed_run_available():
+        return None, (403, {
+            "error": "Only the owner of this task or a cron admin can run it.",
+            "reason": "cron_run_ungoverned",
+        })
+    owner = str(job.get("owner_email") or "").strip().lower()
+    caller = str(identity.get("email") or "").strip().lower() if isinstance(identity, dict) else ""
+    return {
+        "run_as": owner or (caller if owns and not is_admin else ""),
+        "unbound_allowed": bool(is_admin),
+        "profile": _event_profile_for_cron_job(job) or _get_active_profile_name() or "default",
+        "governance_policy": str(resolve_policy_path()),
+    }, None
+
+
 def _handle_cron_pause(handler, body):
-    job_id = body.get("job_id", "")
-    if not job_id:
+    job_id = _cron_body_job_id(body)
+    if job_id is None:
         return bad(handler, "job_id required")
+    job = _cron_job_by_id(job_id)
+    if not job:
+        return bad(handler, "Job not found", 404)
     from cron.jobs import pause_job
 
-    result = pause_job(job_id, reason=body.get("reason"))
+    result = pause_job(job["id"], reason=body.get("reason"))
     if result:
         return j(handler, {"ok": True, "job": result})
     return bad(handler, "Job not found", 404)
 
 
 def _handle_cron_resume(handler, body):
-    job_id = body.get("job_id", "")
-    if not job_id:
+    job_id = _cron_body_job_id(body)
+    if job_id is None:
         return bad(handler, "job_id required")
-    from cron.jobs import resume_job
+    job = _cron_job_by_id(job_id)
+    if not job:
+        return bad(handler, "Job not found", 404)
+    stamp, refusal = _cron_ownerless_task_stamp(handler, "/api/crons/resume", job=job)
+    if refusal is not None:
+        return j(handler, refusal[1], status=refusal[0])
+    from cron.jobs import resume_job, update_job
 
-    result = resume_job(job_id)
+    if stamp:
+        # Before the task is enabled, so it is never scheduled without it.
+        update_job(job["id"], stamp)
+    result = resume_job(job["id"])
     if result:
         return j(handler, {"ok": True, "job": result})
     return bad(handler, "Job not found", 404)

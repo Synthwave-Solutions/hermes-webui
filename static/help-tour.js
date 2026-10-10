@@ -758,7 +758,7 @@
   }
   document.addEventListener("input",event=>{
     const card=document.getElementById("spHelpCard");
-    if(event.target&&event.target.id==="msg"&&card&&card.dataset.kind==="tour_offer")closeCard();
+    if(event.target&&card&&card.dataset.kind==="tour_offer"&&!card.contains(event.target))closeCard();
   });
   function showCard(kind,title,build){
     closeCard();

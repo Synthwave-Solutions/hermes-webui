@@ -60,24 +60,54 @@ Ask your administrator or switch accounts.</p>
 """
 
 
-def subject_from_identity(identity: dict | None) -> GovernanceSubject:
+_POLICY_UNSET = object()
+
+
+def stamped_org_id(policy=_POLICY_UNSET) -> str:
+    """The installation's ``organization.id`` for GovernanceSubject.org_id.
+
+    Plan 3.6: the id is stamped once by the render and every subject on a
+    client installation carries it; HQ and a policy without an organization
+    block give "". With no policy passed, the current one is loaded (cached);
+    a policy that cannot be loaded gives "" (no organisation, fail closed).
+    """
+    from .delegation import organization_id
+
+    if policy is _POLICY_UNSET:
+        try:
+            policy = loader.get_policy()
+        except Exception:
+            return ""
+    try:
+        return organization_id(policy)
+    except Exception:
+        return ""
+
+
+def subject_from_identity(identity: dict | None, policy=_POLICY_UNSET) -> GovernanceSubject:
     """Build a governance subject from the api.auth session identity dict.
 
     ``identity`` is the dict returned by api.auth.get_session_identity
     ({email, groups, claims_subset, method}) or None for anonymous/legacy
     sessions. The auth layer owns verification; this only translates the
-    safe identity fields into the resolver's principal model.
+    safe identity fields into the resolver's principal model. An
+    authenticated subject also carries the installation's organisation id
+    (``org_id``, plan 3.6) from ``policy``, or from the current policy when
+    the caller has none at hand.
     """
     if not identity:
         return GovernanceSubject()
     claims = identity.get("claims_subset") or {}
     if not isinstance(claims, dict):
         claims = {}
+    email = str(identity.get("email") or "").lower()
+    user_id = str(claims.get("sub") or "")
     return GovernanceSubject(
-        email=str(identity.get("email") or "").lower(),
+        email=email,
         display_name=str(claims.get("name") or ""),
         provider=str(identity.get("method") or ""),
-        user_id=str(claims.get("sub") or ""),
+        user_id=user_id,
+        org_id=stamped_org_id(policy) if (email.strip() or user_id) else "",
         groups=tuple(str(g) for g in (identity.get("groups") or ()) if str(g).strip()),
         claims=claims,
     )
@@ -133,7 +163,7 @@ def evaluate_request(identity: dict | None, method: str, path: str) -> Decision:
     if not policy.enabled:
         return Decision(True, "governance_off", "", policy.mode)
 
-    subject = subject_from_identity(identity)
+    subject = subject_from_identity(identity, policy)
 
     # Bootstrap short circuit: the bootstrap admin can NEVER be denied, even
     # by catalog gaps (unknown_route) or a route whitelist mistake. The
@@ -203,7 +233,7 @@ def is_profile_allowed_for(identity: dict | None, profile: str) -> bool:
         return True
     if not policy.enabled:
         return True
-    subject = subject_from_identity(identity)
+    subject = subject_from_identity(identity, policy)
     if subject.normalized_email and subject.normalized_email in {a.lower() for a in policy.bootstrap_admins}:
         return True
     # The root ("default") profile is the AMBIENT one: a governed user without a
@@ -247,7 +277,7 @@ def identity_has_permission(identity: dict | None, permission: str) -> bool:
         return True
     if not policy.enabled:
         return True
-    subject = subject_from_identity(identity)
+    subject = subject_from_identity(identity, policy)
     if subject.normalized_email and subject.normalized_email in {a.lower() for a in policy.bootstrap_admins}:
         return True
     access = resolve_effective_access(policy, subject)

@@ -34,6 +34,10 @@ Design constraints
   failure mode of #4633.  The direct write guarantees the line lands.
 * ``install_crash_visibility()`` is idempotent and safe to call at import or
   startup time.
+* When the managed-service ops reporter is on (``api/ops_reporter.py``, plan
+  3.3), each crash is also handed to it: a thread crash is queued, a
+  main-thread crash is written straight to its spool because the process is
+  about to die. Off by default; the hand-off never raises and never blocks.
 """
 from __future__ import annotations
 
@@ -127,6 +131,33 @@ def _emit(level: int, message: str, *, exc_info=None) -> None:
         pass
 
 
+def _report_to_ops(exc_type, exc_value, exc_tb, *, level: str, sync: bool = False,
+                   thread_name: Optional[str] = None) -> None:
+    """Hand one crash to the ops reporter (W7). Never raises.
+
+    The reporter decides whether it is on; the sender thread's own crashes
+    are never reported back to it.
+    """
+    try:
+        from api import ops_reporter
+
+        if thread_name == ops_reporter.SENDER_THREAD_NAME:
+            return
+        ops_reporter.report_exception(
+            exc_type,
+            exc_value,
+            exc_tb,
+            level=level,
+            logger_name="crash_visibility",
+            message="Uncaught exception in a WebUI thread" if level != "fatal"
+            else "Uncaught exception on the WebUI main thread",
+            context={"thread": thread_name} if thread_name else None,
+            sync=sync,
+        )
+    except Exception:
+        pass
+
+
 def thread_excepthook(args) -> None:
     """threading.excepthook: log any uncaught exception in a daemon/handler thread.
 
@@ -153,6 +184,7 @@ def thread_excepthook(args) -> None:
             % (thread_name, thread_ident, daemon, getattr(exc_type, "__name__", exc_type)),
             exc_info=(exc_type, exc_value, exc_tb),
         )
+        _report_to_ops(exc_type, exc_value, exc_tb, level="error", thread_name=thread_name)
     except Exception:
         # A hook that raises would re-introduce the silent-death class of bug.
         try:
@@ -190,6 +222,7 @@ def main_excepthook(exc_type, exc_value, exc_tb) -> None:
             % (getattr(exc_type, "__name__", exc_type),),
             exc_info=(exc_type, exc_value, exc_tb),
         )
+        _report_to_ops(exc_type, exc_value, exc_tb, level="fatal", sync=True)
     except Exception:
         try:
             _direct_write("[crash-visibility] main_excepthook failed to log an exception")
@@ -298,4 +331,13 @@ def install_crash_visibility(
             pass
 
         _INSTALLED = True
-        return True
+
+    # 5) Ops reporter (W7): send reports a previous run left in the spool.
+    #    Does nothing unless the reporter is switched on; never raises.
+    try:
+        from api import ops_reporter
+
+        ops_reporter.start()
+    except Exception:
+        pass
+    return True

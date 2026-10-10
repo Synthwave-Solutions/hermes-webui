@@ -106,6 +106,7 @@ function _clearCronSessionCompletionUnreadForInactiveProfiles(){{}}
 @pytest.mark.skipif(NODE is None, reason="node not on PATH")
 def test_poll_started_before_switch_cannot_recreate_unread_state():
     polling = _extract_function(PANELS_JS, "startCronPolling")
+    flags = _extract_function(PANELS_JS, "_cronCompletionFlags")
     reset = _extract_function(PANELS_JS, "_resetCronUnreadForProfileSwitch")
     script = f"""
 let _cronPollSince=10;
@@ -122,6 +123,7 @@ global.showToast=()=>{{}};
 global.t=(key)=>key;
 global.updateCronBadge=()=>{{ _cronUnreadCount=_cronNewJobIds.size; }};
 function _clearCronSessionCompletionUnreadForInactiveProfiles(){{}}
+{flags}
 {polling}
 {reset}
 startCronPolling();
@@ -251,6 +253,7 @@ function _clearSessionCompletionUnread(sid){{
 @pytest.mark.skipif(NODE is None, reason="node not on PATH")
 def test_cron_poll_tags_persisted_markers_with_active_profile():
     polling = _extract_function(PANELS_JS, "startCronPolling")
+    flags = _extract_function(PANELS_JS, "_cronCompletionFlags")
     script = f"""
 let _cronPollSince=10;
 let _cronPollTimer=null;
@@ -277,6 +280,7 @@ global.updateCronBadge=()=>{{ _cronUnreadCount=_cronNewJobIds.size; }};
 function _markSessionCompletionUnreadIfBackground(sid, count, meta){{
   markCalls.push([sid, count, meta]);
 }}
+{flags}
 {polling}
 startCronPolling();
 (async()=>{{
