@@ -1,0 +1,17 @@
+[data-module-gated][hidden]{display:none!important}
+main.main.showing-modules>#mainChat{display:none!important}
+main.main.showing-modules>#mainModules{display:block;overflow:auto}
+#mainModules{padding:24px;min-width:0}
+.modules-heading,.module-card-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.modules-heading h1{font-size:20px;margin:0}
+.modules-intro{color:var(--muted);max-width:70ch;line-height:1.6}
+.module-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:16px}
+.module-card{border:1px solid var(--border);border-radius:8px;padding:16px;min-width:0;overflow-wrap:anywhere}
+.module-card h2{font-size:16px;margin:0}.module-card p{line-height:1.5}.module-card li{margin:12px 0}.module-card li p{margin:4px 0}
+.module-status{font-size:12px;background:var(--hover-bg);padding:4px 8px;border-radius:4px}
+.module-meta{color:var(--muted);font-size:12px}.module-card details{margin-top:12px}.module-card summary{cursor:pointer;font-weight:600}
+.module-button,.module-language select{font:inherit;color:var(--text);background:var(--surface);border:1px solid var(--border);padding:8px;border-radius:4px;cursor:pointer}
+.apps-popover{position:fixed;z-index:1200;top:52px;right:12px;width:min(360px,calc(100vw - 24px));max-height:calc(100dvh - 72px);overflow:auto;box-sizing:border-box;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:16px;box-shadow:0 8px 30px #0003}
+.apps-popover h2{font-size:16px;margin:0}.apps-popover .module-language{display:block;margin:12px 0}.app-links{display:grid;gap:8px}.app-links a{color:var(--text);padding:12px;border:1px solid var(--border);border-radius:4px;text-decoration:none}.app-links a:hover{background:var(--hover-bg)}
+.module-card :focus-visible,.apps-popover :focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+@media(max-width:640px){#mainModules{padding:16px}.module-card-heading{align-items:flex-start}.module-language{font-size:12px}}

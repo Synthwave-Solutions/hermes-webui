@@ -2580,6 +2580,66 @@
       "source_refs": [
         "static/commands.js"
       ]
+    },
+    {
+      "id": "webui.modules.apps",
+      "area": "modules",
+      "status": "conditional",
+      "source_refs": [
+        "api/org_modules.py",
+        "api/apps_launcher.py",
+        "static/modules.js"
+      ]
+    },
+    {
+      "id": "webui.modules.overview",
+      "area": "modules",
+      "status": "conditional",
+      "source_refs": [
+        "api/org_modules.py",
+        "api/apps_launcher.py",
+        "static/modules.js"
+      ]
+    },
+    {
+      "id": "webui.modules.budget",
+      "area": "modules",
+      "status": "conditional",
+      "source_refs": [
+        "api/org_modules.py",
+        "api/apps_launcher.py",
+        "static/modules.js"
+      ]
+    },
+    {
+      "id": "webui.modules.connections",
+      "area": "modules",
+      "status": "conditional",
+      "source_refs": [
+        "api/org_modules.py",
+        "api/apps_launcher.py",
+        "static/modules.js"
+      ]
+    },
+    {
+      "id": "webui.modules.request",
+      "area": "modules",
+      "status": "conditional",
+      "source_refs": [
+        "api/org_modules.py",
+        "api/apps_launcher.py",
+        "static/modules.js"
+      ]
+    },
+    {
+      "id": "webui.modules.language",
+      "area": "modules",
+      "status": "conditional",
+      "source_refs": [
+        "api/org_modules.py",
+        "api/apps_launcher.py",
+        "static/modules.js"
+      ]
     }
   ],
   "controls": [
@@ -7160,6 +7220,15 @@
         "static/ui.js:20944"
       ],
       "feature_id": "webui.files.hidden"
+    },
+    {
+      "control": "btnApps",
+      "tag": "button",
+      "label": "Apps",
+      "source_refs": [
+        "static/index.html"
+      ],
+      "feature_id": "webui.modules.apps"
     }
   ],
   "method": "Inventory of concrete HTML controls and inline handlers, supplemented by manual review of generated conversation menus, bot builder and knowledge controls, composer customization and the embedded read-only memory dashboard. Save/cancel and equivalent responsive controls share a feature. Hidden vendor login, server settings and inactive legacy visualizers are excluded from user workflows.",

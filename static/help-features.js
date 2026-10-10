@@ -66,6 +66,10 @@ window.SynthPulseFeatureCatalog = {
     "planned": {
       "en": "Prepared capabilities",
       "nl": "Voorbereide mogelijkheden"
+    },
+    "modules": {
+      "en": "Apps and modules",
+      "nl": "Apps en modules"
     }
   },
   "features": [
@@ -12705,6 +12709,282 @@ window.SynthPulseFeatureCatalog = {
           "permissions": "Bekijken en bewerken van skills vereist de bijbehorende rechten.",
           "limits": "Een skill levert instructies, geen extra rechten of inloggegevens.",
           "example": "Pas de beschikbare rapportagecontrolelijst toe op het gesprek."
+        }
+      }
+    },
+    {
+      "id": "webui.modules.apps",
+      "area": "modules",
+      "status": "conditional",
+      "conditions": [
+        "Configured installation and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.modules.apps",
+        "#btnApps"
+      ],
+      "source_refs": [
+        "api/org_modules.py",
+        "api/apps_launcher.py",
+        "static/modules.js"
+      ],
+      "related": [
+        "webui.modules.overview"
+      ],
+      "locales": {
+        "en": {
+          "title": "Open configured apps",
+          "purpose": "Open an active module’s configured app in a new tab.",
+          "when": "When reviewing the apps and modules available on your installation.",
+          "steps": [
+            "Choose Apps in the title bar.",
+            "Select an app; sign in there if requested."
+          ],
+          "permissions": "Every signed-in person; the workflow editor also needs platform scope or an explicit installation setting.",
+          "limits": "An empty launcher means no valid links are configured. Opening a link gives no extra rights and verifies no service health.",
+          "example": "Select an app; sign in there if requested."
+        },
+        "nl": {
+          "title": "Ingestelde apps openen",
+          "purpose": "Open de ingestelde app van een actieve module in een nieuw tabblad.",
+          "when": "Wanneer je de apps en modules van je installatie wilt bekijken.",
+          "steps": [
+            "Kies Apps in de titelbalk.",
+            "Kies een app; meld je daar aan als dat wordt gevraagd."
+          ],
+          "permissions": "Iedere aangemelde gebruiker; de workfloweditor vereist daarnaast platformbeheer of een expliciete installatie-instelling.",
+          "limits": "Een lege appkiezer betekent dat er geen geldige links zijn ingesteld. Een link openen geeft geen extra rechten en controleert geen dienststatus.",
+          "example": "Kies een app; meld je daar aan als dat wordt gevraagd."
+        }
+      }
+    },
+    {
+      "id": "webui.modules.overview",
+      "area": "modules",
+      "status": "conditional",
+      "conditions": [
+        "Configured installation and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.modules.overview",
+        "#mainModules"
+      ],
+      "source_refs": [
+        "api/org_modules.py",
+        "api/apps_launcher.py",
+        "static/modules.js"
+      ],
+      "related": [
+        "webui.modules.apps"
+      ],
+      "locales": {
+        "en": {
+          "title": "Review your modules",
+          "purpose": "Read the Standard and Advanced catalogue with the local activation state.",
+          "when": "When reviewing the apps and modules available on your installation.",
+          "steps": [
+            "Open Modules from the navigation.",
+            "Read each status and description."
+          ],
+          "permissions": "Organisation, billing or platform scope on an organisation installation; hidden at headquarters.",
+          "limits": "Active means enabled in local configuration, not healthy or commercially approved. Advanced pilot availability still needs confirmation.",
+          "example": "Read each status and description."
+        },
+        "nl": {
+          "title": "Je modules bekijken",
+          "purpose": "Lees de Standard- en Advanced-catalogus met de lokale activatiestatus.",
+          "when": "Wanneer je de apps en modules van je installatie wilt bekijken.",
+          "steps": [
+            "Open Modules in de navigatie.",
+            "Lees per module de status en beschrijving."
+          ],
+          "permissions": "Organisatie-, facturatie- of platformbeheer op een organisatie-installatie; verborgen op het centrale beheersysteem.",
+          "limits": "Actief betekent ingeschakeld in de lokale configuratie, niet gezond of commercieel goedgekeurd. Beschikbaarheid van Advanced-pilots vereist bevestiging.",
+          "example": "Lees per module de status en beschrijving."
+        }
+      }
+    },
+    {
+      "id": "webui.modules.budget",
+      "area": "modules",
+      "status": "conditional",
+      "conditions": [
+        "Configured installation and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.modules.budget",
+        "#mainModules"
+      ],
+      "source_refs": [
+        "api/org_modules.py",
+        "api/apps_launcher.py",
+        "static/modules.js"
+      ],
+      "related": [
+        "webui.modules.overview"
+      ],
+      "locales": {
+        "en": {
+          "title": "Read module budget usage",
+          "purpose": "See whether a module consumes the model budget and its catalogue usage category.",
+          "when": "When reviewing the apps and modules available on your installation.",
+          "steps": [
+            "Open Modules.",
+            "Read Model budget on the module card."
+          ],
+          "permissions": "The same organisation administration scope as Modules.",
+          "limits": "The category is descriptive, not measured spend, a price, a cap or a guarantee.",
+          "example": "Read Model budget on the module card."
+        },
+        "nl": {
+          "title": "Modelgebruik per module lezen",
+          "purpose": "Zie of een module modelbudget gebruikt en welke gebruikscategorie de catalogus noemt.",
+          "when": "Wanneer je de apps en modules van je installatie wilt bekijken.",
+          "steps": [
+            "Open Modules.",
+            "Lees Modelbudget op de modulekaart."
+          ],
+          "permissions": "Dezelfde organisatiebeheerrechten als Modules.",
+          "limits": "De categorie is beschrijvend, geen gemeten bedrag, prijs, limiet of garantie.",
+          "example": "Lees Modelbudget op de modulekaart."
+        }
+      }
+    },
+    {
+      "id": "webui.modules.connections",
+      "area": "modules",
+      "status": "conditional",
+      "conditions": [
+        "Configured installation and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.modules.connections",
+        "#mainModules"
+      ],
+      "source_refs": [
+        "api/org_modules.py",
+        "api/apps_launcher.py",
+        "static/modules.js"
+      ],
+      "related": [
+        "webui.modules.overview"
+      ],
+      "locales": {
+        "en": {
+          "title": "Understand module connections",
+          "purpose": "Read which modules can work together and whether each connection is configured.",
+          "when": "When reviewing the apps and modules available on your installation.",
+          "steps": [
+            "Open Works with on a module card.",
+            "Read the connection state and consent note."
+          ],
+          "permissions": "The same organisation administration scope as Modules.",
+          "limits": "This is read-only. Connected describes configuration; runtime conditions and consent still apply. No data is sent by expanding this list.",
+          "example": "Read the connection state and consent note."
+        },
+        "nl": {
+          "title": "Koppelingen tussen modules begrijpen",
+          "purpose": "Lees welke modules kunnen samenwerken en of iedere koppeling is ingesteld.",
+          "when": "Wanneer je de apps en modules van je installatie wilt bekijken.",
+          "steps": [
+            "Open Werkt samen met op een modulekaart.",
+            "Lees de koppelingsstatus en de toestemmingsnotitie."
+          ],
+          "permissions": "Dezelfde organisatiebeheerrechten als Modules.",
+          "limits": "Dit overzicht is alleen-lezen. Verbonden beschrijft de configuratie; voorwaarden tijdens uitvoering en toestemming blijven gelden. De lijst openen verstuurt geen gegevens.",
+          "example": "Lees de koppelingsstatus en de toestemmingsnotitie."
+        }
+      }
+    },
+    {
+      "id": "webui.modules.request",
+      "area": "modules",
+      "status": "conditional",
+      "conditions": [
+        "Configured installation and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.modules.request",
+        "#mainModules"
+      ],
+      "source_refs": [
+        "api/org_modules.py",
+        "api/apps_launcher.py",
+        "static/modules.js"
+      ],
+      "related": [
+        "webui.modules.overview"
+      ],
+      "locales": {
+        "en": {
+          "title": "Ask about an Advanced module",
+          "purpose": "Find the contact instruction for availability and setup.",
+          "when": "When reviewing the apps and modules available on your installation.",
+          "steps": [
+            "Expand Request this module on an Advanced card.",
+            "Discuss the module with your organisation administrator or service contact."
+          ],
+          "permissions": "The same organisation administration scope as Modules.",
+          "limits": "No request is submitted, no purchase occurs and no service is activated. Prices are supplied separately.",
+          "example": "Discuss the module with your organisation administrator or service contact."
+        },
+        "nl": {
+          "title": "Informeren naar een Advanced-module",
+          "purpose": "Vind de contactinstructie voor beschikbaarheid en inrichting.",
+          "when": "Wanneer je de apps en modules van je installatie wilt bekijken.",
+          "steps": [
+            "Klap Deze module aanvragen op een Advanced-kaart open.",
+            "Bespreek de module met je organisatiebeheerder of servicecontact."
+          ],
+          "permissions": "Dezelfde organisatiebeheerrechten als Modules.",
+          "limits": "Er wordt geen aanvraag verstuurd, niets gekocht en geen dienst geactiveerd. Prijzen worden apart verstrekt.",
+          "example": "Bespreek de module met je organisatiebeheerder of servicecontact."
+        }
+      }
+    },
+    {
+      "id": "webui.modules.language",
+      "area": "modules",
+      "status": "conditional",
+      "conditions": [
+        "Configured installation and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.modules.language",
+        "#mainModules"
+      ],
+      "source_refs": [
+        "api/org_modules.py",
+        "api/apps_launcher.py",
+        "static/modules.js"
+      ],
+      "related": [
+        "webui.modules.overview"
+      ],
+      "locales": {
+        "en": {
+          "title": "Change the module language",
+          "purpose": "Read the Apps and Modules screens in Dutch or English.",
+          "when": "When reviewing the apps and modules available on your installation.",
+          "steps": [
+            "Choose Language in Apps or Modules.",
+            "Select Nederlands or English."
+          ],
+          "permissions": "Your existing access to Apps or Modules.",
+          "limits": "The choice is stored in this browser and changes these screens only. It does not change permissions or other users’ language.",
+          "example": "Select Nederlands or English."
+        },
+        "nl": {
+          "title": "De moduletaal wijzigen",
+          "purpose": "Lees de schermen Apps en Modules in Nederlands of Engels.",
+          "when": "Wanneer je de apps en modules van je installatie wilt bekijken.",
+          "steps": [
+            "Kies Taal in Apps of Modules.",
+            "Kies Nederlands of English."
+          ],
+          "permissions": "Je bestaande toegang tot Apps of Modules.",
+          "limits": "De keuze wordt in deze browser opgeslagen en geldt voor deze schermen. Rechten en de taal van andere gebruikers veranderen niet.",
+          "example": "Kies Nederlands of English."
         }
       }
     }

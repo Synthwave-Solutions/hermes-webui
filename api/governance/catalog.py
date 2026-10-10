@@ -63,6 +63,9 @@ _SELF_ROUTES: frozenset[str] = frozenset({
     # /api/integrations/* in routes cannot reach these at all).
     "/api/crons/notifications",
     "/api/client-errors",
+    "/api/apps",
+    "/api/org/modules",
+    "/api/org/modules/request",
     "/api/org/overview",
     "/api/org/departments",
     "/api/org/people",

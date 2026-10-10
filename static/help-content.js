@@ -565,10 +565,34 @@ window.SynthPulseHelpContent = {
         },
         "modules": {
           "title": "Modules",
-          "summary": "What your organisation has and what you can add.",
-          "sections": [],
+          "summary": "Review the local module configuration, model usage and possible connections. This screen activates nothing.",
+          "sections": [
+            {
+              "id": "catalogue",
+              "title": "Module overview",
+              "body": "Organisation, billing and platform administrators can read this on an organisation installation. This screen is hidden at headquarters.",
+              "target": "#mainModules"
+            }
+          ],
           "related": [
+            "apps",
             "settings"
+          ]
+        },
+        "apps": {
+          "title": "Apps",
+          "summary": "Open configured apps in a new tab.",
+          "sections": [
+            {
+              "id": "launcher",
+              "title": "Open apps",
+              "body": "Open Apps at the top. Only configured links for active modules appear. Each app checks your access itself.",
+              "target": "#btnApps"
+            }
+          ],
+          "related": [
+            "modules",
+            "integrations"
           ]
         }
       },
@@ -1213,10 +1237,34 @@ window.SynthPulseHelpContent = {
         },
         "modules": {
           "title": "Modules",
-          "summary": "Wat je organisatie heeft en wat je kunt toevoegen.",
-          "sections": [],
+          "summary": "Bekijk de lokale moduleconfiguratie, het modelgebruik en de mogelijke koppelingen. Dit scherm activeert niets.",
+          "sections": [
+            {
+              "id": "catalogue",
+              "title": "Moduleoverzicht",
+              "body": "Organisatie-, facturatie- en platformbeheerders kunnen dit lezen op een organisatie-installatie. Op het centrale beheersysteem staat dit scherm uit.",
+              "target": "#mainModules"
+            }
+          ],
           "related": [
+            "apps",
             "settings"
+          ]
+        },
+        "apps": {
+          "title": "Apps",
+          "summary": "Open ingestelde apps in een nieuw tabblad.",
+          "sections": [
+            {
+              "id": "launcher",
+              "title": "Apps openen",
+              "body": "Open Apps bovenaan. Je ziet alleen ingestelde links voor actieve modules. Elke app controleert zelf je toegang.",
+              "target": "#btnApps"
+            }
+          ],
+          "related": [
+            "modules",
+            "integrations"
           ]
         }
       },

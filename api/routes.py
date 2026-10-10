@@ -12194,6 +12194,13 @@ def handle_get(handler, parsed) -> bool:
     if governance_api.handle_governance_api(handler, parsed, "GET"):
         return True
 
+    if parsed.path == "/api/org/modules":
+        from api import org_modules
+        return org_modules.handle_get(handler, parsed)
+    if parsed.path == "/api/apps":
+        from api import apps_launcher
+        return apps_launcher.handle_get(handler, parsed)
+
     if parsed.path in ("/api/org/overview", "/api/org/departments", "/api/org/people", "/api/org/approvals", "/api/org/usage"):
         from api import org_api
         return org_api.handle_get(handler, parsed)
@@ -12666,6 +12673,8 @@ def handle_get(handler, parsed) -> bool:
         settings = dict(load_settings())
         from api import ops_reporter
         settings["support_telemetry"] = bool(ops_reporter.browser_reporting_enabled())
+        from api.org_modules import settings_view
+        settings.update(settings_view(handler))
         # The caller's own theme/skin/font size beat the instance default
         # (per-user appearance store, 27 Aug 2026; api/settings_scope.py).
         from api.settings_scope import overlay_user_appearance
@@ -14423,6 +14432,10 @@ def handle_post(handler, parsed) -> bool:
     from api.workspace_access import guard_session_request as guard_workspace_request
     if not guard_workspace_request(handler, parsed, body):
         return True
+
+    if parsed.path == "/api/org/modules/request":
+        from api import org_modules
+        return org_modules.handle_request(handler, body)
 
     if parsed.path in ("/api/org/overview", "/api/org/departments", "/api/org/people", "/api/org/approvals", "/api/org/usage"):
         from api import org_api
@@ -16334,6 +16347,8 @@ def handle_post(handler, parsed) -> bool:
 
     if parsed.path == "/api/settings":
         body.pop("support_telemetry", None)
+        for read_only_key in ("enabled_modules", "modules_source", "module_nav", "enabled_connections"):
+            body.pop(read_only_key, None)
         # Appearance self-service (26 Aug 2026 report): the route catalog now
         # admits this POST with config:read; this body-sink guard keeps every
         # non-cosmetic settings write on config:write exactly as before while

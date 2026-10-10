@@ -1,4 +1,4 @@
-// Static MSP catalog snapshot from cockpit 521669ca. No runtime service dependency.
+// Static MSP catalog snapshot, source SHA256 4e6948aedebdfa723dd31caad1bc6cc6740c73a246734424dbae28c9490259dd. No runtime service dependency.
 window.SynthPulseMspFeatureCatalog = {
   "schema_version": 1,
   "product": "msp",
@@ -1230,7 +1230,9 @@ window.SynthPulseMspFeatureCatalog = {
       "related": [
         "msp.roles",
         "msp.secrets",
-        "msp.retention"
+        "msp.retention",
+        "msp.reporter-spool",
+        "msp.reporter-dry-run"
       ],
       "locales": {
         "en": {
@@ -1245,7 +1247,7 @@ window.SynthPulseMspFeatureCatalog = {
             "Use Refresh to recalculate contact age; compare it with the normal five-minute HQ interval. A future timestamp needs a clock check, not an automatic incident."
           ],
           "permissions": "Operators and admins. Partners can read only their own client and job records; staff service and operations data require an operator role.",
-          "limits": "HQ has a bounded reporter workflow. Full discovery of all modules, automatic remediation and universal fleet coverage are not implied.",
+          "limits": "Only configured probes are covered. Each heartbeat is freshly measured; historical heartbeats are not replayed after an outage. Critical-transition events use a separate private durable queue. Full discovery, automatic remediation and universal fleet coverage are not implied.",
           "example": "A five-minute HQ reporter checks the configured WebUI health endpoint and sends signed metadata."
         },
         "nl": {
@@ -1260,7 +1262,7 @@ window.SynthPulseMspFeatureCatalog = {
             "Gebruik Refresh om de contactleeftijd opnieuw te berekenen; vergelijk met het normale HQ-interval van vijf minuten. Een toekomstige tijd vraagt een klokcontrole, geen automatisch incident."
           ],
           "permissions": "Operators en admins. Partners lezen alleen eigen klant- en taakgegevens; servicedesk en beheer vereisen een operatorrol.",
-          "limits": "HQ heeft een afgebakende reporter. Volledige moduledetectie, automatisch herstel en dekking van alle machines zijn niet inbegrepen in deze status.",
+          "limits": "Alleen ingerichte controles vallen hieronder. Iedere heartbeat wordt opnieuw gemeten; oude heartbeats worden na een storing niet opnieuw afgespeeld. Meldingen van een overgang naar kritiek gebruiken een aparte, duurzame privéwachtrij. Volledige detectie, automatisch herstel en dekking van alle machines zijn niet inbegrepen.",
           "example": "Een HQ-reporter controleert elke vijf minuten het ingestelde WebUI-gezondheidsadres en verstuurt ondertekende metadata."
         }
       }
@@ -3167,6 +3169,159 @@ window.SynthPulseMspFeatureCatalog = {
           "permissions": "De eigen control-servicegebruiker via bevoegd hostbeheer. Geen cockpitknop of installatiesleutel kan deze opschoning starten.",
           "limits": "Ruwe meldingen standaard 30 dagen, instelbaar van 1 tot 90; heartbeats 7 dagen; opgeloste of gedempte issues 6 kalendermaanden. Andere issuestatussen blijven. Ticket-, fiscale en auditbewaring vallen hier niet onder. Een voorbereid timersjabloon bewijst niet dat de timer actief is.",
           "example": "Oude heartbeatgeschiedenis van een stille installatie verloopt ook zonder nieuwe meldingen."
+        }
+      }
+    },
+    {
+      "id": "msp.reporter-spool",
+      "area": "operations",
+      "status": "conditional",
+      "conditions": [
+        "durable_reporter_release",
+        "event_stream_api_v1",
+        "dedicated_service_state"
+      ],
+      "anchors": [
+        "/cockpit/help?feature=msp.reporter-spool"
+      ],
+      "source_refs": [
+        "modules/control-agent/README.md"
+      ],
+      "related": [
+        "msp.heartbeat",
+        "msp.reporter-recovery",
+        "msp.reporter-dry-run"
+      ],
+      "locales": {
+        "en": {
+          "title": "Durable reporter queue",
+          "purpose": "Keep captured critical health transitions during transport outages and across reporter restarts.",
+          "when": "When control-api is unreachable or a report is awaiting acknowledgement.",
+          "steps": [
+            "Inspect the content-free reporter result for pending batches, backoff or spool_full.",
+            "Keep the cursor and its sibling spool directory together in the private service state directory.",
+            "Restore transport and let the existing timer retry with current credentials.",
+            "Verify pending counts decrease: draining means batches remain after this bounded run; delivered means the local queue is caught up. Check current heartbeat receipt separately."
+          ],
+          "permissions": "Authorised host operators using the dedicated reporter service identity. Cockpit roles do not grant shell access.",
+          "limits": "This is a host-side feature, not a cockpit button. The 50 MB budget includes held failures. At capacity old pending records remain, but new transient changes may not fit. Heartbeats are measured again, never replayed from disk.",
+          "example": "A service fails while the API is offline, then recovers. Its fault event is delivered later, while the new heartbeat reports the recovered state."
+        },
+        "nl": {
+          "title": "Duurzame reporterwachtrij",
+          "purpose": "Bewaar vastgelegde kritieke gezondheidsovergangen tijdens verbindingsstoringen en herstarts van de reporter.",
+          "when": "Wanneer control-api onbereikbaar is of een melding nog op bevestiging wacht.",
+          "steps": [
+            "Bekijk het inhoudsvrije reporterresultaat voor wachtende batches, wachttijd of spool_full.",
+            "Bewaar cursor en bijbehorende wachtrijmap samen in de privémap van de servicegebruiker.",
+            "Herstel de verbinding en laat de bestaande timer opnieuw proberen met de actuele sleutel.",
+            "Controleer dat wachtende aantallen afnemen: draining betekent dat na deze begrensde run nog batches wachten; delivered betekent dat de lokale wachtrij is bijgewerkt. Controleer actuele heartbeatontvangst afzonderlijk."
+          ],
+          "permissions": "Bevoegde hostbeheerders met de eigen reporterservice-identiteit. Cockpitrollen geven geen shelltoegang.",
+          "limits": "Dit is een hostfunctie, geen cockpitknop. Het budget van 50 MB omvat ook vastgehouden fouten. Bij een volle wachtrij blijven bestaande meldingen bewaard, maar passen nieuwe tijdelijke veranderingen mogelijk niet. Heartbeats worden opnieuw gemeten en nooit vanaf schijf herhaald.",
+          "example": "Een dienst valt uit terwijl de API offline is en herstelt daarna. De foutmelding wordt later bezorgd, terwijl de nieuwe heartbeat de herstelde toestand meldt."
+        }
+      }
+    },
+    {
+      "id": "msp.reporter-recovery",
+      "area": "operations",
+      "status": "conditional",
+      "conditions": [
+        "durable_reporter_release",
+        "event_stream_api_v1",
+        "dedicated_service_state"
+      ],
+      "anchors": [
+        "/cockpit/help?feature=msp.reporter-recovery"
+      ],
+      "source_refs": [
+        "modules/control-agent/README.md"
+      ],
+      "related": [
+        "msp.heartbeat",
+        "msp.reporter-spool",
+        "msp.reporter-dry-run"
+      ],
+      "locales": {
+        "en": {
+          "title": "Recover paused reporter delivery",
+          "purpose": "Resume retained metadata after a connection failure or an explicitly reviewed delivery conflict.",
+          "when": "When delivery remains blocked after connectivity returns, or after a lost acknowledgement.",
+          "steps": [
+            "Check whether the result says transport_pending, server_upgrade_required, telemetry_paused or delivery_blocked.",
+            "For transport errors, restore access and allow the persisted backoff to expire. Upgrade control-api before a reporter that requires stream acknowledgement.",
+            "For a terminal conflict, preserve all files and have an authorised operator reconcile the cursor and server receipt state.",
+            "After the cause is fixed, run the existing command once with --retry-blocked and inspect pending counts and receipt evidence."
+          ],
+          "permissions": "Authorised host operators using the dedicated reporter service identity. Cockpit roles do not grant shell access.",
+          "limits": "The same last batch is acknowledged once without increasing issue counts again. Older, changed or out-of-order batches are refused. Do not delete queues, reset identities or repeatedly override a conflict. Disabled telemetry pauses queued delivery. Event retry backoff never suppresses a fresh heartbeat attempt on the next timer tick.",
+          "example": "The API stored a fault, but its response was lost. The next attempt gets a duplicate acknowledgement and safely removes the local batch."
+        },
+        "nl": {
+          "title": "Vastgehouden reporterverzending herstellen",
+          "purpose": "Hervat bewaarde metadata na een verbindingsfout of een expliciet beoordeeld afleverconflict.",
+          "when": "Wanneer verzending na verbindingsherstel geblokkeerd blijft of een bevestiging verloren ging.",
+          "steps": [
+            "Controleer of het resultaat transport_pending, server_upgrade_required, telemetry_paused of delivery_blocked meldt.",
+            "Herstel bij verbindingsfouten de toegang en wacht de opgeslagen wachttijd af. Werk control-api bij vóór een reporter die stroombevestiging vereist.",
+            "Bewaar bij een blijvend conflict alle bestanden en laat een bevoegde beheerder cursor en serverontvangst met elkaar vergelijken.",
+            "Voer na herstel het bestaande commando eenmaal uit met --retry-blocked en controleer wachtende aantallen en ontvangstbewijs."
+          ],
+          "permissions": "Bevoegde hostbeheerders met de eigen reporterservice-identiteit. Cockpitrollen geven geen shelltoegang.",
+          "limits": "Dezelfde laatste batch wordt bevestigd zonder de issuesteller opnieuw te verhogen. Oudere, gewijzigde of verkeerd geordende batches worden geweigerd. Verwijder geen wachtrij, reset geen identiteit en omzeil een conflict niet herhaaldelijk. Uitgeschakelde telemetrie pauzeert wachtrijverzending. Wachttijd voor foutmeldingen onderdrukt geen nieuwe heartbeatpoging op de volgende timerrun.",
+          "example": "De API sloeg een fout op, maar de bevestiging ging verloren. De volgende poging krijgt een herhaalde bevestiging en verwijdert de lokale batch veilig."
+        }
+      }
+    },
+    {
+      "id": "msp.reporter-dry-run",
+      "area": "operations",
+      "status": "conditional",
+      "conditions": [
+        "durable_reporter_release",
+        "event_stream_api_v1",
+        "dedicated_service_state"
+      ],
+      "anchors": [
+        "/cockpit/help?feature=msp.reporter-dry-run"
+      ],
+      "source_refs": [
+        "modules/control-agent/README.md"
+      ],
+      "related": [
+        "msp.heartbeat",
+        "msp.reporter-spool",
+        "msp.reporter-recovery"
+      ],
+      "locales": {
+        "en": {
+          "title": "Check local reporter probes",
+          "purpose": "Inspect configured local health checks without sending or changing reporter state.",
+          "when": "Before deployment or while separating a local service failure from a transport problem.",
+          "steps": [
+            "Use the existing reporter command as the dedicated service user and add --dry-run.",
+            "Keep configured probe hosts local: localhost, 127.0.0.1 or ::1.",
+            "Read the reported service names and ok/crit states.",
+            "For a real delivery check, use a normal timer run and verify current receipt after resolving the local issue."
+          ],
+          "permissions": "Authorised host operators using the dedicated reporter service identity. Cockpit roles do not grant shell access.",
+          "limits": "Dry run performs local health requests only. It reads no credentials, calls no control-api, enrolls nothing and writes no queue or cursor. It does not prove authentication, network delivery or fleet-wide health.",
+          "example": "The WebUI /health check returns ok while central delivery is offline; the next investigation concerns transport, not the local health endpoint."
+        },
+        "nl": {
+          "title": "Lokale reportercontroles uitvoeren",
+          "purpose": "Bekijk ingerichte lokale gezondheidscontroles zonder te verzenden of reporterstatus te wijzigen.",
+          "when": "Vóór uitrol of wanneer je een lokale servicefout wilt onderscheiden van een verbindingsprobleem.",
+          "steps": [
+            "Gebruik het bestaande reportercommando als de eigen servicegebruiker en voeg --dry-run toe.",
+            "Houd controlehosts lokaal: localhost, 127.0.0.1 of ::1.",
+            "Lees de gerapporteerde dienstnamen en toestanden ok/crit.",
+            "Gebruik voor echte bezorgcontrole een normale timerrun en controleer actuele ontvangst nadat het lokale probleem is verholpen."
+          ],
+          "permissions": "Bevoegde hostbeheerders met de eigen reporterservice-identiteit. Cockpitrollen geven geen shelltoegang.",
+          "limits": "De proef voert alleen lokale gezondheidsverzoeken uit. Hij leest geen sleutels, benadert geen control-api, registreert niets en schrijft geen wachtrij of cursor. Hij bewijst geen authenticatie, bezorging of gezondheid van alle machines.",
+          "example": "De WebUI-controle op /health geeft ok terwijl centrale bezorging offline is; het vervolgonderzoek betreft de verbinding, niet het lokale gezondheidsadres."
         }
       }
     },

@@ -52,11 +52,11 @@ let _logsSeverityFilter = 'all';
 
 // Map of panel names → i18n keys for the app titlebar label.
 const APP_TITLEBAR_KEYS = {
-  approvals: 'tab_approvals', chat: 'tab_chat', tasks: 'tab_tasks', skills: 'tab_skills',
+  modules: 'modules_title', approvals: 'tab_approvals', chat: 'tab_chat', tasks: 'tab_tasks', skills: 'tab_skills',
   memory: 'tab_memory', workspaces: 'tab_workspaces',
   profiles: 'tab_profiles', todos: 'tab_todos', insights: 'tab_insights', logs: 'tab_logs', governance: 'tab_governance', integrations: 'tab_integrations', projects: 'tab_projects', settings: 'tab_settings',
 };
-const MAIN_VIEW_PANELS = ['approvals','settings','skills','memory','tasks','kanban','workspaces','profiles','insights','logs','governance','integrations','projects','plugin'];
+const MAIN_VIEW_PANELS = ['modules','approvals','settings','skills','memory','tasks','kanban','workspaces','profiles','insights','logs','governance','integrations','projects','plugin'];
 const MAIN_VIEW_SIDEBAR_PANEL_FALLBACKS = { plugin: 'settings' };
 
 /**
@@ -378,7 +378,8 @@ function _syncMobileSidebarPanelFromMainView(){
 }
 
 async function switchPanel(name, opts = {}) {
-  const nextPanel = name || 'chat';
+  const gated = document.querySelector('[data-module-gated][data-panel="'+String(name).replace(/[^a-z_]/g,'')+'"][hidden]');
+  const nextPanel = gated || (window.SynthPulseModules && !window.SynthPulseModules.canOpen(name)) ? 'chat' : (name || 'chat');
   const prevPanel = _currentPanel;
   // ── Desktop sidebar collapse toggle (rail-click only) ──
   // If the click came from a rail icon AND we're on desktop, the rail icon
@@ -426,6 +427,7 @@ async function switchPanel(name, opts = {}) {
       mainEl.classList.toggle('showing-' + p, nextPanel === p);
     });
   }
+  if (nextPanel === 'modules' && window.SynthPulseModules) await window.SynthPulseModules.load();
   // Lazy-load panel data
   if (nextPanel === 'tasks') await loadCrons();
   if (nextPanel === 'kanban') await loadKanban();
@@ -450,7 +452,7 @@ async function switchPanel(name, opts = {}) {
   }
   if (opts.fromRailClick && typeof _isDesktopWidth === 'function' && !_isDesktopWidth()) {
     const sidebar = document.querySelector('.sidebar');
-    if (['chat', 'governance', 'integrations', 'approvals'].includes(nextPanel)) {
+    if (['chat', 'governance', 'integrations', 'approvals', 'modules'].includes(nextPanel)) {
       _closeMobileSidebarAfterPanelSelection();
     } else if (sidebar) {
       sidebar.classList.remove('mobile-session-page');
@@ -8932,7 +8934,7 @@ window._navAudience = 'member';
 window._capabilityNavigation = false;
 // Navigation order agreed with Michaël (20 Sep 2026): daily work first, then
 // admin surfaces. Also the default order of the markup in index.html.
-const _MEMBER_NAV_ORDER = ['tasks', 'skills', 'projects', 'profiles', 'memory', 'integrations', 'workspaces', 'files', 'todos', 'insights', 'approvals', 'governance', 'logs'];
+const _MEMBER_NAV_ORDER = ['modules','tasks', 'skills', 'projects', 'profiles', 'memory', 'integrations', 'workspaces', 'files', 'todos', 'insights', 'approvals', 'governance', 'logs'];
 function _canUseFeature(permission){
   const me=window.__GOV_ME__;
   if(!me)return false;
@@ -8988,7 +8990,7 @@ window.loadGovernanceNavVisibility=loadGovernanceNavVisibility;
 
 function _applyTabVisibility(hidden){
   hidden=_sanitizeTabPanelList(hidden);
-  const govHidden=Array.isArray(window._govHiddenNav)?window._govHiddenNav:[];
+  const govHidden=(Array.isArray(window._govHiddenNav)?window._govHiddenNav:[]).concat(window._moduleHiddenNav||[]);
   if(govHidden.length) hidden=hidden.concat(govHidden.filter(p=>hidden.indexOf(p)===-1));
   _applyTabOrder(window._navAudience==='member'&&!window._capabilityNavigation?_MEMBER_NAV_ORDER:_getTabOrder());
   // Hide/unhide all [data-panel] elements (sidebar-nav buttons + rail buttons)
@@ -9019,6 +9021,7 @@ function _renderTabVisibilityChips(){
   panels.forEach(function(panel){
     var tab=document.querySelector('.rail .rail-btn.nav-tab[data-panel="'+panel+'"]')
       ||document.querySelector('.sidebar-nav .nav-tab[data-panel="'+panel+'"]');
+    if(tab && tab.hasAttribute('data-module-gated'))return;
     var label=(tab&&(tab.dataset.tooltip||tab.dataset.label))||panel;
     // Capitalize first letter
     label=label.charAt(0).toUpperCase()+label.slice(1);

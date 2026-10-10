@@ -38,7 +38,7 @@ PANEL_PERMISSIONS = {
 # Never hidden, whatever the grants: the user would otherwise lose the ability
 # to work, to reach their own preferences, or to ask for help.
 ESSENTIAL_PANELS = frozenset({"chat", "settings", "approvals"})
-MEMBER_PANELS = frozenset({"chat", "profiles", "projects", "tasks", "skills", "integrations", "approvals", "memory", "settings"})
+MEMBER_PANELS = frozenset({"modules", "chat", "profiles", "projects", "tasks", "skills", "integrations", "approvals", "memory", "settings"})
 
 
 def _permissions(access) -> frozenset:

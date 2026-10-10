@@ -1,0 +1,752 @@
+{
+  "connections_version": 1,
+  "consent_classes": [
+    "none",
+    "owner_confirm",
+    "participants_notice",
+    "admin_approve"
+  ],
+  "meeting_data_classes": [
+    "meeting_minutes",
+    "meeting_actions",
+    "meeting_decisions"
+  ],
+  "event_types": [
+    "meeting_notes.recorded",
+    "meeting_notes.transcript_ready",
+    "meeting_notes.summary_ready",
+    "meeting_notes.deleted",
+    "knowledge_base.document.parsed",
+    "knowledge_base.document.deleted",
+    "e_signing.submission.completed",
+    "e_signing.submission.declined",
+    "design_studio.export.ready",
+    "connection.failed"
+  ],
+  "preconditions": {
+    "meeting_dpia": {
+      "kind": "render",
+      "owner": "X5",
+      "recorded_by": "C15",
+      "meaning": "the meeting notes DPIA is done"
+    },
+    "consent_notice": {
+      "kind": "render",
+      "owner": "X5",
+      "recorded_by": "C15",
+      "meaning": "the organisation's approved recording notice is configured"
+    },
+    "memory_proposals_ready": {
+      "kind": "render",
+      "owner": "X5",
+      "recorded_by": "C15",
+      "meaning": "organisation memory proposals are available (addendum A8 merged)"
+    },
+    "chat_mapping": {
+      "kind": "runtime",
+      "owner": "X6",
+      "meaning": "the organiser mapped the meeting series to one chat"
+    },
+    "project_mapping": {
+      "kind": "runtime",
+      "owner": "X6",
+      "meaning": "the source is mapped to a project"
+    },
+    "task_owner_mapped": {
+      "kind": "runtime",
+      "owner": "M5b",
+      "meaning": "action item owners are mapped to users"
+    },
+    "contracts_dataset": {
+      "kind": "runtime",
+      "owner": "M1",
+      "meaning": "the restricted Contracts dataset exists and only the admin and legal groups read it"
+    },
+    "knowledge_key": {
+      "kind": "runtime",
+      "owner": "X2",
+      "meaning": "the knowledge base key is present and held only by the tool broker"
+    }
+  },
+  "capabilities": {
+    "workspace": {
+      "provides": {
+        "events": [
+          "connection.failed"
+        ],
+        "tool_views": [],
+        "apis": [
+          "module_events",
+          "memory_proposals"
+        ],
+        "data_classes": [
+          "operational"
+        ]
+      },
+      "consumes": {
+        "events": [
+          "connection.failed"
+        ],
+        "tool_views": [],
+        "apis": [],
+        "data_classes": []
+      }
+    },
+    "group_chat": {
+      "provides": {
+        "events": [],
+        "tool_views": [],
+        "apis": [
+          "group_chat_post"
+        ],
+        "data_classes": []
+      },
+      "consumes": {
+        "events": [
+          "meeting_notes.summary_ready"
+        ],
+        "tool_views": [],
+        "apis": [],
+        "data_classes": []
+      }
+    },
+    "design_studio": {
+      "provides": {
+        "events": [
+          "design_studio.export.ready"
+        ],
+        "tool_views": [],
+        "apis": [],
+        "data_classes": [
+          "design_exports"
+        ]
+      },
+      "consumes": {
+        "events": [],
+        "tool_views": [],
+        "apis": [],
+        "data_classes": []
+      }
+    },
+    "workflows": {
+      "provides": {
+        "events": [],
+        "tool_views": [
+          "workflows_read",
+          "workflows_build"
+        ],
+        "apis": [
+          "event_sink"
+        ],
+        "data_classes": []
+      },
+      "consumes": {
+        "events": [
+          "meeting_notes.summary_ready",
+          "e_signing.submission.completed",
+          "design_studio.export.ready",
+          "connection.failed"
+        ],
+        "tool_views": [],
+        "apis": [],
+        "data_classes": []
+      }
+    },
+    "knowledge_base": {
+      "provides": {
+        "events": [
+          "knowledge_base.document.parsed",
+          "knowledge_base.document.deleted"
+        ],
+        "tool_views": [
+          "knowledge_read"
+        ],
+        "apis": [],
+        "data_classes": [
+          "knowledge_passages",
+          "knowledge_documents"
+        ]
+      },
+      "consumes": {
+        "events": [
+          "meeting_notes.summary_ready",
+          "meeting_notes.deleted",
+          "e_signing.submission.completed"
+        ],
+        "tool_views": [],
+        "apis": [],
+        "data_classes": []
+      }
+    },
+    "notebook": {
+      "provides": {
+        "events": [],
+        "tool_views": [
+          "notebook_read"
+        ],
+        "apis": [],
+        "data_classes": []
+      },
+      "consumes": {
+        "events": [
+          "knowledge_base.document.deleted"
+        ],
+        "tool_views": [
+          "knowledge_read"
+        ],
+        "apis": [],
+        "data_classes": []
+      }
+    },
+    "e_signing": {
+      "provides": {
+        "events": [
+          "e_signing.submission.completed",
+          "e_signing.submission.declined"
+        ],
+        "tool_views": [
+          "signing_prepare"
+        ],
+        "apis": [],
+        "data_classes": [
+          "signed_documents"
+        ]
+      },
+      "consumes": {
+        "events": [
+          "meeting_notes.summary_ready",
+          "design_studio.export.ready"
+        ],
+        "tool_views": [],
+        "apis": [],
+        "data_classes": []
+      }
+    },
+    "dictation": {
+      "provides": {
+        "events": [],
+        "tool_views": [],
+        "apis": [
+          "speech"
+        ],
+        "data_classes": [
+          "speech_audio_transient"
+        ]
+      },
+      "consumes": {
+        "events": [],
+        "tool_views": [],
+        "apis": [],
+        "data_classes": []
+      }
+    },
+    "meeting_notes": {
+      "provides": {
+        "events": [
+          "meeting_notes.recorded",
+          "meeting_notes.transcript_ready",
+          "meeting_notes.summary_ready",
+          "meeting_notes.deleted"
+        ],
+        "tool_views": [
+          "meetings_read"
+        ],
+        "apis": [
+          "speech"
+        ],
+        "data_classes": [
+          "meeting_minutes",
+          "meeting_actions",
+          "meeting_decisions",
+          "speech_audio_transient"
+        ]
+      },
+      "consumes": {
+        "events": [],
+        "tool_views": [],
+        "apis": [],
+        "data_classes": []
+      }
+    }
+  },
+  "connections": [
+    {
+      "id": "assistant_knowledge",
+      "requires": [
+        "knowledge_base"
+      ],
+      "requires_any": [],
+      "default": "on",
+      "consent": [
+        "none"
+      ],
+      "data_classes": [
+        "knowledge_passages"
+      ],
+      "residency": "same_installation",
+      "events": [],
+      "tool_views": [
+        "knowledge_read"
+      ],
+      "workflow_template": null,
+      "preconditions": [
+        "knowledge_key"
+      ],
+      "wave": 1,
+      "client_visible": true,
+      "name": {
+        "nl": "AI-medewerkers zoeken in je kennisbank",
+        "en": "Assistants search your knowledge base"
+      },
+      "summary": {
+        "nl": "AI-medewerkers antwoorden uit de kennisbank met bronnen, alleen uit documenten die jouw groepen mogen lezen.",
+        "en": "Assistants answer from the knowledge base with sources, only from documents your groups may read."
+      }
+    },
+    {
+      "id": "shared_speech",
+      "requires": [],
+      "requires_any": [
+        "dictation",
+        "meeting_notes"
+      ],
+      "default": "on",
+      "consent": [
+        "none"
+      ],
+      "data_classes": [
+        "speech_audio_transient"
+      ],
+      "residency": "same_installation",
+      "events": [],
+      "tool_views": [],
+      "workflow_template": null,
+      "preconditions": [],
+      "wave": 2,
+      "client_visible": true,
+      "name": {
+        "nl": "Eén spraakdienst voor dicteren, spraak en opnames",
+        "en": "One speech service for dictation, voice and recordings"
+      },
+      "summary": {
+        "nl": "Dicteren, spraakgesprekken en geüploade opnames gebruiken allemaal de eigen spraakdienst van je organisatie.",
+        "en": "Dictation, voice conversations and uploaded recordings all use your organisation's own speech service."
+      }
+    },
+    {
+      "id": "minutes_to_chat",
+      "requires": [
+        "meeting_notes",
+        "group_chat"
+      ],
+      "requires_any": [],
+      "default": "off",
+      "consent": [
+        "owner_confirm",
+        "participants_notice"
+      ],
+      "data_classes": [
+        "meeting_minutes"
+      ],
+      "residency": "same_installation",
+      "events": [
+        "meeting_notes.summary_ready"
+      ],
+      "tool_views": [],
+      "workflow_template": "minutes-to-chat",
+      "preconditions": [
+        "meeting_dpia",
+        "consent_notice",
+        "chat_mapping"
+      ],
+      "wave": 2,
+      "client_visible": true,
+      "name": {
+        "nl": "Verslag naar het groepsgesprek",
+        "en": "Minutes to the group chat"
+      },
+      "summary": {
+        "nl": "Het verslag met besluiten en actiepunten verschijnt in het groepsgesprek van het project.",
+        "en": "The minutes with decisions and action items appear in the project's group chat."
+      }
+    },
+    {
+      "id": "minutes_to_knowledge",
+      "requires": [
+        "meeting_notes",
+        "knowledge_base"
+      ],
+      "requires_any": [],
+      "default": "off",
+      "consent": [
+        "owner_confirm",
+        "participants_notice"
+      ],
+      "data_classes": [
+        "meeting_minutes"
+      ],
+      "residency": "same_installation",
+      "events": [
+        "meeting_notes.summary_ready",
+        "meeting_notes.deleted"
+      ],
+      "tool_views": [],
+      "workflow_template": "minutes-to-knowledge",
+      "preconditions": [
+        "meeting_dpia",
+        "consent_notice"
+      ],
+      "wave": 2,
+      "client_visible": true,
+      "name": {
+        "nl": "Verslagen in de kennisbank",
+        "en": "Minutes in the knowledge base"
+      },
+      "summary": {
+        "nl": "Bevestigde verslagen worden doorzoekbare documenten in de kennisbank, met de toegangsrechten van de vergadering.",
+        "en": "Confirmed minutes become searchable documents in the knowledge base, with the meeting's access rights."
+      }
+    },
+    {
+      "id": "actions_to_tasks",
+      "requires": [
+        "meeting_notes",
+        "workflows"
+      ],
+      "requires_any": [],
+      "default": "off",
+      "consent": [
+        "owner_confirm",
+        "participants_notice"
+      ],
+      "data_classes": [
+        "meeting_actions"
+      ],
+      "residency": "same_installation",
+      "events": [
+        "meeting_notes.summary_ready"
+      ],
+      "tool_views": [],
+      "workflow_template": "actions-to-tasks",
+      "preconditions": [
+        "meeting_dpia",
+        "consent_notice",
+        "task_owner_mapped"
+      ],
+      "wave": 2,
+      "client_visible": true,
+      "name": {
+        "nl": "Actiepunten worden taken",
+        "en": "Action items become tasks"
+      },
+      "summary": {
+        "nl": "Elk actiepunt wordt een concepttaak voor de eigenaar, totdat die het bevestigt.",
+        "en": "Each action item becomes a draft task for its owner, until the owner confirms it."
+      }
+    },
+    {
+      "id": "decision_to_signing",
+      "requires": [
+        "meeting_notes",
+        "e_signing"
+      ],
+      "requires_any": [],
+      "default": "off",
+      "consent": [
+        "owner_confirm",
+        "participants_notice"
+      ],
+      "data_classes": [
+        "meeting_decisions"
+      ],
+      "residency": "same_installation",
+      "events": [
+        "meeting_notes.summary_ready"
+      ],
+      "tool_views": [
+        "signing_prepare"
+      ],
+      "workflow_template": "decision-to-signing",
+      "preconditions": [
+        "meeting_dpia",
+        "consent_notice"
+      ],
+      "wave": 2,
+      "client_visible": true,
+      "name": {
+        "nl": "Besluit klaarzetten voor ondertekening",
+        "en": "Prepare a decision for signing"
+      },
+      "summary": {
+        "nl": "Een besluit uit het verslag wordt na jouw goedkeuring klaargezet als concept voor een ondertekenverzoek.",
+        "en": "A decision from the minutes is prepared as a draft signing request after your approval."
+      }
+    },
+    {
+      "id": "design_to_project",
+      "requires": [
+        "design_studio"
+      ],
+      "requires_any": [],
+      "default": "off",
+      "consent": [
+        "none"
+      ],
+      "data_classes": [
+        "design_exports"
+      ],
+      "residency": "same_installation",
+      "events": [
+        "design_studio.export.ready"
+      ],
+      "tool_views": [],
+      "workflow_template": "design-to-project",
+      "preconditions": [
+        "project_mapping"
+      ],
+      "wave": 2,
+      "client_visible": true,
+      "name": {
+        "nl": "Ontwerpen in het project",
+        "en": "Designs in the project"
+      },
+      "summary": {
+        "nl": "Ontwerpen die je uit de ontwerpstudio exporteert, komen in de bestanden van het project.",
+        "en": "Designs you export from the design studio land in the project's files."
+      }
+    },
+    {
+      "id": "signed_archive",
+      "requires": [
+        "e_signing"
+      ],
+      "requires_any": [],
+      "default": "off",
+      "consent": [
+        "none"
+      ],
+      "data_classes": [
+        "signed_documents"
+      ],
+      "residency": "same_installation",
+      "events": [
+        "e_signing.submission.completed"
+      ],
+      "tool_views": [],
+      "workflow_template": "signed-archive",
+      "preconditions": [
+        "project_mapping"
+      ],
+      "wave": 2,
+      "client_visible": true,
+      "name": {
+        "nl": "Ondertekende documenten gearchiveerd",
+        "en": "Signed documents archived"
+      },
+      "summary": {
+        "nl": "Als iedereen heeft ondertekend, komen het ondertekende document en het ondertekeningsverslag in het project.",
+        "en": "When everyone has signed, the signed document and its signing record land in the project."
+      }
+    },
+    {
+      "id": "notebook_from_knowledge",
+      "requires": [
+        "notebook",
+        "knowledge_base"
+      ],
+      "requires_any": [],
+      "default": "off",
+      "consent": [
+        "none"
+      ],
+      "data_classes": [
+        "knowledge_documents"
+      ],
+      "residency": "same_installation",
+      "events": [
+        "knowledge_base.document.deleted"
+      ],
+      "tool_views": [
+        "knowledge_read"
+      ],
+      "workflow_template": null,
+      "preconditions": [],
+      "wave": 2,
+      "client_visible": true,
+      "name": {
+        "nl": "Notitieboek vanuit de kennisbank",
+        "en": "Notebook from the knowledge base"
+      },
+      "summary": {
+        "nl": "Start een onderzoeksnotitieboek vanuit documenten in de kennisbank die je mag lezen.",
+        "en": "Start a research notebook from documents in the knowledge base that you may read."
+      }
+    },
+    {
+      "id": "decisions_to_memory",
+      "requires": [
+        "meeting_notes"
+      ],
+      "requires_any": [],
+      "default": "off",
+      "consent": [
+        "owner_confirm",
+        "participants_notice",
+        "admin_approve"
+      ],
+      "data_classes": [
+        "meeting_decisions"
+      ],
+      "residency": "same_installation",
+      "events": [
+        "meeting_notes.summary_ready",
+        "meeting_notes.deleted"
+      ],
+      "tool_views": [],
+      "workflow_template": "decisions-to-memory",
+      "preconditions": [
+        "meeting_dpia",
+        "consent_notice",
+        "memory_proposals_ready"
+      ],
+      "wave": 2,
+      "client_visible": true,
+      "name": {
+        "nl": "Besluiten in het organisatiegeheugen",
+        "en": "Decisions in organisation memory"
+      },
+      "summary": {
+        "nl": "Goedgekeurde besluiten uit vergaderingen worden organisatiegeheugen dat elke AI-medewerker kan gebruiken.",
+        "en": "Approved decisions from meetings become organisation memory that every assistant can recall."
+      }
+    },
+    {
+      "id": "module_health",
+      "requires": [
+        "workspace"
+      ],
+      "requires_any": [],
+      "default": "on",
+      "consent": [
+        "none"
+      ],
+      "data_classes": [
+        "operational"
+      ],
+      "residency": "same_installation",
+      "events": [
+        "connection.failed"
+      ],
+      "tool_views": [],
+      "workflow_template": "connection-failed",
+      "preconditions": [],
+      "wave": 1,
+      "client_visible": false,
+      "name": {
+        "nl": "Bewaking van alle onderdelen",
+        "en": "Monitoring of all components"
+      },
+      "summary": {
+        "nl": "Fouten, status en gebruik van elke module en koppeling worden bewaakt.",
+        "en": "Errors, health and usage of every module and connection are monitored."
+      }
+    },
+    {
+      "id": "module_map",
+      "requires": [
+        "workspace"
+      ],
+      "requires_any": [],
+      "default": "on",
+      "consent": [
+        "none"
+      ],
+      "data_classes": [
+        "operational"
+      ],
+      "residency": "same_installation",
+      "events": [],
+      "tool_views": [],
+      "workflow_template": null,
+      "preconditions": [],
+      "wave": 1,
+      "client_visible": true,
+      "name": {
+        "nl": "Overzicht van koppelingen",
+        "en": "Overview of connections"
+      },
+      "summary": {
+        "nl": "Laat per module zien met welke andere modules deze samenwerkt.",
+        "en": "Shows per module which other modules it works with."
+      }
+    },
+    {
+      "id": "design_to_signing",
+      "requires": [
+        "design_studio",
+        "e_signing"
+      ],
+      "requires_any": [],
+      "default": "off",
+      "consent": [
+        "owner_confirm"
+      ],
+      "data_classes": [
+        "design_exports"
+      ],
+      "residency": "same_installation",
+      "events": [
+        "design_studio.export.ready"
+      ],
+      "tool_views": [
+        "signing_prepare"
+      ],
+      "workflow_template": "design-to-signing",
+      "preconditions": [],
+      "wave": 2,
+      "client_visible": true,
+      "name": {
+        "nl": "Ontwerp klaarzetten voor ondertekening",
+        "en": "Prepare a design for signing"
+      },
+      "summary": {
+        "nl": "Een ontwerp wordt na jouw bevestiging klaargezet als concept voor een ondertekenverzoek.",
+        "en": "A design is prepared as a draft signing request after you confirm."
+      }
+    },
+    {
+      "id": "signed_to_knowledge",
+      "requires": [
+        "e_signing",
+        "knowledge_base"
+      ],
+      "requires_any": [],
+      "default": "off",
+      "consent": [
+        "owner_confirm"
+      ],
+      "data_classes": [
+        "signed_documents"
+      ],
+      "residency": "same_installation",
+      "events": [
+        "e_signing.submission.completed"
+      ],
+      "tool_views": [],
+      "workflow_template": "signed-to-knowledge",
+      "preconditions": [
+        "contracts_dataset"
+      ],
+      "wave": 2,
+      "client_visible": true,
+      "name": {
+        "nl": "Ondertekende documenten in de kennisbank",
+        "en": "Signed documents in the knowledge base"
+      },
+      "summary": {
+        "nl": "Ondertekende contracten en hun ondertekeningsverslag komen ook in een afgeschermde dataset van de kennisbank.",
+        "en": "Signed contracts and their signing records also land in a restricted dataset of the knowledge base."
+      }
+    }
+  ]
+}

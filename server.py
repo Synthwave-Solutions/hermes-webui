@@ -408,6 +408,8 @@ class Handler(BaseHTTPRequestHandler):
             parsed = urlparse(self.path)
             if not check_auth(self, parsed): return
             if not enforce_request(self, parsed, "GET"): return
+            from api.modules import gate as module_gate
+            if module_gate(self, parsed): return
             result = handle_get(self, parsed)
             if result is False:
                 return j(self, {'error': 'not found'}, status=404)
@@ -442,6 +444,10 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if not _is_csp_report_post and not enforce_request(self, parsed, self.command):
                 self.close_connection = True  # Never parse leftover JSON as another request.
+                return
+            from api.modules import gate as module_gate
+            if module_gate(self, parsed):
+                self.close_connection = True
                 return
             result = route_func(self, parsed)
             if result is False:
