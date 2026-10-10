@@ -53,9 +53,17 @@ def test_real_background_review_keeps_original_skill_roots_after_other_profile_p
     actor_token = governance.bind_governance_context(actor_scope)
     memory_token = memory_tool.bind_personal_memory_dir(personal_dir)
     home_token = constants.set_hermes_home_override(first)
+    # Newer engines split the defer decision (``_spawn_background_review``) from
+    # the spawn itself (``_spawn_background_review_now`` + preempted-review
+    # requeue); carry those real methods onto the stub when the engine has them.
+    stub_type = type("ReviewAgentStub", (SimpleNamespace,), {
+        name: getattr(Agent, name)
+        for name in ("_spawn_background_review_now", "_maybe_requeue_preempted_review",
+                     "_REVIEW_REQUEUE_MAX_ATTEMPTS")
+        if hasattr(Agent, name)})
     try:
         profiles.patch_skill_home_modules(first)
-        Agent._spawn_background_review(SimpleNamespace(), [], review_skills=True)
+        Agent._spawn_background_review(stub_type(), [], review_skills=True)
         assert entered.wait(5)
     finally:
         constants.reset_hermes_home_override(home_token)

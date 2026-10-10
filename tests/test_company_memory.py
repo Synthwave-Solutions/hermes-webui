@@ -13,6 +13,9 @@ from pathlib import Path
 from types import SimpleNamespace as NS
 from unittest.mock import patch
 from urllib.parse import urlparse
+# The WebUI root goes on sys.path by absolute path (as the service script does):
+# newer engines drop the cwd entry ('') from sys.path when run_agent is imported.
+sys.path.insert(0,sys.argv[3])
 sys.path.insert(0,sys.argv[2])
 from api import config,company_memory as c,personal_mnemosyne as p,personal_context as pc,routes
 from api.governance import loader
@@ -86,6 +89,6 @@ with patch.object(loader,'get_policy',return_value=policy):
  assert len(c.listing(admin)['items'])==before
 print('company-memory-ok')
 '''
-    result=subprocess.run([runtime,'-c',script,str(tmp_path),engine],text=True,capture_output=True,timeout=80,
+    result=subprocess.run([runtime,'-c',script,str(tmp_path),engine,str(Path(__file__).resolve().parents[1])],text=True,capture_output=True,timeout=80,
         env=dict(os.environ,HERMES_HOME=str(tmp_path/'hermes'),HERMES_WEBUI_STATE_DIR=str(tmp_path/'state'),MNEMOSYNE_NO_EMBEDDINGS='1'))
     assert result.returncode==0,result.stderr[-4000:]+result.stdout[-1000:]

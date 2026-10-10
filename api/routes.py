@@ -22480,12 +22480,18 @@ def _selected_profile_snapshot_updates(
 
     try:
         from api.profiles import profile_env_for_background_worker
-        from cron.jobs import _compute_provider_model_snapshots
+        import cron.jobs as cron_jobs
     except Exception:
         logger.warning(
             "Selected-profile cron snapshot repair unavailable; saving ambient snapshots",
             exc_info=True,
         )
+        return {}
+    _compute_provider_model_snapshots = getattr(cron_jobs, "_compute_provider_model_snapshots", None)
+    if _compute_provider_model_snapshots is None:
+        # Newer engines dropped create-time model snapshots: an unpinned job
+        # follows the main agent model of its profile when it fires, so there
+        # is no ambient snapshot to repair.
         return {}
 
     try:
@@ -24125,7 +24131,7 @@ def _resolve_approval_legacy(sid: str, approval_id: str, choice: str) -> bool:
     governance_one_shot = bool(pending and (pending.get("approval_kind") == "governance_cli"
         or pending.get("governance_action") or pending.get("required_approver")
         or pending.get("allow_session") is False))
-    if choice in ("once", "session") and not governance_one_shot:
+    if choice == "session" and not governance_one_shot:
         for k in all_keys:
             approve_session(sid, k)
     elif choice == "always":
@@ -24133,6 +24139,9 @@ def _resolve_approval_legacy(sid: str, approval_id: str, choice: str) -> bool:
             approve_session(sid, k)
             approve_permanent(k)
         save_permanent_allowlist(_permanent_approved)
+    # choice == "once": no persistence, the approval covers this single call only (#6017).
+    # resolve_gateway_approval() below still releases the parked call; persisting here would
+    # let every later matching guarded call skip its approval card for the whole session.
     # Unblock the agent thread waiting in the gateway approval queue.
     # This is the primary signal when streaming is active — the agent
     # thread is parked in entry.event.wait() and needs to be woken up.
