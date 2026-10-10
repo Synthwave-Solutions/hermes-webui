@@ -20,12 +20,10 @@ PROFILE_CONCEPT_KEYS = [
 
 
 def _locale_blocks():
-    """Extract every top-level locale block from static/i18n.js."""
-    matches = list(re.finditer(r"^  ('[^']+'|[A-Za-z][A-Za-z0-9-]*): \{$", I18N_JS, re.MULTILINE))
-    end = I18N_JS.index("\n};", matches[-1].start())
+    """Read the demand-loaded bundles used by the current locale loader."""
     return {
-        match.group(1).strip("'"): I18N_JS[match.start() : (matches[index + 1].start() if index + 1 < len(matches) else end)]
-        for index, match in enumerate(matches)
+        path.stem: path.read_text(encoding="utf-8")
+        for path in (ROOT / "static" / "i18n").glob("*.js")
     }
 
 
@@ -56,7 +54,7 @@ def test_i18n_keys_are_english_fallback_owned():
             assert not re.search(rf"\b{re.escape(key)}:\s*'", block), (
                 f"key {key!r} must be absent from non-English locale {locale!r}"
             )
-    assert "_locale[key] ?? LOCALES.en[key]" in I18N_JS
+    assert re.search(r"_locale\[key\]\s*\?\?\s*LOCALES\.en\[key\]", I18N_JS)
 
 
 def test_help_card_uses_i18n_keys():

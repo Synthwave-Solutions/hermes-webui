@@ -100,7 +100,7 @@ window.SynthPulseHelpContent = {
             {
               "id": "mention",
               "title": "Ask a specific bot",
-              "body": "Type @ and the name of a bot to choose who answers. Without a name, the bot that answered last carries on.",
+              "body": "Type @ and the bot name to choose who answers. Without a mention, the conversation follows its configured default routing. Check the bot attribution on the reply.",
               "target": "[data-tour='chat-composer']"
             }
           ],
@@ -140,7 +140,7 @@ window.SynthPulseHelpContent = {
         },
         "realtime_voice": {
           "title": "Realtime voice",
-          "summary": "Have a live spoken conversation with the assistant. It answers while you talk.",
+          "summary": "Have a live spoken conversation when audio is configured and permitted. Availability depends on the provider, browser and installation policy.",
           "parent": "chat",
           "enabled_if": "[data-tour='chat-realtime-voice']",
           "sections": [
@@ -748,7 +748,7 @@ window.SynthPulseHelpContent = {
             {
               "id": "mention",
               "title": "Een bepaalde bot vragen",
-              "body": "Typ @ en de naam van een bot om te kiezen wie antwoordt. Zonder naam gaat de bot die het laatst antwoordde verder.",
+              "body": "Typ @ en de botnaam om te kiezen wie antwoordt. Zonder vermelding volgt het gesprek de ingestelde standaardroutering. Controleer de botvermelding bij het antwoord.",
               "target": "[data-tour='chat-composer']"
             }
           ],
@@ -788,7 +788,7 @@ window.SynthPulseHelpContent = {
         },
         "realtime_voice": {
           "title": "Live spraak",
-          "summary": "Voer een live gesprek met de assistent. Die antwoordt terwijl je praat.",
+          "summary": "Voer een live gesproken gesprek wanneer audio is ingesteld en toegestaan. Beschikbaarheid hangt af van provider, browser en installatiebeleid.",
           "parent": "chat",
           "enabled_if": "[data-tour='chat-realtime-voice']",
           "sections": [

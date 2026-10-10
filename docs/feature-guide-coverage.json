@@ -1,0 +1,7260 @@
+{
+  "schema_version": 1,
+  "product": "webui",
+  "base_commit": "2b2c799f",
+  "features": [
+    {
+      "id": "webui.help.navigation",
+      "area": "help",
+      "status": "available",
+      "source_refs": [
+        "static/governance.js:2067",
+        "static/index.html:1057",
+        "static/index.html:126",
+        "static/index.html:164",
+        "static/index.html:165",
+        "static/index.html:166",
+        "static/index.html:167",
+        "static/index.html:168",
+        "static/index.html:169",
+        "static/index.html:170",
+        "static/index.html:171",
+        "static/index.html:173",
+        "static/index.html:175",
+        "static/index.html:176",
+        "static/index.html:177",
+        "static/index.html:178",
+        "static/index.html:180",
+        "static/index.html:181",
+        "static/index.html:184",
+        "static/index.html:188",
+        "static/index.html:189",
+        "static/index.html:190",
+        "static/index.html:191",
+        "static/index.html:192",
+        "static/index.html:193",
+        "static/index.html:194",
+        "static/index.html:195",
+        "static/index.html:197",
+        "static/index.html:199",
+        "static/index.html:200",
+        "static/index.html:201",
+        "static/index.html:202",
+        "static/index.html:204",
+        "static/projects.js:232"
+      ]
+    },
+    {
+      "id": "webui.help.tour",
+      "area": "help",
+      "status": "available",
+      "source_refs": [
+        "static/commands.js",
+        "static/index.html:1897"
+      ]
+    },
+    {
+      "id": "webui.help.org_tour",
+      "area": "help",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1898"
+      ]
+    },
+    {
+      "id": "webui.help.page",
+      "area": "help",
+      "status": "available",
+      "source_refs": [
+        "static/commands.js",
+        "static/index.html:148",
+        "static/index.html:1909"
+      ]
+    },
+    {
+      "id": "webui.help.guide",
+      "area": "help",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1911"
+      ]
+    },
+    {
+      "id": "webui.help.confirm",
+      "area": "help",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:2023",
+        "static/index.html:2028",
+        "static/index.html:2030",
+        "static/index.html:2031"
+      ]
+    },
+    {
+      "id": "webui.chat.send",
+      "area": "chat",
+      "status": "available",
+      "source_refs": [
+        "static/commands.js",
+        "static/index.html:621",
+        "static/index.html:646",
+        "static/index.html:780"
+      ]
+    },
+    {
+      "id": "webui.chat.normal",
+      "area": "chat",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:459"
+      ]
+    },
+    {
+      "id": "webui.chat.super",
+      "area": "chat",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:460"
+      ]
+    },
+    {
+      "id": "webui.chat.model",
+      "area": "chat",
+      "status": "available",
+      "source_refs": [
+        "static/commands.js",
+        "static/index.html:703",
+        "static/index.html:708",
+        "static/index.html:789"
+      ]
+    },
+    {
+      "id": "webui.chat.reasoning",
+      "area": "chat",
+      "status": "available",
+      "source_refs": [
+        "static/commands.js",
+        "static/index.html:735",
+        "static/index.html:797"
+      ]
+    },
+    {
+      "id": "webui.chat.quota",
+      "area": "chat",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:730",
+        "static/index.html:793"
+      ]
+    },
+    {
+      "id": "webui.chat.context",
+      "area": "chat",
+      "status": "available",
+      "source_refs": [
+        "static/commands.js",
+        "static/index.html:759",
+        "static/index.html:775",
+        "static/index.html:809",
+        "static/ui.js:765"
+      ]
+    },
+    {
+      "id": "webui.chat.tools",
+      "area": "chat",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:748",
+        "static/index.html:827",
+        "static/index.html:830",
+        "static/index.html:831"
+      ]
+    },
+    {
+      "id": "webui.chat.attach",
+      "area": "chat",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:649",
+        "static/index.html:650"
+      ]
+    },
+    {
+      "id": "webui.chat.prompts",
+      "area": "chat",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:653"
+      ]
+    },
+    {
+      "id": "webui.chat.people",
+      "area": "chat",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:2083",
+        "static/index.html:2088",
+        "static/index.html:2089",
+        "static/index.html:742"
+      ]
+    },
+    {
+      "id": "webui.chat.mentions",
+      "area": "chat",
+      "status": "available",
+      "source_refs": [
+        "static/messages.js"
+      ]
+    },
+    {
+      "id": "webui.chat.scroll",
+      "area": "chat",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:2210",
+        "static/index.html:474",
+        "static/index.html:475",
+        "static/index.html:477",
+        "static/outline.js:226",
+        "static/ui.js:1971"
+      ]
+    },
+    {
+      "id": "webui.chat.copy",
+      "area": "chat",
+      "status": "available",
+      "source_refs": [
+        "static/ui.js:15404",
+        "static/ui.js:17389"
+      ]
+    },
+    {
+      "id": "webui.chat.edit",
+      "area": "chat",
+      "status": "available",
+      "source_refs": [
+        "static/ui.js:17386"
+      ]
+    },
+    {
+      "id": "webui.chat.undo",
+      "area": "chat",
+      "status": "available",
+      "source_refs": [
+        "static/commands.js",
+        "static/ui.js:17387"
+      ]
+    },
+    {
+      "id": "webui.chat.retry",
+      "area": "chat",
+      "status": "available",
+      "source_refs": [
+        "static/commands.js",
+        "static/ui.js:17388"
+      ]
+    },
+    {
+      "id": "webui.chat.fork",
+      "area": "chat",
+      "status": "available",
+      "source_refs": [
+        "static/commands.js",
+        "static/ui.js:17396"
+      ]
+    },
+    {
+      "id": "webui.chat.activity",
+      "area": "chat",
+      "status": "available",
+      "source_refs": [
+        "static/ui.js:14802",
+        "static/ui.js:14881",
+        "static/ui.js:18984"
+      ]
+    },
+    {
+      "id": "webui.chat.svg",
+      "area": "chat",
+      "status": "available",
+      "source_refs": [
+        "static/messages.js"
+      ]
+    },
+    {
+      "id": "webui.chat.replay",
+      "area": "chat",
+      "status": "available",
+      "source_refs": [
+        "static/messages.js"
+      ]
+    },
+    {
+      "id": "webui.chat.mobile",
+      "area": "chat",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:699"
+      ]
+    },
+    {
+      "id": "webui.sessions.new",
+      "area": "sessions",
+      "status": "available",
+      "source_refs": [
+        "static/commands.js",
+        "static/index.html:136",
+        "static/index.html:216"
+      ]
+    },
+    {
+      "id": "webui.sessions.search",
+      "area": "sessions",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:221"
+      ]
+    },
+    {
+      "id": "webui.sessions.split",
+      "area": "sessions",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:142",
+        "static/split.js:121"
+      ]
+    },
+    {
+      "id": "webui.sessions.transcript",
+      "area": "sessions",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1120"
+      ]
+    },
+    {
+      "id": "webui.sessions.json",
+      "area": "sessions",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1121",
+        "static/index.html:1125",
+        "static/index.html:1128"
+      ]
+    },
+    {
+      "id": "webui.sessions.html",
+      "area": "sessions",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1124"
+      ]
+    },
+    {
+      "id": "webui.sessions.share",
+      "area": "sessions",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1122",
+        "static/index.html:1123"
+      ]
+    },
+    {
+      "id": "webui.sessions.clear",
+      "area": "sessions",
+      "status": "available",
+      "source_refs": [
+        "static/commands.js",
+        "static/index.html:1126"
+      ]
+    },
+    {
+      "id": "webui.sessions.organize",
+      "area": "sessions",
+      "status": "available",
+      "source_refs": [
+        "static/sessions.js"
+      ]
+    },
+    {
+      "id": "webui.voice.dictation",
+      "area": "voice",
+      "status": "conditional",
+      "source_refs": [
+        "static/index.html:657"
+      ]
+    },
+    {
+      "id": "webui.voice.read",
+      "area": "voice",
+      "status": "conditional",
+      "source_refs": [
+        "static/ui.js:17397"
+      ]
+    },
+    {
+      "id": "webui.voice.loop",
+      "area": "voice",
+      "status": "conditional",
+      "source_refs": [
+        "static/commands.js",
+        "static/index.html:665"
+      ]
+    },
+    {
+      "id": "webui.voice.realtime",
+      "area": "voice",
+      "status": "conditional",
+      "source_refs": [
+        "static/index.html:637",
+        "static/index.html:656"
+      ]
+    },
+    {
+      "id": "webui.voice.hold",
+      "area": "voice",
+      "status": "conditional",
+      "source_refs": [
+        "static/index.html:634",
+        "static/index.html:635",
+        "static/index.html:636"
+      ]
+    },
+    {
+      "id": "webui.tasks.create",
+      "area": "tasks",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:230",
+        "static/index.html:884",
+        "static/index.html:885",
+        "static/panels.js:2464"
+      ]
+    },
+    {
+      "id": "webui.tasks.prompt",
+      "area": "tasks",
+      "status": "available",
+      "source_refs": [
+        "static/panels.js:1949",
+        "static/panels.js:2440"
+      ]
+    },
+    {
+      "id": "webui.tasks.script",
+      "area": "tasks",
+      "status": "available",
+      "source_refs": [
+        "static/panels.js:2445"
+      ]
+    },
+    {
+      "id": "webui.tasks.skills",
+      "area": "tasks",
+      "status": "available",
+      "source_refs": [
+        "static/panels.js:2452"
+      ]
+    },
+    {
+      "id": "webui.tasks.schedule",
+      "area": "tasks",
+      "status": "available",
+      "source_refs": [
+        "static/panels.js:2484",
+        "static/panels.js:2490",
+        "static/panels.js:2502",
+        "static/panels.js:2508",
+        "static/panels.js:2512",
+        "static/panels.js:2520"
+      ]
+    },
+    {
+      "id": "webui.tasks.profile",
+      "area": "tasks",
+      "status": "available",
+      "source_refs": [
+        "static/panels.js:2542",
+        "static/panels.js:2549"
+      ]
+    },
+    {
+      "id": "webui.tasks.delivery",
+      "area": "tasks",
+      "status": "available",
+      "source_refs": [
+        "static/panels.js:2534"
+      ]
+    },
+    {
+      "id": "webui.tasks.notify",
+      "area": "tasks",
+      "status": "available",
+      "source_refs": [
+        "static/panels.js:1737",
+        "static/panels.js:1767",
+        "static/panels.js:1768"
+      ]
+    },
+    {
+      "id": "webui.tasks.mute",
+      "area": "tasks",
+      "status": "available",
+      "source_refs": [
+        "static/panels.js:1739",
+        "static/panels.js:1756"
+      ]
+    },
+    {
+      "id": "webui.tasks.run",
+      "area": "tasks",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:877",
+        "static/panels.js:2044"
+      ]
+    },
+    {
+      "id": "webui.tasks.pause",
+      "area": "tasks",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:878",
+        "static/index.html:879",
+        "static/panels.js:2043"
+      ]
+    },
+    {
+      "id": "webui.tasks.share",
+      "area": "tasks",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:880",
+        "static/panels.js:1348",
+        "static/panels.js:1413",
+        "static/panels.js:1880",
+        "static/panels.js:1883",
+        "static/panels.js:1884"
+      ]
+    },
+    {
+      "id": "webui.tasks.edit",
+      "area": "tasks",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:881",
+        "static/index.html:882",
+        "static/index.html:883"
+      ]
+    },
+    {
+      "id": "webui.tasks.labels",
+      "area": "tasks",
+      "status": "available",
+      "source_refs": [
+        "static/panels.js:1416",
+        "static/panels.js:1438",
+        "static/panels.js:1439",
+        "static/panels.js:1440",
+        "static/panels.js:1441",
+        "static/panels.js:1545",
+        "static/panels.js:1547",
+        "static/panels.js:1548",
+        "static/panels.js:2010",
+        "static/panels.js:2469",
+        "static/panels.js:2470",
+        "static/panels.js:2471",
+        "static/panels.js:2478",
+        "static/panels.js:2528"
+      ]
+    },
+    {
+      "id": "webui.tasks.results",
+      "area": "tasks",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:229",
+        "static/panels.js:2045",
+        "static/panels.js:2165"
+      ]
+    },
+    {
+      "id": "webui.files.workspace",
+      "area": "files",
+      "status": "available",
+      "source_refs": [
+        "static/commands.js",
+        "static/index.html:324",
+        "static/index.html:693",
+        "static/index.html:785",
+        "static/index.html:950",
+        "static/panels.js:7331",
+        "static/panels.js:7336",
+        "static/panels.js:7343"
+      ]
+    },
+    {
+      "id": "webui.files.manage",
+      "area": "files",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:951",
+        "static/index.html:952",
+        "static/index.html:953",
+        "static/index.html:954"
+      ]
+    },
+    {
+      "id": "webui.files.access",
+      "area": "files",
+      "status": "available",
+      "source_refs": [
+        "static/governance.js:1385",
+        "static/governance.js:1390",
+        "static/governance.js:1395",
+        "static/governance.js:1398",
+        "static/governance.js:1401",
+        "static/panels.js:7176",
+        "static/panels.js:7177",
+        "static/panels.js:7178"
+      ]
+    },
+    {
+      "id": "webui.files.browse",
+      "area": "files",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:172",
+        "static/index.html:1943",
+        "static/index.html:1952",
+        "static/index.html:1955",
+        "static/index.html:1958",
+        "static/index.html:196",
+        "static/index.html:1963",
+        "static/index.html:690"
+      ]
+    },
+    {
+      "id": "webui.files.create",
+      "area": "files",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1953",
+        "static/index.html:1954"
+      ]
+    },
+    {
+      "id": "webui.files.upload",
+      "area": "files",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1956",
+        "static/index.html:1961"
+      ]
+    },
+    {
+      "id": "webui.files.preview",
+      "area": "files",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1978"
+      ]
+    },
+    {
+      "id": "webui.files.edit",
+      "area": "files",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1980",
+        "static/index.html:1992"
+      ]
+    },
+    {
+      "id": "webui.files.download",
+      "area": "files",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1977",
+        "static/index.html:1979"
+      ]
+    },
+    {
+      "id": "webui.files.path",
+      "area": "files",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1976"
+      ]
+    },
+    {
+      "id": "webui.files.artifacts",
+      "area": "files",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1964",
+        "static/workspace.js:738"
+      ]
+    },
+    {
+      "id": "webui.files.todos",
+      "area": "files",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1965"
+      ]
+    },
+    {
+      "id": "webui.files.preferences",
+      "area": "files",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1957"
+      ]
+    },
+    {
+      "id": "webui.boards.create",
+      "area": "boards",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:2133",
+        "static/index.html:2137",
+        "static/index.html:2196",
+        "static/index.html:2197",
+        "static/index.html:241",
+        "static/index.html:259",
+        "static/index.html:260",
+        "static/panels.js:3113",
+        "static/panels.js:4698",
+        "static/panels.js:4700"
+      ]
+    },
+    {
+      "id": "webui.boards.status",
+      "area": "boards",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:2143",
+        "static/index.html:2151",
+        "static/panels.js:3333",
+        "static/panels.js:3334",
+        "static/panels.js:4695"
+      ]
+    },
+    {
+      "id": "webui.boards.assignment",
+      "area": "boards",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:2157",
+        "static/index.html:2164"
+      ]
+    },
+    {
+      "id": "webui.boards.runtime",
+      "area": "boards",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:2169",
+        "static/index.html:2177",
+        "static/index.html:2182",
+        "static/index.html:2186"
+      ]
+    },
+    {
+      "id": "webui.boards.links",
+      "area": "boards",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:2191",
+        "static/panels.js:4051",
+        "static/panels.js:4060",
+        "static/panels.js:4062"
+      ]
+    },
+    {
+      "id": "webui.boards.comments",
+      "area": "boards",
+      "status": "available",
+      "source_refs": [
+        "static/panels.js:4713",
+        "static/panels.js:4714"
+      ]
+    },
+    {
+      "id": "webui.boards.block",
+      "area": "boards",
+      "status": "available",
+      "source_refs": [
+        "static/panels.js:4696"
+      ]
+    },
+    {
+      "id": "webui.boards.filter",
+      "area": "boards",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:242",
+        "static/index.html:246",
+        "static/index.html:247",
+        "static/index.html:248",
+        "static/index.html:249",
+        "static/index.html:250",
+        "static/panels.js:3455"
+      ]
+    },
+    {
+      "id": "webui.boards.bulk",
+      "area": "boards",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:253",
+        "static/index.html:254"
+      ]
+    },
+    {
+      "id": "webui.boards.dispatch",
+      "area": "boards",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:255",
+        "static/index.html:256",
+        "static/index.html:914",
+        "static/index.html:915"
+      ]
+    },
+    {
+      "id": "webui.boards.boards",
+      "area": "boards",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:2096",
+        "static/index.html:2097",
+        "static/index.html:2100",
+        "static/index.html:2104",
+        "static/index.html:2108",
+        "static/index.html:2113",
+        "static/index.html:2117",
+        "static/index.html:2122",
+        "static/index.html:2123",
+        "static/index.html:901",
+        "static/index.html:912",
+        "static/panels.js:4946",
+        "static/panels.js:4959",
+        "static/panels.js:4963",
+        "static/panels.js:4967"
+      ]
+    },
+    {
+      "id": "webui.boards.consolidated",
+      "area": "boards",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:913"
+      ]
+    },
+    {
+      "id": "webui.memory.personal",
+      "area": "memory",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:861",
+        "static/index.html:862",
+        "static/index.html:863",
+        "static/panels.js:6472"
+      ]
+    },
+    {
+      "id": "webui.memory.company",
+      "area": "memory",
+      "status": "available",
+      "source_refs": [
+        "static/panels.js"
+      ]
+    },
+    {
+      "id": "webui.memory.project",
+      "area": "memory",
+      "status": "available",
+      "source_refs": [
+        "static/panels.js"
+      ]
+    },
+    {
+      "id": "webui.memory.identity",
+      "area": "memory",
+      "status": "available",
+      "source_refs": [
+        "static/panels.js"
+      ]
+    },
+    {
+      "id": "webui.memory.external",
+      "area": "memory",
+      "status": "available",
+      "source_refs": [
+        "static/panels.js:6360",
+        "static/panels.js:6366",
+        "static/panels.js:6389",
+        "static/panels.js:6390"
+      ]
+    },
+    {
+      "id": "webui.memory.explorer",
+      "area": "memory",
+      "status": "conditional",
+      "source_refs": [
+        "static/memory_dashboard.js",
+        "api/memdash_scope.py",
+        "api/memdash_views.py"
+      ]
+    },
+    {
+      "id": "webui.memory.search",
+      "area": "memory",
+      "status": "conditional",
+      "source_refs": [
+        "static/memory_dashboard.js",
+        "api/memdash_scope.py",
+        "api/memdash_views.py"
+      ]
+    },
+    {
+      "id": "webui.memory.audit",
+      "area": "memory",
+      "status": "conditional",
+      "source_refs": [
+        "static/memory_dashboard.js",
+        "api/memdash_scope.py",
+        "api/memdash_views.py"
+      ]
+    },
+    {
+      "id": "webui.skills.browse",
+      "area": "skills",
+      "status": "available",
+      "source_refs": [
+        "static/commands.js",
+        "static/index.html:274"
+      ]
+    },
+    {
+      "id": "webui.skills.edit",
+      "area": "skills",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:271",
+        "static/index.html:844",
+        "static/index.html:846",
+        "static/index.html:847",
+        "static/panels.js:6132",
+        "static/panels.js:6137",
+        "static/panels.js:6142"
+      ]
+    },
+    {
+      "id": "webui.skills.delete",
+      "area": "skills",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:845"
+      ]
+    },
+    {
+      "id": "webui.skills.wiki",
+      "area": "skills",
+      "status": "available",
+      "source_refs": [
+        "static/panels.js:14586",
+        "static/panels.js:5493",
+        "static/panels.js:5519",
+        "static/panels.js:5522",
+        "static/panels.js:5554",
+        "static/panels.js:5557",
+        "static/panels.js:5560"
+      ]
+    },
+    {
+      "id": "webui.bots.select",
+      "area": "bots",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:121",
+        "static/index.html:682",
+        "static/index.html:968"
+      ]
+    },
+    {
+      "id": "webui.bots.create",
+      "area": "bots",
+      "status": "available",
+      "source_refs": [
+        "static/bot-builder.js:108",
+        "static/index.html:335"
+      ]
+    },
+    {
+      "id": "webui.bots.identity",
+      "area": "bots",
+      "status": "available",
+      "source_refs": [
+        "static/bot-builder.js"
+      ]
+    },
+    {
+      "id": "webui.bots.instructions",
+      "area": "bots",
+      "status": "available",
+      "source_refs": [
+        "static/bot-builder.js"
+      ]
+    },
+    {
+      "id": "webui.bots.skills",
+      "area": "bots",
+      "status": "available",
+      "source_refs": [
+        "static/bot-builder.js"
+      ]
+    },
+    {
+      "id": "webui.bots.tools",
+      "area": "bots",
+      "status": "available",
+      "source_refs": [
+        "static/bot-builder.js"
+      ]
+    },
+    {
+      "id": "webui.bots.memory",
+      "area": "bots",
+      "status": "available",
+      "source_refs": [
+        "static/bot-builder.js"
+      ]
+    },
+    {
+      "id": "webui.bots.knowledge",
+      "area": "bots",
+      "status": "available",
+      "source_refs": [
+        "static/bot-builder.js",
+        "static/bot-knowledge.js"
+      ]
+    },
+    {
+      "id": "webui.bots.access",
+      "area": "bots",
+      "status": "available",
+      "source_refs": [
+        "static/bot-builder.js"
+      ]
+    },
+    {
+      "id": "webui.bots.appearance",
+      "area": "bots",
+      "status": "available",
+      "source_refs": [
+        "static/bot-builder.js:81",
+        "static/panels.js:7972",
+        "static/panels.js:7973",
+        "static/panels.js:7974",
+        "static/panels.js:7975",
+        "static/panels.js:7976",
+        "static/panels.js:7977"
+      ]
+    },
+    {
+      "id": "webui.bots.manage",
+      "area": "bots",
+      "status": "available",
+      "source_refs": [
+        "static/bot-builder.js:106",
+        "static/index.html:969",
+        "static/index.html:970",
+        "static/index.html:971",
+        "static/panels.js:7961",
+        "static/panels.js:7962",
+        "static/panels.js:7963",
+        "static/panels.js:7964",
+        "static/panels.js:7965",
+        "static/panels.js:7980"
+      ]
+    },
+    {
+      "id": "webui.projects.create",
+      "area": "projects",
+      "status": "available",
+      "source_refs": [
+        "static/projects.js:95"
+      ]
+    },
+    {
+      "id": "webui.projects.team",
+      "area": "projects",
+      "status": "available",
+      "source_refs": [
+        "static/projects.js:421",
+        "static/projects.js:424",
+        "static/projects.js:425"
+      ]
+    },
+    {
+      "id": "webui.projects.chat",
+      "area": "projects",
+      "status": "available",
+      "source_refs": [
+        "static/projects.js:395"
+      ]
+    },
+    {
+      "id": "webui.projects.files",
+      "area": "projects",
+      "status": "available",
+      "source_refs": [
+        "static/projects.js:427"
+      ]
+    },
+    {
+      "id": "webui.projects.archive",
+      "area": "projects",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:313",
+        "static/index.html:930",
+        "static/projects.js:425"
+      ]
+    },
+    {
+      "id": "webui.connections.providers",
+      "area": "connections",
+      "status": "conditional",
+      "source_refs": [
+        "static/index.html:1067",
+        "static/index.html:1095",
+        "static/index.html:388"
+      ]
+    },
+    {
+      "id": "webui.connections.channel",
+      "area": "connections",
+      "status": "conditional",
+      "source_refs": [
+        "static/index.html:1082",
+        "static/integrations.js:924"
+      ]
+    },
+    {
+      "id": "webui.connections.publish",
+      "area": "connections",
+      "status": "conditional",
+      "source_refs": [
+        "static/integrations.js:911",
+        "static/integrations.js:913",
+        "static/integrations.js:925"
+      ]
+    },
+    {
+      "id": "webui.connections.people",
+      "area": "connections",
+      "status": "conditional",
+      "source_refs": [
+        "static/integrations.js:1036",
+        "static/integrations.js:1066",
+        "static/integrations.js:1072",
+        "static/integrations.js:1073",
+        "static/integrations.js:1075"
+      ]
+    },
+    {
+      "id": "webui.connections.personal",
+      "area": "connections",
+      "status": "conditional",
+      "source_refs": [
+        "static/integrations.js:1157",
+        "static/integrations.js:1158"
+      ]
+    },
+    {
+      "id": "webui.connections.link",
+      "area": "connections",
+      "status": "conditional",
+      "source_refs": [
+        "static/integrations.js:1160",
+        "static/integrations.js:1164",
+        "static/integrations.js:1167",
+        "static/integrations.js:1169"
+      ]
+    },
+    {
+      "id": "webui.connections.mcp",
+      "area": "connections",
+      "status": "conditional",
+      "source_refs": [
+        "static/panels.js:14327"
+      ]
+    },
+    {
+      "id": "webui.connections.catalog",
+      "area": "connections",
+      "status": "conditional",
+      "source_refs": [
+        "static/index.html:1873",
+        "static/panels.js:14377",
+        "static/panels.js:14392",
+        "static/panels.js:14394"
+      ]
+    },
+    {
+      "id": "webui.governance.once",
+      "area": "governance",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:542"
+      ]
+    },
+    {
+      "id": "webui.governance.session",
+      "area": "governance",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:547"
+      ]
+    },
+    {
+      "id": "webui.governance.always",
+      "area": "governance",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:551"
+      ]
+    },
+    {
+      "id": "webui.governance.deny",
+      "area": "governance",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:535",
+        "static/index.html:536",
+        "static/index.html:555"
+      ]
+    },
+    {
+      "id": "webui.governance.skip",
+      "area": "governance",
+      "status": "available",
+      "source_refs": [
+        "static/commands.js",
+        "static/index.html:559",
+        "static/index.html:677"
+      ]
+    },
+    {
+      "id": "webui.governance.clarify",
+      "area": "governance",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:572",
+        "static/index.html:577",
+        "static/index.html:578",
+        "static/messages.js:8376",
+        "static/messages.js:8381",
+        "static/messages.js:8382"
+      ]
+    },
+    {
+      "id": "webui.governance.requests",
+      "area": "governance",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1052",
+        "static/index.html:1765"
+      ]
+    },
+    {
+      "id": "webui.governance.resume",
+      "area": "governance",
+      "status": "available",
+      "source_refs": [
+        "static/panels.js:14729",
+        "static/panels.js:14732"
+      ]
+    },
+    {
+      "id": "webui.governance.users",
+      "area": "governance",
+      "status": "available",
+      "source_refs": [
+        "static/governance.js:220",
+        "static/governance.js:221",
+        "static/governance.js:237",
+        "static/governance.js:272",
+        "static/governance.js:273",
+        "static/governance.js:454",
+        "static/governance.js:459",
+        "static/governance.js:465"
+      ]
+    },
+    {
+      "id": "webui.governance.mcp_map",
+      "area": "governance",
+      "status": "available",
+      "source_refs": [
+        "static/governance.js:294"
+      ]
+    },
+    {
+      "id": "webui.governance.groups",
+      "area": "governance",
+      "status": "available",
+      "source_refs": [
+        "static/governance.js:1105",
+        "static/governance.js:1106",
+        "static/governance.js:1113",
+        "static/governance.js:1123",
+        "static/governance.js:1125",
+        "static/governance.js:1127",
+        "static/governance.js:1129",
+        "static/governance.js:1134",
+        "static/governance.js:1135"
+      ]
+    },
+    {
+      "id": "webui.governance.preview",
+      "area": "governance",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1034",
+        "static/index.html:1036",
+        "static/index.html:1040"
+      ]
+    },
+    {
+      "id": "webui.governance.audit",
+      "area": "governance",
+      "status": "available",
+      "source_refs": [
+        "static/governance.js:2184",
+        "static/index.html:1016",
+        "static/index.html:1017",
+        "static/index.html:1018",
+        "static/index.html:1019",
+        "static/index.html:1020",
+        "static/index.html:1021",
+        "static/index.html:1022",
+        "static/index.html:378"
+      ]
+    },
+    {
+      "id": "webui.governance.workspace_filter",
+      "area": "governance",
+      "status": "available",
+      "source_refs": [
+        "static/governance.js:1416",
+        "static/governance.js:1419",
+        "static/governance.js:1420"
+      ]
+    },
+    {
+      "id": "webui.governance.organisation",
+      "area": "governance",
+      "status": "available",
+      "source_refs": [
+        "static/governance.js"
+      ]
+    },
+    {
+      "id": "webui.operations.refresh",
+      "area": "operations",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:155",
+        "static/index.html:469",
+        "static/index.html:502",
+        "static/index.html:503",
+        "static/index.html:512",
+        "static/panels.js:3609"
+      ]
+    },
+    {
+      "id": "webui.operations.health",
+      "area": "operations",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:520",
+        "static/index.html:521",
+        "static/panels.js:14468"
+      ]
+    },
+    {
+      "id": "webui.operations.terminal",
+      "area": "operations",
+      "status": "available",
+      "source_refs": [
+        "static/commands.js",
+        "static/index.html:593",
+        "static/index.html:594",
+        "static/index.html:595",
+        "static/index.html:596",
+        "static/index.html:597",
+        "static/index.html:612",
+        "static/index.html:613"
+      ]
+    },
+    {
+      "id": "webui.operations.logs",
+      "area": "operations",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:345",
+        "static/index.html:350",
+        "static/index.html:356",
+        "static/index.html:363",
+        "static/index.html:368",
+        "static/index.html:369",
+        "static/index.html:370",
+        "static/index.html:998"
+      ]
+    },
+    {
+      "id": "webui.operations.insights",
+      "area": "operations",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:296",
+        "static/index.html:300"
+      ]
+    },
+    {
+      "id": "webui.operations.capacity",
+      "area": "operations",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1788",
+        "static/index.html:1790",
+        "static/index.html:1792",
+        "static/index.html:1794",
+        "static/index.html:1797",
+        "static/index.html:1798",
+        "static/panels.js:14862"
+      ]
+    },
+    {
+      "id": "webui.operations.updates",
+      "area": "operations",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1779"
+      ]
+    },
+    {
+      "id": "webui.operations.errors",
+      "area": "operations",
+      "status": "available",
+      "source_refs": [
+        "static/panels.js:14252",
+        "static/ui.js:731",
+        "static/ui.js:9359"
+      ]
+    },
+    {
+      "id": "webui.operations.extensions",
+      "area": "operations",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1747"
+      ]
+    },
+    {
+      "id": "webui.operations.dashboard",
+      "area": "operations",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:174",
+        "static/index.html:198"
+      ]
+    },
+    {
+      "id": "webui.settings.theme",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/commands.js",
+        "static/index.html:1158",
+        "static/index.html:1164",
+        "static/index.html:1170",
+        "static/index.html:1177"
+      ]
+    },
+    {
+      "id": "webui.settings.skin",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1183"
+      ]
+    },
+    {
+      "id": "webui.settings.font_size",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1188",
+        "static/index.html:1194",
+        "static/index.html:1200",
+        "static/index.html:1206",
+        "static/index.html:1213"
+      ]
+    },
+    {
+      "id": "webui.settings.workspace_panel_open",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1217"
+      ]
+    },
+    {
+      "id": "webui.settings.workspace_todos_tab",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1224"
+      ]
+    },
+    {
+      "id": "webui.settings.session_jump_buttons",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1231"
+      ]
+    },
+    {
+      "id": "webui.settings.session_endless_scroll",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1238"
+      ]
+    },
+    {
+      "id": "webui.settings.chat_activity_display_mode",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1246",
+        "static/index.html:1249",
+        "static/index.html:1252",
+        "static/index.html:1256"
+      ]
+    },
+    {
+      "id": "webui.settings.transparent_event_timestamps",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1263"
+      ]
+    },
+    {
+      "id": "webui.settings.auto_scroll_follow",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1270"
+      ]
+    },
+    {
+      "id": "webui.settings.render_user_markdown",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1277"
+      ]
+    },
+    {
+      "id": "webui.settings.large_text_paste_as_attachment",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1284"
+      ]
+    },
+    {
+      "id": "webui.settings.project_quick_create",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1291"
+      ]
+    },
+    {
+      "id": "webui.settings.structured_code_mode",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1298"
+      ]
+    },
+    {
+      "id": "webui.settings.structured_code_auto_lines",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1305"
+      ]
+    },
+    {
+      "id": "webui.settings.show_titlebar_profile",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1311"
+      ]
+    },
+    {
+      "id": "webui.settings.worklog_details_expanded_default",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1318"
+      ]
+    },
+    {
+      "id": "webui.settings.advanced_chat_controls",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1329"
+      ]
+    },
+    {
+      "id": "webui.settings.model",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1374"
+      ]
+    },
+    {
+      "id": "webui.settings.hide_suggestions",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1391"
+      ]
+    },
+    {
+      "id": "webui.settings.hide_empty_state_panel",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1398"
+      ]
+    },
+    {
+      "id": "webui.settings.virtualize_transcript",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1405"
+      ]
+    },
+    {
+      "id": "webui.settings.send_key",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1412"
+      ]
+    },
+    {
+      "id": "webui.settings.language",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1420"
+      ]
+    },
+    {
+      "id": "webui.settings.rtl",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1424"
+      ]
+    },
+    {
+      "id": "webui.settings.sound_enabled",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1431"
+      ]
+    },
+    {
+      "id": "webui.settings.tts_enabled",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1438"
+      ]
+    },
+    {
+      "id": "webui.settings.tts_auto_read",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1445"
+      ]
+    },
+    {
+      "id": "webui.settings.voice_mode_enabled",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1452"
+      ]
+    },
+    {
+      "id": "webui.settings.raw_audio",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1459"
+      ]
+    },
+    {
+      "id": "webui.settings.dictation_append",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1466"
+      ]
+    },
+    {
+      "id": "webui.settings.tts_engine",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1472"
+      ]
+    },
+    {
+      "id": "webui.settings.tts_voice",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1473"
+      ]
+    },
+    {
+      "id": "webui.settings.tts_rate",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1481"
+      ]
+    },
+    {
+      "id": "webui.settings.tts_pitch",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1488"
+      ]
+    },
+    {
+      "id": "webui.settings.notifications_enabled",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1494"
+      ]
+    },
+    {
+      "id": "webui.settings.show_token_usage",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1508"
+      ]
+    },
+    {
+      "id": "webui.settings.max_tokens",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1516"
+      ]
+    },
+    {
+      "id": "webui.settings.show_quota_chip",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1520"
+      ]
+    },
+    {
+      "id": "webui.settings.show_conversation_outline",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1527"
+      ]
+    },
+    {
+      "id": "webui.settings.show_tps",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1534"
+      ]
+    },
+    {
+      "id": "webui.settings.fade_text_effect",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1541"
+      ]
+    },
+    {
+      "id": "webui.settings.terminal_auto_expand",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1548"
+      ]
+    },
+    {
+      "id": "webui.settings.api_redact",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1555"
+      ]
+    },
+    {
+      "id": "webui.settings.sidebar_density",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1562"
+      ]
+    },
+    {
+      "id": "webui.settings.pinned_sessions_limit",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1570"
+      ]
+    },
+    {
+      "id": "webui.settings.auto_title_refresh",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1575"
+      ]
+    },
+    {
+      "id": "webui.settings.default_message_mode",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1585"
+      ]
+    },
+    {
+      "id": "webui.settings.show_busy_placeholder_hint",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1594"
+      ]
+    },
+    {
+      "id": "webui.settings.new_chat_on_workspace_switch",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1601"
+      ]
+    },
+    {
+      "id": "webui.settings.show_cli_sessions",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1608"
+      ]
+    },
+    {
+      "id": "webui.settings.show_cron_sessions",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1615"
+      ]
+    },
+    {
+      "id": "webui.settings.show_claude_code_sessions",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1622"
+      ]
+    },
+    {
+      "id": "webui.settings.show_webhook_sessions",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1629"
+      ]
+    },
+    {
+      "id": "webui.settings.show_previous_messaging_sessions",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1636"
+      ]
+    },
+    {
+      "id": "webui.settings.sync_insights",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1643"
+      ]
+    },
+    {
+      "id": "webui.settings.check_updates",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1650"
+      ]
+    },
+    {
+      "id": "webui.settings.update_channel",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1657"
+      ]
+    },
+    {
+      "id": "webui.settings.ignore_agent_updates",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1665"
+      ]
+    },
+    {
+      "id": "webui.settings.whats_new_summary",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1672"
+      ]
+    },
+    {
+      "id": "webui.settings.bot_name",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1680"
+      ]
+    },
+    {
+      "id": "webui.settings.dashboard_mode",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1847"
+      ]
+    },
+    {
+      "id": "webui.settings.dashboard_url",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1852"
+      ]
+    },
+    {
+      "id": "webui.settings.save",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1682",
+        "static/index.html:1853",
+        "static/index.html:1879",
+        "static/panels.js:9769",
+        "static/panels.js:9770",
+        "static/panels.js:9921"
+      ]
+    },
+    {
+      "id": "webui.settings.photo",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1147",
+        "static/index.html:1149"
+      ]
+    },
+    {
+      "id": "webui.settings.interaction",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1353",
+        "static/index.html:1358",
+        "static/index.html:1365",
+        "static/index.html:1366"
+      ]
+    },
+    {
+      "id": "webui.settings.aux_models",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1385",
+        "static/index.html:1386"
+      ]
+    },
+    {
+      "id": "webui.settings.advanced_model",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1373",
+        "static/index.html:1375",
+        "static/panels.js:13613",
+        "static/panels.js:13617",
+        "static/panels.js:13618",
+        "static/panels.js:13662",
+        "static/panels.js:13672",
+        "static/panels.js:13674"
+      ]
+    },
+    {
+      "id": "webui.settings.notification_permission",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1500",
+        "static/index.html:1502"
+      ]
+    },
+    {
+      "id": "webui.settings.password",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1815",
+        "static/index.html:1818"
+      ]
+    },
+    {
+      "id": "webui.settings.passkey",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1840",
+        "static/panels.js:13239"
+      ]
+    },
+    {
+      "id": "webui.settings.passwordless",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1841"
+      ]
+    },
+    {
+      "id": "webui.settings.disable_auth",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1826",
+        "static/index.html:1830"
+      ]
+    },
+    {
+      "id": "webui.settings.signout",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1831"
+      ]
+    },
+    {
+      "id": "webui.settings.shutdown",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1835"
+      ]
+    },
+    {
+      "id": "webui.settings.composer_visibility",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/panels.js"
+      ]
+    },
+    {
+      "id": "webui.settings.navigation",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:415",
+        "static/index.html:419",
+        "static/index.html:423",
+        "static/index.html:428",
+        "static/index.html:432",
+        "static/index.html:436",
+        "static/index.html:440",
+        "static/index.html:444",
+        "static/index.html:448"
+      ]
+    },
+    {
+      "id": "webui.connections.onboarding",
+      "area": "connections",
+      "status": "conditional",
+      "source_refs": [
+        "static/index.html:2009",
+        "static/index.html:2010",
+        "static/index.html:2011",
+        "static/onboarding.js:185",
+        "static/onboarding.js:204",
+        "static/onboarding.js:214",
+        "static/onboarding.js:220",
+        "static/onboarding.js:319",
+        "static/onboarding.js:338",
+        "static/onboarding.js:351",
+        "static/onboarding.js:368",
+        "static/onboarding.js:372",
+        "static/onboarding.js:405"
+      ]
+    },
+    {
+      "id": "webui.connections.oauth",
+      "area": "connections",
+      "status": "conditional",
+      "source_refs": [
+        "static/onboarding.js:230",
+        "static/onboarding.js:332",
+        "static/onboarding.js:708",
+        "static/onboarding.js:709",
+        "static/onboarding.js:827"
+      ]
+    },
+    {
+      "id": "webui.planned.gateway",
+      "area": "planned",
+      "status": "conditional",
+      "source_refs": [
+        "api/tts_backend.py"
+      ]
+    },
+    {
+      "id": "webui.planned.reporter",
+      "area": "planned",
+      "status": "conditional",
+      "source_refs": [
+        "api/tts_backend.py"
+      ]
+    },
+    {
+      "id": "webui.planned.central_memory",
+      "area": "planned",
+      "status": "planned",
+      "source_refs": [
+        "api/tts_backend.py"
+      ]
+    },
+    {
+      "id": "webui.sessions.rename",
+      "area": "sessions",
+      "status": "available",
+      "source_refs": [
+        "static/commands.js"
+      ]
+    },
+    {
+      "id": "webui.sessions.pin",
+      "area": "sessions",
+      "status": "available",
+      "source_refs": [
+        "static/sessions.js"
+      ]
+    },
+    {
+      "id": "webui.sessions.move_project",
+      "area": "sessions",
+      "status": "available",
+      "source_refs": [
+        "static/sessions.js"
+      ]
+    },
+    {
+      "id": "webui.sessions.archive",
+      "area": "sessions",
+      "status": "available",
+      "source_refs": [
+        "static/sessions.js"
+      ]
+    },
+    {
+      "id": "webui.sessions.delete",
+      "area": "sessions",
+      "status": "available",
+      "source_refs": [
+        "static/sessions.js"
+      ]
+    },
+    {
+      "id": "webui.sessions.regenerate_title",
+      "area": "sessions",
+      "status": "available",
+      "source_refs": [
+        "static/sessions.js"
+      ]
+    },
+    {
+      "id": "webui.sessions.link",
+      "area": "sessions",
+      "status": "available",
+      "source_refs": [
+        "static/sessions.js"
+      ]
+    },
+    {
+      "id": "webui.chat.save_prompt",
+      "area": "chat",
+      "status": "available",
+      "source_refs": [
+        "static/messages.js"
+      ]
+    },
+    {
+      "id": "webui.bots.knowledge_upload",
+      "area": "bots",
+      "status": "available",
+      "source_refs": [
+        "static/bot-builder.js",
+        "static/bot-knowledge.js"
+      ]
+    },
+    {
+      "id": "webui.bots.knowledge_legacy",
+      "area": "bots",
+      "status": "available",
+      "source_refs": [
+        "static/bot-builder.js",
+        "static/bot-knowledge.js"
+      ]
+    },
+    {
+      "id": "webui.memory.overview",
+      "area": "memory",
+      "status": "conditional",
+      "source_refs": [
+        "static/memory_dashboard.js",
+        "api/memdash_scope.py",
+        "api/memdash_views.py"
+      ]
+    },
+    {
+      "id": "webui.memory.today",
+      "area": "memory",
+      "status": "conditional",
+      "source_refs": [
+        "static/memory_dashboard.js",
+        "api/memdash_scope.py",
+        "api/memdash_views.py"
+      ]
+    },
+    {
+      "id": "webui.memory.visualiser",
+      "area": "memory",
+      "status": "conditional",
+      "source_refs": [
+        "static/memory_dashboard.js",
+        "api/memdash_scope.py",
+        "api/memdash_views.py"
+      ]
+    },
+    {
+      "id": "webui.memory.review",
+      "area": "memory",
+      "status": "conditional",
+      "source_refs": [
+        "static/memory_dashboard.js",
+        "api/memdash_scope.py",
+        "api/memdash_views.py"
+      ]
+    },
+    {
+      "id": "webui.memory.profile",
+      "area": "memory",
+      "status": "conditional",
+      "source_refs": [
+        "static/memory_dashboard.js",
+        "api/memdash_scope.py",
+        "api/memdash_views.py"
+      ]
+    },
+    {
+      "id": "webui.memory.lifecycle",
+      "area": "memory",
+      "status": "conditional",
+      "source_refs": [
+        "static/memory_dashboard.js",
+        "api/memdash_scope.py",
+        "api/memdash_views.py"
+      ]
+    },
+    {
+      "id": "webui.memory.graph",
+      "area": "memory",
+      "status": "conditional",
+      "source_refs": [
+        "static/memory_dashboard.js",
+        "api/memdash_scope.py",
+        "api/memdash_views.py"
+      ]
+    },
+    {
+      "id": "webui.memory.triples",
+      "area": "memory",
+      "status": "conditional",
+      "source_refs": [
+        "static/memory_dashboard.js",
+        "api/memdash_scope.py",
+        "api/memdash_views.py"
+      ]
+    },
+    {
+      "id": "webui.memory.recall",
+      "area": "memory",
+      "status": "conditional",
+      "source_refs": [
+        "static/memory_dashboard.js",
+        "api/memdash_scope.py",
+        "api/memdash_views.py"
+      ]
+    },
+    {
+      "id": "webui.memory.timeline",
+      "area": "memory",
+      "status": "conditional",
+      "source_refs": [
+        "static/memory_dashboard.js",
+        "api/memdash_scope.py",
+        "api/memdash_views.py"
+      ]
+    },
+    {
+      "id": "webui.memory.consolidations",
+      "area": "memory",
+      "status": "conditional",
+      "source_refs": [
+        "static/memory_dashboard.js",
+        "api/memdash_scope.py",
+        "api/memdash_views.py"
+      ]
+    },
+    {
+      "id": "webui.memory.structured_overview",
+      "area": "memory",
+      "status": "conditional",
+      "source_refs": [
+        "static/memory_dashboard.js",
+        "api/memdash_scope.py",
+        "api/memdash_views.py"
+      ]
+    },
+    {
+      "id": "webui.memory.facts",
+      "area": "memory",
+      "status": "conditional",
+      "source_refs": [
+        "static/memory_dashboard.js",
+        "api/memdash_scope.py",
+        "api/memdash_views.py"
+      ]
+    },
+    {
+      "id": "webui.memory.structured_timelines",
+      "area": "memory",
+      "status": "conditional",
+      "source_refs": [
+        "static/memory_dashboard.js",
+        "api/memdash_scope.py",
+        "api/memdash_views.py"
+      ]
+    },
+    {
+      "id": "webui.memory.instructions",
+      "area": "memory",
+      "status": "conditional",
+      "source_refs": [
+        "static/memory_dashboard.js",
+        "api/memdash_scope.py",
+        "api/memdash_views.py"
+      ]
+    },
+    {
+      "id": "webui.memory.structured_graph",
+      "area": "memory",
+      "status": "conditional",
+      "source_refs": [
+        "static/memory_dashboard.js",
+        "api/memdash_scope.py",
+        "api/memdash_views.py"
+      ]
+    },
+    {
+      "id": "webui.memory.preferences",
+      "area": "memory",
+      "status": "conditional",
+      "source_refs": [
+        "static/memory_dashboard.js",
+        "api/memdash_scope.py",
+        "api/memdash_views.py"
+      ]
+    },
+    {
+      "id": "webui.settings.search",
+      "area": "settings",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:410"
+      ]
+    },
+    {
+      "id": "webui.files.hidden",
+      "area": "files",
+      "status": "available",
+      "source_refs": [
+        "static/ui.js:20944"
+      ]
+    },
+    {
+      "id": "webui.governance.approval_prompt",
+      "area": "governance",
+      "status": "available",
+      "source_refs": [
+        "static/governance.js:471"
+      ]
+    },
+    {
+      "id": "webui.governance.effective_grants",
+      "area": "governance",
+      "status": "available",
+      "source_refs": [
+        "static/governance.js:815"
+      ]
+    },
+    {
+      "id": "webui.governance.group_template",
+      "area": "governance",
+      "status": "available",
+      "source_refs": [
+        "static/governance.js:1021"
+      ]
+    },
+    {
+      "id": "webui.governance.integration_approval",
+      "area": "governance",
+      "status": "available",
+      "source_refs": [
+        "static/governance.js:2029"
+      ]
+    },
+    {
+      "id": "webui.operations.extension_gallery",
+      "area": "operations",
+      "status": "conditional",
+      "source_refs": [
+        "static/index.html:1722"
+      ]
+    },
+    {
+      "id": "webui.operations.extension_installed",
+      "area": "operations",
+      "status": "conditional",
+      "source_refs": [
+        "static/panels.js"
+      ]
+    },
+    {
+      "id": "webui.chat.slash",
+      "area": "chat",
+      "status": "available",
+      "source_refs": [
+        "static/commands.js"
+      ]
+    },
+    {
+      "id": "webui.chat.goal",
+      "area": "chat",
+      "status": "available",
+      "source_refs": [
+        "static/commands.js"
+      ]
+    },
+    {
+      "id": "webui.chat.queue",
+      "area": "chat",
+      "status": "available",
+      "source_refs": [
+        "static/commands.js"
+      ]
+    },
+    {
+      "id": "webui.chat.interrupt",
+      "area": "chat",
+      "status": "available",
+      "source_refs": [
+        "static/commands.js"
+      ]
+    },
+    {
+      "id": "webui.chat.steer",
+      "area": "chat",
+      "status": "available",
+      "source_refs": [
+        "static/commands.js"
+      ]
+    },
+    {
+      "id": "webui.chat.aside",
+      "area": "chat",
+      "status": "available",
+      "source_refs": [
+        "static/commands.js"
+      ]
+    },
+    {
+      "id": "webui.chat.background",
+      "area": "chat",
+      "status": "available",
+      "source_refs": [
+        "static/commands.js"
+      ]
+    },
+    {
+      "id": "webui.chat.status",
+      "area": "chat",
+      "status": "available",
+      "source_refs": [
+        "static/commands.js"
+      ]
+    },
+    {
+      "id": "webui.chat.personality",
+      "area": "chat",
+      "status": "available",
+      "source_refs": [
+        "static/commands.js"
+      ]
+    },
+    {
+      "id": "webui.skills.use",
+      "area": "skills",
+      "status": "available",
+      "source_refs": [
+        "static/commands.js"
+      ]
+    }
+  ],
+  "controls": [
+    {
+      "control": "titlebarProfileBtn",
+      "tag": "button",
+      "label": "Switch bot",
+      "source_refs": [
+        "static/index.html:121"
+      ],
+      "feature_id": "webui.bots.select"
+    },
+    {
+      "control": "btnHamburger",
+      "tag": "button",
+      "label": "Menu",
+      "source_refs": [
+        "static/index.html:126"
+      ],
+      "feature_id": "webui.help.navigation"
+    },
+    {
+      "control": "btnTitlebarNewChat",
+      "tag": "button",
+      "label": "new_conversation",
+      "source_refs": [
+        "static/index.html:136"
+      ],
+      "feature_id": "webui.sessions.new"
+    },
+    {
+      "control": "btnSplitView",
+      "tag": "button",
+      "label": "split_view",
+      "source_refs": [
+        "static/index.html:142"
+      ],
+      "feature_id": "webui.sessions.split"
+    },
+    {
+      "control": "btnPageHelp",
+      "tag": "button",
+      "label": "help_page_button_title",
+      "source_refs": [
+        "static/index.html:148"
+      ],
+      "feature_id": "webui.help.page"
+    },
+    {
+      "control": "btnReload",
+      "tag": "button",
+      "label": "reload_page",
+      "source_refs": [
+        "static/index.html:155"
+      ],
+      "feature_id": "webui.operations.refresh"
+    },
+    {
+      "control": "action:switchPanel",
+      "tag": "button",
+      "label": "tab_chat",
+      "source_refs": [
+        "static/index.html:164",
+        "static/index.html:165",
+        "static/index.html:166",
+        "static/index.html:167",
+        "static/index.html:168",
+        "static/index.html:169",
+        "static/index.html:170",
+        "static/index.html:171",
+        "static/index.html:173",
+        "static/index.html:175",
+        "static/index.html:176",
+        "static/index.html:177",
+        "static/index.html:178",
+        "static/index.html:180",
+        "static/index.html:188",
+        "static/index.html:189",
+        "static/index.html:190",
+        "static/index.html:191",
+        "static/index.html:192",
+        "static/index.html:193",
+        "static/index.html:194",
+        "static/index.html:195",
+        "static/index.html:197",
+        "static/index.html:199",
+        "static/index.html:200",
+        "static/index.html:201",
+        "static/index.html:202",
+        "static/index.html:204",
+        "static/index.html:1057",
+        "static/governance.js:2067",
+        "static/projects.js:232"
+      ],
+      "feature_id": "webui.help.navigation"
+    },
+    {
+      "control": "action:openFilesFromRail",
+      "tag": "button",
+      "label": "tab_files",
+      "source_refs": [
+        "static/index.html:172",
+        "static/index.html:196"
+      ],
+      "feature_id": "webui.files.browse"
+    },
+    {
+      "control": "dashboardRailBtn",
+      "tag": "button",
+      "label": "tab_dashboard",
+      "source_refs": [
+        "static/index.html:174"
+      ],
+      "feature_id": "webui.operations.dashboard"
+    },
+    {
+      "control": "railExpandToggle",
+      "tag": "button",
+      "label": "nav_expand_labels",
+      "source_refs": [
+        "static/index.html:181"
+      ],
+      "feature_id": "webui.help.navigation"
+    },
+    {
+      "control": "action:closeMobileSidebar",
+      "tag": "button",
+      "label": "close_menu",
+      "source_refs": [
+        "static/index.html:184"
+      ],
+      "feature_id": "webui.help.navigation"
+    },
+    {
+      "control": "dashboardMobileBtn",
+      "tag": "button",
+      "label": "tab_dashboard",
+      "source_refs": [
+        "static/index.html:198"
+      ],
+      "feature_id": "webui.operations.dashboard"
+    },
+    {
+      "control": "btnNewChat",
+      "tag": "button",
+      "label": "new_conversation",
+      "source_refs": [
+        "static/index.html:216"
+      ],
+      "feature_id": "webui.sessions.new"
+    },
+    {
+      "control": "sessionSearch",
+      "tag": "input",
+      "label": "Filter conversations...",
+      "source_refs": [
+        "static/index.html:221"
+      ],
+      "feature_id": "webui.sessions.search"
+    },
+    {
+      "control": "sessionSearchClear",
+      "tag": "button",
+      "label": "Clear conversation filter",
+      "source_refs": [
+        "static/index.html:221"
+      ],
+      "feature_id": "webui.sessions.search"
+    },
+    {
+      "control": "cronRefreshBtn",
+      "tag": "button",
+      "label": "Refresh job list",
+      "source_refs": [
+        "static/index.html:229"
+      ],
+      "feature_id": "webui.tasks.results"
+    },
+    {
+      "control": "action:openCronCreate",
+      "tag": "button",
+      "label": "new_job",
+      "source_refs": [
+        "static/index.html:230"
+      ],
+      "feature_id": "webui.tasks.create"
+    },
+    {
+      "control": "kanbanNewTaskBtn",
+      "tag": "button",
+      "label": "kanban_new_task",
+      "source_refs": [
+        "static/index.html:241"
+      ],
+      "feature_id": "webui.boards.create"
+    },
+    {
+      "control": "kanbanRefreshBtn",
+      "tag": "button",
+      "label": "kanban_refresh",
+      "source_refs": [
+        "static/index.html:242"
+      ],
+      "feature_id": "webui.boards.filter"
+    },
+    {
+      "control": "kanbanSearch",
+      "tag": "input",
+      "label": "Search tasks",
+      "source_refs": [
+        "static/index.html:246"
+      ],
+      "feature_id": "webui.boards.filter"
+    },
+    {
+      "control": "kanbanAssigneeFilter",
+      "tag": "select",
+      "label": "Assignee filter",
+      "source_refs": [
+        "static/index.html:247"
+      ],
+      "feature_id": "webui.boards.filter"
+    },
+    {
+      "control": "kanbanTenantFilter",
+      "tag": "select",
+      "label": "Tenant filter",
+      "source_refs": [
+        "static/index.html:248"
+      ],
+      "feature_id": "webui.boards.filter"
+    },
+    {
+      "control": "kanbanIncludeArchived",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:249"
+      ],
+      "feature_id": "webui.boards.filter"
+    },
+    {
+      "control": "kanbanOnlyMine",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:250"
+      ],
+      "feature_id": "webui.boards.filter"
+    },
+    {
+      "control": "kanbanBulkStatus",
+      "tag": "select",
+      "label": "Bulk status",
+      "source_refs": [
+        "static/index.html:253"
+      ],
+      "feature_id": "webui.boards.bulk"
+    },
+    {
+      "control": "action:bulkUpdateKanban",
+      "tag": "button",
+      "label": "kanban_bulk_action",
+      "source_refs": [
+        "static/index.html:254"
+      ],
+      "feature_id": "webui.boards.bulk"
+    },
+    {
+      "control": "action:nudgeKanbanDispatcher",
+      "tag": "button",
+      "label": "kanban_nudge_dispatcher",
+      "source_refs": [
+        "static/index.html:255"
+      ],
+      "feature_id": "webui.boards.dispatch"
+    },
+    {
+      "control": "action:runKanbanDispatcher",
+      "tag": "button",
+      "label": "kanban_run_dispatcher",
+      "source_refs": [
+        "static/index.html:256"
+      ],
+      "feature_id": "webui.boards.dispatch"
+    },
+    {
+      "control": "kanbanNewTaskTitle",
+      "tag": "input",
+      "label": "New task",
+      "source_refs": [
+        "static/index.html:259"
+      ],
+      "feature_id": "webui.boards.create"
+    },
+    {
+      "control": "action:createKanbanTask",
+      "tag": "button",
+      "label": "kanban_new_task",
+      "source_refs": [
+        "static/index.html:260"
+      ],
+      "feature_id": "webui.boards.create"
+    },
+    {
+      "control": "action:openSkillCreate",
+      "tag": "button",
+      "label": "new_skill",
+      "source_refs": [
+        "static/index.html:271"
+      ],
+      "feature_id": "webui.skills.edit"
+    },
+    {
+      "control": "skillsSearch",
+      "tag": "input",
+      "label": "Search skills...",
+      "source_refs": [
+        "static/index.html:274"
+      ],
+      "feature_id": "webui.skills.browse"
+    },
+    {
+      "control": "insightsRefreshBtn",
+      "tag": "button",
+      "label": "Refresh",
+      "source_refs": [
+        "static/index.html:296"
+      ],
+      "feature_id": "webui.operations.insights"
+    },
+    {
+      "control": "insightsPeriod",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/index.html:300"
+      ],
+      "feature_id": "webui.operations.insights"
+    },
+    {
+      "control": "action:loadProjectsHub",
+      "tag": "button",
+      "label": "projects_refresh",
+      "source_refs": [
+        "static/index.html:313",
+        "static/index.html:930"
+      ],
+      "feature_id": "webui.projects.archive"
+    },
+    {
+      "control": "action:openWorkspaceCreate",
+      "tag": "button",
+      "label": "workspace_add_title",
+      "source_refs": [
+        "static/index.html:324"
+      ],
+      "feature_id": "webui.files.workspace"
+    },
+    {
+      "control": "action:openProfileCreate",
+      "tag": "button",
+      "label": "new_profile",
+      "source_refs": [
+        "static/index.html:335"
+      ],
+      "feature_id": "webui.bots.create"
+    },
+    {
+      "control": "logsRefreshBtn",
+      "tag": "button",
+      "label": "Refresh",
+      "source_refs": [
+        "static/index.html:345"
+      ],
+      "feature_id": "webui.operations.logs"
+    },
+    {
+      "control": "logsFile",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/index.html:350"
+      ],
+      "feature_id": "webui.operations.logs"
+    },
+    {
+      "control": "logsTail",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/index.html:356"
+      ],
+      "feature_id": "webui.operations.logs"
+    },
+    {
+      "control": "logsSeverityFilter",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/index.html:363"
+      ],
+      "feature_id": "webui.operations.logs"
+    },
+    {
+      "control": "logsAutoRefresh",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:368"
+      ],
+      "feature_id": "webui.operations.logs"
+    },
+    {
+      "control": "logsWrap",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:369"
+      ],
+      "feature_id": "webui.operations.logs"
+    },
+    {
+      "control": "logsCopyAll",
+      "tag": "button",
+      "label": "logs_copy_all",
+      "source_refs": [
+        "static/index.html:370"
+      ],
+      "feature_id": "webui.operations.logs"
+    },
+    {
+      "control": "governanceRefreshBtn",
+      "tag": "button",
+      "label": "Refresh",
+      "source_refs": [
+        "static/index.html:378"
+      ],
+      "feature_id": "webui.governance.audit"
+    },
+    {
+      "control": "integrationsRefreshBtn",
+      "tag": "button",
+      "label": "Refresh",
+      "source_refs": [
+        "static/index.html:388"
+      ],
+      "feature_id": "webui.connections.providers"
+    },
+    {
+      "control": "action:switchSettingsSection",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/index.html:415",
+        "static/index.html:419",
+        "static/index.html:423",
+        "static/index.html:428",
+        "static/index.html:432",
+        "static/index.html:436",
+        "static/index.html:440",
+        "static/index.html:444",
+        "static/index.html:448"
+      ],
+      "feature_id": "webui.settings.navigation"
+    },
+    {
+      "control": "chatModeNormal",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/index.html:459"
+      ],
+      "feature_id": "webui.chat.normal"
+    },
+    {
+      "control": "chatModeSuper",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/index.html:460"
+      ],
+      "feature_id": "webui.chat.super"
+    },
+    {
+      "control": "btnStaleClientRefresh",
+      "tag": "button",
+      "label": "update_hard_refresh_now",
+      "source_refs": [
+        "static/index.html:469"
+      ],
+      "feature_id": "webui.operations.refresh"
+    },
+    {
+      "control": "jumpToSessionStartBtn",
+      "tag": "button",
+      "label": "session_jump_start_label",
+      "source_refs": [
+        "static/index.html:474"
+      ],
+      "feature_id": "webui.chat.scroll"
+    },
+    {
+      "control": "scrollToBottomBtn",
+      "tag": "button",
+      "label": "session_jump_end_label",
+      "source_refs": [
+        "static/index.html:475"
+      ],
+      "feature_id": "webui.chat.scroll"
+    },
+    {
+      "control": "action:dismissReconnect",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/index.html:502"
+      ],
+      "feature_id": "webui.operations.refresh"
+    },
+    {
+      "control": "action:refreshSession",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/index.html:503"
+      ],
+      "feature_id": "webui.operations.refresh"
+    },
+    {
+      "control": "offlineCheckNow",
+      "tag": "button",
+      "label": "offline_check_now",
+      "source_refs": [
+        "static/index.html:512"
+      ],
+      "feature_id": "webui.operations.refresh"
+    },
+    {
+      "control": "btnRestartGateway",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/index.html:520"
+      ],
+      "feature_id": "webui.operations.health"
+    },
+    {
+      "control": "agentHealthDismiss",
+      "tag": "button",
+      "label": "Dismiss agent heartbeat alert",
+      "source_refs": [
+        "static/index.html:521"
+      ],
+      "feature_id": "webui.operations.health"
+    },
+    {
+      "control": "approvalCollapse",
+      "tag": "button",
+      "label": "Collapse approval",
+      "source_refs": [
+        "static/index.html:535"
+      ],
+      "feature_id": "webui.governance.deny"
+    },
+    {
+      "control": "action:dismissApprovalCard",
+      "tag": "button",
+      "label": "Dismiss approval",
+      "source_refs": [
+        "static/index.html:536"
+      ],
+      "feature_id": "webui.governance.deny"
+    },
+    {
+      "control": "approvalBtnOnce",
+      "tag": "button",
+      "label": "approval_btn_once_title",
+      "source_refs": [
+        "static/index.html:542"
+      ],
+      "feature_id": "webui.governance.once"
+    },
+    {
+      "control": "approvalBtnSession",
+      "tag": "button",
+      "label": "Allow for this session",
+      "source_refs": [
+        "static/index.html:547"
+      ],
+      "feature_id": "webui.governance.session"
+    },
+    {
+      "control": "approvalBtnAlways",
+      "tag": "button",
+      "label": "Always allow this command pattern",
+      "source_refs": [
+        "static/index.html:551"
+      ],
+      "feature_id": "webui.governance.always"
+    },
+    {
+      "control": "approvalBtnDeny",
+      "tag": "button",
+      "label": "Deny — do not run this command",
+      "source_refs": [
+        "static/index.html:555"
+      ],
+      "feature_id": "webui.governance.deny"
+    },
+    {
+      "control": "approvalSkipAll",
+      "tag": "button",
+      "label": "approval_skip_all_title",
+      "source_refs": [
+        "static/index.html:559"
+      ],
+      "feature_id": "webui.governance.skip"
+    },
+    {
+      "control": "clarifyCollapse",
+      "tag": "button",
+      "label": "Collapse clarification",
+      "source_refs": [
+        "static/index.html:572",
+        "static/messages.js:8376"
+      ],
+      "feature_id": "webui.governance.clarify"
+    },
+    {
+      "control": "clarifyInput",
+      "tag": "input",
+      "label": "Type your response…",
+      "source_refs": [
+        "static/index.html:577",
+        "static/messages.js:8381"
+      ],
+      "feature_id": "webui.governance.clarify"
+    },
+    {
+      "control": "clarifySubmit",
+      "tag": "button",
+      "label": "clarify_send",
+      "source_refs": [
+        "static/index.html:578",
+        "static/messages.js:8382"
+      ],
+      "feature_id": "webui.governance.clarify"
+    },
+    {
+      "control": "btnTerminalClear",
+      "tag": "button",
+      "label": "terminal_clear",
+      "source_refs": [
+        "static/index.html:593"
+      ],
+      "feature_id": "webui.operations.terminal"
+    },
+    {
+      "control": "btnTerminalCopy",
+      "tag": "button",
+      "label": "terminal_copy_output",
+      "source_refs": [
+        "static/index.html:594"
+      ],
+      "feature_id": "webui.operations.terminal"
+    },
+    {
+      "control": "btnTerminalRestart",
+      "tag": "button",
+      "label": "terminal_restart",
+      "source_refs": [
+        "static/index.html:595"
+      ],
+      "feature_id": "webui.operations.terminal"
+    },
+    {
+      "control": "btnTerminalCollapse",
+      "tag": "button",
+      "label": "terminal_collapse",
+      "source_refs": [
+        "static/index.html:596"
+      ],
+      "feature_id": "webui.operations.terminal"
+    },
+    {
+      "control": "btnTerminalClose",
+      "tag": "button",
+      "label": "terminal_close",
+      "source_refs": [
+        "static/index.html:597"
+      ],
+      "feature_id": "webui.operations.terminal"
+    },
+    {
+      "control": "btnTerminalExpand",
+      "tag": "button",
+      "label": "terminal_expand",
+      "source_refs": [
+        "static/index.html:612"
+      ],
+      "feature_id": "webui.operations.terminal"
+    },
+    {
+      "control": "btnTerminalDockClose",
+      "tag": "button",
+      "label": "terminal_close",
+      "source_refs": [
+        "static/index.html:613"
+      ],
+      "feature_id": "webui.operations.terminal"
+    },
+    {
+      "control": "queuePill",
+      "tag": "button",
+      "label": "Show queued messages",
+      "source_refs": [
+        "static/index.html:621"
+      ],
+      "feature_id": "webui.chat.send"
+    },
+    {
+      "control": "realtimeVoiceHold",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/index.html:634"
+      ],
+      "feature_id": "webui.voice.hold"
+    },
+    {
+      "control": "realtimeVoiceMic",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/index.html:635"
+      ],
+      "feature_id": "webui.voice.hold"
+    },
+    {
+      "control": "realtimeVoiceInterrupt",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/index.html:636"
+      ],
+      "feature_id": "webui.voice.hold"
+    },
+    {
+      "control": "realtimeVoiceEnd",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/index.html:637"
+      ],
+      "feature_id": "webui.voice.realtime"
+    },
+    {
+      "control": "msg",
+      "tag": "textarea",
+      "label": "Message SynthPulse…",
+      "source_refs": [
+        "static/index.html:646"
+      ],
+      "feature_id": "webui.chat.send"
+    },
+    {
+      "control": "fileInput",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:649"
+      ],
+      "feature_id": "webui.chat.attach"
+    },
+    {
+      "control": "btnAttach",
+      "tag": "button",
+      "label": "composer_control_attach",
+      "source_refs": [
+        "static/index.html:650"
+      ],
+      "feature_id": "webui.chat.attach"
+    },
+    {
+      "control": "btnSavedPrompts",
+      "tag": "button",
+      "label": "composer_control_saved_prompts",
+      "source_refs": [
+        "static/index.html:653"
+      ],
+      "feature_id": "webui.chat.prompts"
+    },
+    {
+      "control": "btnRealtimeVoice",
+      "tag": "button",
+      "label": "Voice mode",
+      "source_refs": [
+        "static/index.html:656"
+      ],
+      "feature_id": "webui.voice.realtime"
+    },
+    {
+      "control": "btnMic",
+      "tag": "button",
+      "label": "voice_dictate",
+      "source_refs": [
+        "static/index.html:657"
+      ],
+      "feature_id": "webui.voice.dictation"
+    },
+    {
+      "control": "btnVoiceMode",
+      "tag": "button",
+      "label": "voice_mode_toggle",
+      "source_refs": [
+        "static/index.html:665"
+      ],
+      "feature_id": "webui.voice.loop"
+    },
+    {
+      "control": "yoloPill",
+      "tag": "button",
+      "label": "yolo_pill_title_active",
+      "source_refs": [
+        "static/index.html:677"
+      ],
+      "feature_id": "webui.governance.skip"
+    },
+    {
+      "control": "profileChip",
+      "tag": "button",
+      "label": "Switch bot",
+      "source_refs": [
+        "static/index.html:682"
+      ],
+      "feature_id": "webui.bots.select"
+    },
+    {
+      "control": "btnWorkspacePanelToggle",
+      "tag": "button",
+      "label": "Show workspace panel",
+      "source_refs": [
+        "static/index.html:690"
+      ],
+      "feature_id": "webui.files.browse"
+    },
+    {
+      "control": "composerWorkspaceChip",
+      "tag": "button",
+      "label": "Switch workspace",
+      "source_refs": [
+        "static/index.html:693"
+      ],
+      "feature_id": "webui.files.workspace"
+    },
+    {
+      "control": "composerMobileConfigBtn",
+      "tag": "button",
+      "label": "Workspace, model, quota, reasoning, and context settings",
+      "source_refs": [
+        "static/index.html:699"
+      ],
+      "feature_id": "webui.chat.mobile"
+    },
+    {
+      "control": "composerModelChip",
+      "tag": "button",
+      "label": "Conversation model",
+      "source_refs": [
+        "static/index.html:703"
+      ],
+      "feature_id": "webui.chat.model"
+    },
+    {
+      "control": "modelSelect",
+      "tag": "select",
+      "label": "Conversation model",
+      "source_refs": [
+        "static/index.html:708"
+      ],
+      "feature_id": "webui.chat.model"
+    },
+    {
+      "control": "providerQuotaChip",
+      "tag": "button",
+      "label": "Provider quota",
+      "source_refs": [
+        "static/index.html:730"
+      ],
+      "feature_id": "webui.chat.quota"
+    },
+    {
+      "control": "composerReasoningChip",
+      "tag": "button",
+      "label": "Reasoning effort level",
+      "source_refs": [
+        "static/index.html:735"
+      ],
+      "feature_id": "webui.chat.reasoning"
+    },
+    {
+      "control": "composerPeopleChip",
+      "tag": "button",
+      "label": "group_people",
+      "source_refs": [
+        "static/index.html:742"
+      ],
+      "feature_id": "webui.chat.people"
+    },
+    {
+      "control": "composerToolsetsChip",
+      "tag": "button",
+      "label": "Session toolsets",
+      "source_refs": [
+        "static/index.html:748"
+      ],
+      "feature_id": "webui.chat.tools"
+    },
+    {
+      "control": "ctxIndicator",
+      "tag": "button",
+      "label": "Context window usage",
+      "source_refs": [
+        "static/index.html:759"
+      ],
+      "feature_id": "webui.chat.context"
+    },
+    {
+      "control": "ctxCompressBtn",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/index.html:775"
+      ],
+      "feature_id": "webui.chat.context"
+    },
+    {
+      "control": "btnSend",
+      "tag": "button",
+      "label": "composer_send",
+      "source_refs": [
+        "static/index.html:780"
+      ],
+      "feature_id": "webui.chat.send"
+    },
+    {
+      "control": "composerMobileWorkspaceAction",
+      "tag": "button",
+      "label": "Switch workspace",
+      "source_refs": [
+        "static/index.html:785"
+      ],
+      "feature_id": "webui.files.workspace"
+    },
+    {
+      "control": "composerMobileModelAction",
+      "tag": "button",
+      "label": "Conversation model",
+      "source_refs": [
+        "static/index.html:789"
+      ],
+      "feature_id": "webui.chat.model"
+    },
+    {
+      "control": "composerMobileQuotaAction",
+      "tag": "button",
+      "label": "Provider quota",
+      "source_refs": [
+        "static/index.html:793"
+      ],
+      "feature_id": "webui.chat.quota"
+    },
+    {
+      "control": "composerMobileReasoningAction",
+      "tag": "button",
+      "label": "Reasoning effort level",
+      "source_refs": [
+        "static/index.html:797"
+      ],
+      "feature_id": "webui.chat.reasoning"
+    },
+    {
+      "control": "composerMobileCtxCompressBtn",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/index.html:809"
+      ],
+      "feature_id": "webui.chat.context"
+    },
+    {
+      "control": "toolsetsInput",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:827"
+      ],
+      "feature_id": "webui.chat.tools"
+    },
+    {
+      "control": "toolsetsApplyBtn",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/index.html:830"
+      ],
+      "feature_id": "webui.chat.tools"
+    },
+    {
+      "control": "toolsetsClearBtn",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/index.html:831"
+      ],
+      "feature_id": "webui.chat.tools"
+    },
+    {
+      "control": "btnEditSkillDetail",
+      "tag": "button",
+      "label": "skills_edit",
+      "source_refs": [
+        "static/index.html:844"
+      ],
+      "feature_id": "webui.skills.edit"
+    },
+    {
+      "control": "btnDeleteSkillDetail",
+      "tag": "button",
+      "label": "skills_delete",
+      "source_refs": [
+        "static/index.html:845"
+      ],
+      "feature_id": "webui.skills.delete"
+    },
+    {
+      "control": "btnCancelSkillDetail",
+      "tag": "button",
+      "label": "cancel",
+      "source_refs": [
+        "static/index.html:846"
+      ],
+      "feature_id": "webui.skills.edit"
+    },
+    {
+      "control": "btnSaveSkillDetail",
+      "tag": "button",
+      "label": "save",
+      "source_refs": [
+        "static/index.html:847"
+      ],
+      "feature_id": "webui.skills.edit"
+    },
+    {
+      "control": "btnEditMemoryDetail",
+      "tag": "button",
+      "label": "edit",
+      "source_refs": [
+        "static/index.html:861"
+      ],
+      "feature_id": "webui.memory.personal"
+    },
+    {
+      "control": "btnCancelMemoryDetail",
+      "tag": "button",
+      "label": "cancel",
+      "source_refs": [
+        "static/index.html:862"
+      ],
+      "feature_id": "webui.memory.personal"
+    },
+    {
+      "control": "btnSaveMemoryDetail",
+      "tag": "button",
+      "label": "save",
+      "source_refs": [
+        "static/index.html:863"
+      ],
+      "feature_id": "webui.memory.personal"
+    },
+    {
+      "control": "btnRunTaskDetail",
+      "tag": "button",
+      "label": "cron_run_now",
+      "source_refs": [
+        "static/index.html:877"
+      ],
+      "feature_id": "webui.tasks.run"
+    },
+    {
+      "control": "btnPauseTaskDetail",
+      "tag": "button",
+      "label": "cron_pause",
+      "source_refs": [
+        "static/index.html:878"
+      ],
+      "feature_id": "webui.tasks.pause"
+    },
+    {
+      "control": "btnResumeTaskDetail",
+      "tag": "button",
+      "label": "cron_resume",
+      "source_refs": [
+        "static/index.html:879"
+      ],
+      "feature_id": "webui.tasks.pause"
+    },
+    {
+      "control": "btnShareTaskDetail",
+      "tag": "button",
+      "label": "cron_share_tooltip",
+      "source_refs": [
+        "static/index.html:880"
+      ],
+      "feature_id": "webui.tasks.share"
+    },
+    {
+      "control": "btnEditTaskDetail",
+      "tag": "button",
+      "label": "edit",
+      "source_refs": [
+        "static/index.html:881"
+      ],
+      "feature_id": "webui.tasks.edit"
+    },
+    {
+      "control": "btnDuplicateTaskDetail",
+      "tag": "button",
+      "label": "cron_duplicate",
+      "source_refs": [
+        "static/index.html:882"
+      ],
+      "feature_id": "webui.tasks.edit"
+    },
+    {
+      "control": "btnDeleteTaskDetail",
+      "tag": "button",
+      "label": "delete_title",
+      "source_refs": [
+        "static/index.html:883"
+      ],
+      "feature_id": "webui.tasks.edit"
+    },
+    {
+      "control": "btnCancelTaskDetail",
+      "tag": "button",
+      "label": "cancel",
+      "source_refs": [
+        "static/index.html:884"
+      ],
+      "feature_id": "webui.tasks.create"
+    },
+    {
+      "control": "btnSaveTaskDetail",
+      "tag": "button",
+      "label": "save",
+      "source_refs": [
+        "static/index.html:885"
+      ],
+      "feature_id": "webui.tasks.create"
+    },
+    {
+      "control": "kanbanBoardSwitcherToggle",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/index.html:901"
+      ],
+      "feature_id": "webui.boards.boards"
+    },
+    {
+      "control": "btnKanbanCreateBoard",
+      "tag": "button",
+      "label": "kanban_new_board",
+      "source_refs": [
+        "static/index.html:912"
+      ],
+      "feature_id": "webui.boards.boards"
+    },
+    {
+      "control": "btnKanbanViewToggle",
+      "tag": "button",
+      "label": "kanban_view_consolidated",
+      "source_refs": [
+        "static/index.html:913"
+      ],
+      "feature_id": "webui.boards.consolidated"
+    },
+    {
+      "control": "btnKanbanPreviewDispatcher",
+      "tag": "button",
+      "label": "kanban_nudge_dispatcher",
+      "source_refs": [
+        "static/index.html:914"
+      ],
+      "feature_id": "webui.boards.dispatch"
+    },
+    {
+      "control": "btnKanbanRunDispatcher",
+      "tag": "button",
+      "label": "kanban_run_dispatcher",
+      "source_refs": [
+        "static/index.html:915"
+      ],
+      "feature_id": "webui.boards.dispatch"
+    },
+    {
+      "control": "btnActivateWorkspaceDetail",
+      "tag": "button",
+      "label": "workspace_use_title",
+      "source_refs": [
+        "static/index.html:950"
+      ],
+      "feature_id": "webui.files.workspace"
+    },
+    {
+      "control": "btnEditWorkspaceDetail",
+      "tag": "button",
+      "label": "edit",
+      "source_refs": [
+        "static/index.html:951"
+      ],
+      "feature_id": "webui.files.manage"
+    },
+    {
+      "control": "btnDeleteWorkspaceDetail",
+      "tag": "button",
+      "label": "remove",
+      "source_refs": [
+        "static/index.html:952"
+      ],
+      "feature_id": "webui.files.manage"
+    },
+    {
+      "control": "btnCancelWorkspaceDetail",
+      "tag": "button",
+      "label": "cancel",
+      "source_refs": [
+        "static/index.html:953"
+      ],
+      "feature_id": "webui.files.manage"
+    },
+    {
+      "control": "btnSaveWorkspaceDetail",
+      "tag": "button",
+      "label": "save",
+      "source_refs": [
+        "static/index.html:954"
+      ],
+      "feature_id": "webui.files.manage"
+    },
+    {
+      "control": "btnActivateProfileDetail",
+      "tag": "button",
+      "label": "profile_switch_title",
+      "source_refs": [
+        "static/index.html:968"
+      ],
+      "feature_id": "webui.bots.select"
+    },
+    {
+      "control": "btnDeleteProfileDetail",
+      "tag": "button",
+      "label": "profile_delete_title",
+      "source_refs": [
+        "static/index.html:969"
+      ],
+      "feature_id": "webui.bots.manage"
+    },
+    {
+      "control": "btnCancelProfileDetail",
+      "tag": "button",
+      "label": "cancel",
+      "source_refs": [
+        "static/index.html:970"
+      ],
+      "feature_id": "webui.bots.manage"
+    },
+    {
+      "control": "btnSaveProfileDetail",
+      "tag": "button",
+      "label": "save",
+      "source_refs": [
+        "static/index.html:971"
+      ],
+      "feature_id": "webui.bots.manage"
+    },
+    {
+      "control": "action:copyLogsAll",
+      "tag": "button",
+      "label": "logs_copy_all",
+      "source_refs": [
+        "static/index.html:998"
+      ],
+      "feature_id": "webui.operations.logs"
+    },
+    {
+      "control": "action:_govSwitchTab",
+      "tag": "button",
+      "label": "governance_overview",
+      "source_refs": [
+        "static/index.html:1016",
+        "static/index.html:1017",
+        "static/index.html:1018",
+        "static/index.html:1019",
+        "static/index.html:1020",
+        "static/index.html:1021",
+        "static/index.html:1022"
+      ],
+      "feature_id": "webui.governance.audit"
+    },
+    {
+      "control": "govPreviewEmail",
+      "tag": "input",
+      "label": "name@example.com",
+      "source_refs": [
+        "static/index.html:1034"
+      ],
+      "feature_id": "webui.governance.preview"
+    },
+    {
+      "control": "govPreviewGroups",
+      "tag": "input",
+      "label": "sw-engineering",
+      "source_refs": [
+        "static/index.html:1036"
+      ],
+      "feature_id": "webui.governance.preview"
+    },
+    {
+      "control": "action:_govRunPreview",
+      "tag": "button",
+      "label": "governance_preview_run",
+      "source_refs": [
+        "static/index.html:1040"
+      ],
+      "feature_id": "webui.governance.preview"
+    },
+    {
+      "control": "btnMyApprovalsRefresh",
+      "tag": "button",
+      "label": "refresh",
+      "source_refs": [
+        "static/index.html:1052"
+      ],
+      "feature_id": "webui.governance.requests"
+    },
+    {
+      "control": "action:loadIntegrations",
+      "tag": "button",
+      "label": "integrations_refresh",
+      "source_refs": [
+        "static/index.html:1067"
+      ],
+      "feature_id": "webui.connections.providers"
+    },
+    {
+      "control": "action:chRestartGateway",
+      "tag": "button",
+      "label": "channels_restart_gateway",
+      "source_refs": [
+        "static/index.html:1082"
+      ],
+      "feature_id": "webui.connections.channel"
+    },
+    {
+      "control": "intgSearch",
+      "tag": "input",
+      "label": "Search providers...",
+      "source_refs": [
+        "static/index.html:1095"
+      ],
+      "feature_id": "webui.connections.providers"
+    },
+    {
+      "control": "btnDownload",
+      "tag": "button",
+      "label": "download_transcript",
+      "source_refs": [
+        "static/index.html:1120"
+      ],
+      "feature_id": "webui.sessions.transcript"
+    },
+    {
+      "control": "btnExportJSON",
+      "tag": "button",
+      "label": "export_session_json_tooltip",
+      "source_refs": [
+        "static/index.html:1121"
+      ],
+      "feature_id": "webui.sessions.json"
+    },
+    {
+      "control": "btnShareSession",
+      "tag": "button",
+      "label": "share_session_tooltip",
+      "source_refs": [
+        "static/index.html:1122"
+      ],
+      "feature_id": "webui.sessions.share"
+    },
+    {
+      "control": "btnStopSharingSession",
+      "tag": "button",
+      "label": "stop_sharing_session_tooltip",
+      "source_refs": [
+        "static/index.html:1123"
+      ],
+      "feature_id": "webui.sessions.share"
+    },
+    {
+      "control": "btnExportHTML",
+      "tag": "button",
+      "label": "export_session_html_tooltip",
+      "source_refs": [
+        "static/index.html:1124"
+      ],
+      "feature_id": "webui.sessions.html"
+    },
+    {
+      "control": "btnImportJSON",
+      "tag": "button",
+      "label": "import_session_json_tooltip",
+      "source_refs": [
+        "static/index.html:1125"
+      ],
+      "feature_id": "webui.sessions.json"
+    },
+    {
+      "control": "btnClearConvModal",
+      "tag": "button",
+      "label": "clear_conversation_btn_tooltip",
+      "source_refs": [
+        "static/index.html:1126"
+      ],
+      "feature_id": "webui.sessions.clear"
+    },
+    {
+      "control": "importFileInput",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1128"
+      ],
+      "feature_id": "webui.sessions.json"
+    },
+    {
+      "control": "profilePhotoInput",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1147"
+      ],
+      "feature_id": "webui.settings.photo"
+    },
+    {
+      "control": "profilePhotoRemoveBtn",
+      "tag": "button",
+      "label": "profile_photo_remove",
+      "source_refs": [
+        "static/index.html:1149"
+      ],
+      "feature_id": "webui.settings.photo"
+    },
+    {
+      "control": "action:_pickTheme",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1158",
+        "static/index.html:1164",
+        "static/index.html:1170"
+      ],
+      "feature_id": "webui.settings.theme"
+    },
+    {
+      "control": "settingsTheme",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1177"
+      ],
+      "feature_id": "webui.settings.theme"
+    },
+    {
+      "control": "settingsSkin",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1183"
+      ],
+      "feature_id": "webui.settings.skin"
+    },
+    {
+      "control": "action:_pickFontSize",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1188",
+        "static/index.html:1194",
+        "static/index.html:1200",
+        "static/index.html:1206"
+      ],
+      "feature_id": "webui.settings.font_size"
+    },
+    {
+      "control": "settingsFontSize",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1213"
+      ],
+      "feature_id": "webui.settings.font_size"
+    },
+    {
+      "control": "settingsWorkspacePanelOpen",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1217"
+      ],
+      "feature_id": "webui.settings.workspace_panel_open"
+    },
+    {
+      "control": "settingsWorkspaceTodosTab",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1224"
+      ],
+      "feature_id": "webui.settings.workspace_todos_tab"
+    },
+    {
+      "control": "settingsSessionJumpButtons",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1231"
+      ],
+      "feature_id": "webui.settings.session_jump_buttons"
+    },
+    {
+      "control": "settingsSessionEndlessScroll",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1238"
+      ],
+      "feature_id": "webui.settings.session_endless_scroll"
+    },
+    {
+      "control": "action:_pickChatActivityDisplayMode",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1246",
+        "static/index.html:1249",
+        "static/index.html:1252"
+      ],
+      "feature_id": "webui.settings.chat_activity_display_mode"
+    },
+    {
+      "control": "settingsChatActivityDisplayMode",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1256"
+      ],
+      "feature_id": "webui.settings.chat_activity_display_mode"
+    },
+    {
+      "control": "settingsTransparentEventTimestamps",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1263"
+      ],
+      "feature_id": "webui.settings.transparent_event_timestamps"
+    },
+    {
+      "control": "settingsAutoScrollFollow",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1270"
+      ],
+      "feature_id": "webui.settings.auto_scroll_follow"
+    },
+    {
+      "control": "settingsRenderUserMarkdown",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1277"
+      ],
+      "feature_id": "webui.settings.render_user_markdown"
+    },
+    {
+      "control": "settingsLargeTextPasteAsAttachment",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1284"
+      ],
+      "feature_id": "webui.settings.large_text_paste_as_attachment"
+    },
+    {
+      "control": "settingsProjectQuickCreate",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1291"
+      ],
+      "feature_id": "webui.settings.project_quick_create"
+    },
+    {
+      "control": "settingsStructuredCodeMode",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1298"
+      ],
+      "feature_id": "webui.settings.structured_code_mode"
+    },
+    {
+      "control": "settingsStructuredCodeAutoLines",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1305"
+      ],
+      "feature_id": "webui.settings.structured_code_auto_lines"
+    },
+    {
+      "control": "settingsShowTitlebarProfile",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1311"
+      ],
+      "feature_id": "webui.settings.show_titlebar_profile"
+    },
+    {
+      "control": "settingsWorklogDetailsExpandedDefault",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1318"
+      ],
+      "feature_id": "webui.settings.worklog_details_expanded_default"
+    },
+    {
+      "control": "settingsAdvancedChatControls",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1329"
+      ],
+      "feature_id": "webui.settings.advanced_chat_controls"
+    },
+    {
+      "control": "interactionUserMode",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1353"
+      ],
+      "feature_id": "webui.settings.interaction"
+    },
+    {
+      "control": "interactionTaskMode",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1358"
+      ],
+      "feature_id": "webui.settings.interaction"
+    },
+    {
+      "control": "interactionSave",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1365"
+      ],
+      "feature_id": "webui.settings.interaction"
+    },
+    {
+      "control": "interactionReload",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1366"
+      ],
+      "feature_id": "webui.settings.interaction"
+    },
+    {
+      "control": "settingsModelChip",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1373"
+      ],
+      "feature_id": "webui.settings.advanced_model"
+    },
+    {
+      "control": "settingsModel",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1374"
+      ],
+      "feature_id": "webui.settings.model"
+    },
+    {
+      "control": "mainAdvancedBtn",
+      "tag": "button",
+      "label": "Advanced options for main model",
+      "source_refs": [
+        "static/index.html:1375"
+      ],
+      "feature_id": "webui.settings.advanced_model"
+    },
+    {
+      "control": "btnResetAuxModels",
+      "tag": "button",
+      "label": "settings_btn_reset_aux_models",
+      "source_refs": [
+        "static/index.html:1385"
+      ],
+      "feature_id": "webui.settings.aux_models"
+    },
+    {
+      "control": "btnApplyAuxModels",
+      "tag": "button",
+      "label": "settings_btn_apply_aux_models",
+      "source_refs": [
+        "static/index.html:1386"
+      ],
+      "feature_id": "webui.settings.aux_models"
+    },
+    {
+      "control": "settingsHideSuggestions",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1391"
+      ],
+      "feature_id": "webui.settings.hide_suggestions"
+    },
+    {
+      "control": "settingsHideEmptyStatePanel",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1398"
+      ],
+      "feature_id": "webui.settings.hide_empty_state_panel"
+    },
+    {
+      "control": "settingsVirtualizeTranscript",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1405"
+      ],
+      "feature_id": "webui.settings.virtualize_transcript"
+    },
+    {
+      "control": "settingsSendKey",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1412"
+      ],
+      "feature_id": "webui.settings.send_key"
+    },
+    {
+      "control": "settingsLanguage",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1420"
+      ],
+      "feature_id": "webui.settings.language"
+    },
+    {
+      "control": "settingsRtl",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1424"
+      ],
+      "feature_id": "webui.settings.rtl"
+    },
+    {
+      "control": "settingsSoundEnabled",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1431"
+      ],
+      "feature_id": "webui.settings.sound_enabled"
+    },
+    {
+      "control": "settingsTtsEnabled",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1438"
+      ],
+      "feature_id": "webui.settings.tts_enabled"
+    },
+    {
+      "control": "settingsTtsAutoRead",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1445"
+      ],
+      "feature_id": "webui.settings.tts_auto_read"
+    },
+    {
+      "control": "settingsVoiceModeEnabled",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1452"
+      ],
+      "feature_id": "webui.settings.voice_mode_enabled"
+    },
+    {
+      "control": "settingsRawAudio",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1459"
+      ],
+      "feature_id": "webui.settings.raw_audio"
+    },
+    {
+      "control": "settingsDictationAppend",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1466"
+      ],
+      "feature_id": "webui.settings.dictation_append"
+    },
+    {
+      "control": "settingsTtsEngine",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1472"
+      ],
+      "feature_id": "webui.settings.tts_engine"
+    },
+    {
+      "control": "settingsTtsVoice",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1473"
+      ],
+      "feature_id": "webui.settings.tts_voice"
+    },
+    {
+      "control": "settingsTtsRate",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1481"
+      ],
+      "feature_id": "webui.settings.tts_rate"
+    },
+    {
+      "control": "settingsTtsPitch",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1488"
+      ],
+      "feature_id": "webui.settings.tts_pitch"
+    },
+    {
+      "control": "settingsNotificationsEnabled",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1494"
+      ],
+      "feature_id": "webui.settings.notifications_enabled"
+    },
+    {
+      "control": "notificationPermissionButton",
+      "tag": "button",
+      "label": "notifications_enable_btn",
+      "source_refs": [
+        "static/index.html:1500"
+      ],
+      "feature_id": "webui.settings.notification_permission"
+    },
+    {
+      "control": "action:sendBrowserNotification",
+      "tag": "button",
+      "label": "notifications_test_btn",
+      "source_refs": [
+        "static/index.html:1502"
+      ],
+      "feature_id": "webui.settings.notification_permission"
+    },
+    {
+      "control": "settingsShowTokenUsage",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1508"
+      ],
+      "feature_id": "webui.settings.show_token_usage"
+    },
+    {
+      "control": "settingsMaxTokens",
+      "tag": "input",
+      "label": "No override",
+      "source_refs": [
+        "static/index.html:1516"
+      ],
+      "feature_id": "webui.settings.max_tokens"
+    },
+    {
+      "control": "settingsShowQuotaChip",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1520"
+      ],
+      "feature_id": "webui.settings.show_quota_chip"
+    },
+    {
+      "control": "settingsShowConversationOutline",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1527"
+      ],
+      "feature_id": "webui.settings.show_conversation_outline"
+    },
+    {
+      "control": "settingsShowTps",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1534"
+      ],
+      "feature_id": "webui.settings.show_tps"
+    },
+    {
+      "control": "settingsFadeTextEffect",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1541"
+      ],
+      "feature_id": "webui.settings.fade_text_effect"
+    },
+    {
+      "control": "settingsTerminalAutoExpand",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1548"
+      ],
+      "feature_id": "webui.settings.terminal_auto_expand"
+    },
+    {
+      "control": "settingsApiRedact",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1555"
+      ],
+      "feature_id": "webui.settings.api_redact"
+    },
+    {
+      "control": "settingsSidebarDensity",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1562"
+      ],
+      "feature_id": "webui.settings.sidebar_density"
+    },
+    {
+      "control": "settingsPinnedSessionsLimit",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1570"
+      ],
+      "feature_id": "webui.settings.pinned_sessions_limit"
+    },
+    {
+      "control": "settingsAutoTitleRefresh",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1575"
+      ],
+      "feature_id": "webui.settings.auto_title_refresh"
+    },
+    {
+      "control": "settingsDefaultMessageMode",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1585"
+      ],
+      "feature_id": "webui.settings.default_message_mode"
+    },
+    {
+      "control": "settingsShowBusyPlaceholderHint",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1594"
+      ],
+      "feature_id": "webui.settings.show_busy_placeholder_hint"
+    },
+    {
+      "control": "settingsNewChatOnWorkspaceSwitch",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1601"
+      ],
+      "feature_id": "webui.settings.new_chat_on_workspace_switch"
+    },
+    {
+      "control": "settingsShowCliSessions",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1608"
+      ],
+      "feature_id": "webui.settings.show_cli_sessions"
+    },
+    {
+      "control": "settingsShowCronSessions",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1615"
+      ],
+      "feature_id": "webui.settings.show_cron_sessions"
+    },
+    {
+      "control": "settingsShowClaudeCodeSessions",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1622"
+      ],
+      "feature_id": "webui.settings.show_claude_code_sessions"
+    },
+    {
+      "control": "settingsShowWebhookSessions",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1629"
+      ],
+      "feature_id": "webui.settings.show_webhook_sessions"
+    },
+    {
+      "control": "settingsShowPreviousMessagingSessions",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1636"
+      ],
+      "feature_id": "webui.settings.show_previous_messaging_sessions"
+    },
+    {
+      "control": "settingsSyncInsights",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1643"
+      ],
+      "feature_id": "webui.settings.sync_insights"
+    },
+    {
+      "control": "settingsCheckUpdates",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1650"
+      ],
+      "feature_id": "webui.settings.check_updates"
+    },
+    {
+      "control": "settingsUpdateChannel",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1657"
+      ],
+      "feature_id": "webui.settings.update_channel"
+    },
+    {
+      "control": "settingsIgnoreAgentUpdates",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1665"
+      ],
+      "feature_id": "webui.settings.ignore_agent_updates"
+    },
+    {
+      "control": "settingsWhatsNewSummary",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1672"
+      ],
+      "feature_id": "webui.settings.whats_new_summary"
+    },
+    {
+      "control": "settingsBotName",
+      "tag": "input",
+      "label": "SynthPulse",
+      "source_refs": [
+        "static/index.html:1680"
+      ],
+      "feature_id": "webui.settings.bot_name"
+    },
+    {
+      "control": "action:saveSettings",
+      "tag": "button",
+      "label": "settings_save_btn",
+      "source_refs": [
+        "static/index.html:1682",
+        "static/index.html:1879",
+        "static/panels.js:9770"
+      ],
+      "feature_id": "webui.settings.save"
+    },
+    {
+      "control": "extensionsCopyDiagnosticsBtn",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1747"
+      ],
+      "feature_id": "webui.operations.extensions"
+    },
+    {
+      "control": "btnAccessRequestsRefresh",
+      "tag": "button",
+      "label": "refresh",
+      "source_refs": [
+        "static/index.html:1765"
+      ],
+      "feature_id": "webui.governance.requests"
+    },
+    {
+      "control": "btnCheckUpdatesNow",
+      "tag": "button",
+      "label": "settings_check_now",
+      "source_refs": [
+        "static/index.html:1779"
+      ],
+      "feature_id": "webui.operations.updates"
+    },
+    {
+      "control": "capacityPollSeconds",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1788"
+      ],
+      "feature_id": "webui.operations.capacity"
+    },
+    {
+      "control": "capacityCooldownSeconds",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1790"
+      ],
+      "feature_id": "webui.operations.capacity"
+    },
+    {
+      "control": "capacityThresholds",
+      "tag": "input",
+      "label": "anthropic=20, openai=10",
+      "source_refs": [
+        "static/index.html:1792"
+      ],
+      "feature_id": "webui.operations.capacity"
+    },
+    {
+      "control": "capacityDestination",
+      "tag": "input",
+      "label": "telegram:123456789",
+      "source_refs": [
+        "static/index.html:1794"
+      ],
+      "feature_id": "webui.operations.capacity"
+    },
+    {
+      "control": "btnCapacitySave",
+      "tag": "button",
+      "label": "capacity_save",
+      "source_refs": [
+        "static/index.html:1797"
+      ],
+      "feature_id": "webui.operations.capacity"
+    },
+    {
+      "control": "action:loadCapacityAlerts",
+      "tag": "button",
+      "label": "refresh",
+      "source_refs": [
+        "static/index.html:1798"
+      ],
+      "feature_id": "webui.operations.capacity"
+    },
+    {
+      "control": "settingsPassword",
+      "tag": "input",
+      "label": "Enter new password…",
+      "source_refs": [
+        "static/index.html:1815"
+      ],
+      "feature_id": "webui.settings.password"
+    },
+    {
+      "control": "settingsCurrentPassword",
+      "tag": "input",
+      "label": "Enter current password…",
+      "source_refs": [
+        "static/index.html:1818"
+      ],
+      "feature_id": "webui.settings.password"
+    },
+    {
+      "control": "settingsAuthDisabledAck",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1826"
+      ],
+      "feature_id": "webui.settings.disable_auth"
+    },
+    {
+      "control": "btnDisableAuth",
+      "tag": "button",
+      "label": "disable_auth",
+      "source_refs": [
+        "static/index.html:1830"
+      ],
+      "feature_id": "webui.settings.disable_auth"
+    },
+    {
+      "control": "btnSignOut",
+      "tag": "button",
+      "label": "sign_out",
+      "source_refs": [
+        "static/index.html:1831"
+      ],
+      "feature_id": "webui.settings.signout"
+    },
+    {
+      "control": "btnShutdownServer",
+      "tag": "button",
+      "label": "settings_btn_shutdown",
+      "source_refs": [
+        "static/index.html:1835"
+      ],
+      "feature_id": "webui.settings.shutdown"
+    },
+    {
+      "control": "btnRegisterPasskey",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1840"
+      ],
+      "feature_id": "webui.settings.passkey"
+    },
+    {
+      "control": "btnGoPasswordless",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1841"
+      ],
+      "feature_id": "webui.settings.passwordless"
+    },
+    {
+      "control": "settingsDashboardMode",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1847"
+      ],
+      "feature_id": "webui.settings.dashboard_mode"
+    },
+    {
+      "control": "settingsDashboardUrl",
+      "tag": "input",
+      "label": "http://127.0.0.1:9119",
+      "source_refs": [
+        "static/index.html:1852"
+      ],
+      "feature_id": "webui.settings.dashboard_url"
+    },
+    {
+      "control": "action:saveDashboardSettings",
+      "tag": "button",
+      "label": "settings_dashboard_save",
+      "source_refs": [
+        "static/index.html:1853"
+      ],
+      "feature_id": "webui.settings.save"
+    },
+    {
+      "control": "mcpToolSearch",
+      "tag": "input",
+      "label": "Search tools by name, server, or description…",
+      "source_refs": [
+        "static/index.html:1873"
+      ],
+      "feature_id": "webui.connections.catalog"
+    },
+    {
+      "control": "helpCardStartTour",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1897"
+      ],
+      "feature_id": "webui.help.tour"
+    },
+    {
+      "control": "helpCardStartOrgTour",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1898"
+      ],
+      "feature_id": "webui.help.org_tour"
+    },
+    {
+      "control": "helpCardExplain",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1909"
+      ],
+      "feature_id": "webui.help.page"
+    },
+    {
+      "control": "btnWorkspacePanelEdgeToggle",
+      "tag": "button",
+      "label": "Show workspace panel",
+      "source_refs": [
+        "static/index.html:1943"
+      ],
+      "feature_id": "webui.files.browse"
+    },
+    {
+      "control": "btnUpDir",
+      "tag": "button",
+      "label": "workspace_parent_directory",
+      "source_refs": [
+        "static/index.html:1952"
+      ],
+      "feature_id": "webui.files.browse"
+    },
+    {
+      "control": "btnNewFile",
+      "tag": "button",
+      "label": "new_file",
+      "source_refs": [
+        "static/index.html:1953"
+      ],
+      "feature_id": "webui.files.create"
+    },
+    {
+      "control": "btnNewFolder",
+      "tag": "button",
+      "label": "new_folder",
+      "source_refs": [
+        "static/index.html:1954"
+      ],
+      "feature_id": "webui.files.create"
+    },
+    {
+      "control": "btnRefreshPanel",
+      "tag": "button",
+      "label": "kanban_refresh",
+      "source_refs": [
+        "static/index.html:1955"
+      ],
+      "feature_id": "webui.files.browse"
+    },
+    {
+      "control": "btnUploadWorkspace",
+      "tag": "button",
+      "label": "workspace_upload_file",
+      "source_refs": [
+        "static/index.html:1956"
+      ],
+      "feature_id": "webui.files.upload"
+    },
+    {
+      "control": "btnWorkspacePrefs",
+      "tag": "button",
+      "label": "workspace_options",
+      "source_refs": [
+        "static/index.html:1957"
+      ],
+      "feature_id": "webui.files.preferences"
+    },
+    {
+      "control": "btnClearPreview",
+      "tag": "button",
+      "label": "workspace_close_preview",
+      "source_refs": [
+        "static/index.html:1958"
+      ],
+      "feature_id": "webui.files.browse"
+    },
+    {
+      "control": "workspaceFileInput",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1961"
+      ],
+      "feature_id": "webui.files.upload"
+    },
+    {
+      "control": "workspaceFilesTab",
+      "tag": "button",
+      "label": "workspace_files_tab",
+      "source_refs": [
+        "static/index.html:1963"
+      ],
+      "feature_id": "webui.files.browse"
+    },
+    {
+      "control": "workspaceArtifactsTab",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1964"
+      ],
+      "feature_id": "webui.files.artifacts"
+    },
+    {
+      "control": "workspaceTodosTab",
+      "tag": "button",
+      "label": "tab_todos",
+      "source_refs": [
+        "static/index.html:1965"
+      ],
+      "feature_id": "webui.files.todos"
+    },
+    {
+      "control": "btnCopyPreviewRelPath",
+      "tag": "button",
+      "label": "copy_relative_path",
+      "source_refs": [
+        "static/index.html:1976"
+      ],
+      "feature_id": "webui.files.path"
+    },
+    {
+      "control": "btnOpenInBrowser",
+      "tag": "button",
+      "label": "Open in new browser tab",
+      "source_refs": [
+        "static/index.html:1977"
+      ],
+      "feature_id": "webui.files.download"
+    },
+    {
+      "control": "btnRenderMarkdownAnyway",
+      "tag": "button",
+      "label": "Render this large file as rich Markdown",
+      "source_refs": [
+        "static/index.html:1978"
+      ],
+      "feature_id": "webui.files.preview"
+    },
+    {
+      "control": "btnDownloadFile",
+      "tag": "button",
+      "label": "Download file to your computer",
+      "source_refs": [
+        "static/index.html:1979"
+      ],
+      "feature_id": "webui.files.download"
+    },
+    {
+      "control": "btnEditFile",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1980"
+      ],
+      "feature_id": "webui.files.edit"
+    },
+    {
+      "control": "previewEditArea",
+      "tag": "textarea",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1992"
+      ],
+      "feature_id": "webui.files.edit"
+    },
+    {
+      "control": "onboardingBackBtn",
+      "tag": "button",
+      "label": "onboarding_back",
+      "source_refs": [
+        "static/index.html:2009"
+      ],
+      "feature_id": "webui.connections.onboarding"
+    },
+    {
+      "control": "onboardingSkipBtn",
+      "tag": "button",
+      "label": "onboarding_skip",
+      "source_refs": [
+        "static/index.html:2010"
+      ],
+      "feature_id": "webui.connections.onboarding"
+    },
+    {
+      "control": "onboardingNextBtn",
+      "tag": "button",
+      "label": "onboarding_continue",
+      "source_refs": [
+        "static/index.html:2011"
+      ],
+      "feature_id": "webui.connections.onboarding"
+    },
+    {
+      "control": "appDialogClose",
+      "tag": "button",
+      "label": "Close dialog",
+      "source_refs": [
+        "static/index.html:2023"
+      ],
+      "feature_id": "webui.help.confirm"
+    },
+    {
+      "control": "appDialogInput",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:2028"
+      ],
+      "feature_id": "webui.help.confirm"
+    },
+    {
+      "control": "appDialogCancel",
+      "tag": "button",
+      "label": "cancel",
+      "source_refs": [
+        "static/index.html:2030"
+      ],
+      "feature_id": "webui.help.confirm"
+    },
+    {
+      "control": "appDialogConfirm",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/index.html:2031"
+      ],
+      "feature_id": "webui.help.confirm"
+    },
+    {
+      "control": "groupPeopleFilter",
+      "tag": "input",
+      "label": "Search colleagues",
+      "source_refs": [
+        "static/index.html:2083"
+      ],
+      "feature_id": "webui.chat.people"
+    },
+    {
+      "control": "action:closeGroupPeoplePicker",
+      "tag": "button",
+      "label": "cancel",
+      "source_refs": [
+        "static/index.html:2088"
+      ],
+      "feature_id": "webui.chat.people"
+    },
+    {
+      "control": "groupPeopleModalSubmit",
+      "tag": "button",
+      "label": "save",
+      "source_refs": [
+        "static/index.html:2089"
+      ],
+      "feature_id": "webui.chat.people"
+    },
+    {
+      "control": "kanbanBoardModalMode",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:2096"
+      ],
+      "feature_id": "webui.boards.boards"
+    },
+    {
+      "control": "kanbanBoardModalSlug",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:2097"
+      ],
+      "feature_id": "webui.boards.boards"
+    },
+    {
+      "control": "kanbanBoardModalName",
+      "tag": "input",
+      "label": "e.g. Experiments",
+      "source_refs": [
+        "static/index.html:2100"
+      ],
+      "feature_id": "webui.boards.boards"
+    },
+    {
+      "control": "kanbanBoardModalSlugInput",
+      "tag": "input",
+      "label": "experiments",
+      "source_refs": [
+        "static/index.html:2104"
+      ],
+      "feature_id": "webui.boards.boards"
+    },
+    {
+      "control": "kanbanBoardModalDesc",
+      "tag": "textarea",
+      "label": "",
+      "source_refs": [
+        "static/index.html:2108"
+      ],
+      "feature_id": "webui.boards.boards"
+    },
+    {
+      "control": "kanbanBoardModalIcon",
+      "tag": "input",
+      "label": "📋",
+      "source_refs": [
+        "static/index.html:2113"
+      ],
+      "feature_id": "webui.boards.boards"
+    },
+    {
+      "control": "kanbanBoardModalColor",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:2117"
+      ],
+      "feature_id": "webui.boards.boards"
+    },
+    {
+      "control": "action:closeKanbanBoardModal",
+      "tag": "button",
+      "label": "cancel",
+      "source_refs": [
+        "static/index.html:2122"
+      ],
+      "feature_id": "webui.boards.boards"
+    },
+    {
+      "control": "kanbanBoardModalSubmit",
+      "tag": "button",
+      "label": "save",
+      "source_refs": [
+        "static/index.html:2123"
+      ],
+      "feature_id": "webui.boards.boards"
+    },
+    {
+      "control": "kanbanTaskModalTitleInput",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:2133"
+      ],
+      "feature_id": "webui.boards.create"
+    },
+    {
+      "control": "kanbanTaskModalBody",
+      "tag": "textarea",
+      "label": "Optional — what needs to happen, acceptance criteria, links",
+      "source_refs": [
+        "static/index.html:2137"
+      ],
+      "feature_id": "webui.boards.create"
+    },
+    {
+      "control": "kanbanTaskModalStatus",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/index.html:2143"
+      ],
+      "feature_id": "webui.boards.status"
+    },
+    {
+      "control": "kanbanTaskModalPriority",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:2151"
+      ],
+      "feature_id": "webui.boards.status"
+    },
+    {
+      "control": "kanbanTaskModalAssignee",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/index.html:2157"
+      ],
+      "feature_id": "webui.boards.assignment"
+    },
+    {
+      "control": "kanbanTaskModalTenant",
+      "tag": "input",
+      "label": "Optional — project or team slug",
+      "source_refs": [
+        "static/index.html:2164"
+      ],
+      "feature_id": "webui.boards.assignment"
+    },
+    {
+      "control": "kanbanTaskModalWorkspaceKind",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/index.html:2169"
+      ],
+      "feature_id": "webui.boards.runtime"
+    },
+    {
+      "control": "kanbanTaskModalWorkspacePath",
+      "tag": "input",
+      "label": "Path to workspace",
+      "source_refs": [
+        "static/index.html:2177"
+      ],
+      "feature_id": "webui.boards.runtime"
+    },
+    {
+      "control": "kanbanTaskModalSkills",
+      "tag": "input",
+      "label": "Comma-separated skill names, e.g. python,git",
+      "source_refs": [
+        "static/index.html:2182"
+      ],
+      "feature_id": "webui.boards.runtime"
+    },
+    {
+      "control": "kanbanTaskModalMaxRuntimeSeconds",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:2186"
+      ],
+      "feature_id": "webui.boards.runtime"
+    },
+    {
+      "control": "kanbanTaskModalParents",
+      "tag": "input",
+      "label": "Parent task ID",
+      "source_refs": [
+        "static/index.html:2191"
+      ],
+      "feature_id": "webui.boards.links"
+    },
+    {
+      "control": "action:closeKanbanTaskModal",
+      "tag": "button",
+      "label": "cancel",
+      "source_refs": [
+        "static/index.html:2196"
+      ],
+      "feature_id": "webui.boards.create"
+    },
+    {
+      "control": "kanbanTaskModalSubmit",
+      "tag": "button",
+      "label": "create",
+      "source_refs": [
+        "static/index.html:2197"
+      ],
+      "feature_id": "webui.boards.create"
+    },
+    {
+      "control": "builderPhoto",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/bot-builder.js:81"
+      ],
+      "feature_id": "webui.bots.appearance"
+    },
+    {
+      "control": "builderTab",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/bot-builder.js:106"
+      ],
+      "feature_id": "webui.bots.manage"
+    },
+    {
+      "control": "builderBack",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/bot-builder.js:108"
+      ],
+      "feature_id": "webui.bots.create"
+    },
+    {
+      "control": "builderNext",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/bot-builder.js:108"
+      ],
+      "feature_id": "webui.bots.create"
+    },
+    {
+      "control": "action:_govEditUser",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/governance.js:220"
+      ],
+      "feature_id": "webui.governance.users"
+    },
+    {
+      "control": "action:_govDeleteUser",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/governance.js:221"
+      ],
+      "feature_id": "webui.governance.users"
+    },
+    {
+      "control": "govUserEmail",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/governance.js:237"
+      ],
+      "feature_id": "webui.governance.users"
+    },
+    {
+      "control": "govUserSave",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/governance.js:272"
+      ],
+      "feature_id": "webui.governance.users"
+    },
+    {
+      "control": "action:_govResetUserForm",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/governance.js:273"
+      ],
+      "feature_id": "webui.governance.users"
+    },
+    {
+      "control": "action:_govMcpToolMapAdd",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/governance.js:294"
+      ],
+      "feature_id": "webui.governance.mcp_map"
+    },
+    {
+      "control": "govUserAccessLevel",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/governance.js:454"
+      ],
+      "feature_id": "webui.governance.users"
+    },
+    {
+      "control": "govUserAccessMode",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/governance.js:459"
+      ],
+      "feature_id": "webui.governance.users"
+    },
+    {
+      "control": "govUserApprovalMode",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/governance.js:465"
+      ],
+      "feature_id": "webui.governance.users"
+    },
+    {
+      "control": "action:_govEditGroup",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/governance.js:1105"
+      ],
+      "feature_id": "webui.governance.groups"
+    },
+    {
+      "control": "action:_govDeleteGroup",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/governance.js:1106"
+      ],
+      "feature_id": "webui.governance.groups"
+    },
+    {
+      "control": "action:_govToggleGroupForm",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/governance.js:1113"
+      ],
+      "feature_id": "webui.governance.groups"
+    },
+    {
+      "control": "govGroupName",
+      "tag": "input",
+      "label": "sw-engineering",
+      "source_refs": [
+        "static/governance.js:1123"
+      ],
+      "feature_id": "webui.governance.groups"
+    },
+    {
+      "control": "govGroupDesc",
+      "tag": "input",
+      "label": "What is this group for?",
+      "source_refs": [
+        "static/governance.js:1125"
+      ],
+      "feature_id": "webui.governance.groups"
+    },
+    {
+      "control": "govGroupSso",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/governance.js:1127"
+      ],
+      "feature_id": "webui.governance.groups"
+    },
+    {
+      "control": "govGroupRoles",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/governance.js:1129"
+      ],
+      "feature_id": "webui.governance.groups"
+    },
+    {
+      "control": "action:_govSaveGroup",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/governance.js:1134"
+      ],
+      "feature_id": "webui.governance.groups"
+    },
+    {
+      "control": "action:_govResetGroupForm",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/governance.js:1135"
+      ],
+      "feature_id": "webui.governance.groups"
+    },
+    {
+      "control": "action:_govWsToggleMember",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/governance.js:1385",
+        "static/governance.js:1390"
+      ],
+      "feature_id": "webui.files.access"
+    },
+    {
+      "control": "govWsOwner_",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/governance.js:1395"
+      ],
+      "feature_id": "webui.files.access"
+    },
+    {
+      "control": "govWsMembers_",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/governance.js:1398"
+      ],
+      "feature_id": "webui.files.access"
+    },
+    {
+      "control": "action:_govSaveWorkspaceAssign",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/governance.js:1401"
+      ],
+      "feature_id": "webui.files.access"
+    },
+    {
+      "control": "govWsUserFilter",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/governance.js:1416"
+      ],
+      "feature_id": "webui.governance.workspace_filter"
+    },
+    {
+      "control": "action:_govApplyWsUserFilter",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/governance.js:1419"
+      ],
+      "feature_id": "webui.governance.workspace_filter"
+    },
+    {
+      "control": "action:_govClearWsUserFilter",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/governance.js:1420"
+      ],
+      "feature_id": "webui.governance.workspace_filter"
+    },
+    {
+      "control": "action:_govLoadAudit",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/governance.js:2184"
+      ],
+      "feature_id": "webui.governance.audit"
+    },
+    {
+      "control": "action:chCopy",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/integrations.js:911"
+      ],
+      "feature_id": "webui.connections.publish"
+    },
+    {
+      "control": "action:chPublish",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/integrations.js:913"
+      ],
+      "feature_id": "webui.connections.publish"
+    },
+    {
+      "control": "action:chOpenConfigure",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/integrations.js:924"
+      ],
+      "feature_id": "webui.connections.channel"
+    },
+    {
+      "control": "action:chDisable",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/integrations.js:925"
+      ],
+      "feature_id": "webui.connections.publish"
+    },
+    {
+      "control": "action:chApprove",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/integrations.js:1036"
+      ],
+      "feature_id": "webui.connections.people"
+    },
+    {
+      "control": "action:chRemovePerson",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/integrations.js:1066"
+      ],
+      "feature_id": "webui.connections.people"
+    },
+    {
+      "control": "chAddPlatform",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/integrations.js:1072"
+      ],
+      "feature_id": "webui.connections.people"
+    },
+    {
+      "control": "chAddUserId",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/integrations.js:1073"
+      ],
+      "feature_id": "webui.connections.people"
+    },
+    {
+      "control": "action:chAddPerson",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/integrations.js:1075"
+      ],
+      "feature_id": "webui.connections.people"
+    },
+    {
+      "control": "action:chSaveMyBot",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/integrations.js:1157"
+      ],
+      "feature_id": "webui.connections.personal"
+    },
+    {
+      "control": "action:chRemoveMyBot",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/integrations.js:1158"
+      ],
+      "feature_id": "webui.connections.personal"
+    },
+    {
+      "control": "action:chLinkMe",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/integrations.js:1160",
+        "static/integrations.js:1167"
+      ],
+      "feature_id": "webui.connections.link"
+    },
+    {
+      "control": "action:chUnlinkMe",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/integrations.js:1164"
+      ],
+      "feature_id": "webui.connections.link"
+    },
+    {
+      "control": "chMinePlatform",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/integrations.js:1167"
+      ],
+      "feature_id": "webui.connections.link"
+    },
+    {
+      "control": "chMineOtherId",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/integrations.js:1167"
+      ],
+      "feature_id": "webui.connections.link"
+    },
+    {
+      "control": "action:chApplyMine",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/integrations.js:1169"
+      ],
+      "feature_id": "webui.connections.link"
+    },
+    {
+      "control": "onboardingBaseUrlInput",
+      "tag": "input",
+      "label": "${t(",
+      "source_refs": [
+        "static/onboarding.js:185"
+      ],
+      "feature_id": "webui.connections.onboarding"
+    },
+    {
+      "control": "action:_runOnboardingProbe",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/onboarding.js:185"
+      ],
+      "feature_id": "webui.connections.onboarding"
+    },
+    {
+      "control": "onboardingApiKeyInput",
+      "tag": "input",
+      "label": "${t(placeholderKey)}",
+      "source_refs": [
+        "static/onboarding.js:204"
+      ],
+      "feature_id": "webui.connections.onboarding"
+    },
+    {
+      "control": "onboardingModelInput",
+      "tag": "input",
+      "label": "${t(",
+      "source_refs": [
+        "static/onboarding.js:214"
+      ],
+      "feature_id": "webui.connections.onboarding"
+    },
+    {
+      "control": "onboardingModelSelect",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/onboarding.js:220"
+      ],
+      "feature_id": "webui.connections.onboarding"
+    },
+    {
+      "control": "anthropicOAuthBtn",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/onboarding.js:230"
+      ],
+      "feature_id": "webui.connections.oauth"
+    },
+    {
+      "control": "onboardingProviderSelect",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/onboarding.js:319",
+        "static/onboarding.js:338",
+        "static/onboarding.js:351"
+      ],
+      "feature_id": "webui.connections.onboarding"
+    },
+    {
+      "control": "codexOAuthBtn",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/onboarding.js:332"
+      ],
+      "feature_id": "webui.connections.oauth"
+    },
+    {
+      "control": "onboardingWorkspaceSelect",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/onboarding.js:368"
+      ],
+      "feature_id": "webui.connections.onboarding"
+    },
+    {
+      "control": "onboardingWorkspaceInput",
+      "tag": "input",
+      "label": "${t(",
+      "source_refs": [
+        "static/onboarding.js:372"
+      ],
+      "feature_id": "webui.connections.onboarding"
+    },
+    {
+      "control": "onboardingPasswordInput",
+      "tag": "input",
+      "label": "${t(",
+      "source_refs": [
+        "static/onboarding.js:405"
+      ],
+      "feature_id": "webui.connections.onboarding"
+    },
+    {
+      "control": "action:copyCodexOAuthCode",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/onboarding.js:708"
+      ],
+      "feature_id": "webui.connections.oauth"
+    },
+    {
+      "control": "action:cancelCodexOAuth",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/onboarding.js:709"
+      ],
+      "feature_id": "webui.connections.oauth"
+    },
+    {
+      "control": "action:cancelAnthropicOAuth",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/onboarding.js:827"
+      ],
+      "feature_id": "webui.connections.oauth"
+    },
+    {
+      "control": "action:openCronShareDialog",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:1348",
+        "static/panels.js:1413"
+      ],
+      "feature_id": "webui.tasks.share"
+    },
+    {
+      "control": "action:openCronCategoryPopover",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:1416"
+      ],
+      "feature_id": "webui.tasks.labels"
+    },
+    {
+      "control": "cronEmojiCustom",
+      "tag": "input",
+      "label": "${esc(t(",
+      "source_refs": [
+        "static/panels.js:1438"
+      ],
+      "feature_id": "webui.tasks.labels"
+    },
+    {
+      "control": "action:_saveCronEmoji",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:1439",
+        "static/panels.js:1440"
+      ],
+      "feature_id": "webui.tasks.labels"
+    },
+    {
+      "control": "action:_closeCronEmojiPopover",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:1441"
+      ],
+      "feature_id": "webui.tasks.labels"
+    },
+    {
+      "control": "cronCategoryPick",
+      "tag": "input",
+      "label": "${esc(t(",
+      "source_refs": [
+        "static/panels.js:1545"
+      ],
+      "feature_id": "webui.tasks.labels"
+    },
+    {
+      "control": "action:_closeCronCategoryPopover",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:1547"
+      ],
+      "feature_id": "webui.tasks.labels"
+    },
+    {
+      "control": "action:_saveCronCategory",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:1548"
+      ],
+      "feature_id": "webui.tasks.labels"
+    },
+    {
+      "control": "action:openCronNotifyPopover",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:1737"
+      ],
+      "feature_id": "webui.tasks.notify"
+    },
+    {
+      "control": "action:toggleCronNotifyMute",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:1739",
+        "static/panels.js:1756"
+      ],
+      "feature_id": "webui.tasks.mute"
+    },
+    {
+      "control": "action:_closeCronNotifyPopover",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:1767"
+      ],
+      "feature_id": "webui.tasks.notify"
+    },
+    {
+      "control": "action:_saveCronNotify",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:1768"
+      ],
+      "feature_id": "webui.tasks.notify"
+    },
+    {
+      "control": "cronShareExtra",
+      "tag": "input",
+      "label": "name@synthwave.solutions",
+      "source_refs": [
+        "static/panels.js:1880"
+      ],
+      "feature_id": "webui.tasks.share"
+    },
+    {
+      "control": "cronShareCancel",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:1883"
+      ],
+      "feature_id": "webui.tasks.share"
+    },
+    {
+      "control": "cronShareSave",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:1884"
+      ],
+      "feature_id": "webui.tasks.share"
+    },
+    {
+      "control": "action:toggleCronPromptExpanded",
+      "tag": "button",
+      "label": "${esc(promptToggleLabel)}",
+      "source_refs": [
+        "static/panels.js:1949"
+      ],
+      "feature_id": "webui.tasks.prompt"
+    },
+    {
+      "control": "action:openCronEmojiPopover",
+      "tag": "button",
+      "label": "${esc(t(",
+      "source_refs": [
+        "static/panels.js:2010"
+      ],
+      "feature_id": "webui.tasks.labels"
+    },
+    {
+      "control": "action:resumeCurrentCron",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:2043"
+      ],
+      "feature_id": "webui.tasks.pause"
+    },
+    {
+      "control": "action:runCurrentCron",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:2044"
+      ],
+      "feature_id": "webui.tasks.run"
+    },
+    {
+      "control": "action:copyCurrentCronDiagnostics",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:2045"
+      ],
+      "feature_id": "webui.tasks.results"
+    },
+    {
+      "control": "cronFormPrompt",
+      "tag": "textarea",
+      "label": "${esc(t(",
+      "source_refs": [
+        "static/panels.js:2440"
+      ],
+      "feature_id": "webui.tasks.prompt"
+    },
+    {
+      "control": "cronFormScript",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:2445"
+      ],
+      "feature_id": "webui.tasks.script"
+    },
+    {
+      "control": "cronFormSkillSearch",
+      "tag": "input",
+      "label": "${esc(t(",
+      "source_refs": [
+        "static/panels.js:2452"
+      ],
+      "feature_id": "webui.tasks.skills"
+    },
+    {
+      "control": "cronFormName",
+      "tag": "input",
+      "label": "${esc(t(",
+      "source_refs": [
+        "static/panels.js:2464"
+      ],
+      "feature_id": "webui.tasks.create"
+    },
+    {
+      "control": "cronFormEmoji",
+      "tag": "input",
+      "label": "${esc(t(",
+      "source_refs": [
+        "static/panels.js:2469"
+      ],
+      "feature_id": "webui.tasks.labels"
+    },
+    {
+      "control": "action:_toggleCronEmojiGrid",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:2470"
+      ],
+      "feature_id": "webui.tasks.labels"
+    },
+    {
+      "control": "action:_pickCronEmoji",
+      "tag": "button",
+      "label": "${esc(t(",
+      "source_refs": [
+        "static/panels.js:2471"
+      ],
+      "feature_id": "webui.tasks.labels"
+    },
+    {
+      "control": "cronFormCategory",
+      "tag": "input",
+      "label": "${esc(t(",
+      "source_refs": [
+        "static/panels.js:2478"
+      ],
+      "feature_id": "webui.tasks.labels"
+    },
+    {
+      "control": "cronFormSchedulePreset",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:2484"
+      ],
+      "feature_id": "webui.tasks.schedule"
+    },
+    {
+      "control": "cronFormScheduleWeekday",
+      "tag": "select",
+      "label": "${esc(t(",
+      "source_refs": [
+        "static/panels.js:2490"
+      ],
+      "feature_id": "webui.tasks.schedule"
+    },
+    {
+      "control": "cronFormScheduleMonthDay",
+      "tag": "select",
+      "label": "${esc(t(",
+      "source_refs": [
+        "static/panels.js:2502"
+      ],
+      "feature_id": "webui.tasks.schedule"
+    },
+    {
+      "control": "cronFormScheduleTime",
+      "tag": "input",
+      "label": "${esc(t(",
+      "source_refs": [
+        "static/panels.js:2508"
+      ],
+      "feature_id": "webui.tasks.schedule"
+    },
+    {
+      "control": "cronFormScheduleMinute",
+      "tag": "input",
+      "label": "${esc(t(",
+      "source_refs": [
+        "static/panels.js:2512"
+      ],
+      "feature_id": "webui.tasks.schedule"
+    },
+    {
+      "control": "cronFormSchedule",
+      "tag": "input",
+      "label": "0 9 * * *  —  every 1h  —  @daily",
+      "source_refs": [
+        "static/panels.js:2520"
+      ],
+      "feature_id": "webui.tasks.schedule"
+    },
+    {
+      "control": "cronFormDiagram",
+      "tag": "textarea",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:2528"
+      ],
+      "feature_id": "webui.tasks.labels"
+    },
+    {
+      "control": "cronFormDeliver",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:2534"
+      ],
+      "feature_id": "webui.tasks.delivery"
+    },
+    {
+      "control": "cronFormProfile",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:2542"
+      ],
+      "feature_id": "webui.tasks.profile"
+    },
+    {
+      "control": "cronFormModel",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:2549"
+      ],
+      "feature_id": "webui.tasks.profile"
+    },
+    {
+      "control": "action:loadKanbanTask",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:3113"
+      ],
+      "feature_id": "webui.boards.create"
+    },
+    {
+      "control": "action:quickKanbanCardAction",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:3333",
+        "static/panels.js:3334"
+      ],
+      "feature_id": "webui.boards.status"
+    },
+    {
+      "control": "action:clearKanbanFilters",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:3455"
+      ],
+      "feature_id": "webui.boards.filter"
+    },
+    {
+      "control": "action:hardRefreshWebUIClient",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:3609"
+      ],
+      "feature_id": "webui.operations.refresh"
+    },
+    {
+      "control": "action:removeKanbanDependency",
+      "tag": "button",
+      "label": "kanban_remove_dependency",
+      "source_refs": [
+        "static/panels.js:4051"
+      ],
+      "feature_id": "webui.boards.links"
+    },
+    {
+      "control": "kanbanDependencyInput",
+      "tag": "input",
+      "label": "Task ID to link",
+      "source_refs": [
+        "static/panels.js:4060"
+      ],
+      "feature_id": "webui.boards.links"
+    },
+    {
+      "control": "action:addKanbanDependency",
+      "tag": "button",
+      "label": "kanban_add_dependency",
+      "source_refs": [
+        "static/panels.js:4062"
+      ],
+      "feature_id": "webui.boards.links"
+    },
+    {
+      "control": "action:updateKanbanTask",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:4695"
+      ],
+      "feature_id": "webui.boards.status"
+    },
+    {
+      "control": "action:blockKanbanTask",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:4696"
+      ],
+      "feature_id": "webui.boards.block"
+    },
+    {
+      "control": "action:unblockKanbanTask",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:4696"
+      ],
+      "feature_id": "webui.boards.block"
+    },
+    {
+      "control": "action:closeKanbanTaskDetail",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:4698"
+      ],
+      "feature_id": "webui.boards.create"
+    },
+    {
+      "control": "action:openKanbanEdit",
+      "tag": "button",
+      "label": "kanban_edit_task",
+      "source_refs": [
+        "static/panels.js:4700"
+      ],
+      "feature_id": "webui.boards.create"
+    },
+    {
+      "control": "kanbanCommentInput",
+      "tag": "textarea",
+      "label": "${esc(t(",
+      "source_refs": [
+        "static/panels.js:4713"
+      ],
+      "feature_id": "webui.boards.comments"
+    },
+    {
+      "control": "action:addKanbanComment",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:4714"
+      ],
+      "feature_id": "webui.boards.comments"
+    },
+    {
+      "control": "action:switchKanbanBoard",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:4946"
+      ],
+      "feature_id": "webui.boards.boards"
+    },
+    {
+      "control": "action:openKanbanCreateBoard",
+      "tag": "button",
+      "label": "kanban_new_board",
+      "source_refs": [
+        "static/panels.js:4959"
+      ],
+      "feature_id": "webui.boards.boards"
+    },
+    {
+      "control": "action:openKanbanRenameBoard",
+      "tag": "button",
+      "label": "kanban_rename_board",
+      "source_refs": [
+        "static/panels.js:4963"
+      ],
+      "feature_id": "webui.boards.boards"
+    },
+    {
+      "control": "action:archiveKanbanBoard",
+      "tag": "button",
+      "label": "kanban_archive_board",
+      "source_refs": [
+        "static/panels.js:4967"
+      ],
+      "feature_id": "webui.boards.boards"
+    },
+    {
+      "control": "action:_openWikiBrowser",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:5493"
+      ],
+      "feature_id": "webui.skills.wiki"
+    },
+    {
+      "control": "action:document.getElementById",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:5519",
+        "static/panels.js:14586"
+      ],
+      "feature_id": "webui.skills.wiki"
+    },
+    {
+      "control": "wikiBrowserSearch",
+      "tag": "input",
+      "label": "${esc(t(",
+      "source_refs": [
+        "static/panels.js:5522"
+      ],
+      "feature_id": "webui.skills.wiki"
+    },
+    {
+      "control": "action:window._wikiBrowserBack",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:5554",
+        "static/panels.js:5557",
+        "static/panels.js:5560"
+      ],
+      "feature_id": "webui.skills.wiki"
+    },
+    {
+      "control": "skillFormName",
+      "tag": "input",
+      "label": "my-skill",
+      "source_refs": [
+        "static/panels.js:6132"
+      ],
+      "feature_id": "webui.skills.edit"
+    },
+    {
+      "control": "skillFormCategory",
+      "tag": "input",
+      "label": "${esc(t(",
+      "source_refs": [
+        "static/panels.js:6137"
+      ],
+      "feature_id": "webui.skills.edit"
+    },
+    {
+      "control": "skillFormContent",
+      "tag": "textarea",
+      "label": "${esc(t(",
+      "source_refs": [
+        "static/panels.js:6142"
+      ],
+      "feature_id": "webui.skills.edit"
+    },
+    {
+      "control": "action:previewExternalNote",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:6360",
+        "static/panels.js:6366"
+      ],
+      "feature_id": "webui.memory.external"
+    },
+    {
+      "control": "externalNotesSource",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:6389"
+      ],
+      "feature_id": "webui.memory.external"
+    },
+    {
+      "control": "externalNotesQuery",
+      "tag": "input",
+      "label": "${esc(t(",
+      "source_refs": [
+        "static/panels.js:6390"
+      ],
+      "feature_id": "webui.memory.external"
+    },
+    {
+      "control": "memEditContent",
+      "tag": "textarea",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:6472"
+      ],
+      "feature_id": "webui.memory.personal"
+    },
+    {
+      "control": "wsAssignOwner",
+      "tag": "input",
+      "label": "${esc(t(",
+      "source_refs": [
+        "static/panels.js:7176"
+      ],
+      "feature_id": "webui.files.access"
+    },
+    {
+      "control": "wsAssignMembers",
+      "tag": "input",
+      "label": "${esc(t(",
+      "source_refs": [
+        "static/panels.js:7177"
+      ],
+      "feature_id": "webui.files.access"
+    },
+    {
+      "control": "wsAssignSaveBtn",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:7178"
+      ],
+      "feature_id": "webui.files.access"
+    },
+    {
+      "control": "workspaceFormName",
+      "tag": "input",
+      "label": "${esc(t(",
+      "source_refs": [
+        "static/panels.js:7331"
+      ],
+      "feature_id": "webui.files.workspace"
+    },
+    {
+      "control": "workspaceFormPath",
+      "tag": "input",
+      "label": "${esc(t(",
+      "source_refs": [
+        "static/panels.js:7336"
+      ],
+      "feature_id": "webui.files.workspace"
+    },
+    {
+      "control": "workspaceFormCategory",
+      "tag": "input",
+      "label": "${esc(t(",
+      "source_refs": [
+        "static/panels.js:7343"
+      ],
+      "feature_id": "webui.files.workspace"
+    },
+    {
+      "control": "action:openBotConfiguration",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:7961",
+        "static/panels.js:7962",
+        "static/panels.js:7963",
+        "static/panels.js:7964",
+        "static/panels.js:7965",
+        "static/panels.js:7980"
+      ],
+      "feature_id": "webui.bots.manage"
+    },
+    {
+      "control": "botTitle",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:7972"
+      ],
+      "feature_id": "webui.bots.appearance"
+    },
+    {
+      "control": "botDescription",
+      "tag": "textarea",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:7973"
+      ],
+      "feature_id": "webui.bots.appearance"
+    },
+    {
+      "control": "botShape",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:7974"
+      ],
+      "feature_id": "webui.bots.appearance"
+    },
+    {
+      "control": "botColor",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:7975"
+      ],
+      "feature_id": "webui.bots.appearance"
+    },
+    {
+      "control": "botCategory",
+      "tag": "input",
+      "label": "${esc(t(",
+      "source_refs": [
+        "static/panels.js:7976"
+      ],
+      "feature_id": "webui.bots.appearance"
+    },
+    {
+      "control": "botAvatarFile",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:7977"
+      ],
+      "feature_id": "webui.bots.appearance"
+    },
+    {
+      "control": "action:_discardSettings",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:9769"
+      ],
+      "feature_id": "webui.settings.save"
+    },
+    {
+      "control": "action:_retryAppearanceAutosave",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:9921"
+      ],
+      "feature_id": "webui.settings.save"
+    },
+    {
+      "control": "action:deletePasskey",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:13239"
+      ],
+      "feature_id": "webui.settings.passkey"
+    },
+    {
+      "control": "auxAdvancedClose",
+      "tag": "button",
+      "label": "${esc(t(",
+      "source_refs": [
+        "static/panels.js:13613"
+      ],
+      "feature_id": "webui.settings.advanced_model"
+    },
+    {
+      "control": "auxAdvancedCancel",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:13617"
+      ],
+      "feature_id": "webui.settings.advanced_model"
+    },
+    {
+      "control": "auxAdvancedSave",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:13618"
+      ],
+      "feature_id": "webui.settings.advanced_model"
+    },
+    {
+      "control": "auxAdvancedServiceTier",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:13662"
+      ],
+      "feature_id": "webui.settings.advanced_model"
+    },
+    {
+      "control": "auxAdvancedExtraBody",
+      "tag": "textarea",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:13672"
+      ],
+      "feature_id": "webui.settings.advanced_model"
+    },
+    {
+      "control": "auxAdvancedApiKeyClear",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:13674"
+      ],
+      "feature_id": "webui.settings.advanced_model"
+    },
+    {
+      "control": "action:navigateToErrorSession",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:14252"
+      ],
+      "feature_id": "webui.operations.errors"
+    },
+    {
+      "control": "action:dismissErrorBanner",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:14252"
+      ],
+      "feature_id": "webui.operations.errors"
+    },
+    {
+      "control": "action:toggleMcpServer",
+      "tag": "button",
+      "label": "${esc(t(isEnabled?",
+      "source_refs": [
+        "static/panels.js:14327"
+      ],
+      "feature_id": "webui.connections.mcp"
+    },
+    {
+      "control": "action:setMcpToolsPageSize",
+      "tag": "select",
+      "label": "${esc(t(",
+      "source_refs": [
+        "static/panels.js:14377"
+      ],
+      "feature_id": "webui.connections.catalog"
+    },
+    {
+      "control": "action:setMcpToolsPage",
+      "tag": "button",
+      "label": "${esc(t(",
+      "source_refs": [
+        "static/panels.js:14392",
+        "static/panels.js:14394"
+      ],
+      "feature_id": "webui.connections.catalog"
+    },
+    {
+      "control": "action:_gatewayAction",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:14468"
+      ],
+      "feature_id": "webui.operations.health"
+    },
+    {
+      "control": "action:setApprovalResumeConsent",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:14729"
+      ],
+      "feature_id": "webui.governance.resume"
+    },
+    {
+      "control": "action:cancelApprovalResume",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:14732"
+      ],
+      "feature_id": "webui.governance.resume"
+    },
+    {
+      "control": "action:acknowledgeCapacityAlert",
+      "tag": "button",
+      "label": "capacity_ack",
+      "source_refs": [
+        "static/panels.js:14862"
+      ],
+      "feature_id": "webui.operations.capacity"
+    },
+    {
+      "control": "projNewName",
+      "tag": "input",
+      "label": "Project name",
+      "source_refs": [
+        "static/projects.js:95"
+      ],
+      "feature_id": "webui.projects.create"
+    },
+    {
+      "control": "projNewCategory",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/projects.js:95"
+      ],
+      "feature_id": "webui.projects.create"
+    },
+    {
+      "control": "projCreateButton",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/projects.js:95"
+      ],
+      "feature_id": "webui.projects.create"
+    },
+    {
+      "control": "projStartChat",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/projects.js:395"
+      ],
+      "feature_id": "webui.projects.chat"
+    },
+    {
+      "control": "projPeopleSearch",
+      "tag": "input",
+      "label": "Find people",
+      "source_refs": [
+        "static/projects.js:421"
+      ],
+      "feature_id": "webui.projects.team"
+    },
+    {
+      "control": "projCategory",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/projects.js:424"
+      ],
+      "feature_id": "webui.projects.team"
+    },
+    {
+      "control": "projSaveTeam",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/projects.js:425"
+      ],
+      "feature_id": "webui.projects.team"
+    },
+    {
+      "control": "projArchiveTeam",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/projects.js:425"
+      ],
+      "feature_id": "webui.projects.archive"
+    },
+    {
+      "control": "projUpload",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/projects.js:427"
+      ],
+      "feature_id": "webui.projects.files"
+    },
+    {
+      "control": "btnSplitExit",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/split.js:121"
+      ],
+      "feature_id": "webui.sessions.split"
+    },
+    {
+      "control": "action:copyStatusSessionId",
+      "tag": "button",
+      "label": "${esc(t(",
+      "source_refs": [
+        "static/ui.js:731"
+      ],
+      "feature_id": "webui.operations.errors"
+    },
+    {
+      "control": "action:startCompressionRecovery",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/ui.js:765"
+      ],
+      "feature_id": "webui.chat.context"
+    },
+    {
+      "control": "action:jumpToTurnQuestion",
+      "tag": "button",
+      "label": "${esc(title)}",
+      "source_refs": [
+        "static/ui.js:1971"
+      ],
+      "feature_id": "webui.chat.scroll"
+    },
+    {
+      "control": "action:copyToastText",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/ui.js:9359"
+      ],
+      "feature_id": "webui.operations.errors"
+    },
+    {
+      "control": "action:dismissToast",
+      "tag": "button",
+      "label": "Dismiss error toast",
+      "source_refs": [
+        "static/ui.js:9359"
+      ],
+      "feature_id": "webui.operations.errors"
+    },
+    {
+      "control": "action:_toggleActivityGroup",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/ui.js:14802",
+        "static/ui.js:14881"
+      ],
+      "feature_id": "webui.chat.activity"
+    },
+    {
+      "control": "action:copyMsg",
+      "tag": "button",
+      "label": "${t(",
+      "source_refs": [
+        "static/ui.js:15404",
+        "static/ui.js:17389"
+      ],
+      "feature_id": "webui.chat.copy"
+    },
+    {
+      "control": "action:editMessage",
+      "tag": "button",
+      "label": "${t(",
+      "source_refs": [
+        "static/ui.js:17386"
+      ],
+      "feature_id": "webui.chat.edit"
+    },
+    {
+      "control": "action:undoLastExchange",
+      "tag": "button",
+      "label": "${t(",
+      "source_refs": [
+        "static/ui.js:17387"
+      ],
+      "feature_id": "webui.chat.undo"
+    },
+    {
+      "control": "action:regenerateResponse",
+      "tag": "button",
+      "label": "${t(",
+      "source_refs": [
+        "static/ui.js:17388"
+      ],
+      "feature_id": "webui.chat.retry"
+    },
+    {
+      "control": "action:forkFromMessage",
+      "tag": "button",
+      "label": "${t(",
+      "source_refs": [
+        "static/ui.js:17396"
+      ],
+      "feature_id": "webui.chat.fork"
+    },
+    {
+      "control": "action:speakMessage",
+      "tag": "button",
+      "label": "${t(",
+      "source_refs": [
+        "static/ui.js:17397"
+      ],
+      "feature_id": "webui.voice.read"
+    },
+    {
+      "control": "action:_toggleToolWorklogGroup",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/ui.js:18984"
+      ],
+      "feature_id": "webui.chat.activity"
+    },
+    {
+      "control": "action:openArtifactPath",
+      "tag": "button",
+      "label": "${esc(path)}",
+      "source_refs": [
+        "static/workspace.js:738"
+      ],
+      "feature_id": "webui.files.artifacts"
+    },
+    {
+      "control": "settingsSearch",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/index.html:410"
+      ],
+      "feature_id": "webui.settings.search"
+    },
+    {
+      "control": "outlineToggleBtn",
+      "tag": "button",
+      "label": "Toggle conversation outline",
+      "source_refs": [
+        "static/index.html:477"
+      ],
+      "feature_id": "webui.chat.scroll"
+    },
+    {
+      "control": "action:switchExtensionsTab",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1722"
+      ],
+      "feature_id": "webui.operations.extension_gallery"
+    },
+    {
+      "control": "helpCardGuide",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/index.html:1911"
+      ],
+      "feature_id": "webui.help.guide"
+    },
+    {
+      "control": "action:toggleOutlinePanel",
+      "tag": "button",
+      "label": "Close outline",
+      "source_refs": [
+        "static/index.html:2210"
+      ],
+      "feature_id": "webui.chat.scroll"
+    },
+    {
+      "control": "govUserApprovalPrompt",
+      "tag": "textarea",
+      "label": "",
+      "source_refs": [
+        "static/governance.js:471"
+      ],
+      "feature_id": "webui.governance.approval_prompt"
+    },
+    {
+      "control": "action:_govEffToggle",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/governance.js:815"
+      ],
+      "feature_id": "webui.governance.effective_grants"
+    },
+    {
+      "control": "action:_govApplyGroupTemplate",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/governance.js:1021"
+      ],
+      "feature_id": "webui.governance.group_template"
+    },
+    {
+      "control": "action:_govIntgAction",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/governance.js:2029"
+      ],
+      "feature_id": "webui.governance.integration_approval"
+    },
+    {
+      "control": "action:window._outlineJump",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/outline.js:226"
+      ],
+      "feature_id": "webui.chat.scroll"
+    },
+    {
+      "control": "action:event.stopPropagation",
+      "tag": "button",
+      "label": "${esc(runToggleLabel)}",
+      "source_refs": [
+        "static/panels.js:2165"
+      ],
+      "feature_id": "webui.tasks.results"
+    },
+    {
+      "control": "workspaceShowHiddenFiles",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/ui.js:20944"
+      ],
+      "feature_id": "webui.files.hidden"
+    }
+  ],
+  "method": "Inventory of concrete HTML controls and inline handlers, supplemented by manual review of generated conversation menus, bot builder and knowledge controls, composer customization and the embedded read-only memory dashboard. Save/cancel and equivalent responsive controls share a feature. Hidden vendor login, server settings and inactive legacy visualizers are excluded from user workflows.",
+  "dynamic_features": [
+    "webui.chat.mentions",
+    "webui.chat.svg",
+    "webui.chat.replay",
+    "webui.sessions.organize",
+    "webui.memory.company",
+    "webui.memory.project",
+    "webui.memory.identity",
+    "webui.memory.explorer",
+    "webui.memory.search",
+    "webui.memory.audit",
+    "webui.bots.identity",
+    "webui.bots.instructions",
+    "webui.bots.skills",
+    "webui.bots.tools",
+    "webui.bots.memory",
+    "webui.bots.knowledge",
+    "webui.bots.access",
+    "webui.governance.organisation",
+    "webui.settings.composer_visibility",
+    "webui.planned.gateway",
+    "webui.planned.reporter",
+    "webui.planned.central_memory",
+    "webui.sessions.rename",
+    "webui.sessions.pin",
+    "webui.sessions.move_project",
+    "webui.sessions.archive",
+    "webui.sessions.delete",
+    "webui.sessions.regenerate_title",
+    "webui.sessions.link",
+    "webui.chat.save_prompt",
+    "webui.bots.knowledge_upload",
+    "webui.bots.knowledge_legacy",
+    "webui.memory.overview",
+    "webui.memory.today",
+    "webui.memory.visualiser",
+    "webui.memory.review",
+    "webui.memory.profile",
+    "webui.memory.lifecycle",
+    "webui.memory.graph",
+    "webui.memory.triples",
+    "webui.memory.recall",
+    "webui.memory.timeline",
+    "webui.memory.consolidations",
+    "webui.memory.structured_overview",
+    "webui.memory.facts",
+    "webui.memory.structured_timelines",
+    "webui.memory.instructions",
+    "webui.memory.structured_graph",
+    "webui.memory.preferences",
+    "webui.operations.extension_installed",
+    "webui.chat.slash",
+    "webui.chat.goal",
+    "webui.chat.queue",
+    "webui.chat.interrupt",
+    "webui.chat.steer",
+    "webui.chat.aside",
+    "webui.chat.background",
+    "webui.chat.status",
+    "webui.chat.personality",
+    "webui.skills.use"
+  ],
+  "commands": {
+    "help": "webui.chat.slash",
+    "tour": "webui.help.tour",
+    "explain": "webui.help.page",
+    "clear": "webui.sessions.clear",
+    "compress": "webui.chat.context",
+    "compact": "webui.chat.context",
+    "model": "webui.chat.model",
+    "workspace": "webui.files.workspace",
+    "terminal": "webui.operations.terminal",
+    "new": "webui.sessions.new",
+    "usage": "webui.chat.status",
+    "theme": "webui.settings.theme",
+    "personality": "webui.chat.personality",
+    "skills": "webui.skills.browse",
+    "use": "webui.skills.use",
+    "stop": "webui.chat.send",
+    "goal": "webui.chat.goal",
+    "queue": "webui.chat.queue",
+    "interrupt": "webui.chat.interrupt",
+    "steer": "webui.chat.steer",
+    "title": "webui.sessions.rename",
+    "retry": "webui.chat.retry",
+    "undo": "webui.chat.undo",
+    "btw": "webui.chat.aside",
+    "background": "webui.chat.background",
+    "status": "webui.chat.status",
+    "voice": "webui.voice.loop",
+    "reasoning": "webui.chat.reasoning",
+    "yolo": "webui.governance.skip",
+    "branch": "webui.chat.fork"
+  }
+}

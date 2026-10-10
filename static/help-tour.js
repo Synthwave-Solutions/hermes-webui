@@ -399,6 +399,12 @@
   function focusKey(node){
     return FOCUS_KEYS.find(name=>node.classList&&node.classList.contains(name))||'';
   }
+  function guideButton(pageId){
+    const guide=window.SynthPulseFeatureGuide;
+    if(!guide)return null;
+    return button('sp-help-chip',guide.contextLabel(),()=>guide.open({area:pageId,trigger:document.getElementById('btnPageHelp')}));
+  }
+
   function decorate(run,keep){
     const inst=run.inst,tip=inst.state&&inst.state.tooltip;
     if(!tip)return;
@@ -422,6 +428,10 @@
       const done=button('guida-btn guida-next sp-help-done',tr('help_tour_done'),()=>finish(run));
       controls.appendChild(done);
       primary=done;
+    }
+    if(run.mode==='explain'&&!tip.querySelector('[data-guide-link]')){
+      const link=guideButton(run.id);
+      if(link){link.dataset.guideLink='';tip.querySelector('.guida-tooltip-content')?.appendChild(link);}
     }
     if(last&&run.mode==='explain'){
       const holder=tip.querySelector('.guida-tooltip-content');
@@ -633,7 +643,10 @@
       scroll.appendChild(links);
     }
     node.appendChild(scroll);
-    if(model.pageId)node.appendChild(feedbackRow(model.pageId,model.title));
+    if(model.pageId){
+      const link=guideButton(model.pageId);if(link)scroll.appendChild(link);
+      node.appendChild(feedbackRow(model.pageId,model.title));
+    }
     document.body.appendChild(node);
     placePopover(node);
     const state={node,trigger};

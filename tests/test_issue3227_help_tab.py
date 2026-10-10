@@ -1,4 +1,6 @@
 from pathlib import Path
+from html.parser import HTMLParser
+import re
 
 ROOT = Path(__file__).resolve().parents[1]
 INDEX_HTML = (ROOT / "static" / "index.html").read_text(encoding="utf-8")
@@ -6,7 +8,24 @@ PANELS_JS  = (ROOT / "static" / "panels.js").read_text(encoding="utf-8")
 I18N_JS    = (ROOT / "static" / "i18n.js").read_text(encoding="utf-8")
 STYLE_CSS  = (ROOT / "static" / "style.css").read_text(encoding="utf-8")
 
-LOCALE_COUNT = 15  # en, it, ja, ru, es, de, zh, zh-Hant, pt, ko, fr, tr, pl, vi, cs
+LOCALE_BUNDLES = sorted((ROOT / "static" / "i18n").glob("*.js"))
+
+
+class HelpLinks(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.links = []
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if tag == "a" and "help-card-link" in attrs.get("class", "").split():
+            self.links.append(attrs)
+
+
+def _help_links():
+    parser = HelpLinks()
+    parser.feed(INDEX_HTML)
+    return parser.links
 
 
 def test_help_nav_button_present():
@@ -17,13 +36,17 @@ def test_help_nav_button_present():
 
 def test_help_pane_present():
     assert 'id="settingsPaneHelp"' in INDEX_HTML
-    assert 'href="https://get-hermes.ai/"' in INDEX_HTML
-    assert 'href="https://github.com/nesquena/hermes-webui/issues"' in INDEX_HTML
+    assert {link['href'] for link in _help_links()} == {
+        'https://synthwave.solutions/', 'https://github.com/Synthwave-Solutions',
+    }
 
 
 def test_help_pane_links_are_outbound():
-    assert 'target="_blank"' in INDEX_HTML
-    assert 'rel="noopener noreferrer"' in INDEX_HTML
+    links = _help_links()
+    assert links
+    for link in links:
+        assert link.get('target') == '_blank'
+        assert {'noopener', 'noreferrer'} <= set(link.get('rel', '').split())
 
 
 def test_panels_js_allowlist_includes_help():
@@ -42,11 +65,16 @@ def test_panels_js_foreach_includes_help():
 
 
 def test_i18n_help_keys_present_in_all_locales():
-    assert I18N_JS.count("settings_tab_help") == LOCALE_COUNT
-    assert I18N_JS.count("settings_help_docs_label") == LOCALE_COUNT
-    assert I18N_JS.count("settings_help_issue_label") == LOCALE_COUNT
-    assert I18N_JS.count("settings_help_docs_link") == LOCALE_COUNT
-    assert I18N_JS.count("settings_help_issue_link") == LOCALE_COUNT
+    # Locale catalogs moved out of the loader into on-demand bundles. Check
+    # each actual catalog so adding or removing a supported locale stays safe.
+    assert LOCALE_BUNDLES
+    for bundle in LOCALE_BUNDLES:
+        content = bundle.read_text(encoding="utf-8")
+        assert "__registerHermesLocale(" in content
+        for key in ("settings_tab_help", "settings_help_docs_label",
+                    "settings_help_issue_label", "settings_help_docs_link",
+                    "settings_help_issue_link"):
+            assert re.search(rf"\b{key}:\s*'[^']", content), (bundle.name, key)
 
 
 def test_help_card_link_hover_is_contrast_safe():
