@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {test,expect,open,api,session} from './fixtures';
-test.use({user:'alice'});
+test.use({user:'admin'});
 test('gateway enforcement refuses unavailable speech routes and restores normal capability',async({page},info)=>{
  const qa=path.dirname(process.env.QA_SESSIONS!);
  expect(qa).toContain('e2e-state');
@@ -25,6 +25,8 @@ test('gateway enforcement refuses unavailable speech routes and restores normal 
   await expect(page.locator('#toast')).toContainText('Live voice is not available on this platform.');
   await page.screenshot({path:info.outputPath('gateway-speech-unavailable-desktop.png')});
   await page.setViewportSize({width:390,height:844});
+  await page.locator('#btnRealtimeVoice').click();
+  await expect(page.locator('#toast')).toContainText('Live voice is not available on this platform.');
   await page.screenshot({path:info.outputPath('gateway-speech-unavailable-mobile.png')});
  }finally{fs.writeFileSync(config,original);}
  await expect.poll(async()=>(await api(page,'/api/voice/realtime/capability')).body.available).toBe(true);
