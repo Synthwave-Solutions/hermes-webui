@@ -1,6 +1,12 @@
 import {test,expect,open,api,auth} from './fixtures';
 test.use({user:'alice'});
-async function selectTask(p:any,name:string){const item=p.locator('.cron-item').filter({hasText:name});if(!await item.isVisible())await p.locator('summary').filter({hasText:'Paused'}).click();await item.click();}
+async function selectTask(p:any,name:string){
+ const item=p.locator('.cron-item').filter({hasText:name});
+ await expect(item).toBeAttached();
+ const group=item.locator('xpath=ancestor::details');
+ if(await group.count() && !await group.evaluate((el:HTMLDetailsElement)=>el.open))await group.locator('summary').click();
+ await expect(item).toBeVisible();await item.click();
+}
 test('task notifications persist and a colleague can mute only their own view',async({page,browser},info)=>{
  const name='QA notification ownership '+Date.now();await open(page,'tasks');
  const made=await api(page,'/api/crons/create',{name,prompt:'Synthetic paused notification test',schedule:'0 9 * * *',deliver:'local',enabled:false,category:'Monitoring',shared_with:['bob@example.test']});
