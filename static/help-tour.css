@@ -122,7 +122,7 @@ ol.sp-help-popover-sections{list-style:decimal;padding-left:18px;}
 }
 
 /* Complete catalogue explanations reuse the interactive spotlight tour. */
-.guida-tooltip.sp-help-tooltip.sp-feature-tour{width:min(440px,calc(100vw - 24px))!important;max-height:calc(100dvh - 24px);overflow:hidden;display:flex;flex-direction:column;}
+.guida-tooltip.sp-help-tooltip.sp-feature-tour{transition:none!important;transform:none!important;width:min(440px,calc(100vw - 24px))!important;max-height:calc(100dvh - 24px);overflow:hidden;display:flex;flex-direction:column;}
 .sp-feature-tour .guida-tooltip-content{display:flex;flex-direction:column;min-height:0;max-height:inherit;box-sizing:border-box;width:100%;padding:14px;gap:10px;}
 .sp-feature-tour .guida-header{margin:0;flex-shrink:0;}.sp-feature-tour .guida-header h3{overflow-wrap:anywhere;flex:1;min-width:0;}.sp-feature-tour .guida-progress{white-space:nowrap;flex-shrink:0;}
 .sp-feature-tour-tools{display:grid;grid-template-columns:minmax(0,1fr) 112px;gap:8px;flex-shrink:0;}
