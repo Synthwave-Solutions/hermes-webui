@@ -8696,6 +8696,13 @@ async function loadMemory(force) {
   } catch(e) {
     if (epoch !== _memoryRequestEpoch || context !== _memoryContext()) return;
     if (panel) panel.innerHTML = `<div style="padding:12px;color:var(--accent);font-size:12px">${esc(t('error_prefix'))}${esc(e.message)}</div>`;
+  } finally {
+    // Startup can finish restoring a chat while this panel is fetching. The
+    // stale response must not render, but an active panel still needs a read
+    // for its new context. A newer request owns its own retry and rendering.
+    if (epoch === _memoryRequestEpoch && context !== _memoryContext() && _currentPanel === 'memory') {
+      await loadMemory(force);
+    }
   }
 }
 

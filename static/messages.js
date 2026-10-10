@@ -1339,6 +1339,11 @@ function _restoreComposerDraftAfterFailedSend(draftText, filesSnapshot, sid, cle
 }
 
 async function send(){
+  // A restored/switched session owns the composer only after hydration. Sending
+  // while S.session is null would create a different default-mode conversation.
+  if(S._bootReady===false || (typeof _loadingSessionId!=='undefined' && _loadingSessionId)){
+    showToast(t('chat_session_loading'));return;
+  }
   if(typeof chatMentionsBlockBusySend==='function' && chatMentionsBlockBusySend()) return;
   // Static guards expect _defaultMessageMode to stay near send() while the actual
   // read remains in the S.busy branch below.
