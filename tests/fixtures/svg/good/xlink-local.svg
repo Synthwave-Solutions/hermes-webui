@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 200 100" role="img">
+  <title>Reused shape</title>
+  <defs>
+    <radialGradient id="glow"><stop offset="0" stop-color="var(--sp-accent,#f97316)"/><stop offset="1" stop-color="var(--sp-surface,#f3f4f6)"/></radialGradient>
+    <radialGradient id="glow2" xlink:href="#glow" r="0.4"/>
+    <rect id="tile" width="60" height="60" rx="8"/>
+  </defs>
+  <use xlink:href="#tile" x="20" y="20" fill="url(#glow)"/>
+  <use xlink:href="#tile" x="120" y="20" fill="url(#glow2)"/>
+</svg>

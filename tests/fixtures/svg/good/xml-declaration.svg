@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- drawn for the chat -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 120" role="img">
+  <title>A simple cycle</title>
+  <circle cx="100" cy="60" r="44" fill="none" stroke="var(--sp-accent,#f97316)" stroke-width="4"/>
+  <text x="100" y="65" font-size="14" text-anchor="middle" fill="var(--sp-fg,#1f2937)">Repeat</text>
+</svg>

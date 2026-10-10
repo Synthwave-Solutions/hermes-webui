@@ -1,0 +1,46 @@
+/* Memory explorer frame overrides (plan addendum 6.6.4). Loaded after style.css. */
+
+/* The WebUI system font stack; no web fonts are loaded (font-src 'none'). */
+:root, [data-theme="light"] {
+  --font-brand-serif: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-brand-script: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Settings (access control, server and database), the login overlay, the
+   footer, the theme switches (the WebUI sets the theme) and the database path
+   card are not part of the explorer. */
+nav button[data-tab="settings"],
+#settings,
+#loginOverlay,
+.app-footer,
+.theme-switch,
+.topbar-theme-toggle,
+.hero .status-card .status-label,
+#dbPath {
+  display: none !important;
+}
+
+/* The WebUI's panel already carries a title; keep the hero compact. */
+.hero h1 { font-size: 1.35rem; }
+.hero p { max-width: 60ch; }
+
+/* Light theme stat numbers were transparent upstream (a later rule removes
+   their gradient background but keeps the transparent text fill). */
+[data-theme="light"] .card .num { color: var(--text) !important; -webkit-text-fill-color: var(--text) !important; }
+
+/* Shown when the document is opened outside the WebUI. */
+.memdash-standalone {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  z-index: 1000;
+}

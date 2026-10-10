@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 260" role="img">
+  <title>Three layers of the service</title>
+  <desc>Interface on top of automation on top of data.</desc>
+  <g font-family="system-ui, sans-serif" font-size="14" text-anchor="middle">
+    <rect x="40" y="20" width="520" height="60" rx="8" fill="var(--sp-surface,#f3f4f6)" stroke="var(--sp-border,#d1d5db)"/>
+    <text x="300" y="56" fill="var(--sp-fg,#1f2937)">Interface</text>
+    <rect x="40" y="100" width="520" height="60" rx="8" fill="var(--sp-surface,#f3f4f6)" stroke="var(--sp-accent,#f97316)" stroke-width="2"/>
+    <text x="300" y="136" fill="var(--sp-fg,#1f2937)">Automation</text>
+    <rect x="40" y="180" width="520" height="60" rx="8" fill="var(--sp-surface,#f3f4f6)" stroke="var(--sp-border,#d1d5db)"/>
+    <text x="300" y="216" fill="var(--sp-muted,#6b7280)">Data</text>
+  </g>
+</svg>

@@ -1,0 +1,317 @@
+[
+  {
+    "type": "RUN_STARTED",
+    "threadId": "sess_fixture_tool",
+    "runId": "run_fixture_tool",
+    "protocolVersion": "1.0",
+    "timestamp": 1790000000250
+  },
+  {
+    "type": "STATE_SNAPSHOT",
+    "snapshot": {
+      "context": {
+        "prefillStatus": "not_configured",
+        "prefillSource": "none",
+        "prefillMessageCount": 0
+      }
+    },
+    "timestamp": 1790000000500
+  },
+  {
+    "type": "REASONING_START",
+    "messageId": "run_fixture_tool:reasoning:1",
+    "timestamp": 1790000000750
+  },
+  {
+    "type": "REASONING_MESSAGE_START",
+    "messageId": "run_fixture_tool:reasoning:1:message",
+    "role": "reasoning",
+    "timestamp": 1790000000750
+  },
+  {
+    "type": "REASONING_MESSAGE_CONTENT",
+    "messageId": "run_fixture_tool:reasoning:1:message",
+    "delta": "The user wants the weather. ",
+    "timestamp": 1790000000750
+  },
+  {
+    "type": "REASONING_MESSAGE_CONTENT",
+    "messageId": "run_fixture_tool:reasoning:1:message",
+    "delta": "I will call the search tool.",
+    "timestamp": 1790000001000
+  },
+  {
+    "type": "REASONING_MESSAGE_END",
+    "messageId": "run_fixture_tool:reasoning:1:message",
+    "timestamp": 1790000001250
+  },
+  {
+    "type": "REASONING_END",
+    "messageId": "run_fixture_tool:reasoning:1",
+    "timestamp": 1790000001250
+  },
+  {
+    "type": "TEXT_MESSAGE_START",
+    "messageId": "run_fixture_tool:text:1",
+    "role": "assistant",
+    "timestamp": 1790000001250
+  },
+  {
+    "type": "TEXT_MESSAGE_CONTENT",
+    "messageId": "run_fixture_tool:text:1",
+    "delta": "Let me check ",
+    "timestamp": 1790000001250
+  },
+  {
+    "type": "TEXT_MESSAGE_CONTENT",
+    "messageId": "run_fixture_tool:text:1",
+    "delta": "that for you.",
+    "timestamp": 1790000001500
+  },
+  {
+    "type": "TEXT_MESSAGE_END",
+    "messageId": "run_fixture_tool:text:1",
+    "timestamp": 1790000001750
+  },
+  {
+    "type": "TOOL_CALL_START",
+    "toolCallId": "call_ws_1",
+    "toolCallName": "web_search",
+    "parentMessageId": "run_fixture_tool:text:1",
+    "timestamp": 1790000001750
+  },
+  {
+    "type": "TOOL_CALL_ARGS",
+    "toolCallId": "call_ws_1",
+    "delta": "{\"query\":\"weather Amsterdam\"}",
+    "timestamp": 1790000001750
+  },
+  {
+    "type": "TOOL_CALL_END",
+    "toolCallId": "call_ws_1",
+    "timestamp": 1790000001750
+  },
+  {
+    "type": "STATE_DELTA",
+    "delta": [
+      {
+        "op": "add",
+        "path": "/usage",
+        "value": {
+          "inputTokens": 1200,
+          "outputTokens": 40,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0,
+          "contextLength": 200000,
+          "thresholdTokens": 160000,
+          "lastPromptTokens": 1200,
+          "costStatus": "unknown"
+        }
+      }
+    ],
+    "timestamp": 1790000002000
+  },
+  {
+    "type": "TOOL_CALL_RESULT",
+    "messageId": "run_fixture_tool:tool-result:call_ws_1",
+    "toolCallId": "call_ws_1",
+    "content": "Sunny, 21 degrees",
+    "role": "tool",
+    "timestamp": 1790000002250
+  },
+  {
+    "type": "CUSTOM",
+    "name": "synthpulse.tool_timing",
+    "value": {
+      "toolCallId": "call_ws_1",
+      "durationMs": 500,
+      "isError": false
+    },
+    "timestamp": 1790000002250
+  },
+  {
+    "type": "TOOL_CALL_START",
+    "toolCallId": "t10",
+    "toolCallName": "read_file",
+    "timestamp": 1790000002500
+  },
+  {
+    "type": "TOOL_CALL_ARGS",
+    "toolCallId": "t10",
+    "delta": "{\"path\":\"notes.md\"}",
+    "timestamp": 1790000002500
+  },
+  {
+    "type": "TOOL_CALL_END",
+    "toolCallId": "t10",
+    "timestamp": 1790000002500
+  },
+  {
+    "type": "TOOL_CALL_RESULT",
+    "messageId": "run_fixture_tool:tool-result:t10",
+    "toolCallId": "t10",
+    "content": "# Notes",
+    "role": "tool",
+    "timestamp": 1790000002750
+  },
+  {
+    "type": "CUSTOM",
+    "name": "synthpulse.tool_timing",
+    "value": {
+      "toolCallId": "t10",
+      "durationMs": 420,
+      "isError": false
+    },
+    "timestamp": 1790000002750
+  },
+  {
+    "type": "TEXT_MESSAGE_START",
+    "messageId": "run_fixture_tool:text:2",
+    "role": "assistant",
+    "timestamp": 1790000003000
+  },
+  {
+    "type": "TEXT_MESSAGE_CONTENT",
+    "messageId": "run_fixture_tool:text:2",
+    "delta": "It is sunny and 21 degrees in Amsterdam.",
+    "timestamp": 1790000003000
+  },
+  {
+    "type": "TEXT_MESSAGE_END",
+    "messageId": "run_fixture_tool:text:2",
+    "timestamp": 1790000003500
+  },
+  {
+    "type": "STATE_DELTA",
+    "delta": [
+      {
+        "op": "replace",
+        "path": "/usage/inputTokens",
+        "value": 2400
+      },
+      {
+        "op": "replace",
+        "path": "/usage/outputTokens",
+        "value": 90
+      },
+      {
+        "op": "replace",
+        "path": "/usage/cacheReadTokens",
+        "value": 800
+      },
+      {
+        "op": "replace",
+        "path": "/usage/lastPromptTokens",
+        "value": 2400
+      },
+      {
+        "op": "replace",
+        "path": "/usage/costStatus",
+        "value": "estimated"
+      },
+      {
+        "op": "add",
+        "path": "/usage/estimatedCost",
+        "value": 0.0042
+      },
+      {
+        "op": "add",
+        "path": "/usage/cacheHitPercent",
+        "value": 33.3
+      },
+      {
+        "op": "add",
+        "path": "/usage/turnCacheHitPercent",
+        "value": 33.3
+      },
+      {
+        "op": "add",
+        "path": "/usage/durationSeconds",
+        "value": 4.2
+      },
+      {
+        "op": "add",
+        "path": "/usage/tps",
+        "value": 38.5
+      }
+    ],
+    "timestamp": 1790000003500
+  },
+  {
+    "type": "MESSAGES_SNAPSHOT",
+    "messages": [
+      {
+        "id": "sess_fixture_tool:message:0",
+        "role": "user",
+        "content": "What is the weather in Amsterdam?"
+      },
+      {
+        "id": "sess_fixture_tool:message:1",
+        "role": "assistant",
+        "content": "Let me check that for you.",
+        "toolCalls": [
+          {
+            "id": "call_ws_1",
+            "type": "function",
+            "function": {
+              "name": "web_search",
+              "arguments": "{\"query\": \"weather Amsterdam\"}"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sess_fixture_tool:message:2",
+        "role": "tool",
+        "content": "Sunny, 21 degrees",
+        "toolCallId": "call_ws_1"
+      },
+      {
+        "id": "sess_fixture_tool:message:3",
+        "role": "assistant",
+        "toolCalls": [
+          {
+            "id": "call_rf_1",
+            "type": "function",
+            "function": {
+              "name": "read_file",
+              "arguments": "{\"path\":\"notes.md\"}"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sess_fixture_tool:message:4",
+        "role": "tool",
+        "content": "# Notes",
+        "toolCallId": "call_rf_1"
+      },
+      {
+        "id": "sess_fixture_tool:message:6",
+        "role": "assistant",
+        "content": "It is sunny and 21 degrees in Amsterdam."
+      }
+    ],
+    "timestamp": 1790000003500
+  },
+  {
+    "type": "STATE_DELTA",
+    "delta": [
+      {
+        "op": "add",
+        "path": "/usage/ttftMs",
+        "value": 350
+      }
+    ],
+    "timestamp": 1790000003750
+  },
+  {
+    "type": "RUN_FINISHED",
+    "threadId": "sess_fixture_tool",
+    "runId": "run_fixture_tool",
+    "outcome": {
+      "type": "success"
+    },
+    "timestamp": 1790000004000
+  }
+]

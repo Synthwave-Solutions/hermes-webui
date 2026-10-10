@@ -1,0 +1,155 @@
+/* Memory explorer and Who viewed my memories (A13, plan addendum 6.6). Calm Console tokens only. */
+
+.memdash {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  min-width: 0;
+}
+
+.memdash-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.memdash-toolbar-spacer { flex: 1 1 auto; }
+.memdash-picker-label { font-size: 12px; color: var(--muted); }
+.memdash-picker,
+.memdash-picker-search,
+.memdash-reason-select,
+.memdash-reason-text {
+  min-width: 0;
+  max-width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--input-bg, var(--surface));
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+.memdash-picker { flex: 1 1 260px; }
+.memdash-picker-search { flex: 0 1 200px; }
+
+.memdash-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.memdash-btn:hover { background: var(--hover-bg, var(--surface)); }
+.memdash-btn:focus-visible,
+.memdash-licences:focus-visible { outline: 2px solid var(--focus-ring, var(--accent)); outline-offset: 2px; }
+.memdash-btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text, #fff); }
+.memdash-btn-primary:hover { background: var(--accent-hover, var(--accent)); }
+.memdash-licences { font-size: 12px; color: var(--muted); }
+
+.memdash-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--warning, var(--accent));
+  border-radius: 10px;
+  background: var(--accent-bg, var(--surface));
+  color: var(--text);
+  font-size: 13px;
+}
+.memdash-banner-text { flex: 1 1 240px; min-width: 0; }
+
+.memdash-note { margin: 0; font-size: 12px; color: var(--muted); }
+
+.memdash-frame-box {
+  position: relative;
+  width: 100%;
+  height: max(520px, calc(100vh - 260px));
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--bg);
+}
+.memdash-frame-box.memdash-is-fullscreen { height: 100vh; border-radius: 0; border: 0; }
+.memdash-frame { display: block; width: 100%; height: 100%; border: 0; }
+
+.memdash-message {
+  padding: 16px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.memdash-notice {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.memdash-notice-title { margin: 0 0 6px; font-size: 15px; font-weight: 600; }
+.memdash-notice-body { margin: 0 0 12px; font-size: 13px; line-height: 1.55; color: var(--text); max-width: 72ch; }
+.memdash-notice-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.memdash-sessions { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.memdash-session {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  font-size: 13px;
+}
+.memdash-session.is-new { border-left: 3px solid var(--accent); }
+.memdash-session-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+.memdash-session-title { font-weight: 600; }
+.memdash-role {
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.memdash-session-meta { color: var(--muted); font-size: 12px; }
+
+.memdash-unseen {
+  margin-left: auto;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-text, #fff);
+  font-size: 11px;
+  line-height: 18px;
+}
+
+.memdash-dialog {
+  width: min(460px, calc(100vw - 32px));
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+}
+.memdash-dialog::backdrop { background: rgba(0, 0, 0, .45); }
+.memdash-dialog-body { display: flex; flex-direction: column; gap: 10px; padding: 18px; }
+.memdash-dialog-title { margin: 0; font-size: 16px; font-weight: 600; }
+.memdash-dialog-text { margin: 0; font-size: 13px; line-height: 1.55; }
+.memdash-reason-label { font-size: 12px; color: var(--muted); }
+.memdash-dialog-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+
+@media (max-width: 640px) {
+  .memdash-frame-box { height: max(460px, calc(100vh - 220px)); }
+  .memdash-picker, .memdash-picker-search { flex: 1 1 100%; }
+  .memdash-toolbar-spacer { display: none; }
+}

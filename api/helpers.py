@@ -262,14 +262,26 @@ def j(handler, payload, status: int=200, extra_headers: dict=None, *, pretty: bo
     _safe_write(handler, body)
 
 
-def t(handler, payload, status: int=200, content_type: str='text/plain; charset=utf-8') -> None:
+def flush_pending_auth_cookies(handler) -> None:
+    pending = getattr(handler, "_pending_set_cookies", None)
+    if pending:
+        handler._pending_set_cookies = []
+        for cookie in pending:
+            handler.send_header("Set-Cookie", cookie)
+
+
+def t(handler, payload, status: int=200, content_type: str='text/plain; charset=utf-8', extra_headers: dict=None) -> None:
     """Send a plain text or HTML response."""
     body = payload if isinstance(payload, bytes) else str(payload).encode('utf-8')
     handler.send_response(status)
     handler.send_header('Content-Type', content_type)
     handler.send_header('Content-Length', str(len(body)))
     handler.send_header('Cache-Control', 'no-store')
+    flush_pending_auth_cookies(handler)
     _security_headers(handler)
+    if extra_headers:
+        for key, value in extra_headers.items():
+            handler.send_header(key, value)
     _safe_write(handler, body)
 
 

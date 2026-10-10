@@ -1,0 +1,67 @@
+[
+  {
+    "type": "RUN_STARTED",
+    "threadId": "sess_fixture_error",
+    "runId": "run_fixture_error",
+    "protocolVersion": "1.0",
+    "timestamp": 1790000000250
+  },
+  {
+    "type": "TEXT_MESSAGE_START",
+    "messageId": "run_fixture_error:text:1",
+    "role": "assistant",
+    "timestamp": 1790000000250
+  },
+  {
+    "type": "TEXT_MESSAGE_CONTENT",
+    "messageId": "run_fixture_error:text:1",
+    "delta": "Let me look that up.",
+    "timestamp": 1790000000250
+  },
+  {
+    "type": "TEXT_MESSAGE_END",
+    "messageId": "run_fixture_error:text:1",
+    "timestamp": 1790000000500
+  },
+  {
+    "type": "TOOL_CALL_START",
+    "toolCallId": "call_err_1",
+    "toolCallName": "web_search",
+    "parentMessageId": "run_fixture_error:text:1",
+    "timestamp": 1790000000500
+  },
+  {
+    "type": "TOOL_CALL_ARGS",
+    "toolCallId": "call_err_1",
+    "delta": "{\"query\":\"q\"}",
+    "timestamp": 1790000000500
+  },
+  {
+    "type": "TOOL_CALL_END",
+    "toolCallId": "call_err_1",
+    "timestamp": 1790000000500
+  },
+  {
+    "type": "REASONING_START",
+    "messageId": "run_fixture_error:reasoning:1",
+    "timestamp": 1790000000750
+  },
+  {
+    "type": "REASONING_MESSAGE_START",
+    "messageId": "run_fixture_error:reasoning:1:message",
+    "role": "reasoning",
+    "timestamp": 1790000000750
+  },
+  {
+    "type": "REASONING_MESSAGE_CONTENT",
+    "messageId": "run_fixture_error:reasoning:1:message",
+    "delta": "The search is slow.",
+    "timestamp": 1790000000750
+  },
+  {
+    "type": "RUN_ERROR",
+    "message": "The provider rejected the request: rate limit reached.",
+    "code": "rate_limit",
+    "timestamp": 1790000001000
+  }
+]

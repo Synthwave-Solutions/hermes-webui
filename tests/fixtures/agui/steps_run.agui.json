@@ -1,0 +1,333 @@
+[
+  {
+    "type": "RUN_STARTED",
+    "threadId": "sess_fixture_steps",
+    "runId": "run_fixture_steps",
+    "protocolVersion": "1.0",
+    "timestamp": 1790000000250
+  },
+  {
+    "type": "STEP_STARTED",
+    "stepName": "preparation",
+    "timestamp": 1790000000250
+  },
+  {
+    "type": "STEP_FINISHED",
+    "stepName": "preparation",
+    "timestamp": 1790000000500
+  },
+  {
+    "type": "STEP_STARTED",
+    "stepName": "checkpoint",
+    "timestamp": 1790000000750
+  },
+  {
+    "type": "STEP_FINISHED",
+    "stepName": "checkpoint",
+    "timestamp": 1790000000750
+  },
+  {
+    "type": "STEP_STARTED",
+    "stepName": "agent_run",
+    "timestamp": 1790000001000
+  },
+  {
+    "type": "REASONING_START",
+    "messageId": "run_fixture_steps:reasoning:1",
+    "timestamp": 1790000002000
+  },
+  {
+    "type": "REASONING_MESSAGE_START",
+    "messageId": "run_fixture_steps:reasoning:1:message",
+    "role": "reasoning",
+    "timestamp": 1790000002000
+  },
+  {
+    "type": "REASONING_MESSAGE_CONTENT",
+    "messageId": "run_fixture_steps:reasoning:1:message",
+    "delta": "Start with the logs.",
+    "timestamp": 1790000002000
+  },
+  {
+    "type": "REASONING_MESSAGE_END",
+    "messageId": "run_fixture_steps:reasoning:1:message",
+    "timestamp": 1790000002250
+  },
+  {
+    "type": "REASONING_END",
+    "messageId": "run_fixture_steps:reasoning:1",
+    "timestamp": 1790000002250
+  },
+  {
+    "type": "TEXT_MESSAGE_START",
+    "messageId": "run_fixture_steps:text:1",
+    "role": "assistant",
+    "timestamp": 1790000002250
+  },
+  {
+    "type": "TEXT_MESSAGE_CONTENT",
+    "messageId": "run_fixture_steps:text:1",
+    "delta": "I'll look at the logs first.",
+    "timestamp": 1790000002250
+  },
+  {
+    "type": "TEXT_MESSAGE_END",
+    "messageId": "run_fixture_steps:text:1",
+    "timestamp": 1790000002250
+  },
+  {
+    "type": "TEXT_MESSAGE_START",
+    "messageId": "run_fixture_steps:text:2",
+    "role": "assistant",
+    "timestamp": 1790000002500
+  },
+  {
+    "type": "TEXT_MESSAGE_CONTENT",
+    "messageId": "run_fixture_steps:text:2",
+    "delta": "Checking.",
+    "timestamp": 1790000002500
+  },
+  {
+    "type": "TEXT_MESSAGE_END",
+    "messageId": "run_fixture_steps:text:2",
+    "timestamp": 1790000002750
+  },
+  {
+    "type": "STEP_STARTED",
+    "stepName": "compress",
+    "timestamp": 1790000003000
+  },
+  {
+    "type": "STEP_FINISHED",
+    "stepName": "compress",
+    "timestamp": 1790000003250
+  },
+  {
+    "type": "STATE_SNAPSHOT",
+    "snapshot": {
+      "usage": {
+        "inputTokens": 900,
+        "outputTokens": 10,
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 0,
+        "contextLength": 200000,
+        "thresholdTokens": 160000,
+        "lastPromptTokens": 900,
+        "postCompressionContextTokensEstimate": 5000,
+        "costStatus": "unknown"
+      }
+    },
+    "timestamp": 1790000003250
+  },
+  {
+    "type": "STEP_STARTED",
+    "stepName": "compress",
+    "timestamp": 1790000003500
+  },
+  {
+    "type": "STEP_FINISHED",
+    "stepName": "compress",
+    "timestamp": 1790000003500
+  },
+  {
+    "type": "TOOL_CALL_START",
+    "toolCallId": "t15",
+    "toolCallName": "search_files",
+    "parentMessageId": "run_fixture_steps:text:2",
+    "timestamp": 1790000003750
+  },
+  {
+    "type": "TOOL_CALL_ARGS",
+    "toolCallId": "t15",
+    "delta": "{\"pattern\":\"a\"}",
+    "timestamp": 1790000003750
+  },
+  {
+    "type": "TOOL_CALL_END",
+    "toolCallId": "t15",
+    "timestamp": 1790000003750
+  },
+  {
+    "type": "TOOL_CALL_START",
+    "toolCallId": "t16",
+    "toolCallName": "search_files",
+    "parentMessageId": "run_fixture_steps:text:2",
+    "timestamp": 1790000004000
+  },
+  {
+    "type": "TOOL_CALL_ARGS",
+    "toolCallId": "t16",
+    "delta": "{\"pattern\":\"b\"}",
+    "timestamp": 1790000004000
+  },
+  {
+    "type": "TOOL_CALL_END",
+    "toolCallId": "t16",
+    "timestamp": 1790000004000
+  },
+  {
+    "type": "TOOL_CALL_RESULT",
+    "messageId": "run_fixture_steps:tool-result:t16",
+    "toolCallId": "t16",
+    "content": "2 hits",
+    "role": "tool",
+    "timestamp": 1790000004250
+  },
+  {
+    "type": "CUSTOM",
+    "name": "synthpulse.tool_timing",
+    "value": {
+      "toolCallId": "t16",
+      "durationMs": 200,
+      "isError": false
+    },
+    "timestamp": 1790000004250
+  },
+  {
+    "type": "TOOL_CALL_RESULT",
+    "messageId": "run_fixture_steps:tool-result:t15",
+    "toolCallId": "t15",
+    "content": "no hits",
+    "role": "tool",
+    "timestamp": 1790000004500
+  },
+  {
+    "type": "CUSTOM",
+    "name": "synthpulse.tool_timing",
+    "value": {
+      "toolCallId": "t15",
+      "durationMs": 750,
+      "isError": true
+    },
+    "timestamp": 1790000004500
+  },
+  {
+    "type": "TOOL_CALL_START",
+    "toolCallId": "call_orphan",
+    "toolCallName": "fetch",
+    "timestamp": 1790000004750
+  },
+  {
+    "type": "TOOL_CALL_ARGS",
+    "toolCallId": "call_orphan",
+    "delta": "{}",
+    "timestamp": 1790000004750
+  },
+  {
+    "type": "TOOL_CALL_END",
+    "toolCallId": "call_orphan",
+    "timestamp": 1790000004750
+  },
+  {
+    "type": "TOOL_CALL_RESULT",
+    "messageId": "run_fixture_steps:tool-result:call_orphan",
+    "toolCallId": "call_orphan",
+    "content": "orphan result",
+    "role": "tool",
+    "timestamp": 1790000004750
+  },
+  {
+    "type": "CUSTOM",
+    "name": "synthpulse.tool_timing",
+    "value": {
+      "toolCallId": "call_orphan",
+      "isError": false
+    },
+    "timestamp": 1790000004750
+  },
+  {
+    "type": "STATE_DELTA",
+    "delta": [
+      {
+        "op": "replace",
+        "path": "/usage/inputTokens",
+        "value": 1500
+      },
+      {
+        "op": "replace",
+        "path": "/usage/outputTokens",
+        "value": 45
+      },
+      {
+        "op": "replace",
+        "path": "/usage/cacheReadTokens",
+        "value": 800
+      },
+      {
+        "op": "replace",
+        "path": "/usage/lastPromptTokens",
+        "value": 1500
+      },
+      {
+        "op": "replace",
+        "path": "/usage/costStatus",
+        "value": "estimated"
+      },
+      {
+        "op": "add",
+        "path": "/usage/estimatedCost",
+        "value": 0.0042
+      },
+      {
+        "op": "add",
+        "path": "/usage/cacheHitPercent",
+        "value": 33.3
+      },
+      {
+        "op": "add",
+        "path": "/usage/turnCacheHitPercent",
+        "value": 33.3
+      },
+      {
+        "op": "add",
+        "path": "/usage/durationSeconds",
+        "value": 4.2
+      },
+      {
+        "op": "add",
+        "path": "/usage/tps",
+        "value": 38.5
+      }
+    ],
+    "timestamp": 1790000005000
+  },
+  {
+    "type": "MESSAGES_SNAPSHOT",
+    "messages": [
+      {
+        "id": "sess_fixture_steps:message:0",
+        "role": "user",
+        "content": "Find the error."
+      },
+      {
+        "id": "sess_fixture_steps:message:1",
+        "role": "assistant",
+        "content": "I stopped at the tool limit."
+      }
+    ],
+    "timestamp": 1790000005000
+  },
+  {
+    "type": "CUSTOM",
+    "name": "synthpulse.terminal_state",
+    "value": {
+      "state": "tool_limit_reached",
+      "reason": "max_iterations"
+    },
+    "timestamp": 1790000005000
+  },
+  {
+    "type": "STEP_FINISHED",
+    "stepName": "agent_run",
+    "timestamp": 1790000005250
+  },
+  {
+    "type": "RUN_FINISHED",
+    "threadId": "sess_fixture_steps",
+    "runId": "run_fixture_steps",
+    "outcome": {
+      "type": "cancelled"
+    },
+    "timestamp": 1790000005250
+  }
+]

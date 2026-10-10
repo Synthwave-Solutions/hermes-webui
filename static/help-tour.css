@@ -1,0 +1,122 @@
+/* Guided tours, Explain this page and What's new (plan 6.1, W4).
+   Guida's own classes (.guida-*) are mapped onto the app tokens here. Every
+   rule pairs a Guida class with one of our custom classes so it outranks the
+   style block Guida injects at run time. Colours come from tokens only, so
+   dark mode (:root.dark) and every skin (:root[data-skin]) follow on their
+   own; the few values without a token are set per theme below.
+   Layers: page cards 1050, app dialogs 1100, help popover 1150, pickers 1300,
+   tour overlay 1400 to 1402, image lightbox 9999. The toast (100) never
+   shows while a tour runs: the completion toast comes after cleanup. */
+
+/* ── Title bar button ───────────────────────────────────────────────────── */
+.app-titlebar-help{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;flex-shrink:0;background:none;border:none;color:var(--muted);border-radius:8px;cursor:pointer;padding:0;-webkit-app-region:no-drag;-webkit-tap-highlight-color:transparent;transition:background-color .15s,color .15s;}
+.app-titlebar-help:hover{background:var(--hover-bg);color:var(--text);}
+.app-titlebar-help:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
+.app-titlebar-help[aria-expanded="true"]{background:var(--accent-bg);color:var(--accent-text);}
+.app-titlebar-help svg{display:block;flex:0 0 auto;}
+@media (max-width:640px){.app-titlebar-help{width:44px;height:44px;line-height:1;overflow:hidden;}}
+
+/* ── Settings > Help cards ──────────────────────────────────────────────── */
+.help-card-actions{display:flex;flex-wrap:wrap;gap:8px;}
+button.help-card-link{font:inherit;font-size:12px;font-weight:600;line-height:1.2;cursor:pointer;}
+button.help-card-link:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+.help-card-link[hidden]{display:none;}
+
+/* ── Guida overlay, spotlight and ring ──────────────────────────────────── */
+.guida-overlay.sp-help-overlay{z-index:1400;}
+/* The spotlight is drawn by Guida's SVG mask; the backdrop itself stays
+   clear so the highlighted control is never dimmed or blurred. */
+.guida-backdrop.sp-help-backdrop{background-color:transparent!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}
+.guida-backdrop.sp-help-backdrop > svg > rect{fill:rgba(8,15,28,.46);}
+:root.dark .guida-backdrop.sp-help-backdrop > svg > rect{fill:rgba(0,0,0,.62);}
+.guida-highlight.sp-help-highlight{z-index:1401;transition:none;}
+.guida-highlight.sp-help-highlight::before{border:2px solid var(--accent);border-radius:12px;box-shadow:0 0 0 4px var(--accent-bg-strong,rgba(51,177,255,.25));animation:sp-help-pulse 2.2s ease-in-out infinite;}
+@keyframes sp-help-pulse{0%,100%{box-shadow:0 0 0 3px var(--accent-bg-strong,rgba(51,177,255,.22));}50%{box-shadow:0 0 0 6px var(--accent-bg,rgba(51,177,255,.12));}}
+
+/* ── Tour step card ─────────────────────────────────────────────────────── */
+/* 320px matches the width Guida uses to keep the card on screen. */
+.guida-tooltip.sp-help-tooltip{z-index:1402;width:min(320px,calc(100vw - 24px))!important;max-width:calc(100vw - 24px);min-width:0;background:var(--surface);color:var(--text);border:1px solid var(--border2);border-radius:var(--sp-radius-lg,14px);box-shadow:var(--sp-shadow-md,0 12px 32px rgba(0,0,0,.18));font-family:var(--font-ui,inherit);}
+.sp-help-tooltip .guida-tooltip-content{padding:16px 16px 14px;}
+.sp-help-tooltip .guida-header{flex-direction:row;align-items:center;gap:10px;margin-bottom:8px;}
+.sp-help-tooltip .guida-header h3{color:var(--text);font-size:14.5px;font-weight:650;line-height:1.3;}
+.sp-help-tooltip .guida-progress{background:var(--accent-bg);color:var(--accent-text);border:1px solid var(--accent-bg-strong,var(--border2));font-size:11px;font-weight:600;}
+.sp-help-tooltip .guida-tooltip-content p{color:var(--muted);font-size:13px;line-height:1.5;margin:0 0 14px;}
+.sp-help-tooltip .guida-actions{flex-direction:column;}
+.sp-help-tooltip .guida-controls{display:flex;flex-wrap:nowrap;align-items:center;justify-content:flex-end;gap:8px;}
+.sp-help-tooltip .guida-btn{width:auto;min-width:0;height:32px;padding:0 12px;border-radius:var(--sp-radius-sm,8px);font:inherit;font-size:12.5px;font-weight:600;transition:background-color .15s,border-color .15s,color .15s;}
+.sp-help-tooltip .guida-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+.sp-help-tooltip .guida-close{order:-1;margin-right:auto;background:transparent;color:var(--muted);border:1px solid transparent;}
+.sp-help-tooltip .guida-close:hover{background:var(--hover-bg);color:var(--text);border-color:transparent;}
+.sp-help-tooltip .guida-btn-secondary{background:var(--input-bg);color:var(--text);border:1px solid var(--border2);}
+.sp-help-tooltip .guida-btn-secondary:hover{background:var(--hover-bg);border-color:var(--border2);}
+.sp-help-tooltip .guida-next{background:var(--accent);color:var(--sp-on-accent,#fff);border:1px solid var(--accent);}
+.sp-help-tooltip .guida-next:hover{background:var(--accent);filter:brightness(1.06);}
+.sp-help-tooltip .guida-arrow-top{border-top-color:var(--surface);}
+.sp-help-tooltip .guida-arrow-bottom{border-bottom-color:var(--surface);}
+.sp-help-tooltip .guida-arrow-left{border-left-color:var(--surface);}
+.sp-help-tooltip .guida-arrow-right{border-right-color:var(--surface);}
+/* Completion is a normal WebUI toast; Guida's emoji card never shows. */
+.sp-help-tooltip .guida-completion,.guida-tooltip .guida-completion{display:none!important;}
+.sp-help-tooltip .sp-help-feedback{margin-top:12px;padding:10px 0 0;}
+
+/* ── Explain this page popover (fallback and text-only pages) ───────────── */
+.sp-help-popover{position:fixed;z-index:1150;width:min(380px,calc(100vw - 16px));display:flex;flex-direction:column;background:var(--surface);color:var(--text);border:1px solid var(--border2);border-radius:var(--sp-radius-lg,14px);box-shadow:var(--sp-shadow-md,0 12px 32px rgba(0,0,0,.18));overflow:hidden;font-family:var(--font-ui,inherit);animation:sp-help-in .16s var(--sp-ease,ease-out);}
+.sp-help-popover.is-narrow{width:auto;}
+.sp-help-popover:focus{outline:none;}
+.sp-help-popover:focus-visible{box-shadow:var(--sp-shadow-md,0 12px 32px rgba(0,0,0,.18)),0 0 0 2px var(--accent);}
+.sp-help-popover-head{display:flex;align-items:flex-start;gap:10px;padding:14px 10px 8px 16px;}
+.sp-help-popover-titles{flex:1;min-width:0;}
+.sp-help-popover-eyebrow{font-size:11px;font-weight:600;letter-spacing:.02em;color:var(--muted);margin-bottom:2px;}
+.sp-help-popover-title{margin:0;font-size:15px;font-weight:650;line-height:1.3;color:var(--text);}
+.sp-help-popover-close{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;flex:0 0 auto;border:none;border-radius:8px;background:none;color:var(--muted);cursor:pointer;padding:0;}
+.sp-help-popover-close:hover{background:var(--hover-bg);color:var(--text);}
+.sp-help-popover-close:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
+.sp-help-popover-body{flex:1;min-height:0;overflow-y:auto;padding:0 16px 10px;}
+.sp-help-popover-summary{margin:0 0 12px;font-size:13px;line-height:1.5;color:var(--text);}
+.sp-help-popover-subhead{margin:12px 0 6px;font-size:11.5px;font-weight:650;letter-spacing:.02em;color:var(--muted);}
+.sp-help-popover-sections{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px;}
+ol.sp-help-popover-sections{list-style:decimal;padding-left:18px;}
+.sp-help-popover-section-title{font-size:13px;font-weight:600;color:var(--text);}
+.sp-help-popover-section-body{margin:2px 0 0;font-size:12.5px;line-height:1.5;color:var(--muted);}
+.sp-help-popover-related{display:flex;flex-wrap:wrap;gap:6px;}
+.sp-help-chip{font:inherit;font-size:12px;font-weight:500;padding:4px 10px;border-radius:999px;border:1px solid var(--border2);background:var(--input-bg);color:var(--text);cursor:pointer;}
+.sp-help-chip:hover{border-color:var(--accent);background:var(--hover-bg);}
+.sp-help-chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+.sp-help-feedback{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;padding:10px 16px 14px;border-top:1px solid var(--border);}
+.sp-help-link{font:inherit;font-size:12px;font-weight:600;background:none;border:none;padding:4px 0;color:var(--accent-text);cursor:pointer;text-decoration:underline;text-underline-offset:2px;}
+.sp-help-link:hover{color:var(--text);}
+.sp-help-link:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px;}
+.sp-help-link[hidden]{display:none;}
+.sp-help-feedback-thanks{font-size:12px;color:var(--muted);}
+.sp-help-feedback-thanks:empty{display:none;}
+
+/* ── What's new and the tour offer ──────────────────────────────────────── */
+.sp-help-card{position:fixed;z-index:1050;right:16px;top:64px;bottom:auto;width:min(360px,calc(100vw - 32px));padding:14px 16px;background:var(--surface);color:var(--text);border:1px solid var(--border2);border-radius:var(--sp-radius-lg,14px);box-shadow:var(--sp-shadow-md,0 12px 32px rgba(0,0,0,.18));font-family:var(--font-ui,inherit);animation:sp-help-in .2s var(--sp-ease,ease-out);}
+.sp-help-card-title{margin:0 0 8px;font-size:14px;font-weight:650;line-height:1.3;color:var(--text);}
+.sp-help-card-list{list-style:none;margin:0 0 12px;padding:0;display:flex;flex-direction:column;gap:8px;}
+.sp-help-card-item-title{font-size:13px;font-weight:600;color:var(--text);}
+.sp-help-card-item-body{margin:2px 0 0;font-size:12.5px;line-height:1.5;color:var(--muted);}
+.sp-help-card-text{margin:0 0 12px;font-size:13px;line-height:1.5;color:var(--muted);}
+.sp-help-card-actions{display:flex;justify-content:flex-end;gap:8px;}
+.sp-help-btn{font:inherit;font-size:12.5px;font-weight:600;height:32px;padding:0 12px;border-radius:var(--sp-radius-sm,8px);border:1px solid var(--border2);background:var(--input-bg);color:var(--text);cursor:pointer;}
+.sp-help-btn:hover{background:var(--hover-bg);}
+.sp-help-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+.sp-help-btn-primary{background:var(--accent);border-color:var(--accent);color:var(--sp-on-accent,#fff);}
+.sp-help-btn-primary:hover{background:var(--accent);filter:brightness(1.06);}
+@media (max-width:640px){
+  .sp-help-card{left:8px;right:8px;top:calc(56px + env(safe-area-inset-top,0px));bottom:auto;width:auto;}
+  .sp-help-tooltip .guida-btn,.sp-help-btn{height:40px;}
+}
+
+@keyframes sp-help-in{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:none;}}
+
+/* High contrast and reduced motion. */
+@media (prefers-contrast: more){
+  .guida-highlight.sp-help-highlight::before{border-width:3px;}
+  .guida-tooltip.sp-help-tooltip,.sp-help-popover,.sp-help-card{border-width:2px;}
+}
+@media (prefers-reduced-motion: reduce){
+  .guida-tooltip.sp-help-tooltip,.guida-backdrop.sp-help-backdrop,.guida-highlight.sp-help-highlight,.sp-help-tooltip .guida-btn{transition:none!important;}
+  .guida-highlight.sp-help-highlight::before{animation:none!important;}
+  .sp-help-popover,.sp-help-card{animation:none!important;}
+}

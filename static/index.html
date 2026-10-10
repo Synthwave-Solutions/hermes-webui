@@ -73,6 +73,8 @@
 <link rel="stylesheet" href="static/style.css?v=__WEBUI_VERSION__">
 <link rel="stylesheet" href="static/personal-memories.css?v=__WEBUI_VERSION__">
 <link rel="stylesheet" href="static/chat-bots.css?v=__WEBUI_VERSION__">
+<link rel="stylesheet" href="static/group-routing.css?v=__WEBUI_VERSION__">
+<link rel="stylesheet" href="static/help-tour.css?v=__WEBUI_VERSION__">
 <link rel="stylesheet" href="static/bot-builder.css?v=__WEBUI_VERSION__">
 
   <!-- KaTeX math rendering CSS (loaded eagerly from vendored assets to prevent font CSP noise) -->
@@ -115,12 +117,12 @@
 <body>
 <header class="app-titlebar" role="banner">
   <div class="app-titlebar-left">
-    <button class="app-titlebar-profile has-tooltip has-tooltip--bottom" data-tooltip="Switch bot" id="titlebarProfileBtn" type="button" onclick="toggleProfileDropdown(event)" aria-label="Switch bot" style="display:none">
+    <button class="app-titlebar-profile has-tooltip has-tooltip--bottom" data-tooltip="Switch bot" id="titlebarProfileBtn" type="button" onclick="toggleProfileDropdown(event)" aria-label="Switch bot" style="display:none" data-tour="profile-switch">
       <span class="app-titlebar-profile-icon" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
       <span class="app-titlebar-profile-label" id="titlebarProfileLabel">default</span>
       <span class="app-titlebar-profile-chevron" aria-hidden="true"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
     </button>
-    <button class="app-titlebar-hamburger has-tooltip has-tooltip--bottom" id="btnHamburger" onclick="toggleMobileSidebar()" type="button" data-tooltip="Menu" aria-label="Menu">
+    <button class="app-titlebar-hamburger has-tooltip has-tooltip--bottom" id="btnHamburger" onclick="toggleMobileSidebar()" type="button" data-tooltip="Menu" aria-label="Menu" data-tour="menu-button">
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
   </button>
   </div>
@@ -140,6 +142,13 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="16" height="16">
       <rect x="3" y="4" width="18" height="16" rx="2"/>
       <line x1="12" y1="4" x2="12" y2="20"/>
+    </svg>
+  </button>
+  <button class="app-titlebar-help has-tooltip has-tooltip--bottom-right" data-tooltip="Explain what you can do on this page" id="btnPageHelp" type="button" aria-label="Explain this page" aria-haspopup="dialog" data-i18n-title="help_page_button_title" data-i18n-aria-label="help_page_button" data-tour="help-button">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="16" height="16">
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+      <line x1="12" y1="17" x2="12.01" y2="17"/>
     </svg>
   </button>
   <button class="app-titlebar-reload has-tooltip has-tooltip--bottom-right" data-tooltip="Reload page" id="btnReload" onclick="window.location.reload()" type="button" aria-label="Reload" data-i18n-title="reload_page">
@@ -203,13 +212,13 @@
       <div class="panel-head">
         <span data-i18n="tab_chat">Chat</span>
         <div class="panel-head-actions">
-          <button class="panel-head-btn has-tooltip has-tooltip--bottom-right" id="btnNewChat" data-tooltip="New conversation (Cmd+K)" data-i18n-title="new_conversation" aria-label="New conversation">
+          <button class="panel-head-btn has-tooltip has-tooltip--bottom-right" id="btnNewChat" data-tooltip="New conversation (Cmd+K)" data-i18n-title="new_conversation" aria-label="New conversation" data-tour="chat-new">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           </button>
         </div>
       </div>
-      <div class="session-search sidebar-search"><div class="session-search-field"><svg class="sidebar-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg><input id="sessionSearch" type="search" placeholder="Filter conversations..." data-i18n-placeholder="filter_conversations" oninput="filterSessions()" autocomplete="off" data-1p-ignore data-lpignore="true" data-bwignore="true" data-form-type="other"><button type="button" id="sessionSearchClear" class="session-search-clear has-tooltip has-tooltip--bottom-right" aria-label="Clear conversation filter" data-tooltip="Clear conversation filter" onclick="clearSessionSearch()" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div></div>
-      <div class="session-list" id="sessionList"></div>
+      <div class="session-search sidebar-search"><div class="session-search-field"><svg class="sidebar-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg><input id="sessionSearch" type="search" placeholder="Filter conversations..." data-i18n-placeholder="filter_conversations" oninput="filterSessions()" autocomplete="off" data-1p-ignore data-lpignore="true" data-bwignore="true" data-form-type="other" data-tour="chat-search"><button type="button" id="sessionSearchClear" class="session-search-clear has-tooltip has-tooltip--bottom-right" aria-label="Clear conversation filter" data-tooltip="Clear conversation filter" onclick="clearSessionSearch()" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div></div>
+      <div class="session-list" id="sessionList" data-tour="chat-list"></div>
     </div>
     <!-- Tasks (cron) panel -->
     <div class="panel-view" id="panelTasks">
@@ -217,22 +226,22 @@
         <span data-i18n="scheduled_jobs">Scheduled jobs</span>
         <div class="panel-head-actions">
           <button class="panel-head-btn has-tooltip has-tooltip--bottom" id="cronRefreshBtn" onclick="loadCrons(true)" data-tooltip="Refresh job list" aria-label="Refresh job list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
-          <button class="panel-head-btn has-tooltip has-tooltip--bottom" onclick="openCronCreate()" data-tooltip="New job" data-i18n-title="new_job" aria-label="New job"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+          <button class="panel-head-btn has-tooltip has-tooltip--bottom" onclick="openCronCreate()" data-tooltip="New job" data-i18n-title="new_job" aria-label="New job" data-tour="tasks-new"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
         </div>
       </div>
       <div id="cronGatewayNotice" class="detail-alert cron-gateway-notice" style="display:none"></div>
-      <div class="cron-list" id="cronList"><div style="padding:12px;color:var(--muted);font-size:12px" data-i18n="loading">Loading...</div></div>
+      <div class="cron-list" id="cronList" data-tour="tasks-list"><div style="padding:12px;color:var(--muted);font-size:12px" data-i18n="loading">Loading...</div></div>
     </div>
     <!-- Kanban panel -->
     <div class="panel-view" id="panelKanban">
       <div class="panel-head">
         <span data-i18n="tab_kanban">Kanban</span>
         <div class="panel-head-actions">
-          <button class="panel-head-btn has-tooltip has-tooltip--bottom" id="kanbanNewTaskBtn" onclick="openKanbanCreate()" data-tooltip="New task" data-i18n-title="kanban_new_task" aria-label="New task"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+          <button class="panel-head-btn has-tooltip has-tooltip--bottom" id="kanbanNewTaskBtn" onclick="openKanbanCreate()" data-tooltip="New task" data-i18n-title="kanban_new_task" aria-label="New task" data-tour="kanban-new"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
           <button class="panel-head-btn has-tooltip has-tooltip--bottom" id="kanbanRefreshBtn" onclick="loadKanban(true)" data-tooltip="Refresh" data-i18n-title="kanban_refresh" aria-label="Refresh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
         </div>
       </div>
-      <div class="kanban-filter-stack">
+      <div class="kanban-filter-stack" data-tour="kanban-filters">
         <div class="sidebar-search"><svg class="sidebar-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg><input id="kanbanSearch" type="search" placeholder="Search tasks" data-i18n-placeholder="kanban_search_tasks" oninput="filterKanban()" autocomplete="off" data-1p-ignore data-lpignore="true" data-bwignore="true" data-form-type="other"></div>
         <select id="kanbanAssigneeFilter" onchange="loadKanban(true)" aria-label="Assignee filter"></select>
         <select id="kanbanTenantFilter" onchange="loadKanban(true)" aria-label="Tenant filter"></select>
@@ -251,32 +260,32 @@
         </div>
       </div>
       <div class="kanban-summary" id="kanbanSummary"></div>
-      <div class="kanban-list" id="kanbanList"><div style="padding:12px;color:var(--muted);font-size:12px" data-i18n="loading">Loading...</div></div>
+      <div class="kanban-list" id="kanbanList" data-tour="kanban-list"><div style="padding:12px;color:var(--muted);font-size:12px" data-i18n="loading">Loading...</div></div>
     </div>
     <!-- Skills panel -->
     <div class="panel-view" id="panelSkills">
       <div class="panel-head">
         <span data-i18n="tab_skills">Skills</span>
         <div class="panel-head-actions">
-          <button class="panel-head-btn has-tooltip has-tooltip--bottom" onclick="openSkillCreate()" data-tooltip="New skill" data-i18n-title="new_skill" aria-label="New skill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+          <button class="panel-head-btn has-tooltip has-tooltip--bottom" onclick="openSkillCreate()" data-tooltip="New skill" data-i18n-title="new_skill" aria-label="New skill" data-tour="skills-new"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
         </div>
       </div>
-      <div class="skills-search sidebar-search"><svg class="sidebar-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg><input id="skillsSearch" type="search" placeholder="Search skills..." data-i18n-placeholder="search_skills" oninput="filterSkills()" autocomplete="off" data-1p-ignore data-lpignore="true" data-bwignore="true" data-form-type="other"></div>
-      <div class="skills-list" id="skillsList"><div style="padding:12px;color:var(--muted);font-size:12px" data-i18n="loading">Loading...</div></div>
+      <div class="skills-search sidebar-search"><svg class="sidebar-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg><input id="skillsSearch" type="search" placeholder="Search skills..." data-i18n-placeholder="search_skills" oninput="filterSkills()" autocomplete="off" data-1p-ignore data-lpignore="true" data-bwignore="true" data-form-type="other" data-tour="skills-search"></div>
+      <div class="skills-list" id="skillsList" data-tour="skills-list"><div style="padding:12px;color:var(--muted);font-size:12px" data-i18n="loading">Loading...</div></div>
     </div>
     <!-- Memory panel -->
     <div class="panel-view" id="panelMemory">
       <div class="panel-head">
         <span data-i18n="personal_memory">Personal memory</span>
       </div>
-      <div class="side-menu" id="memoryPanel"><div style="padding:12px;color:var(--muted);font-size:12px" data-i18n="loading">Loading...</div></div>
+      <div class="side-menu" id="memoryPanel" data-tour="memory-sections"><div style="padding:12px;color:var(--muted);font-size:12px" data-i18n="loading">Loading...</div></div>
     </div>
     <!-- Todo panel -->
     <div class="panel-view" id="panelTodos">
       <div class="panel-head">
         <span data-i18n="current_task_list">Current task list</span>
       </div>
-      <div id="todoPanel" style="flex:1;overflow-y:auto;padding:8px 12px"></div>
+      <div id="todoPanel" style="flex:1;overflow-y:auto;padding:8px 12px" data-tour="todos-list"></div>
     </div>
     <!-- Insights panel -->
     <div class="panel-view" id="panelInsights">
@@ -287,7 +296,7 @@
         </div>
       </div>
       <div class="panel-head-sub" style="padding:0 12px 8px">
-        <select id="insightsPeriod" onchange="loadInsights()" style="width:100%;background:var(--input-bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px">
+        <select id="insightsPeriod" onchange="loadInsights()" style="width:100%;background:var(--input-bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px" data-tour="insights-period">
           <option value="7">7 days</option>
           <option value="30" selected>30 days</option>
           <option value="90">90 days</option>
@@ -304,28 +313,28 @@
         </div>
       </div>
       <div class="panel-head-sub" data-i18n="projects_desc">Everything this workstation holds about a project, in one place.</div>
-      <div style="flex:1;overflow-y:auto;padding:8px" id="projectsPanelList"><div style="color:var(--muted);font-size:12px" data-i18n="loading">Loading...</div></div>
+      <div style="flex:1;overflow-y:auto;padding:8px" id="projectsPanelList" data-tour="projects-list"><div style="color:var(--muted);font-size:12px" data-i18n="loading">Loading...</div></div>
     </div>
     <!-- Workspaces panel -->
     <div class="panel-view" id="panelWorkspaces">
       <div class="panel-head">
         <span data-i18n="tab_workspaces">Spaces</span>
         <div class="panel-head-actions">
-          <button class="panel-head-btn has-tooltip has-tooltip--bottom" onclick="openWorkspaceCreate()" data-tooltip="Add space" data-i18n-title="workspace_add_title" aria-label="Add space"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+          <button class="panel-head-btn has-tooltip has-tooltip--bottom" onclick="openWorkspaceCreate()" data-tooltip="Add space" data-i18n-title="workspace_add_title" aria-label="Add space" data-tour="spaces-add"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
         </div>
       </div>
       <div class="panel-head-sub" data-i18n="workspace_desc">Add and switch workspaces for your sessions.</div>
-      <div style="flex:1;overflow-y:auto;padding:8px" id="workspacesPanel"><div style="color:var(--muted);font-size:12px" data-i18n="loading">Loading...</div></div>
+      <div style="flex:1;overflow-y:auto;padding:8px" id="workspacesPanel" data-tour="spaces-list"><div style="color:var(--muted);font-size:12px" data-i18n="loading">Loading...</div></div>
     </div>
     <!-- Profiles panel -->
     <div class="panel-view" id="panelProfiles">
       <div class="panel-head">
         <span data-i18n="tab_profiles">Bots</span>
         <div class="panel-head-actions">
-          <button class="panel-head-btn has-tooltip has-tooltip--bottom" onclick="openProfileCreate()" data-tooltip="New bot" data-i18n-title="new_profile" aria-label="New bot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+          <button class="panel-head-btn has-tooltip has-tooltip--bottom" onclick="openProfileCreate()" data-tooltip="New bot" data-i18n-title="new_profile" aria-label="New bot" data-tour="bots-new"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
         </div>
       </div>
-      <div style="flex:1;overflow-y:auto;padding:8px" id="profilesPanel"><div style="color:var(--muted);font-size:12px" data-i18n="loading">Loading...</div></div>
+      <div style="flex:1;overflow-y:auto;padding:8px" id="profilesPanel" data-tour="bots-list"><div style="color:var(--muted);font-size:12px" data-i18n="loading">Loading...</div></div>
     </div>
     <!-- Logs panel -->
     <div class="panel-view" id="panelLogs">
@@ -335,7 +344,7 @@
           <button class="panel-head-btn has-tooltip has-tooltip--bottom" id="logsRefreshBtn" onclick="loadLogs(true)" data-tooltip="Refresh" aria-label="Refresh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
         </div>
       </div>
-      <div class="logs-control-panel">
+      <div class="logs-control-panel" data-tour="logs-controls">
         <label class="logs-control-label" for="logsFile" data-i18n="logs_file">File</label>
         <select id="logsFile" onchange="loadLogs(true)">
           <option value="agent">agent</option>
@@ -368,7 +377,7 @@
           <button class="panel-head-btn has-tooltip has-tooltip--bottom" id="governanceRefreshBtn" onclick="loadGovernance()" data-tooltip="Refresh" aria-label="Refresh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
         </div>
       </div>
-      <div class="panel-head-sub" data-i18n="governance_desc">Roles, groups, and access policy for this workstation.</div>
+      <div class="panel-head-sub" data-i18n="governance_desc" data-tour="governance-intro">Roles, groups, and access policy for this workstation.</div>
     </div>
     <!-- Integrations panel (per-user Nango connections; ownership enforced server-side) -->
     <div class="panel-view" id="panelIntegrations">
@@ -378,11 +387,11 @@
           <button class="panel-head-btn has-tooltip has-tooltip--bottom" id="integrationsRefreshBtn" onclick="loadIntegrations()" data-tooltip="Refresh" aria-label="Refresh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
         </div>
       </div>
-      <div class="panel-head-sub" data-i18n="integrations_desc">Connect third-party services to your account.</div>
+      <div class="panel-head-sub" data-i18n="integrations_desc" data-tour="connections-intro">Connect third-party services to your account.</div>
     </div>
     <div class="panel-view" id="panelApprovals">
       <div class="panel-head"><span data-i18n="tab_approvals">My approvals</span></div>
-      <div class="panel-head-sub" data-i18n="my_approvals_description">Track requests waiting for approval. Only your requests appear here.</div>
+      <div class="panel-head-sub" data-i18n="my_approvals_description" data-tour="approvals-intro">Track requests waiting for approval. Only your requests appear here.</div>
     </div>
     <!-- Settings panel (menu list; actual panes render in .main) -->
     <div class="panel-view" id="panelSettings">
@@ -398,10 +407,10 @@
           </svg>
           <input id="settingsSearch" type="search" data-i18n-placeholder="settings_search_placeholder"
             placeholder="Search settings…" oninput="filterSettings(this.value)" autocomplete="off"
-            data-1p-ignore data-lpignore="true" data-bwignore="true" data-form-type="other">
+            data-1p-ignore data-lpignore="true" data-bwignore="true" data-form-type="other" data-tour="settings-search">
           <div id="settingsSearchResults" class="settings-search-results" style="display:none"></div>
         </div>
-        <div class="settings-menu-items">
+        <div class="settings-menu-items" data-tour="settings-menu">
           <button type="button" class="side-menu-item active" data-settings-section="conversation" onclick="switchSettingsSection('conversation',{fromSidebarItem:true})">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             <span data-i18n="settings_tab_conversation">Conversation</span>
@@ -423,7 +432,7 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
             <span data-i18n="providers_tab_title">Providers</span>
           </button>
-          <button type="button" class="side-menu-item" data-settings-section="plugins" onclick="switchSettingsSection('plugins',{fromSidebarItem:true})">
+          <button type="button" class="side-menu-item" data-settings-section="plugins" onclick="switchSettingsSection('plugins',{fromSidebarItem:true})" data-tour="settings-plugins">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l3 7h7l-5.5 4.3 2.1 7L12 16.2 5.4 20.3l2.1-7L2 9h7z"/></svg>
             <span data-i18n="settings_tab_plugins">Plugins</span>
           </button>
@@ -435,7 +444,7 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="8" rx="2"/><rect x="2" y="13" width="20" height="8" rx="2"/><line x1="6" y1="7" x2="6.01" y2="7"/><line x1="6" y1="17" x2="6.01" y2="17"/></svg>
             <span data-i18n="settings_tab_system">System</span>
           </button>
-          <button type="button" class="side-menu-item" data-settings-section="help" onclick="switchSettingsSection('help',{fromSidebarItem:true})">
+          <button type="button" class="side-menu-item" data-settings-section="help" onclick="switchSettingsSection('help',{fromSidebarItem:true})" data-tour="settings-help">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
             <span data-i18n="settings_tab_help">Help</span>
           </button>
@@ -619,7 +628,7 @@
         </div>
         <div class="attach-tray" id="attachTray"></div>
         <div class="mic-status" id="micStatus" style="display:none"><span class="mic-dot"></span> <span data-i18n="voice_listening">Listening…</span></div>
-        <div id="realtimeVoiceBar" class="voice-mode-bar" hidden aria-label="Realtime voice controls">
+        <div id="realtimeVoiceBar" class="voice-mode-bar" hidden aria-label="Realtime voice controls" data-tour="realtime-voice-bar">
           <span id="realtimeVoiceStatus" role="status" aria-live="polite">Voice off</span>
           <button type="button" id="realtimeVoiceHold">Hold to talk</button>
           <button type="button" id="realtimeVoiceMic" aria-pressed="false">Unmute microphone</button>
@@ -629,22 +638,22 @@
           <div id="realtimeVoiceTranscript" class="realtime-voice-transcript" aria-label="Voice transcript" aria-live="polite" hidden></div>
           <div id="realtimeVoiceTasks" class="realtime-voice-tasks" aria-label="Voice background tasks" hidden></div>
         </div>
-        <div class="voice-mode-bar" id="voiceModeBar" style="display:none">
+        <div class="voice-mode-bar" id="voiceModeBar" style="display:none" data-tour="voice-mode-bar">
           <span class="voice-mode-indicator" id="voiceModeIndicator"></span>
           <span class="voice-mode-label" id="voiceModeLabel"></span>
         </div>
-        <textarea id="msg" rows="1" placeholder="Message SynthPulse…"></textarea>
+        <textarea id="msg" rows="1" placeholder="Message SynthPulse…" data-tour="chat-composer"></textarea>
         <div class="composer-footer">
           <div class="composer-left">
             <input type="file" id="fileInput" class="file-input-visually-hidden" multiple accept="image/*,text/*,application/pdf,application/json,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.md,.py,.js,.ts,.yaml,.yml,.toml,.csv,.sh,.txt,.log,.env,.xls,.xlsx,.doc,.docx,.zip,.tar,.gz,.tgz,.bz2,.xz">
-            <button type="button" class="icon-btn has-tooltip" id="btnAttach" data-tooltip="Attach files" data-i18n-title="composer_control_attach" data-i18n-aria-label="composer_control_attach" aria-label="Attach files">
+            <button type="button" class="icon-btn has-tooltip" id="btnAttach" data-tooltip="Attach files" data-i18n-title="composer_control_attach" data-i18n-aria-label="composer_control_attach" aria-label="Attach files" data-tour="chat-attach">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
             </button>
-            <button type="button" class="icon-btn has-tooltip" id="btnSavedPrompts" data-tooltip="Saved prompts" data-i18n-title="composer_control_saved_prompts" data-i18n-aria-label="composer_control_saved_prompts" onclick="toggleSavedPromptsPopup()" aria-haspopup="menu" aria-expanded="false" aria-controls="savedPromptsPopup" aria-label="Saved prompts">
+            <button type="button" class="icon-btn has-tooltip" id="btnSavedPrompts" data-tooltip="Saved prompts" data-i18n-title="composer_control_saved_prompts" data-i18n-aria-label="composer_control_saved_prompts" onclick="toggleSavedPromptsPopup()" aria-haspopup="menu" aria-expanded="false" aria-controls="savedPromptsPopup" aria-label="Saved prompts" data-tour="chat-saved-prompts">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
             </button>
-            <button type="button" class="icon-btn has-tooltip" id="btnRealtimeVoice" aria-label="Voice mode" aria-pressed="false" title="Voice mode" data-tooltip="Voice mode"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9v6M8 5v14M12 2v20M16 5v14M20 9v6"/></svg></button>
-            <button class="icon-btn mic-btn has-tooltip" id="btnMic" aria-label="Dictate message" data-tooltip="Dictate" data-i18n-title="voice_dictate" style="display:none">
+            <button type="button" class="icon-btn has-tooltip" id="btnRealtimeVoice" aria-label="Voice mode" aria-pressed="false" title="Voice mode" data-tooltip="Voice mode" data-tour="chat-realtime-voice"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9v6M8 5v14M12 2v20M16 5v14M20 9v6"/></svg></button>
+            <button class="icon-btn mic-btn has-tooltip" id="btnMic" aria-label="Dictate message" data-tooltip="Dictate" data-i18n-title="voice_dictate" style="display:none" data-tour="chat-dictate">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="9" y="1" width="6" height="12" rx="3"/>
                 <path d="M5 10a7 7 0 0 0 14 0"/>
@@ -652,7 +661,7 @@
                 <line x1="8" y1="23" x2="16" y2="23"/>
               </svg>
             </button>
-            <button class="icon-btn voice-mode-btn has-tooltip" id="btnVoiceMode" data-tooltip="Voice mode" data-i18n-title="voice_mode_toggle" style="display:none">
+            <button class="icon-btn voice-mode-btn has-tooltip" id="btnVoiceMode" data-tooltip="Voice mode" data-i18n-title="voice_mode_toggle" style="display:none" data-tour="chat-voice-mode">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <!-- Lucide audio-lines: signals two-way voice conversation, matches ChatGPT/Gemini convention. -->
                 <path d="M2 10v4"/>
@@ -669,7 +678,7 @@
               <span class="yolo-pill-label" data-i18n="yolo_pill_label">YOLO</span>
             </button>
             <div id="profileChipWrap" class="composer-profile-wrap">
-              <button class="composer-profile-chip profile-chip" id="profileChip" type="button" onclick="toggleProfileDropdown()" title="Switch bot">
+              <button class="composer-profile-chip profile-chip" id="profileChip" type="button" onclick="toggleProfileDropdown()" title="Switch bot" data-tour="chat-bot">
                 <span class="composer-profile-icon" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
                 <span class="composer-profile-label" id="profileChipLabel">default</span>
                 <span class="composer-profile-chevron" aria-hidden="true"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
@@ -677,7 +686,7 @@
             </div>
             <div class="composer-ws-wrap">
               <div class="composer-workspace-group ws-chip" id="composerWorkspaceGroup" role="group" aria-label="Workspace controls">
-                <button class="composer-workspace-files-btn" id="btnWorkspacePanelToggle" type="button" onclick="toggleWorkspacePanel()" title="Show workspace panel" aria-pressed="false" aria-label="Show workspace panel">
+                <button class="composer-workspace-files-btn" id="btnWorkspacePanelToggle" type="button" onclick="toggleWorkspacePanel()" title="Show workspace panel" aria-pressed="false" aria-label="Show workspace panel" data-tour="chat-workspace">
                   <span class="composer-workspace-icon" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></span>
                 </button>
                 <button class="composer-workspace-chip" id="composerWorkspaceChip" type="button" onclick="toggleComposerWsDropdown()" title="Switch workspace" aria-label="Switch workspace" aria-haspopup="true" aria-expanded="false" aria-controls="composerWsDropdown" disabled>
@@ -690,7 +699,7 @@
               <svg id="composerMobileCtxRing" viewBox="0 0 36 36" width="24" height="24" style="display:block;overflow:visible;transform:rotate(-90deg)" aria-hidden="true"><circle cx="18" cy="18" r="14" fill="none" stroke="currentColor" stroke-width="3.5" opacity="0.2"/><circle id="ctx-arc" cx="18" cy="18" r="14" fill="none" stroke="#22c55e" stroke-width="3.5" stroke-dasharray="87.96 87.96" stroke-dashoffset="87.96" stroke-linecap="round"/><text id="ctx-num" x="18" y="18" text-anchor="middle" dominant-baseline="middle" style="transform:rotate(90deg);transform-origin:18px 18px;font-size:9px;font-weight:700;fill:currentColor;stroke:none">0</text></svg>
             </button>
             <div class="composer-model-wrap">
-              <button class="composer-model-chip" id="composerModelChip" type="button" onclick="toggleModelDropdown()" title="Conversation model">
+              <button class="composer-model-chip" id="composerModelChip" type="button" onclick="toggleModelDropdown()" title="Conversation model" data-tour="chat-model">
                 <span class="composer-model-icon" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/></svg></span>
                 <span class="composer-model-label" id="composerModelLabel"></span>
                 <span class="composer-model-chevron" aria-hidden="true"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
@@ -729,7 +738,7 @@
               </button>
             </div>
             <div class="composer-people-wrap" id="composerPeopleWrap">
-              <button class="composer-people-chip" id="composerPeopleChip" type="button" onclick="openGroupPeoplePicker()" title="Who is in this conversation" data-i18n-title="group_people" aria-label="Who is in this conversation">
+              <button class="composer-people-chip" id="composerPeopleChip" type="button" onclick="openGroupPeoplePicker()" title="Who is in this conversation" data-i18n-title="group_people" aria-label="Who is in this conversation" data-tour="chat-people">
                 <span class="composer-people-icon" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
                 <span class="composer-people-label" id="composerPeopleLabel" data-i18n="group_just_me">Just me</span>
               </button>
@@ -1876,6 +1885,29 @@
               </div>
             </div>
             <div class="help-cards">
+              <div class="help-card" data-tour="help-card-tour">
+                <div class="help-card-icon" aria-hidden="true">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+                </div>
+                <div class="help-card-body">
+                  <div class="help-card-title" data-i18n="help_card_tour_title">Take the tour</div>
+                  <div class="help-card-desc" data-i18n="help_card_tour_body">A short walk through the basics.</div>
+                  <div class="help-card-actions">
+                    <button type="button" class="help-card-link" id="helpCardStartTour" data-help-action="tour" data-help-tour="first_run"><span data-i18n="help_tour_first_run">Getting started</span></button>
+                    <button type="button" class="help-card-link" id="helpCardStartOrgTour" data-help-action="tour" data-help-tour="org_admin" hidden><span data-i18n="help_tour_org_admin">Tour for organisation admins</span></button>
+                  </div>
+                </div>
+              </div>
+              <div class="help-card" data-tour="help-card-explain">
+                <div class="help-card-icon" aria-hidden="true">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                </div>
+                <div class="help-card-body">
+                  <div class="help-card-title" data-i18n="help_card_explain_title">Explain this page</div>
+                  <div class="help-card-desc" data-i18n="help_card_explain_body">See what the current page is for and how to use it.</div>
+                  <button type="button" class="help-card-link" id="helpCardExplain" data-help-action="explain"><span data-i18n="help_page_button">Explain this page</span></button>
+                </div>
+              </div>
               <div class="help-card">
                 <div class="help-card-icon" aria-hidden="true">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
@@ -1912,7 +1944,7 @@
   </button>
   <aside class="rightpanel">
     <div class="resize-handle" id="rightpanelResize"></div>
-    <div class="panel-header">
+    <div class="panel-header" data-tour="workspace-files">
       <div class="workspace-panel-title-group"><span id="workspacePanelHeading" class="workspace-panel-heading" title="Workspace">Workspace</span><span id="workspaceHiddenIndicator" class="workspace-hidden-indicator" data-i18n-title="workspace_hidden_files_visible_title" title="Hidden files are visible — click for options" hidden onclick="toggleWorkspacePrefsMenu(event)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><span data-i18n="workspace_hidden_files_visible">hidden visible</span></span></div>
       <span class="git-badge" id="gitBadge" style="display:none"></span>
       <div class="panel-actions">
@@ -1927,12 +1959,12 @@
     </div>
     <input type="file" id="workspaceFileInput" class="file-input-visually-hidden" multiple accept="image/*,text/*,.pdf,.json,.csv,.md,.py,.js,.ts,.yaml,.yml,.toml,.zip,.tar,.gz,.tgz,.bz2,.xz">
     <div class="workspace-panel-tabs" role="tablist" aria-label="Workspace panel views" data-i18n-aria-label="workspace_panel_views">
-      <button class="workspace-panel-tab active" id="workspaceFilesTab" type="button" onclick="switchWorkspacePanelTab('files')" role="tab" aria-selected="true" data-i18n="workspace_files_tab">Files</button>
+      <button class="workspace-panel-tab active" id="workspaceFilesTab" type="button" onclick="switchWorkspacePanelTab('files')" role="tab" aria-selected="true" data-i18n="workspace_files_tab" data-tour="workspace-files-tab">Files</button>
       <button class="workspace-panel-tab" id="workspaceArtifactsTab" type="button" onclick="switchWorkspacePanelTab('artifacts')" role="tab" aria-selected="false"><span data-i18n="workspace_artifacts_tab">Artifacts</span> <span id="workspaceArtifactsCount" class="workspace-artifacts-count">0</span></button>
       <button class="workspace-panel-tab" id="workspaceTodosTab" type="button" onclick="switchWorkspacePanelTab('todos')" role="tab" aria-selected="false" hidden data-i18n="tab_todos">Todos</button>
     </div>
     <div class="breadcrumb-bar" id="breadcrumbBar" style="display:none"></div>
-    <div class="file-tree" id="fileTree"></div>
+    <div class="file-tree" id="fileTree" data-tour="workspace-file-tree"></div>
     <div class="workspace-artifacts" id="workspaceArtifacts" hidden></div>
     <div class="workspace-todos" id="workspaceTodosPanel" hidden style="flex:1;overflow-y:auto;padding:8px 12px"></div>
     <div id="wsEmptyState" style="display:none;flex:1;align-items:center;justify-content:center;padding:24px 16px;text-align:center;color:var(--muted);font-size:12px;line-height:1.6"></div>
@@ -2005,6 +2037,8 @@
 <script src="static/assistant_turn_anchors.js?v=__WEBUI_VERSION__" defer></script>
 <link rel="stylesheet" href="static/skill_learning_activity.css?v=__WEBUI_VERSION__">
 <script src="static/skill_learning_activity.js?v=__WEBUI_VERSION__" defer></script>
+<link rel="stylesheet" href="static/svg_visuals.css?v=__WEBUI_VERSION__">
+<script src="static/svg_visuals.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/ui.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/workspace.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/terminal.js?v=__WEBUI_VERSION__" defer></script>
@@ -2015,6 +2049,8 @@
 <script src="static/extension_settings.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/sp-picker.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/personal-memories.js?v=__WEBUI_VERSION__" defer></script>
+<link rel="stylesheet" href="static/memory_dashboard.css?v=__WEBUI_VERSION__">
+<script src="static/memory_dashboard.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/panels.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/interaction_preferences.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/chat-bots.js?v=__WEBUI_VERSION__" defer></script>
@@ -2026,6 +2062,9 @@
 <script src="static/onboarding.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/split.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/realtime_voice.js?v=__WEBUI_VERSION__" defer></script>
+<script src="static/vendor/guida/0.2.0/guida.umd.js?v=__WEBUI_VERSION__" defer></script>
+<script src="static/help-content.js?v=__WEBUI_VERSION__" defer></script>
+<script src="static/help-tour.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/boot.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/outline.js?v=__WEBUI_VERSION__" defer></script>
 

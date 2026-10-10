@@ -1,0 +1,116 @@
+[
+  {
+    "type": "RUN_STARTED",
+    "threadId": "sess_fixture_cancel",
+    "runId": "run_fixture_cancel",
+    "protocolVersion": "1.0",
+    "timestamp": 1790000000250
+  },
+  {
+    "type": "STEP_STARTED",
+    "stepName": "agent_run",
+    "timestamp": 1790000000250
+  },
+  {
+    "type": "TEXT_MESSAGE_START",
+    "messageId": "run_fixture_cancel:text:1",
+    "role": "assistant",
+    "timestamp": 1790000000500
+  },
+  {
+    "type": "TEXT_MESSAGE_CONTENT",
+    "messageId": "run_fixture_cancel:text:1",
+    "delta": "Working on ",
+    "timestamp": 1790000000500
+  },
+  {
+    "type": "REASONING_START",
+    "messageId": "run_fixture_cancel:reasoning:1",
+    "timestamp": 1790000000750
+  },
+  {
+    "type": "REASONING_MESSAGE_START",
+    "messageId": "run_fixture_cancel:reasoning:1:message",
+    "role": "reasoning",
+    "timestamp": 1790000000750
+  },
+  {
+    "type": "REASONING_MESSAGE_CONTENT",
+    "messageId": "run_fixture_cancel:reasoning:1:message",
+    "delta": "Maybe compress first.",
+    "timestamp": 1790000000750
+  },
+  {
+    "type": "STEP_STARTED",
+    "stepName": "compress",
+    "timestamp": 1790000001000
+  },
+  {
+    "type": "SUBAGENT_STARTED",
+    "subagentRunId": "sa_c",
+    "name": "subagent",
+    "description": "Background lookup",
+    "timestamp": 1790000001250
+  },
+  {
+    "type": "ACTIVITY_SNAPSHOT",
+    "messageId": "run_fixture_cancel:subagent:sa_c",
+    "activityType": "subagent",
+    "content": {
+      "id": "sa_c",
+      "status": "running",
+      "summary": "Background lookup",
+      "taskIndex": 0,
+      "taskCount": 1,
+      "toolCount": 0
+    },
+    "timestamp": 1790000001250
+  },
+  {
+    "type": "REASONING_MESSAGE_END",
+    "messageId": "run_fixture_cancel:reasoning:1:message",
+    "timestamp": 1790000001500
+  },
+  {
+    "type": "REASONING_END",
+    "messageId": "run_fixture_cancel:reasoning:1",
+    "timestamp": 1790000001500
+  },
+  {
+    "type": "TEXT_MESSAGE_END",
+    "messageId": "run_fixture_cancel:text:1",
+    "timestamp": 1790000001500
+  },
+  {
+    "type": "STEP_FINISHED",
+    "stepName": "agent_run",
+    "timestamp": 1790000001500
+  },
+  {
+    "type": "STEP_FINISHED",
+    "stepName": "compress",
+    "timestamp": 1790000001500
+  },
+  {
+    "type": "SUBAGENT_ERROR",
+    "subagentRunId": "sa_c",
+    "message": "The delegated task was cancelled.",
+    "code": "cancelled",
+    "timestamp": 1790000001500
+  },
+  {
+    "type": "RUN_FINISHED",
+    "threadId": "sess_fixture_cancel",
+    "runId": "run_fixture_cancel",
+    "outcome": {
+      "type": "cancelled"
+    },
+    "timestamp": 1790000001500
+  },
+  {
+    "type": "RUN_ERROR",
+    "message": "Save failed after stop",
+    "code": "save_failed",
+    "timestamp": 1790000002250
+  }
+]

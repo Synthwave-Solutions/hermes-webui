@@ -11823,6 +11823,13 @@ def _handle_projects_hub_detail(handler, parsed) -> bool:
     return j(handler, detail)
 
 
+def _serve_memdash_vendor(handler, parsed):
+    from api import memdash_static
+    if not memdash_static.serve(handler, parsed):
+        j(handler, {"error": "not found"}, status=404)
+    return True
+
+
 def handle_get(handler, parsed) -> bool:
     """Handle all GET routes. Returns True if handled, False for 404."""
     from api.share_routes import handle_public as handle_public_share
@@ -11843,6 +11850,9 @@ def handle_get(handler, parsed) -> bool:
 
     if governance_api.handle_governance_api(handler, parsed, "GET"):
         return True
+
+    if parsed.path.startswith(("/static/vendor/mnemosyne-dashboard/", "/session/static/vendor/mnemosyne-dashboard/")):
+        return _serve_memdash_vendor(handler, parsed)
 
     if parsed.path.startswith("/session/static/"):
         # Strip the leading "/session" so _serve_static() sees a path that
@@ -13617,6 +13627,14 @@ def handle_get(handler, parsed) -> bool:
     if parsed.path == "/api/memory":
         return _handle_memory_read(handler, parsed)
 
+    if parsed.path in ("/api/memdash/banks", "/api/memdash/v1/view", "/api/memdash/access-log"):
+        from api import memdash
+        return memdash.handle_get(handler, parsed)
+
+    if parsed.path.startswith("/api/agui/runs/"):
+        from api import agui
+        return agui.handle_replay(handler, parsed)
+
     # ── Profile API (GET) ──
     if parsed.path == "/api/bots/knowledge":
         from api import bot_knowledge
@@ -14045,6 +14063,14 @@ def handle_post(handler, parsed) -> bool:
     from api.workspace_access import guard_session_request as guard_workspace_request
     if not guard_workspace_request(handler, parsed, body):
         return True
+
+    if parsed.path in ("/api/memdash/v1/action", "/api/memdash/access-log/seen", "/api/memdash/notice"):
+        from api import memdash
+        return memdash.handle_post(handler, parsed, body)
+
+    if parsed.path == "/api/help/events":
+        from api import help_events
+        return help_events.handle_post(handler, body)
 
     if parsed.path in ("/api/share/create", "/api/share/revoke"):
         from api.share_routes import handle_mutation as handle_share_mutation
@@ -14702,6 +14728,11 @@ def handle_post(handler, parsed) -> bool:
                 getattr(s, "participants", None), owner_email=getattr(s, "owner_email", None)
             )
             before_bots = list(getattr(s, 'bot_participants', []) or [])
+            from api.group_chat import apply_participants_extra
+            try:
+                apply_participants_extra(s, {**body, 'bot_participants': requested_bots}, _request_owner_email_for_new_session(handler))
+            except ValueError as exc:
+                return bad(handler, str(exc), status=400)
             s.participants = requested
             s.bot_participants = requested_bots
             s.save()
@@ -14716,7 +14747,7 @@ def handle_post(handler, parsed) -> bool:
             profile=getattr(s, "profile", None),
             session_id=sid,
         )
-        return j(handler, {"ok": True, "participants": list(s.participants or []), "bot_participants": list(s.bot_participants or [])})
+        return j(handler, {"ok": True, "participants": list(s.participants or []), "bot_participants": list(s.bot_participants or []), "default_bot": getattr(s, "default_bot", None)})
 
     if parsed.path == "/api/session/toolsets":
         """Set or clear per-session toolset override (#493).
@@ -21209,6 +21240,11 @@ def _active_run_stream_for_session(session_id: str | None) -> str | None:
     return None
 
 
+class _ChatStartResponse(dict):
+    """Wire response with private metadata for the peer event fan-out."""
+    execution_profile = None
+
+
 def _start_chat_stream_for_session(
     s,
     *,
@@ -21236,7 +21272,8 @@ def _start_chat_stream_for_session(
     attachments = attachments or []
     # Groups always use the local worker below, where each turn is bound to
     # its human sender. Personal gateway chats keep their configured backend.
-    from api.group_chat import selected_bot
+    from api import group_chat as _group_chat
+    route_reason = None
     try:
         if continuation_ref:
             from api.governance.continuation import resolve as resolve_continuation
@@ -21245,7 +21282,7 @@ def _start_chat_stream_for_session(
                 raise PermissionError('Async continuation sender changed')
             execution_profile = authority.get('execution_profile')
         else:
-            execution_profile = selected_bot(s, msg, sender_identity or sender_email or getattr(s, 'owner_email', None))
+            execution_profile, route_reason = _group_chat.select_bot_with_reason(s, msg, sender_identity or sender_email or getattr(s, 'owner_email', None))
     except (ValueError, PermissionError) as exc:
         return {'error': str(exc), '_status': 403}
     from api.bot_builder import allowed as _managed_bot_allowed
@@ -21380,6 +21417,7 @@ def _start_chat_stream_for_session(
     # #1932: mark stream as goal-related so the streaming hook evaluates the goal.
     if goal_related:
         STREAM_GOAL_RELATED[stream_id] = True
+    _group_chat.remember_route_reason(stream_id, execution_profile, route_reason)
     diag.stage("worker_thread_start") if diag else None
     # Auth-disabled gateway installations carry a sentinel identity, not a
     # signed user. Preserve that legacy route; managed bots, projects and
@@ -21411,13 +21449,14 @@ def _start_chat_stream_for_session(
         daemon=True,
     )
     thr.start()
-    response = {
+    response = _ChatStartResponse({
         "stream_id": stream_id,
         "session_id": s.session_id,
         "pending_started_at": s.pending_started_at,
         "turn_id": journal_event.get("turn_id"),
         "title": s.title,
-    }
+    })
+    response.execution_profile = execution_profile
     if normalized_model:
         response["effective_model"] = model
     if model_provider:
@@ -21755,11 +21794,13 @@ def _fan_out_peer_turn(s, response, sender_email, msg, attachments) -> bool:
                 name = item
             if name:
                 names.append(str(name).rsplit("/", 1)[-1])
+        from api.group_chat import turn_started_extra
         ch.emit(
             "peer_turn_started",
             {
                 "session_id": str(s.session_id),
                 "stream_id": stream_id,
+                **turn_started_extra(s, getattr(response, "execution_profile", None)),
                 "sender_email": str(sender_email or "").strip().lower(),
                 "message": str(msg or ""),
                 "attachments": names,
@@ -22646,7 +22687,11 @@ def _handle_cron_create(handler, body):
         toast_notifications = body.get("toast_notifications") is not False
         requested_model = body.get("model") or None
         requested_provider = body.get("provider") or None
+        from api.ownership import request_owner_email
+        _creator = request_owner_email(handler)
         job = create_job(
+            owner_email=_creator,
+            origin={"platform": "webui", "chat_id": None, "user_id": _creator} if _creator else None,
             prompt=body["prompt"],
             schedule=body["schedule"],
             name=body.get("name") or None,
@@ -22684,18 +22729,6 @@ def _handle_cron_create(handler, body):
         _shared = _normalize_cron_shared_with(body.get("shared_with"))
         if _shared:
             post_create_updates["shared_with"] = _shared
-        # Stamp the creator, as chat-created jobs already are, so completion
-        # notifications and the ownership rule in api/cron_scope.py reach the
-        # person who scheduled it from the Tasks panel. No stamp without a
-        # signed-in email (password/auth-off installs keep the shared view).
-        try:
-            from api.ownership import request_owner_email
-
-            _creator = request_owner_email(handler)
-        except Exception:
-            _creator = None
-        if _creator and not isinstance(job.get("origin"), dict):
-            post_create_updates["origin"] = {"platform": "webui", "chat_id": None, "user_id": _creator}
         if post_create_updates:
             job = update_job(job["id"], post_create_updates) or job
         return j(handler, {"ok": True, "job": _cron_job_for_api(job)})

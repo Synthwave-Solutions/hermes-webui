@@ -6,6 +6,8 @@ const COMMANDS=[
   // noEcho:true = action-only commands that don't produce a chat response.
   // Commands without noEcho get a user message echoed to the chat (#840).
   {name:'help',      desc:t('cmd_help'),             fn:cmdHelp},
+  {name:'tour',      desc:t('cmd_tour_desc'),        fn:cmdTour,      arg:'[admin]', subArgs:['admin'], noEcho:true},
+  {name:'explain',   desc:t('cmd_explain_desc'),     fn:cmdExplain,   arg:'[page]',  noEcho:true},
   {name:'clear',     desc:t('cmd_clear'),         fn:cmdClear,     noEcho:true},
   {name:'compress',  desc:t('cmd_compress'),       fn:cmdCompress, arg:'[focus topic]', noEcho:true},
   {name:'compact',   desc:t('cmd_compact_alias'),       fn:cmdCompact, noEcho:true},
@@ -563,6 +565,25 @@ function cmdHelp(){
   S.messages.push(msg);
   renderMessages();
   showToast(t('type_slash'));
+}
+
+// Guided tours and Explain this page (plan 6.1, W4). Both run in the page, never
+// in the agent, and do nothing when the help scripts did not load.
+function cmdTour(args){
+  const help=window.SynthPulseHelp;
+  if(!help||typeof help.startTour!=='function')return;
+  const arg=String(args||'').trim().toLowerCase();
+  const tour=(arg==='admin'||arg==='org'||arg==='org_admin')?'org_admin':'first_run';
+  Promise.resolve(help.startTour(tour)).then(started=>{
+    if(!started&&tour!=='first_run')help.startTour('first_run');
+  }).catch(()=>{});
+}
+
+function cmdExplain(args){
+  const help=window.SynthPulseHelp;
+  if(!help||typeof help.explainPage!=='function')return;
+  const page=String(args||'').trim().toLowerCase().replace(/[\s-]+/g,'_');
+  Promise.resolve(help.explainPage(page||null)).catch(()=>{});
 }
 
 function cmdClear(){

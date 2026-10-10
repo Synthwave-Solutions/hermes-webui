@@ -3,7 +3,11 @@
   'use strict';
   let key = '', generation = 0, profiles = [], people = [], loading = true, peopleLoading = true, catalogRetry = false;
   let menuRows = [], menuIndex = 0, menuRange = null, preparing = false, retry = null;
-  function tx(key, fallback) { const value = typeof t === 'function' ? t(key) : key; return value && value !== key ? value : fallback; }
+  function tx(key, fallback, ...args) {
+    const value = typeof t === 'function' ? t(key, ...args) : key;
+    if (value && value !== key) return value;
+    return String(fallback).replace(/\{(\d+)\}/g, (match, index) => (index in args ? String(args[index]) : match));
+  }
   function actor() { return String((window.__GOV_ME__ || {}).email || '').toLowerCase(); }
   function contextKey() {
     const s = S.session || {};
@@ -22,17 +26,245 @@
     return '@' + name + ' ' + String(draft || '').replace(/^\s*@[A-Za-z0-9][A-Za-z0-9_-]{0,63}(?=\s|$)\s*/, '');
   }
   function fold(value) { return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
-  function catalog() {
-    return profiles.filter(p => p && p.visible !== false).map(p => ({kind:'bot', id:p.name, label:botDisplayName(p)}))
-      .concat(people.filter(p => p && p.email && p.email.toLowerCase() !== actor())
+
+  // ── Group routing (plan 5.2): handles, route reasons, Working and default ──
+  // The internal-name denylist of plan E.4.3, equal to api/modules.py
+  // DISPLAY_DENYLIST (tests/test_group_routing.py keeps them in step). A
+  // handle is a bot's title slug with these names cut out, exactly as
+  // api/group_chat.handle_from_text computes it on the server.
+  const HANDLE_DENYLIST = [
+    'n8n', 'OmniRoute', 'LangGraph', 'Hermes', 'LiteLLM', 'RAGFlow', 'Langfuse',
+    'OpenWebUI', 'OpenDesign', 'OpenNotebook', 'DocuSeal', 'OpenWhispr', 'OpenWispr',
+    'Fireflies', 'Meetily', 'Vexa', 'OpenBot', 'Nango', 'SurrealDB', 'Elasticsearch',
+    'MinIO', 'Valkey', 'Mnemosyne', 'mnemo-hub', 'GenOffice', 'Genspark',
+  ];
+  const ROUTE_REASONS = ['mention', 'only_bot', 'sticky', 'default'];
+  const BOT_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+  const LEAD_MENTION = /^\s*@([A-Za-z0-9][A-Za-z0-9_-]{0,63})(?=\s|$)/;
+  function slug(text) {
+    return String(text || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  }
+  const DENIED_PARTS = HANDLE_DENYLIST.map(slug).filter(Boolean);
+  function handleFromText(text) {
+    let handle = slug(text), changed = true;
+    while (changed) {
+      changed = false;
+      for (const part of DENIED_PARTS) {
+        if (handle.includes(part)) { handle = handle.split(part).join('-'); changed = true; }
+      }
+      handle = handle.replace(/-+/g, '-').replace(/^-+|-+$/g, '');
+    }
+    return handle.slice(0, 64).replace(/^-+|-+$/g, '');
+  }
+  function botHandle(id, title) { return handleFromText(title) || handleFromText(id) || 'bot'; }
+  function handleFor(p) { return botHandle(p && p.name, p && p.bot && p.bot.title); }
+  function profileFor(id) { return profiles.find(p => p && p.name === id) || null; }
+  function handleForBot(id, title) { const p = profileFor(id); return p ? handleFor(p) : botHandle(id, title); }
+  // The text that addresses a bot: its handle when no other bot here shares it.
+  function addressName(p, rows) {
+    const handle = handleFor(p);
+    return (rows || []).filter(row => row && handleFor(row) === handle).length > 1 ? p.name : handle;
+  }
+  function reasonText(reason, handle) {
+    if (reason === 'mention') return tx('group_route_reason_mention', 'Asked by name');
+    if (reason === 'only_bot') return tx('group_route_reason_only_bot', 'Only bot in this chat');
+    if (reason === 'sticky') return tx('group_route_reason_sticky', 'Continued with {0} (last to answer)', '@' + handle);
+    if (reason === 'default') return tx('group_route_reason_default', 'Default bot of this chat');
+    return '';
+  }
+  function lastBot(messages) {
+    const list = Array.isArray(messages) ? messages : [];
+    for (let i = list.length - 1; i >= 0; i--) {
+      const m = list[i];
+      if (m && m.role === 'assistant' && typeof m.bot_profile === 'string' && m.bot_profile.trim()) return m.bot_profile.trim();
+    }
+    return null;
+  }
+  // The bot ``@token`` names among ``bots``: its id, or a unique handle.
+  function resolveMention(token, bots, handleOf) {
+    token = String(token || '');
+    if (bots.includes(token)) return token;
+    const low = token.toLowerCase();
+    const byId = bots.filter(bot => bot.toLowerCase() === low);
+    if (byId.length === 1) return byId[0];
+    const byHandle = bots.filter(bot => (handleOf || botHandle)(bot) === low);
+    return byHandle.length === 1 ? byHandle[0] : null;
+  }
+  // Which bot answers a draft, mirroring api/group_chat.select_bot_with_reason.
+  // ``usable(bot)`` says whether the viewer may use a bot. Returns
+  // {bot, reason}, {bot: null, reason: 'last_unavailable'} or null.
+  function predictRoute(session, messages, draft, usable, handleOf) {
+    const bots = session && Array.isArray(session.bot_participants) ? session.bot_participants : [];
+    if (!bots.length) return null;
+    const can = typeof usable === 'function' ? usable : () => true;
+    const mention = LEAD_MENTION.exec(String(draft || ''));
+    if (mention) { const bot = resolveMention(mention[1], bots, handleOf); return bot ? {bot, reason:'mention'} : null; }
+    if (bots.length === 1) return can(bots[0]) ? {bot:bots[0], reason:'only_bot'} : null;
+    const last = lastBot(messages);
+    let skipped = false;
+    if (last && bots.includes(last)) { if (can(last)) return {bot:last, reason:'sticky'}; skipped = true; }
+    const fallback = session.default_bot;
+    if (fallback && fallback !== last && bots.includes(fallback) && can(fallback)) return {bot:fallback, reason:'default'};
+    return skipped ? {bot:null, reason:'last_unavailable'} : null;
+  }
+  function catalogReady() { return !loading && !catalogRetry && profiles.length > 0; }
+  function usableByViewer(bot) { return !catalogReady() || profiles.some(p => p && p.name === bot); }
+  function currentRoute() {
+    const input = document.getElementById('msg');
+    return predictRoute(S.session, S.messages, input ? input.value : '', usableByViewer, id => handleForBot(id));
+  }
+  function canManageDefault(session) {
+    if (!session || !session.session_id) return false;
+    if (typeof _groupPeopleCanManage === 'function') { try { return !!_groupPeopleCanManage(); } catch (_) { return false; } }
+    const owner = String(session.owner_email || '').toLowerCase();
+    return !!owner && owner === actor();
+  }
+
+  // The live route of the newest turn and the Working state, per session.
+  const liveRoutes = {}, working = {};
+  let workingTimer = null, decoratePending = false, observed = null, defaultSaving = false;
+  function emitWorking(entry, isWorking) {
+    try {
+      window.dispatchEvent(new CustomEvent('synpulse:group-working', {detail:{
+        session_id:entry.sessionId, stream_id:entry.streamId, bot:entry.bot, reason:entry.reason, working:isWorking}}));
+    } catch (_) {}
+  }
+  function stillWorking(entry) {
+    const s = S.session || {};
+    return s.session_id === entry.sessionId && !!entry.streamId && S.activeStreamId === entry.streamId;
+  }
+  function checkWorking() {
+    let changed = false;
+    for (const sid of Object.keys(working)) {
+      if (!stillWorking(working[sid])) { const entry = working[sid]; delete working[sid]; emitWorking(entry, false); changed = true; }
+    }
+    if (!Object.keys(working).length && workingTimer) { clearInterval(workingTimer); workingTimer = null; }
+    if (changed) paint();
+  }
+  function onTurnBot(sessionId, streamId, data) {
+    if (!data || typeof data.bot !== 'string' || !BOT_ID.test(data.bot)) return;
+    const sid = String(sessionId || data.session_id || '');
+    if (!sid) return;
+    const handle = typeof data.handle === 'string' && BOT_ID.test(data.handle) ? data.handle.toLowerCase() : handleForBot(data.bot, data.name);
+    const entry = {sessionId:sid, streamId:String(streamId || data.stream_id || ''), bot:data.bot,
+      reason:ROUTE_REASONS.includes(data.reason) ? data.reason : null, handle, since:Date.now()};
+    liveRoutes[sid] = entry;
+    const before = working[sid];
+    if (stillWorking(entry)) {
+      working[sid] = entry;
+      if (!before || before.streamId !== entry.streamId || before.bot !== entry.bot) emitWorking(entry, true);
+      if (!workingTimer) workingTimer = setInterval(checkWorking, 600);
+    }
+    paint(); scheduleDecorate();
+  }
+  function workingState(sessionId) {
+    const entry = working[String(sessionId || '')];
+    return entry && stillWorking(entry) ? {bot:entry.bot, stream_id:entry.streamId, reason:entry.reason, since:entry.since} : null;
+  }
+
+  // The reason chip on a reply: persisted ``route_reason`` on the message,
+  // or the live route of the newest turn.
+  function messageForTurn(turn) {
+    if (!turn || turn.id === 'liveAssistantTurn') return null;
+    const index = Number(turn.dataset && turn.dataset.recycleKey);
+    return Number.isInteger(index) && Array.isArray(S.messages) ? S.messages[index] || null : null;
+  }
+  function followedByUser(turn) {
+    for (let node = turn.nextElementSibling; node; node = node.nextElementSibling) {
+      if (node.matches && node.matches('.msg-row[data-role="user"]')) return true;
+    }
+    return false;
+  }
+  function setReplyChip(turn, info) {
+    const role = turn.querySelector('.msg-role.assistant');
+    if (!role) return;
+    let chip = role.querySelector('.group-route-chip');
+    const text = info ? reasonText(info.reason, info.handle) : '';
+    if (!text) { if (chip) chip.remove(); return; }
+    if (!chip) { chip = document.createElement('span'); chip.className = 'group-route-chip'; role.appendChild(chip); }
+    if (chip.textContent !== text) chip.textContent = text;
+    chip.dataset.routeReason = info.reason;
+  }
+  function decorateReplies() {
+    const inner = document.getElementById('msgInner');
+    if (!inner) return;
+    const session = S.session || {}, sid = session.session_id || '';
+    // Private chats carry no route reasons; skip the walk unless a chip is left over.
+    if (!(session.bot_participants || []).length && !liveRoutes[sid] && !inner.querySelector('.group-route-chip')) return;
+    const turns = Array.from(inner.querySelectorAll('.assistant-turn'));
+    const live = liveRoutes[sid];
+    let target = null;
+    if (live && live.reason) {
+      const last = turns[turns.length - 1];
+      if (last && !followedByUser(last)) {
+        const m = messageForTurn(last);
+        if (last.id === 'liveAssistantTurn' ? S.activeStreamId === live.streamId : !!(m && m.bot_profile === live.bot)) target = last;
+      }
+    }
+    for (const turn of turns) {
+      const m = messageForTurn(turn);
+      let info = null;
+      if (turn === target) info = {reason:live.reason, handle:live.handle};
+      else if (m && typeof m.bot_profile === 'string' && ROUTE_REASONS.includes(m.route_reason)) {
+        info = {reason:m.route_reason, handle:handleForBot(m.bot_profile, m.bot_name)};
+      }
+      setReplyChip(turn, info);
+    }
+  }
+  function scheduleDecorate() {
+    if (decoratePending) return;
+    decoratePending = true;
+    const run = () => { decoratePending = false; observe(); decorateReplies(); };
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(run);
+    else if (typeof setTimeout === 'function') setTimeout(run, 0);
+    else decoratePending = false;
+  }
+  function observe() {
+    const inner = document.getElementById('msgInner');
+    if (!inner || inner === observed || typeof MutationObserver !== 'function') return;
+    observed = inner;
+    // Turns are added, replaced and recycled as direct children of #msgInner.
+    new MutationObserver(scheduleDecorate).observe(inner, {childList:true});
+  }
+
+  async function setDefaultBot(name) {
+    const session = S.session || {};
+    if (!session.session_id || defaultSaving) return false;
+    const next = name && name !== session.default_bot ? name : null;
+    defaultSaving = true; paint();
+    try {
+      const result = await api('/api/session/participants', {method:'POST', body:JSON.stringify({
+        session_id:session.session_id, participants:session.participants || [],
+        bot_participants:session.bot_participants || [], default_bot:next})});
+      if (!result || !result.ok) throw new Error((result && result.error) || '');
+      if (S.session && S.session.session_id === session.session_id) {
+        S.session.default_bot = Object.prototype.hasOwnProperty.call(result, 'default_bot') ? result.default_bot : next;
+        if (Array.isArray(result.participants)) S.session.participants = result.participants;
+        if (Array.isArray(result.bot_participants)) S.session.bot_participants = result.bot_participants;
+      }
+      return true;
+    } catch (error) {
+      if (typeof showToast === 'function') showToast((error && error.message) || tx('group_route_default_failed', 'Could not change the default bot.'));
+      return false;
+    } finally { defaultSaving = false; paint(); }
+  }
+
+  function catalog(includeHidden) {
+    const bots = profiles.filter(p => p && typeof p.name === 'string');
+    return bots.filter(p => includeHidden || p.visible !== false).map(p => {
+      const handle = handleFor(p), shared = bots.filter(other => handleFor(other) === handle).length > 1;
+      return {kind:'bot', id:p.name, label:botDisplayName(p), handle:shared ? null : handle,
+        description:p.bot && typeof p.bot.description === 'string' ? p.bot.description.trim() : ''};
+    }).concat(people.filter(p => p && p.email && p.email.toLowerCase() !== actor())
         .map(p => ({kind:'user', id:p.email, label:p.display_name || p.name || p.email})));
   }
   function mentionMatches(text, rows) {
     const result = [];
     // Whole tokens only: an email address in prose is not an invitation.
     for (const match of String(text || '').matchAll(/(?:^|\s)@([^\s,;!?()[\]{}<>]+)/g)) {
-      const token = match[1].replace(/[.:]$/, '');
-      const item = rows.find(row => row.id.toLowerCase() === token.toLowerCase());
+      const token = match[1].replace(/[.:]$/, ''), low = token.toLowerCase();
+      const item = rows.find(row => row.id.toLowerCase() === low) || rows.find(row => row.handle && row.handle === low);
       if (item) { const start = match.index + match[0].indexOf('@'); result.push({item, start, end:start + token.length + 1}); }
     }
     return result;
@@ -47,11 +279,12 @@
   function normalizeBotAddress(text, rows) {
     const match = mentionMatches(text, rows).find(row => row.item.kind === 'bot');
     if (!match) return text;
+    const name = match.item.handle || match.item.id;
     if (match.start === 0) {
       const remainder = text.slice(match.end);
-      return '@' + match.item.id + (remainder && !/^\s/.test(remainder) ? ' ' : '') + remainder;
+      return '@' + name + (remainder && !/^\s/.test(remainder) ? ' ' : '') + remainder;
     }
-    return '@' + match.item.id + ' ' + text.slice(0, match.start) + text.slice(match.end);
+    return '@' + name + ' ' + text.slice(0, match.start) + text.slice(match.end);
   }
   function closeMenu() {
     menuRange = null; menuRows = [];
@@ -66,7 +299,7 @@
     const input = document.getElementById('msg');
     if (!input || !menuRange || contextKey() !== key) return closeMenu();
     const {start, end} = menuRange;
-    input.setRangeText('@' + item.id + ' ', start, end, 'end');
+    input.setRangeText('@' + (item.kind === 'bot' && item.handle ? item.handle : item.id) + ' ', start, end, 'end');
     closeMenu(); input.dispatchEvent(new Event('input', {bubbles:true})); input.focus();
   }
   function paintMenu() {
@@ -76,7 +309,8 @@
     const match = /(?:^|\s)@([^\s@]*)$/.exec(before);
     if (!match) return closeMenu();
     const query = fold(match[1]);
-    menuRows = catalog().filter(row => fold(row.label + ' ' + row.id).includes(query)).slice(0, 12);
+    // Hidden bots stay out of the picker; their @mentions still resolve.
+    menuRows = catalog(false).filter(row => fold(row.label + ' ' + row.id + ' ' + (row.handle || '')).includes(query)).slice(0, 12);
     menuRange = {start:before.length - match[1].length - 1, end:input.selectionStart};
     menuIndex = Math.min(menuIndex, Math.max(0, menuRows.length - 1));
     let popup = document.getElementById('chatMentionDropdown');
@@ -88,8 +322,13 @@
       button.dataset.mentionKind = row.kind; button.dataset.mentionId = row.id;
       button.setAttribute('role','option'); button.setAttribute('aria-selected',String(index === menuIndex)); button.tabIndex = -1;
       const label = document.createElement('span'); label.textContent = row.label;
-      const detail = document.createElement('small'); detail.textContent = (row.kind === 'bot' ? tx('chat_mentions_bot', 'Bot') : tx('chat_mentions_person', 'Person')) + ' · @' + row.id;
-      button.append(label, detail); button.onpointerdown = event => event.preventDefault(); button.onclick = () => choose(row); popup.appendChild(button);
+      const detail = document.createElement('small'); detail.textContent = (row.kind === 'bot' ? tx('chat_mentions_bot', 'Bot') : tx('chat_mentions_person', 'Person')) + ' · @' + (row.kind === 'bot' && row.handle ? row.handle : row.id);
+      button.append(label, detail);
+      if (row.kind === 'bot' && row.description) {
+        const description = document.createElement('small'); description.className = 'group-route-bot-description'; description.textContent = row.description;
+        button.appendChild(description);
+      }
+      button.onpointerdown = event => event.preventDefault(); button.onclick = () => choose(row); popup.appendChild(button);
     });
     if (menuRows.length) input.setAttribute('aria-activedescendant','chatMentionOption-' + menuIndex);
     else { input.removeAttribute('aria-activedescendant'); const empty = document.createElement('span'); empty.textContent = tx('chat_mentions_empty', 'No matching people or bots'); popup.appendChild(empty); }
@@ -151,15 +390,33 @@
     const group = ((S.session || {}).bot_participants || []).length > 0;
     const buttons = document.querySelectorAll('#chatBotRosterItems [data-bot]');
     for (const button of buttons) {
-      const selected = String(group ? (mention ? mention[1] === button.dataset.bot : buttons.length === 1) : S.activeProfile === button.dataset.bot);
+      const route = group ? currentRoute() : null;
+      const selected = String(group ? !!route && route.bot === button.dataset.bot : S.activeProfile === button.dataset.bot);
       if (button.getAttribute('aria-pressed') !== selected) button.setAttribute('aria-pressed', selected);
       const disabled = loading || !S._bootReady || preparing || (!group && !!S.busy);
       if (button.disabled !== disabled) button.disabled = disabled;
     }
     const hint = document.getElementById('chatMentionHint');
-    const hidden = !preparing && !!collapsed() && !/(?:^|\s)@/.test(draft);
+    const hidden = !preparing && !(hint && hint.dataset.routeWarning) && !!collapsed() && !/(?:^|\s)@/.test(draft);
     if (hint && hint.hidden !== hidden) hint.hidden = hidden;
   }
+  function starIcon(filled) {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 16 16'); svg.setAttribute('width', '14'); svg.setAttribute('height', '14'); svg.setAttribute('aria-hidden', 'true');
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', 'M8 1.8l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z');
+    path.setAttribute('fill', filled ? 'currentColor' : 'none'); path.setAttribute('stroke', 'currentColor'); path.setAttribute('stroke-width', '1.3'); path.setAttribute('stroke-linejoin', 'round');
+    svg.appendChild(path);
+    return svg;
+  }
+  // What the roster shows beyond the catalog; a render repaints only when it changed.
+  let paintedSignature = '';
+  function rosterSignature() {
+    const session = S.session || {}, route = (session.bot_participants || []).length ? currentRoute() : null;
+    return JSON.stringify([route && route.bot, route && route.reason, session.default_bot || null,
+      (workingState(session.session_id) || {}).bot || null, !!S._bootReady, !!S.busy, S.activeProfile || '']);
+  }
+  function badge(className, text) { const node = document.createElement('small'); node.className = className; node.textContent = text; return node; }
   function paint() {
     paintSidebarBots();
     const host = document.getElementById('composerWrap');
@@ -174,27 +431,63 @@
     const items = document.createElement('div'); items.id = 'chatBotRosterItems'; items.className = 'chat-bot-roster-items'; items.hidden = !!collapsed(); bar.appendChild(items);
     const session = S.session || {}, group = (session.bot_participants || []).length > 0;
     const rows = available(profiles, session);
+    const route = group ? currentRoute() : null;
+    const busyBot = group ? (workingState(session.session_id) || {}).bot : null;
+    const manage = group && (session.bot_participants || []).length > 1 && canManageDefault(session);
     for (const p of rows) {
       const button = document.createElement('button'); button.type = 'button'; button.className = 'chat-bot-recipient'; button.dataset.bot = p.name;
       const input = document.getElementById('msg');
-      button.title = '@' + p.name; button.disabled = loading || !S._bootReady || preparing || (!group && !!S.busy);
+      button.setAttribute('aria-pressed',String(group ? !!(route && route.bot === p.name) : S.activeProfile === p.name));
+      button.title = '@' + handleFor(p); button.disabled = loading || !S._bootReady || preparing || (!group && !!S.busy);
       button.innerHTML = botAvatarHtml(p); const name = document.createElement('span'); name.textContent = botDisplayName(p); button.appendChild(name);
+      if (group && session.default_bot === p.name) button.appendChild(badge('group-route-default-badge', tx('group_route_default_badge', 'Default')));
+      if (busyBot === p.name) {
+        button.dataset.working = 'true';
+        const state = badge('group-route-working', tx('group_route_working', 'Working'));
+        const dot = document.createElement('span'); dot.className = 'group-route-working-dot'; dot.setAttribute('aria-hidden', 'true');
+        state.prepend(dot); button.appendChild(state);
+      }
       button.onclick = async () => {
         if (!S._bootReady || preparing) return;
         if (contextKey() !== key) { window.refreshChatBots(); return; }
-        if (group) { if (!input) return; input.value = address(input.value, p.name); input.dispatchEvent(new Event('input', {bubbles:true})); input.focus(); paint(); }
+        if (group) { if (!input) return; input.value = address(input.value, addressName(p, rows)); input.dispatchEvent(new Event('input', {bubbles:true})); input.focus(); paint(); }
         else if (p.name !== S.activeProfile || (typeof _showAllProfiles !== 'undefined' && _showAllProfiles)) { button.disabled = true; try { await switchToProfile(p.name); } catch (err) { showToast(err.message); } finally { button.disabled = false; window.refreshChatBots(); } }
       };
       items.appendChild(button);
+      if (manage) {
+        const isDefault = session.default_bot === p.name;
+        const star = document.createElement('button'); star.type = 'button'; star.className = 'group-route-default-toggle'; star.dataset.defaultBot = p.name;
+        const label = (isDefault ? tx('group_route_clear_default', 'Clear default') : tx('group_route_set_default', 'Set as default')) + ': ' + botDisplayName(p);
+        star.setAttribute('aria-label', label); star.title = label; star.setAttribute('aria-pressed', String(isDefault));
+        star.disabled = loading || !S._bootReady || preparing || defaultSaving;
+        star.appendChild(starIcon(isDefault));
+        star.onclick = () => { if (contextKey() !== key) { window.refreshChatBots(); return; } setDefaultBot(p.name); };
+        items.appendChild(star);
+      }
+    }
+    // A repaint resets the strip's scroll; keep the working bot in view on narrow screens.
+    const busy = items.querySelector('[data-working="true"]');
+    if (busy && !items.hidden && items.scrollWidth > items.clientWidth) {
+      const box = items.getBoundingClientRect(), chip = busy.getBoundingClientRect();
+      if (chip.right > box.right) items.scrollLeft += chip.right - box.right + 8;
+      else if (chip.left < box.left) items.scrollLeft -= box.left - chip.left + 8;
     }
     if (!rows.length) { const state = document.createElement('span'); state.className = 'chat-bot-roster-state'; state.setAttribute('role','status'); state.textContent = loading ? tx('chat_bots_loading', 'Loading bots…') : tx('chat_bots_unavailable', 'No available bots'); items.appendChild(state); }
     let hint = document.getElementById('chatMentionHint');
     if (!hint) { hint = document.createElement('div'); hint.id = 'chatMentionHint'; hint.className = 'chat-mention-hint'; host.appendChild(hint); }
     paintDraftState();
-    hint.textContent = preparing ? tx('chat_mentions_preparing', 'Preparing recipients…') : tx('chat_mentions_hint', '@ people: new group from private chat. First @ bot responds.');
+    const draft = (document.getElementById('msg') || {}).value || '';
+    const unavailable = !preparing && !!route && route.reason === 'last_unavailable';
+    hint.hidden = !preparing && !unavailable && !!collapsed() && !/(?:^|\s)@/.test(draft);
+    hint.textContent = preparing ? tx('chat_mentions_preparing', 'Preparing recipients…')
+      : unavailable ? tx('group_route_last_bot_unavailable', 'The last bot is not available to you. Choose a bot to continue.')
+      : tx('chat_mentions_hint', '@ people: new group from private chat. First @ bot responds.');
+    if (unavailable) hint.dataset.routeWarning = 'true'; else delete hint.dataset.routeWarning;
+    paintedSignature = rosterSignature();
   }
   window.refreshChatBots = function () {
-    const next = contextKey(); if (next === key && !catalogRetry) return;
+    scheduleDecorate();
+    const next = contextKey(); if (next === key && !catalogRetry) { if (rosterSignature() !== paintedSignature) paint(); return; }
     const changed = next !== key;
     key = next; catalogRetry = false;
     if (changed) { profiles = []; people = []; }
@@ -206,7 +499,7 @@
       profiles = result.profiles;
     }).catch(() => { if (fresh()) catalogRetry = true; }).finally(() => {
       if (!fresh()) return;
-      loading = false; paint(); paintMenu();
+      loading = false; paint(); paintMenu(); scheduleDecorate();
     });
     if (!actor()) { people = []; peopleLoading = false; return; }
     Promise.resolve(api('/api/people', {timeoutToast:false})).then(result => {
@@ -229,7 +522,8 @@
     const input = document.getElementById('msg'); if (!input || !/(?:^|\s)@/.test(input.value)) return true;
     const origin = contextKey(), original = input.value;
     if (loading || peopleLoading) { showToast(tx('chat_mentions_loading', 'People and bots are still loading. Please try again.')); return false; }
-    const selected = mentions(original, catalog()); if (!selected.length) return true;
+    // Hidden bots are not offered in the picker, but a typed mention still resolves.
+    const directory = catalog(true), selected = mentions(original, directory); if (!selected.length) return true;
     const users = selected.filter(row => row.kind === 'user').map(row => row.id), bots = selected.filter(row => row.kind === 'bot').map(row => row.id);
     if (users.length && ((S.pendingFiles || []).length || (typeof _pendingSelections !== 'undefined' && _pendingSelections.length))) {
       showToast(tx('chat_mentions_attachments', 'Remove private attachments or selections first. You can attach files explicitly in the group.')); return false;
@@ -283,5 +577,10 @@
   if (typeof runAfterBootReady === 'function') runAfterBootReady(() => window.refreshChatBots());
   else if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => window.refreshChatBots(), {once:true});
   else window.refreshChatBots();
-  window.chatBotRecipientRules = {available, address, mentions, fold, normalizeBotAddress};
+  // Live bot identity of group turns (plan 5.2). static/messages.js hands each
+  // `turn_bot` stream event to onTurnBot; workingState(sessionId) is the
+  // Working state per session, also announced as `synpulse:group-working`.
+  window.groupRouting = {onTurnBot, workingState, reasonText, handleFor, setDefaultBot, predictRoute:currentRoute};
+  window.chatBotRecipientRules = {available, address, mentions, fold, normalizeBotAddress,
+    HANDLE_DENYLIST, handleFromText, botHandle, resolveMention, predictRoute, reasonText, lastBot};
 })();

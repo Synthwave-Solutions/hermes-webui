@@ -1,0 +1,7 @@
+<svg viewBox="0 0 240 100" role="img">
+  <title>Before and after</title>
+  <rect x="10" y="20" width="100" height="60" rx="6" fill="var(--sp-surface,#f3f4f6)"/>
+  <rect x="130" y="20" width="100" height="60" rx="6" fill="var(--sp-accent,#f97316)"/>
+  <text x="60" y="55" font-size="13" text-anchor="middle" fill="var(--sp-fg,#1f2937)">Before</text>
+  <text x="180" y="55" font-size="13" text-anchor="middle" fill="var(--sp-bg,#ffffff)">After</text>
+</svg>

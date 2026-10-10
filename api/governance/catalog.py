@@ -61,6 +61,7 @@ _SELF_ROUTES: frozenset[str] = frozenset({
     # to ASK. The install itself stays gated on an admin decision, and the
     # role's route allowlist still applies (a role without /api/mcp/* or
     # /api/integrations/* in routes cannot reach these at all).
+    "/api/help/events",
     "/api/mcp/servers/request",
     "/api/mcp/requests",
     "/api/integrations/request",
@@ -113,6 +114,13 @@ ROUTE_CATALOG: tuple[RouteRule, ...] = (
     # sessions, projects, background
     RouteRule("/api/session/skill-updates", "chat:use", "skills:write", match="exact"),
     RouteRule("/api/session/yolo",        "sessions:read", "sessions:write", match="exact"),
+    RouteRule("/api/memdash/banks", "chat:use", match="exact"),
+    RouteRule("/api/memdash/v1/view", "chat:use", match="exact"),
+    RouteRule("/api/memdash/v1/action", "chat:use", "chat:use", match="exact"),
+    RouteRule("/api/memdash/access-log", "chat:use", match="exact"),
+    RouteRule("/api/memdash/access-log/seen", "chat:use", "chat:use", match="exact"),
+    RouteRule("/api/memdash/notice", "chat:use", "chat:use", match="exact"),
+    RouteRule("/api/agui/runs", "sessions:read"),
     RouteRule("/api/session",             "sessions:read", "sessions:write"),
     RouteRule("/api/sessions",            "sessions:read", "sessions:write"),
     RouteRule("/api/projects",            "sessions:read", "sessions:write"),

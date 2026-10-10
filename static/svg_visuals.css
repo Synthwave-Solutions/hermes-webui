@@ -1,0 +1,59 @@
+/* Inline SVG visuals in chat (plan addendum 3.1 and 3.3, package A1).
+   Figures reuse the mermaid toolbar buttons and the Calm Console tokens. */
+
+.svg-visual{
+  display:flex;flex-direction:column;gap:6px;
+  margin:8px 0;padding:8px;box-sizing:border-box;
+  max-width:100%;min-width:0;
+  border:1px solid var(--border);border-radius:var(--radius, 8px);
+  background:var(--code-bg);
+}
+.svg-visual-toolbar{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:4px;flex-shrink:0;}
+.svg-visual-btn[disabled]{opacity:.45;cursor:default;}
+.svg-visual-img{
+  display:block;margin:0 auto;
+  max-width:100%;height:auto;max-height:80vh;object-fit:contain;
+  border-radius:calc(var(--radius, 8px) / 2);
+  cursor:zoom-in;
+}
+.svg-visual--media .msg-media-svg{margin:0 auto;cursor:zoom-in;}
+.svg-visual-caption{
+  margin:0;text-align:center;
+  font-size:12px;line-height:1.4;color:var(--muted);
+  overflow-wrap:anywhere;
+}
+.svg-visual pre.svg-visual-source{margin:0;max-height:320px;overflow:auto;background:var(--surface);border-radius:calc(var(--radius, 8px) / 2);}
+.svg-visual pre.svg-visual-source[hidden]{display:none!important;}
+
+/* Paper fallback: a drawing with fixed dark strokes and no background gets
+   a fixed light card, so it stays readable in the dark theme. */
+.svg-visual--paper .svg-visual-img{background:#fff;padding:8px;box-sizing:border-box;}
+
+/* A visual that was not allowed falls back to its code with a notice. */
+.svg-visual-blocked{margin:8px 0;}
+.svg-visual-notice{margin:0 0 4px;font-size:12px;line-height:1.4;color:var(--muted);}
+
+/* Full size view in the shared image lightbox. */
+.img-lightbox.svg-visual-lightbox img{background:var(--surface);}
+.img-lightbox.svg-visual-lightbox--paper img{background:#fff;}
+
+/* While a reply streams, an svg fence is still code: keep it to about seven
+   lines with a fade and the "Drawing visual" label (svg_drawing) on top. The
+   label uses ::before, because ::after is the streaming cursor. */
+[data-live-assistant="1"] pre > code.language-svg,
+[data-live-assistant="1"] pre > code.svg{
+  display:block;max-height:calc(7 * 1.5em);overflow:hidden;
+  -webkit-mask-image:linear-gradient(to bottom,#000 55%,transparent);
+  mask-image:linear-gradient(to bottom,#000 55%,transparent);
+}
+[data-live-assistant="1"] pre:has(> code.language-svg)::before,
+[data-live-assistant="1"] pre:has(> code.svg)::before{
+  content:var(--svg-visual-drawing-label, "");
+  display:block;padding-bottom:6px;
+  font-size:12px;line-height:1.4;color:var(--muted);white-space:normal;
+}
+
+@media (max-width: 480px){
+  .svg-visual{padding:6px;}
+  .svg-visual-img{max-height:70vh;}
+}

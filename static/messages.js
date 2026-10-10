@@ -5959,6 +5959,12 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
       }
     });
 
+    // Group routing (plan 5.2): the bot working on this group turn and why;
+    // static/chat-bots.js shows the Working state and the reason chip.
+    source.addEventListener('turn_bot',e=>{
+      try{ if(window.groupRouting) window.groupRouting.onTurnBot(activeSid, streamId, JSON.parse(e.data||'{}')); }catch(_){}
+    });
+
     function _resolveGoalMessage(d){
       const key=String(d && d.message_key ? d.message_key : '').trim();
       const args=Array.isArray(d && d.message_args) ? d.message_args : [];

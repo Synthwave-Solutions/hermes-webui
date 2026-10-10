@@ -1,0 +1,290 @@
+[
+  {
+    "type": "RUN_STARTED",
+    "threadId": "sess_fixture_subagent",
+    "runId": "run_fixture_subagent",
+    "protocolVersion": "1.0",
+    "timestamp": 1790000000250
+  },
+  {
+    "type": "TOOL_CALL_START",
+    "toolCallId": "call_dt_1",
+    "toolCallName": "delegate_task",
+    "timestamp": 1790000000250
+  },
+  {
+    "type": "TOOL_CALL_ARGS",
+    "toolCallId": "call_dt_1",
+    "delta": "{\"tasks\":[\"Research pricing\",\"Draft summary\"]}",
+    "timestamp": 1790000000250
+  },
+  {
+    "type": "TOOL_CALL_END",
+    "toolCallId": "call_dt_1",
+    "timestamp": 1790000000250
+  },
+  {
+    "type": "SUBAGENT_STARTED",
+    "subagentRunId": "sa_1",
+    "name": "subagent",
+    "description": "Research pricing",
+    "timestamp": 1790000000500
+  },
+  {
+    "type": "ACTIVITY_SNAPSHOT",
+    "messageId": "run_fixture_subagent:subagent:sa_1",
+    "activityType": "subagent",
+    "content": {
+      "id": "sa_1",
+      "status": "queued",
+      "summary": "Research pricing",
+      "taskIndex": 0,
+      "taskCount": 2,
+      "toolCount": 0
+    },
+    "timestamp": 1790000000500
+  },
+  {
+    "type": "SUBAGENT_STARTED",
+    "subagentRunId": "sa_2",
+    "name": "subagent",
+    "description": "Draft summary",
+    "timestamp": 1790000000750
+  },
+  {
+    "type": "ACTIVITY_SNAPSHOT",
+    "messageId": "run_fixture_subagent:subagent:sa_2",
+    "activityType": "subagent",
+    "content": {
+      "id": "sa_2",
+      "status": "queued",
+      "summary": "Draft summary",
+      "taskIndex": 1,
+      "taskCount": 2,
+      "toolCount": 0
+    },
+    "timestamp": 1790000000750
+  },
+  {
+    "type": "ACTIVITY_SNAPSHOT",
+    "messageId": "run_fixture_subagent:subagent:sa_1",
+    "activityType": "subagent",
+    "content": {
+      "id": "sa_1",
+      "status": "running",
+      "summary": "Research pricing",
+      "taskIndex": 0,
+      "taskCount": 2,
+      "toolCount": 1
+    },
+    "timestamp": 1790000001000
+  },
+  {
+    "type": "SUBAGENT_STARTED",
+    "subagentRunId": "sa_1.1",
+    "name": "subagent",
+    "description": "Nested lookup",
+    "parentSubagentRunId": "sa_1",
+    "timestamp": 1790000001250
+  },
+  {
+    "type": "ACTIVITY_SNAPSHOT",
+    "messageId": "run_fixture_subagent:subagent:sa_1.1",
+    "activityType": "subagent",
+    "content": {
+      "id": "sa_1.1",
+      "status": "running",
+      "summary": "Nested lookup",
+      "taskIndex": 0,
+      "taskCount": 2,
+      "toolCount": 0,
+      "parentId": "sa_1"
+    },
+    "timestamp": 1790000001250
+  },
+  {
+    "type": "SUBAGENT_STARTED",
+    "subagentRunId": "sa_x",
+    "name": "subagent",
+    "description": "Parent never announced",
+    "timestamp": 1790000001500
+  },
+  {
+    "type": "ACTIVITY_SNAPSHOT",
+    "messageId": "run_fixture_subagent:subagent:sa_x",
+    "activityType": "subagent",
+    "content": {
+      "id": "sa_x",
+      "status": "running",
+      "summary": "Parent never announced",
+      "taskIndex": 0,
+      "taskCount": 2,
+      "toolCount": 0
+    },
+    "timestamp": 1790000001500
+  },
+  {
+    "type": "ACTIVITY_SNAPSHOT",
+    "messageId": "run_fixture_subagent:subagent:sa_1.1",
+    "activityType": "subagent",
+    "content": {
+      "id": "sa_1.1",
+      "status": "completed",
+      "summary": "Nested lookup",
+      "taskIndex": 0,
+      "taskCount": 2,
+      "toolCount": 0,
+      "durationSeconds": 1.5,
+      "parentId": "sa_1"
+    },
+    "timestamp": 1790000001750
+  },
+  {
+    "type": "SUBAGENT_FINISHED",
+    "subagentRunId": "sa_1.1",
+    "timestamp": 1790000001750
+  },
+  {
+    "type": "ACTIVITY_SNAPSHOT",
+    "messageId": "run_fixture_subagent:subagent:sa_1",
+    "activityType": "subagent",
+    "content": {
+      "id": "sa_1",
+      "status": "completed",
+      "summary": "Research pricing",
+      "taskIndex": 0,
+      "taskCount": 2,
+      "toolCount": 3,
+      "durationSeconds": 4.0
+    },
+    "timestamp": 1790000002000
+  },
+  {
+    "type": "SUBAGENT_FINISHED",
+    "subagentRunId": "sa_1",
+    "timestamp": 1790000002000
+  },
+  {
+    "type": "ACTIVITY_SNAPSHOT",
+    "messageId": "run_fixture_subagent:subagent:sa_2",
+    "activityType": "subagent",
+    "content": {
+      "id": "sa_2",
+      "status": "failed",
+      "summary": "Draft summary",
+      "taskIndex": 1,
+      "taskCount": 2,
+      "toolCount": 0
+    },
+    "timestamp": 1790000002250
+  },
+  {
+    "type": "SUBAGENT_ERROR",
+    "subagentRunId": "sa_2",
+    "message": "The delegated task failed.",
+    "code": "failed",
+    "timestamp": 1790000002250
+  },
+  {
+    "type": "ACTIVITY_SNAPSHOT",
+    "messageId": "run_fixture_subagent:subagent:sa_x",
+    "activityType": "subagent",
+    "content": {
+      "id": "sa_x",
+      "status": "cancelled",
+      "summary": "Parent never announced",
+      "taskIndex": 0,
+      "taskCount": 2,
+      "toolCount": 0
+    },
+    "timestamp": 1790000002500
+  },
+  {
+    "type": "SUBAGENT_ERROR",
+    "subagentRunId": "sa_x",
+    "message": "The delegated task was cancelled.",
+    "code": "cancelled",
+    "timestamp": 1790000002500
+  },
+  {
+    "type": "TOOL_CALL_RESULT",
+    "messageId": "run_fixture_subagent:tool-result:call_dt_1",
+    "toolCallId": "call_dt_1",
+    "content": "2 tasks: 1 completed, 1 failed",
+    "role": "tool",
+    "timestamp": 1790000003250
+  },
+  {
+    "type": "CUSTOM",
+    "name": "synthpulse.tool_timing",
+    "value": {
+      "toolCallId": "call_dt_1",
+      "durationMs": 3000,
+      "isError": false
+    },
+    "timestamp": 1790000003250
+  },
+  {
+    "type": "TEXT_MESSAGE_START",
+    "messageId": "run_fixture_subagent:text:1",
+    "role": "assistant",
+    "timestamp": 1790000003500
+  },
+  {
+    "type": "TEXT_MESSAGE_CONTENT",
+    "messageId": "run_fixture_subagent:text:1",
+    "delta": "Pricing research is done; the summary draft failed.",
+    "timestamp": 1790000003500
+  },
+  {
+    "type": "TEXT_MESSAGE_END",
+    "messageId": "run_fixture_subagent:text:1",
+    "timestamp": 1790000003750
+  },
+  {
+    "type": "STATE_SNAPSHOT",
+    "snapshot": {
+      "usage": {
+        "inputTokens": 3100,
+        "outputTokens": 120,
+        "cacheReadTokens": 800,
+        "cacheWriteTokens": 0,
+        "contextLength": 200000,
+        "thresholdTokens": 160000,
+        "lastPromptTokens": 3100,
+        "estimatedCost": 0.0042,
+        "cacheHitPercent": 33.3,
+        "turnCacheHitPercent": 33.3,
+        "durationSeconds": 4.2,
+        "tps": 38.5,
+        "costStatus": "estimated"
+      }
+    },
+    "timestamp": 1790000003750
+  },
+  {
+    "type": "MESSAGES_SNAPSHOT",
+    "messages": [
+      {
+        "id": "sess_fixture_subagent:message:0",
+        "role": "user",
+        "content": "Research pricing and draft a summary."
+      },
+      {
+        "id": "sess_fixture_subagent:message:1",
+        "role": "assistant",
+        "content": "Pricing research is done; the summary draft failed."
+      }
+    ],
+    "timestamp": 1790000003750
+  },
+  {
+    "type": "RUN_FINISHED",
+    "threadId": "sess_fixture_subagent",
+    "runId": "run_fixture_subagent",
+    "outcome": {
+      "type": "success"
+    },
+    "timestamp": 1790000004000
+  }
+]

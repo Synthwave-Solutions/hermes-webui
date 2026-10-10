@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 160" role="img">
+  <title>Text along a curve</title>
+  <path id="curve" d="M20 130Q160 10 300 130" fill="none" stroke="var(--sp-border,#d1d5db)"/>
+  <text font-size="16" fill="var(--sp-fg,#1f2937)"><textPath href="#curve" startOffset="50%" text-anchor="middle">From idea to launch</textPath></text>
+</svg>

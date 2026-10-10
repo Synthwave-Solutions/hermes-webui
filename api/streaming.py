@@ -762,6 +762,14 @@ def _webui_ephemeral_system_prompt(
             parts.append(shared_memory)
     parts.append(_WEBUI_PROGRESS_PROMPT)
     parts.append(_WEBUI_ARTIFACT_DELIVERY_PROMPT)
+    try:
+        from api import webui_visuals
+        visuals_prompt = webui_visuals.prompt_block(config_data)
+    except Exception:
+        logger.debug("WebUI visuals prompt unavailable", exc_info=True)
+        visuals_prompt = ""
+    if visuals_prompt:
+        parts.append(visuals_prompt)
     delivery_prompt = _webui_delivery_context_prompt(config_data)
     if delivery_prompt:
         parts.append(delivery_prompt)
@@ -4844,6 +4852,10 @@ def _stamp_group_bot_author(session, msg_text, profile) -> None:
         if isinstance(message, dict) and message.get('role') == 'assistant' and not message.get('bot_profile'):
             message['bot_profile'] = profile
             message['bot_name'] = label
+            from api.group_chat import latest_route_reason
+            reason = latest_route_reason(getattr(session, "session_id", None), profile)
+            if reason:
+                message["route_reason"] = reason
 
 
 def _stamp_group_message_author(session, msg_text, sender_email) -> None:
@@ -7318,6 +7330,9 @@ def _run_agent_streaming(
                 raise PermissionError('Selected bot was removed from the project')
             if execution_profile not in normalize_bots(getattr(s, 'bot_participants', None)) or not bot_allowed(_turn_identity, execution_profile):
                 raise PermissionError('Selected group bot is no longer allowed')
+            # Live bot identity (plan 5.2): which bot works on this group turn and why.
+            from api.group_chat import turn_bot_event
+            put('turn_bot', turn_bot_event(session_id, stream_id, execution_profile))
         from api import personal_context
         # Identity is captured by the authenticated dispatcher, never from
         # a selected bot or a request body user/profile override.

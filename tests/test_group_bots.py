@@ -4,6 +4,12 @@ from api import group_chat
 
 
 def test_selection_is_one_explicit_member_and_actor_authorized(monkeypatch):
+    """One member of the chat, and only one the sender may use.
+
+    Group routing (plan 5.2) lets an unaddressed message continue with the bot
+    that answered last, then the chat's default bot. Each fallback is checked
+    against the sender's rights and skipped, never used, when refused.
+    """
     session=SimpleNamespace(bot_participants=['writer','reviewer'])
     calls=[]
     def allowed(actor,bot): calls.append((actor,bot));return actor=='alice@example.test'
@@ -12,7 +18,13 @@ def test_selection_is_one_explicit_member_and_actor_authorized(monkeypatch):
     with pytest.raises(ValueError):group_chat.selected_bot(session,'Please work','alice@example.test')
     with pytest.raises(ValueError):group_chat.selected_bot(session,'@admin Work','alice@example.test')
     with pytest.raises(ValueError):group_chat.selected_bot(session,'@writer Work','other@example.test')
-    assert calls==[('alice@example.test','reviewer'),('other@example.test','writer')]
+    session.messages=[{'role':'assistant','content':'Done','bot_profile':'reviewer'}]
+    assert group_chat.selected_bot(session,'Please work','alice@example.test')=='reviewer'
+    with pytest.raises(ValueError,match='last bot is not available'):group_chat.selected_bot(session,'Please work','other@example.test')
+    session.default_bot='writer'
+    with pytest.raises(ValueError,match='last bot is not available'):group_chat.selected_bot(session,'Please work','other@example.test')
+    assert calls==[('alice@example.test','reviewer'),('other@example.test','writer'),('alice@example.test','reviewer'),
+        ('other@example.test','reviewer'),('other@example.test','reviewer'),('other@example.test','writer')]
 
 
 def test_one_bot_has_unambiguous_default(monkeypatch):

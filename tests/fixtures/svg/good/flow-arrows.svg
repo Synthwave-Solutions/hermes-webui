@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 140" role="img">
+  <title>Request flow</title>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="currentColor"/>
+    </marker>
+  </defs>
+  <g fill="none" stroke="currentColor" stroke-width="2">
+    <rect x="20" y="40" width="140" height="60" rx="10"/>
+    <rect x="250" y="40" width="140" height="60" rx="10"/>
+    <rect x="480" y="40" width="140" height="60" rx="10"/>
+    <path d="M160 70H246" marker-end="url(#arrow)"/>
+    <path d="M390 70H476" marker-end="url(#arrow)"/>
+  </g>
+  <g font-size="14" text-anchor="middle" fill="currentColor">
+    <text x="90" y="75">Ask</text><text x="320" y="75">Check</text><text x="550" y="75">Answer</text>
+  </g>
+</svg>

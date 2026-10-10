@@ -1,0 +1,101 @@
+[
+  {
+    "type": "RUN_STARTED",
+    "threadId": "sess_fixture_group",
+    "runId": "run_fixture_group",
+    "protocolVersion": "1.0",
+    "timestamp": 1790000000250
+  },
+  {
+    "type": "CUSTOM",
+    "name": "synthpulse.turn_bot",
+    "value": {
+      "bot": "sales",
+      "reason": "sticky"
+    },
+    "timestamp": 1790000000250
+  },
+  {
+    "type": "TEXT_MESSAGE_START",
+    "messageId": "run_fixture_group:text:1",
+    "role": "assistant",
+    "name": "sales",
+    "timestamp": 1790000000500
+  },
+  {
+    "type": "TEXT_MESSAGE_CONTENT",
+    "messageId": "run_fixture_group:text:1",
+    "delta": "Q3 sales were 1.2M.",
+    "timestamp": 1790000000500
+  },
+  {
+    "type": "CUSTOM",
+    "name": "synthpulse.pending_steer_leftover",
+    "value": {
+      "session_id": "sess_fixture_group",
+      "text": "also add Q4"
+    },
+    "timestamp": 1790000000750
+  },
+  {
+    "type": "TEXT_MESSAGE_END",
+    "messageId": "run_fixture_group:text:1",
+    "timestamp": 1790000001000
+  },
+  {
+    "type": "STATE_SNAPSHOT",
+    "snapshot": {
+      "usage": {
+        "inputTokens": 700,
+        "outputTokens": 20,
+        "cacheReadTokens": 800,
+        "cacheWriteTokens": 0,
+        "contextLength": 200000,
+        "thresholdTokens": 160000,
+        "lastPromptTokens": 700,
+        "estimatedCost": 0.0042,
+        "cacheHitPercent": 33.3,
+        "turnCacheHitPercent": 33.3,
+        "durationSeconds": 4.2,
+        "tps": 38.5,
+        "costStatus": "estimated"
+      }
+    },
+    "timestamp": 1790000001000
+  },
+  {
+    "type": "MESSAGES_SNAPSHOT",
+    "messages": [
+      {
+        "id": "sess_fixture_group:message:0",
+        "role": "user",
+        "content": "What were Q3 sales?"
+      },
+      {
+        "id": "sess_fixture_group:message:1",
+        "role": "assistant",
+        "name": "sales",
+        "content": "Q3 sales were 1.2M."
+      }
+    ],
+    "timestamp": 1790000001000
+  },
+  {
+    "type": "CUSTOM",
+    "name": "synthpulse.title_status",
+    "value": {
+      "session_id": "sess_fixture_group",
+      "state": "pending"
+    },
+    "timestamp": 1790000001250
+  },
+  {
+    "type": "RUN_FINISHED",
+    "threadId": "sess_fixture_group",
+    "runId": "run_fixture_group",
+    "outcome": {
+      "type": "success"
+    },
+    "timestamp": 1790000001500
+  }
+]

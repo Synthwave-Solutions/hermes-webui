@@ -1,0 +1,101 @@
+/* Group chat routing and live bot identity (plan 5.2): the reason chip on a
+   reply, the Working and Default badges in the bot roster, the default bot
+   toggle and bot descriptions in the mention picker. Quiet metadata in the
+   Calm Console style: muted text, subtle borders, one accent. */
+
+.msg-role.assistant .group-route-chip {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  margin-left: 8px;
+  padding: 0 8px;
+  border: 1px solid var(--border-subtle, var(--border));
+  border-radius: var(--radius-pill, 999px);
+  color: var(--muted);
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-size: var(--font-size-xs, 11px);
+  font-weight: 400;
+  line-height: 1.7;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-bot-recipient .group-route-default-badge,
+.chat-bot-recipient .group-route-working {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  margin-left: 2px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill, 999px);
+  font-family: var(--font-ui, system-ui, sans-serif);
+  font-size: var(--font-size-xs, 11px);
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+.chat-bot-recipient .group-route-default-badge {
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.chat-bot-recipient .group-route-working {
+  background: var(--accent-bg, transparent);
+  color: var(--accent-text, var(--text));
+}
+
+.group-route-working-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: group-route-working-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes group-route-working-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .group-route-working-dot { animation: none; }
+}
+
+.group-route-default-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  min-height: 44px;
+  margin-left: -6px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md, 8px);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.group-route-default-toggle[aria-pressed="true"] { color: var(--accent-text, var(--text)); }
+.group-route-default-toggle:hover { background: var(--hover-bg, transparent); color: var(--text); }
+.group-route-default-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.group-route-default-toggle:disabled { opacity: .6; cursor: wait; }
+
+.chat-mention-dropdown .group-route-bot-description {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-width: 100%;
+}
+
+.chat-mention-hint[data-route-warning="true"] { color: var(--text); }
+
+@media (max-width: 640px) {
+  .msg-role.assistant .group-route-chip { max-width: 60vw; margin-left: 6px; }
+  .group-route-default-toggle { margin-left: -4px; }
+}

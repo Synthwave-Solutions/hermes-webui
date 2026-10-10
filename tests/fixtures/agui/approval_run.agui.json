@@ -1,0 +1,201 @@
+[
+  {
+    "type": "RUN_STARTED",
+    "threadId": "sess_fixture_approval",
+    "runId": "run_fixture_approval",
+    "protocolVersion": "1.0",
+    "timestamp": 1790000000250
+  },
+  {
+    "type": "TEXT_MESSAGE_START",
+    "messageId": "run_fixture_approval:text:1",
+    "role": "assistant",
+    "timestamp": 1790000000250
+  },
+  {
+    "type": "TEXT_MESSAGE_CONTENT",
+    "messageId": "run_fixture_approval:text:1",
+    "delta": "I will clean the build folder.",
+    "timestamp": 1790000000250
+  },
+  {
+    "type": "TEXT_MESSAGE_END",
+    "messageId": "run_fixture_approval:text:1",
+    "timestamp": 1790000000500
+  },
+  {
+    "type": "TOOL_CALL_START",
+    "toolCallId": "call_term_1",
+    "toolCallName": "terminal",
+    "parentMessageId": "run_fixture_approval:text:1",
+    "timestamp": 1790000000500
+  },
+  {
+    "type": "TOOL_CALL_ARGS",
+    "toolCallId": "call_term_1",
+    "delta": "{\"command\":\"rm -rf build\"}",
+    "timestamp": 1790000000500
+  },
+  {
+    "type": "TOOL_CALL_END",
+    "toolCallId": "call_term_1",
+    "timestamp": 1790000000500
+  },
+  {
+    "type": "CUSTOM",
+    "name": "synthpulse.approval",
+    "value": {
+      "approvalId": "gwlocal:abc123",
+      "command": "rm -rf build",
+      "description": "Recursive delete",
+      "patternKey": "recursive_delete",
+      "patternKeys": [
+        "recursive_delete"
+      ],
+      "pendingCount": 1
+    },
+    "timestamp": 1790000000750
+  },
+  {
+    "type": "ACTIVITY_SNAPSHOT",
+    "messageId": "run_fixture_approval:approval:gwlocal:abc123",
+    "activityType": "approval",
+    "content": {
+      "kind": "approval",
+      "status": "pending",
+      "approvalId": "gwlocal:abc123",
+      "description": "Recursive delete"
+    },
+    "timestamp": 1790000000750
+  },
+  {
+    "type": "CUSTOM",
+    "name": "synthpulse.clarify",
+    "value": {
+      "clarifyId": "clr_1",
+      "question": "Which folder should I clean?",
+      "timeoutSeconds": 300,
+      "choices": [
+        "build",
+        "dist"
+      ]
+    },
+    "timestamp": 1790000001000
+  },
+  {
+    "type": "ACTIVITY_SNAPSHOT",
+    "messageId": "run_fixture_approval:clarify:clr_1",
+    "activityType": "approval",
+    "content": {
+      "kind": "clarify",
+      "status": "pending",
+      "clarifyId": "clr_1",
+      "question": "Which folder should I clean?"
+    },
+    "timestamp": 1790000001000
+  },
+  {
+    "type": "CUSTOM",
+    "name": "synthpulse.warning",
+    "value": {
+      "type": "fallback",
+      "message": "Primary model is busy, using the fallback model."
+    },
+    "timestamp": 1790000001250
+  },
+  {
+    "type": "TOOL_CALL_RESULT",
+    "messageId": "run_fixture_approval:tool-result:call_term_1",
+    "toolCallId": "call_term_1",
+    "content": "removed build/",
+    "role": "tool",
+    "timestamp": 1790000001500
+  },
+  {
+    "type": "CUSTOM",
+    "name": "synthpulse.tool_timing",
+    "value": {
+      "toolCallId": "call_term_1",
+      "durationMs": 1000,
+      "isError": false
+    },
+    "timestamp": 1790000001500
+  },
+  {
+    "type": "CUSTOM",
+    "name": "synthpulse.state_saved",
+    "value": {
+      "session_id": "sess_fixture_approval",
+      "kind": "memory",
+      "action": "saved"
+    },
+    "timestamp": 1790000001750
+  },
+  {
+    "type": "STATE_SNAPSHOT",
+    "snapshot": {
+      "usage": {
+        "inputTokens": 900,
+        "outputTokens": 30,
+        "cacheReadTokens": 800,
+        "cacheWriteTokens": 0,
+        "contextLength": 200000,
+        "thresholdTokens": 160000,
+        "lastPromptTokens": 900,
+        "estimatedCost": 0.0042,
+        "cacheHitPercent": 33.3,
+        "turnCacheHitPercent": 33.3,
+        "durationSeconds": 4.2,
+        "tps": 38.5,
+        "costStatus": "estimated"
+      }
+    },
+    "timestamp": 1790000002000
+  },
+  {
+    "type": "MESSAGES_SNAPSHOT",
+    "messages": [
+      {
+        "id": "sess_fixture_approval:message:0",
+        "role": "user",
+        "content": "Clean the build folder."
+      },
+      {
+        "id": "sess_fixture_approval:message:1",
+        "role": "assistant",
+        "content": "I will clean the build folder.",
+        "toolCalls": [
+          {
+            "id": "call_term_1",
+            "type": "function",
+            "function": {
+              "name": "terminal",
+              "arguments": "{\"command\": \"rm -rf build\"}"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sess_fixture_approval:message:2",
+        "role": "tool",
+        "content": "removed build/",
+        "toolCallId": "call_term_1"
+      },
+      {
+        "id": "sess_fixture_approval:message:3",
+        "role": "system",
+        "content": "Approval granted."
+      }
+    ],
+    "timestamp": 1790000002000
+  },
+  {
+    "type": "RUN_FINISHED",
+    "threadId": "sess_fixture_approval",
+    "runId": "run_fixture_approval",
+    "outcome": {
+      "type": "success"
+    },
+    "timestamp": 1790000002250
+  }
+]

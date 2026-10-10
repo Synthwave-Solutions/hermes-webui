@@ -1158,6 +1158,7 @@ class Session:
         self.participants = _normalize_participants(participants, owner_email=self.owner_email)
         from api.group_chat import normalize_bots
         self.bot_participants = normalize_bots(bot_participants)
+        self.default_bot = kwargs.get("default_bot") if kwargs.get("default_bot") in self.bot_participants else None
         self.composer_draft = composer_draft if isinstance(composer_draft, dict) else {}
         self.anchor_activity_scenes = anchor_activity_scenes if isinstance(anchor_activity_scenes, dict) else {}
         raw_message_count = kwargs.get('message_count')
@@ -1231,7 +1232,7 @@ class Session:
             'parent_session_id',
             'worktree_path', 'worktree_branch', 'worktree_repo_root', 'worktree_created_at',
             'is_cli_session', 'source_tag', 'raw_source', 'session_source', 'source_label', 'read_only',
-            'enabled_toolsets', 'chat_mode', 'participants', 'bot_participants', 'project_shared', 'composer_draft', 'anchor_activity_scenes',
+            'enabled_toolsets', 'chat_mode', 'participants', 'bot_participants', 'default_bot', 'project_shared', 'composer_draft', 'anchor_activity_scenes',
         ]
         meta = {k: getattr(self, k, None) for k in METADATA_FIELDS}
         meta['message_count'] = len(self.messages or [])
@@ -1508,6 +1509,7 @@ class Session:
             'chat_mode': self.chat_mode,
             'participants': list(self.participants or []),
             'bot_participants': list(self.bot_participants or []),
+            'default_bot': self.default_bot,
             'project_shared': self.project_shared,
             'share_token': self.share_token,
             'share_created_at': self.share_created_at,

@@ -1,0 +1,61 @@
+{
+  "description": "Recorded WebUI run journals and the AG-UI 1.0 events each projects to (plan 5.1, package W5). Shared by tests/test_agui_projection.py and the browser port in W10.",
+  "schema": "ag-ui-1.0.schema.json",
+  "schemaSha256": "d6972043f6f2d7adaf59242ea89561825b2690bd06ede48064aac80a803cf168",
+  "cases": [
+    {
+      "name": "tool_run",
+      "journal": "tool_run.jsonl",
+      "expected": "tool_run.agui.json",
+      "covers": "reasoning then text, a structured tool call with its id, a legacy tool call with a sequence id and a native duration, context and usage state, journal-only frames dropped, usage after done, the redacted messages snapshot"
+    },
+    {
+      "name": "subagent_run",
+      "journal": "subagent_run.jsonl",
+      "expected": "subagent_run.agui.json",
+      "covers": "subagent announce, nesting under an announced parent, an unannounced parent left out, completed, failed and cancelled subagents, reuse after finish ignored, a malformed id ignored"
+    },
+    {
+      "name": "todo_run",
+      "journal": "todo_run.jsonl",
+      "expected": "todo_run.agui.json",
+      "covers": "todo tool calls, the plan activity replaced by each todo_state, goal and goal_continue as one goal activity"
+    },
+    {
+      "name": "approval_run",
+      "journal": "approval_run.jsonl",
+      "expected": "approval_run.agui.json",
+      "covers": "approval and clarify as custom events plus approval activities, private mirror tokens dropped, warning and state_saved passthrough, a system message in the snapshot"
+    },
+    {
+      "name": "cancel_run",
+      "journal": "cancel_run.jsonl",
+      "expected": "cancel_run.agui.json",
+      "covers": "cancel closes the open message, reasoning, steps and subagent before RUN_FINISHED cancelled; later frames dropped; a cancelled apperror ignored; a later failure reported once as RUN_ERROR"
+    },
+    {
+      "name": "error_run",
+      "journal": "error_run.jsonl",
+      "expected": "error_run.agui.json",
+      "covers": "apperror becomes RUN_ERROR with its code while a reasoning span is open; nothing follows"
+    },
+    {
+      "name": "group_turn",
+      "journal": "group_turn.jsonl",
+      "expected": "group_turn.agui.json",
+      "covers": "turn_bot as synthpulse.turn_bot, the bot named on the streamed message and in the snapshot, frames between done and stream_end kept inside the run, a title after stream_end dropped"
+    },
+    {
+      "name": "steps_run",
+      "journal": "steps_run.jsonl",
+      "expected": "steps_run.agui.json",
+      "covers": "the step frame contract (started, finished, finished without started, repeated and invalid frames), interim messages streamed and not streamed, compression as the compress step, two legacy calls matched by name, an orphaned result, a tool limit stop as RUN_FINISHED cancelled"
+    },
+    {
+      "name": "truncated_run",
+      "journal": "truncated_run.jsonl",
+      "expected": "truncated_run.agui.json",
+      "covers": "a journal without a terminal frame projects without an invented ending"
+    }
+  ]
+}

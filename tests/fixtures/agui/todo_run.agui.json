@@ -1,0 +1,240 @@
+[
+  {
+    "type": "RUN_STARTED",
+    "threadId": "sess_fixture_todo",
+    "runId": "run_fixture_todo",
+    "protocolVersion": "1.0",
+    "timestamp": 1790000000250
+  },
+  {
+    "type": "TOOL_CALL_START",
+    "toolCallId": "call_todo_1",
+    "toolCallName": "todo",
+    "timestamp": 1790000000250
+  },
+  {
+    "type": "TOOL_CALL_ARGS",
+    "toolCallId": "call_todo_1",
+    "delta": "{\"todos\":[{\"content\":\"Collect figures\",\"id\":\"1\",\"status\":\"completed\"},{\"content\":\"Write draft\",\"id\":\"2\",\"status\":\"in_progress\"},{\"content\":\"Review\",\"id\":\"3\",\"status\":\"pending\"}]}",
+    "timestamp": 1790000000250
+  },
+  {
+    "type": "TOOL_CALL_END",
+    "toolCallId": "call_todo_1",
+    "timestamp": 1790000000250
+  },
+  {
+    "type": "TOOL_CALL_RESULT",
+    "messageId": "run_fixture_todo:tool-result:call_todo_1",
+    "toolCallId": "call_todo_1",
+    "content": "{\"todos\": [...]}",
+    "role": "tool",
+    "timestamp": 1790000000500
+  },
+  {
+    "type": "CUSTOM",
+    "name": "synthpulse.tool_timing",
+    "value": {
+      "toolCallId": "call_todo_1",
+      "durationMs": 250,
+      "isError": false
+    },
+    "timestamp": 1790000000500
+  },
+  {
+    "type": "ACTIVITY_SNAPSHOT",
+    "messageId": "run_fixture_todo:plan",
+    "activityType": "plan",
+    "content": {
+      "todos": [
+        {
+          "id": "1",
+          "content": "Collect figures",
+          "status": "completed"
+        },
+        {
+          "id": "2",
+          "content": "Write draft",
+          "status": "in_progress"
+        },
+        {
+          "id": "3",
+          "content": "Review",
+          "status": "pending"
+        }
+      ],
+      "summary": {
+        "total": 3,
+        "pending": 1,
+        "in_progress": 1,
+        "completed": 1,
+        "cancelled": 0
+      }
+    },
+    "timestamp": 1790000000750
+  },
+  {
+    "type": "TOOL_CALL_START",
+    "toolCallId": "call_todo_2",
+    "toolCallName": "todo",
+    "timestamp": 1790000001000
+  },
+  {
+    "type": "TOOL_CALL_ARGS",
+    "toolCallId": "call_todo_2",
+    "delta": "{\"todos\":[{\"content\":\"Collect figures\",\"id\":\"1\",\"status\":\"completed\"},{\"content\":\"Write draft\",\"id\":\"2\",\"status\":\"completed\"},{\"content\":\"Review\",\"id\":\"3\",\"status\":\"pending\"}]}",
+    "timestamp": 1790000001000
+  },
+  {
+    "type": "TOOL_CALL_END",
+    "toolCallId": "call_todo_2",
+    "timestamp": 1790000001000
+  },
+  {
+    "type": "TOOL_CALL_RESULT",
+    "messageId": "run_fixture_todo:tool-result:call_todo_2",
+    "toolCallId": "call_todo_2",
+    "content": "{\"todos\": [...]}",
+    "role": "tool",
+    "timestamp": 1790000001250
+  },
+  {
+    "type": "CUSTOM",
+    "name": "synthpulse.tool_timing",
+    "value": {
+      "toolCallId": "call_todo_2",
+      "durationMs": 250,
+      "isError": false
+    },
+    "timestamp": 1790000001250
+  },
+  {
+    "type": "ACTIVITY_SNAPSHOT",
+    "messageId": "run_fixture_todo:plan",
+    "activityType": "plan",
+    "content": {
+      "todos": [
+        {
+          "id": "1",
+          "content": "Collect figures",
+          "status": "completed"
+        },
+        {
+          "id": "2",
+          "content": "Write draft",
+          "status": "completed"
+        },
+        {
+          "id": "3",
+          "content": "Review",
+          "status": "pending"
+        }
+      ],
+      "summary": {
+        "total": 3,
+        "pending": 1,
+        "in_progress": 0,
+        "completed": 2,
+        "cancelled": 0
+      }
+    },
+    "timestamp": 1790000001500
+  },
+  {
+    "type": "TEXT_MESSAGE_START",
+    "messageId": "run_fixture_todo:text:1",
+    "role": "assistant",
+    "timestamp": 1790000001750
+  },
+  {
+    "type": "TEXT_MESSAGE_CONTENT",
+    "messageId": "run_fixture_todo:text:1",
+    "delta": "Two of three steps are done.",
+    "timestamp": 1790000001750
+  },
+  {
+    "type": "ACTIVITY_SNAPSHOT",
+    "messageId": "run_fixture_todo:goal",
+    "activityType": "goal",
+    "content": {
+      "state": "evaluating",
+      "message": "Evaluating goal progress…",
+      "messageKey": "goal_evaluating_progress"
+    },
+    "timestamp": 1790000002000
+  },
+  {
+    "type": "ACTIVITY_SNAPSHOT",
+    "messageId": "run_fixture_todo:goal",
+    "activityType": "goal",
+    "content": {
+      "state": "continuing",
+      "message": "The goal is not met yet.",
+      "messageKey": "goal_continuing"
+    },
+    "timestamp": 1790000002250
+  },
+  {
+    "type": "ACTIVITY_SNAPSHOT",
+    "messageId": "run_fixture_todo:goal",
+    "activityType": "goal",
+    "content": {
+      "state": "continuing",
+      "message": "The goal is not met yet.",
+      "messageKey": "goal_continuing",
+      "continuationPrompt": "Continue with the review."
+    },
+    "timestamp": 1790000002500
+  },
+  {
+    "type": "TEXT_MESSAGE_END",
+    "messageId": "run_fixture_todo:text:1",
+    "timestamp": 1790000002750
+  },
+  {
+    "type": "STATE_SNAPSHOT",
+    "snapshot": {
+      "usage": {
+        "inputTokens": 1800,
+        "outputTokens": 60,
+        "cacheReadTokens": 800,
+        "cacheWriteTokens": 0,
+        "contextLength": 200000,
+        "thresholdTokens": 160000,
+        "lastPromptTokens": 1800,
+        "estimatedCost": 0.0042,
+        "cacheHitPercent": 33.3,
+        "turnCacheHitPercent": 33.3,
+        "durationSeconds": 4.2,
+        "tps": 38.5,
+        "costStatus": "estimated"
+      }
+    },
+    "timestamp": 1790000002750
+  },
+  {
+    "type": "MESSAGES_SNAPSHOT",
+    "messages": [
+      {
+        "id": "sess_fixture_todo:message:0",
+        "role": "user",
+        "content": "Plan and write the report."
+      },
+      {
+        "id": "sess_fixture_todo:message:1",
+        "role": "assistant",
+        "content": "Two of three steps are done."
+      }
+    ],
+    "timestamp": 1790000002750
+  },
+  {
+    "type": "RUN_FINISHED",
+    "threadId": "sess_fixture_todo",
+    "runId": "run_fixture_todo",
+    "outcome": {
+      "type": "success"
+    },
+    "timestamp": 1790000003000
+  }
+]

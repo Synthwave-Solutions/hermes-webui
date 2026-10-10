@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="120" role="img">
+  <title>Two options</title>
+  <rect x="10" y="10" width="130" height="100" rx="8" fill="none" stroke="var(--sp-border,#d1d5db)"/>
+  <rect x="160" y="10" width="130" height="100" rx="8" fill="none" stroke="var(--sp-accent,#f97316)"/>
+  <text x="75" y="65" font-size="14" text-anchor="middle" fill="var(--sp-fg,#1f2937)">Option A</text>
+  <text x="225" y="65" font-size="14" text-anchor="middle" fill="var(--sp-fg,#1f2937)">Option B</text>
+</svg>
