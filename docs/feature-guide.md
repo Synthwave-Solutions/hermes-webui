@@ -1,8 +1,10 @@
 # Bilingual feature guide
 
 The Help section now includes **Browse all features**. Every **Explain this page**
-flow also links to the matching area of the guide. The searchable modal contains
-270 WebUI topics and a static snapshot of 178 MSP topics. Product, area and
+flow runs an interactive Guida tour over all catalogue features mapped to that page.
+Chat includes the composer, sessions, bot/voice and workspace controls, rather than
+only the three high-level overview sections. The searchable modal contains
+276 WebUI topics and a static snapshot of 181 MSP topics. Product, area and
 availability filters, English/Dutch switching, related topics and deep links work
 without a runtime connection to the MSP cockpit.
 
@@ -12,6 +14,30 @@ permissions, or planned work. It does not claim that a feature is active on the
 current installation. The read-only owner-scoped memory explorer, audio routes,
 model-gateway enforcement and optional diagnostic reporting keep their actual
 limits. Browsing help never activates them.
+
+## Interactive explanations
+
+Every feature has **Start interactive guide**. **Guide through these results**
+starts a tour of the current search/filter results, including MSP topics. One
+step contains the complete explanation of one feature, with a topic picker,
+Previous/Next, NL/EN switch and a link back to the selected catalogue entry.
+
+The guide highlights an actual visible control only in its mapped panel. Hidden,
+role-restricted, embedded, background and planned capabilities keep their full
+explanation and an explicit context notice instead of a fabricated spotlight.
+MSP topics in WebUI explain that their controls belong to the separate cockpit.
+No page switching occurs while moving between features. **Open this section**
+is an explicit navigation action through the existing panel guards; it never
+clicks a feature, changes a setting, opens a secret, sends a message or runs a job.
+
+The tooltip traps keyboard focus, blocks background clicks and shortcuts, and
+restores focus on close. Its text scrolls independently, stays readable on narrow
+screens and respects reduced motion. Pending Guida transitions cannot reopen a
+closed tour. If Guida cannot load, the complete static explanation remains open.
+
+`static/help-feature-targets.js` is the reviewed inert map from all WebUI feature
+IDs to panels, settings sections and candidate selectors. Keep it in sync with
+new controls. Empty targets are intentional when no exact parent-DOM hook exists.
 
 ## State and privacy
 
@@ -31,7 +57,7 @@ bilingual catalogs, without user, deployment or conversation data.
 
 * `static/help-features.js`: public WebUI catalog, schema version 1.
 * `static/help-msp-features.js`: static MSP catalog snapshot from cockpit
-  `521669ca1fb6372c084592ae9d03ca076aa62630`. Refresh it from the cockpit's
+  `a72b3b4fefcc1a9bd86c63455d664e0067fb9f13`. Refresh it from the cockpit's
   `apps/cockpit/frontend/public/feature-guide.json`; review the diff and rerun
   catalog/browser tests. There is no network import or shared runtime dependency.
 * `docs/feature-guide-coverage.json`: 500 concrete control mappings, 60 supplemental
@@ -58,3 +84,8 @@ fixture only. It covers bilingual and cross-product search, availability filters
 JSON download, unknown/deep links, hidden-control handling, escaped search text,
 keyboard focus, Escape, background shortcut isolation, draft preservation and
 390/1440-pixel layouts. Never point the mutation fixture at production.
+
+`tests/e2e/full/feature-interactive.spec.ts` additionally visits all 457 topics in
+both languages, checks the full chat tour, individual/filtered starts, real
+spotlights, missing targets, late-close cleanup, drafts, request isolation and
+390/900/1440-pixel layouts.

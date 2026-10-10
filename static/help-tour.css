@@ -120,3 +120,19 @@ ol.sp-help-popover-sections{list-style:decimal;padding-left:18px;}
   .guida-highlight.sp-help-highlight::before{animation:none!important;}
   .sp-help-popover,.sp-help-card{animation:none!important;}
 }
+
+/* Complete catalogue explanations reuse the interactive spotlight tour. */
+.guida-tooltip.sp-help-tooltip.sp-feature-tour{width:min(440px,calc(100vw - 24px))!important;max-height:calc(100dvh - 24px);overflow:hidden;display:flex;flex-direction:column;}
+.sp-feature-tour .guida-tooltip-content{display:flex;flex-direction:column;min-height:0;max-height:inherit;box-sizing:border-box;width:100%;padding:14px;gap:10px;}
+.sp-feature-tour .guida-header{margin:0;flex-shrink:0;}.sp-feature-tour .guida-header h3{overflow-wrap:anywhere;flex:1;min-width:0;}.sp-feature-tour .guida-progress{white-space:nowrap;flex-shrink:0;}
+.sp-feature-tour-tools{display:grid;grid-template-columns:minmax(0,1fr) 112px;gap:8px;flex-shrink:0;}
+.sp-feature-tour-tools label{display:flex;flex-direction:column;gap:4px;min-width:0;color:var(--muted);font-size:11px;}
+.sp-feature-tour-tools select{width:100%;min-width:0;min-height:38px;box-sizing:border-box;border:1px solid var(--border2);border-radius:8px;background:var(--input-bg);color:var(--text);font:inherit;font-size:12px;padding:6px;}
+.sp-feature-tour-detail{overflow:auto;min-height:0;max-height:50dvh;overscroll-behavior:contain;scrollbar-gutter:stable;font-size:13px;line-height:1.5;}
+.sp-feature-tour-detail section+section{margin-top:16px;}.sp-feature-tour-detail h4{font-size:12px;margin:0 0 5px;color:var(--text);}.sp-feature-tour .sp-feature-tour-detail p{margin:0;overflow-wrap:anywhere;}
+.sp-feature-tour-detail ol{padding-left:20px;margin:0;color:var(--muted);}.sp-feature-tour-detail li+li{margin-top:6px;}
+.sp-feature-tour .sp-feature-tour-status{margin-bottom:10px!important;color:var(--accent-text)!important;font-size:11px!important;}
+.sp-feature-tour .sp-feature-tour-note{padding:10px;margin-bottom:12px!important;background:var(--accent-bg);border-radius:8px;}
+.sp-feature-tour .guida-actions,.sp-feature-tour-links{flex-shrink:0;}.sp-feature-tour-links{display:flex;gap:8px;flex-wrap:wrap;}.sp-feature-tour .guida-arrow{display:none;}
+.sp-feature-tour :is(select,button):focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+@media(max-width:640px){.sp-feature-tour .guida-tooltip-content{padding:12px;gap:8px;}.sp-feature-tour-tools{grid-template-columns:minmax(0,1fr) 98px;}.sp-feature-tour-tools select,.sp-feature-tour .guida-btn{min-height:44px;}.sp-feature-tour .guida-btn{padding-inline:9px;font-size:12px;}}

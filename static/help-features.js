@@ -265,11 +265,12 @@ window.SynthPulseFeatureCatalog = {
       "locales": {
         "en": {
           "title": "Explain this page",
-          "purpose": "Get a short explanation tied to the current section.",
+          "purpose": "Walk through interactive explanations of every documented feature associated with the current page.",
           "when": "When you want to understand a control before changing application state.",
           "steps": [
             "Choose the question-mark help button.",
-            "Follow the highlights or open the feature guide for detail.",
+            "Use Next feature or choose a topic directly. Switch between Dutch and English and read the complete explanation.",
+            "Visible controls are highlighted. For a missing control, the guide explains the context or prerequisites that may be needed.",
             "Composer shortcut: /explain. Review any required arguments in the command suggestions."
           ],
           "permissions": "Reading this static guide needs no extra permission. Described features retain their own access checks.",
@@ -278,11 +279,12 @@ window.SynthPulseFeatureCatalog = {
         },
         "nl": {
           "title": "Leg deze pagina uit",
-          "purpose": "Krijg een korte uitleg bij het huidige onderdeel.",
+          "purpose": "Doorloop interactieve uitleg van alle gedocumenteerde functies die bij de huidige pagina horen.",
           "when": "Wanneer je een bediening wilt begrijpen voordat je de toepassing wijzigt.",
           "steps": [
             "Kies de hulpknop met het vraagteken.",
-            "Volg de markeringen of open de functiegids voor details.",
+            "Doorloop de functies met Volgende functie of kies direct een onderwerp. Wissel tussen Nederlands en Engels en lees de volledige uitleg.",
+            "Zichtbare bedieningen worden aangewezen. Bij een ontbrekende bediening lees je welke context of voorwaarden nodig kunnen zijn.",
             "Snelopdracht in het berichtveld: /explain. Controleer eventuele argumenten in de opdrachtsuggesties."
           ],
           "permissions": "Deze statische gids lezen vereist geen extra rechten. Beschreven functies behouden hun eigen toegangscontrole.",
@@ -316,10 +318,12 @@ window.SynthPulseFeatureCatalog = {
           "steps": [
             "Open Feature guide in Help.",
             "Search, filter by area or availability, then choose a result.",
+            "Choose Start interactive guide for a feature, or Guide through these results for the filtered selection.",
+            "Use Previous, Next feature and Choose a feature; each topic includes instructions, access, limits and an example.",
             "Switch language or download the catalog."
           ],
           "permissions": "Reading this static guide needs no extra permission. Described features retain their own access checks.",
-          "limits": "This guide describes capabilities, not your current permissions or live service health. Search stays in this browser.",
+          "limits": "This guide describes capabilities, not your current permissions or live service health. Search stays in this browser. The tour does not perform the instructions. Open this section navigates only when you choose it; hidden or planned controls are explained without highlighting.",
           "example": "Search for notification mute and read its limits."
         },
         "nl": {
@@ -329,10 +333,12 @@ window.SynthPulseFeatureCatalog = {
           "steps": [
             "Open Functiegids bij Hulp.",
             "Zoek, filter op onderdeel of beschikbaarheid en kies een resultaat.",
+            "Kies Interactieve uitleg starten bij de functie, of Rondleiding langs deze resultaten voor je selectie.",
+            "Gebruik Vorige, Volgende functie en Kies een functie; lees per functie ook de stappen, toegang, grenzen en het voorbeeld.",
             "Wissel van taal of download de catalogus."
           ],
           "permissions": "Deze statische gids lezen vereist geen extra rechten. Beschreven functies behouden hun eigen toegangscontrole.",
-          "limits": "Deze gids beschrijft mogelijkheden, niet je huidige rechten of actuele servicestatus. Zoeken blijft in deze browser.",
+          "limits": "Deze gids beschrijft mogelijkheden, niet je huidige rechten of actuele servicestatus. Zoeken blijft in deze browser. De rondleiding voert geen stappen uit. Open dit onderdeel navigeert alleen na jouw keuze; verborgen of geplande bedieningen krijgen uitleg zonder markering.",
           "example": "Zoek naar meldingen dempen en lees de beperkingen."
         }
       }

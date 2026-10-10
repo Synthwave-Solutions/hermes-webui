@@ -389,13 +389,18 @@
     run.ended=true;
     if(activeRun===run)activeRun=null;
     window.removeEventListener('keydown',onTourKey,true);
+    if(run.blockPointer){document.removeEventListener('pointerdown',run.blockPointer,true);document.removeEventListener('click',run.blockPointer,true);}
     try{run.cleanup.call(run.inst);}catch(_){}
     run.inst.cleanup=function(){};
     clearStepMarks();
+    if(run.observer)run.observer.disconnect();
+    if(run.frame)cancelAnimationFrame(run.frame);
+    if(run.reconcile){document.removeEventListener('transitionend',run.reconcile,true);document.removeEventListener('animationend',run.reconcile,true);}
+    if(run.anchor)run.anchor.remove();
     restoreFocus(run.trigger);
   }
 
-  const FOCUS_KEYS=['sp-help-done','guida-next','guida-prev','guida-close','sp-help-did-not-help','sp-help-support'];
+  const FOCUS_KEYS=['sp-help-done','guida-next','guida-prev','guida-close','sp-help-did-not-help','sp-help-support','sp-feature-tour-picker','sp-feature-tour-language'];
   function focusKey(node){
     return FOCUS_KEYS.find(name=>node.classList&&node.classList.contains(name))||'';
   }
@@ -437,6 +442,7 @@
       const holder=tip.querySelector('.guida-tooltip-content');
       if(holder)holder.appendChild(feedbackRow(run.id,run.title));
     }
+    if(run.mode==='feature')decorateFeature(run);
     if(run.focusedStep!==index){
       run.focusedStep=index;
       restoreFocus(primary||close);
@@ -465,12 +471,17 @@
     const tip=run.inst.state&&run.inst.state.tooltip;
     const inside=!!(tip&&tip.contains(document.activeElement));
     const idle=!document.activeElement||document.activeElement===document.body;
+    if(run.mode==='feature'){
+      event.stopImmediatePropagation();
+      if(!inside&&!idle&&event.key!=='Escape'){event.preventDefault();restoreFocus(tip?.querySelector('.guida-close'));return;}
+    }
     if(event.key==='Escape'){
       event.preventDefault();event.stopImmediatePropagation();
       run.inst.close();
       return;
     }
     if(!inside&&!idle)return;
+    if(/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement?.tagName||'')&&event.key!=='Tab')return;
     if(event.key==='ArrowRight'){event.preventDefault();event.stopImmediatePropagation();stepForward(run);return;}
     if(event.key==='ArrowLeft'){event.preventDefault();event.stopImmediatePropagation();stepBack(run);return;}
     if(event.key==='Tab'&&tip){
@@ -484,7 +495,8 @@
 
   // Starts one Guida run over resolved step elements. mode is 'tour' or
   // 'explain'; only tours remember that they were seen.
-  function runGuida(mode,id,title,steps,trigger){
+  function runGuida(mode,id,title,steps,trigger,options){
+    options=options||{};
     const Guida=guidaClass();
     if(!Guida||!steps.length)return null;
     clearStepMarks();
@@ -514,7 +526,43 @@
         customClasses:{overlay:'sp-help-overlay',backdrop:'sp-help-backdrop',tooltip:'sp-help-tooltip',highlight:'sp-help-highlight'},
       });
     }catch(_){clearStepMarks();return null;}
-    const run={mode,id,title,steps,inst,trigger,uid:'spHelpTour'+(++uid),focusedStep:-1,moving:false,ended:false,cleanup:inst.cleanup};
+    const run={mode,id,title,steps,inst,trigger,uid:'spHelpTour'+(++uid),focusedStep:-1,moving:false,ended:false,cleanup:inst.cleanup,locale:options.locale||'en',anchor:options.anchor||null};
+    if(mode==='feature'){
+      const showStep=inst.showStep;
+      inst.showStep=function(index){
+        if(run.ended||!this.state.isActive)return;
+        const step=steps[index];if(!step)return;
+        const node=resolveFeatureNode(step.feature);step.node=node||run.anchor;step.highlight=!!node;
+        clearStepMarks();step.node.setAttribute('data-sp-help-step',String(index));
+        this.config.steps[index].title=escHtml(step.feature.locales[run.locale].title);
+        this.config.steps[index].description=escHtml(step.feature.locales[run.locale].purpose);
+        this.config.steps[index].highlight=!!node;
+        this.config.steps[index].position=node?autoPosition(node):'bottom';
+        const backdrop=this.state.overlay?.querySelector('.guida-backdrop');if(!node&&backdrop)backdrop.replaceChildren();
+        showStep.call(this,index);
+      };
+      // Guida redraws on every scroll. Do not replace a scrollable explanation
+      // while the person is reading it; only reposition the card/spotlight.
+      inst.setupResizeHandler=function(){
+        const update=event=>{
+          if(run.ended||(event.target instanceof Node&&this.state.tooltip?.contains(event.target)))return;
+          const step=steps[this.state.currentStep],node=resolveFeatureNode(step.feature);
+          if(node!== (step.highlight?step.node:null)){this.showStep(this.state.currentStep);return;}
+          const backdrop=this.state.overlay?.querySelector('.guida-backdrop');
+          if(node&&backdrop)this.updateClipPath(node,backdrop,this.state.currentStepConfig);
+          positionFeatureTip(run);
+        };
+        this.state.resizeHandler=update;this.state.scrollHandler=update;
+        window.addEventListener('resize',update);document.addEventListener('scroll',update,true);
+        // Panels and picker controls can appear after their async loader or
+        // entrance animation. Re-resolve only when the current target changes.
+        run.reconcile=()=>{if(!run.frame&&!run.ended)run.frame=requestAnimationFrame(()=>{run.frame=0;update({target:document});});};
+        run.observer=new MutationObserver(run.reconcile);
+        const layout=document.querySelector('.layout');
+        if(layout)run.observer.observe(layout,{subtree:true,childList:true,attributes:true,attributeFilter:['class','style','hidden','aria-hidden']});
+        document.addEventListener('transitionend',run.reconcile,true);document.addEventListener('animationend',run.reconcile,true);
+      };
+    }
     // Storage never throws, and only tours are remembered.
     inst.markAsCompleted=function(){
       this.state.isCompleted=true;
@@ -558,6 +606,10 @@
       }
     });
     inst.on('close',()=>endRun(run));
+    if(mode==='feature'){
+      run.blockPointer=event=>{if(!(event.target instanceof Node)||!inst.state.tooltip?.contains(event.target)){event.preventDefault();event.stopImmediatePropagation();}};
+      document.addEventListener('pointerdown',run.blockPointer,true);document.addEventListener('click',run.blockPointer,true);
+    }
     activeRun=run;
     window.addEventListener('keydown',onTourKey,true);
     try{inst.start();}catch(err){
@@ -674,6 +726,107 @@
     return node;
   }
 
+  // Catalogue tours share Guida with the short onboarding tours. One step per
+  // feature keeps the complete explanation together; the topic picker gives
+  // direct access to every feature without forcing a long linear tour.
+  const FEATURE_COPY={
+    en:{next:'Next feature',back:'Previous',close:'Close',done:'Done',of:'Feature {0} of {1}',jump:'Choose a feature',language:'Guide language',guide:'Back to feature guide',open:'Open this section',purpose:'What it does',when:'When to use it',steps:'How to use it',permissions:'Access required',limits:'Conditions and limits',example:'Example',available:'Implemented',conditional:'Requires configuration or permissions',planned:'Planned',missing:'This control is not visible here. It may require another page, an open conversation, configuration or permission. The guide does not activate it or perform the steps for you.',future:'This feature is planned. There is no working control to highlight yet.',msp:'This feature belongs to the MSP cockpit. Here you can follow its explanation; its controls are in that application.',nonvisual:'This is a background capability with no separate control to highlight.',tour:'Interactive feature guide'},
+    nl:{next:'Volgende functie',back:'Vorige',close:'Sluiten',done:'Klaar',of:'Functie {0} van {1}',jump:'Kies een functie',language:'Taal van de gids',guide:'Terug naar functiegids',open:'Open dit onderdeel',purpose:'Wat het doet',when:'Wanneer je dit gebruikt',steps:'Zo gebruik je dit',permissions:'Benodigde toegang',limits:'Voorwaarden en grenzen',example:'Voorbeeld',available:'Geïmplementeerd',conditional:'Vereist configuratie of rechten',planned:'Gepland',missing:'Deze bediening is hier niet zichtbaar. Mogelijk is een andere pagina, een geopend gesprek, configuratie of toestemming nodig. De gids activeert niets en voert de stappen niet voor je uit.',future:'Deze functie is gepland. Er is nog geen werkende bediening om aan te wijzen.',msp:'Deze functie hoort bij de MSP-cockpit. Je kunt hier de uitleg doorlopen; de bediening staat in die applicatie.',nonvisual:'Dit is een achtergrondfunctie zonder afzonderlijke bediening om aan te wijzen.',tour:'Interactieve functiegids'},
+  };
+  function featureText(run,key){return FEATURE_COPY[run.locale||'en'][key];}
+  function resolveFeatureNode(feature){
+    if(feature.product==='msp'||feature.status==='planned')return null;
+    const mapping=(window.SynthPulseFeatureTargets||{})[feature.id];
+    if(mapping&&(panelHidden(mapping.panel)||mapping.panel!==currentPanel()))return null;
+    const targets=mapping?mapping.targets:(feature.anchors||[]).filter(s=>/^#[A-Za-z][\w-]*$/.test(s));
+    for(const selector of targets){
+      let nodes=[];try{nodes=document.querySelectorAll(selector);}catch(_){}
+      for(const node of nodes){if(isVisible(node)&&!node.closest('[inert]')&&node.type!=='hidden')return node;}
+    }
+    return null;
+  }
+  function positionFeatureTip(run){
+    const tip=run.inst.state.tooltip;if(!tip)return;
+    const width=window.innerWidth,height=window.innerHeight;
+    tip.style.maxHeight=Math.max(100,height-24)+'px';
+    const box=tip.getBoundingClientRect(),step=run.steps[run.inst.state.currentStep];
+    const target=step&&step.node?.getBoundingClientRect();
+    let left=(width-box.width)/2,top=(height-box.height)/2;
+    if(step?.highlight&&target){
+      left=target.left+target.width/2-box.width/2;
+      top=target.top>height/2?target.top-box.height-16:target.bottom+16;
+    }
+    tip.style.left=Math.max(12,Math.min(left,width-box.width-12))+'px';
+    tip.style.top=Math.max(12,Math.min(top,height-box.height-12))+'px';
+  }
+  function decorateFeature(run){
+    const inst=run.inst,tip=inst.state.tooltip,step=run.steps[inst.state.currentStep];
+    if(!tip||!step)return;
+    const f=step.feature,copy=f.locales[run.locale];
+    tip.classList.add('sp-feature-tour');tip.lang=run.locale;tip.dataset.feature=f.id;
+    tip.querySelector('.guida-header h3').textContent=copy.title;
+    tip.querySelector('.guida-progress span').textContent=featureText(run,'of').replace('{0}',inst.state.currentStep+1).replace('{1}',run.steps.length);
+    const container=tip.querySelector('.guida-tooltip-content');
+    const intro=container.querySelector(':scope > p');
+    const article=el('div','sp-feature-tour-detail');article.id=run.uid+'-body';
+    const status=el('p','sp-feature-tour-status',featureText(run,f.status));article.append(status);
+    if(!step.highlight){
+      const mapping=(window.SynthPulseFeatureTargets||{})[f.id];
+      const reason=f.status==='planned'?'future':f.product==='msp'?'msp':'missing';
+      article.append(el('p','sp-feature-tour-note',featureText(run,reason)));
+    }
+    for(const field of ['purpose','when','steps','permissions','limits','example']){
+      const section=el('section');section.append(el('h4','',featureText(run,field)));
+      if(field==='steps'){const list=el('ol');copy.steps.forEach(value=>list.append(el('li','',value)));section.append(list);}
+      else section.append(el('p','',copy[field]));
+      article.append(section);
+    }
+    intro.replaceWith(article);tip.setAttribute('aria-describedby',article.id);
+    const tools=el('div','sp-feature-tour-tools');
+    const pickerLabel=el('label','',featureText(run,'jump')),picker=el('select','sp-feature-tour-picker');
+    run.steps.forEach((entry,index)=>{const opt=el('option','',String(index+1)+'. '+entry.feature.locales[run.locale].title);opt.value=String(index);picker.append(opt);});
+    picker.value=String(inst.state.currentStep);picker.setAttribute('aria-label',featureText(run,'jump'));
+    picker.addEventListener('change',()=>{if(!run.ended){inst.state.currentStep=Number(picker.value);inst.showStep(inst.state.currentStep);}});
+    pickerLabel.append(picker);tools.append(pickerLabel);
+    const langLabel=el('label','',featureText(run,'language')),lang=el('select','sp-feature-tour-language');
+    for(const [value,label] of [['en','English'],['nl','Nederlands']]){const opt=el('option','',label);opt.value=value;lang.append(opt);}
+    lang.value=run.locale;lang.setAttribute('aria-label',featureText(run,'language'));
+    lang.addEventListener('change',()=>{run.locale=lang.value;storeSet('sp-feature-guide-language',run.locale);window.SynthPulseFeatureGuide.setLanguage(run.locale);inst.showStep(inst.state.currentStep);restoreFocus(inst.state.tooltip.querySelector('.sp-feature-tour-language'));});
+    langLabel.append(lang);tools.append(langLabel);container.insertBefore(tools,article);
+    const next=tip.querySelector('.guida-next'),prev=tip.querySelector('.guida-prev'),close=tip.querySelector('.guida-close');
+    if(next)next.textContent=featureText(run,next.classList.contains('sp-help-done')?'done':'next');
+    if(prev)prev.textContent=featureText(run,'back');if(close)close.textContent=featureText(run,'close');
+    const links=el('div','sp-feature-tour-links');
+    links.append(button('sp-help-chip',featureText(run,'guide'),()=>{const locale=run.locale;closeAll();window.SynthPulseFeatureGuide.open({feature:f.id,locale});}));
+    const mapping=(window.SynthPulseFeatureTargets||{})[f.id];
+    if(f.status!=='planned'&&mapping&&!panelHidden(mapping.panel)&&panelView(mapping.panel)&&
+      (mapping.panel!==currentPanel()||(mapping.section&&typeof window.switchSettingsSection==='function'))){
+      const open=button('sp-help-chip',featureText(run,'open'),async()=>{
+        open.disabled=true;
+        if(await goToPanel(mapping.panel)){
+          if(run.ended)return;
+          if(mapping.section&&typeof window.switchSettingsSection==='function')window.switchSettingsSection(mapping.section);
+          if(!run.ended)inst.showStep(inst.state.currentStep);
+        }else open.disabled=false;
+      });links.append(open);
+    }
+    container.append(links);positionFeatureTip(run);
+  }
+  function startFeatureTour(ids,opts){
+    opts=opts||{};const guide=window.SynthPulseFeatureGuide;
+    if(!guide||!Array.isArray(ids)||!guidaClass())return false;
+    const features=[...new Set(ids)].map(id=>guide.getFeature(id)).filter(Boolean);
+    if(!features.length)return false;
+    closeAll();guide.close();closeCard();
+    const locale=opts.locale==='nl'||opts.locale==='en'?opts.locale:guide.language();
+    const anchor=el('span');anchor.id='spFeatureTourAnchor';anchor.setAttribute('aria-hidden','true');
+    anchor.style.cssText='position:fixed;top:45%;left:50%;width:1px;height:1px;pointer-events:none';document.body.append(anchor);
+    const steps=features.map(f=>({id:f.id,title:f.locales[locale].title,body:f.locales[locale].purpose,node:anchor,position:'bottom',feature:f,highlight:false}));
+    const run=runGuida('feature','features',FEATURE_COPY[locale].tour,steps,opts.trigger||document.getElementById('btnPageHelp'),{locale,anchor});
+    if(!run)anchor.remove();
+    return !!run;
+  }
+
   // ── Public actions ─────────────────────────────────────────────────────────
   function closeAll(){
     if(activeRun){try{activeRun.inst.close();}catch(_){endRun(activeRun);}}
@@ -732,6 +885,9 @@
     recordEvent('explain_clicked',{page:pageId});
     const panel=parentOf(entry)||pageId;
     if(asked&&panel!==currentPanel()&&panelView(panel))await goToPanel(panel);
+    const catalog=window.SynthPulseFeatureGuide;
+    const allFeatures=catalog?.featuresForPage(pageId)||[];
+    if(allFeatures.length&&startFeatureTour(allFeatures.map(f=>f.id),{trigger,locale:catalog.language()}))return true;
     const sections=(Array.isArray(entry.sections)?entry.sections:[]).filter(section=>allowed(section,ctx));
     const visible=sections.filter(section=>typeof section.target==='string'&&isVisible(query(section.target)));
     if(visible.length&&guidaClass()){
@@ -909,6 +1065,7 @@
 
   window.SynthPulseHelp=Object.freeze({
     startTour,
+    startFeatureTour,
     explainPage,
     hasSeen,
     showWhatsNew,
