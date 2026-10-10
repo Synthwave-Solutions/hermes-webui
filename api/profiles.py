@@ -916,6 +916,372 @@ def _load_profile_config_cached(cfg_path: Path) -> dict:
     return cfg
 
 
+# ── Model gateway (plan 3.12, package R3) ──────────────────────────────────
+# Every model call of a managed installation goes through its one model
+# gateway with the caller's own key. For the profile env that means:
+#
+# * the installation's gateway posture (SP_MODEL_GATEWAY_*, SP_MANAGED and
+#   SP_AUDIT_ORG_SALT_FILE) is never taken from a profile .env, so a profile
+#   cannot lift enforcement, repoint the gateway or borrow another profile's
+#   key file;
+# * under enforcement (SP_MODEL_GATEWAY_ENFORCE=1 in the installation env, or
+#   model_gateway.enforce in the root or the profile config.yaml) provider key
+#   variables in a profile .env are skipped, with one warning per profile; the
+#   profile's own gateway key stays;
+# * each profile uses its own gateway key file (model_gateway.key_file in its
+#   config.yaml) instead of the installation's.
+#
+# Without enforcement and without a model_gateway block nothing changes.
+
+_GATEWAY_TRUTHY_VALUES = frozenset({'1', 'true', 'yes', 'on'})
+_GATEWAY_ENV_PREFIX = 'SP_MODEL_GATEWAY_'
+_GATEWAY_POSTURE_ENV_KEYS = frozenset({'SP_MANAGED', 'SP_AUDIT_ORG_SALT_FILE'})
+_GATEWAY_KEY_FILE_ENV = 'SP_MODEL_GATEWAY_KEY_FILE'
+_GATEWAY_ROUTES = ('realtime', 'audio', 'images')
+# Startup snapshots: the installation env is the authority. A later mutation of
+# os.environ (a profile env mirrored into the process for a worker) can neither
+# clear enforcement nor hand one profile another profile's key file.
+_INITIAL_GATEWAY_ENFORCE = os.getenv('SP_MODEL_GATEWAY_ENFORCE', '').strip()
+_INITIAL_GATEWAY_KEY_FILE = os.getenv(_GATEWAY_KEY_FILE_ENV, '').strip()
+
+# Provider key variables (names only) that a profile .env may not bring into
+# the process under enforcement. A fail-closed floor; the WebUI's provider map,
+# the engine's provider registry and, when present, the engine's own gateway
+# module add to it.
+_PROVIDER_KEY_ENV_FLOOR = frozenset({
+    'OPENAI_API_KEY', 'VOICE_TOOLS_OPENAI_KEY', 'AZURE_OPENAI_API_KEY',
+    'ANTHROPIC_API_KEY', 'ANTHROPIC_TOKEN', 'CLAUDE_CODE_OAUTH_TOKEN', 'AZURE_ANTHROPIC_KEY',
+    'OPENROUTER_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY', 'ELEVENLABS_API_KEY',
+    'FAL_KEY', 'GROQ_API_KEY', 'MISTRAL_API_KEY', 'XAI_API_KEY', 'DEEPSEEK_API_KEY',
+    'DEEPGRAM_API_KEY', 'COHERE_API_KEY', 'TOGETHER_API_KEY', 'FIREWORKS_API_KEY',
+    'PERPLEXITY_API_KEY', 'REPLICATE_API_TOKEN', 'HF_TOKEN', 'CORTECS_API_KEY',
+    'REGOLO_API_KEY', 'LYCEUM_API_KEY', 'VOYAGE_API_KEY', 'JINA_API_KEY',
+    'CEREBRAS_API_KEY', 'MOONSHOT_API_KEY', 'KIMI_API_KEY', 'GLM_API_KEY', 'ZAI_API_KEY',
+    'DASHSCOPE_API_KEY', 'MINIMAX_API_KEY', 'NVIDIA_API_KEY', 'ASSEMBLYAI_API_KEY',
+    'SPEECHMATICS_API_KEY', 'AZURE_SPEECH_KEY', 'KREA_API_KEY', 'AZURE_FOUNDRY_API_KEY',
+    'AWS_BEARER_TOKEN_BEDROCK', 'FREELLMAPI_API_KEY', 'LLM_UPSTREAM_API_KEY',
+})
+# Credentials that the provider registries list but that are not model keys
+# alone (source control, cloud identity, a local server or a generic custom
+# endpoint, which may be the gateway itself). They stay in the profile env.
+_SHARED_NON_MODEL_CREDENTIAL_ENV = frozenset({
+    'GH_TOKEN', 'GITHUB_TOKEN', 'CUSTOM_API_KEY', 'LM_API_KEY', 'LMSTUDIO_API_KEY',
+    'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_SESSION_TOKEN', 'AWS_PROFILE',
+    'AWS_CONTAINER_CREDENTIALS_RELATIVE_URI', 'AWS_CONTAINER_CREDENTIALS_FULL_URI',
+    'AWS_WEB_IDENTITY_TOKEN_FILE', 'AZURE_CLIENT_ID', 'AZURE_CLIENT_SECRET',
+    'AZURE_TENANT_ID', 'AZURE_FEDERATED_TOKEN_FILE', 'IDENTITY_ENDPOINT',
+    'IDENTITY_HEADER', 'MSI_ENDPOINT', 'MSI_SECRET',
+})
+
+_GATEWAY_ENV_WARNED: set[str] = set()
+_GATEWAY_ENV_WARNED_LOCK = threading.Lock()
+# True while _reload_dotenv() has put the process-wide profile's own key file
+# into os.environ; the next reload restores the installation's.
+_process_gateway_key_file_applied = False
+
+
+def _gateway_truthy(value) -> bool:
+    if isinstance(value, bool):
+        return value
+    return str(value or '').strip().lower() in _GATEWAY_TRUTHY_VALUES
+
+
+def _is_gateway_posture_env_key(key: str) -> bool:
+    """True for the installation's gateway posture, which no profile .env sets."""
+    return key.startswith(_GATEWAY_ENV_PREFIX) or key in _GATEWAY_POSTURE_ENV_KEYS
+
+
+def provider_key_env_names() -> frozenset[str]:
+    """Names of the provider key variables skipped from a profile .env under enforcement."""
+    names = set(_PROVIDER_KEY_ENV_FLOOR)
+    try:
+        from api.providers import _provider_credential_env_vars
+
+        names.update(_provider_credential_env_vars())
+    except Exception:
+        logger.debug("Provider credential env names unavailable", exc_info=True)
+    names.update(_agent_registry_credential_env_names())
+    try:
+        from agent.model_gateway import provider_credential_env_names as _engine_names
+
+        names.update(_engine_names())
+    except Exception:
+        # Engines without the model gateway module: the floor and registry apply.
+        pass
+    return frozenset(
+        name for name in names
+        if isinstance(name, str) and name
+        and name not in _SHARED_NON_MODEL_CREDENTIAL_ENV
+        and not _is_gateway_posture_env_key(name)
+    )
+
+
+def _model_gateway_block(home) -> dict:
+    if home is None:
+        return {}
+    cfg_path = Path(home).expanduser() / 'config.yaml'
+    cfg = _load_profile_config_cached(cfg_path) if cfg_path.exists() else {}
+    block = cfg.get('model_gateway') if isinstance(cfg, dict) else None
+    return block if isinstance(block, dict) else {}
+
+
+def _gateway_home(home) -> Optional[Path]:
+    if home is not None:
+        return Path(home).expanduser()
+    try:
+        return Path(get_active_hermes_home()).expanduser()
+    except Exception:
+        return None
+
+
+def _gateway_config_homes(home) -> list[Path]:
+    """The root home first (a floor for every profile), then the profile home."""
+    homes: list[Path] = []
+    for candidate in (_DEFAULT_HERMES_HOME, _gateway_home(home)):
+        if candidate is None:
+            continue
+        path = Path(candidate).expanduser()
+        if path not in homes:
+            homes.append(path)
+    return homes
+
+
+def model_gateway_enforced(home=None) -> bool:
+    """The WebUI's enforcement predicate for a profile home (the active one by default).
+
+    On when the installation env says so (at startup or now), or when the root
+    or the profile config.yaml sets ``model_gateway.enforce``. A profile can
+    never switch it off: its .env cannot set the variable and a false value in
+    its config does not lift the root's.
+    """
+    if _gateway_truthy(_INITIAL_GATEWAY_ENFORCE) or _gateway_truthy(
+            os.environ.get('SP_MODEL_GATEWAY_ENFORCE')):
+        return True
+    for candidate in _gateway_config_homes(home):
+        if _gateway_truthy(_model_gateway_block(candidate).get('enforce')):
+            return True
+    return False
+
+
+def model_gateway_base_url(home=None) -> str:
+    """The gateway's OpenAI-compatible base URL (normally ending in /v1), or ''.
+
+    The installation env (``SP_MODEL_GATEWAY_URL``) wins; otherwise the profile
+    config, then the root config.
+    """
+    value = str(os.environ.get('SP_MODEL_GATEWAY_URL') or '').strip()
+    if value:
+        return value.rstrip('/')
+    for candidate in reversed(_gateway_config_homes(home)):
+        raw = _model_gateway_block(candidate).get('base_url')
+        if isinstance(raw, str) and raw.strip():
+            return raw.strip().rstrip('/')
+    return ''
+
+
+def model_gateway_route_enabled(route: str, home=None) -> bool:
+    """True when the gateway carries ``route`` (realtime, audio or images).
+
+    The installation env (``SP_MODEL_GATEWAY_REALTIME``, ``_AUDIO``, ``_IMAGES``)
+    says so; for realtime also the engine's ``model_gateway.realtime`` setting.
+    """
+    if route not in _GATEWAY_ROUTES:
+        return False
+    if _gateway_truthy(os.environ.get(_GATEWAY_ENV_PREFIX + route.upper())):
+        return True
+    if route == 'realtime':
+        return any(_gateway_truthy(_model_gateway_block(candidate).get('realtime'))
+                   for candidate in _gateway_config_homes(home))
+    return False
+
+
+def _url_origin(url) -> Optional[tuple[str, str, int]]:
+    from urllib.parse import urlsplit
+
+    raw = str(url or '').strip()
+    if not raw:
+        return None
+    try:
+        parts = urlsplit(raw if '://' in raw else f'http://{raw}')
+        host = (parts.hostname or '').lower().rstrip('.')
+        scheme = (parts.scheme or 'http').lower()
+        port = parts.port or (443 if scheme in ('https', 'wss') else 80)
+    except ValueError:
+        return None
+    if not host:
+        return None
+    return {'wss': 'https', 'ws': 'http'}.get(scheme, scheme), host, port
+
+
+def _profile_gateway_key_env_names(home) -> tuple[str, ...]:
+    """Variables that hold the profile's own gateway key (names only).
+
+    ``model_gateway.key_env`` and the key variable of every configured provider
+    entry whose base URL is on the gateway (the HQ shape: a ``custom_providers``
+    entry for the gateway with ``key_env``).
+    """
+    if home is None:
+        return ()
+    names: list[str] = []
+    key_env = _model_gateway_block(home).get('key_env')
+    if isinstance(key_env, str) and key_env.strip():
+        names.append(key_env.strip())
+    gateway_origin = _url_origin(model_gateway_base_url(home))
+    if gateway_origin is not None:
+        cfg_path = Path(home).expanduser() / 'config.yaml'
+        cfg = _load_profile_config_cached(cfg_path) if cfg_path.exists() else {}
+        entries: list = []
+        if isinstance(cfg, dict):
+            custom = cfg.get('custom_providers')
+            if isinstance(custom, list):
+                entries.extend(custom)
+            providers = cfg.get('providers')
+            if isinstance(providers, dict):
+                entries.extend(providers.values())
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            base = entry.get('base_url') or entry.get('api') or entry.get('url')
+            if _url_origin(base) != gateway_origin:
+                continue
+            for field in ('key_env', 'api_key_env'):
+                value = str(entry.get(field) or '').strip()
+                if value:
+                    names.append(value)
+            match = re.fullmatch(r'\$\{([^}]+)\}', str(entry.get('api_key') or '').strip())
+            if match and match.group(1).strip():
+                names.append(match.group(1).strip())
+    return tuple(dict.fromkeys(names))
+
+
+def _profile_gateway_key_file(home) -> str:
+    """The profile's own gateway key file (``model_gateway.key_file``), or ''."""
+    if home is None:
+        return ''
+    raw = _model_gateway_block(home).get('key_file')
+    if not isinstance(raw, str) or not raw.strip():
+        return ''
+    path = Path(raw.strip()).expanduser()
+    if not path.is_absolute():
+        path = Path(home).expanduser() / path
+    return str(path)
+
+
+def _profile_env_file_values(home) -> dict[str, str]:
+    """The profile .env as parsed by the runtime env path (values never logged)."""
+    values: dict[str, str] = {}
+    if home is None:
+        return values
+    env_path = Path(home).expanduser() / '.env'
+    if not env_path.exists():
+        return values
+    try:
+        for line in env_path.read_text(encoding='utf-8').splitlines():
+            line = line.strip()
+            if line and not line.startswith('#') and '=' in line:
+                k, v = line.split('=', 1)
+                k = k.strip()
+                v = v.strip().strip('"').strip("'")
+                if k and v:
+                    values[k] = v
+    except Exception:
+        logger.debug("Failed to read profile env from %s", env_path)
+    return values
+
+
+def _read_gateway_key_file(path: str) -> str:
+    if not path:
+        return ''
+    try:
+        return Path(path).expanduser().read_text(encoding='utf-8').strip()
+    except OSError:
+        logger.warning("Model gateway key file %s is not readable", path)
+        return ''
+
+
+def model_gateway_key(home=None) -> str:
+    """The profile's own gateway key for a call the WebUI makes itself, or ''.
+
+    Order: the profile's key file (``model_gateway.key_file``), then the
+    profile's declared gateway key variable (its .env; for the root profile also
+    the process env), then the installation's key file as it was at startup.
+    The live ``SP_MODEL_GATEWAY_KEY_FILE`` is never read here, because a worker
+    for another profile may have mirrored that profile's file into it. The value
+    is never logged.
+    """
+    home = _gateway_home(home)
+    if home is None:
+        return _read_gateway_key_file(_INITIAL_GATEWAY_KEY_FILE)
+    own_file = _profile_gateway_key_file(home)
+    if own_file:
+        return _read_gateway_key_file(own_file)
+    names = _profile_gateway_key_env_names(home)
+    if names:
+        dotenv = _profile_env_file_values(home)
+        is_root = _DEFAULT_HERMES_HOME is not None and Path(home) == Path(_DEFAULT_HERMES_HOME).expanduser()
+        for name in names:
+            value = dotenv.get(name) or (str(os.environ.get(name) or '').strip() if is_root else '')
+            if value and value not in ('no-key-required', 'no-key'):
+                return value
+    if model_gateway_enforced(home) and home != _DEFAULT_HERMES_HOME:
+        return ''
+    return _read_gateway_key_file(_INITIAL_GATEWAY_KEY_FILE)
+
+
+class _ProfileEnvGate:
+    """Decides which profile .env variables reach the process, per profile home."""
+
+    def __init__(self, home):
+        self.home = Path(home).expanduser() if home is not None else None
+        self.enforced = model_gateway_enforced(self.home)
+        self._provider_names = provider_key_env_names() if self.enforced else frozenset()
+        self._own_key_names = frozenset(_profile_gateway_key_env_names(self.home)) if self.enforced else frozenset()
+        self.skipped_provider: list[str] = []
+        self.skipped_posture: list[str] = []
+
+    def allows(self, key: str) -> bool:
+        if _is_gateway_posture_env_key(key):
+            self.skipped_posture.append(key)
+            return False
+        if self.enforced and key in self._provider_names and key not in self._own_key_names:
+            self.skipped_provider.append(key)
+            return False
+        return True
+
+    def key_file_env(self, loaded_values: dict[str, str]) -> dict[str, str]:
+        """The gateway key file entry for this profile's runtime env."""
+        own_file = _profile_gateway_key_file(self.home)
+        if own_file:
+            return {_GATEWAY_KEY_FILE_ENV: own_file}
+        if self.enforced and (self.home != _DEFAULT_HERMES_HOME or any(loaded_values.get(name) for name in self._own_key_names)):
+            # The profile holds its own gateway key in a variable: blank the
+            # installation's key file so the engine's lookup reaches that key.
+            return {_GATEWAY_KEY_FILE_ENV: ''}
+        return {}
+
+    def warn_once(self) -> None:
+        if not (self.skipped_provider or self.skipped_posture) or self.home is None:
+            return
+        marker = str(self.home)
+        with _GATEWAY_ENV_WARNED_LOCK:
+            if marker in _GATEWAY_ENV_WARNED:
+                return
+            _GATEWAY_ENV_WARNED.add(marker)
+        if self.skipped_provider:
+            logger.warning(
+                "Profile .env %s: ignored %d provider key variable(s) under model gateway "
+                "enforcement (%s); model calls use the gateway with the profile's own key",
+                self.home / '.env', len(set(self.skipped_provider)),
+                ', '.join(sorted(set(self.skipped_provider))),
+            )
+        if self.skipped_posture:
+            logger.warning(
+                "Profile .env %s: ignored installation gateway setting(s) %s; "
+                "the installation env takes precedence",
+                self.home / '.env', ', '.join(sorted(set(self.skipped_posture))),
+            )
+
+
 def get_profile_runtime_env(home: Path) -> dict[str, str]:
     """Return env vars needed to run an agent turn for a profile home.
 
@@ -925,9 +1291,15 @@ def get_profile_runtime_env(home: Path) -> dict[str, str]:
     environment variables (matching ``hermes -p <profile>``), so streaming must
     apply the selected profile's terminal config and ``.env`` for the duration
     of that run.
+
+    Model gateway (plan 3.12): the installation's gateway posture never comes
+    from the profile ``.env``; under enforcement its provider key variables are
+    skipped (one warning per profile); and the profile's own gateway key file,
+    when it has one, becomes ``SP_MODEL_GATEWAY_KEY_FILE`` for the run.
     """
     home = Path(home).expanduser()
     env: dict[str, str] = {}
+    gate = _ProfileEnvGate(home)
 
     cfg_path = home / 'config.yaml'
     cfg = _load_profile_config_cached(cfg_path) if cfg_path.exists() else {}
@@ -954,10 +1326,14 @@ def get_profile_runtime_env(home: Path) -> dict[str, str]:
                         # the same way _reload_dotenv() protects the live env.
                         if k in _PROTECTED_ENV_KEYS:
                             continue
+                        if not gate.allows(k):
+                            continue
                         env[k] = v
         except Exception:
             logger.debug("Failed to read runtime env from %s", env_path)
 
+    env.update(gate.key_file_env(env))
+    gate.warn_once()
     return env
 
 
@@ -1101,6 +1477,14 @@ def _profile_secret_env_names(profile_home_path: Path) -> set[str]:
     # profile-scoped read can't inherit the server process's ANTHROPIC_TOKEN /
     # CLAUDE_CODE_OAUTH_TOKEN etc. (#3961 cross-profile residual leak).
     names.update(_agent_registry_credential_env_names())
+
+    # Model gateway (plan 3.12): under enforcement the worker also hides every
+    # provider key the process holds; the profile env never brings one back.
+    try:
+        if model_gateway_enforced(profile_home_path):
+            names.update(provider_key_env_names())
+    except Exception:
+        logger.debug("Failed to resolve model gateway enforcement for profile scope", exc_info=True)
 
     config_path = Path(profile_home_path) / "config.yaml"
     if not config_path.exists():
@@ -1605,42 +1989,63 @@ def _reload_dotenv(home: Path):
     Clears env vars that were loaded from the previously active profile before
     applying the current profile's .env. This prevents API keys and other
     profile-scoped secrets from leaking across profile switches.
+
+    Model gateway (plan 3.12): the installation's gateway posture never comes
+    from the profile .env; under enforcement its provider key variables are
+    skipped (one warning per profile); and the profile's own gateway key file
+    replaces the installation's until the next reload restores it.
     """
-    global _loaded_profile_env_keys
+    global _loaded_profile_env_keys, _process_gateway_key_file_applied
 
     # Remove keys loaded from the previous profile first.
     for key in list(_loaded_profile_env_keys):
         os.environ.pop(key, None)
     _loaded_profile_env_keys = set()
+    if _process_gateway_key_file_applied:
+        if _INITIAL_GATEWAY_KEY_FILE:
+            os.environ[_GATEWAY_KEY_FILE_ENV] = _INITIAL_GATEWAY_KEY_FILE
+        else:
+            os.environ.pop(_GATEWAY_KEY_FILE_ENV, None)
+        _process_gateway_key_file_applied = False
 
+    gate = _ProfileEnvGate(home)
+    loaded_values: dict[str, str] = {}
     env_path = home / '.env'
-    if not env_path.exists():
-        return
     try:
-        loaded_keys: set[str] = set()
-        for line in env_path.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if line and not line.startswith('#') and '=' in line:
-                k, v = line.split('=', 1)
-                k = k.strip()
-                v = v.strip().strip('"').strip("'")
-                if k and v:
-                    # Operator/deployment-level keys are never overridable by a
-                    # profile's own .env (#4589 — prevents a contained user from
-                    # disabling their isolation via HERMES_WEBUI_ISOLATED_PROFILE=0).
-                    if k in _PROTECTED_ENV_KEYS:
-                        logger.warning(
-                            "Ignoring protected key %s in profile .env %s; "
-                            "operator/deployment env takes precedence",
-                            k, env_path,
-                        )
-                        continue
-                    os.environ[k] = v
-                    loaded_keys.add(k)
-        _loaded_profile_env_keys = loaded_keys
-    except Exception:
-        _loaded_profile_env_keys = set()
-        logger.debug("Failed to reload dotenv from %s", env_path)
+        if env_path.exists():
+            loaded_keys: set[str] = set()
+            try:
+                for line in env_path.read_text(encoding="utf-8").splitlines():
+                    line = line.strip()
+                    if line and not line.startswith('#') and '=' in line:
+                        k, v = line.split('=', 1)
+                        k = k.strip()
+                        v = v.strip().strip('"').strip("'")
+                        if k and v:
+                            # Operator/deployment-level keys are never overridable by a
+                            # profile's own .env (#4589: prevents a contained user from
+                            # disabling their isolation via HERMES_WEBUI_ISOLATED_PROFILE=0).
+                            if k in _PROTECTED_ENV_KEYS:
+                                logger.warning(
+                                    "Ignoring protected key %s in profile .env %s; "
+                                    "operator/deployment env takes precedence",
+                                    k, env_path,
+                                )
+                                continue
+                            if not gate.allows(k):
+                                continue
+                            os.environ[k] = v
+                            loaded_keys.add(k)
+                            loaded_values[k] = v
+                _loaded_profile_env_keys = loaded_keys
+            except Exception:
+                _loaded_profile_env_keys = set()
+                logger.debug("Failed to reload dotenv from %s", env_path)
+        for key, value in gate.key_file_env(loaded_values).items():
+            os.environ[key] = value
+            _process_gateway_key_file_applied = True
+    finally:
+        gate.warn_once()
 
 
 def init_profile_state() -> None:

@@ -30,6 +30,7 @@ import os
 import re
 import threading
 import time
+import urllib.parse
 from pathlib import Path
 
 from api.helpers import bad, j
@@ -435,7 +436,54 @@ def revoke_pairing(platform: str, user_id) -> dict:
     return {"ok": True, "revoked": revoked}
 
 
-# ── Public webhook URLs through Tailscale Funnel ────────────────────────────
+# ── Public webhook URLs (provider-neutral, PLAN 3.10) ────────────────────────
+# The tailscale CLI runs only when the installation's network provider is
+# "tailscale" (SP_NET_PROVIDER unset counts as that) and SP_PUBLIC_HOOKS_BASE
+# is unset: HQ today, where this WebUI publishes each mount itself. Anywhere
+# else the platform's reverse proxy serves the hooks on the installation's own
+# domain, SP_PUBLIC_HOOKS_BASE (legacy alias SP_TS_HOOKS_BASE) is the base the
+# mounts hang under (https://hooks.example.com/hooks gives
+# https://hooks.example.com/hooks/teams), and no subprocess runs at all. An
+# unknown provider or an unusable base fails closed: no CLI, no URL.
+
+_CLI_NET_PROVIDER = "tailscale"
+_HOOKS_NOT_PUBLISHABLE = ("Webhooks cannot be published from this host, and no public webhook address "
+                          "is set for this platform.")
+
+
+def _net_setting(name: str, env: dict) -> str:
+    return str(os.getenv(name) or env.get(name) or "").strip()
+
+
+def _usable_hooks_base(raw: str) -> str:
+    base = str(raw or "").strip().rstrip("/")
+    if not base:
+        return ""
+    try:
+        parts = urllib.parse.urlsplit(base)
+        usable = (parts.scheme.lower() in ("http", "https") and bool(parts.hostname)
+                  and not parts.username and not parts.password)
+    except ValueError:
+        usable = False
+    if not usable:
+        logger.warning("channels: the public webhook base is not an http(s) URL; ignoring it")
+        return ""
+    return base
+
+
+def _hooks_route(env: dict) -> tuple[str, str]:
+    """("cli", "") when this WebUI publishes through the tailscale CLI, else
+    ("platform", base) with the usable public hooks base or ""."""
+    public = _net_setting("SP_PUBLIC_HOOKS_BASE", env)
+    provider = _net_setting("SP_NET_PROVIDER", env).lower() or _CLI_NET_PROVIDER
+    if provider == _CLI_NET_PROVIDER and not public:
+        return "cli", ""
+    return "platform", _usable_hooks_base(public or _net_setting("SP_TS_HOOKS_BASE", env))
+
+
+def _hook_url(base: str, spec: dict) -> str:
+    return base + spec["mount"].replace("/hooks", "", 1) if base else ""
+
 
 def _tailscale(*args, timeout=25):
     import shutil
@@ -456,13 +504,24 @@ def _tailnet_fqdn() -> str:
 
 
 def public_hooks_status(env: dict | None = None) -> dict:
-    """Per webhook platform: {state, url, mount}. state is published (Funnel
-    serves the mount), unpublished (CLI present, not served), or unavailable
-    (no CLI: a client container; the VM bootstrap owns Funnel there and hands
-    the base URL in as SP_TS_HOOKS_BASE)."""
+    """Per webhook platform: {state, url, mount, label, managed_by}.
+
+    Platform path (managed_by "platform"): published with the URL under the
+    public hooks base, or unavailable without a usable one; no subprocess.
+    CLI path (HQ): published (the mount is served publicly), unpublished (CLI
+    present, not served), or unavailable (no CLI; a legacy client container
+    whose bootstrap handed the base in as SP_TS_HOOKS_BASE shows that URL)."""
     env = env if env is not None else _env_values()
+    route, base = _hooks_route(env)
+    if route != "cli":
+        out = {}
+        for key, spec in PUBLIC_HOOKS.items():
+            url = _hook_url(base, spec)
+            out[key] = {"state": "published" if url else "unavailable", "url": url, "mount": spec["mount"],
+                        "label": spec["label"], "managed_by": "platform"}
+        return out
     out = {}
-    base_hint = str(os.getenv("SP_TS_HOOKS_BASE") or env.get("SP_TS_HOOKS_BASE") or "").rstrip("/")
+    base_hint = _usable_hooks_base(_net_setting("SP_TS_HOOKS_BASE", env))
     served = None
     try:
         proc = _tailscale("serve", "status", "--json", timeout=15)
@@ -482,7 +541,7 @@ def public_hooks_status(env: dict | None = None) -> dict:
         served = {}
     for key, spec in PUBLIC_HOOKS.items():
         if served is None:
-            url = base_hint + spec["mount"].replace("/hooks", "", 1) if base_hint else ""
+            url = _hook_url(base_hint, spec)
             out[key] = {"state": "published" if url else "unavailable", "url": url, "mount": spec["mount"],
                         "label": spec["label"], "managed_by": "bootstrap"}
             continue
@@ -496,20 +555,28 @@ def public_hooks_status(env: dict | None = None) -> dict:
 
 
 def publish_hook(platform: str) -> dict:
-    """Expose the platform's webhook on the tailnet node through Funnel and pin
-    the gateway listener to loopback. Idempotent; requires the Funnel node
-    attribute in the tailnet ACL (docs/TAILSCALE.md)."""
+    """Make the platform's webhook public. Platform path: nothing to do here,
+    report the URL under the public hooks base. CLI path (HQ): publish the
+    mount on the node and pin the gateway listener to loopback; idempotent,
+    needs the publish attribute in the tailnet ACL (docs/TAILSCALE.md)."""
     spec = PUBLIC_HOOKS.get(str(platform or "").strip().lower())
     if not spec:
         raise ValueError("This channel has no public webhook")
+    route, base = _hooks_route(_env_values())
+    if route != "cli":
+        if not base:
+            raise RuntimeError(_HOOKS_NOT_PUBLISHABLE)
+        # The reverse proxy reaches the listener; leave its bind address alone.
+        return {"ok": True, "platform": platform, "url": _hook_url(base, spec), "mount": spec["mount"],
+                "managed_by": "platform"}
     fqdn = _tailnet_fqdn()
     if not fqdn:
-        raise RuntimeError("Tailscale is not available on this host; the deploy bootstrap publishes webhooks at a client")
+        raise RuntimeError(_HOOKS_NOT_PUBLISHABLE)
     backend = f"http://127.0.0.1:{spec['port']}{spec['path']}"
     proc = _tailscale("funnel", "--bg", f"--https={FUNNEL_PORT}", "--set-path", spec["mount"], backend, timeout=40)
     if proc.returncode != 0:
         detail = (proc.stderr or proc.stdout or "").strip().splitlines()
-        raise RuntimeError("tailscale funnel failed: " + (detail[-1] if detail else "unknown error"))
+        raise RuntimeError("Publishing the webhook failed: " + (detail[-1] if detail else "unknown error"))
     from api.providers import _write_env_file
     _write_env_file(_env_path(), {spec["host_env"]: "127.0.0.1"})
     url = f"https://{fqdn}:{FUNNEL_PORT}{spec['mount']}"
@@ -520,6 +587,9 @@ def unpublish_hook(platform: str) -> dict:
     spec = PUBLIC_HOOKS.get(str(platform or "").strip().lower())
     if not spec:
         raise ValueError("This channel has no public webhook")
+    route, _base = _hooks_route(_env_values())
+    if route != "cli":
+        return {"ok": True, "platform": platform, "managed_by": "platform"}
     proc = _tailscale("funnel", f"--https={FUNNEL_PORT}", "--set-path", spec["mount"], "off", timeout=40)
     return {"ok": proc.returncode == 0, "platform": platform}
 

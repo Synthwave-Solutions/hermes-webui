@@ -155,7 +155,7 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
   // On page load, probe the server so we can distinguish "can't reach server"
-  // (Tailscale off, wrong network) from "session expired / need to log in".
+  // (VPN off, wrong network) from "session expired / need to log in".
   // Uses /health — public for WebUI auth, but deployment access proxies may
   // require same-origin cookies before the request reaches WebUI.
   // If unreachable, retries every 3 s and auto-reloads once the server is back.
@@ -184,7 +184,7 @@ document.addEventListener('DOMContentLoaded', function () {
           }
         })
         .catch(function () {
-          showErr('Cannot reach server — check your VPN / Tailscale connection.');
+          showErr('Cannot reach the server. Check your network or VPN connection.');
           setFormDisabled(true);
           // Keep retrying so the page auto-recovers once the network is back.
           if (retryTimer === null) {

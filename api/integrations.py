@@ -32,7 +32,10 @@ Config (env, read at call time so profile .env switches are honoured):
 - ``HERMES_WEBUI_NANGO_SECRET_KEY_FILE`` file containing the environment
   secret key (read + stripped per request-ish, cached by mtime)
 - ``HERMES_WEBUI_NANGO_CONNECT_URL``    public Connect UI base URL returned
-  to the frontend alongside minted session tokens
+  to the frontend alongside minted session tokens. There is no built-in
+  default: unset (or not an absolute http(s) URL) means connecting apps is
+  not set up on this installation, and the connect call answers
+  ``not_configured`` without minting a session or building a URL
 - ``HERMES_WEBUI_NANGO_PROVIDERS_YAML`` path to Nango's providers.yaml
 """
 from __future__ import annotations
@@ -54,7 +57,6 @@ logger = logging.getLogger(__name__)
 
 _DEFAULT_API_URL = "http://127.0.0.1:3003"
 _DEFAULT_SECRET_KEY_FILE = "/home/synthwavehq/.config/synthwave/nango/secret-key-dev"
-_DEFAULT_CONNECT_URL = "https://synthwavehq.tailbdab77.ts.net:3009"
 _DEFAULT_PROVIDERS_YAML = "/home/synthwavehq/.hermes/external/nango/providers.yaml"
 
 _NANGO_TIMEOUT_SECONDS = 15
@@ -75,6 +77,12 @@ _SCALAR_FIELDS = ("display_name", "auth_mode", "docs", "alias")
 # never does (the route answers it with HTTP 202).
 CONNECT_STATUS_READY = "ready"
 CONNECT_STATUS_PENDING = "pending_approval"
+# No connect address on this installation (HERMES_WEBUI_NANGO_CONNECT_URL
+# unset): no session, no approval bookkeeping, no URL. The frontend shows the
+# i18n key; ``message`` is its English value for other API callers.
+CONNECT_STATUS_NOT_CONFIGURED = "not_configured"
+CONNECT_NOT_CONFIGURED_KEY = "integrations_connect_not_configured"
+CONNECT_NOT_CONFIGURED_MESSAGE = "Connecting apps is not set up on this platform yet. Ask your administrator."
 
 # Catalog ``approval`` values. Deliberately only three, so the UI has one
 # field to switch a button on: anything that is not "approved" or "pending"
@@ -103,8 +111,38 @@ def _nango_api_url() -> str:
 
 
 def _nango_connect_url() -> str:
-    raw = str(os.getenv("HERMES_WEBUI_NANGO_CONNECT_URL", "") or "").strip()
-    return (raw or _DEFAULT_CONNECT_URL).rstrip("/")
+    """Public Connect UI base URL, or "" when connecting apps is not set up.
+
+    Deliberately without a built-in default (PLAN 3.10): an installation
+    without HERMES_WEBUI_NANGO_CONNECT_URL must never hand out another host's
+    address. A value that is not an absolute http(s) URL counts as unset.
+    """
+    raw = str(os.getenv("HERMES_WEBUI_NANGO_CONNECT_URL", "") or "").strip().rstrip("/")
+    if not raw:
+        return ""
+    try:
+        parts = urllib.parse.urlsplit(raw)
+        usable = (parts.scheme.lower() in ("http", "https") and bool(parts.hostname)
+                  and not parts.username and not parts.password)
+    except ValueError:
+        usable = False
+    if not usable:
+        logger.warning("integrations: HERMES_WEBUI_NANGO_CONNECT_URL is not an http(s) URL; connecting is off")
+        return ""
+    return raw
+
+
+def connect_configured() -> bool:
+    """Whether this installation has a connect address at all."""
+    return bool(_nango_connect_url())
+
+
+def _connect_not_configured() -> dict:
+    return {
+        "status": CONNECT_STATUS_NOT_CONFIGURED,
+        "message_key": CONNECT_NOT_CONFIGURED_KEY,
+        "message": CONNECT_NOT_CONFIGURED_MESSAGE,
+    }
 
 
 _DEFAULT_NANGO_ENV_FILE = "~/.config/synthwave/nango/nango.env"
@@ -429,7 +467,7 @@ def _setup_view(entry: dict, v1_row: dict | None) -> dict:
                                  "in one click.")
     elif kind == "cimd":
         view["setup_message"] = (f"{label} identifies this Nango by a public metadata URL. "
-                                 "Nango must be reachable from the internet (Tailscale Funnel) before it can connect.")
+                                 "Nango must be reachable from the internet before it can connect.")
     else:
         view["setup_message"] = (f"{label} needs its own OAuth app. An admin registers the app at the provider with the "
                                  f"redirect URL {nango_callback_url()} and pastes the client id and secret here.")
@@ -1092,14 +1130,16 @@ def _create_via_dashboard(key: str, entry: dict, credentials: dict | None) -> di
 
     dynamic: Nango registers the client at the provider during the create.
     cimd: Nango stores its metadata URL; the provider must be able to fetch
-    it, which fails on a tailnet-only host, so that is reported up front.
+    it, which fails while Nango is only reachable on a private network, so
+    that is reported up front.
     static: the admin's client id/secret travel along in ``auth``.
     """
     kind = _setup_kind(entry)
     if kind == "cimd" and not _public_https(nango_callback_url()):
         raise ValueError(
             f"{str(entry.get('display_name') or key)} identifies this Nango by a public metadata URL, "
-            "which needs Nango to be reachable from the internet. It cannot be enabled on this tailnet-only host."
+            "which needs Nango to be reachable from the internet. It cannot be enabled while Nango is only "
+            "reachable on a private network."
         )
     payload: dict[str, Any] = {"provider": str(entry.get("_provider") or key), "integrationId": key, "useSharedCredentials": False}
     if kind == "static":
@@ -1110,8 +1150,9 @@ def _create_via_dashboard(key: str, entry: dict, credentials: dict | None) -> di
 def _public_https(url: str) -> bool:
     """Whether a provider on the internet can plausibly fetch this URL.
 
-    A tailnet name can be public too (Tailscale Funnel), so only plain
-    local names are rejected here; the provider's own fetch is the real test.
+    A private network name can be published on the internet too, so only
+    plain local names are rejected here; the provider's own fetch is the real
+    test.
     """
     host = str(urllib.parse.urlsplit(url).hostname or "").lower()
     if not url.startswith("https://") or not host:
@@ -1226,6 +1267,11 @@ def create_connect_session(
       IMPLICITLY APPROVES the provider globally (see _record_admin_approval),
       so the next user gets a one-click connect.
 
+    Before any of that: without a connect address on this installation
+    (``HERMES_WEBUI_NANGO_CONNECT_URL`` unset) the call answers
+    ``{status: "not_configured", message_key, message}`` for every caller. It
+    makes no Nango call, records no approval or request and builds no URL.
+
     Existing connections are untouched by all of this: the gate sits on
     minting NEW sessions only, so providers that are already connected keep
     working, and listing/deleting connections is unchanged.
@@ -1235,6 +1281,9 @@ def create_connect_session(
     key = str(provider_config_key or "").strip()
     if not key:
         raise ValueError("provider_config_key is required")
+    connect_url = _nango_connect_url()
+    if not connect_url:
+        return _connect_not_configured()
     configured = {str(row.get("unique_key") or "") for row in _list_integrations()}
     if key not in configured:
         raise ValueError(f"integration '{key}' is not configured in Nango")
@@ -1287,7 +1336,7 @@ def create_connect_session(
         "status": CONNECT_STATUS_READY,
         "approval": APPROVAL_APPROVED,
         "token": token,
-        "connect_url": _nango_connect_url(),
+        "connect_url": connect_url,
         "expires_at": data.get("expires_at"),
     }
 

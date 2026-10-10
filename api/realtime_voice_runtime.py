@@ -195,8 +195,11 @@ class VoiceController:
     MAX_TASKS = 16
     TTL = 15 * 60
 
-    def __init__(self, bridge, call_id, *, connector=None, journal_dir=None):
+    def __init__(self, bridge, call_id, *, connector=None, journal_dir=None, route=None):
         self.bridge, self.call_id = bridge, call_id
+        # The realtime route the call was created on (api.realtime_voice.RealtimeRoute).
+        # None means the route in force when the sideband opens.
+        self.route = route
         self.voice_id = uuid.uuid4().hex
         self.actor, self.session_id = bridge.actor, bridge.session_id
         self.created = time.monotonic()
@@ -217,7 +220,22 @@ class VoiceController:
     def check(self):
         if self.closed.is_set() or time.monotonic() - self.created >= self.TTL:
             raise PermissionError("Voice connection ended")
+        self._check_route()
         return self.bridge.check()
+
+    def _check_route(self):
+        """End the call once its route is no longer the one in force (plan 3.12).
+
+        A call made on the direct provider route ends within a monitor tick of
+        model gateway enforcement being switched on, and a gateway call ends
+        when the gateway stops carrying the realtime route.
+        """
+        from api.realtime_voice import realtime_route
+
+        current = realtime_route(self.route.home if self.route is not None else None)
+        mine = self.route.kind if self.route is not None else "direct"
+        if current.kind == "refused" or current.kind != mine:
+            raise PermissionError("Live voice is no longer available on this platform")
 
     def persist(self):
         # This journal contains no cookies, provider IDs, SDP, tokens or raw audio.
@@ -259,13 +277,18 @@ class VoiceController:
             return self._snapshot()
 
     def start(self):
+        from api.realtime_voice import authorization, realtime_route, sideband_url
+        if self.route is None:
+            self.route = realtime_route()
+        if self.route.kind == "refused":
+            raise PermissionError("Live voice is not available on this platform")
         self.check()
         if self.connector is None:
             from websockets.sync.client import connect
             self.connector = connect
         self.socket = self.connector(
-            "wss://api.openai.com/v1/realtime?" + urlencode({"call_id": self.call_id}),
-            additional_headers={"Authorization": "Bearer " + os.environ["OPENAI_API_KEY"]},
+            sideband_url(self.route, self.call_id),
+            additional_headers={"Authorization": authorization(self.route)},
             proxy=None, open_timeout=10, max_size=1024 * 1024)
         self.check()
         self.state = "listening"
@@ -478,7 +501,7 @@ class VoiceController:
             if hasattr(self.bridge, "headers"):
                 self.bridge.headers.clear()
             from api.realtime_voice import hangup_call
-            hangup_call(self.call_id)
+            hangup_call(self.call_id, self.route)
             try:
                 self.persist()
             except Exception:

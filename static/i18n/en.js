@@ -1,5 +1,8 @@
 // Locale bundle; loaded on demand by static/i18n.js.
 window.__registerHermesLocale('en', {
+  integrations_connect_not_configured: 'Connecting apps is not set up on this platform yet. Ask your administrator.',
+  channels_hook_on_save_neutral: 'On save the webhook is published on your platform\'s public address and the URL appears on the card. Enter that URL at the provider.',
+  voice_live_unavailable: 'Live voice is not available on this platform.',
     cron_notify_legend: 'Notifications',
     cron_notify_me_label: 'Notify me',
     cron_notify_me_all: 'Every run',

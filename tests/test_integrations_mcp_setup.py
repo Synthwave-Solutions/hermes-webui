@@ -36,6 +36,8 @@ def mcp(monkeypatch):
     monkeypatch.setattr(integrations, '_approval_entries', lambda: {})
     monkeypatch.setattr(integrations, '_record_admin_approval', lambda *a: approved.append(a))
     monkeypatch.setattr(integrations, '_nango_dashboard_auth', lambda: None)
+    # No built-in connect address since N3: connecting needs the variable.
+    monkeypatch.setenv('HERMES_WEBUI_NANGO_CONNECT_URL', 'https://connect.example.test:3009')
 
     def request(method, path, **kwargs):
         sent.append((method, path, kwargs))
@@ -193,3 +195,37 @@ def test_repair_static_stores_the_admin_credentials(dashboard):
     assert patch[1] == '/integrations/slack-mcp'
     assert patch[2] == {'authType': 'MCP_OAUTH2', 'clientId': 'id', 'clientSecret': 'sec', 'scopes': 'channels:read,chat:write'}
     assert sent == []
+
+
+# ── Setup copy names no network product (PLAN 3.10, N3) ──────────────────────
+
+NETWORK_PRODUCTS = ('Tailscale', 'tailnet', 'Funnel', 'NetBird', 'WireGuard', 'Headscale')
+DASHES = ('\u2013', '\u2014')
+
+
+def _neutral(text):
+    return not any(p.lower() in text.lower() for p in NETWORK_PRODUCTS) and not any(d in text for d in DASHES)
+
+
+def test_cimd_setup_message_names_no_network_product(dashboard):
+    entries, configured, sent, approved, rows, v1 = dashboard
+    configured.append({'provider': 'lovable-mcp', 'unique_key': 'lovable-mcp'})
+    rows['lovable-mcp'] = {'unique_key': 'lovable-mcp', 'provider': 'lovable-mcp', 'oauth_client_id': None, 'missing_fields': []}
+    row = next(r for r in integrations.get_catalog(is_admin=True)['providers'] if r.get('unique_key') == 'lovable-mcp')
+    assert row['needs_setup'] is True and row['setup_kind'] == 'cimd'
+    assert 'reachable from the internet' in row['setup_message']
+    assert _neutral(row['setup_message'])
+
+
+def test_private_host_refusal_names_no_network_product(dashboard, monkeypatch):
+    monkeypatch.setattr(integrations, 'nango_callback_url', lambda: 'http://nango.internal:3003/oauth/callback')
+    with pytest.raises(ValueError) as exc:
+        integrations.enable_integration('admin@example.test', 'lovable-mcp')
+    assert 'internet' in str(exc.value)
+    assert _neutral(str(exc.value))
+
+
+def test_setup_copy_in_the_module_names_no_network_product():
+    import inspect
+    for fn in (integrations._setup_view, integrations._create_via_dashboard, integrations._public_https):
+        assert _neutral(inspect.getsource(fn)), fn.__name__

@@ -213,11 +213,11 @@ if(typeof document!=='undefined') (function(){
     if(!window.isSecureContext||!navigator.mediaDevices?.getUserMedia||typeof RTCPeerConnection==='undefined'){
       launchPending=false;showToast('Voice mode needs HTTPS and microphone support');return;
     }
-    const cap=await api('/api/voice/realtime/capability',{retries:0}).catch(()=>null);
+    const cap=await api('/api/voice/realtime/capability',{retries:0}).catch(error=>({available:false,help:error?.status===409?(typeof t==='function'?t('voice_live_unavailable'):'Live voice is not available on this platform.'):null}));
     if(intent!==launchEpoch)return;
     if(current()!==sid){launchPending=false;return;}
     launchPending=false;
-    if(!cap?.available){showToast('Voice mode is not enabled. Ask an administrator to enable speech.');return;}
+    if(!cap?.available){showToast(cap?.help||'Voice mode is not enabled. Ask an administrator to enable speech.');return;}
     if(typeof window._voiceModeActive==='function'&&window._voiceModeActive()){
       showToast('Turn off the existing voice mode first');return;
     }

@@ -18,6 +18,9 @@
 // While the popup is open we poll the connections list every 3s and stop
 // when it closes.
 //
+// Not set up: without a connect address on this installation the server
+// answers {"status":"not_configured"} and mints nothing; we say so and stop.
+//
 // Approvals: each catalog provider carries an "approval" field from the
 // approvals registry (api/approvals.py) - "approved" (or absent, for the
 // admin-managed globals that predate the registry) means connect straight
@@ -731,6 +734,14 @@ async function _intgConnect(providerConfigKey) {
     await _intgRefreshRequests();
     return;
   }
+  // No connect address on this platform: nothing was minted, nothing to open.
+  if (data && String(data.status || '') === 'not_configured') {
+    closePopup();
+    if (typeof showToast === 'function') {
+      showToast(_intgT('integrations_connect_not_configured', 'Connecting apps is not set up on this platform yet. Ask your administrator.'), 6000, 'warning');
+    }
+    return;
+  }
   const base = String((data && data.connect_url) || '').replace(/\/+$/, '');
   const token = String((data && data.token) || '');
   if (!base || !token) {
@@ -930,7 +941,7 @@ function chOpenConfigure(key) {
     const pub = document.createElement('div'); pub.className = 'app-dialog-desc ch-public';
     pub.textContent = p.public.state === 'published'
       ? p.public.label + ': ' + p.public.url
-      : _intgT('channels_hook_on_save', 'On save the webhook is published through Tailscale Funnel and the public URL appears on the card. Enter that URL at the provider.');
+      : _intgT('channels_hook_on_save_neutral', "On save the webhook is published on your platform's public address and the URL appears on the card. Enter that URL at the provider.");
     form.appendChild(pub);
   }
   const inputs = {};

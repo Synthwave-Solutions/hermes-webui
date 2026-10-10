@@ -11,6 +11,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import api.gateway_channels as ch  # noqa: E402
 
+NET_ENV_KEYS = ("SP_NET_PROVIDER", "SP_PUBLIC_HOOKS_BASE", "SP_TS_HOOKS_BASE")
+
+
+@pytest.fixture(autouse=True)
+def _no_ambient_network_env(monkeypatch):
+    """The publish and status paths read these; never inherit them from the runner."""
+    for key in NET_ENV_KEYS:
+        monkeypatch.delenv(key, raising=False)
+
 
 @pytest.fixture
 def env(monkeypatch, tmp_path):
@@ -226,6 +235,223 @@ def test_publish_hook_runs_funnel_and_pins_loopback(env, monkeypatch):
     assert "WHATSAPP_CLOUD_WEBHOOK_HOST=127.0.0.1" in env.read_text()
     with pytest.raises(ValueError):
         ch.publish_hook("telegram")
+
+
+# ── provider-neutral publish and status (PLAN 3.10, N3) ─────────────────────
+# The tailscale CLI runs only when SP_NET_PROVIDER is unset or "tailscale" and
+# SP_PUBLIC_HOOKS_BASE is unset (HQ today). Otherwise the URL comes from
+# SP_PUBLIC_HOOKS_BASE (legacy alias SP_TS_HOOKS_BASE) and nothing is spawned.
+
+PUBLIC_BASE = "https://hooks.acme.example/hooks"
+NETWORK_PRODUCTS = ("Tailscale", "tailnet", "Funnel", "NetBird", "WireGuard", "Headscale")
+DASHES = ("\u2013", "\u2014")
+
+
+@pytest.fixture
+def no_subprocess(monkeypatch):
+    """Fail the test on any CLI lookup or process spawn, even a swallowed one."""
+    import shutil
+    import subprocess
+    attempts = []
+
+    def refuse(*args, **kwargs):
+        attempts.append(args)
+        raise AssertionError(f"no subprocess expected, got {args!r}")
+    monkeypatch.setattr(ch, "_tailscale", refuse)
+    monkeypatch.setattr(subprocess, "run", refuse)
+    monkeypatch.setattr(subprocess, "Popen", refuse)
+    monkeypatch.setattr(shutil, "which", refuse)
+    yield attempts
+    assert attempts == [], "a CLI was looked up or spawned"
+
+
+def _neutral(text: str) -> bool:
+    return not any(p.lower() in text.lower() for p in NETWORK_PRODUCTS) and not any(d in text for d in DASHES)
+
+
+@pytest.mark.parametrize("provider", ["netbird", "none", " NetBird "])
+def test_non_tailscale_status_uses_the_public_base_without_subprocess(env, monkeypatch, no_subprocess, provider):
+    monkeypatch.setenv("SP_NET_PROVIDER", provider)
+    monkeypatch.setenv("SP_PUBLIC_HOOKS_BASE", PUBLIC_BASE + "/")
+    hooks = ch.public_hooks_status({})
+    assert hooks["whatsapp_cloud"] == {"state": "published", "url": "https://hooks.acme.example/hooks/whatsapp",
+                                       "mount": "/hooks/whatsapp", "label": "Meta webhook callback URL",
+                                       "managed_by": "platform"}
+    assert hooks["teams"]["url"] == "https://hooks.acme.example/hooks/teams"
+    assert hooks["teams"]["state"] == "published"
+    wa = next(p for p in ch.status_payload()["platforms"] if p["key"] == "whatsapp_cloud")
+    assert wa["public"]["url"] == "https://hooks.acme.example/hooks/whatsapp"
+
+
+@pytest.mark.parametrize("provider", ["netbird", "none"])
+def test_non_tailscale_without_a_base_is_unavailable_without_subprocess(env, monkeypatch, no_subprocess, provider):
+    monkeypatch.setenv("SP_NET_PROVIDER", provider)
+    hooks = ch.public_hooks_status({})
+    for key in ch.PUBLIC_HOOKS:
+        assert hooks[key]["state"] == "unavailable" and hooks[key]["url"] == ""
+        assert hooks[key]["managed_by"] == "platform"
+
+
+@pytest.mark.parametrize("provider", [None, "tailscale"])
+def test_public_base_skips_the_cli_on_tailscale_too(env, monkeypatch, no_subprocess, provider):
+    if provider:
+        monkeypatch.setenv("SP_NET_PROVIDER", provider)
+    monkeypatch.setenv("SP_PUBLIC_HOOKS_BASE", PUBLIC_BASE)
+    hooks = ch.public_hooks_status({})
+    assert hooks["teams"]["state"] == "published"
+    assert hooks["teams"]["url"] == "https://hooks.acme.example/hooks/teams"
+    out = ch.publish_hook("teams")
+    assert out["url"] == "https://hooks.acme.example/hooks/teams" and out["managed_by"] == "platform"
+
+
+def test_legacy_hooks_base_is_an_alias_and_the_public_base_wins(env, monkeypatch, no_subprocess):
+    monkeypatch.setenv("SP_NET_PROVIDER", "netbird")
+    monkeypatch.setenv("SP_TS_HOOKS_BASE", "https://legacy.acme.example/hooks")
+    assert ch.public_hooks_status({})["teams"]["url"] == "https://legacy.acme.example/hooks/teams"
+    # The profile .env counts the same way as the process env.
+    monkeypatch.delenv("SP_TS_HOOKS_BASE")
+    assert ch.public_hooks_status({"SP_TS_HOOKS_BASE": "https://legacy.acme.example/hooks"})["teams"]["state"] == "published"
+    monkeypatch.setenv("SP_PUBLIC_HOOKS_BASE", PUBLIC_BASE)
+    monkeypatch.setenv("SP_TS_HOOKS_BASE", "https://legacy.acme.example/hooks")
+    assert ch.public_hooks_status({})["teams"]["url"] == "https://hooks.acme.example/hooks/teams"
+
+
+def test_an_unknown_provider_fails_closed(env, monkeypatch, no_subprocess):
+    monkeypatch.setenv("SP_NET_PROVIDER", "headscale")
+    assert ch.public_hooks_status({})["teams"]["state"] == "unavailable"
+    with pytest.raises(RuntimeError):
+        ch.publish_hook("teams")
+
+
+@pytest.mark.parametrize("base", ["javascript:alert(1)", "ftp://hooks.acme.example/hooks",
+                                  "https://user:pw@hooks.acme.example/hooks", "https://", "hooks.acme.example"])
+def test_an_unusable_public_base_fails_closed(env, monkeypatch, no_subprocess, base):
+    monkeypatch.setenv("SP_PUBLIC_HOOKS_BASE", base)
+    hooks = ch.public_hooks_status({})
+    assert hooks["whatsapp_cloud"]["state"] == "unavailable" and hooks["whatsapp_cloud"]["url"] == ""
+    with pytest.raises(RuntimeError):
+        ch.publish_hook("whatsapp_cloud")
+
+
+def test_publish_off_tailscale_reports_the_url_and_writes_nothing(env, monkeypatch, no_subprocess):
+    monkeypatch.setenv("SP_NET_PROVIDER", "netbird")
+    monkeypatch.setenv("SP_PUBLIC_HOOKS_BASE", PUBLIC_BASE)
+    before = env.read_text()
+    out = ch.publish_hook("whatsapp_cloud")
+    assert out == {"ok": True, "platform": "whatsapp_cloud", "url": "https://hooks.acme.example/hooks/whatsapp",
+                   "mount": "/hooks/whatsapp", "managed_by": "platform"}
+    # The platform's reverse proxy reaches the listener; never pin it to loopback here.
+    assert env.read_text() == before
+    assert ch.unpublish_hook("whatsapp_cloud") == {"ok": True, "platform": "whatsapp_cloud", "managed_by": "platform"}
+    with pytest.raises(ValueError):
+        ch.publish_hook("telegram")
+
+
+def test_publish_off_tailscale_without_a_base_refuses_in_neutral_words(env, monkeypatch, no_subprocess):
+    monkeypatch.setenv("SP_NET_PROVIDER", "none")
+    with pytest.raises(RuntimeError) as exc:
+        ch.publish_hook("teams")
+    assert _neutral(str(exc.value))
+
+
+def test_configure_route_off_tailscale_spawns_nothing(env, monkeypatch, no_subprocess):
+    import io
+    monkeypatch.setenv("SP_NET_PROVIDER", "netbird")
+    monkeypatch.setenv("SP_PUBLIC_HOOKS_BASE", PUBLIC_BASE)
+
+    class _Handler:
+        def __init__(self):
+            self.status, self.headers, self.wfile = None, {}, io.BytesIO()
+
+        def send_response(self, status):
+            self.status = status
+
+        def send_header(self, *a):
+            pass
+
+        def end_headers(self):
+            pass
+
+    handler = _Handler()
+    ch.handle_post(handler, "/api/gateway/channels/configure",
+                   {"platform": "teams", "values": {"TEAMS_CLIENT_ID": "id", "TEAMS_CLIENT_SECRET": "s", "TEAMS_TENANT_ID": "t"}})
+    assert handler.status == 200
+    body = json.loads(handler.wfile.getvalue().decode("utf-8"))
+    assert body["public"]["url"] == "https://hooks.acme.example/hooks/teams"
+    handler = _Handler()
+    ch.handle_post(handler, "/api/gateway/channels/disable", {"platform": "teams"})
+    assert handler.status == 200
+
+
+@pytest.mark.parametrize("provider", [None, "tailscale", " Tailscale "])
+def test_tailscale_path_runs_exactly_todays_commands(env, monkeypatch, provider):
+    if provider:
+        monkeypatch.setenv("SP_NET_PROVIDER", provider)
+    calls = []
+
+    class _Proc:
+        def __init__(self, out=""):
+            self.stdout, self.stderr, self.returncode = out, "", 0
+    serve = {"AllowFunnel": {"node.tail.ts.net:8443": True},
+             "Web": {"node.tail.ts.net:8443": {"Handlers": {"/hooks/teams": {"Proxy": "http://127.0.0.1:3978/api/messages"}}}}}
+
+    def fake(*args, timeout=25):
+        calls.append(args)
+        if args[:2] == ("serve", "status"):
+            return _Proc(json.dumps(serve))
+        if args[:2] == ("status", "--json"):
+            return _Proc(json.dumps({"Self": {"DNSName": "node.tail.ts.net."}}))
+        return _Proc()
+    monkeypatch.setattr(ch, "_tailscale", fake)
+    hooks = ch.public_hooks_status({})
+    assert calls == [("serve", "status", "--json"), ("status", "--json")]
+    assert hooks["teams"] == {"state": "published", "url": "https://node.tail.ts.net:8443/hooks/teams",
+                              "mount": "/hooks/teams", "label": "Azure Bot messaging endpoint", "managed_by": "webui"}
+    assert hooks["whatsapp_cloud"]["state"] == "unpublished"
+    calls.clear()
+    out = ch.publish_hook("whatsapp_cloud")
+    assert calls == [("status", "--json"),
+                     ("funnel", "--bg", "--https=8443", "--set-path", "/hooks/whatsapp", "http://127.0.0.1:8090/whatsapp/webhook")]
+    assert out["url"] == "https://node.tail.ts.net:8443/hooks/whatsapp"
+    assert "WHATSAPP_CLOUD_WEBHOOK_HOST=127.0.0.1" in env.read_text()
+    calls.clear()
+    ch.unpublish_hook("whatsapp_cloud")
+    assert calls == [("funnel", "--https=8443", "--set-path", "/hooks/whatsapp", "off")]
+
+
+def test_tailscale_path_errors_are_worded_neutrally(env, monkeypatch):
+    def missing(*args, timeout=25):
+        raise FileNotFoundError("no cli")
+    monkeypatch.setattr(ch, "_tailscale", missing)
+    with pytest.raises(RuntimeError) as exc:
+        ch.publish_hook("teams")
+    assert _neutral(str(exc.value))
+
+    class _Proc:
+        def __init__(self, out="", rc=0):
+            self.stdout, self.stderr, self.returncode = out, "", rc
+
+    def failing(*args, timeout=25):
+        if args[:2] == ("status", "--json"):
+            return _Proc(json.dumps({"Self": {"DNSName": "node.tail.ts.net."}}))
+        return _Proc("", 1)
+    monkeypatch.setattr(ch, "_tailscale", failing)
+    with pytest.raises(RuntimeError) as exc:
+        ch.publish_hook("teams")
+    assert _neutral(str(exc.value))
+
+
+def test_channel_dialog_uses_the_neutral_hook_copy():
+    root = Path(__file__).resolve().parent.parent
+    js = (root / "static" / "integrations.js").read_text(encoding="utf-8")
+    en = (root / "static" / "i18n" / "en.js").read_text(encoding="utf-8")
+    neutral = ("On save the webhook is published on your platform's public address and the URL appears "
+               "on the card. Enter that URL at the provider.")
+    assert "channels_hook_on_save_neutral: '" + neutral.replace("'", "\\'") + "'" in en
+    assert "_intgT('channels_hook_on_save_neutral', \"" + neutral + "\")" in js
+    assert "_intgT('channels_hook_on_save'," not in js
+    assert "through Tailscale Funnel" not in js
+    assert _neutral(neutral)
 
 
 # ── one bot per person (self-service) ───────────────────────────────────────
