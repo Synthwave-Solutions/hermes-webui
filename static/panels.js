@@ -454,7 +454,7 @@ async function switchPanel(name, opts = {}) {
   }
   if (opts.fromRailClick && typeof _isDesktopWidth === 'function' && !_isDesktopWidth()) {
     const sidebar = document.querySelector('.sidebar');
-    if (['chat', 'governance', 'integrations', 'approvals', 'modules', 'apps'].includes(nextPanel)) {
+    if (['chat', 'governance', 'integrations', 'approvals', 'modules', 'apps', 'msp'].includes(nextPanel)) {
       _closeMobileSidebarAfterPanelSelection();
     } else if (sidebar) {
       sidebar.classList.remove('mobile-session-page');
