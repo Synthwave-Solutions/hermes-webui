@@ -31,13 +31,13 @@ Example using documentation-only addresses:
 
 The curated registry includes OpenDesign, Craft Studio and all eight editors,
 HyperFrames, n8n, OmniRoute, Nango, DocuSeal, RAGFlow,
-Langfuse and five separate HermesOffice editors: Docs (Word), Sheets (Excel),
+Langfuse and five separate SynthPulse Office editors: Docs (Word), Sheets (Excel),
 Slides (PowerPoint), PDF and Markdown. OpenWebUI, MSP Cockpit, personal dashboards,
 and the classic design entry are omitted. Craft Studio and its editors share
 Design & video with OpenDesign and HyperFrames. Every destination follows the
 same trusted-host rule; there is no external desktop download exception.
 
-HermesOffice destinations point to the independently deployed browser workspace
+SynthPulse Office destinations point to the independently deployed browser workspace
 on the VPS. Each editor starts directly from its own tile. The workspace requires
 an authenticated owner account with platform access, connects AI to OmniRoute,
 and offers uploads and downloads for its document folder. It does not turn a
@@ -55,11 +55,11 @@ in the directory do not relax hostname validation.
 ## Access and module behavior
 
 Members see only member entries whose associated module is active. Creative
-apps use `design_studio`; DocuSeal uses `e_signing` and HermesOffice uses `office_apps`. n8n requires platform scope
+apps use `design_studio`; DocuSeal uses `e_signing` and SynthPulse Office uses `office_apps`. n8n requires platform scope
 unless `SP_WORKFLOWS_CLIENT_EDITOR=1` explicitly permits member access; it still
 requires the `workflows` module for members.
 
-OmniRoute, Nango, RAGFlow, Langfuse and the HermesOffice editors are platform-only entries. Organisation,
+OmniRoute, Nango, RAGFlow, Langfuse and the SynthPulse Office editors are platform-only entries. Organisation,
 department and billing administrators do not thereby gain platform access.
 
 Platform administrators can discover all explicitly configured named apps,

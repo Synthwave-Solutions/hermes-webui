@@ -14064,13 +14064,13 @@ window.SynthPulseFeatureCatalog = {
       ],
       "locales": {
         "nl": {
-          "title": "HermesOffice Docs (Word) gebruiken",
+          "title": "SynthPulse Office Docs (Word) gebruiken",
           "purpose": "Schrijf en bewerk Word-documenten met opmaak, tabellen en AI-hulp. Deze editor draait op de VPS en opent vanuit SynthPulse in je browser.",
           "when": "Gebruik dit om documenten te maken of een bestaand docx-bestand te bewerken.",
           "steps": [
-            "Kies Apps onderaan de navigatie en open HermesOffice Docs (Word) in Documenten en kennis.",
+            "Kies Apps onderaan de navigatie en open SynthPulse Office Docs (Word) in Documenten en kennis.",
             "Kies Open app. Je SynthPulse-aanmelding geeft de eigenaar toegang tot de eigen VPS-werkruimte. Wacht tot Verbonden met VPS verschijnt.",
-            "Voor een bestaand bestand: kies Bestanden, upload het bestand en open het in de editor via Bestand > Openen vanuit /documents. Voor een nieuw bestand gebruik je de nieuw-functie van de editor.",
+            "Voor een bestaand bestand: kies Bestanden, upload het bestand en open het in de editor via Bestand > Openen vanuit /documents. Voor een nieuw bestand gebruik je de nieuw-functie van de editor. Of vraag Super Agent, Claude Code of Codex om met de skill synthpulse-office-docs een bestand te maken en in SynthPulse Office te openen.",
             "Bewerk je bestand. Open het AI-paneel en beschrijf de gewenste wijziging; de AI loopt via de ingestelde OmniRoute-verbinding. Controleer voorgestelde wijzigingen voordat je verder werkt.",
             "Sla op in /documents. Kies Bestanden, Vernieuwen en klik op de bestandsnaam om je resultaat naar je computer te downloaden. Klembord helpt om tekst tussen je computer en de editor te kopiëren."
           ],
@@ -14079,13 +14079,13 @@ window.SynthPulseFeatureCatalog = {
           "example": "Maak een projectvoorstel, laat de AI de inleiding verbeteren en download het docx-bestand."
         },
         "en": {
-          "title": "HermesOffice Docs (Word) guide",
+          "title": "SynthPulse Office Docs (Word) guide",
           "purpose": "Write and edit Word documents with formatting, tables and AI assistance. This editor runs on the VPS and opens from SynthPulse in your browser.",
           "when": "Use this to create documents or edit an existing docx file.",
           "steps": [
-            "Choose Apps at the bottom of navigation and find HermesOffice Docs (Word) under Documents and knowledge.",
+            "Choose Apps at the bottom of navigation and find SynthPulse Office Docs (Word) under Documents and knowledge.",
             "Choose Open app. Your SynthPulse sign-in gives the workspace owner access to the VPS workspace. Wait for Connected to VPS.",
-            "For an existing file, choose Files, upload it and open it in the editor using File > Open from /documents. For a new file, use the editor’s new-file action.",
+            "For an existing file, choose Files, upload it and open it in the editor using File > Open from /documents. For a new file, use the editor’s new-file action. Or ask Super Agent, Claude Code or Codex to use synthpulse-office-docs to create a file and open it in SynthPulse Office.",
             "Edit your file. Open the AI panel and describe the change; AI uses the configured OmniRoute connection. Review proposed changes before continuing.",
             "Save in /documents. Choose Files, Refresh and click the filename to download the result to your computer. Clipboard helps copy text between your computer and the editor."
           ],
@@ -14116,13 +14116,13 @@ window.SynthPulseFeatureCatalog = {
       ],
       "locales": {
         "nl": {
-          "title": "HermesOffice Sheets (Excel) gebruiken",
+          "title": "SynthPulse Office Sheets (Excel) gebruiken",
           "purpose": "Bewerk Excel-werkboeken met cellen, formules en AI-hulp. Deze editor draait op de VPS en opent vanuit SynthPulse in je browser.",
           "when": "Gebruik dit om spreadsheets te maken of een bestaand xlsx-bestand te bewerken.",
           "steps": [
-            "Kies Apps onderaan de navigatie en open HermesOffice Sheets (Excel) in Documenten en kennis.",
+            "Kies Apps onderaan de navigatie en open SynthPulse Office Sheets (Excel) in Documenten en kennis.",
             "Kies Open app. Je SynthPulse-aanmelding geeft de eigenaar toegang tot de eigen VPS-werkruimte. Wacht tot Verbonden met VPS verschijnt.",
-            "Voor een bestaand bestand: kies Bestanden, upload het bestand en open het in de editor via Bestand > Openen vanuit /documents. Voor een nieuw bestand gebruik je de nieuw-functie van de editor.",
+            "Voor een bestaand bestand: kies Bestanden, upload het bestand en open het in de editor via Bestand > Openen vanuit /documents. Voor een nieuw bestand gebruik je de nieuw-functie van de editor. Of vraag Super Agent, Claude Code of Codex om met de skill synthpulse-office-sheets een bestand te maken en in SynthPulse Office te openen.",
             "Bewerk je bestand. Open het AI-paneel en beschrijf de gewenste wijziging; de AI loopt via de ingestelde OmniRoute-verbinding. Controleer voorgestelde wijzigingen voordat je verder werkt.",
             "Sla op in /documents. Kies Bestanden, Vernieuwen en klik op de bestandsnaam om je resultaat naar je computer te downloaden. Klembord helpt om tekst tussen je computer en de editor te kopiëren."
           ],
@@ -14131,13 +14131,13 @@ window.SynthPulseFeatureCatalog = {
           "example": "Vul omzet en kosten in, bereken de marge met een formule en download het xlsx-bestand."
         },
         "en": {
-          "title": "HermesOffice Sheets (Excel) guide",
+          "title": "SynthPulse Office Sheets (Excel) guide",
           "purpose": "Edit Excel workbooks with cells, formulas and AI assistance. This editor runs on the VPS and opens from SynthPulse in your browser.",
           "when": "Use this to create spreadsheets or edit an existing xlsx file.",
           "steps": [
-            "Choose Apps at the bottom of navigation and find HermesOffice Sheets (Excel) under Documents and knowledge.",
+            "Choose Apps at the bottom of navigation and find SynthPulse Office Sheets (Excel) under Documents and knowledge.",
             "Choose Open app. Your SynthPulse sign-in gives the workspace owner access to the VPS workspace. Wait for Connected to VPS.",
-            "For an existing file, choose Files, upload it and open it in the editor using File > Open from /documents. For a new file, use the editor’s new-file action.",
+            "For an existing file, choose Files, upload it and open it in the editor using File > Open from /documents. For a new file, use the editor’s new-file action. Or ask Super Agent, Claude Code or Codex to use synthpulse-office-sheets to create a file and open it in SynthPulse Office.",
             "Edit your file. Open the AI panel and describe the change; AI uses the configured OmniRoute connection. Review proposed changes before continuing.",
             "Save in /documents. Choose Files, Refresh and click the filename to download the result to your computer. Clipboard helps copy text between your computer and the editor."
           ],
@@ -14168,13 +14168,13 @@ window.SynthPulseFeatureCatalog = {
       ],
       "locales": {
         "nl": {
-          "title": "HermesOffice Slides (PowerPoint) gebruiken",
+          "title": "SynthPulse Office Slides (PowerPoint) gebruiken",
           "purpose": "Maak en bewerk PowerPoint-presentaties met dia’s en AI-hulp. Deze editor draait op de VPS en opent vanuit SynthPulse in je browser.",
           "when": "Gebruik dit om presentaties te maken of een bestaand pptx-bestand te bewerken.",
           "steps": [
-            "Kies Apps onderaan de navigatie en open HermesOffice Slides (PowerPoint) in Documenten en kennis.",
+            "Kies Apps onderaan de navigatie en open SynthPulse Office Slides (PowerPoint) in Documenten en kennis.",
             "Kies Open app. Je SynthPulse-aanmelding geeft de eigenaar toegang tot de eigen VPS-werkruimte. Wacht tot Verbonden met VPS verschijnt.",
-            "Voor een bestaand bestand: kies Bestanden, upload het bestand en open het in de editor via Bestand > Openen vanuit /documents. Voor een nieuw bestand gebruik je de nieuw-functie van de editor.",
+            "Voor een bestaand bestand: kies Bestanden, upload het bestand en open het in de editor via Bestand > Openen vanuit /documents. Voor een nieuw bestand gebruik je de nieuw-functie van de editor. Of vraag Super Agent, Claude Code of Codex om met de skill synthpulse-office-slides een bestand te maken en in SynthPulse Office te openen.",
             "Bewerk je bestand. Open het AI-paneel en beschrijf de gewenste wijziging; de AI loopt via de ingestelde OmniRoute-verbinding. Controleer voorgestelde wijzigingen voordat je verder werkt.",
             "Sla op in /documents. Kies Bestanden, Vernieuwen en klik op de bestandsnaam om je resultaat naar je computer te downloaden. Klembord helpt om tekst tussen je computer en de editor te kopiëren."
           ],
@@ -14183,13 +14183,13 @@ window.SynthPulseFeatureCatalog = {
           "example": "Maak drie dia’s over je project, controleer de inhoud en download het pptx-bestand."
         },
         "en": {
-          "title": "HermesOffice Slides (PowerPoint) guide",
+          "title": "SynthPulse Office Slides (PowerPoint) guide",
           "purpose": "Create and edit PowerPoint presentations with slides and AI assistance. This editor runs on the VPS and opens from SynthPulse in your browser.",
           "when": "Use this to create presentations or edit an existing pptx file.",
           "steps": [
-            "Choose Apps at the bottom of navigation and find HermesOffice Slides (PowerPoint) under Documents and knowledge.",
+            "Choose Apps at the bottom of navigation and find SynthPulse Office Slides (PowerPoint) under Documents and knowledge.",
             "Choose Open app. Your SynthPulse sign-in gives the workspace owner access to the VPS workspace. Wait for Connected to VPS.",
-            "For an existing file, choose Files, upload it and open it in the editor using File > Open from /documents. For a new file, use the editor’s new-file action.",
+            "For an existing file, choose Files, upload it and open it in the editor using File > Open from /documents. For a new file, use the editor’s new-file action. Or ask Super Agent, Claude Code or Codex to use synthpulse-office-slides to create a file and open it in SynthPulse Office.",
             "Edit your file. Open the AI panel and describe the change; AI uses the configured OmniRoute connection. Review proposed changes before continuing.",
             "Save in /documents. Choose Files, Refresh and click the filename to download the result to your computer. Clipboard helps copy text between your computer and the editor."
           ],
@@ -14220,13 +14220,13 @@ window.SynthPulseFeatureCatalog = {
       ],
       "locales": {
         "nl": {
-          "title": "HermesOffice PDF gebruiken",
+          "title": "SynthPulse Office PDF gebruiken",
           "purpose": "Open pdf-documenten op de VPS en gebruik de beschikbare annotatie- en AI-functies. Deze editor draait op de VPS en opent vanuit SynthPulse in je browser.",
           "when": "Gebruik dit om pdf-documenten te maken of een bestaand pdf-bestand te bewerken.",
           "steps": [
-            "Kies Apps onderaan de navigatie en open HermesOffice PDF in Documenten en kennis.",
+            "Kies Apps onderaan de navigatie en open SynthPulse Office PDF in Documenten en kennis.",
             "Kies Open app. Je SynthPulse-aanmelding geeft de eigenaar toegang tot de eigen VPS-werkruimte. Wacht tot Verbonden met VPS verschijnt.",
-            "Voor een bestaand bestand: kies Bestanden, upload het bestand en open het in de editor via Bestand > Openen vanuit /documents. Voor een nieuw bestand gebruik je de nieuw-functie van de editor.",
+            "Voor een bestaand bestand: kies Bestanden, upload het bestand en open het in de editor via Bestand > Openen vanuit /documents. Voor een nieuw bestand gebruik je de nieuw-functie van de editor. Of vraag Super Agent, Claude Code of Codex om met de skill synthpulse-office-pdf een bestand te maken en in SynthPulse Office te openen.",
             "Bewerk je bestand. Open het AI-paneel en beschrijf de gewenste wijziging; de AI loopt via de ingestelde OmniRoute-verbinding. Controleer voorgestelde wijzigingen voordat je verder werkt.",
             "Sla op in /documents. Kies Bestanden, Vernieuwen en klik op de bestandsnaam om je resultaat naar je computer te downloaden. Klembord helpt om tekst tussen je computer en de editor te kopiëren."
           ],
@@ -14235,13 +14235,13 @@ window.SynthPulseFeatureCatalog = {
           "example": "Upload een pdf, bekijk de pagina’s en vraag de AI om een samenvatting."
         },
         "en": {
-          "title": "HermesOffice PDF guide",
+          "title": "SynthPulse Office PDF guide",
           "purpose": "Open PDF documents on the VPS and use the available annotation and AI features. This editor runs on the VPS and opens from SynthPulse in your browser.",
           "when": "Use this to create PDF documents or edit an existing pdf file.",
           "steps": [
-            "Choose Apps at the bottom of navigation and find HermesOffice PDF under Documents and knowledge.",
+            "Choose Apps at the bottom of navigation and find SynthPulse Office PDF under Documents and knowledge.",
             "Choose Open app. Your SynthPulse sign-in gives the workspace owner access to the VPS workspace. Wait for Connected to VPS.",
-            "For an existing file, choose Files, upload it and open it in the editor using File > Open from /documents. For a new file, use the editor’s new-file action.",
+            "For an existing file, choose Files, upload it and open it in the editor using File > Open from /documents. For a new file, use the editor’s new-file action. Or ask Super Agent, Claude Code or Codex to use synthpulse-office-pdf to create a file and open it in SynthPulse Office.",
             "Edit your file. Open the AI panel and describe the change; AI uses the configured OmniRoute connection. Review proposed changes before continuing.",
             "Save in /documents. Choose Files, Refresh and click the filename to download the result to your computer. Clipboard helps copy text between your computer and the editor."
           ],
@@ -14272,13 +14272,13 @@ window.SynthPulseFeatureCatalog = {
       ],
       "locales": {
         "nl": {
-          "title": "HermesOffice Markdown gebruiken",
+          "title": "SynthPulse Office Markdown gebruiken",
           "purpose": "Schrijf en bewerk Markdown met een teksteditor en AI-hulp. Deze editor draait op de VPS en opent vanuit SynthPulse in je browser.",
           "when": "Gebruik dit om Markdown-bestanden te maken of een bestaand md-bestand te bewerken.",
           "steps": [
-            "Kies Apps onderaan de navigatie en open HermesOffice Markdown in Documenten en kennis.",
+            "Kies Apps onderaan de navigatie en open SynthPulse Office Markdown in Documenten en kennis.",
             "Kies Open app. Je SynthPulse-aanmelding geeft de eigenaar toegang tot de eigen VPS-werkruimte. Wacht tot Verbonden met VPS verschijnt.",
-            "Voor een bestaand bestand: kies Bestanden, upload het bestand en open het in de editor via Bestand > Openen vanuit /documents. Voor een nieuw bestand gebruik je de nieuw-functie van de editor.",
+            "Voor een bestaand bestand: kies Bestanden, upload het bestand en open het in de editor via Bestand > Openen vanuit /documents. Voor een nieuw bestand gebruik je de nieuw-functie van de editor. Of vraag Super Agent, Claude Code of Codex om met de skill synthpulse-office-markdown een bestand te maken en in SynthPulse Office te openen.",
             "Bewerk je bestand. Open het AI-paneel en beschrijf de gewenste wijziging; de AI loopt via de ingestelde OmniRoute-verbinding. Controleer voorgestelde wijzigingen voordat je verder werkt.",
             "Sla op in /documents. Kies Bestanden, Vernieuwen en klik op de bestandsnaam om je resultaat naar je computer te downloaden. Klembord helpt om tekst tussen je computer en de editor te kopiëren."
           ],
@@ -14287,13 +14287,13 @@ window.SynthPulseFeatureCatalog = {
           "example": "Schrijf projectnotities met koppen en lijsten en download het md-bestand."
         },
         "en": {
-          "title": "HermesOffice Markdown guide",
+          "title": "SynthPulse Office Markdown guide",
           "purpose": "Write and edit Markdown with a text editor and AI assistance. This editor runs on the VPS and opens from SynthPulse in your browser.",
           "when": "Use this to create Markdown files or edit an existing md file.",
           "steps": [
-            "Choose Apps at the bottom of navigation and find HermesOffice Markdown under Documents and knowledge.",
+            "Choose Apps at the bottom of navigation and find SynthPulse Office Markdown under Documents and knowledge.",
             "Choose Open app. Your SynthPulse sign-in gives the workspace owner access to the VPS workspace. Wait for Connected to VPS.",
-            "For an existing file, choose Files, upload it and open it in the editor using File > Open from /documents. For a new file, use the editor’s new-file action.",
+            "For an existing file, choose Files, upload it and open it in the editor using File > Open from /documents. For a new file, use the editor’s new-file action. Or ask Super Agent, Claude Code or Codex to use synthpulse-office-markdown to create a file and open it in SynthPulse Office.",
             "Edit your file. Open the AI panel and describe the change; AI uses the configured OmniRoute connection. Review proposed changes before continuing.",
             "Save in /documents. Choose Files, Refresh and click the filename to download the result to your computer. Clipboard helps copy text between your computer and the editor."
           ],
