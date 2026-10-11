@@ -58,14 +58,19 @@ def test_every_feature_is_mapped_once_with_existing_navigation_names():
     assert set(TARGETS) == {feature['id'] for feature in CATALOG['features']}
     assert len(TARGETS) == len(CATALOG['features'])
     for feature_id, entry in TARGETS.items():
-        assert set(entry) in ({'panel', 'targets'}, {'panel', 'section', 'targets'}), feature_id
+        assert {'panel', 'targets'} <= set(entry) <= {'panel', 'section', 'targets', 'entryTargets', 'entryHint'}, feature_id
+        assert ('entryTargets' in entry) == ('entryHint' in entry), feature_id
+        if 'entryTargets' in entry:
+            assert entry['entryTargets'] and isinstance(entry['entryTargets'], list)
+            assert set(entry['entryHint']) == {'nl', 'en'}
+            assert all(isinstance(value, str) and value.strip() for value in entry['entryHint'].values())
         assert entry['panel'] in HTML.panels, feature_id
         assert isinstance(entry['targets'], list)
         assert len(entry['targets']) == len(set(entry['targets'])), feature_id
         if 'section' in entry:
             assert entry['panel'] == 'settings'
             assert entry['section'] in HTML.sections
-        for selector in entry['targets']:
+        for selector in entry['targets'] + entry.get('entryTargets', []):
             assert isinstance(selector, str) and selector
             assert selector.startswith(('#', '.', '['))
             assert not re.search(r'(?:https?:|javascript:|onclick|onchange|nth-child|nth-of-type)', selector)
@@ -74,13 +79,15 @@ def test_every_feature_is_mapped_once_with_existing_navigation_names():
                 assert re.search(r'(?<![\w-])' + re.escape(element_id) + r'(?![\w-])', SOURCE), (feature_id, selector)
             for css_class in re.findall(r'\.([a-zA-Z][\w-]*)', selector):
                 assert css_class in SOURCE, (feature_id, selector)
+            for action in re.findall(r"\[data-help-action='([^']+)'\]", selector):
+                assert 'data-help-action="' + action + '"' in SOURCE, (feature_id, selector)
             for tour in re.findall(r"\[data-tour='([^']+)'\]", selector):
                 assert 'data-tour="' + tour + '"' in SOURCE, (feature_id, selector)
 
 
 def test_static_settings_controls_use_their_real_pane():
     for feature_id, entry in TARGETS.items():
-        for selector in entry['targets']:
+        for selector in entry['targets'] + entry.get('entryTargets', []):
             if not re.fullmatch(r'#[\w-]+', selector):
                 continue
             actual = HTML.ancestors.get(selector[1:])
@@ -108,7 +115,7 @@ def test_planned_and_opaque_views_do_not_claim_visible_controls():
                     'memory.graph', 'memory.triples', 'memory.facts', 'memory.timeline',
                     'memory.overview', 'memory.recall', 'memory.preferences'):
         assert TARGETS['webui.' + feature]['targets'] == []
-    assert TARGETS['webui.chat.edit']['targets'] == ['.msg-edit-area']
+    assert TARGETS['webui.chat.edit']['targets'] == ["[data-help-action='edit-message']", '.msg-edit-area']
     assert '#builderTab' not in {s for row in TARGETS.values() for s in row['targets']}
     # The group itself is an entry point, not a fabricated exact menu action.
     assert TARGETS['webui.sessions.organize']['targets'] == ['.session-actions-trigger']
@@ -124,7 +131,8 @@ if(!Object.isFrozen(value))throw Error('mutable export');
 for(const entry of Object.values(value)){
  if(!Object.isFrozen(entry)||!Object.isFrozen(entry.targets))throw Error('mutable entry');
  for(const [key,item] of Object.entries(entry)){
-  if(key==='targets'){if(!item.every(s=>typeof s==='string'))throw Error('non-string target');}
+  if(key==='targets'||key==='entryTargets'){if(!Object.isFrozen(item)||!item.every(s=>typeof s==='string'))throw Error('non-string target');}
+  else if(key==='entryHint'){if(!Object.isFrozen(item)||!Object.values(item).every(s=>typeof s==='string'))throw Error('mutable or invalid hint');}
   else if(typeof item!=='string')throw Error('executable value');
  }
 }
@@ -132,3 +140,25 @@ console.log(JSON.stringify(value));
 """
     result = subprocess.run(['node', '-e', script, str(SCRIPT)], check=True, capture_output=True, text=True)
     assert json.loads(result.stdout) == TARGETS
+
+
+def test_closed_drawers_forms_and_responsive_controls_have_honest_entry_hints():
+    expected = {
+        'chat.model': '#composerMobileConfigBtn',
+        'chat.reasoning': '#composerMobileConfigBtn',
+        'files.workspace': '#composerMobileConfigBtn',
+        'sessions.search': '#btnHamburger',
+        'sessions.delete': '.session-actions-trigger',
+        'tasks.prompt': "[data-tour='tasks-new']",
+        'tasks.run': '.cron-item:not(.readonly)',
+        'files.create': '#btnWorkspacePanelEdgeToggle',
+        'files.hidden': '#btnWorkspacePrefs',
+        'bots.instructions': "[data-builder-tab='1']",
+    }
+    for feature, selector in expected.items():
+        row = TARGETS['webui.' + feature]
+        assert selector in row.get('entryTargets', []), feature
+        assert selector not in row['targets'], feature
+        assert row['entryHint']['nl'] and row['entryHint']['en']
+    for feature in ('planned.gateway', 'planned.reporter', 'planned.central_memory', 'governance.once'):
+        assert 'entryTargets' not in TARGETS['webui.' + feature]

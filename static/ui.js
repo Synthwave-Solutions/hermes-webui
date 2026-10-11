@@ -17383,9 +17383,9 @@ function renderMessages(options){
     if(recoveryHtml) bodyHtml += recoveryHtml;
     const statusHtml = (!isUser&&m._statusCard) ? _statusCardHtml(m._statusCard) : '';
     const isEditableUser=isUser&&rawIdx===lastUserRawIdx;
-    const editBtn  = isEditableUser ? `<button class="msg-action-btn" title="${t('edit_message')}" onclick="editMessage(this)">${li('pencil',13)}</button>` : '';
+    const editBtn  = isEditableUser ? `<button class="msg-action-btn" title="${t('edit_message')}" data-help-action="edit-message" onclick="editMessage(this)">${li('pencil',13)}</button>` : '';
     const undoBtn  = isLastAssistant ? `<button class="msg-action-btn" title="${t('undo_exchange')}" onclick="undoLastExchange()">${li('undo',13)}</button>` : '';
-    const retryBtn = isLastAssistant ? `<button class="msg-action-btn" title="${t('regenerate')}" onclick="regenerateResponse(this)">${li('rotate-ccw',13)}</button>` : '';
+    const retryBtn = isLastAssistant ? `<button class="msg-action-btn" title="${t('regenerate')}" data-help-action="retry-response" onclick="regenerateResponse(this)">${li('rotate-ccw',13)}</button>` : '';
     const copyBtn  = `<button class="msg-copy-btn msg-action-btn" title="${t('copy')}" onclick="copyMsg(this)">${li('copy',13)}</button>`;
     const readOnlySession=typeof _isReadOnlySession==='function'
       ? _isReadOnlySession(S.session)
@@ -17393,7 +17393,7 @@ function renderMessages(options){
     const branchableReadOnlySession=typeof _isBranchableReadOnlySession==='function'
       ? _isBranchableReadOnlySession(S.session)
       : false;
-    const forkBtn  = (readOnlySession&&!branchableReadOnlySession) ? '' : `<button class="msg-action-btn" title="${t('fork_from_here')}" onclick="forkFromMessage(${rawIdx+1})">${li('git-branch',13)}</button>`;
+    const forkBtn  = (readOnlySession&&!branchableReadOnlySession) ? '' : `<button class="msg-action-btn" title="${t('fork_from_here')}" data-help-action="fork-message" onclick="forkFromMessage(${rawIdx+1})">${li('git-branch',13)}</button>`;
     const ttsBtn   = !isUser ? `<button class="msg-action-btn msg-tts-btn" title="${t('tts_listen')||'Listen'}" onclick="speakMessage(this)">${li('volume-2',13)}</button>` : '';
     const tsVal=m._ts||m.timestamp;
     // _formatInServerTz handles fractional-hour offsets (India +0530 etc.)

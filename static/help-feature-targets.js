@@ -73,21 +73,42 @@
       "#composerModelChip",
       "#modelSelect",
       "#composerMobileModelAction"
-    ]
+    ],
+    "entryTargets": [
+      "#composerMobileConfigBtn"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst de chatinstellingen aan. Open dit menu na de uitleg om deze bediening op een smal scherm te vinden.",
+      "en": "The highlight marks chat settings. Open this menu after the guide to find this control on a narrow screen."
+    }
   },
   "webui.chat.reasoning": {
     "panel": "chat",
     "targets": [
       "#composerReasoningChip",
       "#composerMobileReasoningAction"
-    ]
+    ],
+    "entryTargets": [
+      "#composerMobileConfigBtn"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst de chatinstellingen aan. Open dit menu na de uitleg om deze bediening op een smal scherm te vinden.",
+      "en": "The highlight marks chat settings. Open this menu after the guide to find this control on a narrow screen."
+    }
   },
   "webui.chat.quota": {
     "panel": "chat",
     "targets": [
       "#providerQuotaChip",
       "#composerMobileQuotaAction"
-    ]
+    ],
+    "entryTargets": [
+      "#composerMobileConfigBtn"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst de chatinstellingen aan. Open dit menu na de uitleg om deze bediening op een smal scherm te vinden.",
+      "en": "The highlight marks chat settings. Open this menu after the guide to find this control on a narrow screen."
+    }
   },
   "webui.chat.context": {
     "panel": "chat",
@@ -95,7 +116,14 @@
       "#ctxIndicator",
       "#ctxCompressBtn",
       "#composerMobileCtxCompressBtn"
-    ]
+    ],
+    "entryTargets": [
+      "#composerMobileConfigBtn"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst de chatinstellingen aan. Open dit menu na de uitleg om deze bediening op een smal scherm te vinden.",
+      "en": "The highlight marks chat settings. Open this menu after the guide to find this control on a narrow screen."
+    }
   },
   "webui.chat.tools": {
     "panel": "chat",
@@ -104,7 +132,14 @@
       "#toolsetsInput",
       "#toolsetsApplyBtn",
       "#toolsetsClearBtn"
-    ]
+    ],
+    "entryTargets": [
+      "#composerMobileConfigBtn"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst de chatinstellingen aan. Open dit menu na de uitleg om deze bediening op een smal scherm te vinden.",
+      "en": "The highlight marks chat settings. Open this menu after the guide to find this control on a narrow screen."
+    }
   },
   "webui.chat.attach": {
     "panel": "chat",
@@ -125,7 +160,14 @@
       "#composerPeopleChip",
       "#groupPeopleFilter",
       "#groupPeopleModalSubmit"
-    ]
+    ],
+    "entryTargets": [
+      "#composerMobileConfigBtn"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst de chatinstellingen aan. Open dit menu na de uitleg om deze bediening op een smal scherm te vinden.",
+      "en": "The highlight marks chat settings. Open this menu after the guide to find this control on a narrow screen."
+    }
   },
   "webui.chat.mentions": {
     "panel": "chat",
@@ -150,6 +192,7 @@
   "webui.chat.edit": {
     "panel": "chat",
     "targets": [
+      "[data-help-action='edit-message']",
       ".msg-edit-area"
     ]
   },
@@ -159,11 +202,15 @@
   },
   "webui.chat.retry": {
     "panel": "chat",
-    "targets": []
+    "targets": [
+      "[data-help-action='retry-response']"
+    ]
   },
   "webui.chat.fork": {
     "panel": "chat",
-    "targets": []
+    "targets": [
+      "[data-help-action='fork-message']"
+    ]
   },
   "webui.chat.activity": {
     "panel": "chat",
@@ -201,14 +248,30 @@
     "targets": [
       "#sessionSearch",
       "#sessionSearchClear"
-    ]
+    ],
+    "entryTargets": [
+      "#btnHamburger",
+      ".rail [data-panel='chat']"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst de ingang naar de chatzijbalk aan. Open deze na de uitleg om de gesprekken en hun bedieningen te zien.",
+      "en": "The highlight marks the chat sidebar entry. Open it after the guide to see conversations and their controls."
+    }
   },
   "webui.sessions.split": {
     "panel": "chat",
     "targets": [
       "#btnSplitView",
       "#btnSplitExit"
-    ]
+    ],
+    "entryTargets": [
+      "#btnHamburger",
+      ".rail [data-panel='chat']"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst de ingang naar de chatzijbalk aan. Open deze na de uitleg om de gesprekken en hun bedieningen te zien.",
+      "en": "The highlight marks the chat sidebar entry. Open it after the guide to see conversations and their controls."
+    }
   },
   "webui.sessions.transcript": {
     "panel": "settings",
@@ -252,7 +315,15 @@
     "panel": "chat",
     "targets": [
       ".session-actions-trigger"
-    ]
+    ],
+    "entryTargets": [
+      "#btnHamburger",
+      ".rail [data-panel='chat']"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst de ingang naar de chatzijbalk aan. Open deze na de uitleg om de gesprekken en hun bedieningen te zien.",
+      "en": "The highlight marks the chat sidebar entry. Open it after the guide to see conversations and their controls."
+    }
   },
   "webui.voice.dictation": {
     "panel": "chat",
@@ -285,7 +356,14 @@
       "#realtimeVoiceHold",
       "#realtimeVoiceMic",
       "#realtimeVoiceInterrupt"
-    ]
+    ],
+    "entryTargets": [
+      "#btnRealtimeVoice"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst Realtime spraak aan. De beschreven microfoonbediening verschijnt tijdens een actieve realtime spraaksessie. Start die alleen wanneer je zelf wilt spreken.",
+      "en": "The highlight marks Realtime voice. The described microphone control appears during an active realtime voice session. Start one only when you want to speak."
+    }
   },
   "webui.tasks.create": {
     "panel": "tasks",
@@ -298,19 +376,40 @@
     "panel": "tasks",
     "targets": [
       "#cronFormPrompt"
-    ]
+    ],
+    "entryTargets": [
+      "[data-tour='tasks-new']"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst Nieuwe taak aan. Open na de uitleg dit formulier om de beschreven velden te zien. Er wordt pas een taak aangemaakt wanneer je die zelf opslaat.",
+      "en": "The highlight marks New task. Open this form after the guide to see the described fields. A task is created only when you save it yourself."
+    }
   },
   "webui.tasks.script": {
     "panel": "tasks",
     "targets": [
       "#cronFormScript"
-    ]
+    ],
+    "entryTargets": [
+      "[data-tour='tasks-new']"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst Nieuwe taak aan. Open na de uitleg dit formulier om de beschreven velden te zien. Er wordt pas een taak aangemaakt wanneer je die zelf opslaat.",
+      "en": "The highlight marks New task. Open this form after the guide to see the described fields. A task is created only when you save it yourself."
+    }
   },
   "webui.tasks.skills": {
     "panel": "tasks",
     "targets": [
       "#cronFormSkillSearch"
-    ]
+    ],
+    "entryTargets": [
+      "[data-tour='tasks-new']"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst Nieuwe taak aan. Open na de uitleg dit formulier om de beschreven velden te zien. Er wordt pas een taak aangemaakt wanneer je die zelf opslaat.",
+      "en": "The highlight marks New task. Open this form after the guide to see the described fields. A task is created only when you save it yourself."
+    }
   },
   "webui.tasks.schedule": {
     "panel": "tasks",
@@ -321,20 +420,41 @@
       "#cronFormScheduleTime",
       "#cronFormScheduleMinute",
       "#cronFormSchedule"
-    ]
+    ],
+    "entryTargets": [
+      "[data-tour='tasks-new']"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst Nieuwe taak aan. Open na de uitleg dit formulier om de beschreven velden te zien. Er wordt pas een taak aangemaakt wanneer je die zelf opslaat.",
+      "en": "The highlight marks New task. Open this form after the guide to see the described fields. A task is created only when you save it yourself."
+    }
   },
   "webui.tasks.profile": {
     "panel": "tasks",
     "targets": [
       "#cronFormProfile",
       "#cronFormModel"
-    ]
+    ],
+    "entryTargets": [
+      "[data-tour='tasks-new']"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst Nieuwe taak aan. Open na de uitleg dit formulier om de beschreven velden te zien. Er wordt pas een taak aangemaakt wanneer je die zelf opslaat.",
+      "en": "The highlight marks New task. Open this form after the guide to see the described fields. A task is created only when you save it yourself."
+    }
   },
   "webui.tasks.delivery": {
     "panel": "tasks",
     "targets": [
       "#cronFormDeliver"
-    ]
+    ],
+    "entryTargets": [
+      "[data-tour='tasks-new']"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst Nieuwe taak aan. Open na de uitleg dit formulier om de beschreven velden te zien. Er wordt pas een taak aangemaakt wanneer je die zelf opslaat.",
+      "en": "The highlight marks New task. Open this form after the guide to see the described fields. A task is created only when you save it yourself."
+    }
   },
   "webui.tasks.notify": {
     "panel": "tasks",
@@ -347,20 +467,41 @@
     "targets": [
       ".cron-notify-mute-btn",
       ".cron-notify-mine"
-    ]
+    ],
+    "entryTargets": [
+      ".cron-item"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst een taak in de lijst aan. Open na de uitleg de gewenste taak om de meldingen voor die taak te bekijken.",
+      "en": "The highlight marks a task in the list. Open the intended task after the guide to see its notification controls."
+    }
   },
   "webui.tasks.run": {
     "panel": "tasks",
     "targets": [
       "#btnRunTaskDetail"
-    ]
+    ],
+    "entryTargets": [
+      ".cron-item:not(.readonly)"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst een geplande taak in de lijst aan. Open na de uitleg de taak die je wilt beheren; de beschreven acties staan in de taakdetails.",
+      "en": "The highlight marks a scheduled task in the list. After the guide, open the task you want to manage; its detail view contains the described actions."
+    }
   },
   "webui.tasks.pause": {
     "panel": "tasks",
     "targets": [
       "#btnPauseTaskDetail",
       "#btnResumeTaskDetail"
-    ]
+    ],
+    "entryTargets": [
+      ".cron-item:not(.readonly)"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst een geplande taak in de lijst aan. Open na de uitleg de taak die je wilt beheren; de beschreven acties staan in de taakdetails.",
+      "en": "The highlight marks a scheduled task in the list. After the guide, open the task you want to manage; its detail view contains the described actions."
+    }
   },
   "webui.tasks.share": {
     "panel": "tasks",
@@ -369,7 +510,14 @@
       "#cronShareExtra",
       "#cronShareCancel",
       "#cronShareSave"
-    ]
+    ],
+    "entryTargets": [
+      ".cron-item:not(.readonly)"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst een geplande taak in de lijst aan. Open na de uitleg de taak die je wilt beheren; de beschreven acties staan in de taakdetails.",
+      "en": "The highlight marks a scheduled task in the list. After the guide, open the task you want to manage; its detail view contains the described actions."
+    }
   },
   "webui.tasks.edit": {
     "panel": "tasks",
@@ -377,7 +525,14 @@
       "#btnEditTaskDetail",
       "#btnDuplicateTaskDetail",
       "#btnDeleteTaskDetail"
-    ]
+    ],
+    "entryTargets": [
+      ".cron-item:not(.readonly)"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst een geplande taak in de lijst aan. Open na de uitleg de taak die je wilt beheren; de beschreven acties staan in de taakdetails.",
+      "en": "The highlight marks a scheduled task in the list. After the guide, open the task you want to manage; its detail view contains the described actions."
+    }
   },
   "webui.tasks.labels": {
     "panel": "tasks",
@@ -387,7 +542,14 @@
       "#cronFormEmoji",
       "#cronFormCategory",
       "#cronFormDiagram"
-    ]
+    ],
+    "entryTargets": [
+      "[data-tour='tasks-new']"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst Nieuwe taak aan. Open na de uitleg dit formulier om de beschreven velden te zien. Er wordt pas een taak aangemaakt wanneer je die zelf opslaat.",
+      "en": "The highlight marks New task. Open this form after the guide to see the described fields. A task is created only when you save it yourself."
+    }
   },
   "webui.tasks.results": {
     "panel": "tasks",
@@ -400,7 +562,14 @@
     "targets": [
       "#composerWorkspaceChip",
       "#composerMobileWorkspaceAction"
-    ]
+    ],
+    "entryTargets": [
+      "#composerMobileConfigBtn"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst de chatinstellingen aan. Open dit menu na de uitleg om deze bediening op een smal scherm te vinden.",
+      "en": "The highlight marks chat settings. Open this menu after the guide to find this control on a narrow screen."
+    }
   },
   "webui.files.manage": {
     "panel": "workspaces",
@@ -435,58 +604,144 @@
     "targets": [
       "#btnNewFile",
       "#btnNewFolder"
-    ]
+    ],
+    "entryTargets": [
+      "#btnWorkspacePanelToggle",
+      "#btnWorkspacePanelEdgeToggle",
+      ".rail [data-panel='files']"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst de knop voor het bestandenpaneel aan. Open het paneel na de uitleg; daar vind je deze bediening voor de actieve werkruimte.",
+      "en": "The highlight marks the files panel button. Open that panel after the guide to find this control for the active workspace."
+    }
   },
   "webui.files.upload": {
     "panel": "chat",
     "targets": [
       "#btnUploadWorkspace",
       "#workspaceFileInput"
-    ]
+    ],
+    "entryTargets": [
+      "#btnWorkspacePanelToggle",
+      "#btnWorkspacePanelEdgeToggle",
+      ".rail [data-panel='files']"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst de knop voor het bestandenpaneel aan. Open het paneel na de uitleg; daar vind je deze bediening voor de actieve werkruimte.",
+      "en": "The highlight marks the files panel button. Open that panel after the guide to find this control for the active workspace."
+    }
   },
   "webui.files.preview": {
     "panel": "chat",
     "targets": [
+      "#previewArea",
       "#btnRenderMarkdownAnyway"
-    ]
+    ],
+    "entryTargets": [
+      "#fileTree .file-item[data-ws-type=\"file\"]",
+      "#btnWorkspacePanelToggle",
+      "#btnWorkspacePanelEdgeToggle",
+      ".rail [data-panel='files']"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst de ingang naar bestanden aan. Open na de uitleg het bestandenpaneel en kies een bestand om de voorvertoning en bestandsacties te zien.",
+      "en": "The highlight marks the entry to files. After the guide, open the files panel and choose a file to see its preview and file actions."
+    }
   },
   "webui.files.edit": {
     "panel": "chat",
     "targets": [
       "#btnEditFile",
       "#previewEditArea"
-    ]
+    ],
+    "entryTargets": [
+      "#fileTree .file-item[data-ws-type=\"file\"]",
+      "#btnWorkspacePanelToggle",
+      "#btnWorkspacePanelEdgeToggle",
+      ".rail [data-panel='files']"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst de ingang naar bestanden aan. Open na de uitleg het bestandenpaneel en kies een bestand om de voorvertoning en bestandsacties te zien.",
+      "en": "The highlight marks the entry to files. After the guide, open the files panel and choose a file to see its preview and file actions."
+    }
   },
   "webui.files.download": {
     "panel": "chat",
     "targets": [
       "#btnOpenInBrowser",
       "#btnDownloadFile"
-    ]
+    ],
+    "entryTargets": [
+      "#fileTree .file-item[data-ws-type=\"file\"]",
+      "#btnWorkspacePanelToggle",
+      "#btnWorkspacePanelEdgeToggle",
+      ".rail [data-panel='files']"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst de ingang naar bestanden aan. Open na de uitleg het bestandenpaneel en kies een bestand om de voorvertoning en bestandsacties te zien.",
+      "en": "The highlight marks the entry to files. After the guide, open the files panel and choose a file to see its preview and file actions."
+    }
   },
   "webui.files.path": {
     "panel": "chat",
     "targets": [
       "#btnCopyPreviewRelPath"
-    ]
+    ],
+    "entryTargets": [
+      "#fileTree .file-item[data-ws-type=\"file\"]",
+      "#btnWorkspacePanelToggle",
+      "#btnWorkspacePanelEdgeToggle",
+      ".rail [data-panel='files']"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst de ingang naar bestanden aan. Open na de uitleg het bestandenpaneel en kies een bestand om de voorvertoning en bestandsacties te zien.",
+      "en": "The highlight marks the entry to files. After the guide, open the files panel and choose a file to see its preview and file actions."
+    }
   },
   "webui.files.artifacts": {
     "panel": "chat",
     "targets": [
       "#workspaceArtifactsTab"
-    ]
+    ],
+    "entryTargets": [
+      "#btnWorkspacePanelToggle",
+      "#btnWorkspacePanelEdgeToggle",
+      ".rail [data-panel='files']"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst de knop voor het bestandenpaneel aan. Open het paneel na de uitleg; daar vind je deze bediening voor de actieve werkruimte.",
+      "en": "The highlight marks the files panel button. Open that panel after the guide to find this control for the active workspace."
+    }
   },
   "webui.files.todos": {
     "panel": "chat",
     "targets": [
       "#workspaceTodosTab"
-    ]
+    ],
+    "entryTargets": [
+      "#btnWorkspacePanelToggle",
+      "#btnWorkspacePanelEdgeToggle",
+      ".rail [data-panel='files']"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst de knop voor het bestandenpaneel aan. Open het paneel na de uitleg; daar vind je deze bediening voor de actieve werkruimte.",
+      "en": "The highlight marks the files panel button. Open that panel after the guide to find this control for the active workspace."
+    }
   },
   "webui.files.preferences": {
     "panel": "chat",
     "targets": [
       "#btnWorkspacePrefs"
-    ]
+    ],
+    "entryTargets": [
+      "#btnWorkspacePanelToggle",
+      "#btnWorkspacePanelEdgeToggle",
+      ".rail [data-panel='files']"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst de knop voor het bestandenpaneel aan. Open het paneel na de uitleg; daar vind je deze bediening voor de actieve werkruimte.",
+      "en": "The highlight marks the files panel button. Open that panel after the guide to find this control for the active workspace."
+    }
   },
   "webui.boards.create": {
     "panel": "kanban",
@@ -661,14 +916,28 @@
     "panel": "skills",
     "targets": [
       "#wikiBrowserSearch"
-    ]
+    ],
+    "entryTargets": [
+      ".wiki-browse-btn"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst Bladeren in de wiki aan. Open dit venster na de uitleg om de wikipagina's te zoeken en te lezen.",
+      "en": "The highlight marks Browse wiki. Open that window after the guide to search and read wiki pages."
+    }
   },
   "webui.bots.select": {
     "panel": "chat",
     "targets": [
       "#profileChip",
       "#titlebarProfileBtn"
-    ]
+    ],
+    "entryTargets": [
+      "#composerMobileConfigBtn"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst de ingang naar deze botinstellingen aan. Open na de uitleg de gewenste bot, kies de beschreven configuratieknop en vervolgens het bijbehorende tabblad. Je wijzigingen worden pas met Opslaan bevestigd.",
+      "en": "The highlight marks the entry to these bot settings. After the guide, open the intended bot, choose the described configuration button, then its matching tab. Changes are confirmed only with Save."
+    }
   },
   "webui.bots.create": {
     "panel": "profiles",
@@ -683,47 +952,103 @@
       "#builderName",
       "#builderTitle",
       "#builderDescription"
-    ]
+    ],
+    "entryTargets": [
+      "[data-builder-tab='0']",
+      ".profile-card[data-name]"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst de ingang naar deze botinstellingen aan. Open na de uitleg de gewenste bot, kies de beschreven configuratieknop en vervolgens het bijbehorende tabblad. Je wijzigingen worden pas met Opslaan bevestigd.",
+      "en": "The highlight marks the entry to these bot settings. After the guide, open the intended bot, choose the described configuration button, then its matching tab. Changes are confirmed only with Save."
+    }
   },
   "webui.bots.instructions": {
     "panel": "profiles",
     "targets": [
       "#builderPrompt"
-    ]
+    ],
+    "entryTargets": [
+      "[data-builder-tab='1']",
+      ".profile-card[data-name]"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst de ingang naar deze botinstellingen aan. Open na de uitleg de gewenste bot, kies de beschreven configuratieknop en vervolgens het bijbehorende tabblad. Je wijzigingen worden pas met Opslaan bevestigd.",
+      "en": "The highlight marks the entry to these bot settings. After the guide, open the intended bot, choose the described configuration button, then its matching tab. Changes are confirmed only with Save."
+    }
   },
   "webui.bots.skills": {
     "panel": "profiles",
     "targets": [
       "[data-selection='skills']",
       "[data-filter='skills']"
-    ]
+    ],
+    "entryTargets": [
+      "[data-builder-tab='5']",
+      ".profile-card[data-name]"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst de ingang naar deze botinstellingen aan. Open na de uitleg de gewenste bot, kies de beschreven configuratieknop en vervolgens het bijbehorende tabblad. Je wijzigingen worden pas met Opslaan bevestigd.",
+      "en": "The highlight marks the entry to these bot settings. After the guide, open the intended bot, choose the described configuration button, then its matching tab. Changes are confirmed only with Save."
+    }
   },
   "webui.bots.tools": {
     "panel": "profiles",
     "targets": [
       "[data-selection='mcp_servers']",
       "[data-selection='cli_tools']"
-    ]
+    ],
+    "entryTargets": [
+      "[data-builder-tab='2']",
+      ".profile-card[data-name]"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst de ingang naar deze botinstellingen aan. Open na de uitleg de gewenste bot, kies de beschreven configuratieknop en vervolgens het bijbehorende tabblad. Je wijzigingen worden pas met Opslaan bevestigd.",
+      "en": "The highlight marks the entry to these bot settings. After the guide, open the intended bot, choose the described configuration button, then its matching tab. Changes are confirmed only with Save."
+    }
   },
   "webui.bots.memory": {
     "panel": "profiles",
     "targets": [
       "#builderMemory"
-    ]
+    ],
+    "entryTargets": [
+      "[data-builder-tab='4']",
+      ".profile-card[data-name]"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst de ingang naar deze botinstellingen aan. Open na de uitleg de gewenste bot, kies de beschreven configuratieknop en vervolgens het bijbehorende tabblad. Je wijzigingen worden pas met Opslaan bevestigd.",
+      "en": "The highlight marks the entry to these bot settings. After the guide, open the intended bot, choose the described configuration button, then its matching tab. Changes are confirmed only with Save."
+    }
   },
   "webui.bots.knowledge": {
     "panel": "profiles",
     "targets": [
       "#builderKnowledge [data-knowledge-save]",
       "#builderKnowledge"
-    ]
+    ],
+    "entryTargets": [
+      "[data-builder-tab='4']",
+      ".profile-card[data-name]"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst de ingang naar deze botinstellingen aan. Open na de uitleg de gewenste bot, kies de beschreven configuratieknop en vervolgens het bijbehorende tabblad. Je wijzigingen worden pas met Opslaan bevestigd.",
+      "en": "The highlight marks the entry to these bot settings. After the guide, open the intended bot, choose the described configuration button, then its matching tab. Changes are confirmed only with Save."
+    }
   },
   "webui.bots.access": {
     "panel": "profiles",
     "targets": [
       "[data-selection='allowed_users']",
       "[data-selection='allowed_groups']"
-    ]
+    ],
+    "entryTargets": [
+      "[data-builder-tab='3']",
+      ".profile-card[data-name]"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst de ingang naar deze botinstellingen aan. Open na de uitleg de gewenste bot, kies de beschreven configuratieknop en vervolgens het bijbehorende tabblad. Je wijzigingen worden pas met Opslaan bevestigd.",
+      "en": "The highlight marks the entry to these bot settings. After the guide, open the intended bot, choose the described configuration button, then its matching tab. Changes are confirmed only with Save."
+    }
   },
   "webui.bots.appearance": {
     "panel": "profiles",
@@ -735,7 +1060,15 @@
       "#botColor",
       "#botCategory",
       "#botAvatarFile"
-    ]
+    ],
+    "entryTargets": [
+      "[data-builder-tab='0']",
+      ".profile-card[data-name]"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst de ingang naar deze botinstellingen aan. Open na de uitleg de gewenste bot, kies de beschreven configuratieknop en vervolgens het bijbehorende tabblad. Je wijzigingen worden pas met Opslaan bevestigd.",
+      "en": "The highlight marks the entry to these bot settings. After the guide, open the intended bot, choose the described configuration button, then its matching tab. Changes are confirmed only with Save."
+    }
   },
   "webui.bots.manage": {
     "panel": "profiles",
@@ -743,7 +1076,14 @@
       "#btnDeleteProfileDetail",
       "#btnCancelProfileDetail",
       "#btnSaveProfileDetail"
-    ]
+    ],
+    "entryTargets": [
+      ".profile-card[data-name]"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst een bot in de lijst aan. Open na de uitleg de bot die je wilt beheren om de beschikbare acties te zien.",
+      "en": "The highlight marks a bot in the list. Open the bot you want to manage after the guide to see its available actions."
+    }
   },
   "webui.projects.create": {
     "panel": "projects",
@@ -1495,7 +1835,6 @@
   "webui.settings.advanced_model": {
     "panel": "settings",
     "targets": [
-      "#settingsModelChip",
       "#mainAdvancedBtn",
       "#auxAdvancedClose",
       "#auxAdvancedCancel",
@@ -1613,31 +1952,94 @@
   },
   "webui.sessions.rename": {
     "panel": "chat",
-    "targets": []
+    "targets": [],
+    "entryTargets": [
+      ".session-actions-trigger",
+      "#btnHamburger",
+      ".rail [data-panel='chat']"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst de ingang naar gespreksacties aan. Open na de uitleg de chatzijbalk en het driepuntjesmenu bij een gesprek; kies daar de beschreven actie.",
+      "en": "The highlight marks the entry to conversation actions. After the guide, open the chat sidebar and the three-dot menu beside a conversation, then choose the described action."
+    }
   },
   "webui.sessions.pin": {
     "panel": "chat",
-    "targets": []
+    "targets": [],
+    "entryTargets": [
+      ".session-actions-trigger",
+      "#btnHamburger",
+      ".rail [data-panel='chat']"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst de ingang naar gespreksacties aan. Open na de uitleg de chatzijbalk en het driepuntjesmenu bij een gesprek; kies daar de beschreven actie.",
+      "en": "The highlight marks the entry to conversation actions. After the guide, open the chat sidebar and the three-dot menu beside a conversation, then choose the described action."
+    }
   },
   "webui.sessions.move_project": {
     "panel": "chat",
-    "targets": []
+    "targets": [],
+    "entryTargets": [
+      ".session-actions-trigger",
+      "#btnHamburger",
+      ".rail [data-panel='chat']"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst de ingang naar gespreksacties aan. Open na de uitleg de chatzijbalk en het driepuntjesmenu bij een gesprek; kies daar de beschreven actie.",
+      "en": "The highlight marks the entry to conversation actions. After the guide, open the chat sidebar and the three-dot menu beside a conversation, then choose the described action."
+    }
   },
   "webui.sessions.archive": {
     "panel": "chat",
-    "targets": []
+    "targets": [],
+    "entryTargets": [
+      ".session-actions-trigger",
+      "#btnHamburger",
+      ".rail [data-panel='chat']"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst de ingang naar gespreksacties aan. Open na de uitleg de chatzijbalk en het driepuntjesmenu bij een gesprek; kies daar de beschreven actie.",
+      "en": "The highlight marks the entry to conversation actions. After the guide, open the chat sidebar and the three-dot menu beside a conversation, then choose the described action."
+    }
   },
   "webui.sessions.delete": {
     "panel": "chat",
-    "targets": []
+    "targets": [],
+    "entryTargets": [
+      ".session-actions-trigger",
+      "#btnHamburger",
+      ".rail [data-panel='chat']"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst de ingang naar gespreksacties aan. Open na de uitleg de chatzijbalk en het driepuntjesmenu bij een gesprek; kies daar de beschreven actie.",
+      "en": "The highlight marks the entry to conversation actions. After the guide, open the chat sidebar and the three-dot menu beside a conversation, then choose the described action."
+    }
   },
   "webui.sessions.regenerate_title": {
     "panel": "chat",
-    "targets": []
+    "targets": [],
+    "entryTargets": [
+      ".session-actions-trigger",
+      "#btnHamburger",
+      ".rail [data-panel='chat']"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst de ingang naar gespreksacties aan. Open na de uitleg de chatzijbalk en het driepuntjesmenu bij een gesprek; kies daar de beschreven actie.",
+      "en": "The highlight marks the entry to conversation actions. After the guide, open the chat sidebar and the three-dot menu beside a conversation, then choose the described action."
+    }
   },
   "webui.sessions.link": {
     "panel": "chat",
-    "targets": []
+    "targets": [],
+    "entryTargets": [
+      ".session-actions-trigger",
+      "#btnHamburger",
+      ".rail [data-panel='chat']"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst de ingang naar gespreksacties aan. Open na de uitleg de chatzijbalk en het driepuntjesmenu bij een gesprek; kies daar de beschreven actie.",
+      "en": "The highlight marks the entry to conversation actions. After the guide, open the chat sidebar and the three-dot menu beside a conversation, then choose the described action."
+    }
   },
   "webui.chat.save_prompt": {
     "panel": "chat",
@@ -1649,13 +2051,29 @@
     "panel": "profiles",
     "targets": [
       "[data-knowledge-upload]"
-    ]
+    ],
+    "entryTargets": [
+      "[data-builder-tab='4']",
+      ".profile-card[data-name]"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst de ingang naar deze botinstellingen aan. Open na de uitleg de gewenste bot, kies de beschreven configuratieknop en vervolgens het bijbehorende tabblad. Je wijzigingen worden pas met Opslaan bevestigd.",
+      "en": "The highlight marks the entry to these bot settings. After the guide, open the intended bot, choose the described configuration button, then its matching tab. Changes are confirmed only with Save."
+    }
   },
   "webui.bots.knowledge_legacy": {
     "panel": "profiles",
     "targets": [
       "#builderKnowledge details"
-    ]
+    ],
+    "entryTargets": [
+      "[data-builder-tab='4']",
+      ".profile-card[data-name]"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst de ingang naar deze botinstellingen aan. Open na de uitleg de gewenste bot, kies de beschreven configuratieknop en vervolgens het bijbehorende tabblad. Je wijzigingen worden pas met Opslaan bevestigd.",
+      "en": "The highlight marks the entry to these bot settings. After the guide, open the intended bot, choose the described configuration button, then its matching tab. Changes are confirmed only with Save."
+    }
   },
   "webui.memory.overview": {
     "panel": "memory",
@@ -1736,7 +2154,17 @@
     "panel": "chat",
     "targets": [
       "#workspaceShowHiddenFiles"
-    ]
+    ],
+    "entryTargets": [
+      "#btnWorkspacePrefs",
+      "#btnWorkspacePanelToggle",
+      "#btnWorkspacePanelEdgeToggle",
+      ".rail [data-panel='files']"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst de ingang naar bestandsopties aan. Open na de uitleg het bestandenpaneel en het driepuntjesmenu Werkruimteopties; daar staat Verborgen bestanden tonen.",
+      "en": "The highlight marks the entry to file options. After the guide, open the files panel and its three-dot Workspace options menu to find Show hidden files."
+    }
   },
   "webui.governance.approval_prompt": {
     "panel": "governance",
@@ -1876,6 +2304,8 @@
 };
   for (const entry of Object.values(entries)) {
     Object.freeze(entry.targets);
+    if (entry.entryTargets) Object.freeze(entry.entryTargets);
+    if (entry.entryHint) Object.freeze(entry.entryHint);
     Object.freeze(entry);
   }
   window.SynthPulseFeatureTargets = Object.freeze(entries);
