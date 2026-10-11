@@ -14769,7 +14769,7 @@ window.SynthPulseFeatureCatalog = {
       "related": [],
       "locales": {
         "nl": {
-          "title": "Jaarlijkse supporturen en maandfactuur",
+          "title": "Maandfactuur en jaarlijkse urencap",
           "purpose": "Bekijk één jaarbudget voor basisinfrastructuur, app-strippenkaarten, automations en maatwerk.",
           "when": "Als je wilt weten hoeveel supporturen je hebt en wat je per maand betaalt.",
           "steps": [
@@ -14780,11 +14780,11 @@ window.SynthPulseFeatureCatalog = {
             "Bekijk Betalingen voor het factuurnummer en een beschikbare betaallink."
           ],
           "permissions": "Organisatiebeheerders en financiële beheerders zien de jaarafspraken.",
-          "limits": "De MSP bevestigt eerst uren, tarieven en contractjaar. Centafrondingen worden over twaalf maanden verdeeld. Maandfacturen schrijven het jaarbudget niet opnieuw bij. Consultantdagen worden apart afgesproken.",
+          "limits": "De jaarcap geldt voor het hele contractjaar en wordt niet aangevuld door een nieuwe maand of maandbetaling. Het overzicht toont de cap, netto afgeschreven uren en resterende uren. Boven de cap is expliciet akkoord op extra uren nodig; oude maandruimte verhoogt de cap niet. Facturen worden gezamenlijk per maand verwerkt.",
           "example": "24 uur infrastructuur + 10 uur app-support + 4 uur automation-support = 38 supporturen per jaar, maandelijks betaald."
         },
         "en": {
-          "title": "Annual support hours and monthly invoice",
+          "title": "Monthly invoice and annual hours cap",
           "purpose": "View one annual budget for infrastructure, app hour bundles, automations and custom work.",
           "when": "To understand available annual support hours and monthly payment.",
           "steps": [
@@ -14795,7 +14795,7 @@ window.SynthPulseFeatureCatalog = {
             "Open Payments for the invoice reference and an available checkout link."
           ],
           "permissions": "Organisation and billing administrators see annual agreements.",
-          "limits": "Your MSP first confirms hours, prices and contract year. Cent rounding is spread over twelve months. Monthly invoices never credit the annual budget again. Consultant days are agreed separately.",
+          "limits": "The annual cap covers the entire contract year and is not replenished by a new month or monthly payment. The overview shows the cap, net charged hours and remaining hours. Exceeding it requires explicit approval for extra hours; legacy monthly allowances do not enlarge the cap. Invoices are consolidated monthly.",
           "example": "24 infrastructure hours + 10 app-support hours + 4 automation-support hours = 38 annual support hours, paid monthly."
         }
       }

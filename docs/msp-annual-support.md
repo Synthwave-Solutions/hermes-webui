@@ -21,3 +21,8 @@ requests but cannot view annual commercial terms.
 Monthly requests use the existing Payments workflow. Staff issue the accounting
 invoice and record its reference before a configured live Mollie checkout can
 be offered. No recurring collection or automatic accounting issuance is implied.
+
+The annual card shows the agreed hours cap, net used hours and remaining hours
+for the contract year. Calendar-month boundaries and payments never reset the
+cap. Extra billable support hours require explicit approval tied to that annual
+agreement. Other ledger credits do not automatically increase the annual cap.

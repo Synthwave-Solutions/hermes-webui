@@ -3507,7 +3507,7 @@ window.SynthPulseMspFeatureCatalog = {
             "Maak de factuur in de boekhouding en registreer het nummer bij Betalingen."
           ],
           "permissions": "Operators lezen; HQ-beheerders leggen afspraken vast, activeren en zetten facturen klaar.",
-          "limits": "De MSP bevestigt eerst uren, tarieven en contractjaar. Centafrondingen worden over twaalf maanden verdeeld. Maandfacturen schrijven het jaarbudget niet opnieuw bij. Consultantdagen worden apart afgesproken.",
+          "limits": "De jaarcap geldt voor het hele contractjaar en wordt niet aangevuld door een nieuwe maand of maandbetaling. Het overzicht toont de cap, netto afgeschreven uren en resterende uren. Boven de cap is expliciet akkoord op extra uren nodig; oude maandruimte verhoogt de cap niet. Facturen worden gezamenlijk per maand verwerkt.",
           "example": "24 uur infrastructuur + 10 uur app-support + 4 uur automation-support = 38 supporturen per jaar, maandelijks betaald."
         },
         "en": {
@@ -3523,7 +3523,7 @@ window.SynthPulseMspFeatureCatalog = {
             "Issue the invoice in accounting and record its reference in Payments."
           ],
           "permissions": "Operators read; HQ administrators save and activate agreements and prepare invoices.",
-          "limits": "Your MSP first confirms hours, prices and contract year. Cent rounding is spread over twelve months. Monthly invoices never credit the annual budget again. Consultant days are agreed separately.",
+          "limits": "The annual cap covers the entire contract year and is not replenished by a new month or monthly payment. The overview shows the cap, net charged hours and remaining hours. Exceeding it requires explicit approval for extra hours; legacy monthly allowances do not enlarge the cap. Invoices are consolidated monthly.",
           "example": "24 infrastructure hours + 10 app-support hours + 4 automation-support hours = 38 annual support hours, paid monthly."
         }
       }
