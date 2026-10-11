@@ -388,14 +388,15 @@
   "webui.tasks.script": {
     "panel": "tasks",
     "targets": [
-      "#cronFormScript"
+      "#cronFormScript",
+      ".cron-script-card"
     ],
     "entryTargets": [
-      "[data-tour='tasks-new']"
+      ".cron-item:has(.cron-script-badge)"
     ],
     "entryHint": {
-      "nl": "De markering wijst Nieuwe taak aan. Open na de uitleg dit formulier om de beschreven velden te zien. Er wordt pas een taak aangemaakt wanneer je die zelf opslaat.",
-      "en": "The highlight marks New task. Open this form after the guide to see the described fields. A task is created only when you save it yourself."
+      "nl": "De markering wijst een bestaande scripttaak aan. Open na de uitleg de gewenste scripttaak om het scriptpad te bekijken. Nieuwe taak maakt een agenttaak; het scriptbestand wijzig je op de server.",
+      "en": "The highlight marks an existing script task. Open the intended script task after the guide to inspect its script path. New task creates an agent task; edit the script file on the server."
     }
   },
   "webui.tasks.skills": {
@@ -460,7 +461,14 @@
     "panel": "tasks",
     "targets": [
       "[data-tour='tasks-notify']"
-    ]
+    ],
+    "entryTargets": [
+      "[data-tour='tasks-new']"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst Nieuwe taak aan. Open na de uitleg het formulier en ga naar Meldingen. Je kunt de meldingen daar instellen voordat je de taak opslaat.",
+      "en": "The highlight marks New task. After the guide, open the form and find Notifications. You can configure notifications there before saving the task."
+    }
   },
   "webui.tasks.mute": {
     "panel": "tasks",
@@ -554,8 +562,15 @@
   "webui.tasks.results": {
     "panel": "tasks",
     "targets": [
-      "#cronRefreshBtn"
-    ]
+      "#cronDetailRuns"
+    ],
+    "entryTargets": [
+      ".cron-item:not(.readonly)"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst een geplande taak aan. Open na de uitleg de gewenste taak en bekijk de uitvoer onderaan de details. Er zijn pas resultaten nadat die taak is uitgevoerd.",
+      "en": "The highlight marks a scheduled task. After the guide, open the intended task and review output at the bottom of its details. Results exist only after that task has run."
+    }
   },
   "webui.files.workspace": {
     "panel": "chat",

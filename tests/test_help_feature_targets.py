@@ -150,6 +150,9 @@ def test_closed_drawers_forms_and_responsive_controls_have_honest_entry_hints():
         'sessions.search': '#btnHamburger',
         'sessions.delete': '.session-actions-trigger',
         'tasks.prompt': "[data-tour='tasks-new']",
+        'tasks.notify': "[data-tour='tasks-new']",
+        'tasks.script': '.cron-item:has(.cron-script-badge)',
+        'tasks.results': '.cron-item:not(.readonly)',
         'tasks.run': '.cron-item:not(.readonly)',
         'files.create': '#btnWorkspacePanelEdgeToggle',
         'files.hidden': '#btnWorkspacePrefs',
@@ -162,3 +165,9 @@ def test_closed_drawers_forms_and_responsive_controls_have_honest_entry_hints():
         assert row['entryHint']['nl'] and row['entryHint']['en']
     for feature in ('planned.gateway', 'planned.reporter', 'planned.central_memory', 'governance.once'):
         assert 'entryTargets' not in TARGETS['webui.' + feature]
+
+
+def test_task_read_views_are_not_replaced_by_unrelated_creation_or_refresh_actions():
+    assert "[data-tour='tasks-new']" not in TARGETS['webui.tasks.script']['entryTargets']
+    assert '.cron-script-card' in TARGETS['webui.tasks.script']['targets']
+    assert TARGETS['webui.tasks.results']['targets'] == ['#cronDetailRuns']
