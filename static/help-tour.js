@@ -387,6 +387,7 @@
   function endRun(run){
     if(!run||run.ended)return;
     run.ended=true;
+    restoreFeaturePresentation(run);
     if(activeRun===run)activeRun=null;
     window.removeEventListener('keydown',onTourKey,true);
     if(run.blockPointer){document.removeEventListener('pointerdown',run.blockPointer,true);document.removeEventListener('click',run.blockPointer,true);}
@@ -532,7 +533,17 @@
       inst.showStep=function(index){
         if(run.ended||!this.state.isActive)return;
         const step=steps[index];if(!step)return;
-        const node=resolveFeatureNode(step.feature);step.node=node||run.anchor;step.highlight=!!node;
+        if(run.preparedIndex!==index){
+          restoreFeaturePresentation(run);
+          run.preparedIndex=index;
+          const ticket=run.prepareTicket=(run.prepareTicket||0)+1;
+          run.preparing=true;run.navigationBlocked=false;
+          // Let the card render first. A close/replacement in this turn cancels
+          // preparation before any navigation can happen.
+          Promise.resolve().then(()=>prepareFeature(run,index,ticket)).catch(()=>{console.warn('[help] could not reveal this feature');});
+        }
+        const target=resolveFeatureTarget(step.feature),node=target?.node;
+        step.targetKind=target?.kind;step.node=node||run.anchor;step.highlight=!!node;
         clearStepMarks();step.node.setAttribute('data-sp-help-step',String(index));
         this.config.steps[index].title=escHtml(step.feature.locales[run.locale].title);
         this.config.steps[index].description=escHtml(step.feature.locales[run.locale].purpose);
@@ -546,8 +557,8 @@
       inst.setupResizeHandler=function(){
         const update=event=>{
           if(run.ended||(event.target instanceof Node&&this.state.tooltip?.contains(event.target)))return;
-          const step=steps[this.state.currentStep],node=resolveFeatureNode(step.feature);
-          if(node!== (step.highlight?step.node:null)){this.showStep(this.state.currentStep);return;}
+          const step=steps[this.state.currentStep],node=resolveFeatureTarget(step.feature)?.node;
+          if((node||null)!== (step.highlight?step.node:null)){this.showStep(this.state.currentStep);return;}
           const backdrop=this.state.overlay?.querySelector('.guida-backdrop');
           if(node&&backdrop)this.updateClipPath(node,backdrop,this.state.currentStepConfig);
           positionFeatureTip(run);
@@ -559,7 +570,7 @@
         run.reconcile=()=>{if(!run.frame&&!run.ended)run.frame=requestAnimationFrame(()=>{run.frame=0;update({target:document});});};
         run.observer=new MutationObserver(run.reconcile);
         const layout=document.querySelector('.layout');
-        if(layout)run.observer.observe(layout,{subtree:true,childList:true,attributes:true,attributeFilter:['class','style','hidden','aria-hidden']});
+        if(layout)run.observer.observe(layout,{subtree:true,childList:true,attributes:true,attributeFilter:['class','style','hidden','aria-hidden','inert','aria-busy']});
         document.addEventListener('transitionend',run.reconcile,true);document.addEventListener('animationend',run.reconcile,true);
       };
     }
@@ -730,20 +741,103 @@
   // feature keeps the complete explanation together; the topic picker gives
   // direct access to every feature without forcing a long linear tour.
   const FEATURE_COPY={
-    en:{next:'Next feature',back:'Previous',close:'Close',done:'Done',of:'Feature {0} of {1}',jump:'Choose a feature',language:'Guide language',guide:'Back to feature guide',open:'Open this section',purpose:'What it does',when:'When to use it',steps:'How to use it',permissions:'Access required',limits:'Conditions and limits',example:'Example',available:'Implemented',conditional:'Requires configuration or permissions',planned:'Planned',missing:'This control is not visible here. It may require another page, an open conversation, configuration or permission. The guide does not activate it or perform the steps for you.',future:'This feature is planned. There is no working control to highlight yet.',msp:'This feature belongs to the MSP cockpit. Here you can follow its explanation; its controls are in that application.',nonvisual:'This is a background capability with no separate control to highlight.',tour:'Interactive feature guide'},
-    nl:{next:'Volgende functie',back:'Vorige',close:'Sluiten',done:'Klaar',of:'Functie {0} van {1}',jump:'Kies een functie',language:'Taal van de gids',guide:'Terug naar functiegids',open:'Open dit onderdeel',purpose:'Wat het doet',when:'Wanneer je dit gebruikt',steps:'Zo gebruik je dit',permissions:'Benodigde toegang',limits:'Voorwaarden en grenzen',example:'Voorbeeld',available:'Geïmplementeerd',conditional:'Vereist configuratie of rechten',planned:'Gepland',missing:'Deze bediening is hier niet zichtbaar. Mogelijk is een andere pagina, een geopend gesprek, configuratie of toestemming nodig. De gids activeert niets en voert de stappen niet voor je uit.',future:'Deze functie is gepland. Er is nog geen werkende bediening om aan te wijzen.',msp:'Deze functie hoort bij de MSP-cockpit. Je kunt hier de uitleg doorlopen; de bediening staat in die applicatie.',nonvisual:'Dit is een achtergrondfunctie zonder afzonderlijke bediening om aan te wijzen.',tour:'Interactieve functiegids'},
+    en:{next:'Next feature',back:'Previous',close:'Close',done:'Done',of:'Feature {0} of {1}',jump:'Choose a feature',language:'Guide language',guide:'Back to feature guide',open:'Open this section',purpose:'What it does',when:'When to use it',steps:'How to use it',permissions:'Access required',limits:'Conditions and limits',example:'Example',available:'Implemented',conditional:'Requires configuration or permissions',planned:'Planned',missing:'To reach this feature:',loading:'Opening the relevant section…',blocked:'Save or close your current editor first. The guide keeps your unsaved changes.',entry:'Start with the highlighted control. Close the guide to use it.',future:'This feature is planned. There is no working control to highlight yet.',msp:'This feature belongs to the MSP cockpit. Here you can follow its explanation; its controls are in that application.',nonvisual:'This is a background capability with no separate control to highlight.',tour:'Interactive feature guide'},
+    nl:{next:'Volgende functie',back:'Vorige',close:'Sluiten',done:'Klaar',of:'Functie {0} van {1}',jump:'Kies een functie',language:'Taal van de gids',guide:'Terug naar functiegids',open:'Open dit onderdeel',purpose:'Wat het doet',when:'Wanneer je dit gebruikt',steps:'Zo gebruik je dit',permissions:'Benodigde toegang',limits:'Voorwaarden en grenzen',example:'Voorbeeld',available:'Geïmplementeerd',conditional:'Vereist configuratie of rechten',planned:'Gepland',missing:'Zo bereik je deze functie:',loading:'Het juiste onderdeel wordt geopend…',blocked:'Bewaar of sluit eerst je huidige bewerking. De gids bewaart je niet-opgeslagen wijzigingen.',entry:'Begin bij de gemarkeerde knop. Sluit de gids om die te gebruiken.',future:'Deze functie is gepland. Er is nog geen werkende bediening om aan te wijzen.',msp:'Deze functie hoort bij de MSP-cockpit. Je kunt hier de uitleg doorlopen; de bediening staat in die applicatie.',nonvisual:'Dit is een achtergrondfunctie zonder afzonderlijke bediening om aan te wijzen.',tour:'Interactieve functiegids'},
   };
   function featureText(run,key){return FEATURE_COPY[run.locale||'en'][key];}
-  function resolveFeatureNode(feature){
+  function featureNodes(selectors){
+    const nodes=[];
+    for(const selector of selectors||[]){try{nodes.push(...document.querySelectorAll(selector));}catch(_){}}
+    return nodes;
+  }
+  function resolveFeatureTarget(feature){
     if(feature.product==='msp'||feature.status==='planned')return null;
     const mapping=(window.SynthPulseFeatureTargets||{})[feature.id];
     if(mapping&&(panelHidden(mapping.panel)||mapping.panel!==currentPanel()))return null;
+    if(mapping?.section&&typeof _currentSettingsSection==='string'&&mapping.section!==_currentSettingsSection)return null;
     const targets=mapping?mapping.targets:(feature.anchors||[]).filter(s=>/^#[A-Za-z][\w-]*$/.test(s));
-    for(const selector of targets){
-      let nodes=[];try{nodes=document.querySelectorAll(selector);}catch(_){}
-      for(const node of nodes){if(isVisible(node)&&!node.closest('[inert]')&&node.type!=='hidden')return node;}
+    for(const [kind,selectors] of [['control',targets],['entry',mapping?.entryTargets]]){
+      for(const node of featureNodes(selectors)){
+        if(isVisible(node)&&!node.closest('[inert]')&&node.type!=='hidden')return {node,kind};
+      }
     }
     return null;
+  }
+  function restoreFeaturePresentation(run){
+    for(const undo of (run.presentation||[]).reverse()){try{undo();}catch(_){}}
+    run.presentation=[];
+  }
+  function revealFeatureClass(run,node,name,on){
+    if(!node||node.classList.contains(name)===on)return;
+    node.classList.toggle(name,on);
+    run.presentation.push(()=>{if(node.classList.contains(name)===on)node.classList.toggle(name,!on);});
+  }
+  function featureNavigationBlocked(mapping){
+    const panel=currentPanel(),changingPanel=mapping.panel!==panel;
+    const changingSection=panel==='settings'&&mapping.section&&
+      typeof _currentSettingsSection==='string'&&mapping.section!==_currentSettingsSection;
+    if(!changingPanel&&!changingSection)return false;
+    const visible=selector=>featureNodes([selector]).some(isVisible);
+    const entered=selector=>featureNodes([selector]).some(node=>!!String(node.value||'').trim());
+    if(panel==='settings'){
+      if((typeof _settingsDirty!=='undefined'&&_settingsDirty)||(typeof _auxSettingsDirty!=='undefined'&&_auxSettingsDirty))return true;
+      // Clarification choices have their own Save action and revision state;
+      // entering Preferences again would replace them with server values.
+      const saved=typeof _interactionPreferenceState!=='undefined'&&_interactionPreferenceState;
+      if(saved&&[['#interactionUserMode',saved.user_mode],['#interactionTaskMode',saved.task_mode||'']]
+        .some(([selector,value])=>{const node=query(selector);return node&&!node.disabled&&node.value!==value;}))return true;
+    }
+    if(!changingPanel)return false;
+    // Existing panel loaders can rebuild editors. Do not invalidate a draft
+    // just to demonstrate a feature; the person can save or cancel it first.
+    if(visible('dialog[open], #profileDetailBody .bot-builder, #profileDetailBody .bot-editor, #profileDetailBody .detail-form, #taskDetailBody .detail-form, #workspaceDetailBody .detail-form, #skillDetailBody .detail-form, #memEditContent, #kanbanTaskModal, #kanbanBoardModal'))return true;
+    if(panel==='projects'){
+      if(entered('#projNewName, #projNewCategory'))return true;
+      const project=typeof _projDetail!=='undefined'&&_projDetail?.project;
+      if(project){
+        const category=query('#projCategory');
+        if(category&&!category.disabled&&category.value!==String(project.category||''))return true;
+        for(const [selector,values] of [['#projHumanChoices input',project.members||[]],['#projBotChoices input',project.bot_participants||[]]]){
+          if(featureNodes([selector]).some(node=>!node.disabled&&node.checked!==values.includes(node.value)))return true;
+        }
+      }
+    }
+    if(panel==='integrations'&&entered('#chAddUserId, #chAddPerson, #chMineOtherId, [data-mine-id], [data-mine-field]'))return true;
+    return panel==='kanban'&&entered('#kanbanCommentInput, #kanbanDependencyInput');
+  }
+  async function prepareFeature(run,index,ticket){
+    const current=()=>!run.ended&&run.prepareTicket===ticket&&run.inst.state.currentStep===index;
+    if(!current())return;
+    const feature=run.steps[index].feature,mapping=(window.SynthPulseFeatureTargets||{})[feature.id];
+    try{
+      if(feature.product==='msp'||feature.status==='planned'||!mapping||panelHidden(mapping.panel))return;
+      if(!mapping.targets?.length&&!mapping.entryTargets?.length)return;
+      if(featureNavigationBlocked(mapping)){run.navigationBlocked=true;return;}
+      if(!(await goToPanel(mapping.panel))||!current())return;
+      if(mapping.section&&typeof window.switchSettingsSection==='function'){
+        if(typeof _currentSettingsSection!=='string'||_currentSettingsSection!==mapping.section)window.switchSettingsSection(mapping.section);
+      }
+      if(!current())return;
+      // Reveal only presentation containers, never execute feature buttons or
+      // open forms. Remember our changes and restore them on step change/close.
+      const candidates=featureNodes([...(mapping.targets||[]),...(mapping.entryTargets||[])]);
+      for(const node of candidates){
+        for(let parent=node.parentElement;parent;parent=parent.parentElement){
+          if(parent.tagName==='DETAILS'&&!parent.open){parent.open=true;run.presentation.push(()=>{if(parent.isConnected)parent.open=false;});}
+        }
+      }
+      if(candidates.some(node=>node.closest('.sidebar')&&!isVisible(node))){
+        if(isDesktop())revealFeatureClass(run,document.querySelector('.layout'),'sidebar-collapsed',false);
+        else{
+          const sidebar=document.querySelector('.sidebar');
+          revealFeatureClass(run,sidebar,'mobile-session-page',false);
+          revealFeatureClass(run,sidebar,'mobile-panel-drawer',true);
+          revealFeatureClass(run,sidebar,'mobile-open',true);
+        }
+      }
+    }finally{
+      if(current()){run.preparing=false;run.inst.showStep(index);}
+    }
   }
   function positionFeatureTip(run){
     const tip=run.inst.state.tooltip;if(!tip)return;
@@ -770,10 +864,13 @@
     const intro=container.querySelector(':scope > p');
     const article=el('div','sp-feature-tour-detail');article.id=run.uid+'-body';
     const status=el('p','sp-feature-tour-status',featureText(run,f.status));article.append(status);
-    if(!step.highlight){
-      const mapping=(window.SynthPulseFeatureTargets||{})[f.id];
-      const reason=f.status==='planned'?'future':f.product==='msp'?'msp':'missing';
-      article.append(el('p','sp-feature-tour-note',featureText(run,reason)));
+    const mapping=(window.SynthPulseFeatureTargets||{})[f.id];
+    if(step.targetKind==='entry'){
+      article.append(el('p','sp-feature-tour-note',mapping?.entryHint?.[run.locale]||featureText(run,'entry')));
+    }else if(!step.highlight){
+      const reason=f.status==='planned'?'future':f.product==='msp'?'msp':run.navigationBlocked?'blocked':run.preparing?'loading':'missing';
+      const message=featureText(run,reason)+(reason==='missing'?' '+copy.steps[0]:'');
+      article.append(el('p','sp-feature-tour-note',message));
     }
     for(const field of ['purpose','when','steps','permissions','limits','example']){
       const section=el('section');section.append(el('h4','',featureText(run,field)));
@@ -798,18 +895,8 @@
     if(prev)prev.textContent=featureText(run,'back');if(close)close.textContent=featureText(run,'close');
     const links=el('div','sp-feature-tour-links');
     links.append(button('sp-help-chip',featureText(run,'guide'),()=>{const locale=run.locale;closeAll();window.SynthPulseFeatureGuide.open({feature:f.id,locale});}));
-    const mapping=(window.SynthPulseFeatureTargets||{})[f.id];
-    if(f.status!=='planned'&&mapping&&!panelHidden(mapping.panel)&&panelView(mapping.panel)&&
-      (mapping.panel!==currentPanel()||(mapping.section&&typeof window.switchSettingsSection==='function'))){
-      const open=button('sp-help-chip',featureText(run,'open'),async()=>{
-        open.disabled=true;
-        if(await goToPanel(mapping.panel)){
-          if(run.ended)return;
-          if(mapping.section&&typeof window.switchSettingsSection==='function')window.switchSettingsSection(mapping.section);
-          if(!run.ended)inst.showStep(inst.state.currentStep);
-        }else open.disabled=false;
-      });links.append(open);
-    }
+    // Navigation now follows the selected topic. A blocked editor is left
+    // intact; closing the guide lets the person finish or cancel that edit.
     container.append(links);positionFeatureTip(run);
   }
   function startFeatureTour(ids,opts){

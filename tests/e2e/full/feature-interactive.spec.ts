@@ -69,10 +69,10 @@ test('catalogue opens an individual or filtered tour and preserves language and 
  await page.keyboard.press('Escape');await expect(tip).toHaveCount(0);
 });
 
-test('unavailable controls are explained without navigation, and late next does not reopen a closed tour',async({page})=>{
+test('planned and cross-product topics never navigate, and late next does not reopen a closed tour',async({page})=>{
  await ready(page);const url=page.url();
- await page.evaluate(()=>window.SynthPulseHelp.startFeatureTour(['webui.tasks.notify','msp.reporter-spool'],{locale:'en'}));
- const tip=page.locator('.sp-feature-tour');await expect(tip.locator('.sp-feature-tour-note')).toContainText('not visible');await expect(page.locator('.guida-highlight')).toHaveCount(0);expect(page.url()).toBe(url);
+ await page.evaluate(()=>window.SynthPulseHelp.startFeatureTour(['webui.planned.central_memory','msp.reporter-spool'],{locale:'en'}));
+ const tip=page.locator('.sp-feature-tour');await expect(tip.locator('.sp-feature-tour-note')).toContainText('planned');await expect(page.locator('.guida-highlight')).toHaveCount(0);expect(page.url()).toBe(url);
  await tip.locator('.guida-next').click();await page.keyboard.press('Escape');await page.waitForTimeout(400);await expect(tip).toHaveCount(0);expect(page.url()).toBe(url);await expect(page.locator('#spFeatureTourAnchor')).toHaveCount(0);
 });
 
@@ -81,15 +81,13 @@ test('missing spotlight library keeps the complete catalogue explanation availab
  await page.getByRole('button',{name:'Start interactive guide',exact:true}).click();await expect(page.locator('#spFeatureGuide')).toBeVisible();await expect(page.locator('.sp-guide-notice')).toContainText('could not start');
 });
 
-test('background controls stay inactive and explicit section navigation reveals the real control',async({page})=>{
+test('background controls stay inactive while the guide navigates to the real control',async({page})=>{
  await ready(page);await page.locator('#msg').fill('Do not send this draft.');
  const writes:string[]=[];page.on('request',r=>{if(['POST','PUT','PATCH','DELETE'].includes(r.method())&&!r.url().endsWith('/api/help/events')&&!(r.url().endsWith('/api/auth/passkeys')&&r.postData()==='{}'))writes.push(r.url());});
  await page.evaluate(()=>window.SynthPulseHelp.startFeatureTour(['webui.chat.send'],{locale:'en'}));
  await page.locator('#btnSend').dispatchEvent('click');await expect(page.locator('#msg')).toHaveValue('Do not send this draft.');expect(writes).toEqual([]);
  await page.keyboard.press('Escape');
  await page.evaluate(()=>window.SynthPulseHelp.startFeatureTour(['webui.settings.theme'],{locale:'en'}));
- await expect(page.locator('.sp-feature-tour-note')).toBeVisible();
- await page.getByRole('button',{name:'Open this section',exact:true}).click();
  await expect(page.locator('.sp-feature-tour')).toBeVisible();await expect(page.locator('.guida-highlight')).toHaveCount(1);await expect(page.locator('.sp-feature-tour-note')).toHaveCount(0);
  expect(await page.evaluate(()=>_currentPanel)).toBe('settings');expect(writes).toEqual([]);
  await page.keyboard.press('Escape');await page.evaluate(()=>switchPanel('chat'));await expect(page.locator('#msg')).toHaveValue('Do not send this draft.');

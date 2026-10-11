@@ -323,7 +323,7 @@ window.SynthPulseFeatureCatalog = {
             "Switch language or download the catalog."
           ],
           "permissions": "Reading this static guide needs no extra permission. Described features retain their own access checks.",
-          "limits": "This guide describes capabilities, not your current permissions or live service health. Search stays in this browser. The tour does not perform the instructions. Open this section navigates only when you choose it; hidden or planned controls are explained without highlighting.",
+          "limits": "This guide describes capabilities, not your current permissions or live service health. Search stays in this browser. The tour does not perform the instructions. Choosing a topic opens its relevant section. For controls in a closed form or menu, the guide points to the entry and explains the next step. Unsaved edits are preserved; planned controls are explained without highlighting.",
           "example": "Search for notification mute and read its limits."
         },
         "nl": {
@@ -338,7 +338,7 @@ window.SynthPulseFeatureCatalog = {
             "Wissel van taal of download de catalogus."
           ],
           "permissions": "Deze statische gids lezen vereist geen extra rechten. Beschreven functies behouden hun eigen toegangscontrole.",
-          "limits": "Deze gids beschrijft mogelijkheden, niet je huidige rechten of actuele servicestatus. Zoeken blijft in deze browser. De rondleiding voert geen stappen uit. Open dit onderdeel navigeert alleen na jouw keuze; verborgen of geplande bedieningen krijgen uitleg zonder markering.",
+          "limits": "Deze gids beschrijft mogelijkheden, niet je huidige rechten of actuele servicestatus. Zoeken blijft in deze browser. De rondleiding voert geen stappen uit. Een onderwerp kiezen opent het bijbehorende onderdeel. Bij een gesloten formulier of menu wijst de gids de ingang aan en legt de vervolgstap uit. Niet-opgeslagen wijzigingen blijven behouden; geplande bedieningen krijgen uitleg zonder markering.",
           "example": "Zoek naar meldingen dempen en lees de beperkingen."
         }
       }

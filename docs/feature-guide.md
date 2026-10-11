@@ -26,9 +26,16 @@ The guide highlights an actual visible control only in its mapped panel. Hidden,
 role-restricted, embedded, background and planned capabilities keep their full
 explanation and an explicit context notice instead of a fabricated spotlight.
 MSP topics in WebUI explain that their controls belong to the separate cockpit.
-No page switching occurs while moving between features. **Open this section**
-is an explicit navigation action through the existing panel guards; it never
-clicks a feature, changes a setting, opens a secret, sends a message or runs a job.
+Selecting a feature automatically opens its mapped panel and Settings section
+through the existing access guards. Unsaved settings (including clarification choices), project/connection drafts
+and open bot, memory or task editors prevent the guide from leaving that editor.
+Settings section changes also respect pending edits. Collapsed navigation containers are
+opened temporarily and restored when the topic changes or the guide closes.
+If a control lives in a closed form or menu, the guide marks its audited entry
+button and explains how to reach it. It never clicks feature buttons, opens a
+secret, changes a setting, sends a message or runs a job. Truly conditional
+features show concrete usage instructions instead of a generic missing-control
+warning. Planned and cross-product topics keep their explicit availability notice.
 
 The tooltip traps keyboard focus, blocks background clicks and shortcuts, and
 restores focus on close. Its text scrolls independently, stays readable on narrow
