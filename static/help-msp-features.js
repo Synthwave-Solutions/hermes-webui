@@ -1,4 +1,4 @@
-// Static MSP catalog snapshot, source SHA256 4e6948aedebdfa723dd31caad1bc6cc6740c73a246734424dbae28c9490259dd. No runtime service dependency.
+/* Generated from the MSP cockpit catalogue. */
 window.SynthPulseMspFeatureCatalog = {
   "schema_version": 1,
   "product": "msp",
@@ -3354,34 +3354,32 @@ window.SynthPulseMspFeatureCatalog = {
       ],
       "locales": {
         "nl": {
-          "title": "Supportniveaus per app beheren",
-          "purpose": "Beheer Basis, Plus en Premium als afzonderlijke maandabonnementen per app.",
-          "when": "Bij een nieuwe supportaanvraag of het instellen van tarieven.",
+          "title": "App-support binnen de basisretainer",
+          "purpose": "Beheer per app het supportniveau binnen de totale basisretainer voor infrastructuur.",
+          "when": "Bij het afspreken of wijzigen van app-support.",
           "steps": [
-            "Open App-support en kies een app en niveau.",
-            "Stel naam, inhoud en maandtarief in eurocenten exclusief btw in. Leeg betekent dat er nog geen tarief is.",
-            "Bekijk aanvragen en bespreek de afspraken met de klant via het serviceticket.",
-            "Bevestig het klantakkoord en activeer pas als er een tarief en een actief klantcontract zijn.",
-            "Verwerk een opzegging apart van de appbeschikbaarheid."
+            "Open App-support in HQ.",
+            "Kies de app en het niveau. Leg de naam en dekkingsafspraken vast zonder afzonderlijk tarief.",
+            "Bekijk de aanvraag en bevestig klantakkoord en een actief klantcontract.",
+            "Activeer het afgesproken niveau binnen de infrastructuurretainer."
           ],
-          "permissions": "Operators kunnen lezen; MSP-beheerders kunnen tarieven en afspraken wijzigen.",
-          "limits": "Activering registreert de afspraak. Het maakt nog geen terugkerende Mollie-incasso aan. Reactietijden en inbegrepen uren volgen uit de afgesproken dekking, niet uit alleen de niveaunaam.",
-          "example": "Stel Plus-support voor de documentapp in en verwerk daarna de goedgekeurde klantaanvraag."
+          "permissions": "Organisatiebeheerders en financiële beheerders beheren de aanvragen.",
+          "limits": "App-support heeft geen apart maandtarief. Het niveau bepaalt de afgesproken dekking; een naam alleen belooft geen reactietijd. Aanvragen schrijft geen geld af.",
+          "example": "Vraag Plus-support voor Documenten aan binnen je basisretainer."
         },
         "en": {
-          "title": "Manage support levels per app",
-          "purpose": "Manage Basic, Plus and Premium as separate monthly subscriptions for each application.",
-          "when": "When receiving a support request or configuring prices.",
+          "title": "App support within the base retainer",
+          "purpose": "Manage each app support level within the total infrastructure base retainer.",
+          "when": "When agreeing or changing app support.",
           "steps": [
-            "Open App support and select an app and level.",
-            "Set the name, scope and monthly rate in euro cents excluding VAT. Empty means no price is set.",
-            "Review requests and discuss terms with the customer through the service ticket.",
-            "Confirm customer agreement and activate only after configuring a rate and an active customer contract.",
-            "Process cancellation separately from app availability."
+            "Open App support in HQ.",
+            "Choose the app and level. Record its name and coverage without a separate rate.",
+            "Review the request and confirm customer acceptance and an active customer contract.",
+            "Activate the agreed level within the infrastructure retainer."
           ],
-          "permissions": "Operators can read; MSP administrators can change prices and agreements.",
-          "limits": "Activation records the agreement. It does not create recurring Mollie collection. Response times and included hours depend on the agreed scope, not the tier name alone.",
-          "example": "Configure Plus support for the document app and process the accepted customer request."
+          "permissions": "Organisation and billing administrators manage requests.",
+          "limits": "App support has no separate monthly price. A tier name alone promises no response time. Requests collect no money.",
+          "example": "Request Plus support for Documents within your base retainer."
         }
       }
     },
@@ -3414,7 +3412,7 @@ window.SynthPulseMspFeatureCatalog = {
             "Verwerk wijzigingen of opzeggingen afzonderlijk."
           ],
           "permissions": "MSP-beheerders wijzigen afspraken; operators kunnen lezen.",
-          "limits": "Een aanvraag reserveert nog geen persoon of agenda. Dagen worden niet automatisch omgerekend naar supporturen of maanddagen. Dagindeling, tarief en planning spreek je apart af; app-support blijft een aparte afspraak.",
+          "limits": "App-support valt binnen de basisretainer voor infrastructuur. Consultantdagen worden afzonderlijk afgesproken; activering reserveert geen agenda.",
           "example": "Vraag 2 dagen Agentic Consultant per week aan naast je basispakket."
         },
         "en": {
@@ -3428,8 +3426,56 @@ window.SynthPulseMspFeatureCatalog = {
             "Process changes or cancellations separately."
           ],
           "permissions": "MSP administrators change agreements; operators can read.",
-          "limits": "Requests do not reserve a person or calendar. Days are not automatically converted to support hours or monthly days. Agree day structure, rate and scheduling separately; app support remains a separate agreement.",
+          "limits": "App support is included in the infrastructure base retainer. Consultant days are agreed separately; activation reserves no calendar.",
           "example": "Request 2 days of Agentic Consultant capacity per week alongside the base package."
+        }
+      }
+    },
+    {
+      "id": "msp.releases",
+      "area": "operations",
+      "status": "conditional",
+      "conditions": [
+        "Connected MSP and appropriate administrator permissions"
+      ],
+      "anchors": [
+        "/cockpit/releases"
+      ],
+      "source_refs": [
+        "apps/cockpit/frontend/src/pages/ReleasesPage.jsx",
+        "apps/cockpit/backend/app/control/releases.py"
+      ],
+      "related": [],
+      "locales": {
+        "nl": {
+          "title": "GitHub-updates via OTAP",
+          "purpose": "Rol vastgelegde softwareversies vanuit HQ gecontroleerd uit.",
+          "when": "Wanneer je een geteste GitHub-versie naar productie wilt brengen.",
+          "steps": [
+            "Open Updates & OTAP en kies de software.",
+            "Open de broncode op GitHub en kopieer de volledige commit-SHA. Kies Ophalen naar Ontwikkeling.",
+            "Start Test en wacht op een geslaagde controle. Start daarna Acceptatie.",
+            "Controleer het resultaat en kies Deze versie naar Productie uitrollen. Actieve gebruikersruns blokkeren een WebUI-herstart.",
+            "Herstel zo nodig de vorige geslaagde productieversie met de herstelknop."
+          ],
+          "permissions": "Operators lezen de status; HQ-beheerders starten releases en promoties.",
+          "limits": "Alleen geconfigureerde adapters kunnen uitrollen. Test en Acceptatie gebruiken geïsoleerde bestanden en testgegevens. Codeherstel draait gegevensmigraties niet terug; databaseherstel vereist afzonderlijke beoordeling. Bij een onderbroken worker moet de hostbeheerder de echte uitrolstatus onderzoeken.",
+          "example": "Promoveer dezelfde commit via O, T en A naar P."
+        },
+        "en": {
+          "title": "GitHub updates through OTAP",
+          "purpose": "Deploy pinned software versions from HQ with stage gates.",
+          "when": "When promoting a tested GitHub version into production.",
+          "steps": [
+            "Open Updates & OTAP and select the software.",
+            "Open its source on GitHub, copy the full commit SHA and choose Fetch to Development.",
+            "Start Test and wait for success, then start Acceptance.",
+            "Review the result and deploy this version to Production. Active user runs block a WebUI restart.",
+            "Restore the previous successful production version using its restore button if needed."
+          ],
+          "permissions": "Operators read status; HQ administrators start releases and promotions.",
+          "limits": "Only configured adapters can deploy. Test and Acceptance use isolated files and synthetic data. Code rollback does not reverse data migrations; database restoration requires separate review. Interrupted workers require inspection of actual host state.",
+          "example": "Promote the same commit through D, T and A to P."
         }
       }
     },

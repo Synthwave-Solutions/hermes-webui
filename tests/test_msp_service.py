@@ -21,3 +21,13 @@ def test_unknown_and_anonymous_users_cannot_reach_msp(write_policy,caller,monkey
     for who in [None,'stranger@elsewhere.example']:
         caller.email=who;h=_Handler();msp_service.handle_get(h,SimpleNamespace(path='/api/msp/overview',query=''))
         assert h.status==403
+
+
+def test_job_cost_proxy_rejects_spoofed_profile_and_job(write_policy,caller,monkeypatch):
+    from api import msp_service, profiles
+    caller.email=PLATFORM[0]
+    monkeypatch.setattr(profiles,'get_active_profile_name',lambda:'default')
+    monkeypatch.setattr(control_plane_client,'call',lambda *a,**k:(_ for _ in ()).throw(AssertionError('network')))
+    for body in ({'job_id':{},'profile':'default'}, {'job_id':'valid','profile':'other'}, {'job_id':'valid','org_id':'other'}):
+        h=_Handler();msp_service.handle_post(h,'/api/msp/job-cost',body)
+        assert h.status==422

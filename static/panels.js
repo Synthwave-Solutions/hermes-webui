@@ -2094,6 +2094,7 @@ function _renderCronDetail(job){
   _setCronHeaderButtons('read', job);
   // Load runs asynchronously
   if (!isReadOnly) _loadCronDetailRuns(job.id, _currentCronDetailKey);
+  if (!isReadOnly) window.SynthPulseJobCosts?.mount(job, body);
 }
 
 function _setCronHeaderButtons(mode, job) {

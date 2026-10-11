@@ -2550,6 +2550,19 @@
       "nl": "Kies Overzicht & uren om het basispakket en je consultantinzet te bekijken.",
       "en": "Choose Overview & hours to see your base package and consultant capacity."
     }
+  },
+  "webui.msp.job-costs": {
+    "panel": "msp",
+    "targets": [
+      "#mspJobCosts"
+    ],
+    "entryTargets": [
+      "#mspOverviewTab"
+    ],
+    "entryHint": {
+      "nl": "Kies Overzicht & uren. Uren invoeren doe je bij de betreffende scheduled task.",
+      "en": "Choose Overview & hours. Enter hours on the scheduled task itself."
+    }
   }
 };
   for (const entry of Object.values(entries)) {

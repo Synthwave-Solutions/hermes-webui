@@ -64,7 +64,7 @@ _SELF_ROUTES: frozenset[str] = frozenset({
     "/api/crons/notifications",
     "/api/client-errors",
     "/api/apps",
-    "/api/msp/package", "/api/msp/overview", "/api/msp/tickets", "/api/msp/ticket", "/api/msp/comment",
+    "/api/msp/job-cost", "/api/msp/package", "/api/msp/overview", "/api/msp/tickets", "/api/msp/ticket", "/api/msp/comment",
     "/api/msp/app-state", "/api/msp/app-request", "/api/msp/app-support",
     "/api/org/modules",
     "/api/org/modules/request",

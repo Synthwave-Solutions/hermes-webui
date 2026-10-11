@@ -2978,6 +2978,16 @@
         "api/msp_service.py",
         "static/msp.js"
       ]
+    },
+    {
+      "id": "webui.msp.job-costs",
+      "area": "msp",
+      "status": "conditional",
+      "source_refs": [
+        "static/job-costs.js",
+        "static/msp.js",
+        "api/msp_service.py"
+      ]
     }
   ],
   "controls": [

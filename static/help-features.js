@@ -14522,34 +14522,32 @@ window.SynthPulseFeatureCatalog = {
       ],
       "locales": {
         "nl": {
-          "title": "Supportniveau per app kiezen",
-          "purpose": "Vraag een eigen maandelijks supportabonnement aan per app met Basis, Plus of Premium.",
-          "when": "Als je ondersteuning voor een bepaalde app wilt afsluiten, wijzigen of opzeggen.",
+          "title": "App-support binnen de basisretainer",
+          "purpose": "Beheer per app het supportniveau binnen de totale basisretainer voor infrastructuur.",
+          "when": "Bij het afspreken of wijzigen van app-support.",
           "steps": [
-            "Open Apps en ga naar Maandabonnement voor support bij de gewenste app.",
-            "Kies Basis, Plus of Premium. Lees de omschrijving en het maandtarief exclusief btw; tarief volgt betekent dat de MSP dit nog moet vaststellen.",
-            "Klik op Supportniveau aanvragen. Er komt een ticket bij je MSP en je ziet de status Aangevraagd.",
-            "De MSP bevestigt inhoud, tarief en ingangsdatum. Activering vereist een ingesteld tarief, een actief klantcontract en bevestiging van jouw akkoord.",
-            "Gebruik Opzegging aanvragen om support te beëindigen. Het huidige niveau blijft gelden tot de MSP de wijziging verwerkt."
+            "Open Apps en ga naar Support binnen je basisretainer.",
+            "Kies Basis, Plus of Premium en lees de afgesproken dekking.",
+            "Vraag het niveau aan. Volg je ticket in Mijn MSP.",
+            "De MSP bevestigt het niveau, de scope en de ingangsdatum binnen je infrastructuurretainer."
           ],
-          "permissions": "Organisatiebeheerders en financiële beheerders beheren support per app.",
-          "limits": "Aanvragen incasseert niets. Namen alleen geven geen vaste reactietijd of urenbundel. De concrete dekking en facturatie worden met de MSP afgesproken.",
-          "example": "Vraag Plus aan voor SynthPulse Office Documenten en volg het ticket in Mijn MSP."
+          "permissions": "Organisatiebeheerders en financiële beheerders beheren de aanvragen.",
+          "limits": "App-support heeft geen apart maandtarief. Het niveau bepaalt de afgesproken dekking; een naam alleen belooft geen reactietijd. Aanvragen schrijft geen geld af.",
+          "example": "Vraag Plus-support voor Documenten aan binnen je basisretainer."
         },
         "en": {
-          "title": "Choose support per app",
-          "purpose": "Request a separate monthly support subscription for each app with Basic, Plus or Premium.",
-          "when": "To start, change or cancel support for a specific application.",
+          "title": "App support within the base retainer",
+          "purpose": "Manage each app support level within the total infrastructure base retainer.",
+          "when": "When agreeing or changing app support.",
           "steps": [
-            "Open Apps and find Monthly support subscription on the app card.",
-            "Select Basic, Plus or Premium. Read the description and monthly price excluding VAT; price to be agreed means your MSP has not set it yet.",
-            "Choose Request support level. A ticket enters your MSP queue and the status becomes Requested.",
-            "Your MSP confirms scope, price and start date. Activation requires a configured price, an active customer contract and confirmation of your agreement.",
-            "Use Request cancellation to end support. Your current level stays in place until the MSP processes the change."
+            "Open Apps and find Support within your base retainer.",
+            "Select Basic, Plus or Premium and read the agreed coverage.",
+            "Request the level. Follow your ticket in My MSP.",
+            "Your MSP confirms the level, scope and effective date within your infrastructure retainer."
           ],
-          "permissions": "Organisation and billing administrators manage app support.",
-          "limits": "Requests collect no payment. Tier names alone promise no response time or hours allowance. Scope and billing are agreed with your MSP.",
-          "example": "Request Plus for SynthPulse Office Documents and follow its ticket in My MSP."
+          "permissions": "Organisation and billing administrators manage requests.",
+          "limits": "App support has no separate monthly price. A tier name alone promises no response time. Requests collect no money.",
+          "example": "Request Plus support for Documents within your base retainer."
         }
       }
     },
@@ -14629,10 +14627,10 @@ window.SynthPulseFeatureCatalog = {
             "Open Mijn MSP en kies Overzicht & uren.",
             "Bekijk Basispakket onder Basispakket + Agentic Consultant. De status komt uit je klantcontract of pakketaanvraag.",
             "Als er nog geen actief pakket is, kies Basispakket aanvragen. Volg het bijbehorende ticket bij Tickets.",
-            "Je MSP bevestigt de inhoud, het tarief en de ingangsdatum. Support per app en consultantdagen staan afzonderlijk vermeld."
+            "Je MSP bevestigt inhoud, tarief en ingangsdatum. App-support is inbegrepen in de infrastructuurretainer; consultantinzet is aanvullend."
           ],
           "permissions": "Organisatiebeheerders en financiële beheerders beheren deze afspraken.",
-          "limits": "Een aanvraag activeert geen contract en incasseert niets. De concrete inbegrepen diensten volgen uit je overeenkomst; losse app-support is geen vervanging van het basispakket.",
+          "limits": "App-support is inbegrepen in de infrastructuurretainer. Consultantdagen worden afzonderlijk afgesproken en niet automatisch naar supporturen omgerekend.",
           "example": "Vraag het basispakket aan en bespreek de gewenste platforminrichting met je MSP."
         },
         "en": {
@@ -14643,10 +14641,10 @@ window.SynthPulseFeatureCatalog = {
             "Open My MSP and choose Overview & hours.",
             "Review Base package under Base package + Agentic Consultant. Its status comes from your customer contract or package request.",
             "If there is no active package, choose Request base package. Follow the resulting ticket in Tickets.",
-            "Your MSP confirms scope, price and start date. App support and consultant days are shown separately."
+            "Your MSP confirms scope, price and start date. App support is included in the infrastructure retainer; consultant capacity is additional."
           ],
           "permissions": "Organisation and billing administrators manage these agreements.",
-          "limits": "Submitting a request activates no contract and collects no payment. Included services follow your agreement; individual app support does not replace the base package.",
+          "limits": "App support is included in the infrastructure retainer. Consultant days are agreed separately and are not automatically converted to support hours.",
           "example": "Request the base package and discuss your preferred platform setup with your MSP."
         }
       }
@@ -14683,7 +14681,7 @@ window.SynthPulseFeatureCatalog = {
             "Vraag een ander aantal dagen aan om te wijzigen, of kies Opzegging consultant aanvragen. Tot bevestiging blijft je huidige afspraak staan."
           ],
           "permissions": "Organisatiebeheerders en financiële beheerders kunnen inzet aanvragen en wijzigen.",
-          "limits": "Een aanvraag reserveert nog geen persoon of agenda. Dagen worden niet automatisch omgerekend naar supporturen of maanddagen. Dagindeling, tarief en planning spreek je apart af; app-support blijft een aparte afspraak.",
+          "limits": "App-support is inbegrepen in de infrastructuurretainer. Consultantdagen worden afzonderlijk afgesproken en niet automatisch naar supporturen omgerekend.",
           "example": "Vraag 2 dagen Agentic Consultant per week aan naast je basispakket."
         },
         "en": {
@@ -14698,8 +14696,56 @@ window.SynthPulseFeatureCatalog = {
             "Request another number of days to change capacity, or choose Request consultant cancellation. Existing terms remain until confirmed."
           ],
           "permissions": "Organisation and billing administrators can request and change capacity.",
-          "limits": "Requests do not reserve a person or calendar. Days are not automatically converted to support hours or monthly days. Agree day structure, rate and scheduling separately; app support remains a separate agreement.",
+          "limits": "App support is included in the infrastructure retainer. Consultant days are agreed separately and are not automatically converted to support hours.",
           "example": "Request 2 days of Agentic Consultant capacity per week alongside the base package."
+        }
+      }
+    },
+    {
+      "id": "webui.msp.job-costs",
+      "area": "msp",
+      "status": "conditional",
+      "conditions": [
+        "Connected MSP and appropriate administrator permissions"
+      ],
+      "anchors": [
+        "#mspJobCosts",
+        "#cronJobCosts"
+      ],
+      "source_refs": [
+        "static/job-costs.js",
+        "static/msp.js",
+        "api/msp_service.py"
+      ],
+      "related": [],
+      "locales": {
+        "nl": {
+          "title": "Scheduled jobs: uren en jaarlijks support",
+          "purpose": "Leg realisatie-uren en het afgesproken uurtarief vast per scheduled job.",
+          "when": "Voor inzicht in de waarde van automatiseringen en jaarlijks onderhoud.",
+          "steps": [
+            "Open Scheduled tasks en selecteer de taak in het eigen profiel.",
+            "Vul onder Realisatie en supportkosten de uren en het uurtarief in. Laat het tarief leeg zolang dit nog niet is afgesproken.",
+            "Sla op. De jaarlijkse supportberekening is 15% van uren × uurtarief.",
+            "Open Mijn MSP, Overzicht & uren voor de som van alle geregistreerde jobs van deze installatie."
+          ],
+          "permissions": "Organisatiebeheerders en financiële beheerders kunnen bedragen vastleggen voor zichtbare jobs.",
+          "limits": "Het percentage geldt per jaar, niet per uitvoering. Opslaan maakt geen factuur of extra supporturenbundel. Bedragen zonder tarief tellen nog niet mee. Wijzigen vervangt de urenregistratie en telt deze niet dubbel.",
+          "example": "10 uur × €100 = €1.000 jobbedrag en €150 jaarlijks support."
+        },
+        "en": {
+          "title": "Scheduled jobs: hours and annual support",
+          "purpose": "Record implementation hours and the agreed hourly rate for each scheduled job.",
+          "when": "To understand automation value and annual maintenance.",
+          "steps": [
+            "Open Scheduled tasks and select the job in its owning profile.",
+            "Under Implementation and support costs, enter hours and hourly rate. Leave the rate empty until agreed.",
+            "Save. Annual support is 15% of hours × hourly rate.",
+            "Open My MSP, Overview & hours for the sum of registered jobs on this installation."
+          ],
+          "permissions": "Organisation and billing administrators can record amounts for visible jobs.",
+          "limits": "The percentage applies annually, not per run. Saving creates no invoice or support allowance. Unpriced jobs are excluded from monetary totals. Editing replaces the record without double counting.",
+          "example": "10 hours × €100 = €1,000 job value and €150 annual support."
         }
       }
     }

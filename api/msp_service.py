@@ -6,7 +6,7 @@ from api.org_modules import context
 from api.governance import delegation
 from api.helpers import j
 
-ROUTES=('/api/msp/package','/api/msp/overview','/api/msp/tickets','/api/msp/ticket','/api/msp/comment',
+ROUTES=('/api/msp/job-cost','/api/msp/package','/api/msp/overview','/api/msp/tickets','/api/msp/ticket','/api/msp/comment',
         '/api/msp/app-state','/api/msp/app-request','/api/msp/app-support')
 
 
@@ -59,7 +59,9 @@ def handle_post(handler,path,body):
     # Validate even self-service payloads before forwarding. Organisation and
     # acting headers can never be supplied by the browser.
     if not isinstance(body,dict):return respond(handler,(422,{'error':'Invalid request'}))
-    if path=='/api/msp/package':
+    if path=='/api/msp/job-cost':
+        allowed={'job_id','profile','title','hours_hundredths','hourly_cents','expected_revision'};target='/v1/customer/job-cost'
+    elif path=='/api/msp/package':
         allowed={'kind','days_per_week','action'};target='/v1/customer/package'
     elif path=='/api/msp/tickets':
         allowed={'need','impact','title','body','service','private','department'};target='/v1/tickets'
@@ -75,5 +77,19 @@ def handle_post(handler,path,body):
         target='/v1/customer/apps/'+app_id+'/'+action
     else:return False
     if set(body)-allowed:return respond(handler,(422,{'error':'Unknown request fields'}))
+    if path=='/api/msp/job-cost':
+        if not isinstance(body.get('job_id'),str) or not re.fullmatch(r'[A-Za-z0-9_.-]{1,120}',body['job_id']):return respond(handler,(422,{'error':'Invalid job ID'}))
+        from api.profiles import get_active_profile_name, cron_profile_context
+        from api.cron_scope import caller_sees_cron_profile
+        profile=get_active_profile_name() or 'default'
+        if body.get('profile')!=profile:return respond(handler,(422,{'error':'Open the job in its owning profile'}))
+        from api.routes import _ensure_agent_cron_import_path
+        _ensure_agent_cron_import_path()
+        from cron.jobs import get_job
+        with cron_profile_context():
+            job=get_job(body.get('job_id',''))
+            if not job or not caller_sees_cron_profile(handler,profile,job_id=body.get('job_id'),job=job):
+                return respond(handler,(404,{'error':'Job not found'}))
+            body={**body,'title':str(job.get('name') or job['id'])[:200]}
     payload={k:v for k,v in body.items() if k not in ('app_id','ticket_id')}
     return respond(handler,fetch(handler,target,'POST',payload))
