@@ -37,6 +37,8 @@ puts it in an error message, and redirects are never followed, so the
 from __future__ import annotations
 
 import hashlib
+import http.client
+import socket
 import hmac
 import json
 import logging
@@ -113,7 +115,7 @@ _EMAIL_RE = re.compile(r"^[^@\s,;:<>()\[\]\"'\\]+@[^@\s,;:<>()\[\]\"'\\]+$")
 
 def _base_url() -> str | None:
     """The validated control-api base URL without a trailing slash, or None."""
-    raw = str(os.environ.get(CONTROL_URL_ENV) or "").strip()
+    raw = str(os.environ.get(CONTROL_URL_ENV) or ("http://localhost" if os.environ.get("SP_CONTROL_SOCKET") else "")).strip()
     if not raw or len(raw) > 512 or any(ord(ch) < 33 or ord(ch) > 126 for ch in raw):
         return None
     try:
@@ -349,6 +351,31 @@ def _read_limited(fp) -> bytes | None:
 
 
 def _send(method: str, url: str, headers: dict, body: bytes, timeout: float) -> tuple[int, Any]:
+    unix_socket = os.environ.get("SP_CONTROL_SOCKET", "")
+    if unix_socket:
+        connection = None
+        try:
+            if not os.path.isabs(unix_socket):
+                return _local_error("not_configured", "Control socket must be an absolute path.")
+            connection = http.client.HTTPConnection("localhost", timeout=timeout)
+            connection.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            connection.sock.settimeout(timeout)
+            connection.sock.connect(unix_socket)
+            parts = urlsplit(url)
+            target = parts.path + ("?" + parts.query if parts.query else "")
+            connection.request(method, target, body=body or None, headers=headers)
+            response = connection.getresponse()
+            if 300 <= response.status < 400:
+                return _local_error("redirect_refused", "Control redirect refused.")
+            raw = _read_limited(response)
+            if raw is None:
+                return _local_error("invalid_response", "Control response is too large.")
+            return _parse_json_body(response.status, raw)
+        except (OSError, http.client.HTTPException):
+            return _local_error("unreachable", "The control plane could not be reached.")
+        finally:
+            if connection is not None:
+                connection.close()
     request = urllib.request.Request(url, data=body if body else None, method=method, headers=headers)
     try:
         with _opener().open(request, timeout=timeout) as response:

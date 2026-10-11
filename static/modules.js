@@ -17,9 +17,9 @@
     select.value=lang(); select.addEventListener('change',()=>{language=select.value;try{localStorage.setItem('sp-modules-language',language);}catch(_){}render();byId('mainModules')?.querySelector('select')?.focus();});label.append(select);return label;
   }
   function hide() {
-    modulesAllowed=false; moduleRows=null;window.SynthPulseApps?.applyVisible(false);
+    modulesAllowed=false; moduleRows=null;window.SynthPulseApps?.applyVisible(false);window.SynthPulseMSP?.applyVisible(false);
     document.querySelectorAll('[data-module-gated]').forEach(n=>{n.hidden=true;});
-    window._moduleHiddenNav=['apps','modules','knowledge','meetings'];
+    window._moduleHiddenNav=['apps','modules','msp','knowledge','meetings'];
     const main=byId('mainModules');if(main)main.replaceChildren();
   }
   function apply(settings) {
@@ -27,10 +27,11 @@
     const nav=settings && settings.module_nav;
     if(!nav || !Array.isArray(nav.hidden_panels) || !Array.isArray(settings.enabled_modules))return;
     modulesAllowed=nav.modules_visible===true;
-    window._moduleHiddenNav=nav.hidden_panels.concat(modulesAllowed?[]:['modules'],nav.apps_visible===true?[]:['apps']);
-    window.SynthPulseApps?.applyVisible(nav.apps_visible===true);
+    window._moduleHiddenNav=nav.hidden_panels.concat(modulesAllowed?[]:['modules'],nav.apps_visible===true?[]:['apps'],nav.msp_visible===true?[]:['msp']);
+    window.SynthPulseApps?.applyVisible(nav.apps_visible===true);window.SynthPulseMSP?.applyVisible(nav.msp_visible===true);
     document.querySelectorAll('[data-module-gated]').forEach(n=>{
-      if(n.dataset.panel==='apps')n.hidden=nav.apps_visible!==true;
+      if(n.dataset.panel==='msp')n.hidden=nav.msp_visible!==true;
+      else if(n.dataset.panel==='apps')n.hidden=nav.apps_visible!==true;
       else if(n.dataset.panel==='modules')n.hidden=!modulesAllowed;
       else if(n.dataset.module)n.hidden=!settings.enabled_modules.includes(n.dataset.module);
       else if(n.dataset.panel)n.hidden=window._moduleHiddenNav.includes(n.dataset.panel);

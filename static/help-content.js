@@ -594,6 +594,36 @@ window.SynthPulseHelpContent = {
             "modules",
             "integrations"
           ]
+        },
+        "msp": {
+          "title": "My MSP",
+          "summary": "See your actual support allowance, usage and app support subscriptions with your MSP.",
+          "sections": [
+            {
+              "id": "overview",
+              "title": "View support hours and subscriptions",
+              "body": "See your actual support allowance, usage and app support subscriptions with your MSP. An installation without an active contract shows no invented allowance. App support does not automatically credit your hours balance.",
+              "target": "#mspOverviewTab",
+              "dynamic": true
+            },
+            {
+              "id": "tickets",
+              "title": "Create, track and reply to tickets",
+              "body": "Send a question or incident to your MSP and follow open and completed tickets. Internal MSP notes remain hidden. A submitted request is not an approved change or payment order.",
+              "target": "#mspTicketsTab",
+              "dynamic": true
+            },
+            {
+              "id": "billing",
+              "title": "View payments",
+              "body": "See payment requests and invoice statuses for your organisation. A configured payment provider and invoice are required for a payment link. Returning from Mollie does not by itself mark an invoice paid.",
+              "target": "#mspBillingTab",
+              "dynamic": true
+            }
+          ],
+          "related": [
+            "apps"
+          ]
         }
       },
       "tour_steps": {
@@ -1265,6 +1295,36 @@ window.SynthPulseHelpContent = {
           "related": [
             "modules",
             "integrations"
+          ]
+        },
+        "msp": {
+          "title": "Mijn MSP",
+          "summary": "Bekijk je echte urenbundel, verbruik en supportabonnementen bij jouw MSP.",
+          "sections": [
+            {
+              "id": "overview",
+              "title": "Supporturen en abonnementen bekijken",
+              "body": "Bekijk je echte urenbundel, verbruik en supportabonnementen bij jouw MSP. Zonder actief contract zie je geen verzonnen uren. Support per app voegt niet automatisch uren toe aan je bundel.",
+              "target": "#mspOverviewTab",
+              "dynamic": true
+            },
+            {
+              "id": "tickets",
+              "title": "Tickets aanmaken, volgen en beantwoorden",
+              "body": "Dien een vraag of storing rechtstreeks bij je MSP in en volg openstaande en afgehandelde tickets. Interne MSP-notities blijven verborgen. Een ingediende aanvraag is nog geen goedgekeurde wijziging of betaalopdracht.",
+              "target": "#mspTicketsTab",
+              "dynamic": true
+            },
+            {
+              "id": "billing",
+              "title": "Betalingen bekijken",
+              "body": "Bekijk betaalverzoeken en factuurstatussen van je organisatie. Zonder geconfigureerde betaalprovider en factuur is er geen betaallink. Terugkeren uit Mollie betekent niet vanzelf dat een factuur betaald is.",
+              "target": "#mspBillingTab",
+              "dynamic": true
+            }
+          ],
+          "related": [
+            "apps"
           ]
         }
       },

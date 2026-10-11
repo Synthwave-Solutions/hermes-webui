@@ -96,3 +96,7 @@ keyboard focus, Escape, background shortcut isolation, draft preservation and
 both languages, checks the full chat tour, individual/filtered starts, real
 spotlights, missing targets, late-close cleanup, drafts, request isolation and
 390/900/1440-pixel layouts.
+
+Customer MSP self service is covered by `webui.msp.overview`, `webui.msp.tickets`,
+`webui.msp.billing`, `webui.apps.availability`, `webui.apps.request` and
+`webui.apps.support`. See [the customer MSP contract](customer-msp.md).

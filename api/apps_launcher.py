@@ -53,18 +53,27 @@ def handle_get(handler, parsed):
     if not subject.normalized_email or subject.provider == 'auth_disabled':
         j(handler, {'error': 'forbidden'}, status=403)
         return True
+    from api import msp_service, control_plane_client
+    managed = control_plane_client.configured()
+    customer = {}
+    if managed:
+        status, customer = msp_service.overview(handler)
+        if status != 200:
+            j(handler, {'error': 'msp_unavailable', 'message': 'App availability could not be verified. Retry shortly.'}, status=503)
+            return True
+    customer_apps = {row['id']: row for row in customer.get('apps', [])}
     state = modules.current_state()
     platform = scope.scope == 'platform'
     editor = os.getenv('SP_WORKFLOWS_CLIENT_EDITOR') == '1'
     apps = []
     named_links = _links('SP_APP_LINKS')
     for app_id, spec in app_catalog.REGISTRY.items():
-        if app_id not in named_links:
+        if app_id not in named_links and not managed:
             continue
         access = 'member' if app_id == 'n8n' and editor else spec.access
-        if not platform and (access == 'platform' or spec.module not in state.active):
+        if not platform and (access == 'platform' or (spec.module not in state.active and not managed)):
             continue
-        value = named_links[app_id]
+        value = named_links.get(app_id)
         unconfigured = value is None or value == ''
         url = None if unconfigured else safe_link(value, os.environ)
         if not unconfigured and url is None:
@@ -95,5 +104,16 @@ def handle_get(handler, parsed):
                                      'automation' if mid == 'workflows' else 'productivity',
                          'access': 'platform' if mid == 'workflows' and not editor else 'member',
                          'url': url, 'status': 'configured'})
-    j(handler, {'apps': apps})
+    for row in apps:
+        managed_app = customer_apps.get(row['id'])
+        if managed and managed_app:
+            available = bool(row['url']) and (platform or row['module'] in state.active)
+            row.update(enabled=managed_app['enabled'], support_levels=managed_app['support_levels'],
+                       support=managed_app['support'], available=available)
+            if not row['enabled'] or not available:
+                row['url'] = None
+    result = {'apps': apps}
+    if managed:
+        result['msp'] = {'connected': True, 'manage_apps': customer.get('permissions', {}).get('manage_apps', False)}
+    j(handler, result)
     return True
