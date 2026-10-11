@@ -2900,6 +2900,84 @@
         "api/apps_launcher.py",
         "static/apps.js"
       ]
+    },
+    {
+      "id": "webui.msp.overview",
+      "area": "msp",
+      "status": "conditional",
+      "source_refs": [
+        "api/msp_service.py",
+        "static/msp.js",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.msp.tickets",
+      "area": "msp",
+      "status": "conditional",
+      "source_refs": [
+        "api/msp_service.py",
+        "static/msp.js",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.msp.billing",
+      "area": "msp",
+      "status": "conditional",
+      "source_refs": [
+        "api/msp_service.py",
+        "static/msp.js",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.apps.availability",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/msp_service.py",
+        "static/msp.js",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.apps.support",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/msp_service.py",
+        "static/msp.js",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.apps.request",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/msp_service.py",
+        "static/msp.js",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.msp.package",
+      "area": "msp",
+      "status": "conditional",
+      "source_refs": [
+        "api/msp_service.py",
+        "static/msp.js"
+      ]
+    },
+    {
+      "id": "webui.msp.consultant",
+      "area": "msp",
+      "status": "conditional",
+      "source_refs": [
+        "api/msp_service.py",
+        "static/msp.js"
+      ]
     }
   ],
   "controls": [
@@ -7516,6 +7594,15 @@
         "static/apps.js"
       ],
       "feature_id": "webui.apps.language"
+    },
+    {
+      "control": "btnMsp",
+      "tag": "button",
+      "label": "Mijn MSP",
+      "source_refs": [
+        "static/index.html"
+      ],
+      "feature_id": "webui.msp.overview"
     }
   ],
   "method": "Inventory of concrete HTML controls and inline handlers, supplemented by manual review of generated conversation menus, bot builder and knowledge controls, composer customization and the embedded read-only memory dashboard. Save/cancel and equivalent responsive controls share a feature. Hidden vendor login, server settings and inactive legacy visualizers are excluded from user workflows.",

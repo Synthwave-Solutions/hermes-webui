@@ -1,7 +1,8 @@
-/* Read-only directory. The server owns app visibility and trusted destinations. */
+/* The server owns app availability, support requests and trusted destinations. */
 (function () {
   'use strict';
   let allowed=false, generation=0, rows=null, loading=false, failed=false, language='', query='', category='all';
+  let msp={connected:false,manage_apps:false},mutation=false,feedback='';
   const $=id=>document.getElementById(id);
   const copy={
     nl:{intro:'Je apps op één plek. Open een app in een nieuw tabblad; sommige apps vragen om een eigen login.',search:'Zoek een app',category:'Categorie',all:'Alle apps',creative:'Ontwerp & video',automation:'Automatisering',productivity:'Documenten en kennis',platform:'Beheer en platform',open:'Open app',help:'Uitleg',admin:'Beheer',unconfigured:'Nog geen browseradres gekoppeld',loading:'Apps laden…',error:'Apps konden niet worden geladen.',retry:'Opnieuw proberen',empty:'Er zijn nog geen apps voor jouw account gekoppeld.',noResults:'Geen apps gevonden. Pas je zoekterm of categorie aan.',count:'apps',language:'Taal',guide:'Interactieve gids',sidebar:'Kies een categorie of zoek op naam. Je chat blijft bewaard.'},
@@ -13,10 +14,11 @@
   function localized(value){return typeof value==='string'?value:value?.[lang()]||value?.en||'';}
   function appId(row){return row.id||row.module;}
   function validUrl(value){try{const u=new URL(value);return u.protocol==='https:'&&!u.username&&!u.password&&!u.search&&!u.hash?u.href:null;}catch(_){return null;}}
-  function guide(id,trigger){const feature='webui.apps.'+id;const known=window.SynthPulseFeatureCatalog?.features?.some(f=>f.id===feature);window.SynthPulseHelp?.startFeatureTour([known?feature:'webui.modules.apps'],{locale:lang(),trigger});}
+  function guide(id,trigger){const feature='webui.apps.'+id;const known=window.SynthPulseFeatureCatalog?.features?.some(f=>f.id===feature);window.SynthPulseHelp?.startFeatureTour(id==='overview'&&msp.connected?['webui.apps.overview','webui.apps.availability','webui.apps.request','webui.apps.support']:[known?feature:'webui.modules.apps'],{locale:lang(),trigger});}
   const categories=['creative','automation','productivity','platform'];
   function renderList(){
     const root=$('appsList'),count=$('appsCount');if(!root)return;root.replaceChildren();const c=copy[lang()];
+    if(feedback){const message=el('p',feedback,'msp-notice');message.setAttribute('role','status');root.append(message);}
     if(loading){root.append(el('p',c.loading));count.textContent='';return;}
     if(failed){root.append(el('p',c.error),btn(c.retry,load));count.textContent='';return;}
     const all=rows||[],term=query.trim().toLocaleLowerCase();
@@ -32,9 +34,33 @@
         card.append(heading,el('p',localized(r.description)||c.intro,'app-description'));
         const actions=el('div',null,'app-actions'),url=validUrl(r.url);
         if(url){const action=c.open;const link=el('a',action+' ↗','app-button app-open');link.href=url;link.target='_blank';link.rel='noopener noreferrer';link.setAttribute('aria-label',action+': '+name);actions.append(link);}
-        else card.append(el('p',c.unconfigured,'app-unconfigured'));
+        else card.append(el('p',r.available&&r.enabled===false?(lang()==='nl'?'Uitgeschakeld in SynthPulse':'Disabled in SynthPulse'):c.unconfigured,'app-unconfigured'));
         if(r.id){const help=btn(c.help,()=>guide(id,help));help.setAttribute('aria-label',c.help+': '+name);actions.append(help);}
-        card.append(actions);grid.append(card);
+        card.append(actions);
+        if(msp.connected && r.support_levels){
+          const nl=lang()==='nl';
+          const change=(path,payload)=>mutate(path,{app_id:id,...payload});
+          if(msp.manage_apps && r.available){
+            const toggle=btn((r.enabled?(nl?'Aan':'On'):(nl?'Uit':'Off'))+' · SynthPulse',()=>change('/api/msp/app-state',{enabled:!r.enabled}));
+            toggle.classList.add('app-state-toggle');toggle.setAttribute('role','switch');toggle.setAttribute('aria-checked',String(r.enabled));toggle.setAttribute('aria-label',(nl?'App beschikbaar: ':'App available: ')+name);toggle.disabled=mutation;card.append(toggle);
+            card.append(el('p',nl?'Uitschakelen blokkeert openen vanuit SynthPulse. Je bestanden blijven bewaard; support opzeggen doe je apart.':'Turning off prevents opening the app from SynthPulse. Files are preserved; cancel support separately.','msp-muted'));
+          }
+          if(!r.available){const request=btn(nl?'App aanvragen bij MSP':'Request app from MSP',()=>change('/api/msp/app-request',{note:(nl?'Graag deze app beschikbaar maken: ':'Please make this app available: ')+name}));request.disabled=mutation;card.append(request);}
+          const support=el('div',null,'app-support');support.append(el('strong',nl?'Maandabonnement voor support':'Monthly support subscription'));
+          const sub=r.support;
+          if(sub){const labels=nl?{requested:'Aangevraagd',active:'Actief',cancel_requested:'Opzegging aangevraagd',cancelled:'Opgezegd',rejected:'Afgewezen'}:{requested:'Requested',active:'Active',cancel_requested:'Cancellation requested',cancelled:'Cancelled',rejected:'Declined'};support.append(el('p',(labels[sub.status]||sub.status)+' · '+(sub.active_level||sub.requested_level||'')));}
+          if(msp.manage_apps){
+            const label=el('label',nl?'Supportniveau':'Support level'),pick=el('select');pick.setAttribute('aria-label',(nl?'Supportniveau: ':'Support level: ')+name);
+            for(const level of r.support_levels){const price=level.monthly_cents==null?(nl?'tarief volgt':'price to be agreed'):new Intl.NumberFormat(nl?'nl-NL':'en-GB',{style:'currency',currency:'EUR'}).format(level.monthly_cents/100)+(nl?' / maand excl. btw':' / month excl. VAT');const option=el('option',level.name+' · '+price);option.value=level.level;pick.append(option);}
+            pick.value=(sub&&sub.requested_level!=='cancel'&&sub.requested_level)||r.support_levels[0]?.level||'basic';label.append(pick);support.append(label);
+            const terms=el('p',null,'msp-muted');function showTerms(){const level=r.support_levels.find(x=>x.level===pick.value);terms.textContent=level?.description||(nl?'Inhoud en afspraken worden door je MSP bevestigd.':'Your MSP will confirm the scope and terms.');}pick.onchange=showTerms;showTerms();support.append(terms);
+            const request=btn(nl?'Supportniveau aanvragen':'Request support level',()=>change('/api/msp/app-support',{level:pick.value}));request.disabled=mutation;support.append(request);
+            if(sub&&!['cancelled','rejected','cancel_requested'].includes(sub.status)){const cancel=btn(nl?'Opzegging aanvragen':'Request cancellation',()=>change('/api/msp/app-support',{level:'cancel'}));cancel.disabled=mutation;support.append(cancel);}
+            support.append(el('p',nl?'Aanvragen incasseert niets. Je MSP bevestigt tarief en ingangsdatum.':'Submitting a request collects no payment. Your MSP confirms the price and start date.','msp-muted'));
+          }else support.append(el('p',nl?'Je organisatiebeheerder beheert dit abonnement.':'Your organisation administrator manages this subscription.','msp-muted'));
+          card.append(support);
+        }
+        grid.append(card);
       }
     }
   }
@@ -42,7 +68,7 @@
     const root=$('mainApps');if(!root)return;root.replaceChildren();if(!allowed)return;const c=copy[lang()];
     const head=el('div',null,'apps-heading');head.append(el('h1','Apps'));
     const locale=el('select');locale.id='appsLanguage';locale.setAttribute('aria-label',c.language);
-    for(const [value,text] of [['nl','Nederlands'],['en','English']]){const o=el('option',text);o.value=value;locale.append(o);}locale.value=lang();locale.addEventListener('change',()=>{language=locale.value;try{localStorage.setItem('sp-apps-language',language);}catch(_){}render();$('appsLanguage')?.focus();});
+    for(const [value,text] of [['nl','Nederlands'],['en','English']]){const o=el('option',text);o.value=value;locale.append(o);}locale.value=lang();locale.addEventListener('change',()=>{language=locale.value;feedback='';try{localStorage.setItem('sp-apps-language',language);}catch(_){}render();$('appsLanguage')?.focus();});
     const guideButton=btn(c.guide,()=>guide('overview',guideButton));head.append(guideButton,locale);root.append(head,el('p',c.intro,'apps-intro'));
     const toolbar=el('div',null,'apps-toolbar'),searchLabel=el('label',c.search),search=el('input');search.id='appsSearch';search.type='search';search.placeholder=c.search;search.value=query;search.addEventListener('input',()=>{query=search.value;renderList();});searchLabel.append(search);
     const filterLabel=el('label',c.category),filter=el('select');filter.id='appsCategory';
@@ -51,11 +77,18 @@
     if($('appsSidebar'))$('appsSidebar').textContent=c.sidebar;
     renderList();
   }
-  function applyVisible(value){allowed=value===true;generation++;rows=null;loading=false;failed=false;query='';category='all';if(!allowed){$('mainApps')?.replaceChildren();$('appsSidebar')?.replaceChildren();}}
+  function applyVisible(value){allowed=value===true;msp={connected:false,manage_apps:false};mutation=false;feedback='';generation++;rows=null;loading=false;failed=false;query='';category='all';if(!allowed){$('mainApps')?.replaceChildren();$('appsSidebar')?.replaceChildren();}}
   async function load(){
     if(!allowed)return false;const mine=++generation;loading=true;failed=false;render();
-    try{const result=await api('/api/apps');if(mine!==generation||!allowed)return false;rows=Array.isArray(result.apps)?result.apps:[];loading=false;render();return true;}
+    try{const result=await api('/api/apps');if(mine!==generation||!allowed)return false;rows=Array.isArray(result.apps)?result.apps:[];msp=result.msp||{connected:false,manage_apps:false};loading=false;render();return true;}
     catch(_){if(mine===generation&&allowed){rows=null;loading=false;failed=true;render();}return false;}
+  }
+  async function mutate(path,payload){
+    if(mutation)return;const mine=generation;mutation=true;feedback='';renderList();
+    try{await api(path,{method:'POST',body:JSON.stringify(payload)});if(mine!==generation||!allowed)return;
+      feedback=lang()==='nl'?'Opgeslagen. Aanvragen vind je terug bij Mijn MSP en je tickets.':'Saved. Requests appear in My MSP and your tickets.';
+      mutation=false;await load();
+    }catch(_){if(mine===generation&&allowed){mutation=false;feedback=lang()==='nl'?'Wijziging niet bevestigd. Vernieuw om de actuele status te controleren.':'Change not confirmed. Refresh to check the current status.';renderList();}}
   }
   function reveal(id){
     if(!allowed)return;const previous={query,category};const changed=query!==''||category!=='all';

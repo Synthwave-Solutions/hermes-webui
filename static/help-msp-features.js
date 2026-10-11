@@ -981,15 +981,17 @@ window.SynthPulseMspFeatureCatalog = {
     {
       "id": "msp.billing",
       "area": "commercial",
-      "status": "planned",
+      "status": "conditional",
       "conditions": [
-        "not_released"
+        "deployment_prerequisites"
       ],
       "anchors": [
+        "/cockpit/payments",
         "/cockpit/help?feature=msp.billing"
       ],
       "source_refs": [
-        "apps/cockpit/README.md"
+        "apps/cockpit/README.md",
+        "apps/cockpit/docs/mollie-payments.md"
       ],
       "related": [
         "msp.roles",
@@ -997,30 +999,38 @@ window.SynthPulseMspFeatureCatalog = {
       ],
       "locales": {
         "en": {
-          "title": "Payment collection and invoicing automation",
-          "purpose": "Describe the intended billing connection without presenting it as active payment collection.",
-          "when": "When planning payment integration or checking whether a stored request charged money.",
+          "title": "Pay invoices with Mollie",
+          "purpose": "Create checkout links for invoiced requests and verify payment with Mollie.",
+          "when": "After approving and invoicing a customer request.",
           "steps": [
-            "Record the approved commercial agreement",
-            "Let the billing owner use the currently approved finance process",
-            "Reconcile actual invoices and payments separately"
+            "Open Payments and check the Mollie connection and test or live mode.",
+            "As admin, save the API key in the secure field. It is verified and stored on the server only.",
+            "Approve the request, issue the invoice in your accounting system and record its reference.",
+            "Create and share the checkout link. The VAT-inclusive amount comes from the request; repeated clicks reuse the current payment.",
+            "Mollie reports changes. SynthPulse checks amount, currency, profile and customer metadata before a live payment settles the invoice.",
+            "Use Check status with Mollie to verify again. If creation was interrupted, enter its payment ID from Mollie to recover the original payment.",
+            "Review reported refunds and chargebacks manually."
           ],
-          "permissions": "Operators and admins. Partners can read only their own client and job records; staff service and operations data require an operator role.",
-          "limits": "This cockpit release does not provide a live payment checkout or automatically collect Mollie charges from the service desk.",
-          "example": "A saved draft contract never means a payment was collected."
+          "permissions": "Operators may read. Only admins can configure the key and process payment requests.",
+          "limits": "Requires a key, public webhook, real prices and contracts. Test payments do not settle real invoices. Issue invoice documents in your accounting system. Automatic direct debit and subscription collection are not connected. Hours are credited on invoicing, never twice on payment.",
+          "example": "An invoiced support bundle receives a checkout link. A verified live payment changes its status to Paid."
         },
         "nl": {
-          "title": "Automatisch innen en factureren",
-          "purpose": "Beschrijf de bedoelde facturatiekoppeling zonder te suggereren dat betalingen al worden geïnd.",
-          "when": "Bij het voorbereiden van betaalintegratie of controleren of een opgeslagen verzoek geld heeft afgeschreven.",
+          "title": "Facturen betalen met Mollie",
+          "purpose": "Maak betaallinks voor gefactureerde aanvragen en controleer betaling via Mollie.",
+          "when": "Na het goedkeuren en factureren van een klantaanvraag.",
           "steps": [
-            "Leg de goedgekeurde commerciële afspraak vast",
-            "Laat de facturatieverantwoordelijke het geldende financiële proces volgen",
-            "Controleer echte facturen en betalingen afzonderlijk"
+            "Open Betalingen en controleer de Mollie-koppeling en test- of livemodus.",
+            "Sla als admin de API-sleutel in het beveiligde veld op. Deze wordt gecontroleerd en alleen op de server bewaard.",
+            "Keur de aanvraag goed, maak de factuur in je boekhouding en registreer het factuurnummer.",
+            "Maak en deel de betaallink. Het bedrag inclusief btw komt uit de aanvraag; opnieuw klikken gebruikt dezelfde lopende betaling.",
+            "Mollie meldt wijzigingen. SynthPulse controleert bedrag, valuta, profiel en klantkoppeling voordat een livebetaling de factuur voldoet.",
+            "Gebruik Status bij Mollie controleren voor een nieuwe controle. Na een onderbroken aanmaak kun je het betaal-ID uit Mollie invoeren om de oorspronkelijke betaling te koppelen.",
+            "Controleer gemelde terugbetalingen en terugboekingen handmatig."
           ],
-          "permissions": "Operators en admins. Partners lezen alleen eigen klant- en taakgegevens; servicedesk en beheer vereisen een operatorrol.",
-          "limits": "Deze cockpitversie biedt geen actieve betaalpagina en int geen Mollie-betalingen vanuit de servicedesk.",
-          "example": "Een opgeslagen conceptcontract betekent nooit dat een betaling is geïnd."
+          "permissions": "Operators mogen lezen. Alleen admins mogen de sleutel instellen en betaalverzoeken verwerken.",
+          "limits": "Vereist een sleutel, openbare webhook, echte tarieven en contracten. Testbetalingen voldoen geen echte facturen. Factuurdocumenten maak je in de boekhouding. Automatische incasso en abonnementincasso zijn nog niet aangesloten. Uren worden bij facturatie toegekend en niet opnieuw bij betaling.",
+          "example": "Een gefactureerde urenbundel krijgt een betaallink. Na bevestigde livebetaling wordt de status Betaald."
         }
       }
     },
@@ -3322,6 +3332,104 @@ window.SynthPulseMspFeatureCatalog = {
           "permissions": "Bevoegde hostbeheerders met de eigen reporterservice-identiteit. Cockpitrollen geven geen shelltoegang.",
           "limits": "De proef voert alleen lokale gezondheidsverzoeken uit. Hij leest geen sleutels, benadert geen control-api, registreert niets en schrijft geen wachtrij of cursor. Hij bewijst geen authenticatie, bezorging of gezondheid van alle machines.",
           "example": "De WebUI-controle op /health geeft ok terwijl centrale bezorging offline is; het vervolgonderzoek betreft de verbinding, niet het lokale gezondheidsadres."
+        }
+      }
+    },
+    {
+      "id": "msp.app-support",
+      "area": "commercial",
+      "status": "conditional",
+      "conditions": [
+        "Organisation membership and active contract for approval"
+      ],
+      "anchors": [
+        "/cockpit/app-support"
+      ],
+      "source_refs": [
+        "apps/cockpit/backend/app/control/commercial/app_support.py",
+        "apps/cockpit/frontend/src/pages/AppSupportPage.jsx"
+      ],
+      "related": [
+        "msp.billing"
+      ],
+      "locales": {
+        "nl": {
+          "title": "Supportniveaus per app beheren",
+          "purpose": "Beheer Basis, Plus en Premium als afzonderlijke maandabonnementen per app.",
+          "when": "Bij een nieuwe supportaanvraag of het instellen van tarieven.",
+          "steps": [
+            "Open App-support en kies een app en niveau.",
+            "Stel naam, inhoud en maandtarief in eurocenten exclusief btw in. Leeg betekent dat er nog geen tarief is.",
+            "Bekijk aanvragen en bespreek de afspraken met de klant via het serviceticket.",
+            "Bevestig het klantakkoord en activeer pas als er een tarief en een actief klantcontract zijn.",
+            "Verwerk een opzegging apart van de appbeschikbaarheid."
+          ],
+          "permissions": "Operators kunnen lezen; MSP-beheerders kunnen tarieven en afspraken wijzigen.",
+          "limits": "Activering registreert de afspraak. Het maakt nog geen terugkerende Mollie-incasso aan. Reactietijden en inbegrepen uren volgen uit de afgesproken dekking, niet uit alleen de niveaunaam.",
+          "example": "Stel Plus-support voor de documentapp in en verwerk daarna de goedgekeurde klantaanvraag."
+        },
+        "en": {
+          "title": "Manage support levels per app",
+          "purpose": "Manage Basic, Plus and Premium as separate monthly subscriptions for each application.",
+          "when": "When receiving a support request or configuring prices.",
+          "steps": [
+            "Open App support and select an app and level.",
+            "Set the name, scope and monthly rate in euro cents excluding VAT. Empty means no price is set.",
+            "Review requests and discuss terms with the customer through the service ticket.",
+            "Confirm customer agreement and activate only after configuring a rate and an active customer contract.",
+            "Process cancellation separately from app availability."
+          ],
+          "permissions": "Operators can read; MSP administrators can change prices and agreements.",
+          "limits": "Activation records the agreement. It does not create recurring Mollie collection. Response times and included hours depend on the agreed scope, not the tier name alone.",
+          "example": "Configure Plus support for the document app and process the accepted customer request."
+        }
+      }
+    },
+    {
+      "id": "msp.service-packages",
+      "area": "commercial",
+      "status": "conditional",
+      "conditions": [
+        "Connected MSP and organisation administrator"
+      ],
+      "anchors": [
+        "/cockpit/service-packages"
+      ],
+      "source_refs": [
+        "apps/cockpit/frontend/src/pages/ServicePackagesPage.jsx",
+        "apps/cockpit/backend/app/control/commercial/service_packages.py"
+      ],
+      "related": [
+        "msp.app-support"
+      ],
+      "locales": {
+        "nl": {
+          "title": "Basispakket en consultantinzet beheren",
+          "purpose": "Vraag consultantinzet aan naast het basispakket, uitgedrukt in dagen per week.",
+          "when": "Als je structurele begeleiding of uitvoering door een Agentic Consultant wilt.",
+          "steps": [
+            "Open Pakketten en bekijk de aangevraagde inzet.",
+            "Leg het afgesproken maandtarief, scope en de ingangsdatum vast.",
+            "Bevestig het klantakkoord en activeer de afspraak. Er moet een actief klantcontract zijn.",
+            "Verwerk wijzigingen of opzeggingen afzonderlijk."
+          ],
+          "permissions": "MSP-beheerders wijzigen afspraken; operators kunnen lezen.",
+          "limits": "Een aanvraag reserveert nog geen persoon of agenda. Dagen worden niet automatisch omgerekend naar supporturen of maanddagen. Dagindeling, tarief en planning spreek je apart af; app-support blijft een aparte afspraak.",
+          "example": "Vraag 2 dagen Agentic Consultant per week aan naast je basispakket."
+        },
+        "en": {
+          "title": "Manage base package and consultant capacity",
+          "purpose": "Request consultant capacity alongside the base package, expressed in days per week.",
+          "when": "For ongoing guidance or delivery by an Agentic Consultant.",
+          "steps": [
+            "Open Packages and review requested capacity.",
+            "Record the agreed monthly rate, scope and effective date.",
+            "Confirm customer acceptance and activate the agreement. An active customer contract is required.",
+            "Process changes or cancellations separately."
+          ],
+          "permissions": "MSP administrators change agreements; operators can read.",
+          "limits": "Requests do not reserve a person or calendar. Days are not automatically converted to support hours or monthly days. Agree day structure, rate and scheduling separately; app support remains a separate agreement.",
+          "example": "Request 2 days of Agentic Consultant capacity per week alongside the base package."
         }
       }
     },

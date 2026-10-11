@@ -167,10 +167,13 @@ def settings_view(handler):
     nav = modules.nav_view(state)
     nav['modules_visible'] = False
     nav['apps_visible'] = False
+    nav['msp_visible'] = False
     try:
         policy, subject, scope = context(handler)
         nav['modules_visible'] = visible(policy, scope)
         nav['apps_visible'] = bool(subject.normalized_email and subject.provider != 'auth_disabled')
+        from api import msp_service
+        nav['msp_visible'] = msp_service.visible(handler)
     except Exception:
         pass
     return {'enabled_modules': list(state.active), 'modules_source': state.source,

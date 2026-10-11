@@ -74,6 +74,10 @@ window.SynthPulseFeatureCatalog = {
     "apps": {
       "nl": "Apps",
       "en": "Apps"
+    },
+    "msp": {
+      "nl": "Mijn MSP",
+      "en": "My MSP"
     }
   },
   "features": [
@@ -14300,6 +14304,402 @@ window.SynthPulseFeatureCatalog = {
           "permissions": "Platform administration and owner access to this VPS workspace. This shared workspace is not a separate environment for each customer.",
           "limits": "The editor runs on the VPS. Files only reach your computer when you download them. Uploads are limited to 50 MB and never overwrite existing files. Complex Microsoft Office formatting and features may differ; review the result. AI quality depends on the routed model.",
           "example": "Write project notes with headings and lists and download the md file."
+        }
+      }
+    },
+    {
+      "id": "webui.msp.overview",
+      "area": "msp",
+      "status": "conditional",
+      "conditions": [
+        "Signed-in organisation account and connected MSP service"
+      ],
+      "anchors": [
+        "?help_feature=webui.msp.overview",
+        "#mspOverviewTab"
+      ],
+      "source_refs": [
+        "api/msp_service.py",
+        "static/msp.js",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "Supporturen en abonnementen bekijken",
+          "purpose": "Bekijk je echte urenbundel, verbruik en supportabonnementen bij jouw MSP.",
+          "when": "Als je wilt weten hoeveel support beschikbaar is.",
+          "steps": [
+            "Open Mijn MSP in de navigatie.",
+            "Kies Overzicht & uren. Beschikbaar, deze maand gebruikt en maandbundel komen uit de MSP-administratie.",
+            "Bekijk onder Support per app de huidige en aangevraagde niveaus. Open Apps om een niveau aan te vragen."
+          ],
+          "permissions": "Uren en betalingen zijn voor organisatiebeheerders en financiële beheerders.",
+          "limits": "Zonder actief contract zie je geen verzonnen uren. Support per app voegt niet automatisch uren toe aan je bundel.",
+          "example": "Controleer je resterende supportminuten voordat je een grotere wijziging aanvraagt."
+        },
+        "en": {
+          "title": "View support hours and subscriptions",
+          "purpose": "See your actual support allowance, usage and app support subscriptions with your MSP.",
+          "when": "When you want to know how much support remains.",
+          "steps": [
+            "Open My MSP in navigation.",
+            "Choose Overview & hours. Available, used this month and monthly allowance come from the MSP administration.",
+            "Under Support per app, compare active and requested levels. Open Apps to request a level."
+          ],
+          "permissions": "Hours and payments are available to organisation and billing administrators.",
+          "limits": "An installation without an active contract shows no invented allowance. App support does not automatically credit your hours balance.",
+          "example": "Check remaining support minutes before requesting a larger change."
+        }
+      }
+    },
+    {
+      "id": "webui.msp.tickets",
+      "area": "msp",
+      "status": "conditional",
+      "conditions": [
+        "Signed-in organisation account and connected MSP service"
+      ],
+      "anchors": [
+        "?help_feature=webui.msp.tickets",
+        "#mspTicketsTab"
+      ],
+      "source_refs": [
+        "api/msp_service.py",
+        "static/msp.js",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "Tickets aanmaken, volgen en beantwoorden",
+          "purpose": "Dien een vraag of storing rechtstreeks bij je MSP in en volg openstaande en afgehandelde tickets.",
+          "when": "Bij een vraag, storing, toegangsprobleem of wijziging.",
+          "steps": [
+            "Open Mijn MSP en kies Tickets.",
+            "Vul onderwerp en omschrijving in. Kies het soort vraag, de impact en eventueel de app. Klik op Verstuur naar MSP.",
+            "Open een ticket uit de lijst om de status en gedeelde reacties te bekijken en zelf te reageren.",
+            "Gebruik Zichtbaarheid om eigen tickets te zien. Beheerders kunnen ook de toegestane organisatie- of afdelingstickets bekijken."
+          ],
+          "permissions": "Aangemelde organisatiegebruikers kunnen tickets indienen. Je rol bepaalt welke andere tickets je kunt zien.",
+          "limits": "Interne MSP-notities blijven verborgen. Een ingediende aanvraag is nog geen goedgekeurde wijziging of betaalopdracht.",
+          "example": "Meld dat een spreadsheet niet opent en voeg later de foutmelding als reactie toe."
+        },
+        "en": {
+          "title": "Create, track and reply to tickets",
+          "purpose": "Send a question or incident to your MSP and follow open and completed tickets.",
+          "when": "For a question, incident, access issue or change.",
+          "steps": [
+            "Open My MSP and choose Tickets.",
+            "Enter a subject and description. Select the request type, impact and optional app, then Send to MSP.",
+            "Open a ticket to read its status and shared replies, and add your own reply.",
+            "Use Visibility for your tickets. Administrators can also view permitted organisation or department tickets."
+          ],
+          "permissions": "Signed-in organisation users can submit tickets. Your role determines which other tickets you can see.",
+          "limits": "Internal MSP notes remain hidden. A submitted request is not an approved change or payment order.",
+          "example": "Report a spreadsheet that will not open and add the error message in a reply."
+        }
+      }
+    },
+    {
+      "id": "webui.msp.billing",
+      "area": "msp",
+      "status": "conditional",
+      "conditions": [
+        "Signed-in organisation account and connected MSP service"
+      ],
+      "anchors": [
+        "?help_feature=webui.msp.billing",
+        "#mspBillingTab"
+      ],
+      "source_refs": [
+        "api/msp_service.py",
+        "static/msp.js",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "Betalingen bekijken",
+          "purpose": "Bekijk betaalverzoeken en factuurstatussen van je organisatie.",
+          "when": "Als je wilt weten of een factuur klaarstaat of betaald is.",
+          "steps": [
+            "Open Mijn MSP en kies Betalingen.",
+            "Bekijk het bedrag inclusief btw en de status per betaalverzoek.",
+            "Gebruik Betalen via Mollie als je MSP een echte betaallink heeft klaargezet. Controleer het bedrag voordat je betaalt."
+          ],
+          "permissions": "Alleen organisatiebeheerders en financiële beheerders zien betalingen.",
+          "limits": "Zonder geconfigureerde betaalprovider en factuur is er geen betaallink. Terugkeren uit Mollie betekent niet vanzelf dat een factuur betaald is.",
+          "example": "Open een openstaande factuur en betaal via de beschikbare Mollie-link."
+        },
+        "en": {
+          "title": "View payments",
+          "purpose": "See payment requests and invoice statuses for your organisation.",
+          "when": "When you want to check whether an invoice is ready or paid.",
+          "steps": [
+            "Open My MSP and choose Payments.",
+            "Review the amount including VAT and the status of each payment request.",
+            "Use Pay through Mollie when your MSP has prepared a live payment link. Check the amount before paying."
+          ],
+          "permissions": "Only organisation and billing administrators see payments.",
+          "limits": "A configured payment provider and invoice are required for a payment link. Returning from Mollie does not by itself mark an invoice paid.",
+          "example": "Open an outstanding invoice and pay through the available Mollie link."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.availability",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Signed-in organisation account and connected MSP service"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.availability",
+        "#mainApps"
+      ],
+      "source_refs": [
+        "api/msp_service.py",
+        "static/msp.js",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "Apps aan- en uitzetten",
+          "purpose": "Bepaal per app of deze vanuit SynthPulse geopend kan worden.",
+          "when": "Als je een app tijdelijk niet beschikbaar wilt maken voor je organisatie.",
+          "steps": [
+            "Open Apps en zoek de gewenste app.",
+            "Gebruik de schakelaar Aan of Uit bij de app. De wijziging wordt bij je MSP opgeslagen.",
+            "Zet de app weer aan om deze vanuit SynthPulse te openen."
+          ],
+          "permissions": "Organisatiebeheerders en financiële beheerders kunnen deze instelling wijzigen.",
+          "limits": "Dit regelt de SynthPulse-launcher. Het stopt geen externe server en trekt geen directe app-login in. Bestanden blijven bewaard en het supportabonnement loopt door.",
+          "example": "Zet een ongebruikte ontwerpapp uit zonder documenten te verwijderen."
+        },
+        "en": {
+          "title": "Enable and disable apps",
+          "purpose": "Choose whether each app can be opened from SynthPulse.",
+          "when": "When you want to make an app temporarily unavailable to your organisation.",
+          "steps": [
+            "Open Apps and find the app.",
+            "Use its On or Off switch. The setting is saved with your MSP.",
+            "Turn the app on again to open it from SynthPulse."
+          ],
+          "permissions": "Organisation and billing administrators can change availability.",
+          "limits": "This controls the SynthPulse launcher. It does not stop an external server or revoke direct app access. Files are preserved and support continues.",
+          "example": "Turn off an unused design app without removing documents."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.support",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Signed-in organisation account and connected MSP service"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.support",
+        "#mainApps"
+      ],
+      "source_refs": [
+        "api/msp_service.py",
+        "static/msp.js",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "Supportniveau per app kiezen",
+          "purpose": "Vraag een eigen maandelijks supportabonnement aan per app met Basis, Plus of Premium.",
+          "when": "Als je ondersteuning voor een bepaalde app wilt afsluiten, wijzigen of opzeggen.",
+          "steps": [
+            "Open Apps en ga naar Maandabonnement voor support bij de gewenste app.",
+            "Kies Basis, Plus of Premium. Lees de omschrijving en het maandtarief exclusief btw; tarief volgt betekent dat de MSP dit nog moet vaststellen.",
+            "Klik op Supportniveau aanvragen. Er komt een ticket bij je MSP en je ziet de status Aangevraagd.",
+            "De MSP bevestigt inhoud, tarief en ingangsdatum. Activering vereist een ingesteld tarief, een actief klantcontract en bevestiging van jouw akkoord.",
+            "Gebruik Opzegging aanvragen om support te beëindigen. Het huidige niveau blijft gelden tot de MSP de wijziging verwerkt."
+          ],
+          "permissions": "Organisatiebeheerders en financiële beheerders beheren support per app.",
+          "limits": "Aanvragen incasseert niets. Namen alleen geven geen vaste reactietijd of urenbundel. De concrete dekking en facturatie worden met de MSP afgesproken.",
+          "example": "Vraag Plus aan voor SynthPulse Office Documenten en volg het ticket in Mijn MSP."
+        },
+        "en": {
+          "title": "Choose support per app",
+          "purpose": "Request a separate monthly support subscription for each app with Basic, Plus or Premium.",
+          "when": "To start, change or cancel support for a specific application.",
+          "steps": [
+            "Open Apps and find Monthly support subscription on the app card.",
+            "Select Basic, Plus or Premium. Read the description and monthly price excluding VAT; price to be agreed means your MSP has not set it yet.",
+            "Choose Request support level. A ticket enters your MSP queue and the status becomes Requested.",
+            "Your MSP confirms scope, price and start date. Activation requires a configured price, an active customer contract and confirmation of your agreement.",
+            "Use Request cancellation to end support. Your current level stays in place until the MSP processes the change."
+          ],
+          "permissions": "Organisation and billing administrators manage app support.",
+          "limits": "Requests collect no payment. Tier names alone promise no response time or hours allowance. Scope and billing are agreed with your MSP.",
+          "example": "Request Plus for SynthPulse Office Documents and follow its ticket in My MSP."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.request",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Signed-in organisation account and connected MSP service"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.request",
+        "#mainApps"
+      ],
+      "source_refs": [
+        "api/msp_service.py",
+        "static/msp.js",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "Een app aanvragen",
+          "purpose": "Vraag je MSP om een nog niet beschikbare app beschikbaar te maken.",
+          "when": "Als een app in de catalogus staat maar nog niet voor jouw installatie is gekoppeld.",
+          "steps": [
+            "Open Apps en zoek een nog niet beschikbare app.",
+            "Klik op App aanvragen. Er komt een echt ticket in de MSP-servicedesk.",
+            "Ga naar Mijn MSP, Tickets om de status te volgen en je wensen toe te lichten."
+          ],
+          "permissions": "Aangemelde organisatiegebruikers kunnen toegestane apps aanvragen.",
+          "limits": "Een aanvraag installeert of activeert de app nog niet. De MSP beoordeelt toegang, inrichting en eventuele kosten.",
+          "example": "Vraag een documentapp aan en vermeld welke bestanden je ermee wilt maken."
+        },
+        "en": {
+          "title": "Request an app",
+          "purpose": "Ask your MSP to make an unavailable app available.",
+          "when": "When an app is in the catalogue but not yet connected for your installation.",
+          "steps": [
+            "Open Apps and find an unavailable application.",
+            "Choose Request app. A real ticket is created in the MSP service desk.",
+            "Open My MSP, Tickets to follow its status and explain your needs."
+          ],
+          "permissions": "Signed-in organisation users can request permitted apps.",
+          "limits": "A request does not install or activate the app. Your MSP checks access, setup and any costs.",
+          "example": "Request a document app and explain which files you need to create."
+        }
+      }
+    },
+    {
+      "id": "webui.msp.package",
+      "area": "msp",
+      "status": "conditional",
+      "conditions": [
+        "Connected MSP and organisation administrator"
+      ],
+      "anchors": [
+        "?help_feature=webui.msp.package",
+        "#mspBasePackage"
+      ],
+      "source_refs": [
+        "api/msp_service.py",
+        "static/msp.js"
+      ],
+      "related": [
+        "webui.msp.overview",
+        "webui.apps.support"
+      ],
+      "locales": {
+        "nl": {
+          "title": "Basispakket bekijken en aanvragen",
+          "purpose": "Bekijk de status en vastgelegde afspraken van je basispakket, de basis van je SynthPulse-abonnement.",
+          "when": "Als je je hoofdabonnement wilt controleren of een basispakket wilt aanvragen.",
+          "steps": [
+            "Open Mijn MSP en kies Overzicht & uren.",
+            "Bekijk Basispakket onder Basispakket + Agentic Consultant. De status komt uit je klantcontract of pakketaanvraag.",
+            "Als er nog geen actief pakket is, kies Basispakket aanvragen. Volg het bijbehorende ticket bij Tickets.",
+            "Je MSP bevestigt de inhoud, het tarief en de ingangsdatum. Support per app en consultantdagen staan afzonderlijk vermeld."
+          ],
+          "permissions": "Organisatiebeheerders en financiële beheerders beheren deze afspraken.",
+          "limits": "Een aanvraag activeert geen contract en incasseert niets. De concrete inbegrepen diensten volgen uit je overeenkomst; losse app-support is geen vervanging van het basispakket.",
+          "example": "Vraag het basispakket aan en bespreek de gewenste platforminrichting met je MSP."
+        },
+        "en": {
+          "title": "View and request the base package",
+          "purpose": "See the status and recorded terms of your base package, the foundation of your SynthPulse subscription.",
+          "when": "To check your main subscription or request a base package.",
+          "steps": [
+            "Open My MSP and choose Overview & hours.",
+            "Review Base package under Base package + Agentic Consultant. Its status comes from your customer contract or package request.",
+            "If there is no active package, choose Request base package. Follow the resulting ticket in Tickets.",
+            "Your MSP confirms scope, price and start date. App support and consultant days are shown separately."
+          ],
+          "permissions": "Organisation and billing administrators manage these agreements.",
+          "limits": "Submitting a request activates no contract and collects no payment. Included services follow your agreement; individual app support does not replace the base package.",
+          "example": "Request the base package and discuss your preferred platform setup with your MSP."
+        }
+      }
+    },
+    {
+      "id": "webui.msp.consultant",
+      "area": "msp",
+      "status": "conditional",
+      "conditions": [
+        "Connected MSP and organisation administrator"
+      ],
+      "anchors": [
+        "?help_feature=webui.msp.consultant",
+        "#mspConsultant"
+      ],
+      "source_refs": [
+        "api/msp_service.py",
+        "static/msp.js"
+      ],
+      "related": [
+        "webui.msp.overview",
+        "webui.apps.support"
+      ],
+      "locales": {
+        "nl": {
+          "title": "Agentic Consultant in dagen per week",
+          "purpose": "Vraag consultantinzet aan naast het basispakket, uitgedrukt in dagen per week.",
+          "when": "Als je structurele begeleiding of uitvoering door een Agentic Consultant wilt.",
+          "steps": [
+            "Open Mijn MSP en ga naar Agentic Consultant onder Overzicht & uren.",
+            "Vul het gewenste aantal dagen per week in. Halve dagen zijn mogelijk.",
+            "Kies Consultantinzet aanvragen. De aanvraag komt als ticket bij je MSP terecht.",
+            "Je MSP bevestigt beschikbaarheid, inhoud, tarief en ingangsdatum. Na akkoord en verwerking zie je de afgesproken inzet naast een eventuele wijzigingsaanvraag.",
+            "Vraag een ander aantal dagen aan om te wijzigen, of kies Opzegging consultant aanvragen. Tot bevestiging blijft je huidige afspraak staan."
+          ],
+          "permissions": "Organisatiebeheerders en financiële beheerders kunnen inzet aanvragen en wijzigen.",
+          "limits": "Een aanvraag reserveert nog geen persoon of agenda. Dagen worden niet automatisch omgerekend naar supporturen of maanddagen. Dagindeling, tarief en planning spreek je apart af; app-support blijft een aparte afspraak.",
+          "example": "Vraag 2 dagen Agentic Consultant per week aan naast je basispakket."
+        },
+        "en": {
+          "title": "Agentic Consultant days per week",
+          "purpose": "Request consultant capacity alongside the base package, expressed in days per week.",
+          "when": "For ongoing guidance or delivery by an Agentic Consultant.",
+          "steps": [
+            "Open My MSP and find Agentic Consultant under Overview & hours.",
+            "Enter your preferred number of days per week. Half days are supported.",
+            "Choose Request consultant capacity. A service ticket is created with your MSP.",
+            "Your MSP confirms availability, scope, rate and effective date. Once accepted and processed, agreed capacity appears separately from any pending change.",
+            "Request another number of days to change capacity, or choose Request consultant cancellation. Existing terms remain until confirmed."
+          ],
+          "permissions": "Organisation and billing administrators can request and change capacity.",
+          "limits": "Requests do not reserve a person or calendar. Days are not automatically converted to support hours or monthly days. Agree day structure, rate and scheduling separately; app support remains a separate agreement.",
+          "example": "Request 2 days of Agentic Consultant capacity per week alongside the base package."
         }
       }
     }

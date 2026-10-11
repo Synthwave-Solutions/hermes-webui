@@ -145,7 +145,7 @@ def stub():
 @pytest.fixture
 def env(tmp_path, monkeypatch):
     """Isolated env: no control-plane variables and no proxies."""
-    for name in ("SP_CONTROL_URL", "SP_CONTROL_KEY_FILE", "SP_INGEST_KEY_FILE",
+    for name in ("SP_CONTROL_SOCKET", "SP_CONTROL_URL", "SP_CONTROL_KEY_FILE", "SP_INGEST_KEY_FILE",
                  "HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy", "ALL_PROXY", "all_proxy"):
         monkeypatch.delenv(name, raising=False)
     cpc.clear_cache()
@@ -475,3 +475,31 @@ def test_key_material_never_appears_in_results_or_logs(env, stub, caplog):
     text = json.dumps(outputs) + caplog.text + repr(cpc.configured()) + repr(cpc.ingest_configured())
     for secret in (SECRET_HEX, INGEST_SECRET_HEX, INGEST_KEY_ID + INGEST_SECRET_HEX[:16]):
         assert secret not in text
+
+
+def test_unix_socket_preserves_signed_identity_body_and_rejects_redirect(env,stub,monkeypatch,tmp_path):
+    from socketserver import ThreadingUnixStreamServer
+    path=str(tmp_path/'c.sock')
+    # Permit only this private test socket; keep all other network guards.
+    from tests.conftest import _REAL_SOCKET_CONNECT
+    import socket
+    guarded=socket.socket.connect
+    def connect(sock,address):
+        if sock.family==socket.AF_UNIX and address==path:return _REAL_SOCKET_CONNECT(sock,address)
+        return guarded(sock,address)
+    monkeypatch.setattr(socket.socket,'connect',connect)
+    server=ThreadingUnixStreamServer(path,stub.server.RequestHandlerClass)
+    thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
+    env.configure('http://localhost')
+    monkeypatch.delenv('SP_CONTROL_URL')
+    monkeypatch.setenv('SP_CONTROL_SOCKET',path)
+    try:
+        assert cpc.configured()
+        status,body=cpc.call('POST','/v1/customer/apps/opendesign/state',acting=ACTING,body={'enabled':False})
+        assert status==201 and body['acting'][0]=='ada@acme.example', body
+        assert stub.requests[-1]['body']=={'enabled':False}
+        stub.response=(302,{'Location':'https://elsewhere.example'},b'')
+        status,body=cpc.call('GET','/v1/customer/overview',acting=ACTING)
+        assert status==0 and body['error']['code']=='redirect_refused'
+    finally:
+        server.shutdown();server.server_close();thread.join()

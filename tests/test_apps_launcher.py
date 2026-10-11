@@ -209,3 +209,17 @@ def test_office_links_use_the_same_trusted_host_policy(write_policy, caller, mon
     assert bool(rows) is allowed
     if allowed:
         assert rows[0]['url'] == url and rows[0]['access'] == 'platform'
+
+
+def test_managed_app_off_hides_destination_and_fails_closed(write_policy,caller,monkeypatch):
+    from api import control_plane_client, msp_service
+    monkeypatch.setenv('SP_DOMAIN','example.test')
+    monkeypatch.setenv('SP_APP_LINKS','{"opendesign":"https://design.example.test"}')
+    monkeypatch.setattr(control_plane_client,'configured',lambda:True)
+    monkeypatch.setattr(msp_service,'overview',lambda h:(200,{'apps':[{'id':'opendesign','enabled':False,'support_levels':[],'support':None}],'permissions':{'manage_apps':True}}))
+    h=get(caller,PLATFORM[0]);assert h.status==200
+    app=next(a for a in h.body['apps'] if a['id']=='opendesign')
+    assert app['url'] is None and app['enabled'] is False and app['available'] is True
+    assert h.body['msp']['manage_apps'] is True
+    monkeypatch.setattr(msp_service,'overview',lambda h:(503,{'error':'unavailable'}))
+    h=get(caller,PLATFORM[0]);assert h.status==503 and 'apps' not in h.body

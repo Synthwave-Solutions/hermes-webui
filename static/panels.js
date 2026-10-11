@@ -56,7 +56,7 @@ const APP_TITLEBAR_KEYS = {
   memory: 'tab_memory', workspaces: 'tab_workspaces',
   profiles: 'tab_profiles', todos: 'tab_todos', insights: 'tab_insights', logs: 'tab_logs', governance: 'tab_governance', integrations: 'tab_integrations', projects: 'tab_projects', settings: 'tab_settings',
 };
-const MAIN_VIEW_PANELS = ['apps','modules','approvals','settings','skills','memory','tasks','kanban','workspaces','profiles','insights','logs','governance','integrations','projects','plugin'];
+const MAIN_VIEW_PANELS = ['msp','apps','modules','approvals','settings','skills','memory','tasks','kanban','workspaces','profiles','insights','logs','governance','integrations','projects','plugin'];
 const MAIN_VIEW_SIDEBAR_PANEL_FALLBACKS = { plugin: 'settings' };
 
 /**
@@ -80,7 +80,7 @@ function syncAppTitlebar() {
     if (/^webui$/i.test(sourceLabel)) sourceLabel = '';
   } else {
     const key = APP_TITLEBAR_KEYS[panel];
-    mainText = key && typeof t === 'function' ? t(key) : (panel.charAt(0).toUpperCase() + panel.slice(1));
+    mainText = panel === 'msp' ? (document.documentElement.lang.startsWith('nl') ? 'Mijn MSP' : 'My MSP') : key && typeof t === 'function' ? t(key) : (panel.charAt(0).toUpperCase() + panel.slice(1));
   }
 
   // Don't touch the element while an inline rename is in progress — replacing
@@ -427,6 +427,7 @@ async function switchPanel(name, opts = {}) {
       mainEl.classList.toggle('showing-' + p, nextPanel === p);
     });
   }
+  if (nextPanel === 'msp' && window.SynthPulseMSP) await window.SynthPulseMSP.load();
   if (nextPanel === 'apps' && window.SynthPulseApps) await window.SynthPulseApps.load();
   if (nextPanel === 'modules' && window.SynthPulseModules) await window.SynthPulseModules.load();
   // Lazy-load panel data
@@ -453,7 +454,7 @@ async function switchPanel(name, opts = {}) {
   }
   if (opts.fromRailClick && typeof _isDesktopWidth === 'function' && !_isDesktopWidth()) {
     const sidebar = document.querySelector('.sidebar');
-    if (['chat', 'governance', 'integrations', 'approvals', 'modules', 'apps'].includes(nextPanel)) {
+    if (['chat', 'governance', 'integrations', 'approvals', 'modules', 'apps', 'msp'].includes(nextPanel)) {
       _closeMobileSidebarAfterPanelSelection();
     } else if (sidebar) {
       sidebar.classList.remove('mobile-session-page');
@@ -8940,7 +8941,7 @@ window._navAudience = 'member';
 window._capabilityNavigation = false;
 // Navigation order agreed with Michaël (20 Sep 2026): daily work first, then
 // admin surfaces. Also the default order of the markup in index.html.
-const _MEMBER_NAV_ORDER = ['modules','tasks', 'skills', 'projects', 'profiles', 'memory', 'integrations', 'workspaces', 'files', 'todos', 'insights', 'approvals', 'governance', 'logs', 'apps'];
+const _MEMBER_NAV_ORDER = ['msp','modules','tasks', 'skills', 'projects', 'profiles', 'memory', 'integrations', 'workspaces', 'files', 'todos', 'insights', 'approvals', 'governance', 'logs', 'apps'];
 function _canUseFeature(permission){
   const me=window.__GOV_ME__;
   if(!me)return false;

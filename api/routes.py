@@ -12194,6 +12194,10 @@ def handle_get(handler, parsed) -> bool:
     if governance_api.handle_governance_api(handler, parsed, "GET"):
         return True
 
+    if parsed.path in ("/api/msp/overview", "/api/msp/tickets", "/api/msp/ticket"):
+        from api import msp_service
+        return msp_service.handle_get(handler, parsed)
+
     if parsed.path == "/api/org/modules":
         from api import org_modules
         return org_modules.handle_get(handler, parsed)
@@ -14432,6 +14436,10 @@ def handle_post(handler, parsed) -> bool:
     from api.workspace_access import guard_session_request as guard_workspace_request
     if not guard_workspace_request(handler, parsed, body):
         return True
+
+    if parsed.path in ("/api/msp/package", "/api/msp/tickets", "/api/msp/comment", "/api/msp/app-state", "/api/msp/app-request", "/api/msp/app-support"):
+        from api import msp_service
+        return msp_service.handle_post(handler, parsed.path, body)
 
     if parsed.path == "/api/org/modules/request":
         from api import org_modules

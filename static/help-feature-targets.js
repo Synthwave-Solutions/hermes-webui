@@ -2443,35 +2443,114 @@
     ]
   },
   "webui.apps.hermes_docs": {
-  "panel": "apps",
-  "targets": [
-    "#mainApps [data-app-id=\"hermes_docs\"]"
-  ]
-},
+    "panel": "apps",
+    "targets": [
+      "#mainApps [data-app-id=\"hermes_docs\"]"
+    ]
+  },
   "webui.apps.hermes_sheets": {
-  "panel": "apps",
-  "targets": [
-    "#mainApps [data-app-id=\"hermes_sheets\"]"
-  ]
-},
+    "panel": "apps",
+    "targets": [
+      "#mainApps [data-app-id=\"hermes_sheets\"]"
+    ]
+  },
   "webui.apps.hermes_slides": {
-  "panel": "apps",
-  "targets": [
-    "#mainApps [data-app-id=\"hermes_slides\"]"
-  ]
-},
+    "panel": "apps",
+    "targets": [
+      "#mainApps [data-app-id=\"hermes_slides\"]"
+    ]
+  },
   "webui.apps.hermes_pdf": {
-  "panel": "apps",
-  "targets": [
-    "#mainApps [data-app-id=\"hermes_pdf\"]"
-  ]
-},
+    "panel": "apps",
+    "targets": [
+      "#mainApps [data-app-id=\"hermes_pdf\"]"
+    ]
+  },
   "webui.apps.hermes_markdown": {
-  "panel": "apps",
-  "targets": [
-    "#mainApps [data-app-id=\"hermes_markdown\"]"
-  ]
-}
+    "panel": "apps",
+    "targets": [
+      "#mainApps [data-app-id=\"hermes_markdown\"]"
+    ]
+  },
+  "webui.msp.overview": {
+    "panel": "msp",
+    "targets": [
+      "#mspOverviewTab"
+    ]
+  },
+  "webui.msp.tickets": {
+    "panel": "msp",
+    "targets": [
+      "#mspTicketsTab"
+    ]
+  },
+  "webui.msp.billing": {
+    "panel": "msp",
+    "targets": [
+      "#mspBillingTab"
+    ]
+  },
+  "webui.apps.availability": {
+    "panel": "apps",
+    "targets": [],
+    "entryTargets": [
+      "#mainApps"
+    ],
+    "entryHint": {
+      "nl": "Zoek de gewenste app op deze pagina. De beschikbare bediening hangt af van je rechten en de app-koppeling.",
+      "en": "Find the app on this page. Available controls depend on your permissions and the app connection."
+    }
+  },
+  "webui.apps.support": {
+    "panel": "apps",
+    "targets": [
+      "#mainApps .app-support"
+    ],
+    "entryTargets": [
+      "#mainApps"
+    ],
+    "entryHint": {
+      "nl": "Zoek de gewenste app op deze pagina. De beschikbare bediening hangt af van je rechten en de app-koppeling.",
+      "en": "Find the app on this page. Available controls depend on your permissions and the app connection."
+    }
+  },
+  "webui.apps.request": {
+    "panel": "apps",
+    "targets": [],
+    "entryTargets": [
+      "#mainApps"
+    ],
+    "entryHint": {
+      "nl": "Zoek de gewenste app op deze pagina. De beschikbare bediening hangt af van je rechten en de app-koppeling.",
+      "en": "Find the app on this page. Available controls depend on your permissions and the app connection."
+    }
+  },
+  "webui.msp.package": {
+    "panel": "msp",
+    "targets": [
+      "#mspBasePackage"
+    ],
+    "entryTargets": [
+      "#mspOverviewTab"
+    ],
+    "entryHint": {
+      "nl": "Kies Overzicht & uren om het basispakket en je consultantinzet te bekijken.",
+      "en": "Choose Overview & hours to see your base package and consultant capacity."
+    }
+  },
+  "webui.msp.consultant": {
+    "panel": "msp",
+    "targets": [
+      "#mspConsultant"
+    ],
+    "entryTargets": [
+      "#mspOverviewTab"
+    ],
+    "entryHint": {
+      "nl": "Kies Overzicht & uren om het basispakket en je consultantinzet te bekijken.",
+      "en": "Choose Overview & hours to see your base package and consultant capacity."
+    }
+  }
 };
   for (const entry of Object.values(entries)) {
     Object.freeze(entry.targets);
