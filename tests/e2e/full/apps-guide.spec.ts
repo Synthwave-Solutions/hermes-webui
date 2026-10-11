@@ -9,7 +9,7 @@ for(const width of [1440,390]){
   test.setTimeout(100_000);await page.setViewportSize({width,height:1000});await open(page);
   await page.waitForFunction(()=>typeof S!=='undefined'&&S._bootReady&&_loadingSessionId===null);
   await page.locator('#msg').fill('Apps guide draft remains unsent');
-  await page.evaluate(()=>switchPanel('apps'));await expect(page.locator('#mainApps [data-app-id]')).toHaveCount(25);
+  await page.evaluate(()=>switchPanel('apps'));await expect(page.locator('#mainApps [data-app-id]')).toHaveCount(20);
   await page.locator('#appsCategory').selectOption('craft');await page.locator('#appsSearch').fill('photo');
   const writes:string[]=[];page.on('request',request=>{const url=new URL(request.url());if(['POST','PUT','PATCH','DELETE'].includes(request.method())&&!['/api/help/events','/api/client-events/log'].includes(url.pathname))writes.push(url.pathname);});
   const pagesBefore=context.pages().length;

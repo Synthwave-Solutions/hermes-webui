@@ -2682,16 +2682,6 @@
       ]
     },
     {
-      "id": "webui.apps.opendesign_classic",
-      "area": "apps",
-      "status": "conditional",
-      "source_refs": [
-        "api/app_catalog.py",
-        "api/apps_launcher.py",
-        "static/apps.js"
-      ]
-    },
-    {
       "id": "webui.apps.craft_studio",
       "area": "apps",
       "status": "conditional",
@@ -2792,16 +2782,6 @@
       ]
     },
     {
-      "id": "webui.apps.vision_studio",
-      "area": "apps",
-      "status": "conditional",
-      "source_refs": [
-        "api/app_catalog.py",
-        "api/apps_launcher.py",
-        "static/apps.js"
-      ]
-    },
-    {
       "id": "webui.apps.n8n",
       "area": "apps",
       "status": "conditional",
@@ -2842,67 +2822,7 @@
       ]
     },
     {
-      "id": "webui.apps.pareltje",
-      "area": "apps",
-      "status": "conditional",
-      "source_refs": [
-        "api/app_catalog.py",
-        "api/apps_launcher.py",
-        "static/apps.js"
-      ]
-    },
-    {
-      "id": "webui.apps.slibdetect",
-      "area": "apps",
-      "status": "conditional",
-      "source_refs": [
-        "api/app_catalog.py",
-        "api/apps_launcher.py",
-        "static/apps.js"
-      ]
-    },
-    {
       "id": "webui.apps.cockpit",
-      "area": "apps",
-      "status": "conditional",
-      "source_refs": [
-        "api/app_catalog.py",
-        "api/apps_launcher.py",
-        "static/apps.js"
-      ]
-    },
-    {
-      "id": "webui.apps.silverbullet",
-      "area": "apps",
-      "status": "conditional",
-      "source_refs": [
-        "api/app_catalog.py",
-        "api/apps_launcher.py",
-        "static/apps.js"
-      ]
-    },
-    {
-      "id": "webui.apps.pixel_office",
-      "area": "apps",
-      "status": "conditional",
-      "source_refs": [
-        "api/app_catalog.py",
-        "api/apps_launcher.py",
-        "static/apps.js"
-      ]
-    },
-    {
-      "id": "webui.apps.mnemosyne",
-      "area": "apps",
-      "status": "conditional",
-      "source_refs": [
-        "api/app_catalog.py",
-        "api/apps_launcher.py",
-        "static/apps.js"
-      ]
-    },
-    {
-      "id": "webui.apps.strategy_gantt",
       "area": "apps",
       "status": "conditional",
       "source_refs": [
@@ -2923,6 +2843,36 @@
     },
     {
       "id": "webui.apps.language",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.apps.ragflow",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.apps.langfuse",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.apps.hermesoffice",
       "area": "apps",
       "status": "conditional",
       "source_refs": [

@@ -1,6 +1,6 @@
 # Feature tour target audit
 
-`static/help-feature-targets.js` exports a deeply frozen `window.SynthPulseFeatureTargets` object. It covers all 305 WebUI feature IDs in `help-features.js`. Each record contains a real `panel`, an optional Settings `section`, and an ordered array of candidate CSS `targets`. Optional `entryTargets` and bilingual `entryHint` distinguish a prerequisite entry from the actual feature control. They are considered only when no exact target is visible, and the hint must explicitly say what the highlight represents and how to reach the feature. These are inert navigation hints, not permission grants or evidence that a control is currently visible.
+`static/help-feature-targets.js` exports a deeply frozen `window.SynthPulseFeatureTargets` object. It covers all 300 WebUI feature IDs in `help-features.js`. Each record contains a real `panel`, an optional Settings `section`, and an ordered array of candidate CSS `targets`. Optional `entryTargets` and bilingual `entryHint` distinguish a prerequisite entry from the actual feature control. They are considered only when no exact target is visible, and the hint must explicitly say what the highlight represents and how to reach the feature. These are inert navigation hints, not permission grants or evidence that a control is currently visible.
 
 There are 271 records with exact candidate targets, 55 records with prerequisite entry hints, and 27 records without either kind of hook. The tour controller must check the current panel, current Settings section, actual element visibility and existing access rules before highlighting anything. Hidden native inputs, lazy content, unopened dialogs, missing data, responsive controls and role restrictions can all prevent a candidate from being available. Safe panel/section navigation and opening native disclosure containers may expose an exact target. Never click an action control, populate a field or submit a form to make a target appear. An entry target only points out a next step; it does not open that entry or claim the inner field is already visible.
 
@@ -9,7 +9,7 @@ There are 271 records with exact candidate targets, 55 records with prerequisite
 | Panel | Features |
 | --- | ---: |
 | chat | 77 |
-| apps | 30 |
+| apps | 25 |
 | settings | 98 |
 | tasks | 15 |
 | workspaces | 2 |
@@ -69,7 +69,7 @@ Approvals, media output, active voice controls, restricted configuration, empty 
 ## Apps directory
 
 Apps has its own panel and 29 dedicated topics: overview, search, categories, language and
-all 25 audited app entries. The legacy `webui.modules.apps` deep link also opens
+all 20 audited app entries. The legacy `webui.modules.apps` deep link also opens
 the Apps overview. Each app points at its actual `data-app-id` card, including
 intentional unconfigured cards. When starting a named app explanation, the tour
 uses the directory's presentation-only `reveal(id)` API to clear filters and

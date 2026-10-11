@@ -67,6 +67,9 @@ def handle_get(handler, parsed):
         value = named_links[app_id]
         unconfigured = value is None or value == ''
         url = None if unconfigured else safe_link(value, os.environ)
+        # The audited desktop distribution is the only external catalogue link.
+        if app_id == 'hermesoffice' and value == 'https://github.com/criptogus/HermesOffice/releases/latest':
+            url = value
         if not unconfigured and url is None:
             continue
         apps.append({'id': app_id, 'module': spec.module,
@@ -74,6 +77,9 @@ def handle_get(handler, parsed):
                      'description': {'nl': spec.description_nl, 'en': spec.description_en},
                      'category': spec.category, 'access': access,
                      'url': url, 'status': 'unconfigured' if unconfigured else 'configured'})
+
+        if app_id == 'hermesoffice':
+            apps[-1]['launch_kind'] = 'desktop_download'
 
     # Preserve the previous module-based launcher contract. Named apps do not
     # activate modules; platform users may discover existing external apps only.

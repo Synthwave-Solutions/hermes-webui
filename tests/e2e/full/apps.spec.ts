@@ -5,9 +5,13 @@ test.describe('Apps directory',()=>{
  test('all stack apps, Craft editors, search, categories, layouts and preserved chat',async({page},info)=>{
   await open(page);await ready(page);await page.locator('#msg').fill('QA Apps draft stays here');
   await page.screenshot({path:info.outputPath('apps-before-chat.png'),fullPage:true});
-  await page.locator('#btnApps').click();await expect(page.locator('.app-card')).toHaveCount(25);await expect(page.locator('.app-open')).toHaveCount(23);
-  for(const id of ['opendesign','craft_studio','n8n','omniroute','cockpit','photocraft','filmcraft','effectcraft','vectorcraft','lightcraft','designcraft','pdfcraft','soundcraft'])await expect(page.locator(`[data-app-id="${id}"]`)).toBeVisible();
+  await page.locator('#btnApps').click();await expect(page.locator('.app-card')).toHaveCount(20);await expect(page.locator('.app-open')).toHaveCount(19);
+  for(const id of ['ragflow','langfuse','hermesoffice','opendesign','craft_studio','n8n','omniroute','cockpit','photocraft','filmcraft','effectcraft','vectorcraft','lightcraft','designcraft','pdfcraft','soundcraft'])await expect(page.locator(`[data-app-id="${id}"]`)).toBeVisible();
   await expect(page.locator('[data-app-id="openwebui"] a')).toHaveCount(0);await expect(page.locator('[data-app-id="silverbullet"] a')).toHaveCount(0);
+  await expect(page.locator('[data-app-id="hermesoffice"] a')).toContainText('Download desktop app');
+  for(const id of ['pareltje','silverbullet','slibdetect','pixel_office','mnemosyne','strategy_gantt','opendesign_classic','vision_studio'])await expect(page.locator(`[data-app-id="${id}"]`)).toHaveCount(0);
+  await page.evaluate(()=>_applyTabOrder(['apps','modules','tasks']));
+  for(const selector of ['.rail','.sidebar-nav']){const order=await page.locator(selector+' .nav-tab[data-panel]').evaluateAll(nodes=>nodes.map(n=>n.getAttribute('data-panel')));expect(order.slice(-2)).toEqual(['apps','settings']);}
   await page.locator('#appsSearch').fill('omnirouter');await expect(page.locator('.app-card')).toHaveCount(1);await expect(page.locator('.app-card')).toContainText('OmniRoute');
   await page.locator('#appsSearch').fill('no-such-app');await expect(page.locator('#appsList')).toContainText('No apps found');
   await page.locator('#appsSearch').fill('');await page.locator('#appsCategory').selectOption('craft');await expect(page.locator('.app-card')).toHaveCount(9);
@@ -27,7 +31,7 @@ test.describe('Apps directory',()=>{
   await open(page);await ready(page);await page.setViewportSize({width:390,height:900});
   await page.getByRole('button',{name:'Not now',exact:true}).click();
   await page.getByRole('button',{name:'Menu',exact:true}).click();
-  await page.locator('.sidebar-nav [data-panel="apps"]').click();await expect(page.locator('#mainApps')).toBeVisible();await expect(page.locator('.sidebar')).not.toHaveClass(/mobile-open/);await expect(page.locator('.app-card')).toHaveCount(25);
+  await page.locator('.sidebar-nav [data-panel="apps"]').click();await expect(page.locator('#mainApps')).toBeVisible();await expect(page.locator('.sidebar')).not.toHaveClass(/mobile-open/);await expect(page.locator('.app-card')).toHaveCount(20);
  });
  test('directory retry, empty response and safe text rendering',async({page})=>{
   await open(page);await ready(page);await page.route('**/api/apps',r=>r.fulfill({status:503,json:{error:'offline'}}));await page.locator('#btnApps').click();await expect(page.locator('#appsList')).toContainText('Apps could not be loaded');

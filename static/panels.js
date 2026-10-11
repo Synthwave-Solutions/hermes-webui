@@ -8919,9 +8919,14 @@ function _applyTabOrder(order){
       return child.dataset&&child.dataset.panel==='settings';
     });
     ordered.forEach(function(panel){
+      if(panel==='apps')return;
       var node=container.querySelector('.nav-tab[data-panel="'+panel+'"]');
       if(node) container.insertBefore(node,anchor||null);
     });
+    // Apps stays at the bottom even when an older saved order places it first.
+    var apps=container.querySelector('.nav-tab[data-panel="apps"]');
+    var settings=container.querySelector('.nav-tab[data-panel="settings"]');
+    if(apps)container.insertBefore(apps,settings||null);
   });
 }
 
@@ -8935,7 +8940,7 @@ window._navAudience = 'member';
 window._capabilityNavigation = false;
 // Navigation order agreed with Michaël (20 Sep 2026): daily work first, then
 // admin surfaces. Also the default order of the markup in index.html.
-const _MEMBER_NAV_ORDER = ['apps','modules','tasks', 'skills', 'projects', 'profiles', 'memory', 'integrations', 'workspaces', 'files', 'todos', 'insights', 'approvals', 'governance', 'logs'];
+const _MEMBER_NAV_ORDER = ['modules','tasks', 'skills', 'projects', 'profiles', 'memory', 'integrations', 'workspaces', 'files', 'todos', 'insights', 'approvals', 'governance', 'logs', 'apps'];
 function _canUseFeature(permission){
   const me=window.__GOV_ME__;
   if(!me)return false;

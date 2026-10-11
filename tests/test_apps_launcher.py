@@ -73,7 +73,7 @@ def clean_app_links(monkeypatch):
 
 def test_complete_craft_studio_registry(write_policy, caller, monkeypatch):
     monkeypatch.setenv('SP_MESH_FQDN', 'node.tail.test')
-    ids = ('opendesign', 'opendesign_classic', 'craft_studio') + CRAFT_IDS
+    ids = ('opendesign', 'craft_studio') + CRAFT_IDS
     monkeypatch.setenv('SP_APP_LINKS', json.dumps({
         app_id: f'https://node.tail.test:9443/{app_id}' for app_id in ids
     }))
@@ -88,8 +88,7 @@ def test_complete_craft_studio_registry(write_policy, caller, monkeypatch):
 
 @pytest.mark.parametrize('email', [NOBODY[0], 'owner@acme.example', 'finance@acme.example'])
 def test_admin_apps_are_not_exposed_to_other_scopes(write_policy, caller, monkeypatch, email):
-    ids = ('n8n', 'omniroute', 'nango', 'pareltje', 'slibdetect', 'cockpit',
-           'openwebui', 'pixel_office', 'mnemosyne', 'strategy_gantt', 'silverbullet')
+    ids = ('n8n', 'omniroute', 'nango', 'cockpit', 'openwebui', 'ragflow', 'langfuse')
     monkeypatch.setenv('SP_MESH_FQDN', 'node.tail.test')
     monkeypatch.setenv('SP_APP_LINKS', json.dumps({app_id: None for app_id in ids}))
     assert get(caller, email).body == {'apps': []}
@@ -186,3 +185,26 @@ def test_policy_failure_exposes_no_registry(write_policy, caller, monkeypatch):
     monkeypatch.setattr(apps_launcher, 'context', unavailable)
     response = get(caller, PLATFORM[0])
     assert response.status == 503 and response.body == {'error': 'policy_unavailable'}
+
+
+def test_core_stack_includes_knowledge_and_observability_without_personal_dashboards(write_policy, caller, monkeypatch):
+    monkeypatch.setenv('SP_MESH_FQDN', 'node.tail.test')
+    ids = ['ragflow', 'langfuse', 'pareltje', 'silverbullet', 'slibdetect', 'pixel_office', 'mnemosyne', 'strategy_gantt']
+    monkeypatch.setenv('SP_APP_LINKS', json.dumps({key: 'https://node.tail.test:9443/' for key in ids}))
+    rows = get(caller, PLATFORM[0]).body['apps']
+    assert {row['id'] for row in rows} == {'ragflow', 'langfuse'}
+    assert get(caller, NOBODY[0]).body['apps'] == []
+
+
+@pytest.mark.parametrize('app_id,url,allowed', [
+    ('hermesoffice', 'https://github.com/criptogus/HermesOffice/releases/latest', True),
+    ('hermesoffice', 'https://github.com/other/repo/releases/latest', False),
+    ('hermesoffice', 'https://github.com/criptogus/HermesOffice/releases/latest?next=evil', False),
+    ('opendesign', 'https://github.com/criptogus/HermesOffice/releases/latest', False),
+])
+def test_desktop_distribution_exception_is_exact_and_app_scoped(write_policy, caller, monkeypatch, app_id, url, allowed):
+    monkeypatch.setenv('SP_APP_LINKS', json.dumps({app_id: url}))
+    rows = get(caller, PLATFORM[0]).body['apps']
+    assert bool(rows) is allowed
+    if allowed:
+        assert rows[0]['launch_kind'] == 'desktop_download'

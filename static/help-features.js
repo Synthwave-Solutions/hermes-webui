@@ -13196,56 +13196,6 @@ window.SynthPulseFeatureCatalog = {
       }
     },
     {
-      "id": "webui.apps.opendesign_classic",
-      "area": "apps",
-      "status": "conditional",
-      "conditions": [
-        "Configured app directory and existing access"
-      ],
-      "anchors": [
-        "?help_feature=webui.apps.opendesign_classic",
-        "#mainApps [data-app-id=\"opendesign_classic\"]"
-      ],
-      "source_refs": [
-        "api/app_catalog.py",
-        "api/apps_launcher.py",
-        "static/apps.js"
-      ],
-      "related": [
-        "webui.apps.overview"
-      ],
-      "locales": {
-        "nl": {
-          "title": "OpenDesign Classic openen",
-          "purpose": "Open de klassieke ontwerpomgeving voor bestaande projecten.",
-          "when": "Gebruik deze ingang voor een bestaand ontwerp in de klassieke omgeving.",
-          "steps": [
-            "Kies Apps in de navigatie en zoek OpenDesign Classic.",
-            "Bekijk de status en de beschrijving van de kaart.",
-            "Sluit de gids en kies Openen als een adres is ingesteld. Rond indien nodig de eigen aanmelding van de app af.",
-            "Werk verder in de doelapp en gebruik het oorspronkelijke tabblad om terug te keren naar SynthPulse."
-          ],
-          "permissions": "Toegang tot Apps en de bijbehorende actieve module; platformbeheerders kunnen ingestelde appadressen ook zonder die module bekijken. De doelapp controleert zelf je toegang.",
-          "limits": "Openen navigeert alleen naar het ingestelde adres. De app kan een eigen aanmelding vereisen. Niet ingesteld betekent dat er geen bruikbare link is; een ingestelde link garandeert niet dat de dienst bereikbaar is.",
-          "example": "Bijvoorbeeld: een bestaand ontwerp in de klassieke omgeving."
-        },
-        "en": {
-          "title": "Open OpenDesign Classic",
-          "purpose": "Open the classic design environment for existing projects.",
-          "when": "Use this entry point for an existing design in the classic environment.",
-          "steps": [
-            "Choose Apps in navigation and find OpenDesign Classic.",
-            "Review the card’s status and description.",
-            "Close the guide and choose Open when an address is configured. Complete the app’s own sign-in if required.",
-            "Continue in the destination app and use the original tab to return to SynthPulse."
-          ],
-          "permissions": "Access to Apps and the associated active module; platform administrators can discover configured app addresses even without that module. The destination app checks its own access.",
-          "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable.",
-          "example": "For example: an existing design in the classic environment."
-        }
-      }
-    },
-    {
       "id": "webui.apps.craft_studio",
       "area": "apps",
       "status": "conditional",
@@ -13746,56 +13696,6 @@ window.SynthPulseFeatureCatalog = {
       }
     },
     {
-      "id": "webui.apps.vision_studio",
-      "area": "apps",
-      "status": "conditional",
-      "conditions": [
-        "Configured app directory and existing access"
-      ],
-      "anchors": [
-        "?help_feature=webui.apps.vision_studio",
-        "#mainApps [data-app-id=\"vision_studio\"]"
-      ],
-      "source_refs": [
-        "api/app_catalog.py",
-        "api/apps_launcher.py",
-        "static/apps.js"
-      ],
-      "related": [
-        "webui.apps.overview"
-      ],
-      "locales": {
-        "nl": {
-          "title": "Vision Studio openen",
-          "purpose": "Open de studio voor visuele projecten.",
-          "when": "Gebruik deze ingang voor een visueel project openen in de studio.",
-          "steps": [
-            "Kies Apps in de navigatie en zoek Vision Studio.",
-            "Bekijk de status en de beschrijving van de kaart.",
-            "Sluit de gids en kies Openen als een adres is ingesteld. Rond indien nodig de eigen aanmelding van de app af.",
-            "Werk verder in de doelapp en gebruik het oorspronkelijke tabblad om terug te keren naar SynthPulse."
-          ],
-          "permissions": "Toegang tot Apps en de bijbehorende actieve module; platformbeheerders kunnen ingestelde appadressen ook zonder die module bekijken. De doelapp controleert zelf je toegang.",
-          "limits": "Openen navigeert alleen naar het ingestelde adres. De app kan een eigen aanmelding vereisen. Niet ingesteld betekent dat er geen bruikbare link is; een ingestelde link garandeert niet dat de dienst bereikbaar is.",
-          "example": "Bijvoorbeeld: een visueel project openen in de studio."
-        },
-        "en": {
-          "title": "Open Vision Studio",
-          "purpose": "Open the studio for visual projects.",
-          "when": "Use this entry point for opening a visual project in the studio.",
-          "steps": [
-            "Choose Apps in navigation and find Vision Studio.",
-            "Review the card’s status and description.",
-            "Close the guide and choose Open when an address is configured. Complete the app’s own sign-in if required.",
-            "Continue in the destination app and use the original tab to return to SynthPulse."
-          ],
-          "permissions": "Access to Apps and the associated active module; platform administrators can discover configured app addresses even without that module. The destination app checks its own access.",
-          "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable.",
-          "example": "For example: opening a visual project in the studio."
-        }
-      }
-    },
-    {
       "id": "webui.apps.n8n",
       "area": "apps",
       "status": "conditional",
@@ -13996,106 +13896,6 @@ window.SynthPulseFeatureCatalog = {
       }
     },
     {
-      "id": "webui.apps.pareltje",
-      "area": "apps",
-      "status": "conditional",
-      "conditions": [
-        "Configured app directory and existing access"
-      ],
-      "anchors": [
-        "?help_feature=webui.apps.pareltje",
-        "#mainApps [data-app-id=\"pareltje\"]"
-      ],
-      "source_refs": [
-        "api/app_catalog.py",
-        "api/apps_launcher.py",
-        "static/apps.js"
-      ],
-      "related": [
-        "webui.apps.overview"
-      ],
-      "locales": {
-        "nl": {
-          "title": "Pareltje openen",
-          "purpose": "Open het beheerpaneel van Pareltje.",
-          "when": "Gebruik deze ingang voor het beheer van Pareltje openen.",
-          "steps": [
-            "Kies Apps in de navigatie en zoek Pareltje.",
-            "Bekijk de status en de beschrijving van de kaart.",
-            "Sluit de gids en kies Openen als een adres is ingesteld. Rond indien nodig de eigen aanmelding van de app af.",
-            "Werk verder in de doelapp en gebruik het oorspronkelijke tabblad om terug te keren naar SynthPulse."
-          ],
-          "permissions": "Platformbeheerrechten in SynthPulse en geldige toegang tot de doelapp.",
-          "limits": "Openen navigeert alleen naar het ingestelde adres. De app kan een eigen aanmelding vereisen. Niet ingesteld betekent dat er geen bruikbare link is; een ingestelde link garandeert niet dat de dienst bereikbaar is.",
-          "example": "Bijvoorbeeld: het beheer van Pareltje openen."
-        },
-        "en": {
-          "title": "Open Pareltje",
-          "purpose": "Open the Pareltje management dashboard.",
-          "when": "Use this entry point for opening Pareltje management.",
-          "steps": [
-            "Choose Apps in navigation and find Pareltje.",
-            "Review the card’s status and description.",
-            "Close the guide and choose Open when an address is configured. Complete the app’s own sign-in if required.",
-            "Continue in the destination app and use the original tab to return to SynthPulse."
-          ],
-          "permissions": "Platform administration access in SynthPulse and valid access to the destination app.",
-          "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable.",
-          "example": "For example: opening Pareltje management."
-        }
-      }
-    },
-    {
-      "id": "webui.apps.slibdetect",
-      "area": "apps",
-      "status": "conditional",
-      "conditions": [
-        "Configured app directory and existing access"
-      ],
-      "anchors": [
-        "?help_feature=webui.apps.slibdetect",
-        "#mainApps [data-app-id=\"slibdetect\"]"
-      ],
-      "source_refs": [
-        "api/app_catalog.py",
-        "api/apps_launcher.py",
-        "static/apps.js"
-      ],
-      "related": [
-        "webui.apps.overview"
-      ],
-      "locales": {
-        "nl": {
-          "title": "SlibDetect openen",
-          "purpose": "Open het beheerpaneel van SlibDetect.",
-          "when": "Gebruik deze ingang voor het beheer van SlibDetect openen.",
-          "steps": [
-            "Kies Apps in de navigatie en zoek SlibDetect.",
-            "Bekijk de status en de beschrijving van de kaart.",
-            "Sluit de gids en kies Openen als een adres is ingesteld. Rond indien nodig de eigen aanmelding van de app af.",
-            "Werk verder in de doelapp en gebruik het oorspronkelijke tabblad om terug te keren naar SynthPulse."
-          ],
-          "permissions": "Platformbeheerrechten in SynthPulse en geldige toegang tot de doelapp.",
-          "limits": "Openen navigeert alleen naar het ingestelde adres. De app kan een eigen aanmelding vereisen. Niet ingesteld betekent dat er geen bruikbare link is; een ingestelde link garandeert niet dat de dienst bereikbaar is.",
-          "example": "Bijvoorbeeld: het beheer van SlibDetect openen."
-        },
-        "en": {
-          "title": "Open SlibDetect",
-          "purpose": "Open the SlibDetect management dashboard.",
-          "when": "Use this entry point for opening SlibDetect management.",
-          "steps": [
-            "Choose Apps in navigation and find SlibDetect.",
-            "Review the card’s status and description.",
-            "Close the guide and choose Open when an address is configured. Complete the app’s own sign-in if required.",
-            "Continue in the destination app and use the original tab to return to SynthPulse."
-          ],
-          "permissions": "Platform administration access in SynthPulse and valid access to the destination app.",
-          "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable.",
-          "example": "For example: opening SlibDetect management."
-        }
-      }
-    },
-    {
       "id": "webui.apps.cockpit",
       "area": "apps",
       "status": "conditional",
@@ -14142,206 +13942,6 @@ window.SynthPulseFeatureCatalog = {
           "permissions": "Platform administration access in SynthPulse and valid access to the destination app.",
           "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable. Make changes, run tasks or send documents deliberately inside the destination app; this guide does not perform them.",
           "example": "For example: reviewing a client installation and its deployment."
-        }
-      }
-    },
-    {
-      "id": "webui.apps.silverbullet",
-      "area": "apps",
-      "status": "conditional",
-      "conditions": [
-        "Configured app directory and existing access"
-      ],
-      "anchors": [
-        "?help_feature=webui.apps.silverbullet",
-        "#mainApps [data-app-id=\"silverbullet\"]"
-      ],
-      "source_refs": [
-        "api/app_catalog.py",
-        "api/apps_launcher.py",
-        "static/apps.js"
-      ],
-      "related": [
-        "webui.apps.overview"
-      ],
-      "locales": {
-        "nl": {
-          "title": "SilverBullet openen",
-          "purpose": "Schrijf en organiseer kennisnotities.",
-          "when": "Gebruik deze ingang voor kennisnotities in een eigen notitieomgeving ordenen.",
-          "steps": [
-            "Kies Apps in de navigatie en zoek SilverBullet.",
-            "Bekijk de status en de beschrijving van de kaart.",
-            "Sluit de gids en kies Openen als een adres is ingesteld. Rond indien nodig de eigen aanmelding van de app af.",
-            "Werk verder in de doelapp en gebruik het oorspronkelijke tabblad om terug te keren naar SynthPulse."
-          ],
-          "permissions": "Platformbeheerrechten in SynthPulse en geldige toegang tot de doelapp.",
-          "limits": "Openen navigeert alleen naar het ingestelde adres. De app kan een eigen aanmelding vereisen. Niet ingesteld betekent dat er geen bruikbare link is; een ingestelde link garandeert niet dat de dienst bereikbaar is.",
-          "example": "Bijvoorbeeld: kennisnotities in een eigen notitieomgeving ordenen."
-        },
-        "en": {
-          "title": "Open SilverBullet",
-          "purpose": "Write and organise knowledge notes.",
-          "when": "Use this entry point for organising knowledge notes in a dedicated notebook.",
-          "steps": [
-            "Choose Apps in navigation and find SilverBullet.",
-            "Review the card’s status and description.",
-            "Close the guide and choose Open when an address is configured. Complete the app’s own sign-in if required.",
-            "Continue in the destination app and use the original tab to return to SynthPulse."
-          ],
-          "permissions": "Platform administration access in SynthPulse and valid access to the destination app.",
-          "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable.",
-          "example": "For example: organising knowledge notes in a dedicated notebook."
-        }
-      }
-    },
-    {
-      "id": "webui.apps.pixel_office",
-      "area": "apps",
-      "status": "conditional",
-      "conditions": [
-        "Configured app directory and existing access"
-      ],
-      "anchors": [
-        "?help_feature=webui.apps.pixel_office",
-        "#mainApps [data-app-id=\"pixel_office\"]"
-      ],
-      "source_refs": [
-        "api/app_catalog.py",
-        "api/apps_launcher.py",
-        "static/apps.js"
-      ],
-      "related": [
-        "webui.apps.overview"
-      ],
-      "locales": {
-        "nl": {
-          "title": "Pixel Office openen",
-          "purpose": "Bekijk de virtuele kantooromgeving.",
-          "when": "Gebruik deze ingang voor de virtuele kantooromgeving bekijken.",
-          "steps": [
-            "Kies Apps in de navigatie en zoek Pixel Office.",
-            "Bekijk de status en de beschrijving van de kaart.",
-            "Sluit de gids en kies Openen als een adres is ingesteld. Rond indien nodig de eigen aanmelding van de app af.",
-            "Werk verder in de doelapp en gebruik het oorspronkelijke tabblad om terug te keren naar SynthPulse."
-          ],
-          "permissions": "Platformbeheerrechten in SynthPulse en geldige toegang tot de doelapp.",
-          "limits": "Openen navigeert alleen naar het ingestelde adres. De app kan een eigen aanmelding vereisen. Niet ingesteld betekent dat er geen bruikbare link is; een ingestelde link garandeert niet dat de dienst bereikbaar is.",
-          "example": "Bijvoorbeeld: de virtuele kantooromgeving bekijken."
-        },
-        "en": {
-          "title": "Open Pixel Office",
-          "purpose": "View the virtual office environment.",
-          "when": "Use this entry point for viewing the virtual office environment.",
-          "steps": [
-            "Choose Apps in navigation and find Pixel Office.",
-            "Review the card’s status and description.",
-            "Close the guide and choose Open when an address is configured. Complete the app’s own sign-in if required.",
-            "Continue in the destination app and use the original tab to return to SynthPulse."
-          ],
-          "permissions": "Platform administration access in SynthPulse and valid access to the destination app.",
-          "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable.",
-          "example": "For example: viewing the virtual office environment."
-        }
-      }
-    },
-    {
-      "id": "webui.apps.mnemosyne",
-      "area": "apps",
-      "status": "conditional",
-      "conditions": [
-        "Configured app directory and existing access"
-      ],
-      "anchors": [
-        "?help_feature=webui.apps.mnemosyne",
-        "#mainApps [data-app-id=\"mnemosyne\"]"
-      ],
-      "source_refs": [
-        "api/app_catalog.py",
-        "api/apps_launcher.py",
-        "static/apps.js"
-      ],
-      "related": [
-        "webui.apps.overview"
-      ],
-      "locales": {
-        "nl": {
-          "title": "Mnemosyne openen",
-          "purpose": "Beheer het geheugen van de AI-omgeving.",
-          "when": "Gebruik deze ingang voor het beheer van het AI-geheugen bekijken.",
-          "steps": [
-            "Kies Apps in de navigatie en zoek Mnemosyne.",
-            "Bekijk de status en de beschrijving van de kaart.",
-            "Sluit de gids en kies Openen als een adres is ingesteld. Rond indien nodig de eigen aanmelding van de app af.",
-            "Werk verder in de doelapp en gebruik het oorspronkelijke tabblad om terug te keren naar SynthPulse."
-          ],
-          "permissions": "Platformbeheerrechten in SynthPulse en geldige toegang tot de doelapp.",
-          "limits": "Openen navigeert alleen naar het ingestelde adres. De app kan een eigen aanmelding vereisen. Niet ingesteld betekent dat er geen bruikbare link is; een ingestelde link garandeert niet dat de dienst bereikbaar is.",
-          "example": "Bijvoorbeeld: het beheer van het AI-geheugen bekijken."
-        },
-        "en": {
-          "title": "Open Mnemosyne",
-          "purpose": "Manage memory for the AI environment.",
-          "when": "Use this entry point for reviewing AI memory management.",
-          "steps": [
-            "Choose Apps in navigation and find Mnemosyne.",
-            "Review the card’s status and description.",
-            "Close the guide and choose Open when an address is configured. Complete the app’s own sign-in if required.",
-            "Continue in the destination app and use the original tab to return to SynthPulse."
-          ],
-          "permissions": "Platform administration access in SynthPulse and valid access to the destination app.",
-          "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable.",
-          "example": "For example: reviewing AI memory management."
-        }
-      }
-    },
-    {
-      "id": "webui.apps.strategy_gantt",
-      "area": "apps",
-      "status": "conditional",
-      "conditions": [
-        "Configured app directory and existing access"
-      ],
-      "anchors": [
-        "?help_feature=webui.apps.strategy_gantt",
-        "#mainApps [data-app-id=\"strategy_gantt\"]"
-      ],
-      "source_refs": [
-        "api/app_catalog.py",
-        "api/apps_launcher.py",
-        "static/apps.js"
-      ],
-      "related": [
-        "webui.apps.overview"
-      ],
-      "locales": {
-        "nl": {
-          "title": "Strategy Gantt openen",
-          "purpose": "Bekijk en beheer de strategische planning.",
-          "when": "Gebruik deze ingang voor de strategische planning bekijken.",
-          "steps": [
-            "Kies Apps in de navigatie en zoek Strategy Gantt.",
-            "Bekijk de status en de beschrijving van de kaart.",
-            "Sluit de gids en kies Openen als een adres is ingesteld. Rond indien nodig de eigen aanmelding van de app af.",
-            "Werk verder in de doelapp en gebruik het oorspronkelijke tabblad om terug te keren naar SynthPulse."
-          ],
-          "permissions": "Platformbeheerrechten in SynthPulse en geldige toegang tot de doelapp.",
-          "limits": "Openen navigeert alleen naar het ingestelde adres. De app kan een eigen aanmelding vereisen. Niet ingesteld betekent dat er geen bruikbare link is; een ingestelde link garandeert niet dat de dienst bereikbaar is.",
-          "example": "Bijvoorbeeld: de strategische planning bekijken."
-        },
-        "en": {
-          "title": "Open Strategy Gantt",
-          "purpose": "View and manage strategic planning.",
-          "when": "Use this entry point for reviewing strategic planning.",
-          "steps": [
-            "Choose Apps in navigation and find Strategy Gantt.",
-            "Review the card’s status and description.",
-            "Close the guide and choose Open when an address is configured. Complete the app’s own sign-in if required.",
-            "Continue in the destination app and use the original tab to return to SynthPulse."
-          ],
-          "permissions": "Platform administration access in SynthPulse and valid access to the destination app.",
-          "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable.",
-          "example": "For example: reviewing strategic planning."
         }
       }
     },
@@ -14440,6 +14040,156 @@ window.SynthPulseFeatureCatalog = {
           "permissions": "The same access as Apps. The language choice does not change permissions.",
           "limits": "The choice is stored in this browser. It does not change the language inside external applications or for other users.",
           "example": "Choose English to read app descriptions and interactive explanations in English."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.ragflow",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured app directory and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.ragflow",
+        "#mainApps [data-app-id=\"ragflow\"]"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "RAGFlow gebruiken",
+          "purpose": "Beheer kennisbanken, laat documenten verwerken en test zoekresultaten en antwoorden met bronnen.",
+          "when": "Gebruik dit wanneer je het volgende wilt doen: Zoek het opzegbeleid in een kennisbank en controleer de aangehaalde passage.",
+          "steps": [
+            "Kies Apps onderaan de navigatie en zoek RAGFlow.",
+            "Kies Open app en meld je aan bij RAGFlow.",
+            "Open een bestaande kennisbank of maak een kennisbank voor je project. Voeg alleen documenten toe die je daarvoor mag gebruiken.",
+            "Start de documentverwerking en controleer of die voltooid is. Test vervolgens een zoekvraag of een gekoppelde chat en controleer de bronverwijzingen."
+          ],
+          "permissions": "Platformbeheerrechten in SynthPulse en geldige toegang tot de doelapp.",
+          "limits": "Documentverwerking en beschikbare modellen hangen af van de RAGFlow-configuratie. Een tegel koppelt geen bestanden of SynthPulse-gesprekken automatisch aan een kennisbank.",
+          "example": "Zoek het opzegbeleid in een kennisbank en controleer de aangehaalde passage."
+        },
+        "en": {
+          "title": "RAGFlow guide",
+          "purpose": "Manage knowledge bases, process documents and test search results and answers with sources.",
+          "when": "Use this when you want to do the following: Find the cancellation policy in a knowledge base and verify the cited passage.",
+          "steps": [
+            "Choose Apps at the bottom of navigation and find RAGFlow.",
+            "Choose Open app and sign in to RAGFlow.",
+            "Open an existing knowledge base or create one for your project. Add only documents you are allowed to use for that purpose.",
+            "Start document processing and check that it completes. Then test a search query or a connected chat and review its source references."
+          ],
+          "permissions": "Platform administration access in SynthPulse and valid access to the destination app.",
+          "limits": "Document processing and available models depend on the RAGFlow configuration. An app card does not automatically connect files or SynthPulse conversations to a knowledge base.",
+          "example": "Find the cancellation policy in a knowledge base and verify the cited passage."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.langfuse",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured app directory and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.langfuse",
+        "#mainApps [data-app-id=\"langfuse\"]"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "Langfuse gebruiken",
+          "purpose": "Onderzoek AI-uitvoeringen aan de hand van traces, duur, tokengebruik, kosten en beschikbare evaluaties.",
+          "when": "Gebruik dit wanneer je het volgende wilt doen: Zoek een trage AI-uitvoering en bekijk welke stap de meeste tijd kostte.",
+          "steps": [
+            "Kies Apps onderaan de navigatie en zoek Langfuse.",
+            "Kies Open app, meld je aan en selecteer het juiste project.",
+            "Open Traces en filter op periode, toepassing of de beschikbare sessiegegevens.",
+            "Open een trace om de afzonderlijke stappen, duur en geregistreerde metadata te bekijken. Controleer gebruik en kosten waar die zijn aangeleverd."
+          ],
+          "permissions": "Platformbeheerrechten in SynthPulse en geldige toegang tot de doelapp.",
+          "limits": "Alleen aangesloten toepassingen leveren gegevens. De huidige exporter kan uitsluitend metadata aanleveren; ontbrekende prompts of antwoorden betekenen niet dat de trace defect is. Kosten zijn afhankelijk van aangeleverde model- en gebruiksgegevens.",
+          "example": "Zoek een trage AI-uitvoering en bekijk welke stap de meeste tijd kostte."
+        },
+        "en": {
+          "title": "Langfuse guide",
+          "purpose": "Investigate AI runs using traces, duration, token usage, costs and available evaluations.",
+          "when": "Use this when you want to do the following: Find a slow AI run and inspect which step took the most time.",
+          "steps": [
+            "Choose Apps at the bottom of navigation and find Langfuse.",
+            "Choose Open app, sign in and select the correct project.",
+            "Open Traces and filter by time, application or available session information.",
+            "Open a trace to inspect individual steps, duration and recorded metadata. Review usage and costs where these were supplied."
+          ],
+          "permissions": "Platform administration access in SynthPulse and valid access to the destination app.",
+          "limits": "Only connected applications send data. The current exporter may provide metadata only; missing prompts or responses do not mean a trace is broken. Costs depend on the supplied model and usage information.",
+          "example": "Find a slow AI run and inspect which step took the most time."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.hermesoffice",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured app directory and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.hermesoffice",
+        "#mainApps [data-app-id=\"hermesoffice\"]"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "HermesOffice gebruiken",
+          "purpose": "Open de desktopkantoorsuite voor Word-documenten, spreadsheets, presentaties, pdf en Markdown.",
+          "when": "Gebruik dit wanneer je het volgende wilt doen: Open een bestaand docx-bestand in HermesOffice en sla de bewerkte versie op je computer op.",
+          "steps": [
+            "Kies Apps onderaan de navigatie en zoek HermesOffice.",
+            "Kies Download desktopapp om de officiële releasepagina te openen.",
+            "Download een uitgave die bij je besturingssysteem past en installeer die volgens de projectinstructies. Als de app al is geïnstalleerd, open je haar via je toepassingenmenu.",
+            "Open of maak een document in HermesOffice. Stel AI-toegang in binnen de desktopapp als je AI-bewerking wilt gebruiken en sla je resultaat bewust op."
+          ],
+          "permissions": "Toegang tot de Apps-tegel, installatie op je eigen computer en eventuele AI-providerrechten.",
+          "limits": "Dit is een desktopapp, geen ingebouwde browsereditor. Beschikbare installatiepakketten verschillen per platform. De tegel opent alleen de downloadpagina en synchroniseert geen documenten of AI-instellingen.",
+          "example": "Open een bestaand docx-bestand in HermesOffice en sla de bewerkte versie op je computer op."
+        },
+        "en": {
+          "title": "HermesOffice guide",
+          "purpose": "Open the desktop office suite for Word documents, spreadsheets, presentations, PDF and Markdown.",
+          "when": "Use this when you want to do the following: Open an existing docx file in HermesOffice and save the edited version on your computer.",
+          "steps": [
+            "Choose Apps at the bottom of navigation and find HermesOffice.",
+            "Choose Download desktop app to open the official release page.",
+            "Download a release suitable for your operating system and install it following the project instructions. If it is already installed, open it from your applications menu.",
+            "Open or create a document in HermesOffice. Configure AI access inside the desktop app if you want AI editing and save your result deliberately."
+          ],
+          "permissions": "Access to the app card, installation on your own computer and any required AI provider permissions.",
+          "limits": "This is a desktop application, not an embedded browser editor. Available installation packages differ by platform. The card only opens the download page and does not synchronise documents or AI settings.",
+          "example": "Open an existing docx file in HermesOffice and save the edited version on your computer."
         }
       }
     }

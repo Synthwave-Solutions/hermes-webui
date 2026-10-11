@@ -29,11 +29,13 @@ Example using documentation-only addresses:
 }
 ```
 
-The fixed registry includes OpenDesign and OpenDesign Classic, Craft Studio and
-all eight editors (PhotoCraft, FilmCraft, EffectCraft, VectorCraft, LightCraft,
-DesignCraft, PDFCraft and SoundCraft), HyperFrames, Vision Studio, n8n, OmniRoute,
-Nango, DocuSeal, Pareltje, SlibDetect, MSP Cockpit, SilverBullet, Pixel Office,
-Mnemosyne, Strategy Gantt and Open WebUI.
+The curated registry includes OpenDesign, Craft Studio and all eight editors,
+HyperFrames, n8n, OmniRoute, Nango, DocuSeal, MSP Cockpit, Open WebUI, RAGFlow,
+Langfuse and HermesOffice. Personal dashboards and the classic design entry are
+omitted. HermesOffice is a desktop download, identified by
+`launch_kind: desktop_download`. Its exact official GitHub latest-release URL is
+the only audited external distribution exception; arbitrary GitHub links and
+other app IDs do not receive that exception.
 
 The URL boundary is the existing launcher boundary: HTTPS without credentials,
 query parameters or fragments; an installation-owned `SP_DOMAIN` or subdomain on
@@ -46,12 +48,11 @@ in the directory do not relax hostname validation.
 ## Access and module behavior
 
 Members see only member entries whose associated module is active. Creative
-apps use `design_studio`; DocuSeal uses `e_signing`. n8n requires platform scope
+apps use `design_studio`; DocuSeal uses `e_signing` and HermesOffice uses `office_apps`. n8n requires platform scope
 unless `SP_WORKFLOWS_CLIENT_EDITOR=1` explicitly permits member access; it still
 requires the `workflows` module for members.
 
-OmniRoute, Nango, MSP Cockpit, Pareltje, SlibDetect, SilverBullet, Pixel Office,
-Mnemosyne, Strategy Gantt and Open WebUI are platform-only entries. Organisation,
+OmniRoute, Nango, MSP Cockpit, Open WebUI, RAGFlow and Langfuse are platform-only entries. Organisation,
 department and billing administrators do not thereby gain platform access.
 
 Platform administrators can discover all explicitly configured named apps,
@@ -88,8 +89,8 @@ introduced. Configuration remains owned by the deployment environment.
 
 ## Browser verification
 
-The committed `scripts/e2e/server_fixture.py` seeds all 25 apps with synthetic
-HTTPS addresses, two unconfigured destinations and separate platform,
+The committed `scripts/e2e/server_fixture.py` seeds all 20 apps with synthetic
+HTTPS addresses, one unconfigured destination and separate platform,
 organisation-admin and member identities. Browser networking remains restricted
 to loopback. Run `scripts/e2e/run_full.py --engine <engine-checkout>` with
 `--grep 'Apps directory|every app has|organisation admin modules|member module boundary|platform launcher'`

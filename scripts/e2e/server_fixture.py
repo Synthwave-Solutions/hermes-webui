@@ -59,12 +59,12 @@ def main():
     sys.path[:0] = [str(repo), engine]
     from api.app_catalog import REGISTRY
     # Synthetic directory links are never followed: browser networking remains
-    # loopback-only. Two missing addresses exercise the unavailable-card state.
+    # loopback-only. A missing address exercise the unavailable-card state.
     os.environ.update({
         'SP_DOMAIN': 'example.test',
         'SP_MODULE_LINKS': json.dumps({'design_studio': 'https://design.example.test',
                                       'workflows': 'https://workflows.example.test'}),
-        'SP_APP_LINKS': json.dumps({key: None if key in {'silverbullet', 'openwebui'}
+        'SP_APP_LINKS': json.dumps({key: None if key == 'openwebui'
                                    else 'https://apps.example.test/' + key + '/'
                                    for key in REGISTRY}),
     })

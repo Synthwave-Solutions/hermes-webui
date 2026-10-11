@@ -2340,12 +2340,6 @@
       "#mainApps [data-app-id=\"opendesign\"]"
     ]
   },
-  "webui.apps.opendesign_classic": {
-    "panel": "apps",
-    "targets": [
-      "#mainApps [data-app-id=\"opendesign_classic\"]"
-    ]
-  },
   "webui.apps.craft_studio": {
     "panel": "apps",
     "targets": [
@@ -2406,12 +2400,6 @@
       "#mainApps [data-app-id=\"hyperframes\"]"
     ]
   },
-  "webui.apps.vision_studio": {
-    "panel": "apps",
-    "targets": [
-      "#mainApps [data-app-id=\"vision_studio\"]"
-    ]
-  },
   "webui.apps.n8n": {
     "panel": "apps",
     "targets": [
@@ -2436,46 +2424,10 @@
       "#mainApps [data-app-id=\"docuseal\"]"
     ]
   },
-  "webui.apps.pareltje": {
-    "panel": "apps",
-    "targets": [
-      "#mainApps [data-app-id=\"pareltje\"]"
-    ]
-  },
-  "webui.apps.slibdetect": {
-    "panel": "apps",
-    "targets": [
-      "#mainApps [data-app-id=\"slibdetect\"]"
-    ]
-  },
   "webui.apps.cockpit": {
     "panel": "apps",
     "targets": [
       "#mainApps [data-app-id=\"cockpit\"]"
-    ]
-  },
-  "webui.apps.silverbullet": {
-    "panel": "apps",
-    "targets": [
-      "#mainApps [data-app-id=\"silverbullet\"]"
-    ]
-  },
-  "webui.apps.pixel_office": {
-    "panel": "apps",
-    "targets": [
-      "#mainApps [data-app-id=\"pixel_office\"]"
-    ]
-  },
-  "webui.apps.mnemosyne": {
-    "panel": "apps",
-    "targets": [
-      "#mainApps [data-app-id=\"mnemosyne\"]"
-    ]
-  },
-  "webui.apps.strategy_gantt": {
-    "panel": "apps",
-    "targets": [
-      "#mainApps [data-app-id=\"strategy_gantt\"]"
     ]
   },
   "webui.apps.openwebui": {
@@ -2488,6 +2440,24 @@
     "panel": "apps",
     "targets": [
       "#appsLanguage"
+    ]
+  },
+  "webui.apps.ragflow": {
+    "panel": "apps",
+    "targets": [
+      "#mainApps [data-app-id=\"ragflow\"]"
+    ]
+  },
+  "webui.apps.langfuse": {
+    "panel": "apps",
+    "targets": [
+      "#mainApps [data-app-id=\"langfuse\"]"
+    ]
+  },
+  "webui.apps.hermesoffice": {
+    "panel": "apps",
+    "targets": [
+      "#mainApps [data-app-id=\"hermesoffice\"]"
     ]
   }
 };
