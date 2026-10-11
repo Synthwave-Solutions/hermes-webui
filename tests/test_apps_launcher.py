@@ -50,3 +50,132 @@ def test_anonymous_auth_disabled(write_policy,caller):
     assert get(caller,None).status==403
     caller.method='auth_disabled'
     assert get(caller,PLATFORM[0]).status==403
+
+
+CRAFT_IDS = ('photocraft', 'filmcraft', 'effectcraft', 'vectorcraft',
+             'lightcraft', 'designcraft', 'pdfcraft', 'soundcraft')
+
+
+@pytest.fixture(autouse=True)
+def clean_app_links(monkeypatch):
+    monkeypatch.delenv('SP_APP_LINKS', raising=False)
+    monkeypatch.delenv('SP_MODULE_LINKS', raising=False)
+    monkeypatch.delenv('SP_ENABLED_MODULES', raising=False)
+    monkeypatch.delenv('SP_WORKFLOWS_CLIENT_EDITOR', raising=False)
+    modules.clear_cache()
+
+
+def test_complete_craft_studio_registry(write_policy, caller, monkeypatch):
+    monkeypatch.setenv('SP_MESH_FQDN', 'node.tail.test')
+    ids = ('opendesign', 'opendesign_classic', 'craft_studio') + CRAFT_IDS
+    monkeypatch.setenv('SP_APP_LINKS', json.dumps({
+        app_id: f'https://node.tail.test:9443/{app_id}' for app_id in ids
+    }))
+    rows = get(caller, NOBODY[0]).body['apps']
+    assert {row['id'] for row in rows} == set(ids)
+    assert all(row['module'] == 'design_studio' and row['category'] == 'creative'
+               and row['access'] == 'member' and row['status'] == 'configured'
+               and set(row['name']) == {'nl', 'en'}
+               and set(row['description']) == {'nl', 'en'} for row in rows)
+
+
+@pytest.mark.parametrize('email', [NOBODY[0], 'owner@acme.example', 'finance@acme.example'])
+def test_admin_apps_are_not_exposed_to_other_scopes(write_policy, caller, monkeypatch, email):
+    ids = ('n8n', 'omniroute', 'nango', 'pareltje', 'slibdetect', 'cockpit',
+           'openwebui', 'pixel_office', 'mnemosyne', 'strategy_gantt', 'silverbullet')
+    monkeypatch.setenv('SP_MESH_FQDN', 'node.tail.test')
+    monkeypatch.setenv('SP_APP_LINKS', json.dumps({app_id: None for app_id in ids}))
+    assert get(caller, email).body == {'apps': []}
+    rows = get(caller, PLATFORM[0]).body['apps']
+    assert {row['id'] for row in rows} == set(ids)
+    assert all(row['url'] is None and row['status'] == 'unconfigured'
+               and row['access'] == 'platform' for row in rows)
+
+
+def test_named_workflow_editor_opt_in(write_policy, caller, monkeypatch):
+    monkeypatch.setenv('SP_APP_LINKS', '{"n8n":null,"omniroute":null}')
+    monkeypatch.setenv('SP_WORKFLOWS_CLIENT_EDITOR', '1')
+    rows = get(caller, NOBODY[0]).body['apps']
+    assert [(row['id'], row['access']) for row in rows] == [('n8n', 'member')]
+
+
+def test_module_gate_for_members_admin_directory_does_not_activate(write_policy, caller, monkeypatch):
+    monkeypatch.setenv('SP_DOMAIN', 'example.test')
+    monkeypatch.setenv('SP_APP_LINKS', '{"docuseal":"https://sign.example.test"}')
+    monkeypatch.setenv('SP_MODULE_LINKS', '{"e_signing":"https://legacy.example.test"}')
+    assert get(caller, NOBODY[0]).body == {'apps': []}
+    rows = get(caller, PLATFORM[0]).body['apps']
+    assert [row['id'] for row in rows] == ['docuseal']
+    assert not modules.module_active('e_signing')
+    blocked = _Handler()
+    assert modules.gate(blocked, SimpleNamespace(path='/api/signing/documents'))
+    assert blocked.status == 403
+    monkeypatch.setenv('SP_ENABLED_MODULES', 'e_signing')
+    modules.clear_cache()
+    assert [row['id'] for row in get(caller, NOBODY[0]).body['apps']] == ['docuseal']
+
+
+@pytest.mark.parametrize('raw', ['bad', '[]', 'null', 'false', '12'])
+def test_named_malformed_fail_closed_preserves_legacy(write_policy, caller, monkeypatch, raw):
+    monkeypatch.setenv('SP_DOMAIN', 'example.test')
+    monkeypatch.setenv('SP_APP_LINKS', raw)
+    monkeypatch.setenv('SP_MODULE_LINKS', '{"design_studio":"https://design.example.test"}')
+    rows = get(caller, PLATFORM[0]).body['apps']
+    assert [row['id'] for row in rows] == ['design_studio']
+    assert rows[0]['module'] == 'design_studio'
+
+
+def test_empty_null_unknown_and_invalid_named_entries(write_policy, caller, monkeypatch):
+    monkeypatch.setenv('SP_DOMAIN', 'example.test')
+    monkeypatch.setenv('SP_APP_LINKS', json.dumps({
+        'opendesign': '', 'craft_studio': None,
+        'photocraft': 'https://photo.example.test/edit',
+        'filmcraft': {'url': 'https://film.example.test', 'name': 'Fake'},
+        'effectcraft': [], 'vectorcraft': False,
+        'injected': 'https://injected.example.test', '<script>': None,
+    }))
+    rows = get(caller, NOBODY[0]).body['apps']
+    assert [(row['id'], row['status'], row['url']) for row in rows] == [
+        ('opendesign', 'unconfigured', None), ('craft_studio', 'unconfigured', None),
+        ('photocraft', 'configured', 'https://photo.example.test/edit'),
+    ]
+    assert rows[0]['name'] == {'nl': 'OpenDesign', 'en': 'OpenDesign'}
+
+
+@pytest.mark.parametrize('url', [
+    'https://evil.test', 'https://example.test.evil.test',
+    'https://user:secret@design.example.test', 'https://design.example.test?token=secret',
+    'https://design.example.test#token', 'http://design.example.test',
+    'https://node.tail.test.evil.test:9443', 'https://127.0.0.1',
+    'https://169.254.169.254/latest', 'https://design.example.test:444',
+    'https://design.example.test\\@evil.test', 'https://n8n.example.test',
+])
+def test_named_urls_keep_trusted_origin_boundary(write_policy, caller, monkeypatch, url):
+    monkeypatch.setenv('SP_DOMAIN', 'example.test')
+    monkeypatch.setenv('SP_MESH_FQDN', 'node.tail.test')
+    monkeypatch.setenv('SP_APP_LINKS', json.dumps({'opendesign': url}))
+    assert get(caller, PLATFORM[0]).body == {'apps': []}
+
+
+@pytest.mark.parametrize('replacement', [None, '', 'https://evil.test', 'https://design.example.test/new'])
+def test_legacy_replacement_only_when_named_app_configured(write_policy, caller, monkeypatch, replacement):
+    monkeypatch.setenv('SP_DOMAIN', 'example.test')
+    monkeypatch.setenv('SP_APP_LINKS', json.dumps({'opendesign': replacement,
+                                                 'n8n': 'https://workflows.example.test/new'}))
+    monkeypatch.setenv('SP_MODULE_LINKS', json.dumps({
+        'design_studio': 'https://design.example.test',
+        'workflows': 'https://workflows.example.test',
+    }))
+    rows = get(caller, PLATFORM[0]).body['apps']
+    ids = [row['id'] for row in rows]
+    assert ids.count('n8n') == 1 and 'workflows' not in ids
+    assert ('design_studio' in ids) == (replacement != 'https://design.example.test/new')
+
+
+def test_policy_failure_exposes_no_registry(write_policy, caller, monkeypatch):
+    monkeypatch.setenv('SP_APP_LINKS', '{"opendesign":null}')
+    def unavailable(handler):
+        raise RuntimeError('unavailable')
+    monkeypatch.setattr(apps_launcher, 'context', unavailable)
+    response = get(caller, PLATFORM[0])
+    assert response.status == 503 and response.body == {'error': 'policy_unavailable'}

@@ -4,7 +4,7 @@ import json
 import os
 import re
 from urllib.parse import urlsplit
-from api import modules
+from api import app_catalog, modules
 from api.org_modules import CATALOG, context
 from api.helpers import j
 
@@ -35,6 +35,15 @@ def safe_link(value, environ):
         return None
 
 
+def _links(key):
+    """Only deployment-owned JSON dictionaries can supply destinations."""
+    try:
+        value = json.loads(os.environ.get(key, '{}'))
+        return value if isinstance(value, dict) else {}
+    except (ValueError, TypeError):
+        return {}
+
+
 def handle_get(handler, parsed):
     try:
         policy, subject, scope = context(handler)
@@ -44,22 +53,47 @@ def handle_get(handler, parsed):
     if not subject.normalized_email or subject.provider == 'auth_disabled':
         j(handler, {'error': 'forbidden'}, status=403)
         return True
-    try:
-        links = json.loads(os.environ.get('SP_MODULE_LINKS', '{}'))
-        if not isinstance(links, dict):
-            links = {}
-    except (ValueError, TypeError):
-        links = {}
     state = modules.current_state()
+    platform = scope.scope == 'platform'
+    editor = os.getenv('SP_WORKFLOWS_CLIENT_EDITOR') == '1'
     apps = []
+    named_links = _links('SP_APP_LINKS')
+    for app_id, spec in app_catalog.REGISTRY.items():
+        if app_id not in named_links:
+            continue
+        access = 'member' if app_id == 'n8n' and editor else spec.access
+        if not platform and (access == 'platform' or spec.module not in state.active):
+            continue
+        value = named_links[app_id]
+        unconfigured = value is None or value == ''
+        url = None if unconfigured else safe_link(value, os.environ)
+        if not unconfigured and url is None:
+            continue
+        apps.append({'id': app_id, 'module': spec.module,
+                     'name': {'nl': spec.name, 'en': spec.name},
+                     'description': {'nl': spec.description_nl, 'en': spec.description_en},
+                     'category': spec.category, 'access': access,
+                     'url': url, 'status': 'unconfigured' if unconfigured else 'configured'})
+
+    # Preserve the previous module-based launcher contract. Named apps do not
+    # activate modules; platform users may discover existing external apps only.
+    links = _links('SP_MODULE_LINKS')
+    configured_ids = {row['id'] for row in apps if row['status'] == 'configured'}
     for mid in state.active:
         spec = modules.REGISTRY[mid]
         if not spec.app_tile:
             continue
-        if mid == 'workflows' and os.getenv('SP_WORKFLOWS_CLIENT_EDITOR') != '1' and scope.scope != 'platform':
+        if mid == 'workflows' and not editor and not platform:
+            continue
+        if configured_ids.intersection(app_catalog.LEGACY_REPLACEMENTS.get(mid, ())):
             continue
         url = safe_link(links.get(mid), os.environ)
         if url:
-            apps.append({'module': mid, 'name': CATALOG[mid]['name'], 'url': url})
+            apps.append({'id': mid, 'module': mid, 'name': CATALOG[mid]['name'],
+                         'description': CATALOG[mid]['summary'],
+                         'category': 'creative' if mid == 'design_studio' else
+                                     'automation' if mid == 'workflows' else 'productivity',
+                         'access': 'platform' if mid == 'workflows' and not editor else 'member',
+                         'url': url, 'status': 'configured'})
     j(handler, {'apps': apps})
     return True
