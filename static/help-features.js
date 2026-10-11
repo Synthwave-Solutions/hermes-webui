@@ -14522,32 +14522,34 @@ window.SynthPulseFeatureCatalog = {
       ],
       "locales": {
         "nl": {
-          "title": "App-support binnen de basisretainer",
-          "purpose": "Beheer per app het supportniveau binnen de totale basisretainer voor infrastructuur.",
-          "when": "Bij het afspreken of wijzigen van app-support.",
+          "title": "Supportstrippenkaart per app",
+          "purpose": "Vraag een supportniveau aan voor een beheerde app en neem de uren op in de jaarafspraak.",
+          "when": "Als je app-support wilt toevoegen of wijzigen.",
           "steps": [
-            "Open Apps en ga naar Support binnen je basisretainer.",
-            "Kies Basis, Plus of Premium en lees de afgesproken dekking.",
-            "Vraag het niveau aan. Volg je ticket in Mijn MSP.",
-            "De MSP bevestigt het niveau, de scope en de ingangsdatum binnen je infrastructuurretainer."
+            "Open Apps en kies de beheerde app.",
+            "Lees de supportniveaus Basis, Plus en Premium.",
+            "Vraag het gewenste niveau aan en volg het ticket in Mijn MSP.",
+            "Je MSP bevestigt jaaruren, dekking, jaarprijs en ingangsmaand.",
+            "Bekijk de app-regel in Jaarlijkse supporturen. Alle onderdelen komen samen op één maandfactuur."
           ],
-          "permissions": "Organisatiebeheerders en financiële beheerders beheren de aanvragen.",
-          "limits": "App-support heeft geen apart maandtarief. Het niveau bepaalt de afgesproken dekking; een naam alleen belooft geen reactietijd. Aanvragen schrijft geen geld af.",
-          "example": "Vraag Plus-support voor Documenten aan binnen je basisretainer."
+          "permissions": "Organisatiebeheerders en financiële beheerders beheren app-supportaanvragen.",
+          "limits": "Een aanvraag verleent nog geen uren en schrijft geen geld af. Uitschakelen van een app beëindigt de supportafspraak niet. Een niveaunaam alleen belooft geen reactietijd.",
+          "example": "Neem 10 jaarlijkse supporturen voor Documenten op naast 24 infrastructuururen."
         },
         "en": {
-          "title": "App support within the base retainer",
-          "purpose": "Manage each app support level within the total infrastructure base retainer.",
-          "when": "When agreeing or changing app support.",
+          "title": "Annual support bundle per app",
+          "purpose": "Request a managed-app support level and include its hours in the annual agreement.",
+          "when": "When adding or changing app support.",
           "steps": [
-            "Open Apps and find Support within your base retainer.",
-            "Select Basic, Plus or Premium and read the agreed coverage.",
-            "Request the level. Follow your ticket in My MSP.",
-            "Your MSP confirms the level, scope and effective date within your infrastructure retainer."
+            "Open Apps and choose the managed app.",
+            "Review Basic, Plus and Premium support levels.",
+            "Request a level and follow the ticket in My MSP.",
+            "Your MSP confirms annual hours, coverage, annual price and starting month.",
+            "Review the app line under Annual support hours. All components share one monthly invoice."
           ],
-          "permissions": "Organisation and billing administrators manage requests.",
-          "limits": "App support has no separate monthly price. A tier name alone promises no response time. Requests collect no money.",
-          "example": "Request Plus support for Documents within your base retainer."
+          "permissions": "Organisation and billing administrators manage app-support requests.",
+          "limits": "Requests grant no hours and collect no money. Disabling an app does not cancel its support agreement. A tier name alone promises no response time.",
+          "example": "Include 10 annual Documents support hours alongside 24 infrastructure hours."
         }
       }
     },
@@ -14627,10 +14629,10 @@ window.SynthPulseFeatureCatalog = {
             "Open Mijn MSP en kies Overzicht & uren.",
             "Bekijk Basispakket onder Basispakket + Agentic Consultant. De status komt uit je klantcontract of pakketaanvraag.",
             "Als er nog geen actief pakket is, kies Basispakket aanvragen. Volg het bijbehorende ticket bij Tickets.",
-            "Je MSP bevestigt inhoud, tarief en ingangsdatum. App-support is inbegrepen in de infrastructuurretainer; consultantinzet is aanvullend."
+            "Bekijk één jaarbudget voor basisinfrastructuur, app-strippenkaarten, automations en maatwerk."
           ],
           "permissions": "Organisatiebeheerders en financiële beheerders beheren deze afspraken.",
-          "limits": "App-support is inbegrepen in de infrastructuurretainer. Consultantdagen worden afzonderlijk afgesproken en niet automatisch naar supporturen omgerekend.",
+          "limits": "De MSP bevestigt eerst uren, tarieven en contractjaar. Centafrondingen worden over twaalf maanden verdeeld. Maandfacturen schrijven het jaarbudget niet opnieuw bij. Consultantdagen worden apart afgesproken.",
           "example": "Vraag het basispakket aan en bespreek de gewenste platforminrichting met je MSP."
         },
         "en": {
@@ -14641,10 +14643,10 @@ window.SynthPulseFeatureCatalog = {
             "Open My MSP and choose Overview & hours.",
             "Review Base package under Base package + Agentic Consultant. Its status comes from your customer contract or package request.",
             "If there is no active package, choose Request base package. Follow the resulting ticket in Tickets.",
-            "Your MSP confirms scope, price and start date. App support is included in the infrastructure retainer; consultant capacity is additional."
+            "View one annual budget for infrastructure, app hour bundles, automations and custom work."
           ],
           "permissions": "Organisation and billing administrators manage these agreements.",
-          "limits": "App support is included in the infrastructure retainer. Consultant days are agreed separately and are not automatically converted to support hours.",
+          "limits": "Your MSP first confirms hours, prices and contract year. Cent rounding is spread over twelve months. Monthly invoices never credit the annual budget again. Consultant days are agreed separately.",
           "example": "Request the base package and discuss your preferred platform setup with your MSP."
         }
       }
@@ -14681,7 +14683,7 @@ window.SynthPulseFeatureCatalog = {
             "Vraag een ander aantal dagen aan om te wijzigen, of kies Opzegging consultant aanvragen. Tot bevestiging blijft je huidige afspraak staan."
           ],
           "permissions": "Organisatiebeheerders en financiële beheerders kunnen inzet aanvragen en wijzigen.",
-          "limits": "App-support is inbegrepen in de infrastructuurretainer. Consultantdagen worden afzonderlijk afgesproken en niet automatisch naar supporturen omgerekend.",
+          "limits": "De MSP bevestigt eerst uren, tarieven en contractjaar. Centafrondingen worden over twaalf maanden verdeeld. Maandfacturen schrijven het jaarbudget niet opnieuw bij. Consultantdagen worden apart afgesproken.",
           "example": "Vraag 2 dagen Agentic Consultant per week aan naast je basispakket."
         },
         "en": {
@@ -14696,7 +14698,7 @@ window.SynthPulseFeatureCatalog = {
             "Request another number of days to change capacity, or choose Request consultant cancellation. Existing terms remain until confirmed."
           ],
           "permissions": "Organisation and billing administrators can request and change capacity.",
-          "limits": "App support is included in the infrastructure retainer. Consultant days are agreed separately and are not automatically converted to support hours.",
+          "limits": "Your MSP first confirms hours, prices and contract year. Cent rounding is spread over twelve months. Monthly invoices never credit the annual budget again. Consultant days are agreed separately.",
           "example": "Request 2 days of Agentic Consultant capacity per week alongside the base package."
         }
       }
@@ -14720,32 +14722,81 @@ window.SynthPulseFeatureCatalog = {
       "related": [],
       "locales": {
         "nl": {
-          "title": "Scheduled jobs: uren en jaarlijks support",
-          "purpose": "Leg realisatie-uren en het afgesproken uurtarief vast per scheduled job.",
-          "when": "Voor inzicht in de waarde van automatiseringen en jaarlijks onderhoud.",
+          "title": "Automations: realisatie en jaarlijkse supporturen",
+          "purpose": "Gebruik realisatie-uren als basis voor een supportvoorstel per automation.",
+          "when": "Bij het opnemen van gebouwd werk in een jaarlijkse supportafspraak.",
           "steps": [
-            "Open Scheduled tasks en selecteer de taak in het eigen profiel.",
-            "Vul onder Realisatie en supportkosten de uren en het uurtarief in. Laat het tarief leeg zolang dit nog niet is afgesproken.",
-            "Sla op. De jaarlijkse supportberekening is 15% van uren × uurtarief.",
-            "Open Mijn MSP, Overzicht & uren voor de som van alle geregistreerde jobs van deze installatie."
+            "Open Scheduled tasks en selecteer een taak.",
+            "Leg de realisatie-uren en het afgesproken uurtarief vast. Laat een onbekend tarief leeg.",
+            "Bekijk het supportvoorstel: 15% van realisatie-uren en jobbedrag per jaar. Uren worden afgerond op minuten.",
+            "Sla op en bekijk het voorstel bij Mijn MSP.",
+            "Je MSP neemt de afgesproken supporturen en prijs over in de jaarafspraak."
           ],
-          "permissions": "Organisatiebeheerders en financiële beheerders kunnen bedragen vastleggen voor zichtbare jobs.",
-          "limits": "Het percentage geldt per jaar, niet per uitvoering. Opslaan maakt geen factuur of extra supporturenbundel. Bedragen zonder tarief tellen nog niet mee. Wijzigen vervangt de urenregistratie en telt deze niet dubbel.",
-          "example": "10 uur × €100 = €1.000 jobbedrag en €150 jaarlijks support."
+          "permissions": "Organisatiebeheerders en financiële beheerders registreren zichtbare taken.",
+          "limits": "Realisatie-uren zijn geen beschikbare supporturen. Het voorstel wordt niet per uitvoering berekend en activeert geen afspraak, factuur of incasso. Wijzigen telt de registratie niet dubbel.",
+          "example": "10 uur realisatie geeft een voorstel van 1,5 supportuur per jaar."
         },
         "en": {
-          "title": "Scheduled jobs: hours and annual support",
-          "purpose": "Record implementation hours and the agreed hourly rate for each scheduled job.",
-          "when": "To understand automation value and annual maintenance.",
+          "title": "Automations: implementation and annual support hours",
+          "purpose": "Use implementation hours to propose annual support for each automation.",
+          "when": "When including built work in an annual support agreement.",
           "steps": [
-            "Open Scheduled tasks and select the job in its owning profile.",
-            "Under Implementation and support costs, enter hours and hourly rate. Leave the rate empty until agreed.",
-            "Save. Annual support is 15% of hours × hourly rate.",
-            "Open My MSP, Overview & hours for the sum of registered jobs on this installation."
+            "Open Scheduled tasks and select a job.",
+            "Record implementation hours and agreed hourly rate. Leave an unknown rate empty.",
+            "Review the proposal: 15% of implementation hours and job value per year. Hours are rounded to minutes.",
+            "Save and review the proposal in My MSP.",
+            "Your MSP includes agreed support hours and price in the annual agreement."
           ],
-          "permissions": "Organisation and billing administrators can record amounts for visible jobs.",
-          "limits": "The percentage applies annually, not per run. Saving creates no invoice or support allowance. Unpriced jobs are excluded from monetary totals. Editing replaces the record without double counting.",
-          "example": "10 hours × €100 = €1,000 job value and €150 annual support."
+          "permissions": "Organisation and billing administrators can record visible jobs.",
+          "limits": "Implementation hours are not available support hours. Proposals are annual, not per run, and activate no agreement, invoice or collection. Editing replaces the registration without double counting.",
+          "example": "10 implementation hours propose 1.5 support hours per year."
+        }
+      }
+    },
+    {
+      "id": "webui.msp.annual-support",
+      "area": "msp",
+      "status": "conditional",
+      "conditions": [
+        "Connected MSP and administrator access"
+      ],
+      "anchors": [
+        "#mspAnnualSupport"
+      ],
+      "source_refs": [
+        "static/msp.js"
+      ],
+      "related": [],
+      "locales": {
+        "nl": {
+          "title": "Jaarlijkse supporturen en maandfactuur",
+          "purpose": "Bekijk één jaarbudget voor basisinfrastructuur, app-strippenkaarten, automations en maatwerk.",
+          "when": "Als je wilt weten hoeveel supporturen je hebt en wat je per maand betaalt.",
+          "steps": [
+            "Open Mijn MSP en kies Overzicht & uren.",
+            "Bekijk Jaarlijkse supporturen en het contractjaar. Een concept telt nog niet als beschikbare uren.",
+            "Lees per onderdeel de jaarlijkse uren, het supportniveau en het jaarbedrag.",
+            "Open Maandelijkse factuurverdeling voor de twaalf termijnen.",
+            "Bekijk Betalingen voor het factuurnummer en een beschikbare betaallink."
+          ],
+          "permissions": "Organisatiebeheerders en financiële beheerders zien de jaarafspraken.",
+          "limits": "De MSP bevestigt eerst uren, tarieven en contractjaar. Centafrondingen worden over twaalf maanden verdeeld. Maandfacturen schrijven het jaarbudget niet opnieuw bij. Consultantdagen worden apart afgesproken.",
+          "example": "24 uur infrastructuur + 10 uur app-support + 4 uur automation-support = 38 supporturen per jaar, maandelijks betaald."
+        },
+        "en": {
+          "title": "Annual support hours and monthly invoice",
+          "purpose": "View one annual budget for infrastructure, app hour bundles, automations and custom work.",
+          "when": "To understand available annual support hours and monthly payment.",
+          "steps": [
+            "Open My MSP and choose Overview & hours.",
+            "Review Annual support hours and the contract year. Drafts do not grant available hours.",
+            "Read each component annual hours, support level and amount.",
+            "Open Monthly invoice schedule to see all twelve installments.",
+            "Open Payments for the invoice reference and an available checkout link."
+          ],
+          "permissions": "Organisation and billing administrators see annual agreements.",
+          "limits": "Your MSP first confirms hours, prices and contract year. Cent rounding is spread over twelve months. Monthly invoices never credit the annual budget again. Consultant days are agreed separately.",
+          "example": "24 infrastructure hours + 10 app-support hours + 4 automation-support hours = 38 annual support hours, paid monthly."
         }
       }
     }

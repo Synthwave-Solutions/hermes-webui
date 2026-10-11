@@ -3354,32 +3354,32 @@ window.SynthPulseMspFeatureCatalog = {
       ],
       "locales": {
         "nl": {
-          "title": "App-support binnen de basisretainer",
-          "purpose": "Beheer per app het supportniveau binnen de totale basisretainer voor infrastructuur.",
-          "when": "Bij het afspreken of wijzigen van app-support.",
+          "title": "Supportstrippenkaart per app",
+          "purpose": "Vraag een supportniveau aan voor een beheerde app en neem de uren op in de jaarafspraak.",
+          "when": "Als je app-support wilt toevoegen of wijzigen.",
           "steps": [
-            "Open App-support in HQ.",
-            "Kies de app en het niveau. Leg de naam en dekkingsafspraken vast zonder afzonderlijk tarief.",
-            "Bekijk de aanvraag en bevestig klantakkoord en een actief klantcontract.",
-            "Activeer het afgesproken niveau binnen de infrastructuurretainer."
+            "Open App-support en leg de niveaus en dekking vast.",
+            "Beoordeel een klantaanvraag en bevestig klantakkoord.",
+            "Leg de jaaruren en jaarprijs per app vast bij Jaaruren.",
+            "Activeer de geaccepteerde jaarafspraak en zet alle onderdelen samen op één maandfactuur."
           ],
-          "permissions": "Organisatiebeheerders en financiële beheerders beheren de aanvragen.",
-          "limits": "App-support heeft geen apart maandtarief. Het niveau bepaalt de afgesproken dekking; een naam alleen belooft geen reactietijd. Aanvragen schrijft geen geld af.",
-          "example": "Vraag Plus-support voor Documenten aan binnen je basisretainer."
+          "permissions": "Organisatiebeheerders en financiële beheerders beheren app-supportaanvragen.",
+          "limits": "Een aanvraag verleent nog geen uren en schrijft geen geld af. Uitschakelen van een app beëindigt de supportafspraak niet. Een niveaunaam alleen belooft geen reactietijd.",
+          "example": "Neem 10 jaarlijkse supporturen voor Documenten op naast 24 infrastructuururen."
         },
         "en": {
-          "title": "App support within the base retainer",
-          "purpose": "Manage each app support level within the total infrastructure base retainer.",
-          "when": "When agreeing or changing app support.",
+          "title": "Annual support bundle per app",
+          "purpose": "Request a managed-app support level and include its hours in the annual agreement.",
+          "when": "When adding or changing app support.",
           "steps": [
-            "Open App support in HQ.",
-            "Choose the app and level. Record its name and coverage without a separate rate.",
-            "Review the request and confirm customer acceptance and an active customer contract.",
-            "Activate the agreed level within the infrastructure retainer."
+            "Open App support and record levels and coverage.",
+            "Review a customer request and confirm acceptance.",
+            "Record annual hours and price per app in Annual hours.",
+            "Activate accepted annual terms and combine all components on one monthly invoice."
           ],
-          "permissions": "Organisation and billing administrators manage requests.",
-          "limits": "App support has no separate monthly price. A tier name alone promises no response time. Requests collect no money.",
-          "example": "Request Plus support for Documents within your base retainer."
+          "permissions": "Organisation and billing administrators manage app-support requests.",
+          "limits": "Requests grant no hours and collect no money. Disabling an app does not cancel its support agreement. A tier name alone promises no response time.",
+          "example": "Include 10 annual Documents support hours alongside 24 infrastructure hours."
         }
       }
     },
@@ -3412,7 +3412,7 @@ window.SynthPulseMspFeatureCatalog = {
             "Verwerk wijzigingen of opzeggingen afzonderlijk."
           ],
           "permissions": "MSP-beheerders wijzigen afspraken; operators kunnen lezen.",
-          "limits": "App-support valt binnen de basisretainer voor infrastructuur. Consultantdagen worden afzonderlijk afgesproken; activering reserveert geen agenda.",
+          "limits": "De MSP bevestigt eerst uren, tarieven en contractjaar. Centafrondingen worden over twaalf maanden verdeeld. Maandfacturen schrijven het jaarbudget niet opnieuw bij. Consultantdagen worden apart afgesproken.",
           "example": "Vraag 2 dagen Agentic Consultant per week aan naast je basispakket."
         },
         "en": {
@@ -3426,7 +3426,7 @@ window.SynthPulseMspFeatureCatalog = {
             "Process changes or cancellations separately."
           ],
           "permissions": "MSP administrators change agreements; operators can read.",
-          "limits": "App support is included in the infrastructure base retainer. Consultant days are agreed separately; activation reserves no calendar.",
+          "limits": "Your MSP first confirms hours, prices and contract year. Cent rounding is spread over twelve months. Monthly invoices never credit the annual budget again. Consultant days are agreed separately.",
           "example": "Request 2 days of Agentic Consultant capacity per week alongside the base package."
         }
       }
@@ -3476,6 +3476,55 @@ window.SynthPulseMspFeatureCatalog = {
           "permissions": "Operators read status; HQ administrators start releases and promotions.",
           "limits": "Only configured adapters can deploy. Test and Acceptance use isolated files and synthetic data. Code rollback does not reverse data migrations; database restoration requires separate review. Interrupted workers require inspection of actual host state.",
           "example": "Promote the same commit through D, T and A to P."
+        }
+      }
+    },
+    {
+      "id": "msp.annual-support",
+      "area": "commercial",
+      "status": "conditional",
+      "conditions": [
+        "Connected MSP and administrator access"
+      ],
+      "anchors": [
+        "/cockpit/annual-support"
+      ],
+      "source_refs": [
+        "apps/cockpit/frontend/src/pages/AnnualSupportPage.jsx"
+      ],
+      "related": [],
+      "locales": {
+        "nl": {
+          "title": "Jaarlijkse supporturen en maandfactuur",
+          "purpose": "Bekijk één jaarbudget voor basisinfrastructuur, app-strippenkaarten, automations en maatwerk.",
+          "when": "Als je wilt weten hoeveel supporturen je hebt en wat je per maand betaalt.",
+          "steps": [
+            "Open Jaaruren in HQ.",
+            "Kies de klant en de eerste maand van het contractjaar.",
+            "Voeg de basisinfrastructuur, beheerde apps en automations/maatwerk toe met jaaruren en jaarbedragen.",
+            "Sla het concept op. Bevestig klantakkoord en activeer de jaarafspraak tijdens het contractjaar.",
+            "Open Twaalf maandtermijnen en zet de gezamenlijke maandfactuur klaar.",
+            "Maak de factuur in de boekhouding en registreer het nummer bij Betalingen."
+          ],
+          "permissions": "Operators lezen; HQ-beheerders leggen afspraken vast, activeren en zetten facturen klaar.",
+          "limits": "De MSP bevestigt eerst uren, tarieven en contractjaar. Centafrondingen worden over twaalf maanden verdeeld. Maandfacturen schrijven het jaarbudget niet opnieuw bij. Consultantdagen worden apart afgesproken.",
+          "example": "24 uur infrastructuur + 10 uur app-support + 4 uur automation-support = 38 supporturen per jaar, maandelijks betaald."
+        },
+        "en": {
+          "title": "Annual support hours and monthly invoice",
+          "purpose": "View one annual budget for infrastructure, app hour bundles, automations and custom work.",
+          "when": "To understand available annual support hours and monthly payment.",
+          "steps": [
+            "Open Annual hours in HQ.",
+            "Choose the customer and first contract-year month.",
+            "Add infrastructure, managed apps and automation/custom-work lines with annual hours and amounts.",
+            "Save the draft. Confirm customer acceptance and activate during the contract year.",
+            "Open Twelve monthly installments and prepare the consolidated monthly invoice.",
+            "Issue the invoice in accounting and record its reference in Payments."
+          ],
+          "permissions": "Operators read; HQ administrators save and activate agreements and prepare invoices.",
+          "limits": "Your MSP first confirms hours, prices and contract year. Cent rounding is spread over twelve months. Monthly invoices never credit the annual budget again. Consultant days are agreed separately.",
+          "example": "24 infrastructure hours + 10 app-support hours + 4 automation-support hours = 38 annual support hours, paid monthly."
         }
       }
     },

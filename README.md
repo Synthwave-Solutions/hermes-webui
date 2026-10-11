@@ -883,3 +883,5 @@ reported rather than replayed. Rollback: wait for active chats to finish, revert
 the delegation changes, and restart the WebUI; retain the queue for diagnosis.
 
 MSP administrators can record implementation hours and agreed hourly rates on each scheduled task. My MSP totals these hours and shows annual support at 15% of job value; recording costs does not create an invoice. App-support levels are included in the infrastructure base retainer.
+
+See [annual MSP support hours](docs/msp-annual-support.md) for annual support budgets and monthly invoicing.

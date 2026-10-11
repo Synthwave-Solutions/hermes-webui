@@ -2563,6 +2563,19 @@
       "nl": "Kies Overzicht & uren. Uren invoeren doe je bij de betreffende scheduled task.",
       "en": "Choose Overview & hours. Enter hours on the scheduled task itself."
     }
+  },
+  "webui.msp.annual-support": {
+    "panel": "msp",
+    "targets": [
+      "#mspAnnualSupport"
+    ],
+    "entryTargets": [
+      "#mspOverviewTab"
+    ],
+    "entryHint": {
+      "nl": "Kies Overzicht & uren.",
+      "en": "Choose Overview & hours."
+    }
   }
 };
   for (const entry of Object.values(entries)) {
