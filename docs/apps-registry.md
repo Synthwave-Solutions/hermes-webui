@@ -85,3 +85,14 @@ working legacy link. Other Craft editors do not suppress the OpenDesign entry.
 
 No new persistent state, permission, background process or outbound request is
 introduced. Configuration remains owned by the deployment environment.
+
+## Browser verification
+
+The committed `scripts/e2e/server_fixture.py` seeds all 25 apps with synthetic
+HTTPS addresses, two unconfigured destinations and separate platform,
+organisation-admin and member identities. Browser networking remains restricted
+to loopback. Run `scripts/e2e/run_full.py --engine <engine-checkout>` with
+`--grep 'Apps directory|every app has|organisation admin modules|member module boundary|platform launcher'`
+to exercise Apps and module navigation, role gates, NL/EN copy, viewport widths,
+loading failures, restored filters and drafts, and every app spotlight. The
+runner creates private test state and stops its fixture processes on exit.

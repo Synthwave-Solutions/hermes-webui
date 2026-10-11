@@ -24,11 +24,11 @@ test.describe('organisation admin modules',()=>{
   await page.evaluate(()=>switchPanel('chat'));await expect(page.locator('#msg')).toHaveValue('QA modules draft remains unchanged');
   const r=await api(page,'/api/org/modules/request',{module:'notebook'});expect(r.status).toBe(503);expect(r.body.error).toBe('requests_not_connected');
  });
- test('launcher keyboard, allowed links and role-scoped workflow tile',async({page})=>{
-  await open(page);await ready(page);await page.locator('#btnApps').focus();await page.keyboard.press('Enter');await expect(page.getByRole('dialog',{name:'Apps'})).toBeVisible();
-  await expect(page.locator('#appsPopover a')).toHaveCount(1);await expect(page.locator('#appsPopover a')).toHaveAttribute('href','https://design.example.test');await expect(page.locator('#appsPopover a')).toHaveAttribute('rel','noopener noreferrer');
-  for(let i=0;i<8;i++)await page.keyboard.press('Tab');expect(await page.locator('#appsPopover').evaluate(e=>e.contains(document.activeElement))).toBe(true);
-  await page.keyboard.press('Escape');await expect(page.locator('#appsPopover')).toHaveCount(0);await expect(page.locator('#btnApps')).toBeFocused();
+ test('Apps is a keyboard accessible navigation destination with role scoped links',async({page})=>{
+  await open(page);await ready(page);await page.locator('#btnApps').focus();await page.keyboard.press('Enter');await expect(page.locator('#mainApps')).toBeVisible();
+  const links=page.locator('#mainApps a');expect(await links.count()).toBeGreaterThan(0);
+  await expect(page.locator('[data-app-id="omniroute"]')).toHaveCount(0);await expect(page.locator('[data-app-id="n8n"]')).toHaveCount(0);
+  for(const link of await links.all()){await expect(link).toHaveAttribute('rel','noopener noreferrer');await expect(link).toHaveAttribute('target','_blank');}
  });
  test('failed settings fetch keeps module surfaces hidden',async({page})=>{
   await page.route('**/api/settings',route=>route.abort());await open(page);await expect(page.locator('#btnApps')).toBeHidden();await expect(page.locator('.rail-btn[data-panel="modules"]')).toBeHidden();
@@ -48,7 +48,7 @@ test.describe('platform launcher',()=>{
  test.use({user:'admin'});
  test('platform scope sees workflow app while server settings cannot activate modules',async({page})=>{
   await open(page);await ready(page);const before=await api(page,'/api/settings');
-  expect((await api(page,'/api/apps')).body.apps.map((x:any)=>x.module)).toEqual(['design_studio','workflows']);
+  expect((await api(page,'/api/apps')).body.apps.map((x:any)=>x.id)).toContain('n8n');
   const write=await api(page,'/api/settings',{enabled_modules:['notebook'],module_nav:{modules_visible:true},enabled_connections:['minutes_to_chat']});expect(write.status).toBe(200);
   const after=await api(page,'/api/settings');expect(after.body.enabled_modules).toEqual(before.body.enabled_modules);expect(after.body.enabled_connections).toEqual(before.body.enabled_connections);
  });

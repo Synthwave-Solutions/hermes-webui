@@ -60,3 +60,9 @@ Personal memory is an eighth daily-use area after My approvals. It requires
 chat:use, matching the private memory API. It does not require or grant access
 to shared memory administration, logs or governance. Existing admin navigation
 remains unchanged.
+
+Apps is a separate navigation destination for authenticated members and admins.
+It is independent of the Modules overview: the backend returns only permitted
+links, and unavailable settings keep the destination hidden. The default member
+order places Apps directly after Chat. Desktop and mobile share the same gate.
+Opening an app uses a new browser tab and does not change the current chat draft.

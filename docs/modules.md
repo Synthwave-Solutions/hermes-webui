@@ -1,13 +1,22 @@
 # Apps and local module overview
 
-Apps opens configured module links in a new tab. A signed-in person sees only
-active modules with valid links. Each target app still checks its own identity
-and permissions. With no valid links, the launcher shows an explicit empty state.
+Apps is a dedicated primary navigation section on desktop and mobile. It groups
+configured destinations by purpose, with name/description search (including the
+OmniRouter alias), category filtering, independent Dutch/English copy, and an
+interactive guide for each named app. Apps open in a new tab; each destination
+still checks its own identity and permissions. Missing browser addresses appear
+without an Open action. A configured link does not claim that a service is healthy.
 
+The named stack directory uses `SP_APP_LINKS`; see [Apps registry](apps-registry.md)
+for identities, URL validation and role gates. Platform administrators can see the
+installed stack regardless of module discovery state. Ordinary users still need
+the matching active module and app access. Legacy module links remain supported.
+The directory handles loading, retry, empty and no-result states and clears loaded
+app data if settings or access are unavailable.
 Modules is a read-only view for organisation, billing and platform administrators
 on an organisation installation. It is hidden at headquarters and unavailable to
 members or department administrators. The catalogue has four Standard and six
-Advanced entries, including office apps. The screen, launcher and feature guide
+Advanced entries, including office apps. The screen, Apps directory and feature guide
 have independent Dutch and English explanations.
 
 The local resolver reads only `SP_ENABLED_MODULES`. Empty, malformed or unavailable
@@ -32,4 +41,4 @@ must still check runtime prerequisites and actual consent before acting.
 The backend applies module gates after authentication and governance. Client
 visibility never grants access. Module-derived settings are discarded on settings
 writes. A failed settings fetch keeps module surfaces hidden. Existing chat drafts
-are not changed by viewing the launcher or catalogue.
+are not changed by viewing Apps or the module catalogue.

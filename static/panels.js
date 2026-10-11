@@ -52,11 +52,11 @@ let _logsSeverityFilter = 'all';
 
 // Map of panel names → i18n keys for the app titlebar label.
 const APP_TITLEBAR_KEYS = {
-  modules: 'modules_title', approvals: 'tab_approvals', chat: 'tab_chat', tasks: 'tab_tasks', skills: 'tab_skills',
+  apps: 'tab_apps', modules: 'modules_title', approvals: 'tab_approvals', chat: 'tab_chat', tasks: 'tab_tasks', skills: 'tab_skills',
   memory: 'tab_memory', workspaces: 'tab_workspaces',
   profiles: 'tab_profiles', todos: 'tab_todos', insights: 'tab_insights', logs: 'tab_logs', governance: 'tab_governance', integrations: 'tab_integrations', projects: 'tab_projects', settings: 'tab_settings',
 };
-const MAIN_VIEW_PANELS = ['modules','approvals','settings','skills','memory','tasks','kanban','workspaces','profiles','insights','logs','governance','integrations','projects','plugin'];
+const MAIN_VIEW_PANELS = ['apps','modules','approvals','settings','skills','memory','tasks','kanban','workspaces','profiles','insights','logs','governance','integrations','projects','plugin'];
 const MAIN_VIEW_SIDEBAR_PANEL_FALLBACKS = { plugin: 'settings' };
 
 /**
@@ -427,6 +427,7 @@ async function switchPanel(name, opts = {}) {
       mainEl.classList.toggle('showing-' + p, nextPanel === p);
     });
   }
+  if (nextPanel === 'apps' && window.SynthPulseApps) await window.SynthPulseApps.load();
   if (nextPanel === 'modules' && window.SynthPulseModules) await window.SynthPulseModules.load();
   // Lazy-load panel data
   if (nextPanel === 'tasks') await loadCrons();
@@ -452,7 +453,7 @@ async function switchPanel(name, opts = {}) {
   }
   if (opts.fromRailClick && typeof _isDesktopWidth === 'function' && !_isDesktopWidth()) {
     const sidebar = document.querySelector('.sidebar');
-    if (['chat', 'governance', 'integrations', 'approvals', 'modules'].includes(nextPanel)) {
+    if (['chat', 'governance', 'integrations', 'approvals', 'modules', 'apps'].includes(nextPanel)) {
       _closeMobileSidebarAfterPanelSelection();
     } else if (sidebar) {
       sidebar.classList.remove('mobile-session-page');
@@ -8934,7 +8935,7 @@ window._navAudience = 'member';
 window._capabilityNavigation = false;
 // Navigation order agreed with Michaël (20 Sep 2026): daily work first, then
 // admin surfaces. Also the default order of the markup in index.html.
-const _MEMBER_NAV_ORDER = ['modules','tasks', 'skills', 'projects', 'profiles', 'memory', 'integrations', 'workspaces', 'files', 'todos', 'insights', 'approvals', 'governance', 'logs'];
+const _MEMBER_NAV_ORDER = ['apps','modules','tasks', 'skills', 'projects', 'profiles', 'memory', 'integrations', 'workspaces', 'files', 'todos', 'insights', 'approvals', 'governance', 'logs'];
 function _canUseFeature(permission){
   const me=window.__GOV_ME__;
   if(!me)return false;

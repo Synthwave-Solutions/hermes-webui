@@ -47,6 +47,8 @@ const SHELL_ASSETS = [
   './static/sp-picker.js' + VQ,
   './static/panels.js' + VQ,
   './static/module-content.js' + VQ,
+  './static/apps.js' + VQ,
+  './static/apps.css' + VQ,
   './static/modules.js' + VQ,
   './static/modules.css' + VQ,
   './static/commands.js' + VQ,

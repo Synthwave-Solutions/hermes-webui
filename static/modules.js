@@ -1,8 +1,7 @@
 /* Read-only installation modules. The server is the permission boundary. */
 (function () {
   'use strict';
-  let language = '', generation = 0, modulesAllowed = false, moduleRows = null, apps = [];
-  let popover = null, fetching = null;
+  let language = '', generation = 0, modulesAllowed = false, moduleRows = null;
   const byId = id => document.getElementById(id);
   function lang() {
     if (language) return language;
@@ -15,13 +14,12 @@
   function languagePicker() {
     const label=el('label',content().ui.language+' ', 'module-language'); const select=el('select'); select.setAttribute('aria-label',content().ui.language);
     for(const [value,name] of [['nl','Nederlands'],['en','English']]) {const o=el('option',name);o.value=value;select.append(o);}
-    select.value=lang(); select.addEventListener('change',()=>{const inApps=!!popover?.contains(select);language=select.value;try{localStorage.setItem('sp-modules-language',language);}catch(_){}render();if(popover)renderApps();(inApps?popover:byId('mainModules'))?.querySelector('select')?.focus();});label.append(select);return label;
+    select.value=lang(); select.addEventListener('change',()=>{language=select.value;try{localStorage.setItem('sp-modules-language',language);}catch(_){}render();byId('mainModules')?.querySelector('select')?.focus();});label.append(select);return label;
   }
-  function closeApps(focus=false) { if(popover){popover.remove();popover=null;} const b=byId('btnApps');if(b){b.setAttribute('aria-expanded','false');if(focus)b.focus();} }
   function hide() {
-    modulesAllowed=false; moduleRows=null;apps=[];closeApps();
+    modulesAllowed=false; moduleRows=null;window.SynthPulseApps?.applyVisible(false);
     document.querySelectorAll('[data-module-gated]').forEach(n=>{n.hidden=true;});
-    window._moduleHiddenNav=['modules','knowledge','meetings'];
+    window._moduleHiddenNav=['apps','modules','knowledge','meetings'];
     const main=byId('mainModules');if(main)main.replaceChildren();
   }
   function apply(settings) {
@@ -29,9 +27,10 @@
     const nav=settings && settings.module_nav;
     if(!nav || !Array.isArray(nav.hidden_panels) || !Array.isArray(settings.enabled_modules))return;
     modulesAllowed=nav.modules_visible===true;
-    window._moduleHiddenNav=nav.hidden_panels.concat(modulesAllowed?[]:['modules']);
+    window._moduleHiddenNav=nav.hidden_panels.concat(modulesAllowed?[]:['modules'],nav.apps_visible===true?[]:['apps']);
+    window.SynthPulseApps?.applyVisible(nav.apps_visible===true);
     document.querySelectorAll('[data-module-gated]').forEach(n=>{
-      if(n.id==='btnApps')n.hidden=nav.apps_visible!==true;
+      if(n.dataset.panel==='apps')n.hidden=nav.apps_visible!==true;
       else if(n.dataset.panel==='modules')n.hidden=!modulesAllowed;
       else if(n.dataset.module)n.hidden=!settings.enabled_modules.includes(n.dataset.module);
       else if(n.dataset.panel)n.hidden=window._moduleHiddenNav.includes(n.dataset.panel);
@@ -77,22 +76,7 @@
     try {const result=await api('/api/org/modules');if(mine!==generation||!modulesAllowed)return false;moduleRows=Array.isArray(result.modules)?result.modules:[];render();return true;}
     catch(_){if(mine===generation){moduleRows=null;render();}return false;}
   }
-  function renderApps() {
-    if(!popover)return;const c=content();popover.replaceChildren();const head=el('div',null,'modules-heading');head.append(el('h2',c.ui.apps),button(c.ui.close,()=>closeApps(true)));popover.append(head,languagePicker());
-    const list=el('div',null,'app-links');
-    apps.forEach(app=>{let u;try{u=new URL(app.url);}catch(_){return;}if(u.protocol!=='https:'||u.username||u.password)return;
-      const a=el('a',(app.name||{})[lang()]||(app.name||{}).en||'');a.href=app.url;a.target='_blank';a.rel='noopener noreferrer';list.append(a);});
-    popover.append(list.children.length?list:el('p',c.ui.empty));
-  }
-  async function openApps() {
-    if(popover){closeApps(true);return;}if(fetching)return;
-    const mine=generation;const b=byId('btnApps');if(!b||b.hidden)return;
-    fetching=api('/api/apps');
-    try {const result=await fetching;if(mine!==generation||b.hidden)return;apps=Array.isArray(result.apps)?result.apps:[];popover=el('div',null,'apps-popover');popover.id='appsPopover';popover.setAttribute('role','dialog');popover.setAttribute('aria-label',content().ui.apps);document.body.append(popover);renderApps();b.setAttribute('aria-expanded','true');popover.querySelector('button').focus();}
-    catch(_){if(typeof toast==='function')toast(content().ui.error);}finally{fetching=null;}
-  }
-  document.addEventListener('keydown',e=>{if(!popover)return;if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();closeApps(true);}else if(e.key==='Tab'){const nodes=[...popover.querySelectorAll('a,button,select')];const first=nodes[0],last=nodes[nodes.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}},true);
-  document.addEventListener('pointerdown',e=>{if(popover&&!popover.contains(e.target)&&!byId('btnApps').contains(e.target))closeApps();});
+  function openApps(){return switchPanel('apps');}
   window.SynthPulseModules={apply,refresh,load,canOpen:name=>!window._moduleHiddenNav?.includes(name),openApps};
-  document.addEventListener('DOMContentLoaded',()=>{byId('btnApps')?.addEventListener('click',openApps);refresh();});
+  document.addEventListener('DOMContentLoaded',refresh);
 })();

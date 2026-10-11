@@ -3,7 +3,13 @@ import json
 from types import SimpleNamespace
 import pytest
 from api import apps_launcher, modules
-from tests.test_org_api_read import home, write_policy, caller, _Handler, PLATFORM, NOBODY
+from tests import test_org_api_read as org_fixture
+from tests.test_org_api_read import _Handler, PLATFORM, NOBODY
+
+# Register shared pytest fixtures without shadowing imported names in tests.
+home = org_fixture.home
+write_policy = org_fixture.write_policy
+caller = org_fixture.caller
 
 
 @pytest.mark.parametrize('url',[

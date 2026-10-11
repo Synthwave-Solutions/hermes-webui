@@ -1,0 +1,15 @@
+main.main.showing-apps>#mainChat{display:none!important}
+main.main.showing-apps>#mainApps{display:block;overflow:auto}
+#mainApps{padding:28px;min-width:0;color:var(--text)}
+.apps-heading{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.apps-heading h1{font-size:24px;margin:0 auto 0 0}
+.apps-intro,.apps-sidebar{color:var(--muted);line-height:1.6}.apps-intro{max-width:78ch}.apps-sidebar{padding:16px;font-size:13px}
+.apps-toolbar{display:flex;gap:16px;margin-top:24px;flex-wrap:wrap}.apps-toolbar label{display:flex;flex-direction:column;gap:8px;font-size:13px;font-weight:600}.apps-toolbar label:first-child{flex:1;min-width:min(100%,220px)}
+#mainApps input,#mainApps select,.app-button{font:inherit;color:var(--text);background:var(--surface);border:1px solid var(--border);padding:10px 12px;border-radius:8px;min-height:40px;box-sizing:border-box}
+#mainApps input{width:100%}.app-button{cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}.app-button:hover{background:var(--hover-bg)}
+.apps-count{font-size:12px;color:var(--muted);margin:14px 0}.apps-group{margin:24px 0 32px}.apps-group h2{font-size:17px;margin:0 0 14px}
+.apps-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,270px),1fr));gap:14px}.app-card{border:1px solid var(--border);border-radius:12px;padding:18px;display:flex;flex-direction:column;min-width:0;background:var(--surface);overflow-wrap:anywhere}
+.app-card-heading{display:flex;gap:10px;align-items:center;justify-content:space-between}.app-card h3{font-size:16px;margin:0}.app-badge{font-size:11px;color:var(--muted);border:1px solid var(--border);border-radius:20px;padding:3px 7px}.app-description{font-size:14px;line-height:1.55;color:var(--muted);margin:12px 0 20px}.app-actions{display:flex;gap:8px;margin-top:auto;flex-wrap:wrap}.app-open{color:var(--accent);font-weight:600}.app-unconfigured{font-size:13px;color:var(--muted);margin:0 0 14px}
+#mainApps :focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+@media(max-width:640px){#mainApps{padding:18px}.apps-toolbar{gap:12px}.apps-toolbar label{width:100%}.apps-heading h1{width:100%}.app-button{min-height:44px}}
+
+#mainApps .apps-heading select{width:auto;max-width:100%}.app-card h3{color:var(--text)}
