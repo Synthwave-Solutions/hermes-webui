@@ -3361,7 +3361,7 @@ window.SynthPulseMspFeatureCatalog = {
             "Open App-support en leg de niveaus en dekking vast.",
             "Beoordeel een klantaanvraag en bevestig klantakkoord.",
             "Leg de jaaruren en jaarprijs per app vast bij Jaaruren.",
-            "Activeer de geaccepteerde jaarafspraak en zet alle onderdelen samen op één maandfactuur."
+            "Activeer de geaccepteerde jaarafspraak en zet alle onderdelen samen op één gezamenlijke factuur volgens de afgesproken betaalwijze."
           ],
           "permissions": "Organisatiebeheerders en financiële beheerders beheren app-supportaanvragen.",
           "limits": "Een aanvraag verleent nog geen uren en schrijft geen geld af. Uitschakelen van een app beëindigt de supportafspraak niet. Een niveaunaam alleen belooft geen reactietijd.",
@@ -3375,7 +3375,7 @@ window.SynthPulseMspFeatureCatalog = {
             "Open App support and record levels and coverage.",
             "Review a customer request and confirm acceptance.",
             "Record annual hours and price per app in Annual hours.",
-            "Activate accepted annual terms and combine all components on one monthly invoice."
+            "Activate accepted annual terms and combine all components on one consolidated invoice at the agreed payment frequency."
           ],
           "permissions": "Organisation and billing administrators manage app-support requests.",
           "limits": "Requests grant no hours and collect no money. Disabling an app does not cancel its support agreement. A tier name alone promises no response time.",
@@ -3495,36 +3495,38 @@ window.SynthPulseMspFeatureCatalog = {
       "related": [],
       "locales": {
         "nl": {
-          "title": "Jaarlijkse supporturen en maandfactuur",
+          "title": "Jaarlijkse supporturen en betaalkeuze",
           "purpose": "Bekijk één jaarbudget voor basisinfrastructuur, app-strippenkaarten, automations en maatwerk.",
-          "when": "Als je wilt weten hoeveel supporturen je hebt en wat je per maand betaalt.",
+          "when": "Als je de jaarcap en het verschil tussen maandbetaling en jaarbetaling wilt bekijken.",
           "steps": [
             "Open Jaaruren in HQ.",
             "Kies de klant en de eerste maand van het contractjaar.",
-            "Voeg de basisinfrastructuur, beheerde apps en automations/maatwerk toe met jaaruren en jaarbedragen.",
-            "Sla het concept op. Bevestig klantakkoord en activeer de jaarafspraak tijdens het contractjaar.",
-            "Open Twaalf maandtermijnen en zet de gezamenlijke maandfactuur klaar.",
+            "Voeg basisinfrastructuur, apps en automations/maatwerk toe met jaaruren en jaarbedragen vóór jaarkorting.",
+            "Kies Maandelijks betalen of Jaarlijks vooruitbetalen met korting. Vul het afgesproken kortingspercentage in; laat onbekende korting leeg.",
+            "Vergelijk de jaarprijzen en besparing. Sla het concept op en bevestig klantakkoord op uren, betaalwijze, korting en bedragen voordat je activeert.",
+            "Open Twaalf maandtermijnen of Eén jaarlijkse vooruitbetaling en zet de verschuldigde factuur klaar.",
             "Maak de factuur in de boekhouding en registreer het nummer bij Betalingen."
           ],
           "permissions": "Operators lezen; HQ-beheerders leggen afspraken vast, activeren en zetten facturen klaar.",
-          "limits": "De jaarcap geldt voor het hele contractjaar en wordt niet aangevuld door een nieuwe maand of maandbetaling. Het overzicht toont de cap, netto afgeschreven uren en resterende uren. Boven de cap is expliciet akkoord op extra uren nodig; oude maandruimte verhoogt de cap niet. Facturen worden gezamenlijk per maand verwerkt.",
-          "example": "24 uur infrastructuur + 10 uur app-support + 4 uur automation-support = 38 supporturen per jaar, maandelijks betaald."
+          "limits": "Dezelfde jaarcap geldt bij beide betaalwijzen. Betalen vult de uren niet opnieuw aan. Extra uren vereisen expliciet akkoord. Jaarkorting is per klantafspraak instelbaar, geldt alleen bij jaarlijkse vooruitbetaling en moet eerst zijn afgesproken. Geaccepteerde afspraken kunnen niet achteraf worden gewijzigd. Facturen worden in de boekhouding gemaakt; dit start geen automatische incasso.",
+          "example": "Rekenvoorbeeld, geen vast tarief: 38 jaaruren voor EUR 3.600 bij maandbetaling; met een afgesproken korting van 5% kost jaarbetaling EUR 3.420. Beide hebben 38 jaaruren."
         },
         "en": {
-          "title": "Annual support hours and monthly invoice",
+          "title": "Annual support hours and payment options",
           "purpose": "View one annual budget for infrastructure, app hour bundles, automations and custom work.",
-          "when": "To understand available annual support hours and monthly payment.",
+          "when": "To review the annual cap and compare monthly payments with yearly prepayment.",
           "steps": [
             "Open Annual hours in HQ.",
-            "Choose the customer and first contract-year month.",
-            "Add infrastructure, managed apps and automation/custom-work lines with annual hours and amounts.",
-            "Save the draft. Confirm customer acceptance and activate during the contract year.",
-            "Open Twelve monthly installments and prepare the consolidated monthly invoice.",
+            "Choose the customer and first month of the contract year.",
+            "Add infrastructure, apps and automation/custom-work lines with annual hours and amounts before prepayment discount.",
+            "Choose Monthly payments or Yearly upfront with discount. Enter the agreed discount percentage; leave unknown discounts empty.",
+            "Compare annual prices and savings. Save the draft and confirm acceptance of hours, payment frequency, discount and amounts before activating.",
+            "Open Twelve monthly installments or One yearly upfront payment and prepare the due invoice.",
             "Issue the invoice in accounting and record its reference in Payments."
           ],
           "permissions": "Operators read; HQ administrators save and activate agreements and prepare invoices.",
-          "limits": "The annual cap covers the entire contract year and is not replenished by a new month or monthly payment. The overview shows the cap, net charged hours and remaining hours. Exceeding it requires explicit approval for extra hours; legacy monthly allowances do not enlarge the cap. Invoices are consolidated monthly.",
-          "example": "24 infrastructure hours + 10 app-support hours + 4 automation-support hours = 38 annual support hours, paid monthly."
+          "limits": "Both payment options have the same annual cap. Payments never replenish hours. Extra hours need explicit approval. Yearly discount is configurable per agreement, applies only to yearly prepayment and must be agreed first. Accepted agreements cannot be changed retroactively. Invoices are issued in accounting; this does not start recurring collection.",
+          "example": "Illustration, not a set price: 38 annual hours cost EUR 3,600 with monthly payments; an agreed 5% discount makes yearly prepayment EUR 3,420. Both include 38 annual hours."
         }
       }
     },
