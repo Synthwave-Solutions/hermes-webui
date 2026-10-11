@@ -3386,6 +3386,54 @@ window.SynthPulseMspFeatureCatalog = {
       }
     },
     {
+      "id": "msp.service-packages",
+      "area": "commercial",
+      "status": "conditional",
+      "conditions": [
+        "Connected MSP and organisation administrator"
+      ],
+      "anchors": [
+        "/cockpit/service-packages"
+      ],
+      "source_refs": [
+        "apps/cockpit/frontend/src/pages/ServicePackagesPage.jsx",
+        "apps/cockpit/backend/app/control/commercial/service_packages.py"
+      ],
+      "related": [
+        "msp.app-support"
+      ],
+      "locales": {
+        "nl": {
+          "title": "Basispakket en consultantinzet beheren",
+          "purpose": "Vraag consultantinzet aan naast het basispakket, uitgedrukt in dagen per week.",
+          "when": "Als je structurele begeleiding of uitvoering door een Agentic Consultant wilt.",
+          "steps": [
+            "Open Pakketten en bekijk de aangevraagde inzet.",
+            "Leg het afgesproken maandtarief, scope en de ingangsdatum vast.",
+            "Bevestig het klantakkoord en activeer de afspraak. Er moet een actief klantcontract zijn.",
+            "Verwerk wijzigingen of opzeggingen afzonderlijk."
+          ],
+          "permissions": "MSP-beheerders wijzigen afspraken; operators kunnen lezen.",
+          "limits": "Een aanvraag reserveert nog geen persoon of agenda. Dagen worden niet automatisch omgerekend naar supporturen of maanddagen. Dagindeling, tarief en planning spreek je apart af; app-support blijft een aparte afspraak.",
+          "example": "Vraag 2 dagen Agentic Consultant per week aan naast je basispakket."
+        },
+        "en": {
+          "title": "Manage base package and consultant capacity",
+          "purpose": "Request consultant capacity alongside the base package, expressed in days per week.",
+          "when": "For ongoing guidance or delivery by an Agentic Consultant.",
+          "steps": [
+            "Open Packages and review requested capacity.",
+            "Record the agreed monthly rate, scope and effective date.",
+            "Confirm customer acceptance and activate the agreement. An active customer contract is required.",
+            "Process changes or cancellations separately."
+          ],
+          "permissions": "MSP administrators change agreements; operators can read.",
+          "limits": "Requests do not reserve a person or calendar. Days are not automatically converted to support hours or monthly days. Agree day structure, rate and scheduling separately; app support remains a separate agreement.",
+          "example": "Request 2 days of Agentic Consultant capacity per week alongside the base package."
+        }
+      }
+    },
+    {
       "id": "msp.wizard.identity.name",
       "area": "identity",
       "status": "available",

@@ -2960,6 +2960,24 @@
         "static/msp.js",
         "static/apps.js"
       ]
+    },
+    {
+      "id": "webui.msp.package",
+      "area": "msp",
+      "status": "conditional",
+      "source_refs": [
+        "api/msp_service.py",
+        "static/msp.js"
+      ]
+    },
+    {
+      "id": "webui.msp.consultant",
+      "area": "msp",
+      "status": "conditional",
+      "source_refs": [
+        "api/msp_service.py",
+        "static/msp.js"
+      ]
     }
   ],
   "controls": [

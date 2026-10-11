@@ -2524,6 +2524,32 @@
       "nl": "Zoek de gewenste app op deze pagina. De beschikbare bediening hangt af van je rechten en de app-koppeling.",
       "en": "Find the app on this page. Available controls depend on your permissions and the app connection."
     }
+  },
+  "webui.msp.package": {
+    "panel": "msp",
+    "targets": [
+      "#mspBasePackage"
+    ],
+    "entryTargets": [
+      "#mspOverviewTab"
+    ],
+    "entryHint": {
+      "nl": "Kies Overzicht & uren om het basispakket en je consultantinzet te bekijken.",
+      "en": "Choose Overview & hours to see your base package and consultant capacity."
+    }
+  },
+  "webui.msp.consultant": {
+    "panel": "msp",
+    "targets": [
+      "#mspConsultant"
+    ],
+    "entryTargets": [
+      "#mspOverviewTab"
+    ],
+    "entryHint": {
+      "nl": "Kies Overzicht & uren om het basispakket en je consultantinzet te bekijken.",
+      "en": "Choose Overview & hours to see your base package and consultant capacity."
+    }
   }
 };
   for (const entry of Object.values(entries)) {

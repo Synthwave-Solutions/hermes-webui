@@ -6,7 +6,7 @@ from api.org_modules import context
 from api.governance import delegation
 from api.helpers import j
 
-ROUTES=('/api/msp/overview','/api/msp/tickets','/api/msp/ticket','/api/msp/comment',
+ROUTES=('/api/msp/package','/api/msp/overview','/api/msp/tickets','/api/msp/ticket','/api/msp/comment',
         '/api/msp/app-state','/api/msp/app-request','/api/msp/app-support')
 
 
@@ -59,7 +59,9 @@ def handle_post(handler,path,body):
     # Validate even self-service payloads before forwarding. Organisation and
     # acting headers can never be supplied by the browser.
     if not isinstance(body,dict):return respond(handler,(422,{'error':'Invalid request'}))
-    if path=='/api/msp/tickets':
+    if path=='/api/msp/package':
+        allowed={'kind','days_per_week','action'};target='/v1/customer/package'
+    elif path=='/api/msp/tickets':
         allowed={'need','impact','title','body','service','private','department'};target='/v1/tickets'
     elif path=='/api/msp/comment':
         allowed={'ticket_id','body'};tid=body.get('ticket_id','')

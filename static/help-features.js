@@ -14600,6 +14600,108 @@ window.SynthPulseFeatureCatalog = {
           "example": "Request a document app and explain which files you need to create."
         }
       }
+    },
+    {
+      "id": "webui.msp.package",
+      "area": "msp",
+      "status": "conditional",
+      "conditions": [
+        "Connected MSP and organisation administrator"
+      ],
+      "anchors": [
+        "?help_feature=webui.msp.package",
+        "#mspBasePackage"
+      ],
+      "source_refs": [
+        "api/msp_service.py",
+        "static/msp.js"
+      ],
+      "related": [
+        "webui.msp.overview",
+        "webui.apps.support"
+      ],
+      "locales": {
+        "nl": {
+          "title": "Basispakket bekijken en aanvragen",
+          "purpose": "Bekijk de status en vastgelegde afspraken van je basispakket, de basis van je SynthPulse-abonnement.",
+          "when": "Als je je hoofdabonnement wilt controleren of een basispakket wilt aanvragen.",
+          "steps": [
+            "Open Mijn MSP en kies Overzicht & uren.",
+            "Bekijk Basispakket onder Basispakket + Agentic Consultant. De status komt uit je klantcontract of pakketaanvraag.",
+            "Als er nog geen actief pakket is, kies Basispakket aanvragen. Volg het bijbehorende ticket bij Tickets.",
+            "Je MSP bevestigt de inhoud, het tarief en de ingangsdatum. Support per app en consultantdagen staan afzonderlijk vermeld."
+          ],
+          "permissions": "Organisatiebeheerders en financiële beheerders beheren deze afspraken.",
+          "limits": "Een aanvraag activeert geen contract en incasseert niets. De concrete inbegrepen diensten volgen uit je overeenkomst; losse app-support is geen vervanging van het basispakket.",
+          "example": "Vraag het basispakket aan en bespreek de gewenste platforminrichting met je MSP."
+        },
+        "en": {
+          "title": "View and request the base package",
+          "purpose": "See the status and recorded terms of your base package, the foundation of your SynthPulse subscription.",
+          "when": "To check your main subscription or request a base package.",
+          "steps": [
+            "Open My MSP and choose Overview & hours.",
+            "Review Base package under Base package + Agentic Consultant. Its status comes from your customer contract or package request.",
+            "If there is no active package, choose Request base package. Follow the resulting ticket in Tickets.",
+            "Your MSP confirms scope, price and start date. App support and consultant days are shown separately."
+          ],
+          "permissions": "Organisation and billing administrators manage these agreements.",
+          "limits": "Submitting a request activates no contract and collects no payment. Included services follow your agreement; individual app support does not replace the base package.",
+          "example": "Request the base package and discuss your preferred platform setup with your MSP."
+        }
+      }
+    },
+    {
+      "id": "webui.msp.consultant",
+      "area": "msp",
+      "status": "conditional",
+      "conditions": [
+        "Connected MSP and organisation administrator"
+      ],
+      "anchors": [
+        "?help_feature=webui.msp.consultant",
+        "#mspConsultant"
+      ],
+      "source_refs": [
+        "api/msp_service.py",
+        "static/msp.js"
+      ],
+      "related": [
+        "webui.msp.overview",
+        "webui.apps.support"
+      ],
+      "locales": {
+        "nl": {
+          "title": "Agentic Consultant in dagen per week",
+          "purpose": "Vraag consultantinzet aan naast het basispakket, uitgedrukt in dagen per week.",
+          "when": "Als je structurele begeleiding of uitvoering door een Agentic Consultant wilt.",
+          "steps": [
+            "Open Mijn MSP en ga naar Agentic Consultant onder Overzicht & uren.",
+            "Vul het gewenste aantal dagen per week in. Halve dagen zijn mogelijk.",
+            "Kies Consultantinzet aanvragen. De aanvraag komt als ticket bij je MSP terecht.",
+            "Je MSP bevestigt beschikbaarheid, inhoud, tarief en ingangsdatum. Na akkoord en verwerking zie je de afgesproken inzet naast een eventuele wijzigingsaanvraag.",
+            "Vraag een ander aantal dagen aan om te wijzigen, of kies Opzegging consultant aanvragen. Tot bevestiging blijft je huidige afspraak staan."
+          ],
+          "permissions": "Organisatiebeheerders en financiële beheerders kunnen inzet aanvragen en wijzigen.",
+          "limits": "Een aanvraag reserveert nog geen persoon of agenda. Dagen worden niet automatisch omgerekend naar supporturen of maanddagen. Dagindeling, tarief en planning spreek je apart af; app-support blijft een aparte afspraak.",
+          "example": "Vraag 2 dagen Agentic Consultant per week aan naast je basispakket."
+        },
+        "en": {
+          "title": "Agentic Consultant days per week",
+          "purpose": "Request consultant capacity alongside the base package, expressed in days per week.",
+          "when": "For ongoing guidance or delivery by an Agentic Consultant.",
+          "steps": [
+            "Open My MSP and find Agentic Consultant under Overview & hours.",
+            "Enter your preferred number of days per week. Half days are supported.",
+            "Choose Request consultant capacity. A service ticket is created with your MSP.",
+            "Your MSP confirms availability, scope, rate and effective date. Once accepted and processed, agreed capacity appears separately from any pending change.",
+            "Request another number of days to change capacity, or choose Request consultant cancellation. Existing terms remain until confirmed."
+          ],
+          "permissions": "Organisation and billing administrators can request and change capacity.",
+          "limits": "Requests do not reserve a person or calendar. Days are not automatically converted to support hours or monthly days. Agree day structure, rate and scheduling separately; app support remains a separate agreement.",
+          "example": "Request 2 days of Agentic Consultant capacity per week alongside the base package."
+        }
+      }
     }
   ]
 };
