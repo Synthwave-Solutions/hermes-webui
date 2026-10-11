@@ -73,7 +73,8 @@ def test_complete_craft_studio_registry(write_policy, caller, monkeypatch):
     }))
     rows = get(caller, NOBODY[0]).body['apps']
     assert {row['id'] for row in rows} == set(ids)
-    assert all(row['module'] == 'design_studio' and row['category'] == 'creative'
+    assert all(row['module'] == 'design_studio' and row['category'] ==
+               ('craft' if row['id'] in ('craft_studio',) + CRAFT_IDS else 'creative')
                and row['access'] == 'member' and row['status'] == 'configured'
                and set(row['name']) == {'nl', 'en'}
                and set(row['description']) == {'nl', 'en'} for row in rows)

@@ -2583,12 +2583,12 @@
     },
     {
       "id": "webui.modules.apps",
-      "area": "modules",
+      "area": "apps",
       "status": "conditional",
       "source_refs": [
-        "api/org_modules.py",
+        "api/app_catalog.py",
         "api/apps_launcher.py",
-        "static/modules.js"
+        "static/apps.js"
       ]
     },
     {
@@ -2639,6 +2639,296 @@
         "api/org_modules.py",
         "api/apps_launcher.py",
         "static/modules.js"
+      ]
+    },
+    {
+      "id": "webui.apps.overview",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.apps.search",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.apps.categories",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.apps.opendesign",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.apps.opendesign_classic",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.apps.craft_studio",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.apps.photocraft",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.apps.filmcraft",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.apps.effectcraft",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.apps.vectorcraft",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.apps.lightcraft",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.apps.designcraft",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.apps.pdfcraft",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.apps.soundcraft",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.apps.hyperframes",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.apps.vision_studio",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.apps.n8n",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.apps.omniroute",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.apps.nango",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.apps.docuseal",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.apps.pareltje",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.apps.slibdetect",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.apps.cockpit",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.apps.silverbullet",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.apps.pixel_office",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.apps.mnemosyne",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.apps.strategy_gantt",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.apps.openwebui",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.apps.language",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
       ]
     }
   ],
@@ -7222,6 +7512,24 @@
       "feature_id": "webui.files.hidden"
     },
     {
+      "control": "appsSearch",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/apps.js"
+      ],
+      "feature_id": "webui.apps.search"
+    },
+    {
+      "control": "appsCategory",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/apps.js"
+      ],
+      "feature_id": "webui.apps.categories"
+    },
+    {
       "control": "btnApps",
       "tag": "button",
       "label": "Apps",
@@ -7229,6 +7537,15 @@
         "static/index.html"
       ],
       "feature_id": "webui.modules.apps"
+    },
+    {
+      "control": "appsLanguage",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/apps.js"
+      ],
+      "feature_id": "webui.apps.language"
     }
   ],
   "method": "Inventory of concrete HTML controls and inline handlers, supplemented by manual review of generated conversation menus, bot builder and knowledge controls, composer customization and the embedded read-only memory dashboard. Save/cancel and equivalent responsive controls share a feature. Hidden vendor login, server settings and inactive legacy visualizers are excluded from user workflows.",

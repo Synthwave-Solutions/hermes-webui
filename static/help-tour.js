@@ -398,7 +398,13 @@
     if(run.frame)cancelAnimationFrame(run.frame);
     if(run.reconcile){document.removeEventListener('transitionend',run.reconcile,true);document.removeEventListener('animationend',run.reconcile,true);}
     if(run.anchor)run.anchor.remove();
-    restoreFocus(run.trigger);
+    let focusTarget=run.trigger;
+    if(run.mode==='feature'&&!focusTarget?.isConnected){
+      const appCard=run.appTriggerId&&Array.from(document.querySelectorAll('#mainApps [data-app-id]'))
+        .find(node=>node.dataset.appId===run.appTriggerId);
+      focusTarget=appCard?.querySelector('button')||document.getElementById('btnPageHelp');
+    }
+    restoreFocus(focusTarget);
   }
 
   const FOCUS_KEYS=['sp-help-done','guida-next','guida-prev','guida-close','sp-help-did-not-help','sp-help-support','sp-feature-tour-picker','sp-feature-tour-language'];
@@ -529,6 +535,7 @@
     }catch(_){clearStepMarks();return null;}
     const run={mode,id,title,steps,inst,trigger,uid:'spHelpTour'+(++uid),focusedStep:-1,moving:false,ended:false,cleanup:inst.cleanup,locale:options.locale||'en',anchor:options.anchor||null};
     if(mode==='feature'){
+      run.appTriggerId=trigger?.closest?.('#mainApps [data-app-id]')?.dataset.appId||'';
       const showStep=inst.showStep;
       inst.showStep=function(index){
         if(run.ended||!this.state.isActive)return;
@@ -818,6 +825,13 @@
         if(typeof _currentSettingsSection!=='string'||_currentSettingsSection!==mapping.section)window.switchSettingsSection(mapping.section);
       }
       if(!current())return;
+      if(mapping.panel==='apps'&&feature.id.startsWith('webui.apps.')&&typeof window.SynthPulseApps?.reveal==='function'){
+        const restore=await window.SynthPulseApps.reveal(feature.id.slice('webui.apps.'.length));
+        if(typeof restore==='function'){
+          if(current())run.presentation.push(restore);else restore();
+        }
+        if(!current())return;
+      }
       // Reveal only presentation containers, never execute feature buttons or
       // open forms. Remember our changes and restore them on step change/close.
       const candidates=featureNodes([...(mapping.targets||[]),...(mapping.entryTargets||[])]);

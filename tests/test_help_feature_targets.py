@@ -171,3 +171,14 @@ def test_task_read_views_are_not_replaced_by_unrelated_creation_or_refresh_actio
     assert "[data-tour='tasks-new']" not in TARGETS['webui.tasks.script']['entryTargets']
     assert '.cron-script-card' in TARGETS['webui.tasks.script']['targets']
     assert TARGETS['webui.tasks.results']['targets'] == ['#cronDetailRuns']
+
+
+def test_apps_targets_are_real_cards_and_directory_controls():
+    from api.app_catalog import REGISTRY
+    for app_id in REGISTRY:
+        assert TARGETS['webui.apps.' + app_id] == {
+            'panel': 'apps', 'targets': ['#mainApps [data-app-id="' + app_id + '"]']}
+    for feature_id, target in (('overview', '#mainApps'), ('search', '#appsSearch'),
+                               ('categories', '#appsCategory'), ('language', '#appsLanguage')):
+        assert TARGETS['webui.apps.' + feature_id] == {'panel': 'apps', 'targets': [target]}
+    assert TARGETS['webui.modules.apps'] == TARGETS['webui.apps.overview']

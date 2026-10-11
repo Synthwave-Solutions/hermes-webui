@@ -2281,9 +2281,9 @@
     ]
   },
   "webui.modules.apps": {
-    "panel": "chat",
+    "panel": "apps",
     "targets": [
-      "#btnApps"
+      "#mainApps"
     ]
   },
   "webui.modules.overview": {
@@ -2314,6 +2314,180 @@
     "panel": "modules",
     "targets": [
       "#mainModules .module-language select"
+    ]
+  },
+  "webui.apps.overview": {
+    "panel": "apps",
+    "targets": [
+      "#mainApps"
+    ]
+  },
+  "webui.apps.search": {
+    "panel": "apps",
+    "targets": [
+      "#appsSearch"
+    ]
+  },
+  "webui.apps.categories": {
+    "panel": "apps",
+    "targets": [
+      "#appsCategory"
+    ]
+  },
+  "webui.apps.opendesign": {
+    "panel": "apps",
+    "targets": [
+      "#mainApps [data-app-id=\"opendesign\"]"
+    ]
+  },
+  "webui.apps.opendesign_classic": {
+    "panel": "apps",
+    "targets": [
+      "#mainApps [data-app-id=\"opendesign_classic\"]"
+    ]
+  },
+  "webui.apps.craft_studio": {
+    "panel": "apps",
+    "targets": [
+      "#mainApps [data-app-id=\"craft_studio\"]"
+    ]
+  },
+  "webui.apps.photocraft": {
+    "panel": "apps",
+    "targets": [
+      "#mainApps [data-app-id=\"photocraft\"]"
+    ]
+  },
+  "webui.apps.filmcraft": {
+    "panel": "apps",
+    "targets": [
+      "#mainApps [data-app-id=\"filmcraft\"]"
+    ]
+  },
+  "webui.apps.effectcraft": {
+    "panel": "apps",
+    "targets": [
+      "#mainApps [data-app-id=\"effectcraft\"]"
+    ]
+  },
+  "webui.apps.vectorcraft": {
+    "panel": "apps",
+    "targets": [
+      "#mainApps [data-app-id=\"vectorcraft\"]"
+    ]
+  },
+  "webui.apps.lightcraft": {
+    "panel": "apps",
+    "targets": [
+      "#mainApps [data-app-id=\"lightcraft\"]"
+    ]
+  },
+  "webui.apps.designcraft": {
+    "panel": "apps",
+    "targets": [
+      "#mainApps [data-app-id=\"designcraft\"]"
+    ]
+  },
+  "webui.apps.pdfcraft": {
+    "panel": "apps",
+    "targets": [
+      "#mainApps [data-app-id=\"pdfcraft\"]"
+    ]
+  },
+  "webui.apps.soundcraft": {
+    "panel": "apps",
+    "targets": [
+      "#mainApps [data-app-id=\"soundcraft\"]"
+    ]
+  },
+  "webui.apps.hyperframes": {
+    "panel": "apps",
+    "targets": [
+      "#mainApps [data-app-id=\"hyperframes\"]"
+    ]
+  },
+  "webui.apps.vision_studio": {
+    "panel": "apps",
+    "targets": [
+      "#mainApps [data-app-id=\"vision_studio\"]"
+    ]
+  },
+  "webui.apps.n8n": {
+    "panel": "apps",
+    "targets": [
+      "#mainApps [data-app-id=\"n8n\"]"
+    ]
+  },
+  "webui.apps.omniroute": {
+    "panel": "apps",
+    "targets": [
+      "#mainApps [data-app-id=\"omniroute\"]"
+    ]
+  },
+  "webui.apps.nango": {
+    "panel": "apps",
+    "targets": [
+      "#mainApps [data-app-id=\"nango\"]"
+    ]
+  },
+  "webui.apps.docuseal": {
+    "panel": "apps",
+    "targets": [
+      "#mainApps [data-app-id=\"docuseal\"]"
+    ]
+  },
+  "webui.apps.pareltje": {
+    "panel": "apps",
+    "targets": [
+      "#mainApps [data-app-id=\"pareltje\"]"
+    ]
+  },
+  "webui.apps.slibdetect": {
+    "panel": "apps",
+    "targets": [
+      "#mainApps [data-app-id=\"slibdetect\"]"
+    ]
+  },
+  "webui.apps.cockpit": {
+    "panel": "apps",
+    "targets": [
+      "#mainApps [data-app-id=\"cockpit\"]"
+    ]
+  },
+  "webui.apps.silverbullet": {
+    "panel": "apps",
+    "targets": [
+      "#mainApps [data-app-id=\"silverbullet\"]"
+    ]
+  },
+  "webui.apps.pixel_office": {
+    "panel": "apps",
+    "targets": [
+      "#mainApps [data-app-id=\"pixel_office\"]"
+    ]
+  },
+  "webui.apps.mnemosyne": {
+    "panel": "apps",
+    "targets": [
+      "#mainApps [data-app-id=\"mnemosyne\"]"
+    ]
+  },
+  "webui.apps.strategy_gantt": {
+    "panel": "apps",
+    "targets": [
+      "#mainApps [data-app-id=\"strategy_gantt\"]"
+    ]
+  },
+  "webui.apps.openwebui": {
+    "panel": "apps",
+    "targets": [
+      "#mainApps [data-app-id=\"openwebui\"]"
+    ]
+  },
+  "webui.apps.language": {
+    "panel": "apps",
+    "targets": [
+      "#appsLanguage"
     ]
   }
 };

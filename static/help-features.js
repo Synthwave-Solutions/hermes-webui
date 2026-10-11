@@ -68,8 +68,12 @@ window.SynthPulseFeatureCatalog = {
       "nl": "Voorbereide mogelijkheden"
     },
     "modules": {
-      "en": "Apps and modules",
-      "nl": "Apps en modules"
+      "nl": "Modules",
+      "en": "Modules"
+    },
+    "apps": {
+      "nl": "Apps",
+      "en": "Apps"
     }
   },
   "features": [
@@ -12720,47 +12724,49 @@ window.SynthPulseFeatureCatalog = {
     },
     {
       "id": "webui.modules.apps",
-      "area": "modules",
+      "area": "apps",
       "status": "conditional",
       "conditions": [
-        "Configured installation and existing access"
+        "Configured app directory and existing access"
       ],
       "anchors": [
         "?help_feature=webui.modules.apps",
-        "#btnApps"
+        "#mainApps"
       ],
       "source_refs": [
-        "api/org_modules.py",
+        "api/app_catalog.py",
         "api/apps_launcher.py",
-        "static/modules.js"
+        "static/apps.js"
       ],
       "related": [
-        "webui.modules.overview"
+        "webui.apps.overview"
       ],
       "locales": {
-        "en": {
-          "title": "Open configured apps",
-          "purpose": "Open an active module’s configured app in a new tab.",
-          "when": "When reviewing the apps and modules available on your installation.",
-          "steps": [
-            "Choose Apps in the title bar.",
-            "Select an app; sign in there if requested."
-          ],
-          "permissions": "Every signed-in person; the workflow editor also needs platform scope or an explicit installation setting.",
-          "limits": "An empty launcher means no valid links are configured. Opening a link gives no extra rights and verifies no service health.",
-          "example": "Select an app; sign in there if requested."
-        },
         "nl": {
-          "title": "Ingestelde apps openen",
-          "purpose": "Open de ingestelde app van een actieve module in een nieuw tabblad.",
-          "when": "Wanneer je de apps en modules van je installatie wilt bekijken.",
+          "title": "Apps als eigen onderdeel",
+          "purpose": "Open de beschikbare toepassingen van je installatie vanuit Apps in de navigatie.",
+          "when": "Wanneer je naar een creatieve editor, workflowomgeving of beheerapp wilt.",
           "steps": [
-            "Kies Apps in de titelbalk.",
-            "Kies een app; meld je daar aan als dat wordt gevraagd."
+            "Kies Apps in de navigatie.",
+            "Bekijk de categorie, beschrijving en status van een app.",
+            "Kies Uitleg voor de interactieve gids of Openen om de toepassing in een nieuw tabblad te openen."
           ],
-          "permissions": "Iedere aangemelde gebruiker; de workfloweditor vereist daarnaast platformbeheer of een expliciete installatie-instelling.",
-          "limits": "Een lege appkiezer betekent dat er geen geldige links zijn ingesteld. Een link openen geeft geen extra rechten en controleert geen dienststatus.",
-          "example": "Kies een app; meld je daar aan als dat wordt gevraagd."
+          "permissions": "Je moet aangemeld zijn. Leden zien toegestane apps voor actieve modules; platformbeheerders zien ook ingestelde beheerapps. Iedere app controleert zelf de toegang.",
+          "limits": "Een ingesteld adres is geen gezondheidscontrole of bewijs van een licentie. Niet ingesteld heeft geen werkende Openen-knop. Een app openen activeert geen module en wijzigt geen rechten.",
+          "example": "Open een creatieve editor vanuit Apps en houd je chat in het oorspronkelijke tabblad."
+        },
+        "en": {
+          "title": "Apps as a dedicated section",
+          "purpose": "Open the available applications for your installation from Apps in navigation.",
+          "when": "When you want a creative editor, workflow environment or management app.",
+          "steps": [
+            "Choose Apps in navigation.",
+            "Review an app’s category, description and status.",
+            "Choose Guide for the interactive explanation or Open to open the application in a new tab."
+          ],
+          "permissions": "You must be signed in. Members see permitted apps for active modules; platform administrators also see configured management apps. Each application checks its own access.",
+          "limits": "A configured address is not a health check or proof of a licence. Not configured has no working Open button. Opening an app does not activate modules or change permissions.",
+          "example": "Open a creative editor from Apps while keeping your chat in the original tab."
         }
       }
     },
@@ -12991,6 +12997,1449 @@ window.SynthPulseFeatureCatalog = {
           "permissions": "Je bestaande toegang tot Apps of Modules.",
           "limits": "De keuze wordt in deze browser opgeslagen en geldt voor deze schermen. Rechten en de taal van andere gebruikers veranderen niet.",
           "example": "Kies Nederlands of English."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.overview",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured app directory and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.overview",
+        "#mainApps"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.search",
+        "webui.apps.categories"
+      ],
+      "locales": {
+        "nl": {
+          "title": "Apps als eigen onderdeel",
+          "purpose": "Open de beschikbare toepassingen van je installatie vanuit Apps in de navigatie.",
+          "when": "Wanneer je naar een creatieve editor, workflowomgeving of beheerapp wilt.",
+          "steps": [
+            "Kies Apps in de navigatie.",
+            "Bekijk de categorie, beschrijving en status van een app.",
+            "Kies Uitleg voor de interactieve gids of Openen om de toepassing in een nieuw tabblad te openen."
+          ],
+          "permissions": "Je moet aangemeld zijn. Leden zien toegestane apps voor actieve modules; platformbeheerders zien ook ingestelde beheerapps. Iedere app controleert zelf de toegang.",
+          "limits": "Een ingesteld adres is geen gezondheidscontrole of bewijs van een licentie. Niet ingesteld heeft geen werkende Openen-knop. Een app openen activeert geen module en wijzigt geen rechten.",
+          "example": "Open een creatieve editor vanuit Apps en houd je chat in het oorspronkelijke tabblad."
+        },
+        "en": {
+          "title": "Apps as a dedicated section",
+          "purpose": "Open the available applications for your installation from Apps in navigation.",
+          "when": "When you want a creative editor, workflow environment or management app.",
+          "steps": [
+            "Choose Apps in navigation.",
+            "Review an app’s category, description and status.",
+            "Choose Guide for the interactive explanation or Open to open the application in a new tab."
+          ],
+          "permissions": "You must be signed in. Members see permitted apps for active modules; platform administrators also see configured management apps. Each application checks its own access.",
+          "limits": "A configured address is not a health check or proof of a licence. Not configured has no working Open button. Opening an app does not activate modules or change permissions.",
+          "example": "Open a creative editor from Apps while keeping your chat in the original tab."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.search",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured app directory and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.search",
+        "#appsSearch"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "Een app zoeken",
+          "purpose": "Filter de appkaarten op naam of beschrijving.",
+          "when": "Wanneer je een bepaalde toepassing snel wilt terugvinden.",
+          "steps": [
+            "Open Apps.",
+            "Typ de naam of een beschrijvend woord in Apps zoeken.",
+            "Wis de zoektekst of herstel de filters als je alle toegestane kaarten wilt zien."
+          ],
+          "permissions": "Dezelfde toegang als de Apps-sectie. Zoeken geeft geen toegang tot verborgen beheerapps.",
+          "limits": "Zoeken filtert alleen deze appcatalogus in je browser. Het doorzoekt geen documenten of inhoud binnen de apps. De categoriekeuze blijft ook van toepassing.",
+          "example": "Zoek PhotoCraft om de bijbehorende kaart te vinden."
+        },
+        "en": {
+          "title": "Search for an app",
+          "purpose": "Filter app cards by name or description.",
+          "when": "When you want to find a particular application quickly.",
+          "steps": [
+            "Open Apps.",
+            "Type an app name or descriptive word in Search apps.",
+            "Clear the search text or reset filters to see all permitted cards."
+          ],
+          "permissions": "The same access as the Apps section. Search does not reveal restricted management apps.",
+          "limits": "Search filters this app catalogue in your browser only. It does not search documents or content inside applications. The selected category also applies.",
+          "example": "Search for PhotoCraft to find its card."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.categories",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured app directory and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.categories",
+        "#appsCategory"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "Apps per categorie bekijken",
+          "purpose": "Beperk het overzicht tot creatief werk, Craft Studio, productiviteit, automatisering of platformbeheer.",
+          "when": "Wanneer je een passende tool zoekt binnen een bepaald soort werk.",
+          "steps": [
+            "Open Apps.",
+            "Kies een categorie in het categoriefilter.",
+            "Kies Alle categorieën om het volledige toegestane overzicht terug te krijgen."
+          ],
+          "permissions": "Alleen apps die al voor jou zichtbaar zijn worden gegroepeerd. Platformbeheer blijft beperkt tot platformbeheerders.",
+          "limits": "Een categorie is een weergavefilter. Je activeert geen dienst, abonnement of module. Een eventuele zoektekst blijft van toepassing.",
+          "example": "Kies Craft Studio om de studio en de acht afzonderlijke editors te bekijken."
+        },
+        "en": {
+          "title": "Browse apps by category",
+          "purpose": "Limit the directory to creative work, Craft Studio, productivity, automation or platform management.",
+          "when": "When you want a suitable tool for a particular type of work.",
+          "steps": [
+            "Open Apps.",
+            "Select a category from the category filter.",
+            "Choose All categories to restore the full permitted directory."
+          ],
+          "permissions": "Only apps already visible to you are grouped. Platform management remains restricted to platform administrators.",
+          "limits": "A category is a display filter. It does not activate a service, subscription or module. Any search text still applies.",
+          "example": "Choose Craft Studio to view the studio and all eight separate editors."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.opendesign",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured app directory and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.opendesign",
+        "#mainApps [data-app-id=\"opendesign\"]"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "OpenDesign openen",
+          "purpose": "Ontwerp en bewerk visuele projecten en merkuitingen.",
+          "when": "Gebruik deze ingang voor een campagnebeeld met de juiste kleuren en typografie.",
+          "steps": [
+            "Kies Apps in de navigatie en zoek OpenDesign.",
+            "Bekijk de status en de beschrijving van de kaart.",
+            "Sluit de gids en kies Openen als een adres is ingesteld. Rond indien nodig de eigen aanmelding van de app af.",
+            "Werk verder in de doelapp en gebruik het oorspronkelijke tabblad om terug te keren naar SynthPulse."
+          ],
+          "permissions": "Toegang tot Apps en de bijbehorende actieve module; platformbeheerders kunnen ingestelde appadressen ook zonder die module bekijken. De doelapp controleert zelf je toegang.",
+          "limits": "Openen navigeert alleen naar het ingestelde adres. De app kan een eigen aanmelding vereisen. Niet ingesteld betekent dat er geen bruikbare link is; een ingestelde link garandeert niet dat de dienst bereikbaar is.",
+          "example": "Bijvoorbeeld: een campagnebeeld met de juiste kleuren en typografie."
+        },
+        "en": {
+          "title": "Open OpenDesign",
+          "purpose": "Design and edit visual projects and branded materials.",
+          "when": "Use this entry point for a campaign visual with the right colours and typography.",
+          "steps": [
+            "Choose Apps in navigation and find OpenDesign.",
+            "Review the card’s status and description.",
+            "Close the guide and choose Open when an address is configured. Complete the app’s own sign-in if required.",
+            "Continue in the destination app and use the original tab to return to SynthPulse."
+          ],
+          "permissions": "Access to Apps and the associated active module; platform administrators can discover configured app addresses even without that module. The destination app checks its own access.",
+          "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable.",
+          "example": "For example: a campaign visual with the right colours and typography."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.opendesign_classic",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured app directory and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.opendesign_classic",
+        "#mainApps [data-app-id=\"opendesign_classic\"]"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "OpenDesign Classic openen",
+          "purpose": "Open de klassieke ontwerpomgeving voor bestaande projecten.",
+          "when": "Gebruik deze ingang voor een bestaand ontwerp in de klassieke omgeving.",
+          "steps": [
+            "Kies Apps in de navigatie en zoek OpenDesign Classic.",
+            "Bekijk de status en de beschrijving van de kaart.",
+            "Sluit de gids en kies Openen als een adres is ingesteld. Rond indien nodig de eigen aanmelding van de app af.",
+            "Werk verder in de doelapp en gebruik het oorspronkelijke tabblad om terug te keren naar SynthPulse."
+          ],
+          "permissions": "Toegang tot Apps en de bijbehorende actieve module; platformbeheerders kunnen ingestelde appadressen ook zonder die module bekijken. De doelapp controleert zelf je toegang.",
+          "limits": "Openen navigeert alleen naar het ingestelde adres. De app kan een eigen aanmelding vereisen. Niet ingesteld betekent dat er geen bruikbare link is; een ingestelde link garandeert niet dat de dienst bereikbaar is.",
+          "example": "Bijvoorbeeld: een bestaand ontwerp in de klassieke omgeving."
+        },
+        "en": {
+          "title": "Open OpenDesign Classic",
+          "purpose": "Open the classic design environment for existing projects.",
+          "when": "Use this entry point for an existing design in the classic environment.",
+          "steps": [
+            "Choose Apps in navigation and find OpenDesign Classic.",
+            "Review the card’s status and description.",
+            "Close the guide and choose Open when an address is configured. Complete the app’s own sign-in if required.",
+            "Continue in the destination app and use the original tab to return to SynthPulse."
+          ],
+          "permissions": "Access to Apps and the associated active module; platform administrators can discover configured app addresses even without that module. The destination app checks its own access.",
+          "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable.",
+          "example": "For example: an existing design in the classic environment."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.craft_studio",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured app directory and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.craft_studio",
+        "#mainApps [data-app-id=\"craft_studio\"]"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "Craft Studio openen",
+          "purpose": "Kies een creatieve editor voor beeld, video, ontwerp, documenten of audio.",
+          "when": "Gebruik deze ingang voor de passende editor voor een foto, video of document.",
+          "steps": [
+            "Kies Apps in de navigatie en zoek Craft Studio.",
+            "Bekijk de status en de beschrijving van de kaart.",
+            "Sluit de gids en kies Openen als een adres is ingesteld. Rond indien nodig de eigen aanmelding van de app af.",
+            "Werk verder in de doelapp en gebruik het oorspronkelijke tabblad om terug te keren naar SynthPulse."
+          ],
+          "permissions": "Toegang tot Apps en de bijbehorende actieve module; platformbeheerders kunnen ingestelde appadressen ook zonder die module bekijken. De doelapp controleert zelf je toegang.",
+          "limits": "Openen navigeert alleen naar het ingestelde adres. De app kan een eigen aanmelding vereisen. Niet ingesteld betekent dat er geen bruikbare link is; een ingestelde link garandeert niet dat de dienst bereikbaar is. Dit is de browseringang. De kaart synchroniseert geen bestanden of projecten met een desktopeditor of andere Craft-app.",
+          "example": "Bijvoorbeeld: de passende editor voor een foto, video of document."
+        },
+        "en": {
+          "title": "Open Craft Studio",
+          "purpose": "Choose a creative editor for images, video, design, documents or audio.",
+          "when": "Use this entry point for the appropriate editor for a photo, video or document.",
+          "steps": [
+            "Choose Apps in navigation and find Craft Studio.",
+            "Review the card’s status and description.",
+            "Close the guide and choose Open when an address is configured. Complete the app’s own sign-in if required.",
+            "Continue in the destination app and use the original tab to return to SynthPulse."
+          ],
+          "permissions": "Access to Apps and the associated active module; platform administrators can discover configured app addresses even without that module. The destination app checks its own access.",
+          "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable. This is the browser entry point. The card does not synchronise files or projects with a desktop editor or another Craft app.",
+          "example": "For example: the appropriate editor for a photo, video or document."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.photocraft",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured app directory and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.photocraft",
+        "#mainApps [data-app-id=\"photocraft\"]"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "PhotoCraft openen",
+          "purpose": "Bewerk foto’s en maak beeldcomposities.",
+          "when": "Gebruik deze ingang voor een foto bijsnijden en de compositie aanpassen.",
+          "steps": [
+            "Kies Apps in de navigatie en zoek PhotoCraft.",
+            "Bekijk de status en de beschrijving van de kaart.",
+            "Sluit de gids en kies Openen als een adres is ingesteld. Rond indien nodig de eigen aanmelding van de app af.",
+            "Werk verder in de doelapp en gebruik het oorspronkelijke tabblad om terug te keren naar SynthPulse."
+          ],
+          "permissions": "Toegang tot Apps en de bijbehorende actieve module; platformbeheerders kunnen ingestelde appadressen ook zonder die module bekijken. De doelapp controleert zelf je toegang.",
+          "limits": "Openen navigeert alleen naar het ingestelde adres. De app kan een eigen aanmelding vereisen. Niet ingesteld betekent dat er geen bruikbare link is; een ingestelde link garandeert niet dat de dienst bereikbaar is. Dit is de browseringang. De kaart synchroniseert geen bestanden of projecten met een desktopeditor of andere Craft-app.",
+          "example": "Bijvoorbeeld: een foto bijsnijden en de compositie aanpassen."
+        },
+        "en": {
+          "title": "Open PhotoCraft",
+          "purpose": "Edit photos and create image compositions.",
+          "when": "Use this entry point for cropping a photo and adjusting its composition.",
+          "steps": [
+            "Choose Apps in navigation and find PhotoCraft.",
+            "Review the card’s status and description.",
+            "Close the guide and choose Open when an address is configured. Complete the app’s own sign-in if required.",
+            "Continue in the destination app and use the original tab to return to SynthPulse."
+          ],
+          "permissions": "Access to Apps and the associated active module; platform administrators can discover configured app addresses even without that module. The destination app checks its own access.",
+          "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable. This is the browser entry point. The card does not synchronise files or projects with a desktop editor or another Craft app.",
+          "example": "For example: cropping a photo and adjusting its composition."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.filmcraft",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured app directory and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.filmcraft",
+        "#mainApps [data-app-id=\"filmcraft\"]"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "FilmCraft openen",
+          "purpose": "Monteer video’s en werk aan je tijdlijn.",
+          "when": "Gebruik deze ingang voor videofragmenten ordenen voor een korte montage.",
+          "steps": [
+            "Kies Apps in de navigatie en zoek FilmCraft.",
+            "Bekijk de status en de beschrijving van de kaart.",
+            "Sluit de gids en kies Openen als een adres is ingesteld. Rond indien nodig de eigen aanmelding van de app af.",
+            "Werk verder in de doelapp en gebruik het oorspronkelijke tabblad om terug te keren naar SynthPulse."
+          ],
+          "permissions": "Toegang tot Apps en de bijbehorende actieve module; platformbeheerders kunnen ingestelde appadressen ook zonder die module bekijken. De doelapp controleert zelf je toegang.",
+          "limits": "Openen navigeert alleen naar het ingestelde adres. De app kan een eigen aanmelding vereisen. Niet ingesteld betekent dat er geen bruikbare link is; een ingestelde link garandeert niet dat de dienst bereikbaar is. Dit is de browseringang. De kaart synchroniseert geen bestanden of projecten met een desktopeditor of andere Craft-app.",
+          "example": "Bijvoorbeeld: videofragmenten ordenen voor een korte montage."
+        },
+        "en": {
+          "title": "Open FilmCraft",
+          "purpose": "Edit videos and work on your timeline.",
+          "when": "Use this entry point for arranging video clips for a short edit.",
+          "steps": [
+            "Choose Apps in navigation and find FilmCraft.",
+            "Review the card’s status and description.",
+            "Close the guide and choose Open when an address is configured. Complete the app’s own sign-in if required.",
+            "Continue in the destination app and use the original tab to return to SynthPulse."
+          ],
+          "permissions": "Access to Apps and the associated active module; platform administrators can discover configured app addresses even without that module. The destination app checks its own access.",
+          "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable. This is the browser entry point. The card does not synchronise files or projects with a desktop editor or another Craft app.",
+          "example": "For example: arranging video clips for a short edit."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.effectcraft",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured app directory and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.effectcraft",
+        "#mainApps [data-app-id=\"effectcraft\"]"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "EffectCraft openen",
+          "purpose": "Maak visuele effecten en bewegende composities.",
+          "when": "Gebruik deze ingang voor een compositie met bewegende visuele elementen.",
+          "steps": [
+            "Kies Apps in de navigatie en zoek EffectCraft.",
+            "Bekijk de status en de beschrijving van de kaart.",
+            "Sluit de gids en kies Openen als een adres is ingesteld. Rond indien nodig de eigen aanmelding van de app af.",
+            "Werk verder in de doelapp en gebruik het oorspronkelijke tabblad om terug te keren naar SynthPulse."
+          ],
+          "permissions": "Toegang tot Apps en de bijbehorende actieve module; platformbeheerders kunnen ingestelde appadressen ook zonder die module bekijken. De doelapp controleert zelf je toegang.",
+          "limits": "Openen navigeert alleen naar het ingestelde adres. De app kan een eigen aanmelding vereisen. Niet ingesteld betekent dat er geen bruikbare link is; een ingestelde link garandeert niet dat de dienst bereikbaar is. Dit is de browseringang. De kaart synchroniseert geen bestanden of projecten met een desktopeditor of andere Craft-app.",
+          "example": "Bijvoorbeeld: een compositie met bewegende visuele elementen."
+        },
+        "en": {
+          "title": "Open EffectCraft",
+          "purpose": "Create visual effects and animated compositions.",
+          "when": "Use this entry point for a composition with animated visual elements.",
+          "steps": [
+            "Choose Apps in navigation and find EffectCraft.",
+            "Review the card’s status and description.",
+            "Close the guide and choose Open when an address is configured. Complete the app’s own sign-in if required.",
+            "Continue in the destination app and use the original tab to return to SynthPulse."
+          ],
+          "permissions": "Access to Apps and the associated active module; platform administrators can discover configured app addresses even without that module. The destination app checks its own access.",
+          "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable. This is the browser entry point. The card does not synchronise files or projects with a desktop editor or another Craft app.",
+          "example": "For example: a composition with animated visual elements."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.vectorcraft",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured app directory and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.vectorcraft",
+        "#mainApps [data-app-id=\"vectorcraft\"]"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "VectorCraft openen",
+          "purpose": "Teken en bewerk vectorillustraties.",
+          "when": "Gebruik deze ingang voor een schaalbare illustratie voor een publicatie.",
+          "steps": [
+            "Kies Apps in de navigatie en zoek VectorCraft.",
+            "Bekijk de status en de beschrijving van de kaart.",
+            "Sluit de gids en kies Openen als een adres is ingesteld. Rond indien nodig de eigen aanmelding van de app af.",
+            "Werk verder in de doelapp en gebruik het oorspronkelijke tabblad om terug te keren naar SynthPulse."
+          ],
+          "permissions": "Toegang tot Apps en de bijbehorende actieve module; platformbeheerders kunnen ingestelde appadressen ook zonder die module bekijken. De doelapp controleert zelf je toegang.",
+          "limits": "Openen navigeert alleen naar het ingestelde adres. De app kan een eigen aanmelding vereisen. Niet ingesteld betekent dat er geen bruikbare link is; een ingestelde link garandeert niet dat de dienst bereikbaar is. Dit is de browseringang. De kaart synchroniseert geen bestanden of projecten met een desktopeditor of andere Craft-app.",
+          "example": "Bijvoorbeeld: een schaalbare illustratie voor een publicatie."
+        },
+        "en": {
+          "title": "Open VectorCraft",
+          "purpose": "Draw and edit vector illustrations.",
+          "when": "Use this entry point for a scalable illustration for a publication.",
+          "steps": [
+            "Choose Apps in navigation and find VectorCraft.",
+            "Review the card’s status and description.",
+            "Close the guide and choose Open when an address is configured. Complete the app’s own sign-in if required.",
+            "Continue in the destination app and use the original tab to return to SynthPulse."
+          ],
+          "permissions": "Access to Apps and the associated active module; platform administrators can discover configured app addresses even without that module. The destination app checks its own access.",
+          "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable. This is the browser entry point. The card does not synchronise files or projects with a desktop editor or another Craft app.",
+          "example": "For example: a scalable illustration for a publication."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.lightcraft",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured app directory and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.lightcraft",
+        "#mainApps [data-app-id=\"lightcraft\"]"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "LightCraft openen",
+          "purpose": "Ontwikkel en corrigeer foto’s.",
+          "when": "Gebruik deze ingang voor de belichting en kleuren van een foto beoordelen.",
+          "steps": [
+            "Kies Apps in de navigatie en zoek LightCraft.",
+            "Bekijk de status en de beschrijving van de kaart.",
+            "Sluit de gids en kies Openen als een adres is ingesteld. Rond indien nodig de eigen aanmelding van de app af.",
+            "Werk verder in de doelapp en gebruik het oorspronkelijke tabblad om terug te keren naar SynthPulse."
+          ],
+          "permissions": "Toegang tot Apps en de bijbehorende actieve module; platformbeheerders kunnen ingestelde appadressen ook zonder die module bekijken. De doelapp controleert zelf je toegang.",
+          "limits": "Openen navigeert alleen naar het ingestelde adres. De app kan een eigen aanmelding vereisen. Niet ingesteld betekent dat er geen bruikbare link is; een ingestelde link garandeert niet dat de dienst bereikbaar is. Dit is de browseringang. De kaart synchroniseert geen bestanden of projecten met een desktopeditor of andere Craft-app.",
+          "example": "Bijvoorbeeld: de belichting en kleuren van een foto beoordelen."
+        },
+        "en": {
+          "title": "Open LightCraft",
+          "purpose": "Develop and correct photos.",
+          "when": "Use this entry point for reviewing the exposure and colours of a photo.",
+          "steps": [
+            "Choose Apps in navigation and find LightCraft.",
+            "Review the card’s status and description.",
+            "Close the guide and choose Open when an address is configured. Complete the app’s own sign-in if required.",
+            "Continue in the destination app and use the original tab to return to SynthPulse."
+          ],
+          "permissions": "Access to Apps and the associated active module; platform administrators can discover configured app addresses even without that module. The destination app checks its own access.",
+          "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable. This is the browser entry point. The card does not synchronise files or projects with a desktop editor or another Craft app.",
+          "example": "For example: reviewing the exposure and colours of a photo."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.designcraft",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured app directory and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.designcraft",
+        "#mainApps [data-app-id=\"designcraft\"]"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "DesignCraft openen",
+          "purpose": "Maak ontwerpen en paginalay-outs.",
+          "when": "Gebruik deze ingang voor een consistente pagina-indeling voor een ontwerp.",
+          "steps": [
+            "Kies Apps in de navigatie en zoek DesignCraft.",
+            "Bekijk de status en de beschrijving van de kaart.",
+            "Sluit de gids en kies Openen als een adres is ingesteld. Rond indien nodig de eigen aanmelding van de app af.",
+            "Werk verder in de doelapp en gebruik het oorspronkelijke tabblad om terug te keren naar SynthPulse."
+          ],
+          "permissions": "Toegang tot Apps en de bijbehorende actieve module; platformbeheerders kunnen ingestelde appadressen ook zonder die module bekijken. De doelapp controleert zelf je toegang.",
+          "limits": "Openen navigeert alleen naar het ingestelde adres. De app kan een eigen aanmelding vereisen. Niet ingesteld betekent dat er geen bruikbare link is; een ingestelde link garandeert niet dat de dienst bereikbaar is. Dit is de browseringang. De kaart synchroniseert geen bestanden of projecten met een desktopeditor of andere Craft-app.",
+          "example": "Bijvoorbeeld: een consistente pagina-indeling voor een ontwerp."
+        },
+        "en": {
+          "title": "Open DesignCraft",
+          "purpose": "Create designs and page layouts.",
+          "when": "Use this entry point for a consistent page layout for a design.",
+          "steps": [
+            "Choose Apps in navigation and find DesignCraft.",
+            "Review the card’s status and description.",
+            "Close the guide and choose Open when an address is configured. Complete the app’s own sign-in if required.",
+            "Continue in the destination app and use the original tab to return to SynthPulse."
+          ],
+          "permissions": "Access to Apps and the associated active module; platform administrators can discover configured app addresses even without that module. The destination app checks its own access.",
+          "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable. This is the browser entry point. The card does not synchronise files or projects with a desktop editor or another Craft app.",
+          "example": "For example: a consistent page layout for a design."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.pdfcraft",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured app directory and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.pdfcraft",
+        "#mainApps [data-app-id=\"pdfcraft\"]"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "PDFCraft openen",
+          "purpose": "Open en bewerk pdf-documenten.",
+          "when": "Gebruik deze ingang voor een pdf-document beoordelen en aanpassen.",
+          "steps": [
+            "Kies Apps in de navigatie en zoek PDFCraft.",
+            "Bekijk de status en de beschrijving van de kaart.",
+            "Sluit de gids en kies Openen als een adres is ingesteld. Rond indien nodig de eigen aanmelding van de app af.",
+            "Werk verder in de doelapp en gebruik het oorspronkelijke tabblad om terug te keren naar SynthPulse."
+          ],
+          "permissions": "Toegang tot Apps en de bijbehorende actieve module; platformbeheerders kunnen ingestelde appadressen ook zonder die module bekijken. De doelapp controleert zelf je toegang.",
+          "limits": "Openen navigeert alleen naar het ingestelde adres. De app kan een eigen aanmelding vereisen. Niet ingesteld betekent dat er geen bruikbare link is; een ingestelde link garandeert niet dat de dienst bereikbaar is. Dit is de browseringang. De kaart synchroniseert geen bestanden of projecten met een desktopeditor of andere Craft-app.",
+          "example": "Bijvoorbeeld: een pdf-document beoordelen en aanpassen."
+        },
+        "en": {
+          "title": "Open PDFCraft",
+          "purpose": "Open and edit PDF documents.",
+          "when": "Use this entry point for reviewing and adjusting a PDF document.",
+          "steps": [
+            "Choose Apps in navigation and find PDFCraft.",
+            "Review the card’s status and description.",
+            "Close the guide and choose Open when an address is configured. Complete the app’s own sign-in if required.",
+            "Continue in the destination app and use the original tab to return to SynthPulse."
+          ],
+          "permissions": "Access to Apps and the associated active module; platform administrators can discover configured app addresses even without that module. The destination app checks its own access.",
+          "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable. This is the browser entry point. The card does not synchronise files or projects with a desktop editor or another Craft app.",
+          "example": "For example: reviewing and adjusting a PDF document."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.soundcraft",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured app directory and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.soundcraft",
+        "#mainApps [data-app-id=\"soundcraft\"]"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "SoundCraft openen",
+          "purpose": "Neem audio op en bewerk geluid.",
+          "when": "Gebruik deze ingang voor een geluidsopname voorbereiden en bewerken.",
+          "steps": [
+            "Kies Apps in de navigatie en zoek SoundCraft.",
+            "Bekijk de status en de beschrijving van de kaart.",
+            "Sluit de gids en kies Openen als een adres is ingesteld. Rond indien nodig de eigen aanmelding van de app af.",
+            "Werk verder in de doelapp en gebruik het oorspronkelijke tabblad om terug te keren naar SynthPulse."
+          ],
+          "permissions": "Toegang tot Apps en de bijbehorende actieve module; platformbeheerders kunnen ingestelde appadressen ook zonder die module bekijken. De doelapp controleert zelf je toegang.",
+          "limits": "Openen navigeert alleen naar het ingestelde adres. De app kan een eigen aanmelding vereisen. Niet ingesteld betekent dat er geen bruikbare link is; een ingestelde link garandeert niet dat de dienst bereikbaar is. Dit is de browseringang. De kaart synchroniseert geen bestanden of projecten met een desktopeditor of andere Craft-app.",
+          "example": "Bijvoorbeeld: een geluidsopname voorbereiden en bewerken."
+        },
+        "en": {
+          "title": "Open SoundCraft",
+          "purpose": "Record audio and edit sound.",
+          "when": "Use this entry point for preparing and editing an audio recording.",
+          "steps": [
+            "Choose Apps in navigation and find SoundCraft.",
+            "Review the card’s status and description.",
+            "Close the guide and choose Open when an address is configured. Complete the app’s own sign-in if required.",
+            "Continue in the destination app and use the original tab to return to SynthPulse."
+          ],
+          "permissions": "Access to Apps and the associated active module; platform administrators can discover configured app addresses even without that module. The destination app checks its own access.",
+          "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable. This is the browser entry point. The card does not synchronise files or projects with a desktop editor or another Craft app.",
+          "example": "For example: preparing and editing an audio recording."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.hyperframes",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured app directory and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.hyperframes",
+        "#mainApps [data-app-id=\"hyperframes\"]"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "HyperFrames openen",
+          "purpose": "Maak en bekijk animaties en videocomposities.",
+          "when": "Gebruik deze ingang voor een animatie of videocompositie bekijken.",
+          "steps": [
+            "Kies Apps in de navigatie en zoek HyperFrames.",
+            "Bekijk de status en de beschrijving van de kaart.",
+            "Sluit de gids en kies Openen als een adres is ingesteld. Rond indien nodig de eigen aanmelding van de app af.",
+            "Werk verder in de doelapp en gebruik het oorspronkelijke tabblad om terug te keren naar SynthPulse."
+          ],
+          "permissions": "Toegang tot Apps en de bijbehorende actieve module; platformbeheerders kunnen ingestelde appadressen ook zonder die module bekijken. De doelapp controleert zelf je toegang.",
+          "limits": "Openen navigeert alleen naar het ingestelde adres. De app kan een eigen aanmelding vereisen. Niet ingesteld betekent dat er geen bruikbare link is; een ingestelde link garandeert niet dat de dienst bereikbaar is.",
+          "example": "Bijvoorbeeld: een animatie of videocompositie bekijken."
+        },
+        "en": {
+          "title": "Open HyperFrames",
+          "purpose": "Create and preview animations and video compositions.",
+          "when": "Use this entry point for previewing an animation or video composition.",
+          "steps": [
+            "Choose Apps in navigation and find HyperFrames.",
+            "Review the card’s status and description.",
+            "Close the guide and choose Open when an address is configured. Complete the app’s own sign-in if required.",
+            "Continue in the destination app and use the original tab to return to SynthPulse."
+          ],
+          "permissions": "Access to Apps and the associated active module; platform administrators can discover configured app addresses even without that module. The destination app checks its own access.",
+          "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable.",
+          "example": "For example: previewing an animation or video composition."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.vision_studio",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured app directory and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.vision_studio",
+        "#mainApps [data-app-id=\"vision_studio\"]"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "Vision Studio openen",
+          "purpose": "Open de studio voor visuele projecten.",
+          "when": "Gebruik deze ingang voor een visueel project openen in de studio.",
+          "steps": [
+            "Kies Apps in de navigatie en zoek Vision Studio.",
+            "Bekijk de status en de beschrijving van de kaart.",
+            "Sluit de gids en kies Openen als een adres is ingesteld. Rond indien nodig de eigen aanmelding van de app af.",
+            "Werk verder in de doelapp en gebruik het oorspronkelijke tabblad om terug te keren naar SynthPulse."
+          ],
+          "permissions": "Toegang tot Apps en de bijbehorende actieve module; platformbeheerders kunnen ingestelde appadressen ook zonder die module bekijken. De doelapp controleert zelf je toegang.",
+          "limits": "Openen navigeert alleen naar het ingestelde adres. De app kan een eigen aanmelding vereisen. Niet ingesteld betekent dat er geen bruikbare link is; een ingestelde link garandeert niet dat de dienst bereikbaar is.",
+          "example": "Bijvoorbeeld: een visueel project openen in de studio."
+        },
+        "en": {
+          "title": "Open Vision Studio",
+          "purpose": "Open the studio for visual projects.",
+          "when": "Use this entry point for opening a visual project in the studio.",
+          "steps": [
+            "Choose Apps in navigation and find Vision Studio.",
+            "Review the card’s status and description.",
+            "Close the guide and choose Open when an address is configured. Complete the app’s own sign-in if required.",
+            "Continue in the destination app and use the original tab to return to SynthPulse."
+          ],
+          "permissions": "Access to Apps and the associated active module; platform administrators can discover configured app addresses even without that module. The destination app checks its own access.",
+          "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable.",
+          "example": "For example: opening a visual project in the studio."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.n8n",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured app directory and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.n8n",
+        "#mainApps [data-app-id=\"n8n\"]"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "n8n openen",
+          "purpose": "Bouw en beheer geautomatiseerde workflows.",
+          "when": "Gebruik deze ingang voor een bestaande workflow bekijken voordat je die wijzigt.",
+          "steps": [
+            "Kies Apps in de navigatie en zoek n8n.",
+            "Bekijk de status en de beschrijving van de kaart.",
+            "Sluit de gids en kies Openen als een adres is ingesteld. Rond indien nodig de eigen aanmelding van de app af.",
+            "Werk verder in de doelapp en gebruik het oorspronkelijke tabblad om terug te keren naar SynthPulse."
+          ],
+          "permissions": "Platformbeheerrechten in SynthPulse en geldige toegang tot de doelapp. Leden kunnen de editor alleen zien als de installatiebeheerder dat expliciet heeft toegestaan.",
+          "limits": "Openen navigeert alleen naar het ingestelde adres. De app kan een eigen aanmelding vereisen. Niet ingesteld betekent dat er geen bruikbare link is; een ingestelde link garandeert niet dat de dienst bereikbaar is. Wijzigingen, uitvoeringen of verzendingen doe je bewust binnen de doelapp; deze gids voert ze niet uit.",
+          "example": "Bijvoorbeeld: een bestaande workflow bekijken voordat je die wijzigt."
+        },
+        "en": {
+          "title": "Open n8n",
+          "purpose": "Build and manage automated workflows.",
+          "when": "Use this entry point for reviewing an existing workflow before changing it.",
+          "steps": [
+            "Choose Apps in navigation and find n8n.",
+            "Review the card’s status and description.",
+            "Close the guide and choose Open when an address is configured. Complete the app’s own sign-in if required.",
+            "Continue in the destination app and use the original tab to return to SynthPulse."
+          ],
+          "permissions": "Platform administration access in SynthPulse and valid access to the destination app. Members only see the editor when the installation administrator has explicitly allowed it.",
+          "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable. Make changes, run tasks or send documents deliberately inside the destination app; this guide does not perform them.",
+          "example": "For example: reviewing an existing workflow before changing it."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.omniroute",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured app directory and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.omniroute",
+        "#mainApps [data-app-id=\"omniroute\"]"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "OmniRoute openen",
+          "purpose": "Beheer modelroutes en verbindingen met AI-aanbieders.",
+          "when": "Gebruik deze ingang voor controleren welke modelroute voor een aanbieder is ingesteld.",
+          "steps": [
+            "Kies Apps in de navigatie en zoek OmniRoute.",
+            "Bekijk de status en de beschrijving van de kaart.",
+            "Sluit de gids en kies Openen als een adres is ingesteld. Rond indien nodig de eigen aanmelding van de app af.",
+            "Werk verder in de doelapp en gebruik het oorspronkelijke tabblad om terug te keren naar SynthPulse."
+          ],
+          "permissions": "Platformbeheerrechten in SynthPulse en geldige toegang tot de doelapp.",
+          "limits": "Openen navigeert alleen naar het ingestelde adres. De app kan een eigen aanmelding vereisen. Niet ingesteld betekent dat er geen bruikbare link is; een ingestelde link garandeert niet dat de dienst bereikbaar is. Wijzigingen, uitvoeringen of verzendingen doe je bewust binnen de doelapp; deze gids voert ze niet uit.",
+          "example": "Bijvoorbeeld: controleren welke modelroute voor een aanbieder is ingesteld."
+        },
+        "en": {
+          "title": "Open OmniRoute",
+          "purpose": "Manage model routing and AI provider connections.",
+          "when": "Use this entry point for checking which model route is configured for a provider.",
+          "steps": [
+            "Choose Apps in navigation and find OmniRoute.",
+            "Review the card’s status and description.",
+            "Close the guide and choose Open when an address is configured. Complete the app’s own sign-in if required.",
+            "Continue in the destination app and use the original tab to return to SynthPulse."
+          ],
+          "permissions": "Platform administration access in SynthPulse and valid access to the destination app.",
+          "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable. Make changes, run tasks or send documents deliberately inside the destination app; this guide does not perform them.",
+          "example": "For example: checking which model route is configured for a provider."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.nango",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured app directory and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.nango",
+        "#mainApps [data-app-id=\"nango\"]"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "Nango openen",
+          "purpose": "Beheer integraties en verbindingen met externe diensten.",
+          "when": "Gebruik deze ingang voor de inrichting van een externe koppeling bekijken.",
+          "steps": [
+            "Kies Apps in de navigatie en zoek Nango.",
+            "Bekijk de status en de beschrijving van de kaart.",
+            "Sluit de gids en kies Openen als een adres is ingesteld. Rond indien nodig de eigen aanmelding van de app af.",
+            "Werk verder in de doelapp en gebruik het oorspronkelijke tabblad om terug te keren naar SynthPulse."
+          ],
+          "permissions": "Platformbeheerrechten in SynthPulse en geldige toegang tot de doelapp.",
+          "limits": "Openen navigeert alleen naar het ingestelde adres. De app kan een eigen aanmelding vereisen. Niet ingesteld betekent dat er geen bruikbare link is; een ingestelde link garandeert niet dat de dienst bereikbaar is. Wijzigingen, uitvoeringen of verzendingen doe je bewust binnen de doelapp; deze gids voert ze niet uit.",
+          "example": "Bijvoorbeeld: de inrichting van een externe koppeling bekijken."
+        },
+        "en": {
+          "title": "Open Nango",
+          "purpose": "Manage integrations and connections to external services.",
+          "when": "Use this entry point for reviewing an external integration setup.",
+          "steps": [
+            "Choose Apps in navigation and find Nango.",
+            "Review the card’s status and description.",
+            "Close the guide and choose Open when an address is configured. Complete the app’s own sign-in if required.",
+            "Continue in the destination app and use the original tab to return to SynthPulse."
+          ],
+          "permissions": "Platform administration access in SynthPulse and valid access to the destination app.",
+          "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable. Make changes, run tasks or send documents deliberately inside the destination app; this guide does not perform them.",
+          "example": "For example: reviewing an external integration setup."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.docuseal",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured app directory and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.docuseal",
+        "#mainApps [data-app-id=\"docuseal\"]"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "DocuSeal openen",
+          "purpose": "Bereid documenten voor en volg digitale ondertekening.",
+          "when": "Gebruik deze ingang voor een document voor ondertekening voorbereiden.",
+          "steps": [
+            "Kies Apps in de navigatie en zoek DocuSeal.",
+            "Bekijk de status en de beschrijving van de kaart.",
+            "Sluit de gids en kies Openen als een adres is ingesteld. Rond indien nodig de eigen aanmelding van de app af.",
+            "Werk verder in de doelapp en gebruik het oorspronkelijke tabblad om terug te keren naar SynthPulse."
+          ],
+          "permissions": "Toegang tot Apps en de bijbehorende actieve module; platformbeheerders kunnen ingestelde appadressen ook zonder die module bekijken. De doelapp controleert zelf je toegang.",
+          "limits": "Openen navigeert alleen naar het ingestelde adres. De app kan een eigen aanmelding vereisen. Niet ingesteld betekent dat er geen bruikbare link is; een ingestelde link garandeert niet dat de dienst bereikbaar is. Wijzigingen, uitvoeringen of verzendingen doe je bewust binnen de doelapp; deze gids voert ze niet uit.",
+          "example": "Bijvoorbeeld: een document voor ondertekening voorbereiden."
+        },
+        "en": {
+          "title": "Open DocuSeal",
+          "purpose": "Prepare documents and follow digital signing.",
+          "when": "Use this entry point for preparing a document for signature.",
+          "steps": [
+            "Choose Apps in navigation and find DocuSeal.",
+            "Review the card’s status and description.",
+            "Close the guide and choose Open when an address is configured. Complete the app’s own sign-in if required.",
+            "Continue in the destination app and use the original tab to return to SynthPulse."
+          ],
+          "permissions": "Access to Apps and the associated active module; platform administrators can discover configured app addresses even without that module. The destination app checks its own access.",
+          "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable. Make changes, run tasks or send documents deliberately inside the destination app; this guide does not perform them.",
+          "example": "For example: preparing a document for signature."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.pareltje",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured app directory and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.pareltje",
+        "#mainApps [data-app-id=\"pareltje\"]"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "Pareltje openen",
+          "purpose": "Open het beheerpaneel van Pareltje.",
+          "when": "Gebruik deze ingang voor het beheer van Pareltje openen.",
+          "steps": [
+            "Kies Apps in de navigatie en zoek Pareltje.",
+            "Bekijk de status en de beschrijving van de kaart.",
+            "Sluit de gids en kies Openen als een adres is ingesteld. Rond indien nodig de eigen aanmelding van de app af.",
+            "Werk verder in de doelapp en gebruik het oorspronkelijke tabblad om terug te keren naar SynthPulse."
+          ],
+          "permissions": "Platformbeheerrechten in SynthPulse en geldige toegang tot de doelapp.",
+          "limits": "Openen navigeert alleen naar het ingestelde adres. De app kan een eigen aanmelding vereisen. Niet ingesteld betekent dat er geen bruikbare link is; een ingestelde link garandeert niet dat de dienst bereikbaar is.",
+          "example": "Bijvoorbeeld: het beheer van Pareltje openen."
+        },
+        "en": {
+          "title": "Open Pareltje",
+          "purpose": "Open the Pareltje management dashboard.",
+          "when": "Use this entry point for opening Pareltje management.",
+          "steps": [
+            "Choose Apps in navigation and find Pareltje.",
+            "Review the card’s status and description.",
+            "Close the guide and choose Open when an address is configured. Complete the app’s own sign-in if required.",
+            "Continue in the destination app and use the original tab to return to SynthPulse."
+          ],
+          "permissions": "Platform administration access in SynthPulse and valid access to the destination app.",
+          "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable.",
+          "example": "For example: opening Pareltje management."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.slibdetect",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured app directory and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.slibdetect",
+        "#mainApps [data-app-id=\"slibdetect\"]"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "SlibDetect openen",
+          "purpose": "Open het beheerpaneel van SlibDetect.",
+          "when": "Gebruik deze ingang voor het beheer van SlibDetect openen.",
+          "steps": [
+            "Kies Apps in de navigatie en zoek SlibDetect.",
+            "Bekijk de status en de beschrijving van de kaart.",
+            "Sluit de gids en kies Openen als een adres is ingesteld. Rond indien nodig de eigen aanmelding van de app af.",
+            "Werk verder in de doelapp en gebruik het oorspronkelijke tabblad om terug te keren naar SynthPulse."
+          ],
+          "permissions": "Platformbeheerrechten in SynthPulse en geldige toegang tot de doelapp.",
+          "limits": "Openen navigeert alleen naar het ingestelde adres. De app kan een eigen aanmelding vereisen. Niet ingesteld betekent dat er geen bruikbare link is; een ingestelde link garandeert niet dat de dienst bereikbaar is.",
+          "example": "Bijvoorbeeld: het beheer van SlibDetect openen."
+        },
+        "en": {
+          "title": "Open SlibDetect",
+          "purpose": "Open the SlibDetect management dashboard.",
+          "when": "Use this entry point for opening SlibDetect management.",
+          "steps": [
+            "Choose Apps in navigation and find SlibDetect.",
+            "Review the card’s status and description.",
+            "Close the guide and choose Open when an address is configured. Complete the app’s own sign-in if required.",
+            "Continue in the destination app and use the original tab to return to SynthPulse."
+          ],
+          "permissions": "Platform administration access in SynthPulse and valid access to the destination app.",
+          "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable.",
+          "example": "For example: opening SlibDetect management."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.cockpit",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured app directory and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.cockpit",
+        "#mainApps [data-app-id=\"cockpit\"]"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "MSP Cockpit openen",
+          "purpose": "Beheer installaties, organisaties en uitrol.",
+          "when": "Gebruik deze ingang voor een klantinstallatie en de bijbehorende uitrol bekijken.",
+          "steps": [
+            "Kies Apps in de navigatie en zoek MSP Cockpit.",
+            "Bekijk de status en de beschrijving van de kaart.",
+            "Sluit de gids en kies Openen als een adres is ingesteld. Rond indien nodig de eigen aanmelding van de app af.",
+            "Werk verder in de doelapp en gebruik het oorspronkelijke tabblad om terug te keren naar SynthPulse."
+          ],
+          "permissions": "Platformbeheerrechten in SynthPulse en geldige toegang tot de doelapp.",
+          "limits": "Openen navigeert alleen naar het ingestelde adres. De app kan een eigen aanmelding vereisen. Niet ingesteld betekent dat er geen bruikbare link is; een ingestelde link garandeert niet dat de dienst bereikbaar is. Wijzigingen, uitvoeringen of verzendingen doe je bewust binnen de doelapp; deze gids voert ze niet uit.",
+          "example": "Bijvoorbeeld: een klantinstallatie en de bijbehorende uitrol bekijken."
+        },
+        "en": {
+          "title": "Open MSP Cockpit",
+          "purpose": "Manage installations, organisations and deployments.",
+          "when": "Use this entry point for reviewing a client installation and its deployment.",
+          "steps": [
+            "Choose Apps in navigation and find MSP Cockpit.",
+            "Review the card’s status and description.",
+            "Close the guide and choose Open when an address is configured. Complete the app’s own sign-in if required.",
+            "Continue in the destination app and use the original tab to return to SynthPulse."
+          ],
+          "permissions": "Platform administration access in SynthPulse and valid access to the destination app.",
+          "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable. Make changes, run tasks or send documents deliberately inside the destination app; this guide does not perform them.",
+          "example": "For example: reviewing a client installation and its deployment."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.silverbullet",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured app directory and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.silverbullet",
+        "#mainApps [data-app-id=\"silverbullet\"]"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "SilverBullet openen",
+          "purpose": "Schrijf en organiseer kennisnotities.",
+          "when": "Gebruik deze ingang voor kennisnotities in een eigen notitieomgeving ordenen.",
+          "steps": [
+            "Kies Apps in de navigatie en zoek SilverBullet.",
+            "Bekijk de status en de beschrijving van de kaart.",
+            "Sluit de gids en kies Openen als een adres is ingesteld. Rond indien nodig de eigen aanmelding van de app af.",
+            "Werk verder in de doelapp en gebruik het oorspronkelijke tabblad om terug te keren naar SynthPulse."
+          ],
+          "permissions": "Platformbeheerrechten in SynthPulse en geldige toegang tot de doelapp.",
+          "limits": "Openen navigeert alleen naar het ingestelde adres. De app kan een eigen aanmelding vereisen. Niet ingesteld betekent dat er geen bruikbare link is; een ingestelde link garandeert niet dat de dienst bereikbaar is.",
+          "example": "Bijvoorbeeld: kennisnotities in een eigen notitieomgeving ordenen."
+        },
+        "en": {
+          "title": "Open SilverBullet",
+          "purpose": "Write and organise knowledge notes.",
+          "when": "Use this entry point for organising knowledge notes in a dedicated notebook.",
+          "steps": [
+            "Choose Apps in navigation and find SilverBullet.",
+            "Review the card’s status and description.",
+            "Close the guide and choose Open when an address is configured. Complete the app’s own sign-in if required.",
+            "Continue in the destination app and use the original tab to return to SynthPulse."
+          ],
+          "permissions": "Platform administration access in SynthPulse and valid access to the destination app.",
+          "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable.",
+          "example": "For example: organising knowledge notes in a dedicated notebook."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.pixel_office",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured app directory and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.pixel_office",
+        "#mainApps [data-app-id=\"pixel_office\"]"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "Pixel Office openen",
+          "purpose": "Bekijk de virtuele kantooromgeving.",
+          "when": "Gebruik deze ingang voor de virtuele kantooromgeving bekijken.",
+          "steps": [
+            "Kies Apps in de navigatie en zoek Pixel Office.",
+            "Bekijk de status en de beschrijving van de kaart.",
+            "Sluit de gids en kies Openen als een adres is ingesteld. Rond indien nodig de eigen aanmelding van de app af.",
+            "Werk verder in de doelapp en gebruik het oorspronkelijke tabblad om terug te keren naar SynthPulse."
+          ],
+          "permissions": "Platformbeheerrechten in SynthPulse en geldige toegang tot de doelapp.",
+          "limits": "Openen navigeert alleen naar het ingestelde adres. De app kan een eigen aanmelding vereisen. Niet ingesteld betekent dat er geen bruikbare link is; een ingestelde link garandeert niet dat de dienst bereikbaar is.",
+          "example": "Bijvoorbeeld: de virtuele kantooromgeving bekijken."
+        },
+        "en": {
+          "title": "Open Pixel Office",
+          "purpose": "View the virtual office environment.",
+          "when": "Use this entry point for viewing the virtual office environment.",
+          "steps": [
+            "Choose Apps in navigation and find Pixel Office.",
+            "Review the card’s status and description.",
+            "Close the guide and choose Open when an address is configured. Complete the app’s own sign-in if required.",
+            "Continue in the destination app and use the original tab to return to SynthPulse."
+          ],
+          "permissions": "Platform administration access in SynthPulse and valid access to the destination app.",
+          "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable.",
+          "example": "For example: viewing the virtual office environment."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.mnemosyne",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured app directory and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.mnemosyne",
+        "#mainApps [data-app-id=\"mnemosyne\"]"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "Mnemosyne openen",
+          "purpose": "Beheer het geheugen van de AI-omgeving.",
+          "when": "Gebruik deze ingang voor het beheer van het AI-geheugen bekijken.",
+          "steps": [
+            "Kies Apps in de navigatie en zoek Mnemosyne.",
+            "Bekijk de status en de beschrijving van de kaart.",
+            "Sluit de gids en kies Openen als een adres is ingesteld. Rond indien nodig de eigen aanmelding van de app af.",
+            "Werk verder in de doelapp en gebruik het oorspronkelijke tabblad om terug te keren naar SynthPulse."
+          ],
+          "permissions": "Platformbeheerrechten in SynthPulse en geldige toegang tot de doelapp.",
+          "limits": "Openen navigeert alleen naar het ingestelde adres. De app kan een eigen aanmelding vereisen. Niet ingesteld betekent dat er geen bruikbare link is; een ingestelde link garandeert niet dat de dienst bereikbaar is.",
+          "example": "Bijvoorbeeld: het beheer van het AI-geheugen bekijken."
+        },
+        "en": {
+          "title": "Open Mnemosyne",
+          "purpose": "Manage memory for the AI environment.",
+          "when": "Use this entry point for reviewing AI memory management.",
+          "steps": [
+            "Choose Apps in navigation and find Mnemosyne.",
+            "Review the card’s status and description.",
+            "Close the guide and choose Open when an address is configured. Complete the app’s own sign-in if required.",
+            "Continue in the destination app and use the original tab to return to SynthPulse."
+          ],
+          "permissions": "Platform administration access in SynthPulse and valid access to the destination app.",
+          "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable.",
+          "example": "For example: reviewing AI memory management."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.strategy_gantt",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured app directory and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.strategy_gantt",
+        "#mainApps [data-app-id=\"strategy_gantt\"]"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "Strategy Gantt openen",
+          "purpose": "Bekijk en beheer de strategische planning.",
+          "when": "Gebruik deze ingang voor de strategische planning bekijken.",
+          "steps": [
+            "Kies Apps in de navigatie en zoek Strategy Gantt.",
+            "Bekijk de status en de beschrijving van de kaart.",
+            "Sluit de gids en kies Openen als een adres is ingesteld. Rond indien nodig de eigen aanmelding van de app af.",
+            "Werk verder in de doelapp en gebruik het oorspronkelijke tabblad om terug te keren naar SynthPulse."
+          ],
+          "permissions": "Platformbeheerrechten in SynthPulse en geldige toegang tot de doelapp.",
+          "limits": "Openen navigeert alleen naar het ingestelde adres. De app kan een eigen aanmelding vereisen. Niet ingesteld betekent dat er geen bruikbare link is; een ingestelde link garandeert niet dat de dienst bereikbaar is.",
+          "example": "Bijvoorbeeld: de strategische planning bekijken."
+        },
+        "en": {
+          "title": "Open Strategy Gantt",
+          "purpose": "View and manage strategic planning.",
+          "when": "Use this entry point for reviewing strategic planning.",
+          "steps": [
+            "Choose Apps in navigation and find Strategy Gantt.",
+            "Review the card’s status and description.",
+            "Close the guide and choose Open when an address is configured. Complete the app’s own sign-in if required.",
+            "Continue in the destination app and use the original tab to return to SynthPulse."
+          ],
+          "permissions": "Platform administration access in SynthPulse and valid access to the destination app.",
+          "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable.",
+          "example": "For example: reviewing strategic planning."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.openwebui",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured app directory and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.openwebui",
+        "#mainApps [data-app-id=\"openwebui\"]"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "Open WebUI openen",
+          "purpose": "Open de aanvullende AI-chatomgeving.",
+          "when": "Gebruik deze ingang voor de aanvullende chatomgeving openen zodra een adres is ingesteld.",
+          "steps": [
+            "Kies Apps in de navigatie en zoek Open WebUI.",
+            "Bekijk de status en de beschrijving van de kaart.",
+            "Sluit de gids en kies Openen als een adres is ingesteld. Rond indien nodig de eigen aanmelding van de app af.",
+            "Werk verder in de doelapp en gebruik het oorspronkelijke tabblad om terug te keren naar SynthPulse."
+          ],
+          "permissions": "Platformbeheerrechten in SynthPulse en geldige toegang tot de doelapp.",
+          "limits": "Openen navigeert alleen naar het ingestelde adres. De app kan een eigen aanmelding vereisen. Niet ingesteld betekent dat er geen bruikbare link is; een ingestelde link garandeert niet dat de dienst bereikbaar is.",
+          "example": "Bijvoorbeeld: de aanvullende chatomgeving openen zodra een adres is ingesteld."
+        },
+        "en": {
+          "title": "Open Open WebUI",
+          "purpose": "Open the additional AI chat environment.",
+          "when": "Use this entry point for opening the additional chat environment once an address is configured.",
+          "steps": [
+            "Choose Apps in navigation and find Open WebUI.",
+            "Review the card’s status and description.",
+            "Close the guide and choose Open when an address is configured. Complete the app’s own sign-in if required.",
+            "Continue in the destination app and use the original tab to return to SynthPulse."
+          ],
+          "permissions": "Platform administration access in SynthPulse and valid access to the destination app.",
+          "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable.",
+          "example": "For example: opening the additional chat environment once an address is configured."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.language",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured app directory and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.language",
+        "#appsLanguage"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "De taal van Apps wijzigen",
+          "purpose": "Lees de appnamen, beschrijvingen en bediening in Nederlands of Engels.",
+          "when": "Wanneer je het appoverzicht in de andere taal wilt gebruiken.",
+          "steps": [
+            "Open Apps.",
+            "Kies Nederlands of English met Taal bovenaan.",
+            "Kies Uitleg bij een app om de gids in dezelfde taal te starten."
+          ],
+          "permissions": "Dezelfde toegang als Apps. De taalkeuze verandert geen rechten.",
+          "limits": "De keuze wordt in deze browser opgeslagen. Ze verandert niet de taalinstelling binnen de externe apps of van andere gebruikers.",
+          "example": "Kies Nederlands om de appbeschrijvingen en interactieve uitleg in het Nederlands te lezen."
+        },
+        "en": {
+          "title": "Change the Apps language",
+          "purpose": "Read app names, descriptions and controls in Dutch or English.",
+          "when": "When you want to use the app directory in the other language.",
+          "steps": [
+            "Open Apps.",
+            "Choose Nederlands or English using Language at the top.",
+            "Choose Guide on an app to start its guide in the same language."
+          ],
+          "permissions": "The same access as Apps. The language choice does not change permissions.",
+          "limits": "The choice is stored in this browser. It does not change the language inside external applications or for other users.",
+          "example": "Choose English to read app descriptions and interactive explanations in English."
         }
       }
     }

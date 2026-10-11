@@ -71,7 +71,7 @@ identity and policy returns 503 without revealing app entries.
 - `id`: the audited app ID, or the legacy module ID.
 - `module`: its existing module association.
 - `name` and `description`: objects with `nl` and `en` text.
-- `category`: `creative`, `productivity`, `automation` or `platform`.
+- `category`: `creative`, `craft`, `productivity`, `automation` or `platform`.
 - `access`: `member` or `platform` after applying the workflow editor opt-in.
 - `url`: a validated HTTPS address, or `null`.
 - `status`: `configured` or `unconfigured`.

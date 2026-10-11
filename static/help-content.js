@@ -581,13 +581,13 @@ window.SynthPulseHelpContent = {
         },
         "apps": {
           "title": "Apps",
-          "summary": "Open configured apps in a new tab.",
+          "summary": "Open the available applications for your installation from Apps in navigation.",
           "sections": [
             {
-              "id": "launcher",
-              "title": "Open apps",
-              "body": "Open Apps at the top. Only configured links for active modules appear. Each app checks your access itself.",
-              "target": "#btnApps"
+              "id": "directory",
+              "title": "Apps",
+              "body": "Choose Apps in navigation. You must be signed in. Members see permitted apps for active modules; platform administrators also see configured management apps. Each application checks its own access.",
+              "target": "#mainApps"
             }
           ],
           "related": [
@@ -1253,13 +1253,13 @@ window.SynthPulseHelpContent = {
         },
         "apps": {
           "title": "Apps",
-          "summary": "Open ingestelde apps in een nieuw tabblad.",
+          "summary": "Open de beschikbare toepassingen van je installatie vanuit Apps in de navigatie.",
           "sections": [
             {
-              "id": "launcher",
-              "title": "Apps openen",
-              "body": "Open Apps bovenaan. Je ziet alleen ingestelde links voor actieve modules. Elke app controleert zelf je toegang.",
-              "target": "#btnApps"
+              "id": "directory",
+              "title": "Apps",
+              "body": "Kies Apps in de navigatie. Je moet aangemeld zijn. Leden zien toegestane apps voor actieve modules; platformbeheerders zien ook ingestelde beheerapps. Iedere app controleert zelf de toegang.",
+              "target": "#mainApps"
             }
           ],
           "related": [

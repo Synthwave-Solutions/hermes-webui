@@ -1,14 +1,15 @@
 # Feature tour target audit
 
-`static/help-feature-targets.js` exports a deeply frozen `window.SynthPulseFeatureTargets` object. It covers all 276 WebUI feature IDs in `help-features.js`. Each record contains a real `panel`, an optional Settings `section`, and an ordered array of candidate CSS `targets`. Optional `entryTargets` and bilingual `entryHint` distinguish a prerequisite entry from the actual feature control. They are considered only when no exact target is visible, and the hint must explicitly say what the highlight represents and how to reach the feature. These are inert navigation hints, not permission grants or evidence that a control is currently visible.
+`static/help-feature-targets.js` exports a deeply frozen `window.SynthPulseFeatureTargets` object. It covers all 305 WebUI feature IDs in `help-features.js`. Each record contains a real `panel`, an optional Settings `section`, and an ordered array of candidate CSS `targets`. Optional `entryTargets` and bilingual `entryHint` distinguish a prerequisite entry from the actual feature control. They are considered only when no exact target is visible, and the hint must explicitly say what the highlight represents and how to reach the feature. These are inert navigation hints, not permission grants or evidence that a control is currently visible.
 
-There are 242 records with exact candidate targets, 55 records with prerequisite entry hints, and 27 records without either kind of hook. The tour controller must check the current panel, current Settings section, actual element visibility and existing access rules before highlighting anything. Hidden native inputs, lazy content, unopened dialogs, missing data, responsive controls and role restrictions can all prevent a candidate from being available. Safe panel/section navigation and opening native disclosure containers may expose an exact target. Never click an action control, populate a field or submit a form to make a target appear. An entry target only points out a next step; it does not open that entry or claim the inner field is already visible.
+There are 271 records with exact candidate targets, 55 records with prerequisite entry hints, and 27 records without either kind of hook. The tour controller must check the current panel, current Settings section, actual element visibility and existing access rules before highlighting anything. Hidden native inputs, lazy content, unopened dialogs, missing data, responsive controls and role restrictions can all prevent a candidate from being available. Safe panel/section navigation and opening native disclosure containers may expose an exact target. Never click an action control, populate a field or submit a form to make a target appear. An entry target only points out a next step; it does not open that entry or claim the inner field is already visible.
 
 ## Navigation contexts
 
 | Panel | Features |
 | --- | ---: |
-| chat | 78 |
+| chat | 77 |
+| apps | 30 |
 | settings | 98 |
 | tasks | 15 |
 | workspaces | 2 |
@@ -32,7 +33,7 @@ Conversation exports, imports, sharing and clearing are in Settings / Conversati
 
 ## Chat coverage
 
-Use the mapped panel to build a page tour, rather than only catalogue area `chat`. Chat has 78 applicable features across areas: composer sending, model and reasoning controls, people and groups, tool and context controls, attachments, saved prompts, mentions and slash commands; voice dictation, loop, realtime and message readout; bot selection; session creation, search and split; workspace selection and file browsing; individual approval choices and clarification; Apps; and relevant global controls.
+Use the mapped panel to build a page tour, rather than only catalogue area `chat`. Chat has 77 applicable features across areas: composer sending, model and reasoning controls, people and groups, tool and context controls, attachments, saved prompts, mentions and slash commands; voice dictation, loop, realtime and message readout; bot selection; session creation, search and split; workspace selection and file browsing; individual approval choices and clarification; and relevant global controls.
 
 Some controls are conditional. Message copy, edit and speech need an existing suitable message; edit, retry and fork use stable `data-help-action` hooks on the existing message action buttons. The edit textarea remains a secondary target after the user opens it. Slash commands target the real composer, not invented command buttons. Bot creation uses its existing entry button; detailed bot fields appear only after the user opens the builder. Module details target the actual explanatory summary or metadata container, not an inferred enable/purchase action.
 
@@ -64,3 +65,14 @@ The tests prove metadata structure and source grounding. They do not prove a can
 - Wiki search points to the existing `.wiki-browse-btn` when its browser overlay is closed.
 
 Approvals, media output, active voice controls, restricted configuration, empty collections and opaque iframe pages still require their real state. No generic page, help button or unrelated control stands in for a missing feature.
+
+## Apps directory
+
+Apps has its own panel and 29 dedicated topics: overview, search, categories, language and
+all 25 audited app entries. The legacy `webui.modules.apps` deep link also opens
+the Apps overview. Each app points at its actual `data-app-id` card, including
+intentional unconfigured cards. When starting a named app explanation, the tour
+uses the directory's presentation-only `reveal(id)` API to clear filters and
+reveal the permitted card; it does not open the external application. A returned
+cleanup function is called on step changes, close or a cancelled preparation.
+Cards omitted by server authorization are never recreated by the guide.

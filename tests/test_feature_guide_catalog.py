@@ -88,3 +88,22 @@ def test_all_current_composer_commands_are_documented():
     for command, feature_id in coverage['commands'].items():
         for lang in ('en', 'nl'):
             assert any('/' + command + '.' in step for step in entries[feature_id]['locales'][lang]['steps'])
+
+
+def test_every_registered_app_has_complete_bilingual_guide_entry():
+    from api.app_catalog import REGISTRY
+    entries = {feature['id']: feature for feature in WEB['features']}
+    for app_id, spec in REGISTRY.items():
+        entry = entries['webui.apps.' + app_id]
+        assert entry['area'] == 'apps'
+        assert entry['status'] == 'conditional'
+        assert '#mainApps [data-app-id="' + app_id + '"]' in entry['anchors']
+        for lang in ('nl', 'en'):
+            copy = entry['locales'][lang]
+            assert spec.name in copy['title']
+            assert len(copy['steps']) >= 4
+            assert 'Apps' in copy['steps'][0]
+    for topic in ('overview', 'search', 'categories', 'language'):
+        assert entries['webui.apps.' + topic]['area'] == 'apps'
+    legacy = entries['webui.modules.apps']
+    assert legacy['area'] == 'apps' and '#mainApps' in legacy['anchors']
