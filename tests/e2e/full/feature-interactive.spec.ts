@@ -51,7 +51,7 @@ test('every catalogue feature has complete interactive NL/EN content, including 
   }
   return {count:ids.length,failures,clean:!document.querySelector('.guida-tooltip,#spFeatureTourAnchor,[data-sp-help-step]')};
  });
- expect(report.count).toBe(481);expect(report.failures).toEqual([]);expect(report.clean).toBe(true);
+ expect(report.count).toBe(483);expect(report.failures).toEqual([]);expect(report.clean).toBe(true);
 });
 
 test('catalogue opens an individual or filtered tour and preserves language and selection',async({page})=>{

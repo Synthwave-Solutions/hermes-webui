@@ -25,17 +25,24 @@ Example using documentation-only addresses:
   "craft_studio": "https://studio.example.test/",
   "photocraft": "https://studio.example.test/photo/",
   "n8n": "https://workflows.example.test/",
-  "openwebui": null
+  "hermes_docs": "https://office.example.test/docs/"
 }
 ```
 
 The curated registry includes OpenDesign, Craft Studio and all eight editors,
-HyperFrames, n8n, OmniRoute, Nango, DocuSeal, MSP Cockpit, Open WebUI, RAGFlow,
-Langfuse and HermesOffice. Personal dashboards and the classic design entry are
-omitted. HermesOffice is a desktop download, identified by
-`launch_kind: desktop_download`. Its exact official GitHub latest-release URL is
-the only audited external distribution exception; arbitrary GitHub links and
-other app IDs do not receive that exception.
+HyperFrames, n8n, OmniRoute, Nango, DocuSeal, RAGFlow,
+Langfuse and five separate HermesOffice editors: Docs (Word), Sheets (Excel),
+Slides (PowerPoint), PDF and Markdown. OpenWebUI, MSP Cockpit, personal dashboards,
+and the classic design entry are omitted. Craft Studio and its editors share
+Design & video with OpenDesign and HyperFrames. Every destination follows the
+same trusted-host rule; there is no external desktop download exception.
+
+HermesOffice destinations point to the independently deployed browser workspace
+on the VPS. Each editor starts directly from its own tile. The workspace requires
+an authenticated owner account with platform access, connects AI to OmniRoute,
+and offers uploads and downloads for its document folder. It does not turn a
+shared owner workspace into an isolated workspace per tenant. The Apps guide
+explains these boundaries, file handling and each editor in Dutch and English.
 
 The URL boundary is the existing launcher boundary: HTTPS without credentials,
 query parameters or fragments; an installation-owned `SP_DOMAIN` or subdomain on
@@ -52,7 +59,7 @@ apps use `design_studio`; DocuSeal uses `e_signing` and HermesOffice uses `offic
 unless `SP_WORKFLOWS_CLIENT_EDITOR=1` explicitly permits member access; it still
 requires the `workflows` module for members.
 
-OmniRoute, Nango, MSP Cockpit, Open WebUI, RAGFlow and Langfuse are platform-only entries. Organisation,
+OmniRoute, Nango, RAGFlow, Langfuse and the HermesOffice editors are platform-only entries. Organisation,
 department and billing administrators do not thereby gain platform access.
 
 Platform administrators can discover all explicitly configured named apps,
@@ -72,7 +79,7 @@ identity and policy returns 503 without revealing app entries.
 - `id`: the audited app ID, or the legacy module ID.
 - `module`: its existing module association.
 - `name` and `description`: objects with `nl` and `en` text.
-- `category`: `creative`, `craft`, `productivity`, `automation` or `platform`.
+- `category`: `creative`, `productivity`, `automation` or `platform`.
 - `access`: `member` or `platform` after applying the workflow editor opt-in.
 - `url`: a validated HTTPS address, or `null`.
 - `status`: `configured` or `unconfigured`.
@@ -89,8 +96,8 @@ introduced. Configuration remains owned by the deployment environment.
 
 ## Browser verification
 
-The committed `scripts/e2e/server_fixture.py` seeds all 20 apps with synthetic
-HTTPS addresses, one unconfigured destination and separate platform,
+The committed `scripts/e2e/server_fixture.py` seeds all 22 apps with synthetic
+HTTPS addresses, separate platform,
 organisation-admin and member identities. Browser networking remains restricted
 to loopback. Run `scripts/e2e/run_full.py --engine <engine-checkout>` with
 `--grep 'Apps directory|every app has|organisation admin modules|member module boundary|platform launcher'`

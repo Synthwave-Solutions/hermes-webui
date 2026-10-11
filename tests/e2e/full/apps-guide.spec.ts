@@ -9,8 +9,8 @@ for(const width of [1440,390]){
   test.setTimeout(100_000);await page.setViewportSize({width,height:1000});await open(page);
   await page.waitForFunction(()=>typeof S!=='undefined'&&S._bootReady&&_loadingSessionId===null);
   await page.locator('#msg').fill('Apps guide draft remains unsent');
-  await page.evaluate(()=>switchPanel('apps'));await expect(page.locator('#mainApps [data-app-id]')).toHaveCount(20);
-  await page.locator('#appsCategory').selectOption('craft');await page.locator('#appsSearch').fill('photo');
+  await page.evaluate(()=>switchPanel('apps'));await expect(page.locator('#mainApps [data-app-id]')).toHaveCount(22);
+  await page.locator('#appsCategory').selectOption('creative');await page.locator('#appsSearch').fill('photo');
   const writes:string[]=[];page.on('request',request=>{const url=new URL(request.url());if(['POST','PUT','PATCH','DELETE'].includes(request.method())&&!['/api/help/events','/api/client-events/log'].includes(url.pathname))writes.push(url.pathname);});
   const pagesBefore=context.pages().length;
   for(const locale of ['nl','en']){
@@ -27,7 +27,7 @@ for(const width of [1440,390]){
    }
    await page.screenshot({path:info.outputPath(`apps-guide-${width}-${locale}.png`)});
    await page.keyboard.press('Escape');await expect(tip).toHaveCount(0);
-   await expect(page.locator('#appsCategory')).toHaveValue('craft');await expect(page.locator('#appsSearch')).toHaveValue('photo');
+   await expect(page.locator('#appsCategory')).toHaveValue('creative');await expect(page.locator('#appsSearch')).toHaveValue('photo');
    await expect(page.locator('.guida-highlight')).toHaveCount(0);
   }
   // The actual card button also starts its individual tour, without following

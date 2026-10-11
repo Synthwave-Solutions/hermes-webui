@@ -2424,18 +2424,6 @@
       "#mainApps [data-app-id=\"docuseal\"]"
     ]
   },
-  "webui.apps.cockpit": {
-    "panel": "apps",
-    "targets": [
-      "#mainApps [data-app-id=\"cockpit\"]"
-    ]
-  },
-  "webui.apps.openwebui": {
-    "panel": "apps",
-    "targets": [
-      "#mainApps [data-app-id=\"openwebui\"]"
-    ]
-  },
   "webui.apps.language": {
     "panel": "apps",
     "targets": [
@@ -2454,12 +2442,36 @@
       "#mainApps [data-app-id=\"langfuse\"]"
     ]
   },
-  "webui.apps.hermesoffice": {
-    "panel": "apps",
-    "targets": [
-      "#mainApps [data-app-id=\"hermesoffice\"]"
-    ]
-  }
+  "webui.apps.hermes_docs": {
+  "panel": "apps",
+  "targets": [
+    "#mainApps [data-app-id=\"hermes_docs\"]"
+  ]
+},
+  "webui.apps.hermes_sheets": {
+  "panel": "apps",
+  "targets": [
+    "#mainApps [data-app-id=\"hermes_sheets\"]"
+  ]
+},
+  "webui.apps.hermes_slides": {
+  "panel": "apps",
+  "targets": [
+    "#mainApps [data-app-id=\"hermes_slides\"]"
+  ]
+},
+  "webui.apps.hermes_pdf": {
+  "panel": "apps",
+  "targets": [
+    "#mainApps [data-app-id=\"hermes_pdf\"]"
+  ]
+},
+  "webui.apps.hermes_markdown": {
+  "panel": "apps",
+  "targets": [
+    "#mainApps [data-app-id=\"hermes_markdown\"]"
+  ]
+}
 };
   for (const entry of Object.values(entries)) {
     Object.freeze(entry.targets);

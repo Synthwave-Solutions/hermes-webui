@@ -4,7 +4,7 @@ The Help section now includes **Browse all features**. Every **Explain this page
 flow runs an interactive Guida tour over all catalogue features mapped to that page.
 Chat includes the composer, sessions, bot/voice and workspace controls, rather than
 only the three high-level overview sections. The searchable modal contains
-300 WebUI topics and a static snapshot of 181 MSP topics. Product, area and
+302 WebUI topics and a static snapshot of 181 MSP topics. Product, area and
 availability filters, English/Dutch switching, related topics and deep links work
 without a runtime connection to the MSP cockpit.
 
@@ -92,7 +92,7 @@ JSON download, unknown/deep links, hidden-control handling, escaped search text,
 keyboard focus, Escape, background shortcut isolation, draft preservation and
 390/1440-pixel layouts. Never point the mutation fixture at production.
 
-`tests/e2e/full/feature-interactive.spec.ts` additionally visits all 481 topics in
+`tests/e2e/full/feature-interactive.spec.ts` additionally visits all 483 topics in
 both languages, checks the full chat tour, individual/filtered starts, real
 spotlights, missing targets, late-close cleanup, drafts, request isolation and
 390/900/1440-pixel layouts.

@@ -2822,26 +2822,6 @@
       ]
     },
     {
-      "id": "webui.apps.cockpit",
-      "area": "apps",
-      "status": "conditional",
-      "source_refs": [
-        "api/app_catalog.py",
-        "api/apps_launcher.py",
-        "static/apps.js"
-      ]
-    },
-    {
-      "id": "webui.apps.openwebui",
-      "area": "apps",
-      "status": "conditional",
-      "source_refs": [
-        "api/app_catalog.py",
-        "api/apps_launcher.py",
-        "static/apps.js"
-      ]
-    },
-    {
       "id": "webui.apps.language",
       "area": "apps",
       "status": "conditional",
@@ -2872,7 +2852,47 @@
       ]
     },
     {
-      "id": "webui.apps.hermesoffice",
+      "id": "webui.apps.hermes_docs",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.apps.hermes_sheets",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.apps.hermes_slides",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.apps.hermes_pdf",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.apps.hermes_markdown",
       "area": "apps",
       "status": "conditional",
       "source_refs": [

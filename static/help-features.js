@@ -13119,7 +13119,7 @@ window.SynthPulseFeatureCatalog = {
       "locales": {
         "nl": {
           "title": "Apps per categorie bekijken",
-          "purpose": "Beperk het overzicht tot creatief werk, Craft Studio, productiviteit, automatisering of platformbeheer.",
+          "purpose": "Beperk het overzicht tot creatief werk, Ontwerp & video, productiviteit, automatisering of platformbeheer.",
           "when": "Wanneer je een passende tool zoekt binnen een bepaald soort werk.",
           "steps": [
             "Open Apps.",
@@ -13128,11 +13128,11 @@ window.SynthPulseFeatureCatalog = {
           ],
           "permissions": "Alleen apps die al voor jou zichtbaar zijn worden gegroepeerd. Platformbeheer blijft beperkt tot platformbeheerders.",
           "limits": "Een categorie is een weergavefilter. Je activeert geen dienst, abonnement of module. Een eventuele zoektekst blijft van toepassing.",
-          "example": "Kies Craft Studio om de studio en de acht afzonderlijke editors te bekijken."
+          "example": "Kies Ontwerp & video om de studio en de acht afzonderlijke editors te bekijken."
         },
         "en": {
           "title": "Browse apps by category",
-          "purpose": "Limit the directory to creative work, Craft Studio, productivity, automation or platform management.",
+          "purpose": "Limit the directory to creative work, Design & video, productivity, automation or platform management.",
           "when": "When you want a suitable tool for a particular type of work.",
           "steps": [
             "Open Apps.",
@@ -13141,7 +13141,7 @@ window.SynthPulseFeatureCatalog = {
           ],
           "permissions": "Only apps already visible to you are grouped. Platform management remains restricted to platform administrators.",
           "limits": "A category is a display filter. It does not activate a service, subscription or module. Any search text still applies.",
-          "example": "Choose Craft Studio to view the studio and all eight separate editors."
+          "example": "Choose Design & video to view the studio and all eight separate editors."
         }
       }
     },
@@ -13896,106 +13896,6 @@ window.SynthPulseFeatureCatalog = {
       }
     },
     {
-      "id": "webui.apps.cockpit",
-      "area": "apps",
-      "status": "conditional",
-      "conditions": [
-        "Configured app directory and existing access"
-      ],
-      "anchors": [
-        "?help_feature=webui.apps.cockpit",
-        "#mainApps [data-app-id=\"cockpit\"]"
-      ],
-      "source_refs": [
-        "api/app_catalog.py",
-        "api/apps_launcher.py",
-        "static/apps.js"
-      ],
-      "related": [
-        "webui.apps.overview"
-      ],
-      "locales": {
-        "nl": {
-          "title": "MSP Cockpit openen",
-          "purpose": "Beheer installaties, organisaties en uitrol.",
-          "when": "Gebruik deze ingang voor een klantinstallatie en de bijbehorende uitrol bekijken.",
-          "steps": [
-            "Kies Apps in de navigatie en zoek MSP Cockpit.",
-            "Bekijk de status en de beschrijving van de kaart.",
-            "Sluit de gids en kies Openen als een adres is ingesteld. Rond indien nodig de eigen aanmelding van de app af.",
-            "Werk verder in de doelapp en gebruik het oorspronkelijke tabblad om terug te keren naar SynthPulse."
-          ],
-          "permissions": "Platformbeheerrechten in SynthPulse en geldige toegang tot de doelapp.",
-          "limits": "Openen navigeert alleen naar het ingestelde adres. De app kan een eigen aanmelding vereisen. Niet ingesteld betekent dat er geen bruikbare link is; een ingestelde link garandeert niet dat de dienst bereikbaar is. Wijzigingen, uitvoeringen of verzendingen doe je bewust binnen de doelapp; deze gids voert ze niet uit.",
-          "example": "Bijvoorbeeld: een klantinstallatie en de bijbehorende uitrol bekijken."
-        },
-        "en": {
-          "title": "Open MSP Cockpit",
-          "purpose": "Manage installations, organisations and deployments.",
-          "when": "Use this entry point for reviewing a client installation and its deployment.",
-          "steps": [
-            "Choose Apps in navigation and find MSP Cockpit.",
-            "Review the card’s status and description.",
-            "Close the guide and choose Open when an address is configured. Complete the app’s own sign-in if required.",
-            "Continue in the destination app and use the original tab to return to SynthPulse."
-          ],
-          "permissions": "Platform administration access in SynthPulse and valid access to the destination app.",
-          "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable. Make changes, run tasks or send documents deliberately inside the destination app; this guide does not perform them.",
-          "example": "For example: reviewing a client installation and its deployment."
-        }
-      }
-    },
-    {
-      "id": "webui.apps.openwebui",
-      "area": "apps",
-      "status": "conditional",
-      "conditions": [
-        "Configured app directory and existing access"
-      ],
-      "anchors": [
-        "?help_feature=webui.apps.openwebui",
-        "#mainApps [data-app-id=\"openwebui\"]"
-      ],
-      "source_refs": [
-        "api/app_catalog.py",
-        "api/apps_launcher.py",
-        "static/apps.js"
-      ],
-      "related": [
-        "webui.apps.overview"
-      ],
-      "locales": {
-        "nl": {
-          "title": "Open WebUI openen",
-          "purpose": "Open de aanvullende AI-chatomgeving.",
-          "when": "Gebruik deze ingang voor de aanvullende chatomgeving openen zodra een adres is ingesteld.",
-          "steps": [
-            "Kies Apps in de navigatie en zoek Open WebUI.",
-            "Bekijk de status en de beschrijving van de kaart.",
-            "Sluit de gids en kies Openen als een adres is ingesteld. Rond indien nodig de eigen aanmelding van de app af.",
-            "Werk verder in de doelapp en gebruik het oorspronkelijke tabblad om terug te keren naar SynthPulse."
-          ],
-          "permissions": "Platformbeheerrechten in SynthPulse en geldige toegang tot de doelapp.",
-          "limits": "Openen navigeert alleen naar het ingestelde adres. De app kan een eigen aanmelding vereisen. Niet ingesteld betekent dat er geen bruikbare link is; een ingestelde link garandeert niet dat de dienst bereikbaar is.",
-          "example": "Bijvoorbeeld: de aanvullende chatomgeving openen zodra een adres is ingesteld."
-        },
-        "en": {
-          "title": "Open Open WebUI",
-          "purpose": "Open the additional AI chat environment.",
-          "when": "Use this entry point for opening the additional chat environment once an address is configured.",
-          "steps": [
-            "Choose Apps in navigation and find Open WebUI.",
-            "Review the card’s status and description.",
-            "Close the guide and choose Open when an address is configured. Complete the app’s own sign-in if required.",
-            "Continue in the destination app and use the original tab to return to SynthPulse."
-          ],
-          "permissions": "Platform administration access in SynthPulse and valid access to the destination app.",
-          "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable.",
-          "example": "For example: opening the additional chat environment once an address is configured."
-        }
-      }
-    },
-    {
       "id": "webui.apps.language",
       "area": "apps",
       "status": "conditional",
@@ -14144,15 +14044,15 @@ window.SynthPulseFeatureCatalog = {
       }
     },
     {
-      "id": "webui.apps.hermesoffice",
+      "id": "webui.apps.hermes_docs",
       "area": "apps",
       "status": "conditional",
       "conditions": [
-        "Configured app directory and existing access"
+        "Configured VPS editor and workspace owner access"
       ],
       "anchors": [
-        "?help_feature=webui.apps.hermesoffice",
-        "#mainApps [data-app-id=\"hermesoffice\"]"
+        "?help_feature=webui.apps.hermes_docs",
+        "#mainApps [data-app-id=\"hermes_docs\"]"
       ],
       "source_refs": [
         "api/app_catalog.py",
@@ -14164,32 +14064,242 @@ window.SynthPulseFeatureCatalog = {
       ],
       "locales": {
         "nl": {
-          "title": "HermesOffice gebruiken",
-          "purpose": "Open de desktopkantoorsuite voor Word-documenten, spreadsheets, presentaties, pdf en Markdown.",
-          "when": "Gebruik dit wanneer je het volgende wilt doen: Open een bestaand docx-bestand in HermesOffice en sla de bewerkte versie op je computer op.",
+          "title": "HermesOffice Docs (Word) gebruiken",
+          "purpose": "Schrijf en bewerk Word-documenten met opmaak, tabellen en AI-hulp. Deze editor draait op de VPS en opent vanuit SynthPulse in je browser.",
+          "when": "Gebruik dit om documenten te maken of een bestaand docx-bestand te bewerken.",
           "steps": [
-            "Kies Apps onderaan de navigatie en zoek HermesOffice.",
-            "Kies Download desktopapp om de officiële releasepagina te openen.",
-            "Download een uitgave die bij je besturingssysteem past en installeer die volgens de projectinstructies. Als de app al is geïnstalleerd, open je haar via je toepassingenmenu.",
-            "Open of maak een document in HermesOffice. Stel AI-toegang in binnen de desktopapp als je AI-bewerking wilt gebruiken en sla je resultaat bewust op."
+            "Kies Apps onderaan de navigatie en open HermesOffice Docs (Word) in Documenten en kennis.",
+            "Kies Open app. Je SynthPulse-aanmelding geeft de eigenaar toegang tot de eigen VPS-werkruimte. Wacht tot Verbonden met VPS verschijnt.",
+            "Voor een bestaand bestand: kies Bestanden, upload het bestand en open het in de editor via Bestand > Openen vanuit /documents. Voor een nieuw bestand gebruik je de nieuw-functie van de editor.",
+            "Bewerk je bestand. Open het AI-paneel en beschrijf de gewenste wijziging; de AI loopt via de ingestelde OmniRoute-verbinding. Controleer voorgestelde wijzigingen voordat je verder werkt.",
+            "Sla op in /documents. Kies Bestanden, Vernieuwen en klik op de bestandsnaam om je resultaat naar je computer te downloaden. Klembord helpt om tekst tussen je computer en de editor te kopiëren."
           ],
-          "permissions": "Toegang tot de Apps-tegel, installatie op je eigen computer en eventuele AI-providerrechten.",
-          "limits": "Dit is een desktopapp, geen ingebouwde browsereditor. Beschikbare installatiepakketten verschillen per platform. De tegel opent alleen de downloadpagina en synchroniseert geen documenten of AI-instellingen.",
-          "example": "Open een bestaand docx-bestand in HermesOffice en sla de bewerkte versie op je computer op."
+          "permissions": "Platformbeheer en toegang als eigenaar van deze VPS-werkruimte. Dezelfde werkruimte is geen afzonderlijke omgeving per klant.",
+          "limits": "De editor draait op de VPS. Bestanden worden pas naar je computer gekopieerd wanneer je ze downloadt. Uploads zijn maximaal 50 MB en overschrijven geen bestaande bestanden. Complexe Microsoft Office-opmaak en functies kunnen afwijken; controleer het resultaat. AI-kwaliteit hangt af van het gerouteerde model.",
+          "example": "Maak een projectvoorstel, laat de AI de inleiding verbeteren en download het docx-bestand."
         },
         "en": {
-          "title": "HermesOffice guide",
-          "purpose": "Open the desktop office suite for Word documents, spreadsheets, presentations, PDF and Markdown.",
-          "when": "Use this when you want to do the following: Open an existing docx file in HermesOffice and save the edited version on your computer.",
+          "title": "HermesOffice Docs (Word) guide",
+          "purpose": "Write and edit Word documents with formatting, tables and AI assistance. This editor runs on the VPS and opens from SynthPulse in your browser.",
+          "when": "Use this to create documents or edit an existing docx file.",
           "steps": [
-            "Choose Apps at the bottom of navigation and find HermesOffice.",
-            "Choose Download desktop app to open the official release page.",
-            "Download a release suitable for your operating system and install it following the project instructions. If it is already installed, open it from your applications menu.",
-            "Open or create a document in HermesOffice. Configure AI access inside the desktop app if you want AI editing and save your result deliberately."
+            "Choose Apps at the bottom of navigation and find HermesOffice Docs (Word) under Documents and knowledge.",
+            "Choose Open app. Your SynthPulse sign-in gives the workspace owner access to the VPS workspace. Wait for Connected to VPS.",
+            "For an existing file, choose Files, upload it and open it in the editor using File > Open from /documents. For a new file, use the editor’s new-file action.",
+            "Edit your file. Open the AI panel and describe the change; AI uses the configured OmniRoute connection. Review proposed changes before continuing.",
+            "Save in /documents. Choose Files, Refresh and click the filename to download the result to your computer. Clipboard helps copy text between your computer and the editor."
           ],
-          "permissions": "Access to the app card, installation on your own computer and any required AI provider permissions.",
-          "limits": "This is a desktop application, not an embedded browser editor. Available installation packages differ by platform. The card only opens the download page and does not synchronise documents or AI settings.",
-          "example": "Open an existing docx file in HermesOffice and save the edited version on your computer."
+          "permissions": "Platform administration and owner access to this VPS workspace. This shared workspace is not a separate environment for each customer.",
+          "limits": "The editor runs on the VPS. Files only reach your computer when you download them. Uploads are limited to 50 MB and never overwrite existing files. Complex Microsoft Office formatting and features may differ; review the result. AI quality depends on the routed model.",
+          "example": "Create a project proposal, ask AI to improve the introduction and download the docx file."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.hermes_sheets",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured VPS editor and workspace owner access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.hermes_sheets",
+        "#mainApps [data-app-id=\"hermes_sheets\"]"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "HermesOffice Sheets (Excel) gebruiken",
+          "purpose": "Bewerk Excel-werkboeken met cellen, formules en AI-hulp. Deze editor draait op de VPS en opent vanuit SynthPulse in je browser.",
+          "when": "Gebruik dit om spreadsheets te maken of een bestaand xlsx-bestand te bewerken.",
+          "steps": [
+            "Kies Apps onderaan de navigatie en open HermesOffice Sheets (Excel) in Documenten en kennis.",
+            "Kies Open app. Je SynthPulse-aanmelding geeft de eigenaar toegang tot de eigen VPS-werkruimte. Wacht tot Verbonden met VPS verschijnt.",
+            "Voor een bestaand bestand: kies Bestanden, upload het bestand en open het in de editor via Bestand > Openen vanuit /documents. Voor een nieuw bestand gebruik je de nieuw-functie van de editor.",
+            "Bewerk je bestand. Open het AI-paneel en beschrijf de gewenste wijziging; de AI loopt via de ingestelde OmniRoute-verbinding. Controleer voorgestelde wijzigingen voordat je verder werkt.",
+            "Sla op in /documents. Kies Bestanden, Vernieuwen en klik op de bestandsnaam om je resultaat naar je computer te downloaden. Klembord helpt om tekst tussen je computer en de editor te kopiëren."
+          ],
+          "permissions": "Platformbeheer en toegang als eigenaar van deze VPS-werkruimte. Dezelfde werkruimte is geen afzonderlijke omgeving per klant.",
+          "limits": "De editor draait op de VPS. Bestanden worden pas naar je computer gekopieerd wanneer je ze downloadt. Uploads zijn maximaal 50 MB en overschrijven geen bestaande bestanden. Complexe Microsoft Office-opmaak en functies kunnen afwijken; controleer het resultaat. AI-kwaliteit hangt af van het gerouteerde model.",
+          "example": "Vul omzet en kosten in, bereken de marge met een formule en download het xlsx-bestand."
+        },
+        "en": {
+          "title": "HermesOffice Sheets (Excel) guide",
+          "purpose": "Edit Excel workbooks with cells, formulas and AI assistance. This editor runs on the VPS and opens from SynthPulse in your browser.",
+          "when": "Use this to create spreadsheets or edit an existing xlsx file.",
+          "steps": [
+            "Choose Apps at the bottom of navigation and find HermesOffice Sheets (Excel) under Documents and knowledge.",
+            "Choose Open app. Your SynthPulse sign-in gives the workspace owner access to the VPS workspace. Wait for Connected to VPS.",
+            "For an existing file, choose Files, upload it and open it in the editor using File > Open from /documents. For a new file, use the editor’s new-file action.",
+            "Edit your file. Open the AI panel and describe the change; AI uses the configured OmniRoute connection. Review proposed changes before continuing.",
+            "Save in /documents. Choose Files, Refresh and click the filename to download the result to your computer. Clipboard helps copy text between your computer and the editor."
+          ],
+          "permissions": "Platform administration and owner access to this VPS workspace. This shared workspace is not a separate environment for each customer.",
+          "limits": "The editor runs on the VPS. Files only reach your computer when you download them. Uploads are limited to 50 MB and never overwrite existing files. Complex Microsoft Office formatting and features may differ; review the result. AI quality depends on the routed model.",
+          "example": "Enter revenue and costs, calculate the margin with a formula and download the xlsx file."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.hermes_slides",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured VPS editor and workspace owner access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.hermes_slides",
+        "#mainApps [data-app-id=\"hermes_slides\"]"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "HermesOffice Slides (PowerPoint) gebruiken",
+          "purpose": "Maak en bewerk PowerPoint-presentaties met dia’s en AI-hulp. Deze editor draait op de VPS en opent vanuit SynthPulse in je browser.",
+          "when": "Gebruik dit om presentaties te maken of een bestaand pptx-bestand te bewerken.",
+          "steps": [
+            "Kies Apps onderaan de navigatie en open HermesOffice Slides (PowerPoint) in Documenten en kennis.",
+            "Kies Open app. Je SynthPulse-aanmelding geeft de eigenaar toegang tot de eigen VPS-werkruimte. Wacht tot Verbonden met VPS verschijnt.",
+            "Voor een bestaand bestand: kies Bestanden, upload het bestand en open het in de editor via Bestand > Openen vanuit /documents. Voor een nieuw bestand gebruik je de nieuw-functie van de editor.",
+            "Bewerk je bestand. Open het AI-paneel en beschrijf de gewenste wijziging; de AI loopt via de ingestelde OmniRoute-verbinding. Controleer voorgestelde wijzigingen voordat je verder werkt.",
+            "Sla op in /documents. Kies Bestanden, Vernieuwen en klik op de bestandsnaam om je resultaat naar je computer te downloaden. Klembord helpt om tekst tussen je computer en de editor te kopiëren."
+          ],
+          "permissions": "Platformbeheer en toegang als eigenaar van deze VPS-werkruimte. Dezelfde werkruimte is geen afzonderlijke omgeving per klant.",
+          "limits": "De editor draait op de VPS. Bestanden worden pas naar je computer gekopieerd wanneer je ze downloadt. Uploads zijn maximaal 50 MB en overschrijven geen bestaande bestanden. Complexe Microsoft Office-opmaak en functies kunnen afwijken; controleer het resultaat. AI-kwaliteit hangt af van het gerouteerde model.",
+          "example": "Maak drie dia’s over je project, controleer de inhoud en download het pptx-bestand."
+        },
+        "en": {
+          "title": "HermesOffice Slides (PowerPoint) guide",
+          "purpose": "Create and edit PowerPoint presentations with slides and AI assistance. This editor runs on the VPS and opens from SynthPulse in your browser.",
+          "when": "Use this to create presentations or edit an existing pptx file.",
+          "steps": [
+            "Choose Apps at the bottom of navigation and find HermesOffice Slides (PowerPoint) under Documents and knowledge.",
+            "Choose Open app. Your SynthPulse sign-in gives the workspace owner access to the VPS workspace. Wait for Connected to VPS.",
+            "For an existing file, choose Files, upload it and open it in the editor using File > Open from /documents. For a new file, use the editor’s new-file action.",
+            "Edit your file. Open the AI panel and describe the change; AI uses the configured OmniRoute connection. Review proposed changes before continuing.",
+            "Save in /documents. Choose Files, Refresh and click the filename to download the result to your computer. Clipboard helps copy text between your computer and the editor."
+          ],
+          "permissions": "Platform administration and owner access to this VPS workspace. This shared workspace is not a separate environment for each customer.",
+          "limits": "The editor runs on the VPS. Files only reach your computer when you download them. Uploads are limited to 50 MB and never overwrite existing files. Complex Microsoft Office formatting and features may differ; review the result. AI quality depends on the routed model.",
+          "example": "Create three slides about your project, review the content and download the pptx file."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.hermes_pdf",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured VPS editor and workspace owner access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.hermes_pdf",
+        "#mainApps [data-app-id=\"hermes_pdf\"]"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "HermesOffice PDF gebruiken",
+          "purpose": "Open pdf-documenten op de VPS en gebruik de beschikbare annotatie- en AI-functies. Deze editor draait op de VPS en opent vanuit SynthPulse in je browser.",
+          "when": "Gebruik dit om pdf-documenten te maken of een bestaand pdf-bestand te bewerken.",
+          "steps": [
+            "Kies Apps onderaan de navigatie en open HermesOffice PDF in Documenten en kennis.",
+            "Kies Open app. Je SynthPulse-aanmelding geeft de eigenaar toegang tot de eigen VPS-werkruimte. Wacht tot Verbonden met VPS verschijnt.",
+            "Voor een bestaand bestand: kies Bestanden, upload het bestand en open het in de editor via Bestand > Openen vanuit /documents. Voor een nieuw bestand gebruik je de nieuw-functie van de editor.",
+            "Bewerk je bestand. Open het AI-paneel en beschrijf de gewenste wijziging; de AI loopt via de ingestelde OmniRoute-verbinding. Controleer voorgestelde wijzigingen voordat je verder werkt.",
+            "Sla op in /documents. Kies Bestanden, Vernieuwen en klik op de bestandsnaam om je resultaat naar je computer te downloaden. Klembord helpt om tekst tussen je computer en de editor te kopiëren."
+          ],
+          "permissions": "Platformbeheer en toegang als eigenaar van deze VPS-werkruimte. Dezelfde werkruimte is geen afzonderlijke omgeving per klant.",
+          "limits": "De editor draait op de VPS. Bestanden worden pas naar je computer gekopieerd wanneer je ze downloadt. Uploads zijn maximaal 50 MB en overschrijven geen bestaande bestanden. Complexe Microsoft Office-opmaak en functies kunnen afwijken; controleer het resultaat. AI-kwaliteit hangt af van het gerouteerde model.",
+          "example": "Upload een pdf, bekijk de pagina’s en vraag de AI om een samenvatting."
+        },
+        "en": {
+          "title": "HermesOffice PDF guide",
+          "purpose": "Open PDF documents on the VPS and use the available annotation and AI features. This editor runs on the VPS and opens from SynthPulse in your browser.",
+          "when": "Use this to create PDF documents or edit an existing pdf file.",
+          "steps": [
+            "Choose Apps at the bottom of navigation and find HermesOffice PDF under Documents and knowledge.",
+            "Choose Open app. Your SynthPulse sign-in gives the workspace owner access to the VPS workspace. Wait for Connected to VPS.",
+            "For an existing file, choose Files, upload it and open it in the editor using File > Open from /documents. For a new file, use the editor’s new-file action.",
+            "Edit your file. Open the AI panel and describe the change; AI uses the configured OmniRoute connection. Review proposed changes before continuing.",
+            "Save in /documents. Choose Files, Refresh and click the filename to download the result to your computer. Clipboard helps copy text between your computer and the editor."
+          ],
+          "permissions": "Platform administration and owner access to this VPS workspace. This shared workspace is not a separate environment for each customer.",
+          "limits": "The editor runs on the VPS. Files only reach your computer when you download them. Uploads are limited to 50 MB and never overwrite existing files. Complex Microsoft Office formatting and features may differ; review the result. AI quality depends on the routed model.",
+          "example": "Upload a PDF, review its pages and ask AI for a summary."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.hermes_markdown",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured VPS editor and workspace owner access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.hermes_markdown",
+        "#mainApps [data-app-id=\"hermes_markdown\"]"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "HermesOffice Markdown gebruiken",
+          "purpose": "Schrijf en bewerk Markdown met een teksteditor en AI-hulp. Deze editor draait op de VPS en opent vanuit SynthPulse in je browser.",
+          "when": "Gebruik dit om Markdown-bestanden te maken of een bestaand md-bestand te bewerken.",
+          "steps": [
+            "Kies Apps onderaan de navigatie en open HermesOffice Markdown in Documenten en kennis.",
+            "Kies Open app. Je SynthPulse-aanmelding geeft de eigenaar toegang tot de eigen VPS-werkruimte. Wacht tot Verbonden met VPS verschijnt.",
+            "Voor een bestaand bestand: kies Bestanden, upload het bestand en open het in de editor via Bestand > Openen vanuit /documents. Voor een nieuw bestand gebruik je de nieuw-functie van de editor.",
+            "Bewerk je bestand. Open het AI-paneel en beschrijf de gewenste wijziging; de AI loopt via de ingestelde OmniRoute-verbinding. Controleer voorgestelde wijzigingen voordat je verder werkt.",
+            "Sla op in /documents. Kies Bestanden, Vernieuwen en klik op de bestandsnaam om je resultaat naar je computer te downloaden. Klembord helpt om tekst tussen je computer en de editor te kopiëren."
+          ],
+          "permissions": "Platformbeheer en toegang als eigenaar van deze VPS-werkruimte. Dezelfde werkruimte is geen afzonderlijke omgeving per klant.",
+          "limits": "De editor draait op de VPS. Bestanden worden pas naar je computer gekopieerd wanneer je ze downloadt. Uploads zijn maximaal 50 MB en overschrijven geen bestaande bestanden. Complexe Microsoft Office-opmaak en functies kunnen afwijken; controleer het resultaat. AI-kwaliteit hangt af van het gerouteerde model.",
+          "example": "Schrijf projectnotities met koppen en lijsten en download het md-bestand."
+        },
+        "en": {
+          "title": "HermesOffice Markdown guide",
+          "purpose": "Write and edit Markdown with a text editor and AI assistance. This editor runs on the VPS and opens from SynthPulse in your browser.",
+          "when": "Use this to create Markdown files or edit an existing md file.",
+          "steps": [
+            "Choose Apps at the bottom of navigation and find HermesOffice Markdown under Documents and knowledge.",
+            "Choose Open app. Your SynthPulse sign-in gives the workspace owner access to the VPS workspace. Wait for Connected to VPS.",
+            "For an existing file, choose Files, upload it and open it in the editor using File > Open from /documents. For a new file, use the editor’s new-file action.",
+            "Edit your file. Open the AI panel and describe the change; AI uses the configured OmniRoute connection. Review proposed changes before continuing.",
+            "Save in /documents. Choose Files, Refresh and click the filename to download the result to your computer. Clipboard helps copy text between your computer and the editor."
+          ],
+          "permissions": "Platform administration and owner access to this VPS workspace. This shared workspace is not a separate environment for each customer.",
+          "limits": "The editor runs on the VPS. Files only reach your computer when you download them. Uploads are limited to 50 MB and never overwrite existing files. Complex Microsoft Office formatting and features may differ; review the result. AI quality depends on the routed model.",
+          "example": "Write project notes with headings and lists and download the md file."
         }
       }
     }
