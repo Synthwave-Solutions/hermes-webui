@@ -1,5 +1,5 @@
 FROM node:22-trixie-slim AS node
-FROM python:3.14-slim-trixie
+FROM python:3.13-slim-trixie
 RUN apt-get update && apt-get install -y --no-install-recommends git curl build-essential tini && rm -rf /var/lib/apt/lists/*
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
 COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
