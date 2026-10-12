@@ -31,3 +31,17 @@ def test_job_cost_proxy_rejects_spoofed_profile_and_job(write_policy,caller,monk
     for body in ({'job_id':{},'profile':'default'}, {'job_id':'valid','profile':'other'}, {'job_id':'valid','org_id':'other'}):
         h=_Handler();msp_service.handle_post(h,'/api/msp/job-cost',body)
         assert h.status==422
+
+
+def test_paid_order_proxy_binds_identity_and_rejects_price_or_status(write_policy,caller,monkeypatch):
+    from api import msp_service
+    caller.email=PLATFORM[0];calls=[]
+    monkeypatch.setattr(control_plane_client,'call',lambda *a,**k:(calls.append((a,k)) or (200,{'status':'offered'})))
+    h=_Handler();assert msp_service.handle_post(h,'/api/msp/order',{'order_id':'so_example','action':'submit'})
+    assert h.status==200
+    assert calls[0][0]==('POST','/v1/customer/orders/so_example/submit')
+    assert calls[0][1]['body']=={}
+    assert calls[0][1]['acting']['user']==PLATFORM[0]
+    for extra in [{'paid':True},{'amount':1},{'org_id':'other'},{'user':'other'}]:
+        h=_Handler();msp_service.handle_post(h,'/api/msp/order',{'order_id':'so_example','action':'submit',**extra});assert h.status==422
+    assert len(calls)==1

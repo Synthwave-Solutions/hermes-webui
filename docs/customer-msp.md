@@ -68,3 +68,16 @@ effective date and confirm customer acceptance. An active base customer contract
 is required for activation. Stale ticket decisions fail closed. App support stays
 separate, with its own Basic, Plus and Premium subscriptions. The interactive
 features are `webui.msp.package` and `webui.msp.consultant`.
+
+## Compact overview and prepaid requests
+
+My MSP sits below Apps and above Settings, including when a saved navigation
+order exists. The overview leads with available hours and open tickets. Package,
+consultant and automation details expand on demand; invoice history is collapsed.
+Paid service offers appear in Pay & request. HQ prepares a scoped, priced offer
+against an existing accounting invoice. The customer pays through Mollie, checks
+the payment, then explicitly submits the request. Payment alone creates no ticket.
+Top-ups add hours once after verified payment and Add hours. New support tickets
+and reopened support tickets require available hours; invoice questions and
+existing ticket communication remain accessible. Draft ticket text is preserved.
+An absent price or payment connection is never presented as a free purchase.

@@ -43,21 +43,13 @@
           if(msp.manage_apps && r.available){
             const toggle=btn((r.enabled?(nl?'Aan':'On'):(nl?'Uit':'Off'))+' · SynthPulse',()=>change('/api/msp/app-state',{enabled:!r.enabled}));
             toggle.classList.add('app-state-toggle');toggle.setAttribute('role','switch');toggle.setAttribute('aria-checked',String(r.enabled));toggle.setAttribute('aria-label',(nl?'App beschikbaar: ':'App available: ')+name);toggle.disabled=mutation;card.append(toggle);
-            card.append(el('p',nl?'Uitschakelen blokkeert openen vanuit SynthPulse. Je bestanden blijven bewaard; de afgesproken jaarbundel blijft gelden.':'Turning off prevents opening the app from SynthPulse. Files are preserved; your agreed annual bundle remains in effect.','msp-muted'));
+
           }
-          if(!r.available){const request=btn(nl?'App aanvragen bij MSP':'Request app from MSP',()=>change('/api/msp/app-request',{note:(nl?'Graag deze app beschikbaar maken: ':'Please make this app available: ')+name}));request.disabled=mutation;card.append(request);}
-          const support=el('div',null,'app-support');support.append(el('strong',nl?'Jaarlijkse supportstrippenkaart':'Annual support hour bundle'));
-          const sub=r.support;
-          if(sub){const labels=nl?{requested:'Aangevraagd',active:'Actief',cancel_requested:'Opzegging aangevraagd',cancelled:'Opgezegd',rejected:'Afgewezen'}:{requested:'Requested',active:'Active',cancel_requested:'Cancellation requested',cancelled:'Cancelled',rejected:'Declined'};support.append(el('p',(labels[sub.status]||sub.status)+' · '+(sub.active_level||sub.requested_level||'')));}
-          if(msp.manage_apps){
-            const label=el('label',nl?'Supportniveau':'Support level'),pick=el('select');pick.setAttribute('aria-label',(nl?'Supportniveau: ':'Support level: ')+name);
-            for(const level of r.support_levels){const price=nl?'uren en prijs in jaarafspraak':'hours and price in annual agreement';const option=el('option',level.name+' · '+price);option.value=level.level;pick.append(option);}
-            pick.value=(sub&&sub.requested_level!=='cancel'&&sub.requested_level)||r.support_levels[0]?.level||'basic';label.append(pick);support.append(label);
-            const terms=el('p',null,'msp-muted');function showTerms(){const level=r.support_levels.find(x=>x.level===pick.value);terms.textContent=level?.description||(nl?'Inhoud en afspraken worden door je MSP bevestigd.':'Your MSP will confirm the scope and terms.');}pick.onchange=showTerms;showTerms();support.append(terms);
-            const request=btn(nl?'Supportniveau aanvragen':'Request support level',()=>change('/api/msp/app-support',{level:pick.value}));request.disabled=mutation;support.append(request);
-            if(sub&&!['cancelled','rejected','cancel_requested'].includes(sub.status)){const cancel=btn(nl?'Opzegging aanvragen':'Request cancellation',()=>change('/api/msp/app-support',{level:'cancel'}));cancel.disabled=mutation;support.append(cancel);}
-            support.append(el('p',nl?'Aanvragen incasseert niets. Je MSP bevestigt niveau, jaaruren, prijs en contractjaar. Alle supportonderdelen komen samen op één maandfactuur.':'Submitting a request collects no payment. Your MSP confirms level, annual hours, price and contract year. All support components share one monthly invoice.','msp-muted'));
-          }else support.append(el('p',nl?'Je organisatiebeheerder beheert deze supportafspraak.':'Your organisation administrator manages this support agreement.','msp-muted'));
+          const support=el('div',null,'app-support'),sub=r.support;
+          support.append(el('strong',nl?'Support & uitbreidingen':'Support & upgrades'));
+          if(sub)support.append(el('p',(sub.active_level||sub.requested_level||'')+' · '+(sub.status==='active'?(nl?'Actief':'Active'):sub.status)));
+          support.append(btn(nl?'Aanbod bekijken':'View offers',()=>window.SynthPulseMSP?.openOrders(id)));
+          if(msp.manage_apps&&sub&&!['cancelled','rejected','cancel_requested'].includes(sub.status)){const cancel=btn(nl?'Support opzeggen':'Cancel support',()=>change('/api/msp/app-support',{level:'cancel'}));cancel.disabled=mutation;support.append(cancel);}
           card.append(support);
         }
         grid.append(card);

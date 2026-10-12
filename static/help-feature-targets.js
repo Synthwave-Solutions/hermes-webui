@@ -2534,8 +2534,8 @@
       "#mspOverviewTab"
     ],
     "entryHint": {
-      "nl": "Kies Overzicht & uren om het basispakket en je consultantinzet te bekijken.",
-      "en": "Choose Overview & hours to see your base package and consultant capacity."
+      "nl": "Kies Overzicht om het basispakket en je consultantinzet te bekijken.",
+      "en": "Choose Overview to see your base package and consultant capacity."
     }
   },
   "webui.msp.consultant": {
@@ -2547,8 +2547,8 @@
       "#mspOverviewTab"
     ],
     "entryHint": {
-      "nl": "Kies Overzicht & uren om het basispakket en je consultantinzet te bekijken.",
-      "en": "Choose Overview & hours to see your base package and consultant capacity."
+      "nl": "Kies Overzicht om het basispakket en je consultantinzet te bekijken.",
+      "en": "Choose Overview to see your base package and consultant capacity."
     }
   },
   "webui.msp.job-costs": {
@@ -2560,8 +2560,8 @@
       "#mspOverviewTab"
     ],
     "entryHint": {
-      "nl": "Kies Overzicht & uren. Uren invoeren doe je bij de betreffende scheduled task.",
-      "en": "Choose Overview & hours. Enter hours on the scheduled task itself."
+      "nl": "Kies Overzicht. Uren invoeren doe je bij de betreffende scheduled task.",
+      "en": "Choose Overview. Enter hours on the scheduled task itself."
     }
   },
   "webui.msp.annual-support": {
@@ -2573,8 +2573,8 @@
       "#mspOverviewTab"
     ],
     "entryHint": {
-      "nl": "Kies Overzicht & uren.",
-      "en": "Choose Overview & hours."
+      "nl": "Kies Overzicht.",
+      "en": "Choose Overview."
     }
   }
 };

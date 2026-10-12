@@ -1003,16 +1003,14 @@ window.SynthPulseMspFeatureCatalog = {
           "purpose": "Create checkout links for invoiced requests and verify payment with Mollie.",
           "when": "After approving and invoicing a customer request.",
           "steps": [
-            "Open Payments and check the Mollie connection and test or live mode.",
-            "As admin, save the API key in the secure field. It is verified and stored on the server only.",
-            "Approve the request, issue the invoice in your accounting system and record its reference.",
-            "Create and share the checkout link. The VAT-inclusive amount comes from the request; repeated clicks reuse the current payment.",
-            "Mollie reports changes. SynthPulse checks amount, currency, profile and customer metadata before a live payment settles the invoice.",
-            "Use Check status with Mollie to verify again. If creation was interrupted, enter its payment ID from Mollie to recover the original payment.",
-            "Review reported refunds and chargebacks manually."
+            "Open Payments in HQ.",
+            "Configure Mollie through the secure key field.",
+            "Expand Prepare a payable offer. Choose customer, kind, scope, price and an existing invoice reference.",
+            "The customer sees the offer in My MSP, pays and then submits the request.",
+            "Review payment status and any refunds. Additional hours are credited only after payment and Add hours."
           ],
           "permissions": "Operators may read. Only admins can configure the key and process payment requests.",
-          "limits": "Requires a key, public webhook, real prices and contracts. Test payments do not settle real invoices. Issue invoice documents in your accounting system. Automatic direct debit and subscription collection are not connected. Hours are credited on invoicing, never twice on payment.",
+          "limits": "Paid requests require a verified live payment. Payment alone does not submit a request. Support tickets require remaining hours; invoice questions remain available. Your MSP must configure prices and the payment connection. Test payments do not settle real invoices.",
           "example": "An invoiced support bundle receives a checkout link. A verified live payment changes its status to Paid."
         },
         "nl": {
@@ -1020,16 +1018,14 @@ window.SynthPulseMspFeatureCatalog = {
           "purpose": "Maak betaallinks voor gefactureerde aanvragen en controleer betaling via Mollie.",
           "when": "Na het goedkeuren en factureren van een klantaanvraag.",
           "steps": [
-            "Open Betalingen en controleer de Mollie-koppeling en test- of livemodus.",
-            "Sla als admin de API-sleutel in het beveiligde veld op. Deze wordt gecontroleerd en alleen op de server bewaard.",
-            "Keur de aanvraag goed, maak de factuur in je boekhouding en registreer het factuurnummer.",
-            "Maak en deel de betaallink. Het bedrag inclusief btw komt uit de aanvraag; opnieuw klikken gebruikt dezelfde lopende betaling.",
-            "Mollie meldt wijzigingen. SynthPulse controleert bedrag, valuta, profiel en klantkoppeling voordat een livebetaling de factuur voldoet.",
-            "Gebruik Status bij Mollie controleren voor een nieuwe controle. Na een onderbroken aanmaak kun je het betaal-ID uit Mollie invoeren om de oorspronkelijke betaling te koppelen.",
-            "Controleer gemelde terugbetalingen en terugboekingen handmatig."
+            "Open Betalingen in HQ.",
+            "Configureer de Mollie-koppeling in het beveiligde sleutelveld.",
+            "Klap Betaalbaar aanbod klaarzetten open. Kies klant, type, inhoud, prijs en bestaand factuurnummer.",
+            "De klant ziet het aanbod in Mijn MSP, betaalt en dient daarna de aanvraag in.",
+            "Controleer betaalstatus en eventuele terugboekingen. Extra uren worden pas na betaling en Uren toevoegen bijgeschreven."
           ],
           "permissions": "Operators mogen lezen. Alleen admins mogen de sleutel instellen en betaalverzoeken verwerken.",
-          "limits": "Vereist een sleutel, openbare webhook, echte tarieven en contracten. Testbetalingen voldoen geen echte facturen. Factuurdocumenten maak je in de boekhouding. Automatische incasso en abonnementincasso zijn nog niet aangesloten. Uren worden bij facturatie toegekend en niet opnieuw bij betaling.",
+          "limits": "Een bevestigde livebetaling is vereist voor betaalde aanvragen. Betalen alleen dient nog geen aanvraag in. Supporttickets vereisen resterende uren; factuurvragen blijven bereikbaar. Tarieven en de betaalkoppeling moeten door je MSP zijn ingesteld. Testbetalingen voldoen geen echte facturen.",
           "example": "Een gefactureerde urenbundel krijgt een betaallink. Na bevestigde livebetaling wordt de status Betaald."
         }
       }

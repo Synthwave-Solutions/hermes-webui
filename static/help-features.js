@@ -14328,30 +14328,32 @@ window.SynthPulseFeatureCatalog = {
       ],
       "locales": {
         "nl": {
-          "title": "Supporturen en abonnementen bekijken",
-          "purpose": "Bekijk je echte urenbundel, verbruik en supportabonnementen bij jouw MSP.",
+          "title": "Mijn MSP: overzicht",
+          "purpose": "Bekijk en beheer mijn msp: overzicht.",
           "when": "Als je wilt weten hoeveel support beschikbaar is.",
           "steps": [
-            "Open Mijn MSP in de navigatie.",
-            "Kies Overzicht & uren. Beschikbaar, deze maand gebruikt en maandbundel komen uit de MSP-administratie.",
-            "Bekijk onder Support per app de huidige en aangevraagde niveaus. Open Apps om een niveau aan te vragen."
+            "Open Mijn MSP, onder Apps en boven Instellingen.",
+            "Bekijk beschikbare uren en open tickets.",
+            "Open Pakket, apps & consultant voor details.",
+            "Kies Uren bijkopen of Betalen & aanvragen voor een geprijsd aanbod."
           ],
-          "permissions": "Uren en betalingen zijn voor organisatiebeheerders en financiële beheerders.",
-          "limits": "Zonder actief contract zie je geen verzonnen uren. Support per app voegt niet automatisch uren toe aan je bundel.",
-          "example": "Controleer je resterende supportminuten voordat je een grotere wijziging aanvraagt."
+          "permissions": "Organisatie- en financiële beheerders betalen en dienen uitbreidingen in. Supporttickets volgen je ticketrechten.",
+          "limits": "Een bevestigde livebetaling is vereist voor betaalde aanvragen. Betalen alleen dient nog geen aanvraag in. Supporttickets vereisen resterende uren; factuurvragen blijven bereikbaar. Tarieven en de betaalkoppeling moeten door je MSP zijn ingesteld.",
+          "example": "Koop 2 uur, betaal, kies Uren toevoegen en dien daarna je supportticket in."
         },
         "en": {
-          "title": "View support hours and subscriptions",
-          "purpose": "See your actual support allowance, usage and app support subscriptions with your MSP.",
+          "title": "My MSP: overview",
+          "purpose": "Review and manage my msp: overview.",
           "when": "When you want to know how much support remains.",
           "steps": [
-            "Open My MSP in navigation.",
-            "Choose Overview & hours. Available, used this month and monthly allowance come from the MSP administration.",
-            "Under Support per app, compare active and requested levels. Open Apps to request a level."
+            "Open My MSP below Apps and above Settings.",
+            "Review available hours and open tickets.",
+            "Expand Package, apps & consultant for details.",
+            "Choose Buy hours or Pay & request for a priced offer."
           ],
-          "permissions": "Hours and payments are available to organisation and billing administrators.",
-          "limits": "An installation without an active contract shows no invented allowance. App support does not automatically credit your hours balance.",
-          "example": "Check remaining support minutes before requesting a larger change."
+          "permissions": "Organisation and billing administrators pay and submit upgrades. Support tickets follow your ticket permissions.",
+          "limits": "Paid requests require a verified live payment. Payment alone does not submit a request. Support tickets require remaining hours; invoice questions remain available. Your MSP must configure prices and the payment connection.",
+          "example": "Buy 2 hours, pay, select Add hours, then submit your support ticket."
         }
       }
     },
@@ -14376,32 +14378,34 @@ window.SynthPulseFeatureCatalog = {
       ],
       "locales": {
         "nl": {
-          "title": "Tickets aanmaken, volgen en beantwoorden",
-          "purpose": "Dien een vraag of storing rechtstreeks bij je MSP in en volg openstaande en afgehandelde tickets.",
+          "title": "Supporttickets en saldo",
+          "purpose": "Bekijk en beheer supporttickets en saldo.",
           "when": "Bij een vraag, storing, toegangsprobleem of wijziging.",
           "steps": [
             "Open Mijn MSP en kies Tickets.",
-            "Vul onderwerp en omschrijving in. Kies het soort vraag, de impact en eventueel de app. Klik op Verstuur naar MSP.",
-            "Open een ticket uit de lijst om de status en gedeelde reacties te bekijken en zelf te reageren.",
-            "Gebruik Zichtbaarheid om eigen tickets te zien. Beheerders kunnen ook de toegestane organisatie- of afdelingstickets bekijken."
+            "Bij resterende uren kun je een supportticket indienen. Kies onderwerp, soort vraag en impact.",
+            "Zonder uren kies je eerst Uren bijkopen. Betaal en voeg de uren toe voordat je het supportticket indient.",
+            "Een factuurvraag kan altijd: kies expliciet Factuurvraag. Je invoer blijft bewaard.",
+            "Volg bestaande tickets en reacties in de lijst."
           ],
-          "permissions": "Aangemelde organisatiegebruikers kunnen tickets indienen. Je rol bepaalt welke andere tickets je kunt zien.",
-          "limits": "Interne MSP-notities blijven verborgen. Een ingediende aanvraag is nog geen goedgekeurde wijziging of betaalopdracht.",
-          "example": "Meld dat een spreadsheet niet opent en voeg later de foutmelding als reactie toe."
+          "permissions": "Organisatie- en financiële beheerders betalen en dienen uitbreidingen in. Supporttickets volgen je ticketrechten.",
+          "limits": "Een bevestigde livebetaling is vereist voor betaalde aanvragen. Betalen alleen dient nog geen aanvraag in. Supporttickets vereisen resterende uren; factuurvragen blijven bereikbaar. Tarieven en de betaalkoppeling moeten door je MSP zijn ingesteld.",
+          "example": "Koop 2 uur, betaal, kies Uren toevoegen en dien daarna je supportticket in."
         },
         "en": {
-          "title": "Create, track and reply to tickets",
-          "purpose": "Send a question or incident to your MSP and follow open and completed tickets.",
+          "title": "Support tickets and balance",
+          "purpose": "Review and manage support tickets and balance.",
           "when": "For a question, incident, access issue or change.",
           "steps": [
             "Open My MSP and choose Tickets.",
-            "Enter a subject and description. Select the request type, impact and optional app, then Send to MSP.",
-            "Open a ticket to read its status and shared replies, and add your own reply.",
-            "Use Visibility for your tickets. Administrators can also view permitted organisation or department tickets."
+            "With remaining hours, submit a support ticket with subject, type and impact.",
+            "Without hours, select Buy hours first. Pay and add the hours before submitting the support ticket.",
+            "An invoice question is always available: explicitly select Invoice question. Your draft is preserved.",
+            "Follow existing tickets and replies in the list."
           ],
-          "permissions": "Signed-in organisation users can submit tickets. Your role determines which other tickets you can see.",
-          "limits": "Internal MSP notes remain hidden. A submitted request is not an approved change or payment order.",
-          "example": "Report a spreadsheet that will not open and add the error message in a reply."
+          "permissions": "Organisation and billing administrators pay and submit upgrades. Support tickets follow your ticket permissions.",
+          "limits": "Paid requests require a verified live payment. Payment alone does not submit a request. Support tickets require remaining hours; invoice questions remain available. Your MSP must configure prices and the payment connection.",
+          "example": "Buy 2 hours, pay, select Add hours, then submit your support ticket."
         }
       }
     },
@@ -14426,30 +14430,34 @@ window.SynthPulseFeatureCatalog = {
       ],
       "locales": {
         "nl": {
-          "title": "Betalingen bekijken",
-          "purpose": "Bekijk betaalverzoeken en factuurstatussen van je organisatie.",
+          "title": "Betalen en aanvragen",
+          "purpose": "Bekijk en beheer betalen en aanvragen.",
           "when": "Als je wilt weten of een factuur klaarstaat of betaald is.",
           "steps": [
-            "Open Mijn MSP en kies Betalingen.",
-            "Bekijk het bedrag inclusief btw en de status per betaalverzoek.",
-            "Gebruik Betalen via Mollie als je MSP een echte betaallink heeft klaargezet. Controleer het bedrag voordat je betaalt."
+            "Open Mijn MSP en kies Betalen & aanvragen.",
+            "Kies een aanbod en open Inhoud & voorwaarden. Controleer de prijs inclusief btw.",
+            "Kies Betalen en rond de betaling af bij Mollie.",
+            "Keer terug en kies Betaling controleren. Na bevestiging verschijnt Betaald · aanvraag indienen of Uren toevoegen.",
+            "Dien de aanvraag in of voeg de uren toe. Je vindt aanvragen terug bij Tickets."
           ],
-          "permissions": "Alleen organisatiebeheerders en financiële beheerders zien betalingen.",
-          "limits": "Zonder geconfigureerde betaalprovider en factuur is er geen betaallink. Terugkeren uit Mollie betekent niet vanzelf dat een factuur betaald is.",
-          "example": "Open een openstaande factuur en betaal via de beschikbare Mollie-link."
+          "permissions": "Organisatie- en financiële beheerders betalen en dienen uitbreidingen in. Supporttickets volgen je ticketrechten.",
+          "limits": "Een bevestigde livebetaling is vereist voor betaalde aanvragen. Betalen alleen dient nog geen aanvraag in. Supporttickets vereisen resterende uren; factuurvragen blijven bereikbaar. Tarieven en de betaalkoppeling moeten door je MSP zijn ingesteld.",
+          "example": "Koop 2 uur, betaal, kies Uren toevoegen en dien daarna je supportticket in."
         },
         "en": {
-          "title": "View payments",
-          "purpose": "See payment requests and invoice statuses for your organisation.",
+          "title": "Pay and request",
+          "purpose": "Review and manage pay and request.",
           "when": "When you want to check whether an invoice is ready or paid.",
           "steps": [
-            "Open My MSP and choose Payments.",
-            "Review the amount including VAT and the status of each payment request.",
-            "Use Pay through Mollie when your MSP has prepared a live payment link. Check the amount before paying."
+            "Open My MSP and choose Pay & request.",
+            "Select an offer and expand Scope & terms. Check the price including VAT.",
+            "Choose Pay and complete checkout at Mollie.",
+            "Return and select Check payment. Once verified, Paid · submit request or Add hours becomes available.",
+            "Submit the request or add the hours. Requests appear under Tickets."
           ],
-          "permissions": "Only organisation and billing administrators see payments.",
-          "limits": "A configured payment provider and invoice are required for a payment link. Returning from Mollie does not by itself mark an invoice paid.",
-          "example": "Open an outstanding invoice and pay through the available Mollie link."
+          "permissions": "Organisation and billing administrators pay and submit upgrades. Support tickets follow your ticket permissions.",
+          "limits": "Paid requests require a verified live payment. Payment alone does not submit a request. Support tickets require remaining hours; invoice questions remain available. Your MSP must configure prices and the payment connection.",
+          "example": "Buy 2 hours, pay, select Add hours, then submit your support ticket."
         }
       }
     },
@@ -14522,34 +14530,32 @@ window.SynthPulseFeatureCatalog = {
       ],
       "locales": {
         "nl": {
-          "title": "Supportstrippenkaart per app",
-          "purpose": "Vraag een supportniveau aan voor een beheerde app en neem de uren op in de jaarafspraak.",
+          "title": "App-support beheren",
+          "purpose": "Bekijk en beheer app-support beheren.",
           "when": "Als je app-support wilt toevoegen of wijzigen.",
           "steps": [
-            "Open Apps en kies de beheerde app.",
-            "Lees de supportniveaus Basis, Plus en Premium.",
-            "Vraag het gewenste niveau aan en volg het ticket in Mijn MSP.",
-            "Je MSP bevestigt jaaruren, dekking, jaarprijs en ingangsmaand.",
-            "Bekijk de app-regel in Jaarlijkse supporturen. Alle onderdelen komen samen op één gezamenlijke factuur volgens de afgesproken betaalwijze."
+            "Open Apps en zoek de app.",
+            "Bekijk je huidige supportniveau.",
+            "Kies Aanbod bekijken om een betaalde uitbreiding te kiezen.",
+            "Betaal eerst en dien daarna de aanvraag in. Opzeggen blijft apart beschikbaar."
           ],
-          "permissions": "Organisatiebeheerders en financiële beheerders beheren app-supportaanvragen.",
-          "limits": "Een aanvraag verleent nog geen uren en schrijft geen geld af. Uitschakelen van een app beëindigt de supportafspraak niet. Een niveaunaam alleen belooft geen reactietijd.",
-          "example": "Neem 10 jaarlijkse supporturen voor Documenten op naast 24 infrastructuururen."
+          "permissions": "Organisatie- en financiële beheerders betalen en dienen uitbreidingen in. Supporttickets volgen je ticketrechten.",
+          "limits": "Een bevestigde livebetaling is vereist voor betaalde aanvragen. Betalen alleen dient nog geen aanvraag in. Supporttickets vereisen resterende uren; factuurvragen blijven bereikbaar. Tarieven en de betaalkoppeling moeten door je MSP zijn ingesteld.",
+          "example": "Koop 2 uur, betaal, kies Uren toevoegen en dien daarna je supportticket in."
         },
         "en": {
-          "title": "Annual support bundle per app",
-          "purpose": "Request a managed-app support level and include its hours in the annual agreement.",
+          "title": "Manage app support",
+          "purpose": "Review and manage manage app support.",
           "when": "When adding or changing app support.",
           "steps": [
-            "Open Apps and choose the managed app.",
-            "Review Basic, Plus and Premium support levels.",
-            "Request a level and follow the ticket in My MSP.",
-            "Your MSP confirms annual hours, coverage, annual price and starting month.",
-            "Review the app line under Annual support hours. All components share one consolidated invoice at the agreed payment frequency."
+            "Open Apps and find the app.",
+            "Review the current support level.",
+            "Choose View offers to select a paid upgrade.",
+            "Pay first and then submit the request. Cancellation remains separately available."
           ],
-          "permissions": "Organisation and billing administrators manage app-support requests.",
-          "limits": "Requests grant no hours and collect no money. Disabling an app does not cancel its support agreement. A tier name alone promises no response time.",
-          "example": "Include 10 annual Documents support hours alongside 24 infrastructure hours."
+          "permissions": "Organisation and billing administrators pay and submit upgrades. Support tickets follow your ticket permissions.",
+          "limits": "Paid requests require a verified live payment. Payment alone does not submit a request. Support tickets require remaining hours; invoice questions remain available. Your MSP must configure prices and the payment connection.",
+          "example": "Buy 2 hours, pay, select Add hours, then submit your support ticket."
         }
       }
     },
@@ -14574,30 +14580,32 @@ window.SynthPulseFeatureCatalog = {
       ],
       "locales": {
         "nl": {
-          "title": "Een app aanvragen",
-          "purpose": "Vraag je MSP om een nog niet beschikbare app beschikbaar te maken.",
+          "title": "App-uitbreiding kopen",
+          "purpose": "Bekijk en beheer app-uitbreiding kopen.",
           "when": "Als een app in de catalogus staat maar nog niet voor jouw installatie is gekoppeld.",
           "steps": [
-            "Open Apps en zoek een nog niet beschikbare app.",
-            "Klik op App aanvragen. Er komt een echt ticket in de MSP-servicedesk.",
-            "Ga naar Mijn MSP, Tickets om de status te volgen en je wensen toe te lichten."
+            "Open Apps en zoek de gewenste app.",
+            "Kies Aanbod bekijken bij Support & uitbreidingen.",
+            "Mijn MSP toont het beschikbare aanbod voor deze app.",
+            "Controleer inhoud en prijs, betaal en dien de aanvraag na betaalbevestiging in."
           ],
-          "permissions": "Aangemelde organisatiegebruikers kunnen toegestane apps aanvragen.",
-          "limits": "Een aanvraag installeert of activeert de app nog niet. De MSP beoordeelt toegang, inrichting en eventuele kosten.",
-          "example": "Vraag een documentapp aan en vermeld welke bestanden je ermee wilt maken."
+          "permissions": "Organisatie- en financiële beheerders betalen en dienen uitbreidingen in. Supporttickets volgen je ticketrechten.",
+          "limits": "Een bevestigde livebetaling is vereist voor betaalde aanvragen. Betalen alleen dient nog geen aanvraag in. Supporttickets vereisen resterende uren; factuurvragen blijven bereikbaar. Tarieven en de betaalkoppeling moeten door je MSP zijn ingesteld.",
+          "example": "Koop 2 uur, betaal, kies Uren toevoegen en dien daarna je supportticket in."
         },
         "en": {
-          "title": "Request an app",
-          "purpose": "Ask your MSP to make an unavailable app available.",
+          "title": "Buy an app upgrade",
+          "purpose": "Review and manage buy an app upgrade.",
           "when": "When an app is in the catalogue but not yet connected for your installation.",
           "steps": [
-            "Open Apps and find an unavailable application.",
-            "Choose Request app. A real ticket is created in the MSP service desk.",
-            "Open My MSP, Tickets to follow its status and explain your needs."
+            "Open Apps and find the app.",
+            "Select View offers under Support & upgrades.",
+            "My MSP shows offers for this app.",
+            "Check scope and price, pay and submit after payment is verified."
           ],
-          "permissions": "Signed-in organisation users can request permitted apps.",
-          "limits": "A request does not install or activate the app. Your MSP checks access, setup and any costs.",
-          "example": "Request a document app and explain which files you need to create."
+          "permissions": "Organisation and billing administrators pay and submit upgrades. Support tickets follow your ticket permissions.",
+          "limits": "Paid requests require a verified live payment. Payment alone does not submit a request. Support tickets require remaining hours; invoice questions remain available. Your MSP must configure prices and the payment connection.",
+          "example": "Buy 2 hours, pay, select Add hours, then submit your support ticket."
         }
       }
     },
@@ -14622,32 +14630,32 @@ window.SynthPulseFeatureCatalog = {
       ],
       "locales": {
         "nl": {
-          "title": "Basispakket bekijken en aanvragen",
-          "purpose": "Bekijk de status en vastgelegde afspraken van je basispakket, de basis van je SynthPulse-abonnement.",
+          "title": "Basispakket",
+          "purpose": "Bekijk en beheer basispakket.",
           "when": "Als je je hoofdabonnement wilt controleren of een basispakket wilt aanvragen.",
           "steps": [
-            "Open Mijn MSP en kies Overzicht & uren.",
-            "Bekijk Basispakket onder Basispakket + Agentic Consultant. De status komt uit je klantcontract of pakketaanvraag.",
-            "Als er nog geen actief pakket is, kies Basispakket aanvragen. Volg het bijbehorende ticket bij Tickets.",
-            "Bekijk één jaarbudget voor basisinfrastructuur, app-strippenkaarten, automations en maatwerk."
+            "Open Mijn MSP en klap Pakket, apps & consultant open.",
+            "Bekijk de status van je basispakket.",
+            "Kies Pakket of uitbreiding kiezen.",
+            "Lees het aanbod, betaal en dien daarna de aanvraag in."
           ],
-          "permissions": "Organisatiebeheerders en financiële beheerders beheren deze afspraken.",
-          "limits": "De MSP bevestigt eerst uren, tarieven en contractjaar. Centafrondingen worden over twaalf maanden verdeeld. Maandfacturen schrijven het jaarbudget niet opnieuw bij. Consultantdagen worden apart afgesproken.",
-          "example": "Vraag het basispakket aan en bespreek de gewenste platforminrichting met je MSP."
+          "permissions": "Organisatie- en financiële beheerders betalen en dienen uitbreidingen in. Supporttickets volgen je ticketrechten.",
+          "limits": "Een bevestigde livebetaling is vereist voor betaalde aanvragen. Betalen alleen dient nog geen aanvraag in. Supporttickets vereisen resterende uren; factuurvragen blijven bereikbaar. Tarieven en de betaalkoppeling moeten door je MSP zijn ingesteld.",
+          "example": "Koop 2 uur, betaal, kies Uren toevoegen en dien daarna je supportticket in."
         },
         "en": {
-          "title": "View and request the base package",
-          "purpose": "See the status and recorded terms of your base package, the foundation of your SynthPulse subscription.",
+          "title": "Base package",
+          "purpose": "Review and manage base package.",
           "when": "To check your main subscription or request a base package.",
           "steps": [
-            "Open My MSP and choose Overview & hours.",
-            "Review Base package under Base package + Agentic Consultant. Its status comes from your customer contract or package request.",
-            "If there is no active package, choose Request base package. Follow the resulting ticket in Tickets.",
-            "View one annual budget for infrastructure, app hour bundles, automations and custom work."
+            "Open My MSP and expand Package, apps & consultant.",
+            "Review the base package status.",
+            "Select Choose package or upgrade.",
+            "Read the offer, pay, then submit the request."
           ],
-          "permissions": "Organisation and billing administrators manage these agreements.",
-          "limits": "Your MSP first confirms hours, prices and contract year. Cent rounding is spread over twelve months. Monthly invoices never credit the annual budget again. Consultant days are agreed separately.",
-          "example": "Request the base package and discuss your preferred platform setup with your MSP."
+          "permissions": "Organisation and billing administrators pay and submit upgrades. Support tickets follow your ticket permissions.",
+          "limits": "Paid requests require a verified live payment. Payment alone does not submit a request. Support tickets require remaining hours; invoice questions remain available. Your MSP must configure prices and the payment connection.",
+          "example": "Buy 2 hours, pay, select Add hours, then submit your support ticket."
         }
       }
     },
@@ -14672,34 +14680,32 @@ window.SynthPulseFeatureCatalog = {
       ],
       "locales": {
         "nl": {
-          "title": "Agentic Consultant in dagen per week",
-          "purpose": "Vraag consultantinzet aan naast het basispakket, uitgedrukt in dagen per week.",
+          "title": "Agentic Consultant",
+          "purpose": "Bekijk en beheer agentic consultant.",
           "when": "Als je structurele begeleiding of uitvoering door een Agentic Consultant wilt.",
           "steps": [
-            "Open Mijn MSP en ga naar Agentic Consultant onder Overzicht & uren.",
-            "Vul het gewenste aantal dagen per week in. Halve dagen zijn mogelijk.",
-            "Kies Consultantinzet aanvragen. De aanvraag komt als ticket bij je MSP terecht.",
-            "Je MSP bevestigt beschikbaarheid, inhoud, tarief en ingangsdatum. Na akkoord en verwerking zie je de afgesproken inzet naast een eventuele wijzigingsaanvraag.",
-            "Vraag een ander aantal dagen aan om te wijzigen, of kies Opzegging consultant aanvragen. Tot bevestiging blijft je huidige afspraak staan."
+            "Open Mijn MSP en klap Pakket, apps & consultant open.",
+            "Bekijk afgesproken dagen per week.",
+            "Open Betalen & aanvragen en kies een consultantaanbod met de gewenste inzet.",
+            "Controleer periode en voorwaarden, betaal en dien daarna de aanvraag in."
           ],
-          "permissions": "Organisatiebeheerders en financiële beheerders kunnen inzet aanvragen en wijzigen.",
-          "limits": "De MSP bevestigt eerst uren, tarieven en contractjaar. Centafrondingen worden over twaalf maanden verdeeld. Maandfacturen schrijven het jaarbudget niet opnieuw bij. Consultantdagen worden apart afgesproken.",
-          "example": "Vraag 2 dagen Agentic Consultant per week aan naast je basispakket."
+          "permissions": "Organisatie- en financiële beheerders betalen en dienen uitbreidingen in. Supporttickets volgen je ticketrechten.",
+          "limits": "Een bevestigde livebetaling is vereist voor betaalde aanvragen. Betalen alleen dient nog geen aanvraag in. Supporttickets vereisen resterende uren; factuurvragen blijven bereikbaar. Tarieven en de betaalkoppeling moeten door je MSP zijn ingesteld.",
+          "example": "Koop 2 uur, betaal, kies Uren toevoegen en dien daarna je supportticket in."
         },
         "en": {
-          "title": "Agentic Consultant days per week",
-          "purpose": "Request consultant capacity alongside the base package, expressed in days per week.",
+          "title": "Agentic Consultant",
+          "purpose": "Review and manage agentic consultant.",
           "when": "For ongoing guidance or delivery by an Agentic Consultant.",
           "steps": [
-            "Open My MSP and find Agentic Consultant under Overview & hours.",
-            "Enter your preferred number of days per week. Half days are supported.",
-            "Choose Request consultant capacity. A service ticket is created with your MSP.",
-            "Your MSP confirms availability, scope, rate and effective date. Once accepted and processed, agreed capacity appears separately from any pending change.",
-            "Request another number of days to change capacity, or choose Request consultant cancellation. Existing terms remain until confirmed."
+            "Open My MSP and expand Package, apps & consultant.",
+            "Review agreed days per week.",
+            "Open Pay & request and choose a consultant offer for the desired capacity.",
+            "Check the period and terms, pay, then submit the request."
           ],
-          "permissions": "Organisation and billing administrators can request and change capacity.",
-          "limits": "Your MSP first confirms hours, prices and contract year. Cent rounding is spread over twelve months. Monthly invoices never credit the annual budget again. Consultant days are agreed separately.",
-          "example": "Request 2 days of Agentic Consultant capacity per week alongside the base package."
+          "permissions": "Organisation and billing administrators pay and submit upgrades. Support tickets follow your ticket permissions.",
+          "limits": "Paid requests require a verified live payment. Payment alone does not submit a request. Support tickets require remaining hours; invoice questions remain available. Your MSP must configure prices and the payment connection.",
+          "example": "Buy 2 hours, pay, select Add hours, then submit your support ticket."
         }
       }
     },
@@ -14726,7 +14732,7 @@ window.SynthPulseFeatureCatalog = {
           "purpose": "Gebruik realisatie-uren als basis voor een supportvoorstel per automation.",
           "when": "Bij het opnemen van gebouwd werk in een jaarlijkse supportafspraak.",
           "steps": [
-            "Open Scheduled tasks en selecteer een taak.",
+            "Open Mijn MSP en klap Automations & supportvoorstellen open.",
             "Leg de realisatie-uren en het afgesproken uurtarief vast. Laat een onbekend tarief leeg.",
             "Bekijk het supportvoorstel: 15% van realisatie-uren en jobbedrag per jaar. Uren worden afgerond op minuten.",
             "Sla op en bekijk het voorstel bij Mijn MSP.",
@@ -14741,7 +14747,7 @@ window.SynthPulseFeatureCatalog = {
           "purpose": "Use implementation hours to propose annual support for each automation.",
           "when": "When including built work in an annual support agreement.",
           "steps": [
-            "Open Scheduled tasks and select a job.",
+            "Open My MSP and expand Automations & support proposals.",
             "Record implementation hours and agreed hourly rate. Leave an unknown rate empty.",
             "Review the proposal: 15% of implementation hours and job value per year. Hours are rounded to minutes.",
             "Save and review the proposal in My MSP.",
@@ -14769,36 +14775,34 @@ window.SynthPulseFeatureCatalog = {
       "related": [],
       "locales": {
         "nl": {
-          "title": "Jaarlijkse supporturen en betaalkeuze",
-          "purpose": "Bekijk één jaarbudget voor basisinfrastructuur, app-strippenkaarten, automations en maatwerk.",
+          "title": "Supporturen en jaarafspraak",
+          "purpose": "Bekijk en beheer supporturen en jaarafspraak.",
           "when": "Als je de jaarcap en het verschil tussen maandbetaling en jaarbetaling wilt bekijken.",
           "steps": [
-            "Open Mijn MSP en kies Overzicht & uren.",
-            "Bekijk Jaarlijkse supporturen, de jaarcap, het verbruik en het resterende saldo.",
-            "Lees de betaalwijze: maandbetaling of jaarbetaling met korting.",
-            "Vergelijk de jaarprijs bij maandbetaling, het afgesproken kortingspercentage, de vooruitbetaling en de besparing. Een onbekend tarief staat als Nog afspreken.",
-            "Open Maandelijkse factuurverdeling voor twaalf termijnen, of Eén jaarlijkse vooruitbetaling voor de jaarfactuur.",
-            "Bekijk Betalingen voor het factuurnummer en een beschikbare betaallink. Wijzigen van betaalwijze vraagt een nieuwe afspraak met je MSP."
+            "Open Mijn MSP en bekijk Supporturen.",
+            "Lees Beschikbaar, Gebruikt dit jaar en Jaarcap.",
+            "Klap het contractjaar open voor bedragen, onderdelen en bijgekochte uren.",
+            "Bekijk Afspraak & termijnen onder Betalen & aanvragen voor factuurdata.",
+            "Koop extra uren bij wanneer het saldo op is. De oorspronkelijke jaarcap en het eerdere verbruik blijven bewaard."
           ],
-          "permissions": "Organisatiebeheerders en financiële beheerders zien de jaarafspraken.",
-          "limits": "Dezelfde jaarcap geldt bij beide betaalwijzen. Betalen vult de uren niet opnieuw aan. Extra uren vereisen expliciet akkoord. Jaarkorting is per klantafspraak instelbaar, geldt alleen bij jaarlijkse vooruitbetaling en moet eerst zijn afgesproken. Geaccepteerde afspraken kunnen niet achteraf worden gewijzigd. Facturen worden in de boekhouding gemaakt; dit start geen automatische incasso.",
-          "example": "Rekenvoorbeeld, geen vast tarief: 38 jaaruren voor EUR 3.600 bij maandbetaling; met een afgesproken korting van 5% kost jaarbetaling EUR 3.420. Beide hebben 38 jaaruren."
+          "permissions": "Organisatie- en financiële beheerders betalen en dienen uitbreidingen in. Supporttickets volgen je ticketrechten.",
+          "limits": "Een bevestigde livebetaling is vereist voor betaalde aanvragen. Betalen alleen dient nog geen aanvraag in. Supporttickets vereisen resterende uren; factuurvragen blijven bereikbaar. Tarieven en de betaalkoppeling moeten door je MSP zijn ingesteld.",
+          "example": "Koop 2 uur, betaal, kies Uren toevoegen en dien daarna je supportticket in."
         },
         "en": {
-          "title": "Annual support hours and payment options",
-          "purpose": "View one annual budget for infrastructure, app hour bundles, automations and custom work.",
+          "title": "Support hours and annual agreement",
+          "purpose": "Review and manage support hours and annual agreement.",
           "when": "To review the annual cap and compare monthly payments with yearly prepayment.",
           "steps": [
-            "Open My MSP and choose Overview & hours.",
-            "Review Annual support hours, the cap, usage and remaining hours.",
-            "Read the payment frequency: monthly payments or yearly prepayment with discount.",
-            "Compare the annual price with monthly payment, agreed discount, upfront price and savings. Unknown prices show To be agreed.",
-            "Open Monthly invoice schedule for twelve installments, or One yearly upfront payment for the annual invoice.",
-            "Open Payments for the invoice reference and an available checkout link. Changing payment frequency requires a new agreement with your MSP."
+            "Open My MSP and review Support hours.",
+            "Read Available, Used this year and Annual cap.",
+            "Expand the contract year for prices, components and purchased hours.",
+            "Review Agreement & installments under Pay & request for invoice dates.",
+            "Buy additional hours when your balance runs out. The original annual cap and previous usage are preserved."
           ],
-          "permissions": "Organisation and billing administrators see annual agreements.",
-          "limits": "Both payment options have the same annual cap. Payments never replenish hours. Extra hours need explicit approval. Yearly discount is configurable per agreement, applies only to yearly prepayment and must be agreed first. Accepted agreements cannot be changed retroactively. Invoices are issued in accounting; this does not start recurring collection.",
-          "example": "Illustration, not a set price: 38 annual hours cost EUR 3,600 with monthly payments; an agreed 5% discount makes yearly prepayment EUR 3,420. Both include 38 annual hours."
+          "permissions": "Organisation and billing administrators pay and submit upgrades. Support tickets follow your ticket permissions.",
+          "limits": "Paid requests require a verified live payment. Payment alone does not submit a request. Support tickets require remaining hours; invoice questions remain available. Your MSP must configure prices and the payment connection.",
+          "example": "Buy 2 hours, pay, select Add hours, then submit your support ticket."
         }
       }
     }
