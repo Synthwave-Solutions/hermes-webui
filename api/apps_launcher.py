@@ -18,6 +18,12 @@ def safe_link(value, environ):
     try:
         u = urlsplit(value)
         host = (u.hostname or '').lower()
+        # Opt-in, deployment-owned links for a standalone Pi desktop / SSH tunnel.
+        # Never infer permission from request headers or allow arbitrary HTTP hosts.
+        if (environ.get('SP_LOCAL_PI_APPS') == '1' and u.scheme == 'http'
+                and host == '127.0.0.1' and u.port in (5220, 16081, 16082, 16083, 16084, 16085, 20128)
+                and u.username is None and u.password is None and not u.query and not u.fragment):
+            return value
         domain = environ.get('SP_DOMAIN', '').strip().lower()
         mesh = environ.get('SP_MESH_FQDN', '').strip().lower()
         if (u.scheme != 'https' or not _HOST.fullmatch(host) or '..' in host
