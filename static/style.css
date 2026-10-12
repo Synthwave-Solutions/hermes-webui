@@ -6546,6 +6546,12 @@ main.main > .main-view:not([id="mainChat"]):not([id="mainSettings"]) .main-view-
 .workspace-panel-tabs{display:flex;gap:4px;padding:6px 8px;border-bottom:1px solid var(--border);}
 .workspace-panel-tab{flex:1;border:1px solid transparent;background:transparent;color:var(--muted);border-radius:7px;padding:5px 8px;font-size:12px;cursor:pointer;}
 .workspace-panel-tab.active{background:var(--surface-subtle);color:var(--text);border-color:var(--border2);}
+.workspace-panel-tab[hidden]{display:none;}
+.workspace-screens{flex:1;min-height:0;display:flex;}
+.workspace-screens[hidden]{display:none;}
+.workspace-screens iframe{width:100%;height:100%;min-height:0;border:0;}
+.rightpanel[data-active-tab="screens"] :is(.breadcrumb-bar,.file-tree,#wsEmptyState,.preview-area,.workspace-artifacts,.workspace-todos,.git-badge,.workspace-hidden-indicator){display:none!important;}
+.rightpanel[data-active-tab="screens"] .panel-actions>button:not(#btnClearPreview){display:none!important;}
 .workspace-artifacts{flex:1;overflow:auto;padding:8px;}
 .workspace-artifact-empty{padding:16px 8px;color:var(--muted);font-size:12px;line-height:1.5;text-align:center;}
 .workspace-artifact-item{display:block;width:100%;text-align:left;background:var(--surface-subtle);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:6px;cursor:pointer;}

@@ -95,6 +95,7 @@ function applyLocaleToDOM(){
   document.querySelectorAll('[data-i18n-placeholder]').forEach(el=>{const key=el.getAttribute('data-i18n-placeholder'),val=t(key);if(val&&val!==key)el.placeholder=val;});
   document.querySelectorAll('[data-i18n-aria-label]').forEach(el=>{const key=el.getAttribute('data-i18n-aria-label'),val=t(key);if(val&&val!==key)el.setAttribute('aria-label',val);});
   if(typeof syncAppTitlebar==='function')syncAppTitlebar();
+  if (typeof syncWorkspacePanelUI === 'function') syncWorkspacePanelUI();
   // Chip labels that JS owns (their text depends on state, not on a fixed
   // data-i18n key) have to be re-rendered after a locale switch.
   if(typeof syncChatModeChip==='function')syncChatModeChip();

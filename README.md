@@ -51,6 +51,8 @@ Members use Chats, Bots, Projects, Scheduled tasks, Skills library, Connections
 and My approvals. Effective feature grants and administrative grants determine
 which navigation is shown. See [daily work navigation](docs/role-navigation.md)
 and [chat bot recipients](docs/chat-bot-roster.md).
+[Bot Screens](docs/bot-screens.md) lets explicitly authorized users watch and
+privately take over a bot’s server desktop from the browser.
 
 ## Contents
 

@@ -14809,6 +14809,107 @@ window.SynthPulseFeatureCatalog = {
           "example": "Buy 2 hours, pay, select Add hours, then submit your support ticket."
         }
       }
+    },
+    {
+      "id": "webui.bots.screens",
+      "area": "bots",
+      "status": "conditional",
+      "conditions": [
+        "Explicit Bot Screens access and installed desktop runtime."
+      ],
+      "anchors": [
+        "?help_feature=webui.bots.screens",
+        "#btnBotScreens"
+      ],
+      "source_refs": [
+        "api/bot_screens.py",
+        "static/bot-screens.js",
+        "static/bot-screens.html"
+      ],
+      "related": [
+        "webui.bots.select"
+      ],
+      "locales": {
+        "nl": {
+          "title": "Bot Screens: meekijken en overnemen",
+          "purpose": "Bekijk en bedien de eigen desktop van een bot op de VPS.",
+          "when": "Als je wilt meekijken of zelf wilt inloggen op de computer van de bot.",
+          "steps": [
+            "Open Bots en kies Bot Screens.",
+            "Kies een bot waarvoor je schermrechten hebt en start het scherm.",
+            "Open de Interactieve gids in het schermvenster voor uitleg bij elke bediening.",
+            "Bevestig Overnemen om privé muis en toetsenbord te gebruiken. Kies daarna Teruggeven."
+          ],
+          "permissions": "Schermrechten worden apart per bot toegekend: kijken, bedienen en beheren.",
+          "limits": "Bij een overname zien anderen geen nieuwe schermbeelden. Bij verbindingsverlies blijft de bot geblokkeerd tot de controle wordt teruggegeven. Het scherm is geen extra OS-isolatiegrens.",
+          "example": "Neem tijdelijk over om in te loggen, geef terug en vraag de bot in de chat verder te gaan."
+        },
+        "en": {
+          "title": "Bot Screens: watch and take over",
+          "purpose": "View and control a bot’s own desktop on the VPS.",
+          "when": "When watching the bot work or signing in on its computer.",
+          "steps": [
+            "Open Bots and choose Bot Screens.",
+            "Choose a bot with screen access and start its screen.",
+            "Open the Interactive guide in the screen window for each individual control.",
+            "Confirm Take over to use the mouse and keyboard privately. Then choose Hand back."
+          ],
+          "permissions": "Screen permissions are assigned separately per bot: view, control and administer.",
+          "limits": "Other viewers receive no new frames during takeover. Connection loss keeps the bot blocked until control is handed back. A screen is not an additional OS isolation boundary.",
+          "example": "Take over to sign in, hand back and ask the bot in chat to continue."
+        }
+      }
+    },
+    {
+      "id": "webui.chat.bot_screens",
+      "area": "chat",
+      "status": "conditional",
+      "conditions": [
+        "Explicit Bot Screens access and installed desktop runtime."
+      ],
+      "anchors": [
+        "?help_feature=webui.chat.bot_screens",
+        "#workspaceScreensTab"
+      ],
+      "source_refs": [
+        "static/workspace.js",
+        "static/bot-screens-link.js",
+        "static/bot-screens.js"
+      ],
+      "related": [
+        "webui.bots.screens",
+        "webui.files.browse"
+      ],
+      "locales": {
+        "nl": {
+          "title": "Bot Screens naast je chat",
+          "purpose": "Kijk mee of neem de bot over in het rechterzijpaneel terwijl je chat open blijft.",
+          "when": "Als je wilt meekijken of zelf wilt inloggen op de computer van de bot.",
+          "steps": [
+            "Klap in de chat het rechterzijpaneel open en kies Bot Screens.",
+            "Controleer de gekozen bot en kies Scherm starten als het scherm uitstaat.",
+            "Kies Interactieve gids voor uitleg bij elke knop, of Overnemen om zelf te bedienen.",
+            "Kies Teruggeven zodra je klaar bent. Inklappen of naar Bestanden wisselen geeft de controle niet terug."
+          ],
+          "permissions": "Schermrechten worden apart per bot toegekend: kijken, bedienen en beheren.",
+          "limits": "Bij een overname zien anderen geen nieuwe schermbeelden. Bij verbindingsverlies blijft de bot geblokkeerd tot de controle wordt teruggegeven. Het scherm is geen extra OS-isolatiegrens.",
+          "example": "Log rechts in op de computer van de bot, geef terug en vraag links in de chat verder te gaan."
+        },
+        "en": {
+          "title": "Bot Screens beside your chat",
+          "purpose": "Watch or take over the bot in the right panel while keeping your chat open.",
+          "when": "When watching the bot work or signing in on its computer.",
+          "steps": [
+            "Expand the right panel in chat and select Bot Screens.",
+            "Check the selected bot and choose Start screen if it is off.",
+            "Choose Interactive guide for each control, or Take over to control the screen.",
+            "Choose Hand back when finished. Collapsing the panel or switching to Files does not hand control back."
+          ],
+          "permissions": "Screen permissions are assigned separately per bot: view, control and administer.",
+          "limits": "Other viewers receive no new frames during takeover. Connection loss keeps the bot blocked until control is handed back. A screen is not an additional OS isolation boundary.",
+          "example": "Sign in on the bot computer on the right, hand back and ask it to continue in the chat on the left."
+        }
+      }
     }
   ]
 };

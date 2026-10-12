@@ -345,6 +345,7 @@
       <div class="panel-head">
         <span data-i18n="tab_profiles">Bots</span>
         <div class="panel-head-actions">
+          <a id="btnBotScreens" class="sm-btn" style="display:none" href="/static/bot-screens.html" target="_blank" rel="noopener" hidden>Bot Screens</a>
           <button class="panel-head-btn has-tooltip has-tooltip--bottom" onclick="openProfileCreate()" data-tooltip="New bot" data-i18n-title="new_profile" aria-label="New bot" data-tour="bots-new"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
         </div>
       </div>
@@ -1980,11 +1981,13 @@
       <button class="workspace-panel-tab active" id="workspaceFilesTab" type="button" onclick="switchWorkspacePanelTab('files')" role="tab" aria-selected="true" data-i18n="workspace_files_tab" data-tour="workspace-files-tab">Files</button>
       <button class="workspace-panel-tab" id="workspaceArtifactsTab" type="button" onclick="switchWorkspacePanelTab('artifacts')" role="tab" aria-selected="false"><span data-i18n="workspace_artifacts_tab">Artifacts</span> <span id="workspaceArtifactsCount" class="workspace-artifacts-count">0</span></button>
       <button class="workspace-panel-tab" id="workspaceTodosTab" type="button" onclick="switchWorkspacePanelTab('todos')" role="tab" aria-selected="false" hidden data-i18n="tab_todos">Todos</button>
+      <button class="workspace-panel-tab" id="workspaceScreensTab" type="button" onclick="switchWorkspacePanelTab('screens')" role="tab" aria-selected="false" aria-controls="workspaceScreensPanel" hidden>Bot Screens</button>
     </div>
     <div class="breadcrumb-bar" id="breadcrumbBar" style="display:none"></div>
     <div class="file-tree" id="fileTree" data-tour="workspace-file-tree"></div>
     <div class="workspace-artifacts" id="workspaceArtifacts" hidden></div>
     <div class="workspace-todos" id="workspaceTodosPanel" hidden style="flex:1;overflow-y:auto;padding:8px 12px"></div>
+    <div class="workspace-screens" id="workspaceScreensPanel" role="tabpanel" aria-labelledby="workspaceScreensTab" hidden></div>
     <div id="wsEmptyState" style="display:none;flex:1;align-items:center;justify-content:center;padding:24px 16px;text-align:center;color:var(--muted);font-size:12px;line-height:1.6"></div>
     <div class="preview-area" id="previewArea">
       <div class="preview-path" id="previewPath">
@@ -2078,6 +2081,7 @@
 <script src="static/interaction_preferences.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/chat-bots.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/bot-knowledge.js?v=__WEBUI_VERSION__" defer></script>
+<script src="static/bot-screens-link.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/bot-builder.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/governance.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/integrations.js?v=__WEBUI_VERSION__" defer></script>
