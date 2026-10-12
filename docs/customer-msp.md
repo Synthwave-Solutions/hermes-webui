@@ -1,6 +1,6 @@
 # Customer MSP service
 
-The main WebUI exposes **My MSP / Mijn MSP** for tickets, support minutes,
+The main WebUI exposes **Support** for tickets, support minutes,
 per-app support subscriptions and payments. **Apps** exposes application requests,
 launcher availability and Basic, Plus and Premium support requests.
 All six topics have Dutch and English interactive guides.
@@ -54,7 +54,7 @@ submit synthetic tickets, subscriptions or payments to production.
 
 ## Base package and Agentic Consultant
 
-My MSP starts with the base package and weekly Agentic Consultant capacity.
+Support starts with the base package and weekly Agentic Consultant capacity.
 The base status comes from the existing contract or an explicit package request.
 Organisation/billing admins can request the base package, request consultant
 capacity in half-day increments (0.5 to 7 days per week), change that capacity
@@ -68,3 +68,58 @@ effective date and confirm customer acceptance. An active base customer contract
 is required for activation. Stale ticket decisions fail closed. App support stays
 separate, with its own Basic, Plus and Premium subscriptions. The interactive
 features are `webui.msp.package` and `webui.msp.consultant`.
+
+## Compact overview and prepaid requests
+
+Support sits below Apps and above Settings, including when a saved navigation
+order exists. The overview leads with available hours and open tickets. Package,
+consultant and automation details expand on demand; invoice history is collapsed.
+Paid service offers appear in Payments. HQ prepares a scoped, priced offer
+against an existing accounting invoice. The customer pays through Mollie, checks
+the payment, then explicitly submits the request. Payment alone creates no ticket.
+Top-ups add hours once after verified payment and Add hours. New support tickets
+and reopened support tickets require available hours; invoice questions and
+existing ticket communication remain accessible. Draft ticket text is preserved.
+An absent price or payment connection is never presented as a free purchase.
+
+### Payment visibility
+
+The navigation, page title and guides use **Support**. Its **Payments / Betalingen**
+tab starts with a visible payment overview containing every scoped billing request,
+including paid service offers and purchased hours. It shows the invoice reference,
+description, VAT-inclusive amount, creation date and current status. All, Outstanding
+and Paid filters keep larger histories usable; outstanding means an invoiced request
+that has not been marked paid. Failed or expired payment attempts retain their visible
+status. Only verified live open/pending checkout links are shown.
+
+Priced offers and their pay-then-submit workflow remain below this overview. Financial
+visibility still requires organisation or billing administrator rights. This display
+change does not initiate payments or create accounting invoices.
+
+### Annual support per scheduled job
+
+Job details expose implementation hours and a support switch for MSP managers.
+There is no hourly-rate input or monetary preview in this panel; saving preserves
+an existing stored rate, while new jobs remain unpriced. Annual support is calculated by the server as 15% of implementation
+hours, rounded to whole minutes; its price is 15% of the implementation value, rounded
+to cents. For example, 20 hours at EUR 100 gives 3 annual support hours at EUR 300/year.
+Saving enabled support adds the hours and annual amount once to the support total
+and draft agreements. An unknown rate remains unpriced, never a free offer.
+Only explicitly designated MSP managers can configure implementation hours and support state. Customer administrators have read-only controls and cannot enable,
+edit or disable support through the API. HQ admins grant/revoke this separate
+installation-scoped capability through POST /api/control/commercial/job-support/access
+with org_id, installation_id, email and enabled. Customer/billing roles alone never
+grant MSP access. Revocation takes effect immediately. Saved legacy terms remain
+until the MSP changes their implementation basis. HQ can also disable support directly. Scheduler pause/delete operations do
+not cancel the independent support commitment. Accepted agreements and funded hours
+are preserved; draft additions are not spendable credits.
+
+### Original Mollie invoice PDFs
+
+Paid live requests expose Invoice (PDF). The authenticated proxy retrieves the
+original customer Sales Invoice PDF using server-only credentials after matching
+the live payment, profile and amount. Missing invoices and unavailable PDFs are
+reported explicitly. This is retrieval, not automatic invoice creation or external
+delivery: the invoice must already exist in Mollie Invoicing with the payment source
+reference. The existing accounting invoice is never duplicated. Documents are bounded
+to 512 KiB to fit the signed proxy response limit.

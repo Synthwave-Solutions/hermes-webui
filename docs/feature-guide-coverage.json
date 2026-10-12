@@ -2978,6 +2978,24 @@
         "api/msp_service.py",
         "static/msp.js"
       ]
+    },
+    {
+      "id": "webui.msp.job-costs",
+      "area": "msp",
+      "status": "conditional",
+      "source_refs": [
+        "static/job-costs.js",
+        "static/msp.js",
+        "api/msp_service.py"
+      ]
+    },
+    {
+      "id": "webui.msp.annual-support",
+      "area": "msp",
+      "status": "conditional",
+      "source_refs": [
+        "static/msp.js"
+      ]
     }
   ],
   "controls": [
@@ -7598,7 +7616,7 @@
     {
       "control": "btnMsp",
       "tag": "button",
-      "label": "Mijn MSP",
+      "label": "Support",
       "source_refs": [
         "static/index.html"
       ],

@@ -1,4 +1,4 @@
-// Static MSP catalog snapshot, source SHA256 4e6948aedebdfa723dd31caad1bc6cc6740c73a246734424dbae28c9490259dd. No runtime service dependency.
+/* Generated from the MSP cockpit catalogue. */
 window.SynthPulseMspFeatureCatalog = {
   "schema_version": 1,
   "product": "msp",
@@ -1003,16 +1003,15 @@ window.SynthPulseMspFeatureCatalog = {
           "purpose": "Create checkout links for invoiced requests and verify payment with Mollie.",
           "when": "After approving and invoicing a customer request.",
           "steps": [
-            "Open Payments and check the Mollie connection and test or live mode.",
-            "As admin, save the API key in the secure field. It is verified and stored on the server only.",
-            "Approve the request, issue the invoice in your accounting system and record its reference.",
-            "Create and share the checkout link. The VAT-inclusive amount comes from the request; repeated clicks reuse the current payment.",
-            "Mollie reports changes. SynthPulse checks amount, currency, profile and customer metadata before a live payment settles the invoice.",
-            "Use Check status with Mollie to verify again. If creation was interrupted, enter its payment ID from Mollie to recover the original payment.",
-            "Review reported refunds and chargebacks manually."
+            "Open Payments in HQ.",
+            "Configure Mollie through the secure key field.",
+            "Expand Prepare a payable offer. Choose customer, kind, scope, price and an existing invoice reference.",
+            "The customer sees the offer in Support, pays and then submits the request.",
+            "Review payment status and any refunds. Additional hours are credited only after payment and Add hours.",
+            "For a paid request, choose Mollie invoice (PDF). Only the original customer invoice for the same live payment is retrieved."
           ],
           "permissions": "Operators may read. Only admins can configure the key and process payment requests.",
-          "limits": "Requires a key, public webhook, real prices and contracts. Test payments do not settle real invoices. Issue invoice documents in your accounting system. Automatic direct debit and subscription collection are not connected. Hours are credited on invoicing, never twice on payment.",
+          "limits": "Paid requests require a verified live payment. Payment alone does not submit a request. Support tickets require remaining hours; invoice questions remain available. Your MSP must configure prices and the payment connection. Test payments do not settle real invoices. The customer invoice must already exist in Mollie Invoicing. This retrieves the PDF and does not create a duplicate invoice.",
           "example": "An invoiced support bundle receives a checkout link. A verified live payment changes its status to Paid."
         },
         "nl": {
@@ -1020,16 +1019,15 @@ window.SynthPulseMspFeatureCatalog = {
           "purpose": "Maak betaallinks voor gefactureerde aanvragen en controleer betaling via Mollie.",
           "when": "Na het goedkeuren en factureren van een klantaanvraag.",
           "steps": [
-            "Open Betalingen en controleer de Mollie-koppeling en test- of livemodus.",
-            "Sla als admin de API-sleutel in het beveiligde veld op. Deze wordt gecontroleerd en alleen op de server bewaard.",
-            "Keur de aanvraag goed, maak de factuur in je boekhouding en registreer het factuurnummer.",
-            "Maak en deel de betaallink. Het bedrag inclusief btw komt uit de aanvraag; opnieuw klikken gebruikt dezelfde lopende betaling.",
-            "Mollie meldt wijzigingen. SynthPulse controleert bedrag, valuta, profiel en klantkoppeling voordat een livebetaling de factuur voldoet.",
-            "Gebruik Status bij Mollie controleren voor een nieuwe controle. Na een onderbroken aanmaak kun je het betaal-ID uit Mollie invoeren om de oorspronkelijke betaling te koppelen.",
-            "Controleer gemelde terugbetalingen en terugboekingen handmatig."
+            "Open Betalingen in HQ.",
+            "Configureer de Mollie-koppeling in het beveiligde sleutelveld.",
+            "Klap Betaalbaar aanbod klaarzetten open. Kies klant, type, inhoud, prijs en bestaand factuurnummer.",
+            "De klant ziet het aanbod in Support, betaalt en dient daarna de aanvraag in.",
+            "Controleer betaalstatus en eventuele terugboekingen. Extra uren worden pas na betaling en Uren toevoegen bijgeschreven.",
+            "Kies bij een betaalde aanvraag Mollie-factuur (PDF). Alleen de originele klantfactuur bij dezelfde livebetaling wordt opgehaald."
           ],
           "permissions": "Operators mogen lezen. Alleen admins mogen de sleutel instellen en betaalverzoeken verwerken.",
-          "limits": "Vereist een sleutel, openbare webhook, echte tarieven en contracten. Testbetalingen voldoen geen echte facturen. Factuurdocumenten maak je in de boekhouding. Automatische incasso en abonnementincasso zijn nog niet aangesloten. Uren worden bij facturatie toegekend en niet opnieuw bij betaling.",
+          "limits": "Een bevestigde livebetaling is vereist voor betaalde aanvragen. Betalen alleen dient nog geen aanvraag in. Supporttickets vereisen resterende uren; factuurvragen blijven bereikbaar. Tarieven en de betaalkoppeling moeten door je MSP zijn ingesteld. Testbetalingen voldoen geen echte facturen. De klantfactuur moet al in Mollie Invoicing bestaan. Dit haalt de PDF op en maakt geen tweede factuur aan.",
           "example": "Een gefactureerde urenbundel krijgt een betaallink. Na bevestigde livebetaling wordt de status Betaald."
         }
       }
@@ -3354,34 +3352,32 @@ window.SynthPulseMspFeatureCatalog = {
       ],
       "locales": {
         "nl": {
-          "title": "Supportniveaus per app beheren",
-          "purpose": "Beheer Basis, Plus en Premium als afzonderlijke maandabonnementen per app.",
-          "when": "Bij een nieuwe supportaanvraag of het instellen van tarieven.",
+          "title": "Supportstrippenkaart per app",
+          "purpose": "Vraag een supportniveau aan voor een beheerde app en neem de uren op in de jaarafspraak.",
+          "when": "Als je app-support wilt toevoegen of wijzigen.",
           "steps": [
-            "Open App-support en kies een app en niveau.",
-            "Stel naam, inhoud en maandtarief in eurocenten exclusief btw in. Leeg betekent dat er nog geen tarief is.",
-            "Bekijk aanvragen en bespreek de afspraken met de klant via het serviceticket.",
-            "Bevestig het klantakkoord en activeer pas als er een tarief en een actief klantcontract zijn.",
-            "Verwerk een opzegging apart van de appbeschikbaarheid."
+            "Open App-support en leg de niveaus en dekking vast.",
+            "Beoordeel een klantaanvraag en bevestig klantakkoord.",
+            "Leg de jaaruren en jaarprijs per app vast bij Jaaruren.",
+            "Activeer de geaccepteerde jaarafspraak en zet alle onderdelen samen op één gezamenlijke factuur volgens de afgesproken betaalwijze."
           ],
-          "permissions": "Operators kunnen lezen; MSP-beheerders kunnen tarieven en afspraken wijzigen.",
-          "limits": "Activering registreert de afspraak. Het maakt nog geen terugkerende Mollie-incasso aan. Reactietijden en inbegrepen uren volgen uit de afgesproken dekking, niet uit alleen de niveaunaam.",
-          "example": "Stel Plus-support voor de documentapp in en verwerk daarna de goedgekeurde klantaanvraag."
+          "permissions": "Organisatiebeheerders en financiële beheerders beheren app-supportaanvragen.",
+          "limits": "Een aanvraag verleent nog geen uren en schrijft geen geld af. Uitschakelen van een app beëindigt de supportafspraak niet. Een niveaunaam alleen belooft geen reactietijd.",
+          "example": "Neem 10 jaarlijkse supporturen voor Documenten op naast 24 infrastructuururen."
         },
         "en": {
-          "title": "Manage support levels per app",
-          "purpose": "Manage Basic, Plus and Premium as separate monthly subscriptions for each application.",
-          "when": "When receiving a support request or configuring prices.",
+          "title": "Annual support bundle per app",
+          "purpose": "Request a managed-app support level and include its hours in the annual agreement.",
+          "when": "When adding or changing app support.",
           "steps": [
-            "Open App support and select an app and level.",
-            "Set the name, scope and monthly rate in euro cents excluding VAT. Empty means no price is set.",
-            "Review requests and discuss terms with the customer through the service ticket.",
-            "Confirm customer agreement and activate only after configuring a rate and an active customer contract.",
-            "Process cancellation separately from app availability."
+            "Open App support and record levels and coverage.",
+            "Review a customer request and confirm acceptance.",
+            "Record annual hours and price per app in Annual hours.",
+            "Activate accepted annual terms and combine all components on one consolidated invoice at the agreed payment frequency."
           ],
-          "permissions": "Operators can read; MSP administrators can change prices and agreements.",
-          "limits": "Activation records the agreement. It does not create recurring Mollie collection. Response times and included hours depend on the agreed scope, not the tier name alone.",
-          "example": "Configure Plus support for the document app and process the accepted customer request."
+          "permissions": "Organisation and billing administrators manage app-support requests.",
+          "limits": "Requests grant no hours and collect no money. Disabling an app does not cancel its support agreement. A tier name alone promises no response time.",
+          "example": "Include 10 annual Documents support hours alongside 24 infrastructure hours."
         }
       }
     },
@@ -3414,7 +3410,7 @@ window.SynthPulseMspFeatureCatalog = {
             "Verwerk wijzigingen of opzeggingen afzonderlijk."
           ],
           "permissions": "MSP-beheerders wijzigen afspraken; operators kunnen lezen.",
-          "limits": "Een aanvraag reserveert nog geen persoon of agenda. Dagen worden niet automatisch omgerekend naar supporturen of maanddagen. Dagindeling, tarief en planning spreek je apart af; app-support blijft een aparte afspraak.",
+          "limits": "De MSP bevestigt eerst uren, tarieven en contractjaar. Centafrondingen worden over twaalf maanden verdeeld. Maandfacturen schrijven het jaarbudget niet opnieuw bij. Consultantdagen worden apart afgesproken.",
           "example": "Vraag 2 dagen Agentic Consultant per week aan naast je basispakket."
         },
         "en": {
@@ -3428,8 +3424,109 @@ window.SynthPulseMspFeatureCatalog = {
             "Process changes or cancellations separately."
           ],
           "permissions": "MSP administrators change agreements; operators can read.",
-          "limits": "Requests do not reserve a person or calendar. Days are not automatically converted to support hours or monthly days. Agree day structure, rate and scheduling separately; app support remains a separate agreement.",
+          "limits": "Your MSP first confirms hours, prices and contract year. Cent rounding is spread over twelve months. Monthly invoices never credit the annual budget again. Consultant days are agreed separately.",
           "example": "Request 2 days of Agentic Consultant capacity per week alongside the base package."
+        }
+      }
+    },
+    {
+      "id": "msp.releases",
+      "area": "operations",
+      "status": "conditional",
+      "conditions": [
+        "Connected MSP and appropriate administrator permissions"
+      ],
+      "anchors": [
+        "/cockpit/releases"
+      ],
+      "source_refs": [
+        "apps/cockpit/frontend/src/pages/ReleasesPage.jsx",
+        "apps/cockpit/backend/app/control/releases.py"
+      ],
+      "related": [],
+      "locales": {
+        "nl": {
+          "title": "GitHub-updates via OTAP",
+          "purpose": "Rol vastgelegde softwareversies vanuit HQ gecontroleerd uit.",
+          "when": "Wanneer je een geteste GitHub-versie naar productie wilt brengen.",
+          "steps": [
+            "Open Updates & OTAP en kies de software.",
+            "Open de broncode op GitHub en kopieer de volledige commit-SHA. Kies Ophalen naar Ontwikkeling.",
+            "Start Test en wacht op een geslaagde controle. Start daarna Acceptatie.",
+            "Controleer het resultaat en kies Deze versie naar Productie uitrollen. Actieve gebruikersruns blokkeren een WebUI-herstart.",
+            "Herstel zo nodig de vorige geslaagde productieversie met de herstelknop."
+          ],
+          "permissions": "Operators lezen de status; HQ-beheerders starten releases en promoties.",
+          "limits": "Alleen geconfigureerde adapters kunnen uitrollen. Test en Acceptatie gebruiken geïsoleerde bestanden en testgegevens. Codeherstel draait gegevensmigraties niet terug; databaseherstel vereist afzonderlijke beoordeling. Bij een onderbroken worker moet de hostbeheerder de echte uitrolstatus onderzoeken.",
+          "example": "Promoveer dezelfde commit via O, T en A naar P."
+        },
+        "en": {
+          "title": "GitHub updates through OTAP",
+          "purpose": "Deploy pinned software versions from HQ with stage gates.",
+          "when": "When promoting a tested GitHub version into production.",
+          "steps": [
+            "Open Updates & OTAP and select the software.",
+            "Open its source on GitHub, copy the full commit SHA and choose Fetch to Development.",
+            "Start Test and wait for success, then start Acceptance.",
+            "Review the result and deploy this version to Production. Active user runs block a WebUI restart.",
+            "Restore the previous successful production version using its restore button if needed."
+          ],
+          "permissions": "Operators read status; HQ administrators start releases and promotions.",
+          "limits": "Only configured adapters can deploy. Test and Acceptance use isolated files and synthetic data. Code rollback does not reverse data migrations; database restoration requires separate review. Interrupted workers require inspection of actual host state.",
+          "example": "Promote the same commit through D, T and A to P."
+        }
+      }
+    },
+    {
+      "id": "msp.annual-support",
+      "area": "commercial",
+      "status": "conditional",
+      "conditions": [
+        "Connected MSP and administrator access"
+      ],
+      "anchors": [
+        "/cockpit/annual-support"
+      ],
+      "source_refs": [
+        "apps/cockpit/frontend/src/pages/AnnualSupportPage.jsx"
+      ],
+      "related": [],
+      "locales": {
+        "nl": {
+          "title": "Jaarlijkse supporturen en betaalkeuze",
+          "purpose": "Bekijk één jaarbudget voor basisinfrastructuur, app-strippenkaarten, automations en maatwerk.",
+          "when": "Als je de jaarcap en het verschil tussen maandbetaling en jaarbetaling wilt bekijken.",
+          "steps": [
+            "Open Jaaruren in HQ.",
+            "Kies de klant en de eerste maand van het contractjaar.",
+            "Voeg basisinfrastructuur, apps en automations/maatwerk toe met jaaruren en jaarbedragen vóór jaarkorting.",
+            "Alleen aangewezen MSP-beheerders stellen job-support in: 15% van implementatie-uren en implementatiewaarde. Ingeschakelde uren en bedragen worden automatisch eenmaal toegevoegd aan conceptjaarafspraken. Klanten kunnen dit niet uitzetten; gebruik Support uitschakelen (MSP) om het te beëindigen voor nieuwe afspraken.",
+            "Kies Maandelijks betalen of Jaarlijks vooruitbetalen met korting. Vul het afgesproken kortingspercentage in; laat onbekende korting leeg.",
+            "Vergelijk de jaarprijzen en besparing. Sla het concept op en bevestig klantakkoord op uren, betaalwijze, korting en bedragen voordat je activeert.",
+            "Open Twaalf maandtermijnen of Eén jaarlijkse vooruitbetaling en zet de verschuldigde factuur klaar.",
+            "Maak de factuur in de boekhouding en registreer het nummer bij Betalingen."
+          ],
+          "permissions": "Operators lezen; HQ-beheerders leggen afspraken vast, activeren en zetten facturen klaar.",
+          "limits": "Dezelfde jaarcap geldt bij beide betaalwijzen. Betalen vult de uren niet opnieuw aan. Extra uren vereisen expliciet akkoord. Jaarkorting is per klantafspraak instelbaar, geldt alleen bij jaarlijkse vooruitbetaling en moet eerst zijn afgesproken. Geaccepteerde afspraken kunnen niet achteraf worden gewijzigd. Facturen worden in de boekhouding gemaakt; dit start geen automatische incasso.",
+          "example": "Rekenvoorbeeld, geen vast tarief: 38 jaaruren voor EUR 3.600 bij maandbetaling; met een afgesproken korting van 5% kost jaarbetaling EUR 3.420. Beide hebben 38 jaaruren."
+        },
+        "en": {
+          "title": "Annual support hours and payment options",
+          "purpose": "View one annual budget for infrastructure, app hour bundles, automations and custom work.",
+          "when": "To review the annual cap and compare monthly payments with yearly prepayment.",
+          "steps": [
+            "Open Annual hours in HQ.",
+            "Choose the customer and first month of the contract year.",
+            "Add infrastructure, apps and automation/custom-work lines with annual hours and amounts before prepayment discount.",
+            "Only designated MSP managers configure job support: 15% of implementation hours and value. Enabled hours and amounts are automatically included once in draft annual agreements. Customers cannot turn it off; use Disable support (MSP) to end it for new agreements.",
+            "Choose Monthly payments or Yearly upfront with discount. Enter the agreed discount percentage; leave unknown discounts empty.",
+            "Compare annual prices and savings. Save the draft and confirm acceptance of hours, payment frequency, discount and amounts before activating.",
+            "Open Twelve monthly installments or One yearly upfront payment and prepare the due invoice.",
+            "Issue the invoice in accounting and record its reference in Payments."
+          ],
+          "permissions": "Operators read; HQ administrators save and activate agreements and prepare invoices.",
+          "limits": "Both payment options have the same annual cap. Payments never replenish hours. Extra hours need explicit approval. Yearly discount is configurable per agreement, applies only to yearly prepayment and must be agreed first. Accepted agreements cannot be changed retroactively. Invoices are issued in accounting; this does not start recurring collection.",
+          "example": "Illustration, not a set price: 38 annual hours cost EUR 3,600 with monthly payments; an agreed 5% discount makes yearly prepayment EUR 3,420. Both include 38 annual hours."
         }
       }
     },

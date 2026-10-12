@@ -80,7 +80,7 @@ function syncAppTitlebar() {
     if (/^webui$/i.test(sourceLabel)) sourceLabel = '';
   } else {
     const key = APP_TITLEBAR_KEYS[panel];
-    mainText = panel === 'msp' ? (document.documentElement.lang.startsWith('nl') ? 'Mijn MSP' : 'My MSP') : key && typeof t === 'function' ? t(key) : (panel.charAt(0).toUpperCase() + panel.slice(1));
+    mainText = panel === 'msp' ? 'Support' : key && typeof t === 'function' ? t(key) : (panel.charAt(0).toUpperCase() + panel.slice(1));
   }
 
   // Don't touch the element while an inline rename is in progress — replacing
@@ -2094,6 +2094,7 @@ function _renderCronDetail(job){
   _setCronHeaderButtons('read', job);
   // Load runs asynchronously
   if (!isReadOnly) _loadCronDetailRuns(job.id, _currentCronDetailKey);
+  if (!isReadOnly) window.SynthPulseJobCosts?.mount(job, body);
 }
 
 function _setCronHeaderButtons(mode, job) {
@@ -8920,14 +8921,16 @@ function _applyTabOrder(order){
       return child.dataset&&child.dataset.panel==='settings';
     });
     ordered.forEach(function(panel){
-      if(panel==='apps')return;
+      if(panel==='apps'||panel==='msp')return;
       var node=container.querySelector('.nav-tab[data-panel="'+panel+'"]');
       if(node) container.insertBefore(node,anchor||null);
     });
-    // Apps stays at the bottom even when an older saved order places it first.
+    // Apps and MSP stay above Settings, including with an older saved order.
     var apps=container.querySelector('.nav-tab[data-panel="apps"]');
     var settings=container.querySelector('.nav-tab[data-panel="settings"]');
     if(apps)container.insertBefore(apps,settings||null);
+    var msp=container.querySelector('.nav-tab[data-panel="msp"]');
+    if(msp)container.insertBefore(msp,settings||null);
   });
 }
 
@@ -8941,7 +8944,7 @@ window._navAudience = 'member';
 window._capabilityNavigation = false;
 // Navigation order agreed with Michaël (20 Sep 2026): daily work first, then
 // admin surfaces. Also the default order of the markup in index.html.
-const _MEMBER_NAV_ORDER = ['msp','modules','tasks', 'skills', 'projects', 'profiles', 'memory', 'integrations', 'workspaces', 'files', 'todos', 'insights', 'approvals', 'governance', 'logs', 'apps'];
+const _MEMBER_NAV_ORDER = ['modules','tasks', 'skills', 'projects', 'profiles', 'memory', 'integrations', 'workspaces', 'files', 'todos', 'insights', 'approvals', 'governance', 'logs', 'apps', 'msp'];
 function _canUseFeature(permission){
   const me=window.__GOV_ME__;
   if(!me)return false;
