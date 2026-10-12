@@ -282,7 +282,7 @@ function syncWorkspacePanelState(){
 }
 
 function openWorkspacePanel(mode='browse'){
-  if(mode==='browse'&&!S.session&&!_hasWorkspacePreviewVisible()&&!S._profileDefaultWorkspace)return;
+  if(mode==='browse'&&!S.session&&!_hasWorkspacePreviewVisible()&&!S._profileDefaultWorkspace&&!window.SynthPulseBotScreens?.available)return;
   if(mode==='preview'&&_workspacePanelMode==='browse'){
     syncWorkspacePanelUI();
     return;
@@ -300,6 +300,10 @@ function ensureWorkspacePreviewVisible(){
 }
 
 function handleWorkspaceClose(){
+  if(typeof _workspacePanelActiveTab!=='undefined'&&_workspacePanelActiveTab==='screens'){
+    closeWorkspacePanel();
+    return;
+  }
   if(_hasWorkspacePreviewVisible()){
     clearPreview();
     return;
@@ -367,8 +371,9 @@ function syncWorkspacePanelUI(){
   const mobileOpen=panel.classList.contains('mobile-open');
   const isCompact=_isCompactWorkspaceViewport();
   const isOpen=isCompact?mobileOpen:desktopOpen;
-  const canBrowse=!!S.session||_hasWorkspacePreviewVisible()||!!(S._profileDefaultWorkspace);
-  const hasPreview=_hasWorkspacePreviewVisible();
+  const canBrowse=!!S.session||_hasWorkspacePreviewVisible()||!!(S._profileDefaultWorkspace)||!!window.SynthPulseBotScreens?.available;
+  const screenTab=typeof _workspacePanelActiveTab!=='undefined'&&_workspacePanelActiveTab==='screens';
+  const hasPreview=_hasWorkspacePreviewVisible()&&!screenTab;
   if(toggleBtn){
     toggleBtn.classList.toggle('active',isOpen);
     toggleBtn.setAttribute('aria-pressed',isOpen?'true':'false');

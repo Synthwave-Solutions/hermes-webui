@@ -6,6 +6,15 @@ interactive guidance for each control. Screen access is independent of bot chat
 or configuration access. A bot's screen is its computer on the server, not the
 user's laptop.
 
+From a normal chat, expand the right panel and select its **Bot Screens** tab.
+The same viewer runs beside the conversation, including takeover, full screen
+and the interactive guide. It initially selects the active chat bot when that
+bot is allowed. Use its bot selector to change screens; changing chats does not
+silently replace an open screen. Switching to Files/Artifacts or collapsing the
+panel keeps the viewer and human lease intact. Reopen Bot Screens to hand back.
+The screen tab is shown only to accounts with explicit screen access, including
+when no chat session or workspace has been created yet.
+
 1. Choose an allowed bot, then **Start screen**.
 2. Watch without sending input. A viewer-only account cannot start or control.
 3. Choose **Take over** and confirm. Only that browser tab can drive the screen.

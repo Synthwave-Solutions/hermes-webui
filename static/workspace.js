@@ -500,11 +500,16 @@ if(typeof document !== 'undefined'){
 }
 
 function switchWorkspacePanelTab(tab){
-  _workspacePanelActiveTab = tab === 'artifacts' ? 'artifacts' : tab === 'todos' ? 'todos' : 'files';
+  _workspacePanelActiveTab = tab === 'screens' && window.SynthPulseBotScreens?.available ? 'screens' : tab === 'artifacts' ? 'artifacts' : tab === 'todos' ? 'todos' : 'files';
   _setWorkspacePanelTabDataset();
   const filesTab = $('workspaceFilesTab');
   const artifactsTab = $('workspaceArtifactsTab');
   const todosTab = $('workspaceTodosTab');
+  const screensTab = $('workspaceScreensTab');
+  if(screensTab){
+    screensTab.classList.toggle('active', _workspacePanelActiveTab === 'screens');
+    screensTab.setAttribute('aria-selected', _workspacePanelActiveTab === 'screens' ? 'true' : 'false');
+  }
   if(filesTab){
     filesTab.classList.toggle('active', _workspacePanelActiveTab === 'files');
     filesTab.setAttribute('aria-selected', _workspacePanelActiveTab === 'files' ? 'true' : 'false');
@@ -521,8 +526,12 @@ function switchWorkspacePanelTab(tab){
   if(artifacts) artifacts.hidden = _workspacePanelActiveTab !== 'artifacts';
   const todosPanel = $('workspaceTodosPanel');
   if(todosPanel) todosPanel.hidden = _workspacePanelActiveTab !== 'todos';
+  const screensPanel = $('workspaceScreensPanel');
+  if(screensPanel) screensPanel.hidden = _workspacePanelActiveTab !== 'screens';
+  if(_workspacePanelActiveTab === 'screens') window.SynthPulseBotScreens.mount();
   if(_workspacePanelActiveTab === 'artifacts') renderSessionArtifacts();
   if(_workspacePanelActiveTab === 'todos') _loadWorkspacePanelTodos();
+  if(typeof syncWorkspacePanelUI==='function') syncWorkspacePanelUI();
 }
 
 function _loadWorkspacePanelTodos(){
