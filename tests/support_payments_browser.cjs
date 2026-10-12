@@ -16,7 +16,7 @@ const assert=require('node:assert/strict');
     {id:'open',product_name:'Infrastructure',invoice_ref:'INV-OPEN',created_at:'2026-10-11T10:00:00Z',status:'invoiced',amount_incl_vat_cents:24200,payment:{mode:'live',status:'open',checkout_url:'https://www.mollie.com/checkout/test'}},
     {id:'failed',product_name:'<img src=x onerror="window.xss=1">',invoice_ref:'INV-FAILED',created_at:'2026-10-12T10:00:00Z',status:'invoiced',amount_incl_vat_cents:5000,payment:{mode:'live',status:'failed',checkout_url:'javascript:alert(1)'}}
    ],service_orders:[],annual_support:[],apps:[]};
-   window.api=async path=>path==='/api/msp/overview'?fixture:{tickets:[]};
+   window.invoiceCalls=[];window.api=async (path,opts)=>{if(path==='/api/msp/invoice'){invoiceCalls.push(JSON.parse(opts.body));return {content_type:'application/pdf',filename:'factuur-invoice_example.pdf',pdf_base64:btoa('%PDF-1.7\noriginal invoice\n%%EOF')};}return path==='/api/msp/overview'?fixture:{tickets:[]};};
   });
   await p.addScriptTag({path:'static/msp.js'});
   await p.evaluate(async()=>{SynthPulseMSP.applyVisible(true);await SynthPulseMSP.load();});
@@ -29,6 +29,7 @@ const assert=require('node:assert/strict');
   assert.equal(await p.locator('#mspInvoices a').count(),1);
   assert.equal(await p.locator('#mspInvoices img').count(),0);
   assert.equal(await p.evaluate(()=>!!window.xss),false);
+  const download=p.waitForEvent('download');await p.getByRole('button',{name:lang==='nl'?'Factuur (PDF)':'Invoice (PDF)',exact:true}).click();const doc=await download;assert.equal(doc.suggestedFilename(),'factuur-invoice_example.pdf');assert.equal(require('node:fs').readFileSync(await doc.path(),'utf8'),'%PDF-1.7\noriginal invoice\n%%EOF');assert.deepEqual(await p.evaluate(()=>invoiceCalls),[{request_id:'paid'}]);
   const filter=p.getByLabel(lang==='nl'?'Betaalstatus':'Payment status',{exact:true});
   await filter.selectOption('paid');assert.equal(await p.locator('#mspInvoices [data-invoice-id]').count(),1);
   await filter.selectOption('open');assert.equal(await p.locator('#mspInvoices [data-invoice-id]').count(),2);

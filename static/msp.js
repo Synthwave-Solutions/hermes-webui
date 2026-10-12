@@ -14,7 +14,7 @@
  function field(form,key,label,multiline=false){const l=el('label',label),n=el(multiline?'textarea':'input');n.value=draft[key]||'';n.required=true;n.maxLength=multiline?20000:200;n.oninput=()=>draft[key]=n.value;l.append(n);form.append(l);}
  function amount(value){return new Intl.NumberFormat(lang()==='nl'?'nl-NL':'en-GB',{style:'currency',currency:'EUR'}).format(value/100);}
  function status(value){return c()[value]||value;}
- function failure(exc){let code='';try{code=JSON.parse(exc.body).error?.code||'';}catch(_){}const nl=lang()==='nl';if(code==='support_hours_required')return nl?'Je uren zijn op. Koop eerst uren bij.':'No hours available. Buy hours first.';if(code==='payment_required')return nl?'Betaal eerst en dien daarna je aanvraag in.':'Pay first, then submit your request.';if(code==='mollie_config')return nl?'Betalen is nog niet beschikbaar. Je MSP moet de betaalkoppeling instellen.':'Payments are not available yet. Your MSP must configure the payment connection.';if(exc.status===409)return nl?'Controleer de actuele betaalstatus of neem contact op met je MSP.':'Check the current payment status or contact your MSP.';return c().error;}
+ function failure(exc){let code='';try{code=JSON.parse(exc.body).error?.code||'';}catch(_){}const nl=lang()==='nl';if(code==='support_hours_required')return nl?'Je uren zijn op. Koop eerst uren bij.':'No hours available. Buy hours first.';if(code==='payment_required')return nl?'Betaal eerst en dien daarna je aanvraag in.':'Pay first, then submit your request.';if(code==='mollie_invoice_missing')return nl?'De factuur staat nog niet klaar in Mollie. Je MSP kan dit controleren.':'The invoice is not ready in Mollie yet. Your MSP can check this.';if(code==='mollie_invoice_unavailable')return nl?'De factuur kon niet worden opgehaald. Probeer opnieuw of neem contact op met je MSP.':'Could not retrieve the invoice. Retry or contact your MSP.';if(code==='mollie_config')return nl?'Betalen is nog niet beschikbaar. Je MSP moet de betaalkoppeling instellen.':'Payments are not available yet. Your MSP must configure the payment connection.';if(exc.status===409)return nl?'Controleer de actuele betaalstatus of neem contact op met je MSP.':'Check the current payment status or contact your MSP.';return c().error;}
  async function run(fn){if(busy)return;const mine=generation;busy=true;error='';render();try{await fn(()=>mine===generation);if(mine===generation)await refreshData();}catch(exc){if(mine===generation)error=failure(exc);}finally{if(mine===generation){busy=false;render();}}}
  async function refreshData(){const mine=generation;const [o,t]=await Promise.all([api('/api/msp/overview'),api('/api/msp/tickets?scope='+scope)]);if(mine!==generation)return;overview=o;tickets=t.tickets||[];}
  async function load(){if(!allowed)return false;const mine=++generation;busy=true;error='';render();try{await refreshData();}catch(exc){if(mine===generation)error=failure(exc);}finally{if(mine===generation){busy=false;render();}}return !error;}
@@ -28,6 +28,7 @@
   const box=card(billing?(nl?'Afspraak & termijnen':'Agreement & installments'):(nl?'Supporturen':'Support hours'));box.id=billing?'mspAnnualBilling':'mspAnnualSupport';
   if(!billing){const grid=el('div',undefined,'msp-grid');metric(grid,nl?'Beschikbaar':'Available',hours(overview.support_access?.available_minutes));if(active){metric(grid,nl?'Gebruikt dit jaar':'Used this year',hours(active.used_minutes));metric(grid,nl?'Jaarcap':'Annual cap',hours(active.annual_minutes));}box.append(grid,el('p',nl?'Uren':'Hours','msp-muted'));
    const actions=el('div',undefined,'msp-actions');if(overview.support_access?.can_submit)actions.append(button(nl?'Supportticket maken':'Create support ticket',()=>{tab='tickets';draft.need='question';render();}));actions.append(button(nl?'Uren bijkopen':'Buy hours',()=>toOrders('hours')));box.append(actions);
+   if(overview.support_commitment?.job_minutes){box.append(el('p',hours(overview.support_commitment.annual_minutes)+(nl?' supporturen per jaar, waarvan ':' annual support hours, including ')+hours(overview.support_commitment.job_minutes)+(nl?' voor geplande taken':' for scheduled jobs'),'msp-muted'));if(overview.support_commitment.pending_minutes)box.append(el('small',hours(overview.support_commitment.pending_minutes)+(nl?' job-uren wachten op opname en betaling.':' job hours await agreement and payment.')));}
    if(!overview.support_access?.can_submit)box.append(el('p',nl?'Je uren zijn op. Koop eerst uren bij voor een supportticket.':'No hours available. Buy hours before creating a support ticket.','msp-muted'));
   }
   if(overview.permissions?.billing){
@@ -58,8 +59,8 @@
   if(!overview.permissions?.billing)return;
   const nl=lang()==='nl',data=overview.scheduled_jobs||{jobs:[]},box=fold(nl?'Automations & supportvoorstellen':'Automations & support proposals','mspJobCosts');
   if(!data.jobs.length)box.append(el('p',nl?'Nog geen voorstellen.':'No proposals yet.'));
-  for(const row of data.jobs)box.append(el('p',row.title+' · '+hours(row.annual_support_minutes)+(nl?' supporturen/jaar voorgesteld':' proposed support hours/year')));
-  box.append(el('small',nl?'15% van realisatie-uren. Beschikbaar na opname in je afspraak.':'15% of implementation hours. Available once included in your agreement.'));root.append(box);
+  for(const row of data.jobs)box.append(el('p',row.title+' · '+hours(row.annual_support_minutes)+(nl?' supporturen/jaar · ':' support hours/year · ')+(row.support_enabled?(nl?'Ingeschakeld':'Enabled'):(nl?'Niet ingeschakeld':'Not enabled'))));
+  box.append(el('small',nl?'Ingeschakelde job-uren tellen automatisch mee. Alleen je MSP kan support uitschakelen.':'Enabled job hours count automatically. Only your MSP can disable support.'));root.append(box);
  }
  function renderOverview(root){
   renderAnnual(root);const nl=lang()==='nl',open=tickets.filter(t=>!['resolved','closed'].includes(t.status)).length;
@@ -87,6 +88,12 @@
    if(o.status==='submitted'||o.expired){history.append(item);historyCount++;}else box.append(item);
   }if(historyCount)box.append(history);root.append(box);
  }
+ function downloadInvoice(doc){
+  if(doc.content_type!=='application/pdf'||typeof doc.pdf_base64!=='string'||doc.pdf_base64.length>750000)throw new Error('Invalid invoice');
+  const raw=atob(doc.pdf_base64);if(!raw.startsWith('%PDF-'))throw new Error('Invalid invoice');
+  const bytes=Uint8Array.from(raw,c=>c.charCodeAt(0)),url=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));
+  const a=document.createElement('a');a.href=url;a.download=/^factuur-invoice_[A-Za-z0-9]+\.pdf$/.test(doc.filename)?doc.filename:'factuur.pdf';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+ }
  function paymentStatus(row){
   const nl=lang()==='nl',p=row.payment;
   if(row.status==='paid')return c().paid;
@@ -110,6 +117,7 @@
    if(r.created_at){const date=new Date(r.created_at);if(!Number.isNaN(date.getTime()))item.append(el('small',(nl?'Aangemaakt: ':'Created: ')+new Intl.DateTimeFormat(nl?'nl-NL':'en-GB',{dateStyle:'medium'}).format(date),'msp-muted'));}
    const p=r.payment,url=p?.mode==='live'&&r.status==='invoiced'&&['open','pending'].includes(p.status)?safeCheckout(p.checkout_url):null;
    if(url){const actions=el('div',undefined,'msp-actions'),a=el('a',w.pay,'app-button');a.href=url;a.target='_blank';a.rel='noopener noreferrer';actions.append(a);item.append(actions);}
+   if(r.status==='paid'&&r.payment?.mode==='live'&&r.payment.status==='paid')item.append(button(nl?'Factuur (PDF)':'Invoice (PDF)',()=>run(async valid=>{const document=await api('/api/msp/invoice',{method:'POST',body:JSON.stringify({request_id:r.id})});if(valid())downloadInvoice(document);})));
    box.append(item);
   }
   root.append(box);renderOrders(root);renderAnnual(root,true);

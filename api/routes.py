@@ -14437,7 +14437,7 @@ def handle_post(handler, parsed) -> bool:
     if not guard_workspace_request(handler, parsed, body):
         return True
 
-    if parsed.path in ("/api/msp/order", "/api/msp/job-cost", "/api/msp/package", "/api/msp/tickets", "/api/msp/comment", "/api/msp/app-state", "/api/msp/app-request", "/api/msp/app-support"):
+    if parsed.path in ("/api/msp/invoice", "/api/msp/order", "/api/msp/job-cost", "/api/msp/package", "/api/msp/tickets", "/api/msp/comment", "/api/msp/app-state", "/api/msp/app-request", "/api/msp/app-support"):
         from api import msp_service
         return msp_service.handle_post(handler, parsed.path, body)
 

@@ -6,7 +6,7 @@ from api.org_modules import context
 from api.governance import delegation
 from api.helpers import j
 
-ROUTES=('/api/msp/order','/api/msp/job-cost','/api/msp/package','/api/msp/overview','/api/msp/tickets','/api/msp/ticket','/api/msp/comment',
+ROUTES=('/api/msp/invoice','/api/msp/order','/api/msp/job-cost','/api/msp/package','/api/msp/overview','/api/msp/tickets','/api/msp/ticket','/api/msp/comment',
         '/api/msp/app-state','/api/msp/app-request','/api/msp/app-support')
 
 
@@ -29,7 +29,8 @@ def fetch(handler,path,method='GET',body=None):
     try:acting=identity(handler)
     except PermissionError:return 403,{'error':{'code':'forbidden','message':'Organisation sign-in required'}}
     except Exception:return 503,{'error':{'code':'policy_unavailable','message':'Account permissions unavailable'}}
-    status,data=control.call(method,path,body=body,acting=acting)
+    options={'timeout':60} if path.endswith('/download') else {}
+    status,data=control.call(method,path,body=body,acting=acting,**options)
     return status or 503,data
 
 
@@ -59,13 +60,17 @@ def handle_post(handler,path,body):
     # Validate even self-service payloads before forwarding. Organisation and
     # acting headers can never be supplied by the browser.
     if not isinstance(body,dict):return respond(handler,(422,{'error':'Invalid request'}))
-    if path=='/api/msp/order':
+    if path=='/api/msp/invoice':
+        allowed={'request_id'};ident=body.get('request_id','')
+        if not isinstance(ident,str) or not re.fullmatch(r'br_[A-Za-z0-9_-]{1,80}',ident):return respond(handler,(422,{'error':'Invalid invoice request'}))
+        target='/v1/customer/invoices/'+ident+'/download'
+    elif path=='/api/msp/order':
         allowed={'order_id','action'};ident=body.get('order_id','');action=body.get('action')
         if not isinstance(ident,str) or not re.fullmatch(r'so_[A-Za-z0-9_-]{1,80}',ident) or action not in ('checkout','sync','submit'):
             return respond(handler,(422,{'error':'Invalid service order'}))
         target='/v1/customer/orders/'+ident+'/'+action
     elif path=='/api/msp/job-cost':
-        allowed={'job_id','profile','title','hours_hundredths','hourly_cents','expected_revision'};target='/v1/customer/job-cost'
+        allowed={'job_id','profile','title','hours_hundredths','hourly_cents','expected_revision','support_minutes','support_enabled'};target='/v1/customer/job-cost'
     elif path=='/api/msp/package':
         allowed={'kind','days_per_week','action'};target='/v1/customer/package'
     elif path=='/api/msp/tickets':
@@ -96,5 +101,5 @@ def handle_post(handler,path,body):
             if not job or not caller_sees_cron_profile(handler,profile,job_id=body.get('job_id'),job=job):
                 return respond(handler,(404,{'error':'Job not found'}))
             body={**body,'title':str(job.get('name') or job['id'])[:200]}
-    payload={k:v for k,v in body.items() if k not in ('app_id','ticket_id','order_id') and not (path=='/api/msp/order' and k=='action')}
+    payload={k:v for k,v in body.items() if k not in ('app_id','ticket_id','order_id','request_id') and not (path=='/api/msp/order' and k=='action')}
     return respond(handler,fetch(handler,target,'POST',payload))

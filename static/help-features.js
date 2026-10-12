@@ -14439,10 +14439,11 @@ window.SynthPulseFeatureCatalog = {
             "Kies een aanbod en open Inhoud & voorwaarden. Controleer de prijs inclusief btw.",
             "Kies Betalen en rond de betaling af bij Mollie.",
             "Keer terug en kies Betaling controleren. Na bevestiging verschijnt Betaald · aanvraag indienen of Uren toevoegen.",
-            "Dien de aanvraag in of voeg de uren toe. Je vindt aanvragen terug bij Tickets."
+            "Dien de aanvraag in of voeg de uren toe. Je vindt aanvragen terug bij Tickets.",
+            "Kies na een bevestigde betaling Factuur (PDF) om de originele gekoppelde Mollie-klantfactuur te downloaden."
           ],
           "permissions": "Organisatie- en financiële beheerders betalen en dienen uitbreidingen in. Supporttickets volgen je ticketrechten.",
-          "limits": "Een bevestigde livebetaling is vereist voor betaalde aanvragen. Betalen alleen dient nog geen aanvraag in. Supporttickets vereisen resterende uren; factuurvragen blijven bereikbaar. Tarieven en de betaalkoppeling moeten door je MSP zijn ingesteld.",
+          "limits": "Een bevestigde livebetaling is vereist voor betaalde aanvragen. Betalen alleen dient nog geen aanvraag in. Supporttickets vereisen resterende uren; factuurvragen blijven bereikbaar. Tarieven en de betaalkoppeling moeten door je MSP zijn ingesteld. De klantfactuur moet in Mollie Invoicing bestaan en aan dezelfde betaling gekoppeld zijn. Een ontbrekende PDF wordt gemeld; er wordt geen vervangende factuur aangemaakt.",
           "example": "Koop 2 uur, betaal, kies Uren toevoegen en dien daarna je supportticket in."
         },
         "en": {
@@ -14455,10 +14456,11 @@ window.SynthPulseFeatureCatalog = {
             "Select an offer and expand Scope & terms. Check the price including VAT.",
             "Choose Pay and complete checkout at Mollie.",
             "Return and select Check payment. Once verified, Paid · submit request or Add hours becomes available.",
-            "Submit the request or add the hours. Requests appear under Tickets."
+            "Submit the request or add the hours. Requests appear under Tickets.",
+            "After a verified payment, choose Invoice (PDF) to download the original linked Mollie customer invoice."
           ],
           "permissions": "Organisation and billing administrators pay and submit upgrades. Support tickets follow your ticket permissions.",
-          "limits": "Paid requests require a verified live payment. Payment alone does not submit a request. Support tickets require remaining hours; invoice questions remain available. Your MSP must configure prices and the payment connection.",
+          "limits": "Paid requests require a verified live payment. Payment alone does not submit a request. Support tickets require remaining hours; invoice questions remain available. Your MSP must configure prices and the payment connection. The customer invoice must exist in Mollie Invoicing and reference the same payment. A missing PDF is reported; no substitute invoice is created.",
           "example": "Buy 2 hours, pay, select Add hours, then submit your support ticket."
         }
       }
@@ -14731,33 +14733,33 @@ window.SynthPulseFeatureCatalog = {
       "locales": {
         "nl": {
           "title": "Automations: realisatie en jaarlijkse supporturen",
-          "purpose": "Gebruik realisatie-uren als basis voor een supportvoorstel per automation.",
+          "purpose": "Vul per geplande taak jaarlijkse supporturen in en neem ze automatisch mee in je supporttotaal.",
           "when": "Bij het opnemen van gebouwd werk in een jaarlijkse supportafspraak.",
           "steps": [
-            "Open Support en klap Automations & supportvoorstellen open.",
-            "Leg de realisatie-uren en het afgesproken uurtarief vast. Laat een onbekend tarief leeg.",
-            "Bekijk het supportvoorstel: 15% van realisatie-uren en jobbedrag per jaar. Uren worden afgerond op minuten.",
-            "Sla op en bekijk het voorstel bij Support.",
-            "Je MSP neemt de afgesproken supporturen en prijs over in de jaarafspraak."
+            "Open een geplande taak en ga naar Jaarlijkse support.",
+            "Vul Supporturen per jaar in. Bij Realisatie & tarief staat de suggestie van 15%.",
+            "Schakel Jaarlijkse support inschakelen aan en kies Opslaan.",
+            "Bekijk het jaarlijkse totaal bij Support. Conceptjaarafspraken nemen deze taak automatisch eenmaal op.",
+            "Eenmaal ingeschakeld kan alleen je MSP de support uitschakelen. Extra besteedbare uren vereisen afspraak en betaling."
           ],
           "permissions": "Organisatiebeheerders en financiële beheerders registreren zichtbare taken.",
-          "limits": "Realisatie-uren zijn geen beschikbare supporturen. Het voorstel wordt niet per uitvoering berekend en activeert geen afspraak, factuur of incasso. Wijzigen telt de registratie niet dubbel.",
-          "example": "10 uur realisatie geeft een voorstel van 1,5 supportuur per jaar."
+          "limits": "De instelling geldt per jaar, niet per uitvoering. Pauzeren of verwijderen van een taak beëindigt de centrale supportafspraak niet. Je kunt ingeschakelde uren niet verlagen of de support zelf uitzetten. Geaccepteerde jaarafspraken en betaalde uren blijven behouden.",
+          "example": "Stel voor een dagelijkse rapportage 4 supporturen per jaar in. Het supporttotaal neemt met 4 uur toe, ongeacht het aantal uitvoeringen."
         },
         "en": {
           "title": "Automations: implementation and annual support hours",
-          "purpose": "Use implementation hours to propose annual support for each automation.",
+          "purpose": "Enter annual support hours for each scheduled job and include them automatically in your support total.",
           "when": "When including built work in an annual support agreement.",
           "steps": [
-            "Open Support and expand Automations & support proposals.",
-            "Record implementation hours and agreed hourly rate. Leave an unknown rate empty.",
-            "Review the proposal: 15% of implementation hours and job value per year. Hours are rounded to minutes.",
-            "Save and review the proposal in Support.",
-            "Your MSP includes agreed support hours and price in the annual agreement."
+            "Open a scheduled job and find Annual support.",
+            "Enter Support hours per year. Implementation & rate shows the 15% suggestion.",
+            "Turn on Enable annual support and choose Save.",
+            "Review your annual total in Support. Draft annual agreements include this job exactly once.",
+            "Once enabled, only your MSP can disable support. Extra spendable hours require agreement and payment."
           ],
           "permissions": "Organisation and billing administrators can record visible jobs.",
-          "limits": "Implementation hours are not available support hours. Proposals are annual, not per run, and activate no agreement, invoice or collection. Editing replaces the registration without double counting.",
-          "example": "10 implementation hours propose 1.5 support hours per year."
+          "limits": "The setting is annual, not per execution. Pausing or deleting a job does not end its central support commitment. Customers cannot reduce enabled hours or switch support off. Accepted annual agreements and paid hours are preserved.",
+          "example": "Set 4 annual support hours for a daily report. The support total grows by 4 hours regardless of how often it runs."
         }
       }
     },

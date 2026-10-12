@@ -1007,10 +1007,11 @@ window.SynthPulseMspFeatureCatalog = {
             "Configure Mollie through the secure key field.",
             "Expand Prepare a payable offer. Choose customer, kind, scope, price and an existing invoice reference.",
             "The customer sees the offer in Support, pays and then submits the request.",
-            "Review payment status and any refunds. Additional hours are credited only after payment and Add hours."
+            "Review payment status and any refunds. Additional hours are credited only after payment and Add hours.",
+            "For a paid request, choose Mollie invoice (PDF). Only the original customer invoice for the same live payment is retrieved."
           ],
           "permissions": "Operators may read. Only admins can configure the key and process payment requests.",
-          "limits": "Paid requests require a verified live payment. Payment alone does not submit a request. Support tickets require remaining hours; invoice questions remain available. Your MSP must configure prices and the payment connection. Test payments do not settle real invoices.",
+          "limits": "Paid requests require a verified live payment. Payment alone does not submit a request. Support tickets require remaining hours; invoice questions remain available. Your MSP must configure prices and the payment connection. Test payments do not settle real invoices. The customer invoice must already exist in Mollie Invoicing. This retrieves the PDF and does not create a duplicate invoice.",
           "example": "An invoiced support bundle receives a checkout link. A verified live payment changes its status to Paid."
         },
         "nl": {
@@ -1022,10 +1023,11 @@ window.SynthPulseMspFeatureCatalog = {
             "Configureer de Mollie-koppeling in het beveiligde sleutelveld.",
             "Klap Betaalbaar aanbod klaarzetten open. Kies klant, type, inhoud, prijs en bestaand factuurnummer.",
             "De klant ziet het aanbod in Support, betaalt en dient daarna de aanvraag in.",
-            "Controleer betaalstatus en eventuele terugboekingen. Extra uren worden pas na betaling en Uren toevoegen bijgeschreven."
+            "Controleer betaalstatus en eventuele terugboekingen. Extra uren worden pas na betaling en Uren toevoegen bijgeschreven.",
+            "Kies bij een betaalde aanvraag Mollie-factuur (PDF). Alleen de originele klantfactuur bij dezelfde livebetaling wordt opgehaald."
           ],
           "permissions": "Operators mogen lezen. Alleen admins mogen de sleutel instellen en betaalverzoeken verwerken.",
-          "limits": "Een bevestigde livebetaling is vereist voor betaalde aanvragen. Betalen alleen dient nog geen aanvraag in. Supporttickets vereisen resterende uren; factuurvragen blijven bereikbaar. Tarieven en de betaalkoppeling moeten door je MSP zijn ingesteld. Testbetalingen voldoen geen echte facturen.",
+          "limits": "Een bevestigde livebetaling is vereist voor betaalde aanvragen. Betalen alleen dient nog geen aanvraag in. Supporttickets vereisen resterende uren; factuurvragen blijven bereikbaar. Tarieven en de betaalkoppeling moeten door je MSP zijn ingesteld. Testbetalingen voldoen geen echte facturen. De klantfactuur moet al in Mollie Invoicing bestaan. Dit haalt de PDF op en maakt geen tweede factuur aan.",
           "example": "Een gefactureerde urenbundel krijgt een betaallink. Na bevestigde livebetaling wordt de status Betaald."
         }
       }
@@ -3498,6 +3500,7 @@ window.SynthPulseMspFeatureCatalog = {
             "Open Jaaruren in HQ.",
             "Kies de klant en de eerste maand van het contractjaar.",
             "Voeg basisinfrastructuur, apps en automations/maatwerk toe met jaaruren en jaarbedragen vóór jaarkorting.",
+            "Ingeschakelde job-support wordt automatisch eenmaal toegevoegd aan conceptjaarafspraken. Klanten kunnen dit niet uitzetten; gebruik Support uitschakelen (MSP) om het te beëindigen voor nieuwe afspraken.",
             "Kies Maandelijks betalen of Jaarlijks vooruitbetalen met korting. Vul het afgesproken kortingspercentage in; laat onbekende korting leeg.",
             "Vergelijk de jaarprijzen en besparing. Sla het concept op en bevestig klantakkoord op uren, betaalwijze, korting en bedragen voordat je activeert.",
             "Open Twaalf maandtermijnen of Eén jaarlijkse vooruitbetaling en zet de verschuldigde factuur klaar.",
@@ -3515,6 +3518,7 @@ window.SynthPulseMspFeatureCatalog = {
             "Open Annual hours in HQ.",
             "Choose the customer and first month of the contract year.",
             "Add infrastructure, apps and automation/custom-work lines with annual hours and amounts before prepayment discount.",
+            "Enabled job support is automatically included once in draft annual agreements. Customers cannot turn it off; use Disable support (MSP) to end it for new agreements.",
             "Choose Monthly payments or Yearly upfront with discount. Enter the agreed discount percentage; leave unknown discounts empty.",
             "Compare annual prices and savings. Save the draft and confirm acceptance of hours, payment frequency, discount and amounts before activating.",
             "Open Twelve monthly installments or One yearly upfront payment and prepare the due invoice.",
