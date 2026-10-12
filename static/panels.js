@@ -80,7 +80,7 @@ function syncAppTitlebar() {
     if (/^webui$/i.test(sourceLabel)) sourceLabel = '';
   } else {
     const key = APP_TITLEBAR_KEYS[panel];
-    mainText = panel === 'msp' ? (document.documentElement.lang.startsWith('nl') ? 'Mijn MSP' : 'My MSP') : key && typeof t === 'function' ? t(key) : (panel.charAt(0).toUpperCase() + panel.slice(1));
+    mainText = panel === 'msp' ? 'Support' : key && typeof t === 'function' ? t(key) : (panel.charAt(0).toUpperCase() + panel.slice(1));
   }
 
   // Don't touch the element while an inline rename is in progress — replacing

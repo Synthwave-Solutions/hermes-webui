@@ -1,6 +1,6 @@
 # Customer MSP service
 
-The main WebUI exposes **My MSP / Mijn MSP** for tickets, support minutes,
+The main WebUI exposes **Support** for tickets, support minutes,
 per-app support subscriptions and payments. **Apps** exposes application requests,
 launcher availability and Basic, Plus and Premium support requests.
 All six topics have Dutch and English interactive guides.
@@ -54,7 +54,7 @@ submit synthetic tickets, subscriptions or payments to production.
 
 ## Base package and Agentic Consultant
 
-My MSP starts with the base package and weekly Agentic Consultant capacity.
+Support starts with the base package and weekly Agentic Consultant capacity.
 The base status comes from the existing contract or an explicit package request.
 Organisation/billing admins can request the base package, request consultant
 capacity in half-day increments (0.5 to 7 days per week), change that capacity
@@ -71,13 +71,27 @@ features are `webui.msp.package` and `webui.msp.consultant`.
 
 ## Compact overview and prepaid requests
 
-My MSP sits below Apps and above Settings, including when a saved navigation
+Support sits below Apps and above Settings, including when a saved navigation
 order exists. The overview leads with available hours and open tickets. Package,
 consultant and automation details expand on demand; invoice history is collapsed.
-Paid service offers appear in Pay & request. HQ prepares a scoped, priced offer
+Paid service offers appear in Payments. HQ prepares a scoped, priced offer
 against an existing accounting invoice. The customer pays through Mollie, checks
 the payment, then explicitly submits the request. Payment alone creates no ticket.
 Top-ups add hours once after verified payment and Add hours. New support tickets
 and reopened support tickets require available hours; invoice questions and
 existing ticket communication remain accessible. Draft ticket text is preserved.
 An absent price or payment connection is never presented as a free purchase.
+
+### Payment visibility
+
+The navigation, page title and guides use **Support**. Its **Payments / Betalingen**
+tab starts with a visible payment overview containing every scoped billing request,
+including paid service offers and purchased hours. It shows the invoice reference,
+description, VAT-inclusive amount, creation date and current status. All, Outstanding
+and Paid filters keep larger histories usable; outstanding means an invoiced request
+that has not been marked paid. Failed or expired payment attempts retain their visible
+status. Only verified live open/pending checkout links are shown.
+
+Priced offers and their pay-then-submit workflow remain below this overview. Financial
+visibility still requires organisation or billing administrator rights. This display
+change does not initiate payments or create accounting invoices.

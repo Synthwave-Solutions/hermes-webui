@@ -78,7 +78,7 @@
   async function mutate(path,payload){
     if(mutation)return;const mine=generation;mutation=true;feedback='';renderList();
     try{await api(path,{method:'POST',body:JSON.stringify(payload)});if(mine!==generation||!allowed)return;
-      feedback=lang()==='nl'?'Opgeslagen. Aanvragen vind je terug bij Mijn MSP en je tickets.':'Saved. Requests appear in My MSP and your tickets.';
+      feedback=lang()==='nl'?'Opgeslagen. Aanvragen vind je terug bij Support en je tickets.':'Saved. Requests appear in Support and your tickets.';
       mutation=false;await load();
     }catch(_){if(mine===generation&&allowed){mutation=false;feedback=lang()==='nl'?'Wijziging niet bevestigd. Vernieuw om de actuele status te controleren.':'Change not confirmed. Refresh to check the current status.';renderList();}}
   }

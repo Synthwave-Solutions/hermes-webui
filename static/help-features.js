@@ -76,8 +76,8 @@ window.SynthPulseFeatureCatalog = {
       "en": "Apps"
     },
     "msp": {
-      "nl": "Mijn MSP",
-      "en": "My MSP"
+      "nl": "Support",
+      "en": "Support"
     }
   },
   "features": [
@@ -14328,28 +14328,28 @@ window.SynthPulseFeatureCatalog = {
       ],
       "locales": {
         "nl": {
-          "title": "Mijn MSP: overzicht",
+          "title": "Support: overzicht",
           "purpose": "Bekijk en beheer mijn msp: overzicht.",
           "when": "Als je wilt weten hoeveel support beschikbaar is.",
           "steps": [
-            "Open Mijn MSP, onder Apps en boven Instellingen.",
+            "Open Support, onder Apps en boven Instellingen.",
             "Bekijk beschikbare uren en open tickets.",
             "Open Pakket, apps & consultant voor details.",
-            "Kies Uren bijkopen of Betalen & aanvragen voor een geprijsd aanbod."
+            "Kies Uren bijkopen of Betalingen voor een geprijsd aanbod."
           ],
           "permissions": "Organisatie- en financiële beheerders betalen en dienen uitbreidingen in. Supporttickets volgen je ticketrechten.",
           "limits": "Een bevestigde livebetaling is vereist voor betaalde aanvragen. Betalen alleen dient nog geen aanvraag in. Supporttickets vereisen resterende uren; factuurvragen blijven bereikbaar. Tarieven en de betaalkoppeling moeten door je MSP zijn ingesteld.",
           "example": "Koop 2 uur, betaal, kies Uren toevoegen en dien daarna je supportticket in."
         },
         "en": {
-          "title": "My MSP: overview",
+          "title": "Support: overview",
           "purpose": "Review and manage my msp: overview.",
           "when": "When you want to know how much support remains.",
           "steps": [
-            "Open My MSP below Apps and above Settings.",
+            "Open Support below Apps and above Settings.",
             "Review available hours and open tickets.",
             "Expand Package, apps & consultant for details.",
-            "Choose Buy hours or Pay & request for a priced offer."
+            "Choose Buy hours or Payments for a priced offer."
           ],
           "permissions": "Organisation and billing administrators pay and submit upgrades. Support tickets follow your ticket permissions.",
           "limits": "Paid requests require a verified live payment. Payment alone does not submit a request. Support tickets require remaining hours; invoice questions remain available. Your MSP must configure prices and the payment connection.",
@@ -14382,7 +14382,7 @@ window.SynthPulseFeatureCatalog = {
           "purpose": "Bekijk en beheer supporttickets en saldo.",
           "when": "Bij een vraag, storing, toegangsprobleem of wijziging.",
           "steps": [
-            "Open Mijn MSP en kies Tickets.",
+            "Open Support en kies Tickets.",
             "Bij resterende uren kun je een supportticket indienen. Kies onderwerp, soort vraag en impact.",
             "Zonder uren kies je eerst Uren bijkopen. Betaal en voeg de uren toe voordat je het supportticket indient.",
             "Een factuurvraag kan altijd: kies expliciet Factuurvraag. Je invoer blijft bewaard.",
@@ -14397,7 +14397,7 @@ window.SynthPulseFeatureCatalog = {
           "purpose": "Review and manage support tickets and balance.",
           "when": "For a question, incident, access issue or change.",
           "steps": [
-            "Open My MSP and choose Tickets.",
+            "Open Support and choose Tickets.",
             "With remaining hours, submit a support ticket with subject, type and impact.",
             "Without hours, select Buy hours first. Pay and add the hours before submitting the support ticket.",
             "An invoice question is always available: explicitly select Invoice question. Your draft is preserved.",
@@ -14434,7 +14434,8 @@ window.SynthPulseFeatureCatalog = {
           "purpose": "Bekijk en beheer betalen en aanvragen.",
           "when": "Als je wilt weten of een factuur klaarstaat of betaald is.",
           "steps": [
-            "Open Mijn MSP en kies Betalen & aanvragen.",
+            "Open Support en kies Betalingen.",
+            "Bekijk bedragen, factuurnummers en betaalstatus in het Betalingsoverzicht. Filter op Alles, Openstaand of Betaald.",
             "Kies een aanbod en open Inhoud & voorwaarden. Controleer de prijs inclusief btw.",
             "Kies Betalen en rond de betaling af bij Mollie.",
             "Keer terug en kies Betaling controleren. Na bevestiging verschijnt Betaald · aanvraag indienen of Uren toevoegen.",
@@ -14449,7 +14450,8 @@ window.SynthPulseFeatureCatalog = {
           "purpose": "Review and manage pay and request.",
           "when": "When you want to check whether an invoice is ready or paid.",
           "steps": [
-            "Open My MSP and choose Pay & request.",
+            "Open Support and choose Payments.",
+            "Review amounts, invoice references and payment status in Payment overview. Filter by All, Outstanding or Paid.",
             "Select an offer and expand Scope & terms. Check the price including VAT.",
             "Choose Pay and complete checkout at Mollie.",
             "Return and select Check payment. Once verified, Paid · submit request or Add hours becomes available.",
@@ -14586,7 +14588,7 @@ window.SynthPulseFeatureCatalog = {
           "steps": [
             "Open Apps en zoek de gewenste app.",
             "Kies Aanbod bekijken bij Support & uitbreidingen.",
-            "Mijn MSP toont het beschikbare aanbod voor deze app.",
+            "Support toont het beschikbare aanbod voor deze app.",
             "Controleer inhoud en prijs, betaal en dien de aanvraag na betaalbevestiging in."
           ],
           "permissions": "Organisatie- en financiële beheerders betalen en dienen uitbreidingen in. Supporttickets volgen je ticketrechten.",
@@ -14600,7 +14602,7 @@ window.SynthPulseFeatureCatalog = {
           "steps": [
             "Open Apps and find the app.",
             "Select View offers under Support & upgrades.",
-            "My MSP shows offers for this app.",
+            "Support shows offers for this app.",
             "Check scope and price, pay and submit after payment is verified."
           ],
           "permissions": "Organisation and billing administrators pay and submit upgrades. Support tickets follow your ticket permissions.",
@@ -14634,7 +14636,7 @@ window.SynthPulseFeatureCatalog = {
           "purpose": "Bekijk en beheer basispakket.",
           "when": "Als je je hoofdabonnement wilt controleren of een basispakket wilt aanvragen.",
           "steps": [
-            "Open Mijn MSP en klap Pakket, apps & consultant open.",
+            "Open Support en klap Pakket, apps & consultant open.",
             "Bekijk de status van je basispakket.",
             "Kies Pakket of uitbreiding kiezen.",
             "Lees het aanbod, betaal en dien daarna de aanvraag in."
@@ -14648,7 +14650,7 @@ window.SynthPulseFeatureCatalog = {
           "purpose": "Review and manage base package.",
           "when": "To check your main subscription or request a base package.",
           "steps": [
-            "Open My MSP and expand Package, apps & consultant.",
+            "Open Support and expand Package, apps & consultant.",
             "Review the base package status.",
             "Select Choose package or upgrade.",
             "Read the offer, pay, then submit the request."
@@ -14684,9 +14686,9 @@ window.SynthPulseFeatureCatalog = {
           "purpose": "Bekijk en beheer agentic consultant.",
           "when": "Als je structurele begeleiding of uitvoering door een Agentic Consultant wilt.",
           "steps": [
-            "Open Mijn MSP en klap Pakket, apps & consultant open.",
+            "Open Support en klap Pakket, apps & consultant open.",
             "Bekijk afgesproken dagen per week.",
-            "Open Betalen & aanvragen en kies een consultantaanbod met de gewenste inzet.",
+            "Open Betalingen en kies een consultantaanbod met de gewenste inzet.",
             "Controleer periode en voorwaarden, betaal en dien daarna de aanvraag in."
           ],
           "permissions": "Organisatie- en financiële beheerders betalen en dienen uitbreidingen in. Supporttickets volgen je ticketrechten.",
@@ -14698,9 +14700,9 @@ window.SynthPulseFeatureCatalog = {
           "purpose": "Review and manage agentic consultant.",
           "when": "For ongoing guidance or delivery by an Agentic Consultant.",
           "steps": [
-            "Open My MSP and expand Package, apps & consultant.",
+            "Open Support and expand Package, apps & consultant.",
             "Review agreed days per week.",
-            "Open Pay & request and choose a consultant offer for the desired capacity.",
+            "Open Payments and choose a consultant offer for the desired capacity.",
             "Check the period and terms, pay, then submit the request."
           ],
           "permissions": "Organisation and billing administrators pay and submit upgrades. Support tickets follow your ticket permissions.",
@@ -14732,10 +14734,10 @@ window.SynthPulseFeatureCatalog = {
           "purpose": "Gebruik realisatie-uren als basis voor een supportvoorstel per automation.",
           "when": "Bij het opnemen van gebouwd werk in een jaarlijkse supportafspraak.",
           "steps": [
-            "Open Mijn MSP en klap Automations & supportvoorstellen open.",
+            "Open Support en klap Automations & supportvoorstellen open.",
             "Leg de realisatie-uren en het afgesproken uurtarief vast. Laat een onbekend tarief leeg.",
             "Bekijk het supportvoorstel: 15% van realisatie-uren en jobbedrag per jaar. Uren worden afgerond op minuten.",
-            "Sla op en bekijk het voorstel bij Mijn MSP.",
+            "Sla op en bekijk het voorstel bij Support.",
             "Je MSP neemt de afgesproken supporturen en prijs over in de jaarafspraak."
           ],
           "permissions": "Organisatiebeheerders en financiële beheerders registreren zichtbare taken.",
@@ -14747,10 +14749,10 @@ window.SynthPulseFeatureCatalog = {
           "purpose": "Use implementation hours to propose annual support for each automation.",
           "when": "When including built work in an annual support agreement.",
           "steps": [
-            "Open My MSP and expand Automations & support proposals.",
+            "Open Support and expand Automations & support proposals.",
             "Record implementation hours and agreed hourly rate. Leave an unknown rate empty.",
             "Review the proposal: 15% of implementation hours and job value per year. Hours are rounded to minutes.",
-            "Save and review the proposal in My MSP.",
+            "Save and review the proposal in Support.",
             "Your MSP includes agreed support hours and price in the annual agreement."
           ],
           "permissions": "Organisation and billing administrators can record visible jobs.",
@@ -14779,10 +14781,10 @@ window.SynthPulseFeatureCatalog = {
           "purpose": "Bekijk en beheer supporturen en jaarafspraak.",
           "when": "Als je de jaarcap en het verschil tussen maandbetaling en jaarbetaling wilt bekijken.",
           "steps": [
-            "Open Mijn MSP en bekijk Supporturen.",
+            "Open Support en bekijk Supporturen.",
             "Lees Beschikbaar, Gebruikt dit jaar en Jaarcap.",
             "Klap het contractjaar open voor bedragen, onderdelen en bijgekochte uren.",
-            "Bekijk Afspraak & termijnen onder Betalen & aanvragen voor factuurdata.",
+            "Bekijk Afspraak & termijnen onder Betalingen voor factuurdata.",
             "Koop extra uren bij wanneer het saldo op is. De oorspronkelijke jaarcap en het eerdere verbruik blijven bewaard."
           ],
           "permissions": "Organisatie- en financiële beheerders betalen en dienen uitbreidingen in. Supporttickets volgen je ticketrechten.",
@@ -14794,10 +14796,10 @@ window.SynthPulseFeatureCatalog = {
           "purpose": "Review and manage support hours and annual agreement.",
           "when": "To review the annual cap and compare monthly payments with yearly prepayment.",
           "steps": [
-            "Open My MSP and review Support hours.",
+            "Open Support and review Support hours.",
             "Read Available, Used this year and Annual cap.",
             "Expand the contract year for prices, components and purchased hours.",
-            "Review Agreement & installments under Pay & request for invoice dates.",
+            "Review Agreement & installments under Payments for invoice dates.",
             "Buy additional hours when your balance runs out. The original annual cap and previous usage are preserved."
           ],
           "permissions": "Organisation and billing administrators pay and submit upgrades. Support tickets follow your ticket permissions.",

@@ -7616,7 +7616,7 @@
     {
       "control": "btnMsp",
       "tag": "button",
-      "label": "Mijn MSP",
+      "label": "Support",
       "source_refs": [
         "static/index.html"
       ],

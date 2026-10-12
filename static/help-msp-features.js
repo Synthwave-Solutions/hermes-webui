@@ -1006,7 +1006,7 @@ window.SynthPulseMspFeatureCatalog = {
             "Open Payments in HQ.",
             "Configure Mollie through the secure key field.",
             "Expand Prepare a payable offer. Choose customer, kind, scope, price and an existing invoice reference.",
-            "The customer sees the offer in My MSP, pays and then submits the request.",
+            "The customer sees the offer in Support, pays and then submits the request.",
             "Review payment status and any refunds. Additional hours are credited only after payment and Add hours."
           ],
           "permissions": "Operators may read. Only admins can configure the key and process payment requests.",
@@ -1021,7 +1021,7 @@ window.SynthPulseMspFeatureCatalog = {
             "Open Betalingen in HQ.",
             "Configureer de Mollie-koppeling in het beveiligde sleutelveld.",
             "Klap Betaalbaar aanbod klaarzetten open. Kies klant, type, inhoud, prijs en bestaand factuurnummer.",
-            "De klant ziet het aanbod in Mijn MSP, betaalt en dient daarna de aanvraag in.",
+            "De klant ziet het aanbod in Support, betaalt en dient daarna de aanvraag in.",
             "Controleer betaalstatus en eventuele terugboekingen. Extra uren worden pas na betaling en Uren toevoegen bijgeschreven."
           ],
           "permissions": "Operators mogen lezen. Alleen admins mogen de sleutel instellen en betaalverzoeken verwerken.",

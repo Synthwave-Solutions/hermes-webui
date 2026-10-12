@@ -596,7 +596,7 @@ window.SynthPulseHelpContent = {
           ]
         },
         "msp": {
-          "title": "My MSP",
+          "title": "Support",
           "summary": "See your actual support allowance, usage and app support subscriptions with your MSP.",
           "sections": [
             {
@@ -1298,7 +1298,7 @@ window.SynthPulseHelpContent = {
           ]
         },
         "msp": {
-          "title": "Mijn MSP",
+          "title": "Support",
           "summary": "Bekijk je echte urenbundel, verbruik en supportabonnementen bij jouw MSP.",
           "sections": [
             {
