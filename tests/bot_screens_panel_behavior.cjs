@@ -23,7 +23,7 @@ const panel=index.slice(index.indexOf('<aside class="rightpanel">'),index.indexO
         if(url.pathname.startsWith('/static/'))return route.fulfill({contentType:url.pathname.endsWith('.css')?'text/css':'text/javascript',body:fs.readFileSync(path.join(root,url.pathname))});
         return route.fulfill({contentType:'text/html',body:`<!doctype html><html class="dark"><head><link rel="stylesheet" href="/static/style.css"></head><body>
           <a id="btnBotScreens" hidden style="display:none">Bot Screens</a>${panel}
-          <script>const $=id=>document.getElementById(id);const S={activeProfile:'test-bot',session:null,messages:[],todos:[]};function syncWorkspacePanelUI(){}</script>
+          <script>const $=id=>document.getElementById(id);const t=key=>key;const S={activeProfile:'test-bot',session:null,messages:[],todos:[]};function syncWorkspacePanelUI(){}</script>
           <script src="/static/workspace.js"></script><script src="/static/bot-screens-link.js"></script></body></html>`});
       });
       await page.goto('http://screen.test/');
@@ -46,6 +46,10 @@ const panel=index.slice(index.indexOf('<aside class="rightpanel">'),index.indexO
         assert.equal(await page.evaluate(()=>window.originalScreen===document.getElementById('workspaceScreensFrame')),true);
         assert.equal(await page.locator('#previewEditArea').inputValue(),'Unsaved draft');
         assert.equal(frames,1,'switching tabs must preserve the same viewer/lease');
+        await page.evaluate(()=>showPreview('image'));
+        assert.equal(await page.locator('#previewArea').isVisible(),true,'opening a document must reveal its preview');
+        await page.locator('#workspaceScreensTab').click();
+        assert.equal(await page.evaluate(()=>window.originalScreen===document.getElementById('workspaceScreensFrame')),true);
         await page.setViewportSize({width:390,height:800});
         await page.evaluate(()=>document.querySelector('.rightpanel').classList.add('mobile-open'));
         assert.equal(await page.locator('#workspaceScreensTab').isVisible(),true);

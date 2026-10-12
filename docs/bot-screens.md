@@ -12,6 +12,7 @@ and the interactive guide. It initially selects the active chat bot when that
 bot is allowed. Use its bot selector to change screens; changing chats does not
 silently replace an open screen. Switching to Files/Artifacts or collapsing the
 panel keeps the viewer and human lease intact. Reopen Bot Screens to hand back.
+Opening a document brings its Files preview forward without replacing the viewer.
 The screen tab is shown only to accounts with explicit screen access, including
 when no chat session or workspace has been created yet.
 
