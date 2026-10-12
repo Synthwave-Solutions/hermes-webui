@@ -223,3 +223,12 @@ def test_managed_app_off_hides_destination_and_fails_closed(write_policy,caller,
     assert h.body['msp']['manage_apps'] is True
     monkeypatch.setattr(msp_service,'overview',lambda h:(503,{'error':'unavailable'}))
     h=get(caller,PLATFORM[0]);assert h.status==503 and 'apps' not in h.body
+
+
+def test_pi_loopback_apps_are_explicit_and_port_limited():
+    env={'SP_LOCAL_PI_APPS':'1'}
+    for url in ('http://127.0.0.1:5220/photocraft/', 'http://127.0.0.1:16081/vnc.html', 'http://127.0.0.1:20128'):
+        assert apps_launcher.safe_link(url,{}) is None
+        assert apps_launcher.safe_link(url,env)==url
+    for url in ('http://evil.test:5220/', 'http://127.0.0.1:22/', 'http://user@127.0.0.1:5220/', 'http://127.0.0.1:5220/?token=x'):
+        assert apps_launcher.safe_link(url,env) is None
