@@ -14732,34 +14732,34 @@ window.SynthPulseFeatureCatalog = {
       "related": [],
       "locales": {
         "nl": {
-          "title": "Automations: realisatie en jaarlijkse supporturen",
-          "purpose": "Vul per geplande taak jaarlijkse supporturen in en neem ze automatisch mee in je supporttotaal.",
+          "title": "Automations: implementatie en jaarlijkse supporturen",
+          "purpose": "Vul implementatie-uren in: 15% telt als jaarlijkse support, inclusief het bedrag op basis van je uurtarief.",
           "when": "Bij het opnemen van gebouwd werk in een jaarlijkse supportafspraak.",
           "steps": [
-            "Open een geplande taak en ga naar Jaarlijkse support.",
-            "Vul Supporturen per jaar in. Bij Realisatie & tarief staat de suggestie van 15%.",
-            "Schakel Jaarlijkse support inschakelen aan en kies Opslaan.",
-            "Bekijk het jaarlijkse totaal bij Support. Conceptjaarafspraken nemen deze taak automatisch eenmaal op.",
+            "Open een geplande taak en ga naar Implementatie & jaarlijkse support.",
+            "Als MSP: vul Implementatie-uren en het afgesproken uurtarief in. Bekijk de automatisch berekende 15% supporturen en het jaarbedrag.",
+            "Als MSP: schakel Jaarlijkse support inschakelen aan en kies Opslaan. Gebruikers zien de instellingen alleen ter inzage.",
+            "Bekijk het uren- en bedragstotaal bij Support. Conceptjaarafspraken nemen de jaarlijkse support automatisch eenmaal op.",
             "Eenmaal ingeschakeld kan alleen je MSP de support uitschakelen. Extra besteedbare uren vereisen afspraak en betaling."
           ],
-          "permissions": "Organisatiebeheerders en financiële beheerders registreren zichtbare taken.",
+          "permissions": "Alleen aangewezen MSP-beheerders stellen uren, tarief en support in. Gebruikers kunnen dit niet wijzigen of uitschakelen.",
           "limits": "De instelling geldt per jaar, niet per uitvoering. Pauzeren of verwijderen van een taak beëindigt de centrale supportafspraak niet. Je kunt ingeschakelde uren niet verlagen of de support zelf uitzetten. Geaccepteerde jaarafspraken en betaalde uren blijven behouden.",
-          "example": "Stel voor een dagelijkse rapportage 4 supporturen per jaar in. Het supporttotaal neemt met 4 uur toe, ongeacht het aantal uitvoeringen."
+          "example": "20 implementatie-uren à EUR 100 leveren 3 supporturen en EUR 300 jaarlijkse support op (EUR 25 per maand, excl. btw)."
         },
         "en": {
           "title": "Automations: implementation and annual support hours",
-          "purpose": "Enter annual support hours for each scheduled job and include them automatically in your support total.",
+          "purpose": "Enter implementation hours: 15% becomes annual support, including the amount calculated from your hourly rate.",
           "when": "When including built work in an annual support agreement.",
           "steps": [
-            "Open a scheduled job and find Annual support.",
-            "Enter Support hours per year. Implementation & rate shows the 15% suggestion.",
-            "Turn on Enable annual support and choose Save.",
-            "Review your annual total in Support. Draft annual agreements include this job exactly once.",
+            "Open a scheduled job and find Implementation & annual support.",
+            "As an MSP manager, enter Implementation hours and the agreed hourly rate. Review the automatically calculated 15% support hours and annual amount.",
+            "As an MSP manager, turn on Enable annual support and choose Save. Customers see read-only controls.",
+            "Review the hours and amount totals in Support. Draft annual agreements include this annual support exactly once.",
             "Once enabled, only your MSP can disable support. Extra spendable hours require agreement and payment."
           ],
-          "permissions": "Organisation and billing administrators can record visible jobs.",
+          "permissions": "Only designated MSP managers configure hours, rates and support. Customers cannot edit or disable it.",
           "limits": "The setting is annual, not per execution. Pausing or deleting a job does not end its central support commitment. Customers cannot reduce enabled hours or switch support off. Accepted annual agreements and paid hours are preserved.",
-          "example": "Set 4 annual support hours for a daily report. The support total grows by 4 hours regardless of how often it runs."
+          "example": "20 implementation hours at EUR 100 give 3 annual support hours costing EUR 300/year (EUR 25/month, excl. VAT)."
         }
       }
     },

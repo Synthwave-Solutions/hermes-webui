@@ -98,12 +98,19 @@ change does not initiate payments or create accounting invoices.
 
 ### Annual support per scheduled job
 
-Job details expose an annual support-hours field and opt-in switch. Saving enabled
-support adds the configured minutes once to the organisation's annual commitment
-and synchronizes draft agreements. The optional 15% calculation remains a suggestion.
-Customer administrators cannot disable enabled support or change its minutes; older
-clients omitting these fields preserve the setting. Only an HQ commercial administrator
-can disable it, with revision checking and audit. Scheduler pause/delete operations do
+Job details expose implementation hours, an optional agreed hourly rate and a support
+opt-in switch. Annual support is calculated by the server as 15% of implementation
+hours, rounded to whole minutes; its price is 15% of the implementation value, rounded
+to cents. For example, 20 hours at EUR 100 gives 3 annual support hours at EUR 300/year.
+Saving enabled support adds the hours and annual amount once to the support total
+and draft agreements. An unknown rate remains unpriced, never a free offer.
+Only explicitly designated MSP managers can configure implementation hours, rate and
+support state. Customer administrators have read-only controls and cannot enable,
+edit or disable support through the API. HQ admins grant/revoke this separate
+installation-scoped capability through POST /api/control/commercial/job-support/access
+with org_id, installation_id, email and enabled. Customer/billing roles alone never
+grant MSP access. Revocation takes effect immediately. Saved legacy terms remain
+until the MSP changes their implementation basis. HQ can also disable support directly. Scheduler pause/delete operations do
 not cancel the independent support commitment. Accepted agreements and funded hours
 are preserved; draft additions are not spendable credits.
 

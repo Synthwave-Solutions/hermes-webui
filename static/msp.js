@@ -28,7 +28,7 @@
   const box=card(billing?(nl?'Afspraak & termijnen':'Agreement & installments'):(nl?'Supporturen':'Support hours'));box.id=billing?'mspAnnualBilling':'mspAnnualSupport';
   if(!billing){const grid=el('div',undefined,'msp-grid');metric(grid,nl?'Beschikbaar':'Available',hours(overview.support_access?.available_minutes));if(active){metric(grid,nl?'Gebruikt dit jaar':'Used this year',hours(active.used_minutes));metric(grid,nl?'Jaarcap':'Annual cap',hours(active.annual_minutes));}box.append(grid,el('p',nl?'Uren':'Hours','msp-muted'));
    const actions=el('div',undefined,'msp-actions');if(overview.support_access?.can_submit)actions.append(button(nl?'Supportticket maken':'Create support ticket',()=>{tab='tickets';draft.need='question';render();}));actions.append(button(nl?'Uren bijkopen':'Buy hours',()=>toOrders('hours')));box.append(actions);
-   if(overview.support_commitment?.job_minutes){box.append(el('p',hours(overview.support_commitment.annual_minutes)+(nl?' supporturen per jaar, waarvan ':' annual support hours, including ')+hours(overview.support_commitment.job_minutes)+(nl?' voor geplande taken':' for scheduled jobs'),'msp-muted'));if(overview.support_commitment.pending_minutes)box.append(el('small',hours(overview.support_commitment.pending_minutes)+(nl?' job-uren wachten op opname en betaling.':' job hours await agreement and payment.')));}
+   if(overview.support_commitment?.job_minutes){const total=overview.support_commitment.annual_cents;box.append(el('p',(nl?'Supporttotaal: ':'Support total: ')+(total==null?c().quote:amount(total)+(nl?' per jaar excl. btw, vóór jaarkorting':' per year excl. VAT, before annual discount'))));box.append(el('p',hours(overview.support_commitment.annual_minutes)+(nl?' supporturen per jaar, waarvan ':' annual support hours, including ')+hours(overview.support_commitment.job_minutes)+(nl?' voor geplande taken':' for scheduled jobs'),'msp-muted'));if(overview.support_commitment.pending_minutes)box.append(el('small',hours(overview.support_commitment.pending_minutes)+(nl?' job-uren wachten op opname en betaling.':' job hours await agreement and payment.')));}
    if(!overview.support_access?.can_submit)box.append(el('p',nl?'Je uren zijn op. Koop eerst uren bij voor een supportticket.':'No hours available. Buy hours before creating a support ticket.','msp-muted'));
   }
   if(overview.permissions?.billing){
@@ -59,7 +59,7 @@
   if(!overview.permissions?.billing)return;
   const nl=lang()==='nl',data=overview.scheduled_jobs||{jobs:[]},box=fold(nl?'Automations & supportvoorstellen':'Automations & support proposals','mspJobCosts');
   if(!data.jobs.length)box.append(el('p',nl?'Nog geen voorstellen.':'No proposals yet.'));
-  for(const row of data.jobs)box.append(el('p',row.title+' · '+hours(row.annual_support_minutes)+(nl?' supporturen/jaar · ':' support hours/year · ')+(row.support_enabled?(nl?'Ingeschakeld':'Enabled'):(nl?'Niet ingeschakeld':'Not enabled'))));
+  for(const row of data.jobs)box.append(el('p',row.title+' · '+hours(row.annual_support_minutes)+(nl?' supporturen/jaar · ':' support hours/year · ')+(row.annual_support_cents==null?c().quote:amount(row.annual_support_cents)+(nl?' per jaar excl. btw':' per year excl. VAT'))+' · '+(row.support_enabled?(nl?'Ingeschakeld':'Enabled'):(nl?'Niet ingeschakeld':'Not enabled'))));
   box.append(el('small',nl?'Ingeschakelde job-uren tellen automatisch mee. Alleen je MSP kan support uitschakelen.':'Enabled job hours count automatically. Only your MSP can disable support.'));root.append(box);
  }
  function renderOverview(root){
