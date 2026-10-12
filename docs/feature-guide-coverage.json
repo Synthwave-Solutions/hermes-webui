@@ -2996,6 +2996,15 @@
       "source_refs": [
         "static/msp.js"
       ]
+    },
+    {
+      "id": "webui.bots.screens",
+      "area": "bots",
+      "status": "conditional",
+      "source_refs": [
+        "api/bot_screens.py",
+        "static/bot-screens.js"
+      ]
     }
   ],
   "controls": [
@@ -7621,6 +7630,15 @@
         "static/index.html"
       ],
       "feature_id": "webui.msp.overview"
+    },
+    {
+      "control": "btnBotScreens",
+      "tag": "a",
+      "label": "Bot Screens",
+      "source_refs": [
+        "static/index.html"
+      ],
+      "feature_id": "webui.bots.screens"
     }
   ],
   "method": "Inventory of concrete HTML controls and inline handlers, supplemented by manual review of generated conversation menus, bot builder and knowledge controls, composer customization and the embedded read-only memory dashboard. Save/cancel and equivalent responsive controls share a feature. Hidden vendor login, server settings and inactive legacy visualizers are excluded from user workflows.",

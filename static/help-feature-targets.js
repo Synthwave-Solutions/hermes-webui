@@ -5,6 +5,7 @@
 (function () {
   'use strict';
   const entries = {
+  "webui.bots.screens": {"panel":"profiles", "targets":["#btnBotScreens"], "entryTargets":[".rail [data-panel=\"profiles\"]"]},
   "webui.help.navigation": {
     "panel": "chat",
     "targets": [
