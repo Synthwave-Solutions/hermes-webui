@@ -14733,33 +14733,33 @@ window.SynthPulseFeatureCatalog = {
       "locales": {
         "nl": {
           "title": "Automations: implementatie en jaarlijkse supporturen",
-          "purpose": "Vul implementatie-uren in: 15% telt als jaarlijkse support, inclusief het bedrag op basis van je uurtarief.",
+          "purpose": "Vul implementatie-uren in: 15% telt automatisch mee als jaarlijkse supporturen.",
           "when": "Bij het opnemen van gebouwd werk in een jaarlijkse supportafspraak.",
           "steps": [
             "Open een geplande taak en ga naar Implementatie & jaarlijkse support.",
-            "Als MSP: vul Implementatie-uren en het afgesproken uurtarief in. Bekijk de automatisch berekende 15% supporturen en het jaarbedrag.",
+            "Als MSP: vul Implementatie-uren in. Bekijk de automatisch berekende 15% jaarlijkse supporturen.",
             "Als MSP: schakel Jaarlijkse support inschakelen aan en kies Opslaan. Gebruikers zien de instellingen alleen ter inzage.",
             "Bekijk het uren- en bedragstotaal bij Support. Conceptjaarafspraken nemen de jaarlijkse support automatisch eenmaal op.",
             "Eenmaal ingeschakeld kan alleen je MSP de support uitschakelen. Extra besteedbare uren vereisen afspraak en betaling."
           ],
-          "permissions": "Alleen aangewezen MSP-beheerders stellen uren, tarief en support in. Gebruikers kunnen dit niet wijzigen of uitschakelen.",
+          "permissions": "Alleen aangewezen MSP-beheerders stellen implementatie-uren en support in. Gebruikers kunnen dit niet wijzigen of uitschakelen.",
           "limits": "De instelling geldt per jaar, niet per uitvoering. Pauzeren of verwijderen van een taak beëindigt de centrale supportafspraak niet. Je kunt ingeschakelde uren niet verlagen of de support zelf uitzetten. Geaccepteerde jaarafspraken en betaalde uren blijven behouden.",
-          "example": "20 implementatie-uren à EUR 100 leveren 3 supporturen en EUR 300 jaarlijkse support op (EUR 25 per maand, excl. btw)."
+          "example": "20 implementatie-uren leveren automatisch 3 supporturen per jaar op."
         },
         "en": {
           "title": "Automations: implementation and annual support hours",
-          "purpose": "Enter implementation hours: 15% becomes annual support, including the amount calculated from your hourly rate.",
+          "purpose": "Enter implementation hours: 15% automatically counts as annual support hours.",
           "when": "When including built work in an annual support agreement.",
           "steps": [
             "Open a scheduled job and find Implementation & annual support.",
-            "As an MSP manager, enter Implementation hours and the agreed hourly rate. Review the automatically calculated 15% support hours and annual amount.",
+            "As an MSP manager, enter Implementation hours. Review the automatically calculated 15% annual support hours.",
             "As an MSP manager, turn on Enable annual support and choose Save. Customers see read-only controls.",
             "Review the hours and amount totals in Support. Draft annual agreements include this annual support exactly once.",
             "Once enabled, only your MSP can disable support. Extra spendable hours require agreement and payment."
           ],
-          "permissions": "Only designated MSP managers configure hours, rates and support. Customers cannot edit or disable it.",
+          "permissions": "Only designated MSP managers configure implementation hours and support. Customers cannot edit or disable it.",
           "limits": "The setting is annual, not per execution. Pausing or deleting a job does not end its central support commitment. Customers cannot reduce enabled hours or switch support off. Accepted annual agreements and paid hours are preserved.",
-          "example": "20 implementation hours at EUR 100 give 3 annual support hours costing EUR 300/year (EUR 25/month, excl. VAT)."
+          "example": "20 implementation hours automatically give 3 annual support hours."
         }
       }
     },
