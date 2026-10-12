@@ -21,7 +21,7 @@ def safe_link(value, environ):
         # Opt-in, deployment-owned links for a standalone Pi desktop / SSH tunnel.
         # Never infer permission from request headers or allow arbitrary HTTP hosts.
         if (environ.get('SP_LOCAL_PI_APPS') == '1' and u.scheme == 'http'
-                and host == '127.0.0.1' and u.port in (5220, 16081, 16082, 16083, 16084, 16085, 20128)
+                and host == '127.0.0.1' and u.port in (3003, 3009, 5220, 5227, 5678, 8289, 16081, 16082, 16083, 16084, 16085, 20128)
                 and u.username is None and u.password is None and not u.query and not u.fragment):
             return value
         domain = environ.get('SP_DOMAIN', '').strip().lower()
