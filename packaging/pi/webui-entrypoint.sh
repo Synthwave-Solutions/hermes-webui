@@ -22,6 +22,8 @@
 #                                  (recommended once governance is in enforce).
 # ============================================================================
 set -eu
+# Each bot owns its display and browser session.
+unset DISPLAY WAYLAND_DISPLAY XAUTHORITY DBUS_SESSION_BUS_ADDRESS
 
 # ── SP_WEBUI_* is the product-facing name ───────────────────────────────────
 # docker-compose.yml maps them onto the HERMES_WEBUI_* names the server reads.
