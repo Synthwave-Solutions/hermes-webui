@@ -232,3 +232,10 @@ def test_pi_loopback_apps_are_explicit_and_port_limited():
         assert apps_launcher.safe_link(url,env)==url
     for url in ('http://evil.test:5220/', 'http://127.0.0.1:22/', 'http://user@127.0.0.1:5220/', 'http://127.0.0.1:5220/?token=x'):
         assert apps_launcher.safe_link(url,env) is None
+
+
+def test_pi_office_gateway_is_explicitly_opt_in():
+    from api.apps_launcher import safe_link
+    assert safe_link("http://127.0.0.1:18130/docs/", {"SP_LOCAL_PI_APPS":"1"})
+    assert safe_link("http://127.0.0.1:18130/docs/", {}) is None
+    assert safe_link("http://example.com:18130/docs/", {"SP_LOCAL_PI_APPS":"1"}) is None
