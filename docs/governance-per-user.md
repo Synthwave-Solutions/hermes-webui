@@ -38,8 +38,11 @@ users:
 ```
 
 The assigned role/group grants define available resources, including profiles,
-workspaces, files, models, tools and command scopes. With an explicitly selected
-whitelist or blacklist mode, a direct user grant cannot widen that envelope.
+workspaces, files, models, tools and command scopes. Whitelist mode limits direct
+user grants to that envelope. Blacklist mode allows operational resources by
+default, subject to explicit per-user denies and the access-level ceiling.
+Environment secrets still require explicit grants. Bot Screens independently
+require explicit screen grants regardless of the selected access mode.
 
 | Control | Behavior |
 |---|---|
@@ -47,7 +50,7 @@ whitelist or blacklist mode, a direct user grant cannot widen that envelope.
 | Elevated | Uses assigned additional operational capabilities, including an explicitly granted terminal. Governance administration stays excluded. |
 | Admin | Provides the administrative capability envelope. It remains subject to the selected access mode and explicit denies. |
 | Whitelist | Starts without work capabilities. Direct user grants permit only explicitly selected capabilities within the role/resource envelope. |
-| Blacklist | Inherits the assigned role/resource envelope except explicit per-user denies. |
+| Blacklist | Allows operational resources except explicit per-user denies, subject to the access-level ceiling. |
 | Manual approval | Each eligible tool invocation requires a one-action human approval. Existing gateway/CLI approval interfaces carry the request. |
 | Automatic approval | A configured auxiliary model applies this user's admin-authored prompt to the exact eligible tool invocation. It can accept, deny, or refer to a human. |
 

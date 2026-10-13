@@ -56,7 +56,8 @@ def test_levels_and_explicit_denials_remain_independent(level):
 
 def test_default_allow_preserves_constraints_and_explicit_secret_forwarding():
     a = access(policy())
-    assert a.grants.file_denied_globs == frozenset({"*/bank/*", "*/private/*"})
+    # Blacklist accounts carry their own file denies, not the role template's.
+    assert a.grants.file_denied_globs == frozenset({"*/private/*"})
     assert a.grants.file_allow_globs == frozenset({"*/private/example.md"})
     assert a.grants.cli_approval_commands == frozenset({"deploy-prod"})
     assert a.grants.usage_caps == {"tool_calls": 12}
