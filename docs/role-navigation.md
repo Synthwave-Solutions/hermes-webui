@@ -67,3 +67,7 @@ links, and unavailable settings keep the destination hidden. The default member
 order places Apps at the bottom, just above Settings, including when an older
 saved tab order places it earlier. Desktop and mobile share the same gate.
 Opening an app uses a new browser tab and does not change the current chat draft.
+
+Files, Logs and Todos are omitted from the left navigation for all roles,
+including the mobile navigation. Workspace files and optional Todos remain
+available in the right workspace panel; underlying panel routes are retained.

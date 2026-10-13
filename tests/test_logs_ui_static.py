@@ -5,7 +5,7 @@ REPO = pathlib.Path(__file__).parent.parent
 INDEX = (REPO / "static" / "index.html").read_text(encoding="utf-8")
 PANELS = (REPO / "static" / "panels.js").read_text(encoding="utf-8")
 CSS = (REPO / "static" / "style.css").read_text(encoding="utf-8")
-I18N = (REPO / "static" / "i18n.js").read_text(encoding="utf-8")
+I18N = (REPO / "static" / "i18n" / "en.js").read_text(encoding="utf-8")
 
 
 def _function_body(src: str, name: str) -> str:
@@ -64,16 +64,14 @@ def _function_body(src: str, name: str) -> str:
     return src[brace + 1:i - 1]
 
 
-def test_logs_tab_is_wired_between_insights_and_settings_in_rail_and_mobile_nav():
-    rail = INDEX[INDEX.index('data-panel="insights"'):INDEX.index('<div class="rail-spacer"')]
-    assert 'data-panel="logs"' in rail
-    assert rail.index('data-panel="insights"') < rail.index('data-panel="logs"')
-
+def test_utility_panels_are_absent_from_desktop_and_mobile_navigation():
+    rail = INDEX[:INDEX.index('<div class="rail-spacer"')]
     mobile_start = INDEX.index('class="sidebar-nav"')
     mobile_end = INDEX.index('<!-- Settings button mirrored here for mobile')
     mobile_nav = INDEX[mobile_start:mobile_end]
-    assert 'data-panel="logs"' in mobile_nav
-    assert mobile_nav.index('data-panel="insights"') < mobile_nav.index('data-panel="logs"')
+    for panel in ("files", "logs", "todos"):
+        assert f'data-panel="{panel}"' not in rail
+        assert f'data-panel="{panel}"' not in mobile_nav
 
     assert 'id="panelLogs"' in INDEX
     assert 'id="mainLogs"' in INDEX

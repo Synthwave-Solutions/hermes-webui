@@ -80,10 +80,15 @@ def test_visible_is_the_complement_and_always_includes_the_essentials():
     assert not set(visible) & set(hidden_panels(access, _Policy()))
 
 
-def test_every_panel_id_exists_in_the_markup():
-    """A permission mapped to a panel that does not exist would hide nothing."""
+def test_every_permission_target_exists_in_navigation_or_retained_panels():
     for panel in PANEL_PERMISSIONS:
-        assert f'data-panel="{panel}"' in INDEX_HTML, panel
+        if panel == "files":
+            assert 'id="workspaceFilesTab"' in INDEX_HTML
+        else:
+            assert (
+                f'data-panel="{panel}"' in INDEX_HTML
+                or f'id="panel{panel.capitalize()}"' in INDEX_HTML
+            ), panel
 
 
 def test_me_endpoint_publishes_hidden_nav():
