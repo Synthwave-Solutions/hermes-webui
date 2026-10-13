@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+export SYNTHPULSE_ENGINE_DIR=/opt/synthpulse/hermes-agent
+export SYNTHPULSE_PROFILES_HOME=/home/synthpulse/.synthpulse-engine
+exec /opt/synthpulse/hermes-agent/venv/bin/python /opt/synthpulse-resources/skills/bot-screen-desktop-apps/scripts/botscreen.py "$@"

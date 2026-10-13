@@ -1,0 +1,6 @@
+#!/bin/sh
+set -eu
+case "${1:-}" in
+  create|inspect) exec /opt/synthpulse/hermes-agent/venv/bin/python /opt/synthpulse-resources/tools/office.py "$@" ;;
+  *) echo 'Use your signed-in SynthPulse Office app through Bot Screens to publish, open, share or manage projects. Local CLI: create or inspect.' >&2; exit 2 ;;
+esac
