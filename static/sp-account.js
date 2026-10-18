@@ -1,4 +1,4 @@
-/* Visible "Log out" (🚪) in the navigation rail and the mobile nav.
+/* Visible "Log out" (door icon) in the navigation rail and the mobile nav.
  *
  * Shown only when sign-in is enabled and this browser is signed in (password,
  * passkey or SSO/OIDC: all of them use the same server session cookie). It

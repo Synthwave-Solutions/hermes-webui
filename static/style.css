@@ -8343,10 +8343,8 @@ html[data-nav-audience="member"]:not([data-advanced-chat-controls="1"]) #compose
   .sp-friendly-tool .sp-details-label{display:none;}
 }
 
-/* Log out (🚪) in the rail and the mobile nav */
+/* Log out icon in the rail and the mobile nav */
 .sp-logout-btn[hidden]{display:none!important;}
-.sp-logout-emoji{font-size:17px;line-height:1;font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;filter:saturate(.85);}
-.sp-logout-btn:hover .sp-logout-emoji{filter:none;}
 
 /* ─────────────────────────────────────────────────────────────
    Polish pass (18 Oct 2026, round 2): calmer hierarchy for tool
