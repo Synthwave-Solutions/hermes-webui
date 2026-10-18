@@ -96,11 +96,18 @@ def plan(state: Path, hermes: Path) -> list[dict]:
         items.append({"profile": profile, "registry": str(reg), "action": "update", "old": OLD, "new": new,
                       "name": entry.get("name"), "owner_email": entry.get("owner_email"),
                       "members": entry.get("members") or []})
+    # Chats at /workspace in a profile without a Home space there: move only the chats.
+    seen = {i["profile"] for i in items}
+    index = _read_json(state / "sessions" / "_index.json", []) or []
+    for prof in sorted({r.get("profile") for r in index if isinstance(r, dict) and r.get("workspace") == OLD} - seen):
+        new = _cwd(hermes, prof) if prof and not os.path.isdir(OLD) else None
+        if new:
+            items.append({"profile": prof, "registry": None, "action": "chats_only", "old": OLD, "new": new})
     return items
 
 
 def apply(state: Path, hermes: Path) -> dict:
-    items = [i for i in plan(state, hermes) if i["action"] == "update"]
+    items = [i for i in plan(state, hermes) if i["action"] in ("update", "chats_only")]
     stamp = time.strftime("%Y%m%d-%H%M%S")
     dest = state / "maintenance-backups" / f"home-spaces-{stamp}"
     dest.mkdir(parents=True, exist_ok=False)
@@ -117,24 +124,25 @@ def apply(state: Path, hermes: Path) -> dict:
     index = _read_json(index_path, []) or []
     projects_changed = index_changed = False
     for it in items:
-        reg = Path(it["registry"])
-        raw = reg.read_text(encoding="utf-8")
-        rows = json.loads(raw)
-        keep(reg)
-        for r in rows:
-            if isinstance(r, dict) and r.get("path") == OLD:
-                r["path"] = it["new"]
-        _write(reg, json.dumps(rows, ensure_ascii=False, indent=2))
-        log.append({**it, "result": "space updated"})
-        for p in projects:
-            src = p.get("source_space") if isinstance(p, dict) else None
-            if p.get("kind") == "space" and isinstance(src, dict) and src.get("profile") == it["profile"] and src.get("path") == OLD:
-                src["path"] = it["new"]
-                for f in p.get("folders") or []:
-                    if isinstance(f, dict) and f.get("path") == OLD:
-                        f["path"] = it["new"]
-                projects_changed = True
-                log.append({"project_id": p.get("project_id"), "name": p.get("name"), "result": "space project folder updated"})
+        if it["action"] == "update":
+            reg = Path(it["registry"])
+            raw = reg.read_text(encoding="utf-8")
+            rows = json.loads(raw)
+            keep(reg)
+            for r in rows:
+                if isinstance(r, dict) and r.get("path") == OLD:
+                    r["path"] = it["new"]
+            _write(reg, json.dumps(rows, ensure_ascii=False, indent=2))
+            log.append({**it, "result": "space updated"})
+            for p in projects:
+                src = p.get("source_space") if isinstance(p, dict) else None
+                if p.get("kind") == "space" and isinstance(src, dict) and src.get("profile") == it["profile"] and src.get("path") == OLD:
+                    src["path"] = it["new"]
+                    for f in p.get("folders") or []:
+                        if isinstance(f, dict) and f.get("path") == OLD:
+                            f["path"] = it["new"]
+                    projects_changed = True
+                    log.append({"project_id": p.get("project_id"), "name": p.get("name"), "result": "space project folder updated"})
         for row in index:
             if isinstance(row, dict) and row.get("profile") == it["profile"] and row.get("workspace") == OLD:
                 sfile = state / "sessions" / f"{row.get('session_id')}.json"
