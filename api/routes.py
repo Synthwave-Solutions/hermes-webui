@@ -13486,6 +13486,10 @@ def handle_get(handler, parsed) -> bool:
         from api import projects_hub
 
         all_projects = projects_hub.visible_projects_by_owner(all_projects, owner_scope)
+        # Space projects (Projects + Spaces merge) live in the Projects screen;
+        # keep them out of the chat sidebar chips unless explicitly requested.
+        if (parse_qs(parsed.query).get("include_spaces") or ["0"])[0] != "1":
+            all_projects = [p for p in all_projects if not projects_hub.is_space_project(p)]
         isolated_profile_mode = _is_isolated_profile_mode()
         all_profiles = _all_profiles_enabled(parsed)
         if all_profiles:
@@ -28266,7 +28270,12 @@ def _project_folder_can_open(handler):
 def _handle_project_folders_get(handler, parsed) -> bool:
     from api import project_folders, projects_hub
     if parsed.path == "/api/projects/folders/config":
-        return j(handler, {"enabled": _project_folders_flag()})
+        try:
+            _settings = load_settings()
+        except Exception:
+            _settings = {}
+        return j(handler, {"enabled": _project_folders_flag(), "merged": project_folders.merged(),
+                           "classic_spaces": project_folders.classic_spaces(_settings)})
     if not _project_folders_flag():
         return bad(handler, "Not found", 404)
     active_profile, owner_scope, capabilities = _projects_hub_context(handler)

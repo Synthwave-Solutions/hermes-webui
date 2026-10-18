@@ -25,11 +25,34 @@ MAX_FOLDERS = 20
 ROLES = {"project", "linked"}
 
 
-def enabled(settings: dict | None = None, environ=None) -> bool:
+def enabled(settings: dict | None = None, environ=None, state_dir=None) -> bool:
     env = os.environ if environ is None else environ
     if str(env.get("HERMES_WEBUI_PROJECT_FOLDERS", "")).strip().lower() in {"1", "true", "yes", "on"}:
         return True
-    return bool((settings or {}).get("project_folders_enabled") is True)
+    if (settings or {}).get("project_folders_enabled") is True:
+        return True
+    return merged(state_dir)
+
+
+MARKER = "projects_merge_state.json"
+
+
+def merged(state_dir=None) -> bool:
+    """True once the Projects + Spaces migration has run on this state dir."""
+    try:
+        if state_dir is None:
+            from api.config import STATE_DIR as state_dir  # noqa: N811
+        return (Path(state_dir) / MARKER).is_file()
+    except Exception:
+        return False
+
+
+def classic_spaces(settings: dict | None = None, environ=None) -> bool:
+    """Keep the old Spaces menu item visible (one release after the merge)."""
+    env = os.environ if environ is None else environ
+    if str(env.get("HERMES_WEBUI_CLASSIC_SPACES", "")).strip().lower() in {"1", "true", "yes", "on"}:
+        return True
+    return (settings or {}).get("classic_spaces") is True
 
 
 def _norm(value) -> str:

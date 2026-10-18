@@ -120,5 +120,28 @@
     }
   }
 
-  root.SpProjectFolders = {afterList, afterDetail, openMyWork, _reset: () => { flag = null; inflight = null; }};
+  // After the merge: hide the Spaces menu item (unless the classic view is on)
+  // and present the composer folder chip as the project you work in.
+  let config = null;
+  async function applyMergedChrome() {
+    try { config = await call('/api/projects/folders/config'); } catch (_) { return; }
+    flag = !!(config && config.enabled);
+    const html = root.document.documentElement;
+    if (config && config.merged && !config.classic_spaces) html.setAttribute('data-sp-merged', '1');
+    else html.removeAttribute('data-sp-merged');
+    if (!(config && config.merged)) return;
+    const label = root.document.getElementById('composerWorkspaceLabel');
+    const chip = root.document.getElementById('composerWorkspaceChip');
+    if (label) label.setAttribute('data-sp-prefix', '📁 ' + T('composer_project_prefix', 'Project: '));
+    if (chip) {
+      const title = T('composer_project_title', 'Choose the project you work in');
+      chip.title = title; chip.setAttribute('aria-label', title);
+    }
+  }
+  if (root.document) {
+    if (root.document.readyState === 'loading') root.document.addEventListener('DOMContentLoaded', applyMergedChrome);
+    else applyMergedChrome();
+  }
+
+  root.SpProjectFolders = {afterList, afterDetail, openMyWork, applyMergedChrome, _reset: () => { flag = null; inflight = null; }};
 })(typeof window !== 'undefined' ? window : globalThis);

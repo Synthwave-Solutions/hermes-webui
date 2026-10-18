@@ -8425,3 +8425,8 @@ html:not([data-nav-audience="admin"]) .ws-row-path{display:none;}
 /* Projects: "Mijn werk" entry and folders card (behind the project-folders flag) */
 .proj-row-mywork .sp-mywork-dot{width:auto;height:auto;background:none;font-size:14px;line-height:1;}
 .sp-folder-dialog select{width:100%;margin:8px 0 14px;}
+
+/* Projects + Spaces merged: Spaces menu item hidden (classic view keeps it),
+   composer folder chip reads "📁 Project: <name>". */
+html[data-sp-merged="1"] [data-panel="workspaces"]{display:none!important;}
+html[data-sp-merged="1"] #composerWorkspaceLabel::before{content:attr(data-sp-prefix);}

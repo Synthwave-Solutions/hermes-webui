@@ -2544,4 +2544,6 @@ window.__registerHermesLocale('en', {
     projects_summary_team: 'Work together with people, bots and shared project files.',
     projects_summary_personal: 'Conversations and resources collected in this project.',
     projects_my_work_no_chats: 'No chats without a project yet.',
+    composer_project_prefix: 'Project: ',
+    composer_project_title: 'Choose the project you work in',
 });

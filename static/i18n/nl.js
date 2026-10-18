@@ -2437,4 +2437,6 @@ window.__registerHermesLocale('nl', {
   projects_summary_team: 'Werk samen met mensen, bots en gedeelde projectbestanden.',
   projects_summary_personal: 'Gesprekken en bronnen die bij dit project horen.',
   projects_my_work_no_chats: 'Nog geen gesprekken zonder project.',
+  composer_project_prefix: 'Project: ',
+  composer_project_title: 'Kies het project waarin je werkt',
 });
