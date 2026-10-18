@@ -157,6 +157,15 @@ def analyse(projects, spaces, sessions, policy):
         if pids:
             link_candidates.append({"profile": prof, "path": path, "projects": dict(pids), "chats": len(rows)})
 
+    # Same folder registered in several profiles: merging those into one
+    # project would union their ACLs (people gain access) unless identical.
+    by_real = collections.defaultdict(list)
+    for prof, sp in spaces:
+        by_real[os.path.realpath(os.path.expanduser(sp["path"]))].append((prof, tuple(sorted(_emails(sp)))))
+    same_folder_diff_acl = sorted(
+        [{"path": path, "profiles": sorted({p_ for p_, _ in v}), "acl_variants": len({acl for _, acl in v})}
+         for path, v in by_real.items() if len({acl for _, acl in v}) > 1], key=lambda x: x["path"])
+
     # Per person: now vs after.
     #   Option A (proposed default): every space without a project becomes its
     #   own project with exactly the same owner/members; unowned spaces become a
@@ -198,6 +207,8 @@ def analyse(projects, spaces, sessions, policy):
         "team_projects": sum(1 for p in live_projects if p.get("collaboration")),
         "personal_projects": sum(1 for p in live_projects if not p.get("collaboration")),
         "spaces": len(spaces), "profiles_with_spaces": len({p for p, _ in spaces}),
+        "unique_space_folders": len(by_real),
+        "same_folder_different_acl_across_profiles": len(same_folder_diff_acl),
         "sessions_indexed": len(sessions),
         "sessions_with_workspace_in_space": sum(len(v) for v in sessions_by_space.values()),
         "orphaned_session_workdirs": len(orphans),
@@ -218,6 +229,7 @@ def analyse(projects, spaces, sessions, policy):
             "unowned_spaces": unowned_spaces, "missing_space_dirs": missing_dirs,
             "spaces_used_by_multiple_projects": multi_project_spaces,
             "orphaned_session_workdirs": orphans,
+            "same_folder_different_acl_across_profiles": same_folder_diff_acl,
         },
         "link_candidates": link_candidates,
     }
@@ -243,6 +255,9 @@ def to_markdown(result) -> str:
     lines += ["", "## Conflicten", ""]
     lines.append(f"### Ruimtenamen die in meerdere profielen voorkomen ({len(c['duplicate_space_names_across_profiles'])})")
     lines += [f"* {d['name']}: {', '.join(d['profiles'])}" for d in c["duplicate_space_names_across_profiles"][:60]] or ["* geen"]
+    lines.append(f"\n### Zelfde map in meerdere profielen met verschillende leden ({len(c['same_folder_different_acl_across_profiles'])})")
+    lines.append("Samenvoegen tot één project zou de ledenlijsten optellen; daarom per profiel apart houden of eerst gelijktrekken.")
+    lines += [f"* {d['path']} ({', '.join(d['profiles'])}; {d['acl_variants']} varianten)" for d in c["same_folder_different_acl_across_profiles"][:60]] or ["* geen"]
     lines.append(f"\n### Dubbele projectnamen ({len(c['duplicate_project_names'])})")
     lines += [f"* {n}" for n in c["duplicate_project_names"]] or ["* geen"]
     lines.append(f"\n### Naam van project en ruimte gelijk ({len(c['project_space_name_clashes'])})")
