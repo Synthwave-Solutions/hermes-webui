@@ -13461,6 +13461,9 @@ def handle_get(handler, parsed) -> bool:
     if parsed.path == "/api/projects/hub":
         return _handle_projects_hub(handler)
 
+    if parsed.path in ("/api/projects/folders", "/api/projects/folders/config", "/api/projects/my-work"):
+        return _handle_project_folders_get(handler, parsed)
+
     if parsed.path == "/api/projects/hub/detail":
         return _handle_projects_hub_detail(handler, parsed)
 
@@ -16879,6 +16882,9 @@ def handle_post(handler, parsed) -> bool:
         return j(handler, {"ok": True, "session": s.compact()})
 
     # ── Project CRUD (POST) ──
+    if parsed.path in ("/api/projects/folders/add", "/api/projects/folders/remove"):
+        return _handle_project_folders_post(handler, parsed, body)
+
     if parsed.path == "/api/projects/create":
         if _request_owner_email_for_new_session(handler):
             if not _body_profile_allowed(handler, str(body.get('profile') or '')):
@@ -28233,3 +28239,100 @@ def _handle_mcp_server_update(handler, name, body):
     _save_yaml_config_file(_get_config_path(), cfg)
     reload_config()
     return j(handler, {"ok": True, "server": _server_summary(name, server_cfg)})
+
+# ── Project folders (Projects + Spaces merge, step 2; behind a flag) ────────
+def _project_folders_flag() -> bool:
+    from api import project_folders
+    try:
+        return project_folders.enabled(load_settings())
+    except Exception:
+        return project_folders.enabled(None)
+
+
+def _project_folder_can_open(handler):
+    from api.ownership import request_owner_scope
+    from api.workspace_access import ensure_scope_access
+    scope = request_owner_scope(handler)
+
+    def can_open(path):
+        try:
+            ensure_scope_access(scope, path)
+            return True
+        except PermissionError:
+            return False
+    return can_open
+
+
+def _handle_project_folders_get(handler, parsed) -> bool:
+    from api import project_folders, projects_hub
+    if parsed.path == "/api/projects/folders/config":
+        return j(handler, {"enabled": _project_folders_flag()})
+    if not _project_folders_flag():
+        return bad(handler, "Not found", 404)
+    active_profile, owner_scope, capabilities = _projects_hub_context(handler)
+    if parsed.path == "/api/projects/my-work":
+        from api.ownership import request_owner_email
+        spaces = []
+        if capabilities.get("workspaces"):
+            try:
+                spaces = _workspaces_response_list(load_workspaces(), handler)
+            except Exception:
+                logger.debug("my-work space read failed", exc_info=True)
+        rows = projects_hub.visible_sessions(all_sessions(), owner_scope, active_profile)
+        return j(handler, project_folders.my_work(rows, request_owner_email(handler) or "", spaces))
+    project_id = str((parse_qs(parsed.query).get("project_id") or [""])[0] or "").strip()
+    visible = projects_hub.visible_projects(load_projects(), owner_scope, active_profile)
+    project = next((p for p in visible if str(p.get("project_id") or "") == project_id), None)
+    if project is None:
+        return bad(handler, "Project not found", 404)
+    if not capabilities.get("workspaces"):
+        return j(handler, {"project_id": project_id, "folders": [], "can_manage": False})
+    from api.ownership import request_is_admin, request_owner_email
+    folders = project_folders.visible_folders(project, _project_folder_can_open(handler))
+    return j(handler, {"project_id": project_id, "folders": folders,
+                       "can_manage": project_folders.can_manage(project, (request_owner_email(handler) or "").lower(),
+                                                                request_is_admin(handler))})
+
+
+def _handle_project_folders_post(handler, parsed, body) -> bool:
+    from api import project_folders
+    from api.models import PROJECTS_LOCK
+    from api.ownership import request_is_admin, request_owner_email
+    if not _project_folders_flag():
+        return bad(handler, "Not found", 404)
+    body = body or {}
+    email = (request_owner_email(handler) or "").lower()
+    is_admin = request_is_admin(handler)
+    project_id = str(body.get("project_id") or "").strip()
+    try:
+        from api.governance.resource_scope import access_for
+        access = access_for(handler)
+        may_write = bool(access is None or access.has_permission("files:write"))
+    except Exception:
+        may_write = False
+    try:
+        with PROJECTS_LOCK:
+            projects = load_projects()
+            # Same visibility gate as reading: a project you cannot see is "not found".
+            from api import projects_hub
+            active_profile, owner_scope, _caps = _projects_hub_context(handler)
+            visible_ids = {str(p.get("project_id") or "")
+                           for p in projects_hub.visible_projects(projects, owner_scope, active_profile)}
+            if project_id not in visible_ids:
+                return bad(handler, "Project not found", 404)
+            if parsed.path.endswith("/add"):
+                spaces = _workspaces_response_list(load_workspaces(), handler)
+                project = project_folders.add_folder(
+                    projects, project_id, body.get("path"), body.get("name"), email=email, is_admin=is_admin,
+                    may_write_files=may_write, visible_space_paths={w.get("path") for w in spaces if w.get("path")})
+            else:
+                project = project_folders.remove_folder(projects, project_id, str(body.get("path") or ""),
+                                                        email=email, is_admin=is_admin)
+            save_projects(projects)
+    except LookupError:
+        return bad(handler, "Project not found", 404)
+    except PermissionError as exc:
+        return bad(handler, str(exc), 403)
+    except ValueError as exc:
+        return bad(handler, str(exc), 400)
+    return j(handler, {"ok": True, "folders": project_folders.visible_folders(project, _project_folder_can_open(handler))})

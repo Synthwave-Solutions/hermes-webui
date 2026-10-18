@@ -66,6 +66,7 @@ const SHELL_ASSETS = [
   './static/subagent-threads.js' + VQ,
   './static/sp-account.js' + VQ,
   './static/sp-ux.js' + VQ,
+  './static/projects-folders.js' + VQ,
   './static/extension_settings.js' + VQ,
   './static/interaction_preferences.js' + VQ,
   './static/chat-bots.js' + VQ,

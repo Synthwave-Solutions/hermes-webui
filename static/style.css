@@ -8422,3 +8422,6 @@ html[data-nav-audience="member"]:not([data-advanced-chat-controls="1"]) #compose
 .sp-tech-details > summary::after{content:" ›";display:inline-block;transition:transform .15s;}
 .sp-tech-details[open] > summary::after{transform:rotate(90deg);}
 html:not([data-nav-audience="admin"]) .ws-row-path{display:none;}
+/* Projects: "Mijn werk" entry and folders card (behind the project-folders flag) */
+.proj-row-mywork .sp-mywork-dot{width:auto;height:auto;background:none;font-size:14px;line-height:1;}
+.sp-folder-dialog select{width:100%;margin:8px 0 14px;}
