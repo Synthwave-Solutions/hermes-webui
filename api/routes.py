@@ -13298,6 +13298,35 @@ def handle_get(handler, parsed) -> bool:
         except KeyError:
             return bad(handler, "Session not found", 404)
 
+    if parsed.path == "/api/session/subagents":
+        # Delegated workers of one conversation, readable after the turn that
+        # started them has finished (background delegation outlives the stream).
+        sid = parse_qs(parsed.query).get("session_id", [""])[0]
+        if not sid:
+            return bad(handler, "Missing session_id")
+        try:
+            meta = get_session(sid, metadata_only=True)
+        except KeyError:
+            return bad(handler, "Session not found", 404)
+        if not _session_visible_to_request(meta, handler):
+            return bad(handler, "Session not found", 404)
+        from api import subagent_progress as _subagent_threads
+        workers = _subagent_threads.snapshot(sid)
+        if not workers:
+            try:
+                full = get_session(sid)
+                rows = []
+                for record in (getattr(full, "anchor_activity_scenes", None) or {}).values():
+                    scene = record.get("scene") if isinstance(record, dict) else None
+                    if isinstance(scene, dict) and isinstance(scene.get("activity_rows"), list):
+                        rows.extend(scene["activity_rows"])
+                workers = _subagent_threads.seed_from_rows(rows)
+            except Exception:
+                logger.debug("subagent thread restore failed for %s", sid, exc_info=True)
+                workers = []
+        active = any(w.get("status") in {"queued", "running"} and not w.get("restored") for w in workers)
+        return j(handler, {"session_id": sid, "subagents": workers, "active": active, "server_time": time.time()})
+
     if parsed.path == "/api/session/yolo":
         sid = parse_qs(parsed.query).get("session_id", [""])[0]
         if not sid:

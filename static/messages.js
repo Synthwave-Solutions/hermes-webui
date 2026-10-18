@@ -5846,6 +5846,8 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
       if(!S.session||S.session.session_id!==activeSid||S.activeStreamId!==streamId) return;
       let data;
       try{data=JSON.parse(e.data||'{}');}catch(_){return;}
+      // Subagent cards under the chat (static/subagent-threads.js).
+      try{window.SynPulseSubagentThreads?.noteLive(activeSid,data);}catch(_){}
       const projected=projectSubagent(data);
       if(!projected) return;
       const event={data:JSON.stringify(projected.data),lastEventId:e.lastEventId};

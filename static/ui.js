@@ -4246,7 +4246,7 @@ function syncModelChip(){
   if(!S._bootReady){
     label.textContent='';
     if(mobileLabel) mobileLabel.textContent='';
-    chip.title='Conversation model';
+    chip.title='AI model used for this chat';
     return;
   }
   const opt=_selectedModelOption();
@@ -4256,7 +4256,7 @@ function syncModelChip(){
   const displayText=_formatGatewayModelLabel(sel.value||'',compactText,gatewayRouting)||compactText;
   label.textContent=displayText;
   if(mobileLabel) mobileLabel.textContent=displayText;
-  chip.title=gatewayRouting?`${sel.value||'Conversation model'} ${_gatewayRoutingLabel(gatewayRouting)}`:(sel.value||'Conversation model');
+  chip.title=gatewayRouting?`${sel.value||'AI model used for this chat'} ${_gatewayRoutingLabel(gatewayRouting)}`:(sel.value||'AI model used for this chat');
   chip.classList.toggle('active',!!(dd&&dd.classList.contains('open')));
   if(mobileAction) mobileAction.classList.toggle('active',!!(dd&&dd.classList.contains('open')));
 }
@@ -10566,9 +10566,13 @@ function _showAgentHealthAlert(payload){
   const title=$('agentHealthTitle');
   const details=$('agentHealthDetails');
   if(!banner) return;
-  if(title) title.textContent='SynthPulse agent is not responding';
+  if(title) title.textContent='⚠️ SynthPulse is not responding right now';
+  // Plain words up front; the technical state stays available as a tooltip.
   const state=payload&&payload.details&&payload.details.gateway_state?` State: ${payload.details.gateway_state}.`:'';
-  if(details) details.textContent=`Gateway heartbeat failed.${state} Messages may not be delivered until it comes back.`;
+  if(details){
+    details.textContent='Your messages may not arrive until the connection is back.';
+    details.title=`Gateway heartbeat failed.${state}`;
+  }
   banner.hidden=false;
   banner.classList.add('visible');
 }
@@ -18980,8 +18984,15 @@ function _syncToolRowsContainer(tools, isLiveWorklog){
     if(stepIdx>=0) groupKey=`step:${stepIdx}`;
   }
   group.setAttribute('data-tool-group-disclosure-key',groupKey);
-  const summary=_toolWorklogSummary(rows,{live:isLiveWorklog, toolCount:rows.length});
-  group.innerHTML=`<button type="button" class="tool-group-head tool-worklog-tool-group-head" aria-expanded="${shouldOpen?'true':'false'}" onclick="_toggleToolWorklogGroup(this)"><span class="tool-worklog-tool-group-icon tg-icon">${_toolGroupIcon(rows)}</span><span class="tg-sum tool-worklog-tool-group-label">${esc(summary)}</span><span class="tool-call-group-chevron tg-caret">${li('chevron-right',12)}</span></button><div class="tool-group-body tool-worklog-tool-group-body"><div class="tg-rows tool-worklog-tool-group-rows"></div></div>`;
+  const friendlySummary=typeof _friendlyRowsSummary==='function'?_friendlyRowsSummary(rows):null;
+  const summary=friendlySummary?friendlySummary.text:_toolWorklogSummary(rows,{live:isLiveWorklog, toolCount:rows.length});
+  const groupIcon=friendlySummary?'':`<span class="tool-worklog-tool-group-icon tg-icon">${_toolGroupIcon(rows)}</span>`;
+  if(friendlySummary){
+    group.classList.add('sp-steps-group');
+    if(friendlySummary.running) group.setAttribute('data-sp-running','1');
+    if(friendlySummary.failed) group.setAttribute('data-sp-failed','1');
+  }
+  group.innerHTML=`<button type="button" class="tool-group-head tool-worklog-tool-group-head${friendlySummary?' sp-steps-head':''}" aria-expanded="${shouldOpen?'true':'false'}" onclick="_toggleToolWorklogGroup(this)">${groupIcon}<span class="tg-sum tool-worklog-tool-group-label">${esc(summary)}</span>${friendlySummary&&friendlySummary.running?'<span class="sp-spin" aria-hidden="true"></span>':''}<span class="tool-call-group-chevron tg-caret">${li('chevron-right',12)}</span></button><div class="tool-group-body tool-worklog-tool-group-body"><div class="tg-rows tool-worklog-tool-group-rows"></div></div>`;
   const body=group.querySelector('.tg-rows');
   rows.forEach(row=>body.appendChild(row));
   tools.appendChild(group);
@@ -19120,6 +19131,25 @@ function _toolDetailLeadText(kind, tc){
   if(!target) return '';
   return target;
 }
+// Plain-language rows (static/tool-friendly.js). Off when the module is
+// missing or window._friendlyToolRows===false (escape hatch for debugging).
+function _friendlyToolInfo(tc){
+  if(typeof window==='undefined'||window._friendlyToolRows===false) return null;
+  const api=window.SynPulseFriendlyTools;
+  if(!api||!tc) return null;
+  try{ return api.describe(tc); }catch(_){ return null; }
+}
+function _friendlyRowsSummary(rows){
+  const api=typeof window!=='undefined'&&window._friendlyToolRows!==false?window.SynPulseFriendlyTools:null;
+  if(!api) return null;
+  const items=Array.from(rows||[]).map(row=>{
+    const ds=row&&row.dataset||{};
+    if(ds.toolFamily) return {family:ds.toolFamily,state:ds.toolState||'done'};
+    if(row&&row._tcData) return api.describe(row._tcData);
+    return {family:'unknown',state:ds.toolError==='true'?'failed':(ds.toolDone==='false'?'running':'done')};
+  });
+  return api.groupSummary(items);
+}
 function buildToolCard(tc){
   const row=document.createElement('div');
   row.className='tool-card-row';
@@ -19132,10 +19162,12 @@ function buildToolCard(tc){
   row.dataset.toolActionLabel=typeof _toolActionLabelText==='function'?_toolActionLabelText(tc):_toolDisplayName(tc);
   const disclosureKey=typeof _toolDisclosureIdentity==='function'?_toolDisclosureIdentity(tc):'';
   if(disclosureKey) row.setAttribute('data-tool-disclosure-key', disclosureKey);
-  const icon=toolIcon(tc.name);
+  const friendly=typeof _friendlyToolInfo==='function'?_friendlyToolInfo(tc):null;
+  const icon=friendly?`<span class="sp-tool-emoji" aria-hidden="true">${friendly.emoji}</span>`:toolIcon(tc.name);
   const hasRawDetail=!!(tc.snippet)||(tc.args&&Object.keys(tc.args).length>0);
   const allowsDetail=typeof _toolCardAllowsDetail==='function'?_toolCardAllowsDetail(toolKind,tc):true;
-  const hasDetail=hasRawDetail&&allowsDetail;
+  // Friendly rows keep every raw detail behind "Details", also for reads/searches.
+  const hasDetail=hasRawDetail&&(allowsDetail||!!friendly);
   let displaySnippet='';
   if(tc.snippet){
     const s=tc.snippet;
@@ -19153,7 +19185,7 @@ function buildToolCard(tc){
   const isSubagent=tc.name==='subagent_progress';
   const isDelegation=tc.name==='delegate_task';
   const openClass='';
-  const cardClass='tool-card'+(tc.done===false?' tool-card-running':'')+(isSubagent?' tool-card-subagent':'')+(hasDetail?'':' tool-card-no-detail')+openClass;
+  const cardClass='tool-card'+(tc.done===false?' tool-card-running':'')+(isSubagent?' tool-card-subagent':'')+(hasDetail?'':' tool-card-no-detail')+(friendly?' sp-friendly-tool':'')+(tc&&tc.is_error?' tool-card-error':'')+openClass;
   const headerClick=hasDetail?' onclick="this.closest(\'.tool-card\').classList.toggle(\'open\')"':'';
   // Clean up legacy subagent prefixes since the Lucide icon already shows it
   let displayName=typeof _toolActionLabelText==='function'?_toolActionLabelText(tc,{limit:112}):_toolDisplayName(tc);
@@ -19162,6 +19194,18 @@ function buildToolCard(tc){
   const argPreview=_formatToolArgPreview(tc&&tc.args);
   if(toolKind==='shell'||previewText===argPreview||previewText==='Completed'||previewText==='Running'||previewText==='Failed') previewText='';
   if(isSubagent) previewText=previewText.replace(/^(?:\u{1F500}|↳)\s*/u,'');
+  if(friendly){
+    displayName=friendly.title;
+    genericName=friendly.title;
+    previewText=friendly.target||'';
+    row.dataset.toolActionLabel=friendly.target?`${friendly.title}: ${friendly.target}`:friendly.title;
+    row.dataset.toolFamily=friendly.family;
+    row.dataset.toolState=friendly.state;
+  }
+  const statusChip=friendly&&window.SynPulseFriendlyTools?window.SynPulseFriendlyTools.statusChipHtml(friendly):'';
+  const toggleHtml=friendly
+    ?`<span class="tool-card-toggle sp-details-toggle"><span class="sp-details-label">${esc(window.SynPulseFriendlyTools.text('details'))}</span>${li('chevron-right',12)}</span>`
+    :`<span class="tool-card-toggle">${li('chevron-right',12)}</span>`;
   const detailLeadText=hasDetail&&typeof _toolDetailLeadText==='function'?_toolDetailLeadText(toolKind,tc):'';
   const detailLeadLabel=typeof _toolDetailLeadLabel==='function'?_toolDetailLeadLabel(toolKind):(toolKind==='shell'?'Shell':'Input');
   const detailLead=detailLeadText?`<div class="tool-card-detail-lead"><div class="tool-card-detail-lead-label">${esc(detailLeadLabel)}</div><pre>${esc(detailLeadText)}</pre></div>`:'';
@@ -19174,7 +19218,8 @@ function buildToolCard(tc){
         <span class="tool-card-icon">${icon}</span>
         <span class="tool-card-name"><span class="tool-card-name-label">${esc(displayName)}</span><span class="tool-card-name-generic">${esc(genericName)}</span></span>
         <span class="tool-card-preview">${esc(previewText)}</span>
-        ${hasDetail?`<span class="tool-card-toggle">${li('chevron-right',12)}</span>`:''}
+        ${statusChip}
+        ${hasDetail?toggleHtml:''}
       </div>
       ${hasDetail?`<div class="tool-card-detail">
         ${detailLead}

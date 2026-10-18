@@ -7987,6 +7987,16 @@ def _run_agent_streaming(
                 if subagent:
                     if stream_id in STREAM_LIVE_TOOL_CALLS:
                         remember_subagent(STREAM_LIVE_TOOL_CALLS[stream_id], subagent)
+                    # Background workers outlive this turn's stream: keep a
+                    # conversation-scoped record the browser can poll.
+                    try:
+                        from api.subagent_progress import record as record_subagent
+                        record_subagent(
+                            session_id, subagent,
+                            tool_name=name if event_type == 'subagent.tool' else None,
+                        )
+                    except Exception:
+                        logger.debug("subagent thread record failed", exc_info=True)
                     put('subagent', subagent)
                     return
 

@@ -420,8 +420,9 @@ def _run_gateway_runs_api_streaming(
                 if translated:
                     event_name, event_payload = translated
                     if event_name == "subagent":
-                        from api.subagent_progress import remember
+                        from api.subagent_progress import remember, record
                         remember(STREAM_LIVE_TOOL_CALLS.setdefault(stream_id, []), event_payload)
+                        record(session_id, event_payload, tool_name=payload.get("last_tool"))
                     if event_name == "reasoning":
                         reason_delta = event_payload.get("text")
                         if reason_delta and stream_id in STREAM_REASONING_TEXT:
@@ -828,8 +829,9 @@ def _run_gateway_chat_streaming(
                         if translated:
                             event_name, event_payload = translated
                             if event_name == "subagent":
-                                from api.subagent_progress import remember
+                                from api.subagent_progress import remember, record
                                 remember(STREAM_LIVE_TOOL_CALLS.setdefault(stream_id, []), event_payload)
+                                record(session_id, event_payload, tool_name=payload.get("last_tool"))
                             if event_name == "reasoning":
                                 reason_delta = event_payload.get("text")
                                 if reason_delta and stream_id in STREAM_REASONING_TEXT:

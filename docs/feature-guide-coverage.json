@@ -5291,6 +5291,24 @@
       "feature_id": "webui.settings.signout"
     },
     {
+      "control": "spLogoutMobile",
+      "tag": "button",
+      "label": "Log out",
+      "source_refs": [
+        "static/index.html"
+      ],
+      "feature_id": "webui.settings.signout"
+    },
+    {
+      "control": "spLogoutRail",
+      "tag": "button",
+      "label": "Log out",
+      "source_refs": [
+        "static/index.html"
+      ],
+      "feature_id": "webui.settings.signout"
+    },
+    {
       "control": "btnShutdownServer",
       "tag": "button",
       "label": "settings_btn_shutdown",
