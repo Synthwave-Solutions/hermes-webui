@@ -64,8 +64,13 @@ def _fresh_state_dir():
     sessions_dir.mkdir(parents=True)
     (state_dir / "projects.json").write_text("[]", encoding="utf-8")
     (sessions_dir / "_index.json").write_text("[]", encoding="utf-8")
+    global _PREV_STATE_DIR
+    _PREV_STATE_DIR = os.environ.get("HERMES_WEBUI_STATE_DIR")
     os.environ["HERMES_WEBUI_STATE_DIR"] = str(state_dir)
     return state_dir
+
+
+_PREV_STATE_DIR = None
 
 
 
@@ -79,7 +84,13 @@ def _cleanup_state_dir(state_dir: Path):
     no longer exists or doesn't match their pytest-managed state dir."""
     import shutil
     shutil.rmtree(state_dir, ignore_errors=True)
-    os.environ.pop("HERMES_WEBUI_STATE_DIR", None)
+    # Put the suite's isolated state dir back instead of deleting the variable:
+    # an unset HERMES_WEBUI_STATE_DIR makes later imports resolve the REAL
+    # ~/.hermes/webui (see conftest's production leak guard).
+    if _PREV_STATE_DIR:
+        os.environ["HERMES_WEBUI_STATE_DIR"] = _PREV_STATE_DIR
+    else:
+        os.environ.pop("HERMES_WEBUI_STATE_DIR", None)
 
     # Restore api.config / mcp_server / api.models module constants.
     saved = _SAVED_CONSTANTS

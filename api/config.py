@@ -822,6 +822,24 @@ def _ensure_workspace_dir(path: Path) -> bool:
 
 
 
+_TEST_WORKSPACE_MARKER = "/hermes-webui-tests/"
+
+
+def is_foreign_test_workspace(path) -> bool:
+    """A pytest temp workspace seen by a NON-test state dir.
+
+    A test process once ran with HERMES_WEBUI_DEFAULT_WORKSPACE pointing at its
+    temp tree but without its isolated state dir, and the startup write above
+    stored that temp path in the live settings.json; every new chat then
+    inherited it. Production state never adopts such a path; the test suite
+    itself (whose STATE_DIR lives in the same temp tree) still can.
+    """
+    text = str(path or "")
+    if _TEST_WORKSPACE_MARKER not in text:
+        return False
+    return _TEST_WORKSPACE_MARKER not in (str(STATE_DIR) + "/")
+
+
 def resolve_default_workspace(raw: str | Path | None = None) -> Path:
     """Return the first usable workspace path, creating it when possible."""
     for candidate in _workspace_candidates(raw):
@@ -8771,7 +8789,8 @@ if _settings_file_exists:
             _startup_settings.get("default_workspace")
         )
     _startup_settings.pop("default_model", None)  # always drop stale value; model comes from config.yaml
-    if _startup_settings.get("default_workspace") != str(DEFAULT_WORKSPACE):
+    if (_startup_settings.get("default_workspace") != str(DEFAULT_WORKSPACE)
+            and not is_foreign_test_workspace(DEFAULT_WORKSPACE)):
         _startup_settings["default_workspace"] = str(DEFAULT_WORKSPACE)
         try:
             startup_persisted_speech_keys = _extract_persisted_speech_keys(
