@@ -256,11 +256,11 @@ class TestOnboardingStatusApiOAuth:
 # ── Control Center: section reset on close ─────────────────────────────────
 
 def test_control_center_resets_active_section_on_close():
-    """Closing the control center must reset _settingsSection to 'conversation'."""
+    """Settings start (and reset) on Preferences (SynthPulse, 18 Oct 2026)."""
     src = open(pathlib.Path(__file__).parent.parent / 'static' / 'panels.js').read()
     assert '_settingsSection' in src, '_settingsSection state variable missing from panels.js'
-    assert "_settingsSection = 'conversation'" in src or "_settingsSection='conversation'" in src, \
-        'Control center does not reset section to conversation on close'
+    assert "_settingsSection = 'preferences'" in src or "_settingsSection='preferences'" in src, \
+        'Control center does not start on preferences'
 
 
 def test_control_center_tab_highlight_on_open():

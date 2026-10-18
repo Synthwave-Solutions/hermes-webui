@@ -92,7 +92,8 @@ function _projRenderList() {
   const list = $('projectsPanelList');
   if (!list) return;
   const rows = (_projHub && Array.isArray(_projHub.projects)) ? _projHub.projects : [];
-  const create='<div class="proj-card proj-create"><label class="proj-field" for="projNewName">Project name<input id="projNewName" placeholder="e.g. Product launch" aria-label="Project name"></label><label class="proj-field" for="projNewCategory">' + _projEsc(_projT('category_label', 'Category')) + '<input type="hidden" id="projNewCategory" data-sp-picker data-sp-source="sp:categories" data-sp-custom="1" placeholder="' + _projEsc(_projT('projects_category_placeholder', 'Category (optional)')) + '"></label><button class="app-dialog-btn" id="projCreateButton" onclick="_projCreateShared()">New project</button></div>';
+  const create='<div class="proj-card proj-create"><label class="proj-field" for="projNewName">' + _projEsc(_projT('projects_new_name_label', 'Project name')) + '<input id="projNewName" placeholder="' + _projEsc(_projT('projects_new_name_placeholder', 'e.g. Product launch')) + '" aria-label="' + _projEsc(_projT('projects_new_name_label', 'Project name')) + '"></label><label class="proj-field" for="projNewCategory">' + _projEsc(_projT('category_label', 'Category')) + '<input type="hidden" id="projNewCategory" data-sp-picker data-sp-source="sp:categories" data-sp-custom="1" placeholder="' + _projEsc(_projT('projects_category_placeholder', 'Category (optional)')) + '"></label><button class="app-dialog-btn" id="projCreateButton" onclick="_projCreateShared()">' + _projEsc(_projT('projects_new_button', 'New project')) + '</button></div>';
+  if (typeof spSetFirstRun === 'function') spSetFirstRun('projDetailEmpty', !rows.length);
   if (!rows.length) {
     list.innerHTML = create + '<div class="proj-empty">'
       + _projEsc(_projT('projects_none_yet', 'You do not have any projects on this workstation yet.'))

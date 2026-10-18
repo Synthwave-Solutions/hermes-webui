@@ -1011,10 +1011,17 @@ function _cronGatewayNoticeHtml(status) {
   const helpLink = notConfigured || isRemoteUnreachable || isStaleMetadata
     ? `<p><a href="${docsHref}" target="_blank" rel="noopener">How to enable scheduled jobs in Docker ↗</a></p>`
     : '';
+  // Plain words first; the technical explanation stays one click away.
+  const plainTitle = spT('cron_paused_title', 'Scheduled tasks are paused');
+  const plainBody = spT('cron_paused_body', 'Tasks are saved and you can run them by hand, but they do not start on their own right now. Ask your administrator to turn on scheduling.');
   return `
-    <div class="detail-alert-title">${esc(title)}</div>
-    <p>${esc(body)}</p>
-    ${helpLink}
+    <div class="detail-alert-title">⏸️ ${esc(plainTitle)}</div>
+    <p>${esc(plainBody)}</p>
+    <details class="sp-tech-details"><summary>${esc(spT('details_label', 'Details'))}</summary>
+      <p><strong>${esc(title)}</strong></p>
+      <p>${esc(body)}</p>
+      ${helpLink}
+    </details>
   `;
 }
 
@@ -1101,6 +1108,7 @@ async function loadCrons(animate) {
       if (_currentCronDetailKey && _currentCronDetailKey === _cronJobKey(job)) item.classList.add('active');
       parent.appendChild(item);
     };
+    if (typeof spSetFirstRun === 'function') spSetFirstRun('taskDetailEmpty', !_cronList.length && !(_cronOtherProfileCount > 0));
     if (!_cronList.length) {
       const emptyText = (!_showAllCronProfiles && _cronOtherProfileCount > 0)
         ? 'No cron jobs in the active profile.'
@@ -6269,13 +6277,13 @@ let _currentMemorySection = 'mnemosyne'; // 'memory' | 'user' | 'soul' | 'projec
 let _memoryMode = 'empty'; // 'empty' | 'read' | 'edit'
 
 const MEMORY_SECTIONS = [
-  { key: 'company', label: 'Company memory', iconKey: 'building', readOnly: true },
-  { key: 'mnemosyne', label: 'Saved memories', iconKey: 'brain', readOnly: true },
+  { key: 'company', labelKey: 'memory_section_company', label: 'Company knowledge', iconKey: 'building', readOnly: true },
+  { key: 'mnemosyne', labelKey: 'memory_section_saved', label: 'What SynthPulse remembers', iconKey: 'brain', readOnly: true },
   { key: 'memory', labelKey: 'my_notes', emptyKey: 'no_notes_yet', iconKey: 'brain' },
   { key: 'user',   labelKey: 'user_profile', emptyKey: 'no_profile_yet', iconKey: 'user' },
-  { key: 'soul', label: 'Personal agent preferences', empty: 'How should agents work with you? This does not change a shared bot persona.', iconKey: 'sparkles' },
-  { key: 'project_context', label: 'My project notes', empty: 'Your private notes for this project. Without a project, these are your general project notes.', iconKey: 'file-text' },
-  { key: 'shared_project_context', label: 'Shared project instructions', empty: 'No shared instructions.', iconKey: 'file-text', readOnly: true },
+  { key: 'soul', labelKey: 'memory_section_soul', emptyKey: 'memory_section_soul_empty', label: 'How bots work with you', empty: 'How should bots work with you? This does not change a shared bot.', iconKey: 'sparkles' },
+  { key: 'project_context', labelKey: 'memory_section_project_notes', emptyKey: 'memory_section_project_notes_empty', label: 'My project notes', empty: 'Your private notes for this project. Without a project, these are your general notes.', iconKey: 'file-text' },
+  { key: 'shared_project_context', labelKey: 'memory_section_shared_project', emptyKey: 'memory_section_shared_project_empty', label: 'Shared project instructions', empty: 'No shared instructions.', iconKey: 'file-text', readOnly: true },
   { key: 'external_notes', labelKey: 'external_notes_sources', emptyKey: 'external_notes_empty', iconKey: 'book-open' },
 ];
 
@@ -6284,13 +6292,13 @@ function _memorySectionMeta(key) {
 }
 
 function _memorySectionLabel(meta) {
-  if (meta.label) return meta.label;
-  return t(meta.labelKey);
+  if (meta.labelKey) return spT(meta.labelKey, meta.label || meta.labelKey);
+  return meta.label || '';
 }
 
 function _memorySectionEmpty(meta) {
-  if (meta.empty) return meta.empty;
-  return t(meta.emptyKey);
+  if (meta.emptyKey) return spT(meta.emptyKey, meta.empty || meta.emptyKey);
+  return meta.empty || '';
 }
 
 function _memorySectionContent(key) {
@@ -6409,7 +6417,7 @@ function _renderExternalNotesSources() {
 function _renderMemoryDetail(section) {
   if (section === 'mnemosyne' || section === 'company') {
     const body = $('memoryDetailBody');
-    $('memoryDetailTitle').textContent = section === 'company' ? 'Company memory' : 'Saved memories';
+    $('memoryDetailTitle').textContent = section === 'company' ? spT('memory_section_company','Company knowledge') : spT('memory_section_saved','What SynthPulse remembers');
     body.style.display = '';
     $('memoryDetailEmpty').style.display = 'none';
     _memoryMode = 'read';
@@ -6433,7 +6441,7 @@ function _renderMemoryDetail(section) {
   if (!title || !body) return;
   if (meta.provider) {
     // A registered section renders itself (memory section registry).
-    title.textContent = t(meta.labelKey);
+    title.textContent = _memorySectionLabel(meta);
     try {
       const pending = meta.provider.render(section, {title, body, empty});
       if (pending && typeof pending.catch === 'function') pending.catch(e => console.warn('[memory] section render failed', e));
@@ -7078,6 +7086,7 @@ function renderWorkspacesPanel(workspaces){
     // Ownership badge: owner's local-part for owned entries, "Shared" for legacy ownerless ones.
     const ownerLabel = w.owner_email ? String(w.owner_email).split('@')[0] : (w.legacy_unowned ? 'Shared' : '');
     const ownerBadge = ownerLabel ? `<span class="detail-badge" style="margin-left:6px;font-size:9px;padding:1px 6px">${esc(ownerLabel)}</span>` : '';
+    row.title = w.path;
     row.innerHTML=`
       <span class="ws-drag-handle" title="${esc(t('workspace_drag_hint'))}">${li('grip-vertical',12)}</span>
       <div class="ws-row-info">
@@ -7778,7 +7787,7 @@ function _refreshProfileSwitchBackground(gen){
   }).catch(function(){});
 }
 
-function botDisplayName(p){ return (p.bot&&p.bot.title)||p.name; }
+function botDisplayName(p){ return (p.bot&&p.bot.title)||(typeof spProfileLabel==='function'?spProfileLabel(p.name):p.name); }
 function botAvatarHtml(p){
   const avatar=String(p.bot_avatar_url||'');
   if(avatar.startsWith('/api/profile/avatar?')) return `<img src="${esc(avatar)}" width="32" height="32" alt="" style="border-radius:8px;object-fit:cover;vertical-align:middle;margin-right:8px">`;
@@ -7851,6 +7860,10 @@ async function loadProfilesPanel() {
       panel.appendChild(explainer);
     }
 
+    if (typeof spSetFirstRun === 'function') {
+      const own = (data.profiles || []).filter(p => p && p.name && p.name !== 'default');
+      spSetFirstRun('profileDetailEmpty', own.length === 0);
+    }
     if (!data.profiles || !data.profiles.length) {
       const emptyMsg = document.createElement('div');
       emptyMsg.style.cssText = 'padding:16px;color:var(--muted);font-size:12px';
@@ -8805,8 +8818,9 @@ let _settingsSkinOnOpen = null; // track skin at open time for discard revert
 let _settingsFontSizeOnOpen = null; // track font size at open time for discard revert
 let _settingsHermesDefaultModelOnOpen = '';
 let _settingsHermesDefaultModelProviderOnOpen = null;
-let _settingsSection = 'conversation';
-let _currentSettingsSection = 'conversation';
+// SynthPulse: settings open on Preferences (language, theme, send key).
+let _settingsSection = 'preferences';
+let _currentSettingsSection = 'preferences';
 let _settingsIndex = null;
 let _settingsIndexPromise = null;
 let _settingsSearchSeq = 0;

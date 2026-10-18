@@ -102,6 +102,8 @@ function loadLocaleBundle(code){
   return promise;
 }
 function t(key,...args){const val=_locale[key]??LOCALES.en[key];if(val===undefined)return key;if(typeof val==='function')return val(...args);return args.length?String(val).replace(/\{(\d+)\}/g,(m,i)=>Object.prototype.hasOwnProperty.call(args,i)?String(args[i]):m):val;}
+// t() with an English fallback for strings that may not be in every bundle.
+function spT(key,fallback,...args){const v=t(key,...args);return (v===undefined||v===key)?String(fallback==null?'':fallback).replace(/\{(\d+)\}/g,(m,i)=>Object.prototype.hasOwnProperty.call(args,i)?String(args[i]):m):v;}
 function setLocale(lang){
   const resolved=resolveLocale(lang)||'en';
   _localeCode=resolved;

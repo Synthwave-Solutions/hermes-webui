@@ -428,7 +428,11 @@
           <div id="settingsSearchResults" class="settings-search-results" style="display:none"></div>
         </div>
         <div class="settings-menu-items" data-tour="settings-menu">
-          <button type="button" class="side-menu-item active" data-settings-section="conversation" onclick="switchSettingsSection('conversation',{fromSidebarItem:true})">
+          <button type="button" class="side-menu-item active" data-settings-section="preferences" onclick="switchSettingsSection('preferences',{fromSidebarItem:true})">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+            <span data-i18n="settings_tab_preferences">Preferences</span>
+          </button>
+          <button type="button" class="side-menu-item" data-settings-section="conversation" onclick="switchSettingsSection('conversation',{fromSidebarItem:true})">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             <span data-i18n="settings_tab_conversation">Conversation</span>
           </button>
@@ -440,10 +444,6 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
             <span data-i18n="settings_tab_access">Access requests</span>
             <span class="access-pending-badge" id="accessPendingBadge" hidden aria-live="polite"></span>
-          </button>
-          <button type="button" class="side-menu-item" data-settings-section="preferences" onclick="switchSettingsSection('preferences',{fromSidebarItem:true})">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
-            <span data-i18n="settings_tab_preferences">Preferences</span>
           </button>
           <button type="button" class="side-menu-item" data-settings-section="providers" onclick="switchSettingsSection('providers',{fromSidebarItem:true})">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
@@ -828,14 +828,14 @@
           </div>
           <div class="ws-dropdown ws-dropdown-footer" id="composerWsDropdown" hidden aria-hidden="true" inert></div>
           <div class="composer-reasoning-dropdown" id="composerReasoningDropdown">
-            <div class="reasoning-option" data-effort="">Default</div>
-            <div class="reasoning-option" data-effort="none">None</div>
-            <div class="reasoning-option" data-effort="minimal">Minimal</div>
-            <div class="reasoning-option" data-effort="low">Low</div>
-            <div class="reasoning-option" data-effort="medium">Medium</div>
-            <div class="reasoning-option" data-effort="high">High</div>
-            <div class="reasoning-option" data-effort="xhigh">Extra High</div>
-            <div class="reasoning-option" data-effort="max">Max</div>
+            <div class="reasoning-option" data-effort="" data-i18n="reasoning_opt_default">Default</div>
+            <div class="reasoning-option" data-effort="none" data-i18n="reasoning_opt_none">None</div>
+            <div class="reasoning-option" data-effort="minimal" data-i18n="reasoning_opt_minimal">Minimal</div>
+            <div class="reasoning-option" data-effort="low" data-i18n="reasoning_opt_low">Low</div>
+            <div class="reasoning-option" data-effort="medium" data-i18n="reasoning_opt_medium">Medium</div>
+            <div class="reasoning-option" data-effort="high" data-i18n="reasoning_opt_high">High</div>
+            <div class="reasoning-option" data-effort="xhigh" data-i18n="reasoning_opt_xhigh">Extra High</div>
+            <div class="reasoning-option" data-effort="max" data-i18n="reasoning_opt_max">Max</div>
           </div>
           <div class="composer-toolsets-dropdown" id="composerToolsetsDropdown">
             <div class="toolsets-dropdown-desc" id="toolsetsDropdownDesc"></div>
@@ -907,6 +907,7 @@
         <svg class="main-view-empty-icon" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         <div class="main-view-empty-title" data-i18n="tasks_empty_title">Select a scheduled job</div>
         <div class="main-view-empty-sub" data-i18n="tasks_empty_sub">Pick a job from the sidebar to view its details and runs, or create a new one.</div>
+        <div class="sp-empty-first" hidden><div class="sp-empty-emoji" aria-hidden="true">⏰</div><div class="main-view-empty-title" data-i18n="tasks_first_title">No scheduled tasks yet. Create your first task</div><div class="main-view-empty-sub" data-i18n="tasks_first_sub">Let SynthPulse do something for you at a set time, for example a summary of your mail every morning.</div><button type="button" class="sp-empty-cta" onclick="openCronCreate()" data-i18n="tasks_first_cta">➕ Create your first task</button></div>
       </div>
     </div>
     <div id="mainKanban" class="main-view">
@@ -961,6 +962,7 @@
         <svg class="main-view-empty-icon" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>
         <div class="main-view-empty-title" data-i18n="projects_empty_title">Select a project</div>
         <div class="main-view-empty-sub" data-i18n="projects_empty_sub">Pick a project from the sidebar to see its conversations, spaces, scheduled work and status.</div>
+        <div class="sp-empty-first" hidden><div class="sp-empty-emoji" aria-hidden="true">📁</div><div class="main-view-empty-title" data-i18n="projects_first_title">No projects yet. Create your first project</div><div class="main-view-empty-sub" data-i18n="projects_first_sub">A project brings chats, people, bots and files together around one topic.</div><button type="button" class="sp-empty-cta" onclick="var n=document.getElementById('projNewName');if(n){n.focus();}" data-i18n="projects_first_cta">➕ Create your first project</button></div>
       </div>
     </div>
     <div id="mainWorkspaces" class="main-view">
@@ -996,6 +998,7 @@
         <svg class="main-view-empty-icon" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         <div class="main-view-empty-title" data-i18n="profiles_empty_title">Select a bot</div>
         <div class="main-view-empty-sub" data-i18n="profiles_empty_sub">Pick a bot from the sidebar to view and edit its settings, or create a new one.</div>
+        <div class="sp-empty-first" hidden><div class="sp-empty-emoji" aria-hidden="true">🤖</div><div class="main-view-empty-title" data-i18n="profiles_first_title">No bots of your own yet. Create your first bot</div><div class="main-view-empty-sub" data-i18n="profiles_first_sub">A bot is a helper with its own instructions, skills and connections, for example for sales or support.</div><button type="button" class="sp-empty-cta" onclick="openProfileCreate()" data-i18n="profiles_first_cta">➕ Create your first bot</button></div>
       </div>
     </div>
     <div id="mainInsights" class="main-view">
@@ -2072,6 +2075,7 @@
 <script src="static/tool-friendly.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/subagent-threads.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/sp-account.js?v=__WEBUI_VERSION__" defer></script>
+<script src="static/sp-ux.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/messages.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/extension_settings.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/sp-picker.js?v=__WEBUI_VERSION__" defer></script>

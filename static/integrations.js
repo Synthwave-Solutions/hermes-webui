@@ -910,7 +910,7 @@ function chRenderGrid() {
       if (p.public.state === 'published') {
         meta += '<div class="ch-card-meta ch-public"><span>' + _intgEsc(p.public.label) + ':</span> <code>' + _intgEsc(p.public.url) + '</code> <button type="button" class="sm-btn ch-copy" onclick="chCopy(this)" data-copy="' + _intgEsc(p.public.url) + '">' + _intgT('copy', 'Copy') + '</button></div>';
       } else if (p.public.state === 'unpublished') {
-        meta += '<div class="ch-card-meta ch-public">' + _intgT('channels_hook_unpublished', 'Webhook not public yet.') + ' <button type="button" class="sm-btn" onclick="chPublish(\'' + _intgEsc(p.key) + '\')">' + _intgT('channels_publish', 'Publish via Funnel') + '</button></div>';
+        meta += '<div class="ch-card-meta ch-public">' + _intgT('channels_hook_unpublished', 'Webhook not public yet.') + ' <button type="button" class="sm-btn" title="' + _intgEsc(_intgT('channels_publish_tech', 'Makes the webhook address reachable from the internet.')) + '" onclick="chPublish(\'' + _intgEsc(p.key) + '\')">' + _intgT('channels_publish', 'Publish via Funnel') + '</button></div>';
       } else {
         meta += '<div class="ch-card-meta ch-public">' + _intgT('channels_hook_unavailable', 'Public webhook URL is set by the deploy bootstrap on this host.') + '</div>';
       }
@@ -919,7 +919,13 @@ function chRenderGrid() {
     return '<div class="intg-card' + (p.configured ? ' configured' : '') + '" data-channel="' + _intgEsc(p.key) + '">'
       + '<div class="intg-card-head">' + icon + '<div class="intg-card-name">' + _intgEsc(p.label) + '</div></div>'
       + '<div class="ch-card-status">' + badges.join('') + '</div>'
-      + '<div class="ch-card-summary">' + _intgEsc(p.summary) + '</div>' + meta
+      + (function () {
+          // Plain one-liner for everyone; the technical setup note behind Details.
+          const plain = _intgT('channel_plain_' + p.key, '');
+          if (!plain || plain === 'channel_plain_' + p.key) return '<div class="ch-card-summary">' + _intgEsc(p.summary) + '</div>';
+          return '<div class="ch-card-summary">' + _intgEsc(plain) + '</div>'
+            + '<details class="sp-tech-details ch-card-tech"><summary>' + _intgT('details_label', 'Details') + '</summary><div>' + _intgEsc(p.summary) + '</div></details>';
+        })() + meta
       + '<div class="intg-card-actions">'
       + '<button type="button" class="sm-btn' + (p.configured ? '' : ' primary') + '" onclick="chOpenConfigure(\'' + _intgEsc(p.key) + '\')">' + (p.configured ? _intgT('channels_edit', 'Edit') : _intgT('channels_configure', 'Connect')) + '</button>'
       + (p.configured ? '<button type="button" class="sm-btn" onclick="chDisable(\'' + _intgEsc(p.key) + '\')">' + _intgT('channels_disable', 'Disconnect') + '</button>' : '')

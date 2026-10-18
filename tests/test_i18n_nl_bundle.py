@@ -25,7 +25,10 @@ def test_nl_bundle_is_complete_and_valid():
     out = subprocess.run([node, "-e", _DRIVER, str(ROOT)], capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr
     data = json.loads(out.stdout)
-    assert set(data["en"]) <= set(data["nl"]), sorted(set(data["en"]) - set(data["nl"]))[:10]
+    # Profile concept help is English-owned on purpose (tests/test_issue2147_profile_concept_help.py).
+    english_owned = {k for k in data["en"] if k.startswith("profile_concept_")}
+    missing = set(data["en"]) - set(data["nl"]) - english_owned
+    assert not missing, sorted(missing)[:10]
     assert data["errs"] == []
     assert data["label"] == "Nederlands"
     assert data["sample"] == "Verwerkt 4s"

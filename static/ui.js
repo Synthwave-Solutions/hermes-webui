@@ -5501,13 +5501,15 @@ function _applyReasoningChip(eff){
   wrap.style.display='';
   if(mobileAction) mobileAction.style.display='';
   if(typeof _applyReasoningOptions==='function') _applyReasoningOptions(supportedEfforts);
-  const text=_formatReasoningEffortLabel(effort);
+  const rawText=_formatReasoningEffortLabel(effort);
+  // Plain label ("Normaal", "Grondig"); the engine value stays in rawText.
+  const text=(typeof spT==='function')?spT('reasoning_opt_'+(effort||'default'),rawText):rawText;
   label.textContent=text;
   if(mobileLabel) mobileLabel.textContent=text;
   if(chip){
     const inactive=!effort||effort==='none';
     chip.classList.toggle('inactive',inactive);
-    const labelText='Reasoning effort: '+text;
+    const labelText=(typeof spT==='function')?spT('reasoning_chip_title','Thinking level: {0}',text):'Reasoning effort: '+text;
     chip.title=labelText;
     chip.setAttribute('aria-label',labelText);
   }
@@ -8806,7 +8808,7 @@ function _applyBusyComposerPlaceholder(){
   if(_compressionPlaceholderSaved!==null) return;
   if(input.disabled) return;
   if(_composerHasContent()) return;
-  const idlePlaceholder='Message '+assistantDisplayName()+'\u2026';
+  const idlePlaceholder=(typeof spT==='function')?spT('composer_placeholder_named','Message {0}\u2026',assistantDisplayName()):'Message '+assistantDisplayName()+'\u2026';
   if(!window._showBusyPlaceholderHint||!S.busy){
     input.placeholder=idlePlaceholder;
     return;
