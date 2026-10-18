@@ -19337,7 +19337,7 @@ function _syncToolCallGroupSummary(group){
       const processedLabel=isLiveWorklog
         ? _activityProcessedElapsedLabel(group)
         : _activitySettledProcessedLabel(group);
-      label.textContent=processedLabel||_friendlyProcessedLine(group,'',isLiveWorklog)||t('processed_elapsed','');
+      label.textContent=processedLabel||t('processed_elapsed','');
     }else{
       const rows=Array.from(group.querySelectorAll('.tool-card-row'));
       // Prefer the live _tcData classification; fall back to the durable data-*
