@@ -8433,3 +8433,39 @@ html[data-sp-merged="1"] #composerWorkspaceLabel::before{content:attr(data-sp-pr
 
 /* Hint on shared attributes (name, category, members): changes apply to everyone */
 .sp-shared-hint{margin:8px 0 0;padding:7px 10px;border-radius:var(--sp-radius-sm,8px);background:var(--sp-active-bg,rgba(0,157,255,.08));color:var(--text);font-size:12.5px;}
+
+/* Bot-owned scheduled jobs (18 Oct 2026): the bot on every job, the bot
+   filter above the list, the bot picker and the job chat link. */
+.cron-bot-avatar{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;flex-shrink:0;font-size:13px;line-height:1;}
+.cron-bot-avatar svg,.cron-bot-avatar img{width:18px!important;height:18px!important;margin:0!important;border-radius:5px;}
+.cron-profile-badge.cron-bot-badge{display:inline-flex;align-items:center;gap:4px;padding:1px 7px 1px 2px;max-width:104px;}
+.cron-header .cron-name{min-width:64px;}
+.cron-profile-badge.cron-bot-badge .cron-bot-avatar{width:14px;height:14px;}
+.cron-profile-badge.cron-bot-badge .cron-bot-avatar svg,.cron-profile-badge.cron-bot-badge .cron-bot-avatar img{width:14px!important;height:14px!important;border-radius:4px;}
+.cron-bot-chip-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.cron-bot-chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:2px 9px 2px 3px;border-radius:99px;background:var(--sidebar);border:1px solid var(--border);color:var(--text);margin-right:8px;max-width:100%;}
+.cron-bot-row .detail-row-value{display:flex;align-items:center;flex-wrap:wrap;gap:6px;}
+.cron-job-chat-btn{text-decoration:none;font-weight:600;}
+.cron-bot-filter{display:flex;align-items:center;gap:8px;padding:8px 12px 4px;font-size:12px;color:var(--muted);}
+.cron-bot-filter-label{flex-shrink:0;}
+.cron-bot-filter-field{display:flex;align-items:center;gap:6px;flex:1;min-width:0;border:1px solid var(--border);border-radius:8px;padding:3px 6px;background:var(--surface-subtle);}
+.cron-bot-filter-field select{flex:1;min-width:0;background:transparent;border:none;color:var(--text);font-size:12px;outline:none;}
+.cron-bot-filter-field select option{background:var(--bg);color:var(--text);}
+.cron-bot-dialog .cron-bot-search{width:100%;box-sizing:border-box;margin:4px 0 8px;padding:7px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface-subtle);color:var(--text);font-size:13px;}
+.cron-bot-options{display:flex;flex-direction:column;gap:4px;max-height:52vh;overflow:auto;margin:6px 0 4px;}
+.cron-bot-option{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:8px 10px;border-radius:10px;border:1px solid transparent;background:transparent;color:var(--text);cursor:pointer;font:inherit;}
+.cron-bot-option:hover:not([disabled]),.cron-bot-option:focus-visible{background:var(--sidebar);border-color:var(--border);outline:none;}
+.cron-bot-option.current{background:var(--accent-bg-strong, rgba(99,102,241,.12));border-color:var(--border);cursor:default;}
+.cron-bot-option .cron-bot-avatar{width:32px;height:32px;}
+.cron-bot-option .cron-bot-avatar svg,.cron-bot-option .cron-bot-avatar img{width:32px!important;height:32px!important;border-radius:9px;}
+.cron-bot-option-text{display:flex;flex-direction:column;min-width:0;}
+.cron-bot-option-name{font-size:13px;font-weight:600;}
+.cron-bot-option-desc{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.cron-bot-option-current{color:var(--success);}
+.profile-bot-jobs{margin-top:14px;}
+.profile-bot-job{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:7px 9px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer;font:inherit;font-size:13px;margin-bottom:6px;}
+.profile-bot-job:hover{background:var(--sidebar);}
+.profile-bot-job-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.profile-bot-job-when{font-size:11px;color:var(--muted);flex-shrink:0;}
+.cron-job-topbar-badge{border:none;cursor:pointer;font-family:inherit;}
+.cron-job-topbar-badge:hover{filter:brightness(1.1);}

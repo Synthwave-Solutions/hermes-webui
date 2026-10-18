@@ -11539,6 +11539,18 @@ function syncTopbar(){
       _topbarMeta.appendChild(document.createTextNode(' '));
       _topbarMeta.appendChild(badge);
     }
+    // A job chat (api/cron_bots.py) links back to its scheduled task.
+    const cronJob=S.session.cron_job;
+    if(cronJob&&cronJob.job_id&&typeof openCronFromBot==='function'){
+      const link=document.createElement('button');
+      link.type='button';
+      link.className='topbar-source-badge cron-job-topbar-badge';
+      link.textContent='\u{1F5D3}\uFE0F '+(t('cron_job_chat_view_task')||'View task');
+      link.title=t('cron_job_chat_hint')||'';
+      link.onclick=()=>openCronFromBot(String(cronJob.job_id),String(cronJob.profile||'default'));
+      _topbarMeta.appendChild(document.createTextNode(' '));
+      _topbarMeta.appendChild(link);
+    }
   }
   if(typeof syncAppTitlebar==='function') syncAppTitlebar();
   if(typeof _syncWorkspaceHeadingState==='function') _syncWorkspaceHeadingState();
