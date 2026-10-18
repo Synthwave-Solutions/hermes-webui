@@ -42,8 +42,10 @@ TOOLS = [
     ("delegate_task", {"tasks": "[{'goal': 'Review the README wording'}, {'goal': 'Check links in the README'}]"}, "Dispatched 2 subagents"),
 ]
 SUBAGENTS = [
-    {"id": "sa-0-fixture01", "summary": "Review the README wording for clarity", "task_index": 0, "task_count": 2},
-    {"id": "sa-1-fixture02", "summary": "Check every link in the README", "task_index": 1, "task_count": 2},
+    {"id": "sa-0-fixture01", "summary": "Review the README wording for clarity", "task_index": 0, "task_count": 2,
+     "child_session_id": "20261018_093000_childa"},
+    {"id": "sa-1-fixture02", "summary": "Check every link in the README", "task_index": 1, "task_count": 2,
+     "child_session_id": "20261018_093000_childb"},
 ]
 CHILD_TOOLS = [
     ("sa-0-fixture01", "read_file", "README.md"),
@@ -55,7 +57,8 @@ CHILD_TOOLS = [
 
 
 class FixtureGateway:
-    def __init__(self) -> None:
+    def __init__(self, fail_runs: bool = False) -> None:
+        self.fail_runs = fail_runs
         self.live_ready = threading.Event()
         self.release = threading.Event()
         self._server = ThreadingHTTPServer(("127.0.0.1", 0), self._handler())
@@ -140,7 +143,7 @@ class FixtureGateway:
                     return
 
             def do_POST(self):
-                if urlsplit(self.path).path != "/v1/runs":
+                if owner.fail_runs or urlsplit(self.path).path != "/v1/runs":
                     print("FIXTURE 404", self.command, self.path, file=sys.stderr)
                     self._json({"error": "not found"}, status=404)
                     return
@@ -183,8 +186,9 @@ def _shot(page, out: Path, name: str):
     print("saved", path)
 
 
-def run(theme: str, out: Path, repo_root: Path, engine_tools: Path | None) -> int:
-    gateway = FixtureGateway()
+def run(theme: str, out: Path, repo_root: Path, engine_tools: Path | None, scenario: str = "tools",
+        lang: str = "nl") -> int:
+    gateway = FixtureGateway(fail_runs=scenario == "error")
     gateway.start()
     state_tmp = tempfile.TemporaryDirectory(prefix="hermes-friendly-tools-")
     state_dir = Path(state_tmp.name)
@@ -221,15 +225,25 @@ def run(theme: str, out: Path, repo_root: Path, engine_tools: Path | None) -> in
         with sync_playwright() as pw:
             browser = pw.chromium.launch(headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
             ctx = browser.new_context(base_url=base_url, viewport={"width": 1280, "height": 1500},
-                                      locale="nl-NL", color_scheme=theme)
+                                      locale="nl-NL" if lang == "nl" else "en-US", color_scheme=theme)
             ctx.add_init_script(f"try{{localStorage.setItem('hermes-theme','{theme}');}}catch(e){{}}")
             page = ctx.new_page()
             errors = []
             page.on("pageerror", lambda e: errors.append(str(e)))
+            skill_status = []
+            page.on("response", lambda r: skill_status.append(r.status) if "skill-updates" in r.url else None)
             page.goto("/", wait_until="domcontentloaded")
             page.wait_for_selector("#msg", state="visible", timeout=20000)
             page.locator("#msg").fill(PROMPT)
             page.locator("#btnSend").click()
+            if scenario == "error":
+                page.wait_for_timeout(5000)
+                page.evaluate("() => document.querySelectorAll('.agent-health-banner').forEach(b => b.hidden = true)")
+                _shot(page, out, f"{theme}-error-card")
+                page.evaluate("() => document.querySelectorAll('.sp-error-details').forEach(d => d.open = true)")
+                _shot(page, out, f"{theme}-error-card-details")
+                browser.close()
+                return 0
             if not gateway.live_ready.wait(timeout=60):
                 print("gateway never reached live state", file=sys.stderr)
                 page.screenshot(path=str(out / f"{theme}-debug.png"))
@@ -242,6 +256,21 @@ def run(theme: str, out: Path, repo_root: Path, engine_tools: Path | None) -> in
             _shot(page, out, f"{theme}-2-settled")
             _expand_all(page)
             _shot(page, out, f"{theme}-3-settled-expanded")
+            # Seed one private skill-update notice for this chat through the real
+            # recorder (same state dir as the server) so the notice card renders.
+            sid = page.evaluate("() => (typeof S !== 'undefined' && S.session && S.session.session_id) || ''")
+            if sid:
+                seed = (
+                    "from api.skill_learning_activity import record, ReviewScope, _resolve_actor;"
+                    f"scope=ReviewScope(_resolve_actor(''), 'fixture-run', '', {sid!r});"
+                    "print(record(scope, {'created': 1, 'patched': 0, 'updated': 1},"
+                    " skills=[{'name': 'readme-review', 'kind': 'created', 'count': 1},"
+                    " {'name': 'link-checker', 'kind': 'updated', 'count': 1}], memory=['memory'], source='turn'))"
+                )
+                import subprocess as _sp
+                seeded = _sp.run([sys.executable, "-c", seed], cwd=str(repo_root), env=env,
+                                 capture_output=True, text=True, timeout=30)
+                print("seeded skill notice:", seeded.stdout.strip() or seeded.stderr.strip()[-300:])
             page.reload(wait_until="domcontentloaded")
             page.wait_for_function(f"() => document.body.innerText.includes({json.dumps(FINAL_TEXT)})", timeout=30000)
             page.wait_for_timeout(3000)
@@ -254,6 +283,7 @@ def run(theme: str, out: Path, repo_root: Path, engine_tools: Path | None) -> in
             if dock.count() and dock.is_visible():
                 dock.screenshot(path=str(out / f"{theme}-6-subagent-cards-open.png"))
                 print("saved", out / f"{theme}-6-subagent-cards-open.png")
+            print("skill-updates statuses:", sorted(set(skill_status)))
             if errors:
                 print("page errors:", errors)
             browser.close()
@@ -274,12 +304,14 @@ def main() -> int:
     parser.add_argument("--repo", default=str(Path(__file__).resolve().parent.parent))
     parser.add_argument("--engine-tools", default=os.path.expanduser("~/.hermes/hermes-agent/tools"))
     parser.add_argument("--themes", default="light,dark")
+    parser.add_argument("--scenario", default="tools", choices=["tools", "error"])
+    parser.add_argument("--lang", default="nl", choices=["nl", "en"])
     args = parser.parse_args()
     out = Path(args.out).resolve()
     out.mkdir(parents=True, exist_ok=True)
     rc = 0
     for theme in args.themes.split(","):
-        rc |= run(theme.strip(), out, Path(args.repo).resolve(), Path(args.engine_tools))
+        rc |= run(theme.strip(), out, Path(args.repo).resolve(), Path(args.engine_tools), args.scenario, args.lang)
     return rc
 
 

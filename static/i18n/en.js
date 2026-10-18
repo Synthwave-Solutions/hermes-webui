@@ -26,6 +26,7 @@ window.__registerHermesLocale('en', {
   skill_learning_updated: 'Skill automatically updated',
   skill_learning_private: 'Automatic · Visible only to you',
   skill_learning_unavailable: 'Skill update notices are unavailable.',
+  skill_learning_unavailable_soft: 'Skill updates could not be checked just now.',
   skill_learning_name_unknown: 'Skill name was not recorded',
   skill_learning_memory_saved: 'Memory updated',
   skill_learning_user_saved: 'User profile updated',

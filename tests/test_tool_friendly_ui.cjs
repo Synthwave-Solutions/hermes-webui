@@ -75,4 +75,22 @@ const chip=ft.statusChipHtml({state:'failed',duration:3});
 assert.match(chip,/⚠️/);
 assert.match(chip,/3s/);
 assert.match(ft.statusChipHtml({state:'running'}),/sp-spin/);
+// Exports used by other modules (skill notices, logout, error cards).
+assert.equal(typeof ft.lang,'function');
+ft.setLanguage('nl');
+assert.equal(ft.processedLine({duration:'4s',steps:11}),'⚙️ Verwerkt in 4s · 11 stappen');
+assert.equal(ft.processedLine({live:true,duration:'12s',steps:1}),'⚙️ Bezig · 12s · 1 stap');
+const live=ft.groupSummary([{name:'read_file',args:{},done:true},ft.describe({name:'terminal',args:{command:'pytest'},done:false})]);
+assert.match(live.text,/nu: 💻 Opdracht wordt uitgevoerd/);
+assert.equal(ft.errorCard('Gateway request failed').title,'SynthPulse kon de AI niet bereiken');
+assert.equal(ft.errorCard('Totally normal heading'),null,'normal bold answers are never restyled');
+ft.setLanguage('en');
+assert.equal(ft.processedLine({duration:'4s',steps:2}),'⚙️ Processed in 4s · 2 steps');
+for(const lang of ['nl','en']){
+  ft.setLanguage(lang);
+  for(const label of ['Error','Gateway request failed','Rate limit reached','Task cancelled']){
+    const c=ft.errorCard(label);
+    assert.ok(!/[\u2013\u2014]/.test(c.title+c.hint));
+  }
+}
 console.log('ok');

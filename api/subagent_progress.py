@@ -83,11 +83,13 @@ def _clean_tool(name) -> str:
     return text if _TOOL_RE.match(text) and not text.startswith("_") else ""
 
 
-def record(session_id, data, tool_name=None, now=None):
+def record(session_id, data, tool_name=None, now=None, child_session_id=None):
     """Fold one normalized worker event into the conversation record.
 
     ``tool_name`` is the child tool that produced the event (only its name is
-    kept). Returns the updated worker dict, or None when the event is ignored.
+    kept). ``child_session_id`` is the worker's own conversation id (state.db,
+    source='subagent'), so the card can open its transcript. Returns the
+    updated worker dict, or None when the event is ignored.
     """
     if not isinstance(data, dict) or not _SID_RE.match(str(session_id or "")):
         return None
@@ -133,6 +135,9 @@ def record(session_id, data, tool_name=None, now=None):
             if len(steps) > _MAX_STEPS:
                 del steps[: len(steps) - _MAX_STEPS]
                 prior["steps_truncated"] = True
+        child = str(child_session_id or "")
+        if child and _ID_RE.match(child) and child != session_id:
+            prior["child_session_id"] = child
         prior["updated_at"] = now
         result = dict(prior, steps=list(prior.get("steps") or []))
         if changed_status or now - _last_persist.get(session_id, 0) >= _PERSIST_INTERVAL:

@@ -74,3 +74,10 @@ def test_route_and_stream_hooks_are_wired():
     assert "record_subagent(" in streaming
     gateway = (ROOT / "api" / "gateway_chat.py").read_text(encoding="utf-8")
     assert gateway.count('record(session_id, event_payload') == 2
+
+
+def test_child_session_id_is_kept_for_the_transcript_link():
+    w = sp.record("sess4", _ev("running"), child_session_id="20261018_child", now=1)
+    assert w["child_session_id"] == "20261018_child"
+    assert sp.record("sess5", _ev("running"), child_session_id="../../etc", now=1).get("child_session_id") is None
+    assert sp.record("sess6", _ev("running"), child_session_id="sess6", now=1).get("child_session_id") is None

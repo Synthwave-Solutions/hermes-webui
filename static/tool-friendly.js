@@ -15,8 +15,9 @@
   let forced=null;
   function lang(){
     if(forced) return forced;
+    // The app language (static/i18n.js `_localeCode`, a script-global) wins.
+    try{ if(typeof _localeCode==='string'&&_localeCode) return _localeCode.toLowerCase().startsWith('nl')?'nl':'en'; }catch(_){}
     try{ const s=root.localStorage&&root.localStorage.getItem('sp-feature-guide-language'); if(s==='nl'||s==='en') return s; }catch(_){}
-    try{ if(typeof root._localeCode==='string'&&root._localeCode.toLowerCase().startsWith('nl')) return 'nl'; }catch(_){}
     try{ const n=root.navigator&&(root.navigator.language||''); return String(n).toLowerCase().startsWith('nl')?'nl':'en'; }catch(_){}
     return 'en';
   }
@@ -27,12 +28,16 @@
       last_seen:'Laatst gezien: bezig', queued:'In de wachtrij', subagent:'Subagent', subagents:'Subagents',
       tools_one:'1 stap', tools_many:'{n} stappen', subagents_title:'Subagents', subagents_empty:'Nog geen activiteit',
       subagents_more:'Toon alle stappen', step_more:'{n} eerdere stappen niet bewaard',
+      processed:'Verwerkt', processed_in:'Verwerkt in {d}', working:'Bezig', now:'nu', open_thread:'Bekijk het volledige gesprek',
+      error_title:'Er ging iets mis', error_hint:'Probeer het opnieuw. Blijft dit gebeuren, geef het dan door aan support.',
     },
     en:{
       steps:'Work steps', running:'Running', done:'Done', failed:'Failed', stopped:'Stopped', details:'Details',
       last_seen:'Last seen: running', queued:'Queued', subagent:'Subagent', subagents:'Subagents',
       tools_one:'1 step', tools_many:'{n} steps', subagents_title:'Subagents', subagents_empty:'No activity yet',
       subagents_more:'Show all steps', step_more:'{n} earlier steps not kept',
+      processed:'Processed', processed_in:'Processed in {d}', working:'Working', now:'now', open_thread:'Open the full conversation',
+      error_title:'Something went wrong', error_hint:'Please try again. If it keeps happening, let support know.',
     },
   };
   function text(key, vars){
@@ -307,29 +312,66 @@
     return `<span class="sp-tool-status sp-tool-status-${esc(st)}" title="${esc(label)}">${mark}${dur?`<span class="sp-tool-dur">${esc(dur)}</span>`:''}<span class="sr-only">${esc(label)}</span></span>`;
   }
 
+  // Outer worklog line: "⚙️ Verwerkt in 4s · 11 stappen" / "⚙️ Bezig · 12s · 3 stappen".
+  function processedLine(opts){
+    const o=opts||{};
+    const n=Math.max(0,Number(o.steps)||0);
+    const steps=n?(n===1?text('tools_one'):text('tools_many',{n})):'';
+    const d=String(o.duration||'').trim();
+    const head=o.live?text('working')+(d?' · '+d:''):(d?text('processed_in',{d}):text('processed'));
+    return '⚙️ '+head+(steps?' · '+steps:'');
+  }
+
   // One-line group summary: "🛠️ Werkstappen (12)" plus "💻 5 · 📄 3 · ⚠️ 1".
   const ORDER=['subagent','delegate','opencode','shell','read','write','search','list','web','browser','mail','calendar','drive','notion','crm','code','process','todo','memory','skill','image','vision','schedule','message','clarify','voice','tools','unknown'];
   function groupSummary(items){
     const list=Array.from(items||[]).filter(Boolean);
     const counts=Object.create(null);
-    let failed=0, running=0;
+    let failed=0, running=0, current=null;
     for(const it of list){
       const fam=it.family||family(it);
       const st=it.state||state(it);
       counts[fam]=(counts[fam]||0)+1;
       if(st==='failed') failed++;
-      if(st==='running'||st==='queued') running++;
+      if(st==='running'||st==='queued'){ running++; current=it; }
     }
     const parts=ORDER.filter(f=>counts[f]).map(f=>`${(F[f]||F.unknown)[0]} ${counts[f]}`);
     if(failed) parts.push(`⚠️ ${failed}`);
+    const head=`🛠️ ${text('steps')} (${list.length})`;
+    const now=current&&current.title?`${text('now')}: ${(F[current.family]||F.unknown)[0]} ${current.title}${current.target?' '+current.target:''}`:'';
     return {
       title:`${text('steps')} (${list.length})`,
-      parts, failed, running, count:list.length,
-      text:`🛠️ ${text('steps')} (${list.length})${parts.length?' · '+parts.join(' · '):''}`,
+      parts, failed, running, count:list.length, current:now,
+      text:now?`${head} · ${now}`:`${head}${parts.length?' · '+parts.join(' · '):''}`,
     };
   }
 
-  const api={lang,setLanguage:v=>{forced=(v==='nl'||v==='en')?v:null;},text,family,describe,state,target,shellSummary,formatDuration,statusChipHtml,groupSummary,emojiFor:fam=>(F[fam]||F.unknown)[0],FAMILIES:Object.keys(F)};
+  // Plain-language card for assistant error replies ("**Label:** message").
+  // Only known error labels qualify, so normal answers are never restyled.
+  const ERRORS={
+    'error':['⚠️','alert',['Er ging iets mis','Something went wrong'],['Probeer het opnieuw. Blijft dit gebeuren, geef het dan door aan support.','Please try again. If it keeps happening, let support know.']],
+    'gateway request failed':['🔌','alert',['SynthPulse kon de AI niet bereiken','SynthPulse could not reach the AI'],['Probeer het zo opnieuw. Blijft dit gebeuren, geef het dan door aan support.','Try again in a moment. If it keeps happening, let support know.']],
+    'gateway authentication failed':['🔑','alert',['De verbinding met de AI is niet goed ingesteld','The connection to the AI is not set up correctly'],['Dit moet een beheerder oplossen. Geef het door aan support.','An administrator needs to fix this. Please let support know.']],
+    'service unavailable':['🌩️','alert',['De AI-dienst is even niet bereikbaar','The AI service is not available right now'],['Probeer het over een paar minuten opnieuw.','Please try again in a few minutes.']],
+    'service busy':['🌩️','alert',['De AI-dienst is het even te druk','The AI service is busy right now'],['Probeer het over een minuut opnieuw.','Please try again in a minute.']],
+    'no response from provider':['🌩️','alert',['De AI gaf geen antwoord','The AI did not answer'],['Probeer het opnieuw.','Please try again.']],
+    'rate limit reached':['⏳','alert',['Even te veel verzoeken tegelijk','Too many requests at once'],['Wacht een minuut en probeer het opnieuw.','Wait a minute and try again.']],
+    'out of credits':['💳','alert',['Het AI-tegoed is op','The AI credit has run out'],['Geef het door aan een beheerder.','Please let an administrator know.']],
+    'model not found':['🧭','alert',['Dit AI-model is niet beschikbaar','This AI model is not available'],['Kies een ander model onder het tekstvak.','Pick another model below the message box.']],
+    'provider mismatch':['🧭','alert',['Dit AI-model past niet bij de gekozen dienst','This AI model does not match the chosen service'],['Kies een ander model onder het tekstvak.','Pick another model below the message box.']],
+    'context compression exhausted':['📚','alert',['Dit gesprek is te lang geworden','This conversation has become too long'],['Begin een nieuw gesprek en verwijs naar dit gesprek.','Start a new chat and refer back to this one.']],
+    'tool iteration limit reached':['🛑','info',['Maximaal aantal werkstappen bereikt','Maximum number of work steps reached'],['Vraag de bot om verder te gaan.','Ask the bot to continue.']],
+    'response interrupted':['⏸️','info',['Antwoord onderbroken','Reply interrupted'],['Stuur je bericht opnieuw om verder te gaan.','Send your message again to continue.']],
+    'task cancelled':['⏹️','info',['Gestopt','Stopped'],['Je hebt deze taak gestopt.','You stopped this task.']],
+  };
+  function errorCard(label){
+    const hit=ERRORS[String(label||'').trim().toLowerCase()];
+    if(!hit) return null;
+    const i=lang()==='nl'?0:1;
+    return {emoji:hit[0],tone:hit[1],title:hit[2][i],hint:hit[3][i]};
+  }
+
+  const api={lang,errorCard,processedLine,setLanguage:v=>{forced=(v==='nl'||v==='en')?v:null;},text,family,describe,state,target,shellSummary,formatDuration,statusChipHtml,groupSummary,emojiFor:fam=>(F[fam]||F.unknown)[0],FAMILIES:Object.keys(F)};
   if(typeof module!=='undefined'&&module.exports) module.exports=api;
   root.SynPulseFriendlyTools=api;
 })(typeof window!=='undefined'?window:globalThis);

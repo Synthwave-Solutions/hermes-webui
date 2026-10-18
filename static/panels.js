@@ -10606,6 +10606,7 @@ async function loadSettingsPanel(){
       }
       langSel.value=resolvedLanguage;
       langSel.addEventListener('change',function(){
+        try{localStorage.setItem('sp-lang-explicit',this.value);}catch(_){}
         if(typeof setLocale==='function'){setLocale(this.value);if(typeof applyLocaleToDOM==='function')applyLocaleToDOM();}
         _schedulePreferencesAutosave();
       },{once:false});

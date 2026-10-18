@@ -6,7 +6,7 @@ const _I18N_LOCALE_META = {
   ru:['Русский','ru-RU'],es:['Español','es-ES'],de:['Deutsch','de-DE'],
   zh:['简体中文','zh-CN'],'zh-Hant':['繁體中文','zh-TW'],pt:['Português','pt-PT'],
   ko:['한국어','ko-KR'],fr:['Français','fr-FR'],tr:['Türkçe','tr-TR'],
-  pl:['Polski','pl-PL'],vi:['Tiếng Việt','vi-VN'],
+  pl:['Polski','pl-PL'],vi:['Tiếng Việt','vi-VN'],nl:['Nederlands','nl-NL'],
 };
 const LOCALES = Object.fromEntries(Object.entries(_I18N_LOCALE_META).map(([code,meta])=>[
   code,{_lang:code,_label:meta[0],_speech:meta[1]},
@@ -21,12 +21,19 @@ function _i18nProcessedElapsedEn(duration){return _i18nProcessedElapsed('Process
 function _i18nProcessedElapsedZh(duration){return _i18nProcessedElapsed('已处理',duration);}
 function _i18nProcessedElapsedZhHant(duration){return _i18nProcessedElapsed('已處理',duration);}
 function _i18nProcessedElapsedVi(duration){return _i18nProcessedElapsed('Đã xử lý',duration);}
+function _i18nProcessedElapsedNl(duration){return _i18nProcessedElapsed('Verwerkt',duration);}
 function _i18nProcessedElapsedPl(duration){return _i18nProcessedElapsed('Przetworzono',duration);}
 const _I18N_TOOL_ACTION_TEXT_EN={
   shell:{running:'Running',done:'Ran',fail:'run',fallback:'a command'},read:{running:'Reading',done:'Read',fail:'read',fallback:'a file'},list:{running:'Listing',done:'Listed',fail:'list',fallback:'files'},search:{running:'Searching',done:'Searched',fail:'search',fallback:'workspace'},web:{running:'Checking',done:'Checked',fail:'check',fallback:'web data'},write:{running:'Updating',done:'Updated',fail:'update',fallback:'a file'},skill:{running:'Loading',done:'Loaded',fail:'load',fallback:'a skill'},memory:{running:'Saving',done:'Saved',fail:'save',fallback:'memory'},delegate:{running:'Delegating',done:'Delegated',fail:'delegate',fallback:'a task'},unknown:{running:'Running',done:'Ran',fail:'run',fallback:'a tool'},
 };
 const _I18N_TOOL_SUMMARY_TEXT_EN={
   shell:{running:['Running a command','Running {n} commands'],done:['Ran a command','Ran {n} commands']},read:{running:['Reading a file','Reading {n} files'],done:['Read a file','Read {n} files']},list:{running:['Listing files','Listing {n} items'],done:['Listed files','Listed {n} files']},search:{running:['Searching workspace','Searching workspace {n} times'],done:['Searched workspace','Searched workspace {n} times']},web:{running:['Checking web','Checking web {n} times'],done:['Checked the web','Checked the web {n} times']},write:{running:['Updating a file','Updating {n} files'],done:['Updated a file','Updated {n} files']},skill:{running:['Loading a skill','Loading {n} skills'],done:['Loaded a skill','Loaded {n} skills']},memory:{running:['Saving memory','Saving {n} memory updates'],done:['Saved memory','Saved {n} memory updates']},delegate:{running:['Delegating a task','Delegating {n} tasks'],done:['Delegated a task','Delegated {n} tasks']},unknown:{running:['Running a tool','Running {n} tools'],done:['Ran a tool','Ran {n} tools']},
+};
+const _I18N_TOOL_ACTION_TEXT_NL={
+  shell:{running:'Bezig met',done:'Uitgevoerd:',fail:'uitvoeren van',fallback:'een opdracht'},read:{running:'Bezig met lezen van',done:'Gelezen:',fail:'lezen van',fallback:'een bestand'},list:{running:'Bezig met bekijken van',done:'Bekeken:',fail:'bekijken van',fallback:'bestanden'},search:{running:'Bezig met zoeken in',done:'Gezocht in',fail:'zoeken in',fallback:'de werkmap'},web:{running:'Bezig met controleren van',done:'Gecontroleerd:',fail:'controleren van',fallback:'webgegevens'},write:{running:'Bezig met aanpassen van',done:'Aangepast:',fail:'aanpassen van',fallback:'een bestand'},skill:{running:'Bezig met laden van',done:'Geladen:',fail:'laden van',fallback:'een skill'},memory:{running:'Bezig met opslaan van',done:'Opgeslagen:',fail:'opslaan van',fallback:'geheugen'},delegate:{running:'Bezig met uitbesteden van',done:'Uitbesteed:',fail:'uitbesteden van',fallback:'een taak'},unknown:{running:'Bezig met',done:'Gebruikt:',fail:'gebruiken van',fallback:'een tool'},
+};
+const _I18N_TOOL_SUMMARY_TEXT_NL={
+  shell:{running:['Opdracht wordt uitgevoerd','{n} opdrachten worden uitgevoerd'],done:['Opdracht uitgevoerd','{n} opdrachten uitgevoerd']},read:{running:['Bestand lezen','{n} bestanden lezen'],done:['Bestand gelezen','{n} bestanden gelezen']},list:{running:['Bestanden bekijken','{n} items bekijken'],done:['Bestanden bekeken','{n} bestanden bekeken']},search:{running:['Zoeken in bestanden','{n} keer zoeken in bestanden'],done:['Gezocht in bestanden','{n} keer gezocht in bestanden']},web:{running:['Op het web zoeken','{n} keer op het web zoeken'],done:['Op het web gezocht','{n} keer op het web gezocht']},write:{running:['Bestand aanpassen','{n} bestanden aanpassen'],done:['Bestand aangepast','{n} bestanden aangepast']},skill:{running:['Skill laden','{n} skills laden'],done:['Skill geladen','{n} skills geladen']},memory:{running:['Geheugen opslaan','{n} geheugenupdates opslaan'],done:['Geheugen opgeslagen','{n} geheugenupdates opgeslagen']},delegate:{running:['Taak uitbesteden','{n} taken uitbesteden'],done:['Taak uitbesteed','{n} taken uitbesteed']},unknown:{running:['Tool gebruiken','{n} tools gebruiken'],done:['Tool gebruikt','{n} tools gebruikt']},
 };
 const _I18N_TOOL_ACTION_TEXT_ZH={..._I18N_TOOL_ACTION_TEXT_EN};
 const _I18N_TOOL_SUMMARY_TEXT_ZH={..._I18N_TOOL_SUMMARY_TEXT_EN};
@@ -41,12 +48,14 @@ function _i18nToolActionLabelEn(...args){return _i18nToolActionLabelFromMap(_I18
 function _i18nToolActionLabelZh(...args){return _i18nToolActionLabelFromMap(_I18N_TOOL_ACTION_TEXT_ZH,...args);}
 function _i18nToolActionLabelZhHant(...args){return _i18nToolActionLabelFromMap(_I18N_TOOL_ACTION_TEXT_ZH_HANT,...args);}
 function _i18nToolActionLabelVi(...args){return _i18nToolActionLabelFromMap(_I18N_TOOL_ACTION_TEXT_VI,...args);}
+function _i18nToolActionLabelNl(kind,state,target,display,failed){const verbs=_I18N_TOOL_ACTION_TEXT_NL[kind]||_I18N_TOOL_ACTION_TEXT_NL.unknown;const object=target||verbs.fallback||display||'tool';return failed?`Mislukt: ${verbs.fail||'uitvoeren van'} ${object}`:`${verbs[state]||verbs.running} ${object}`;}
 function _i18nToolActionLabelPl(...args){return _i18nToolActionLabelFromMap(_I18N_TOOL_ACTION_TEXT_PL,...args);}
 function _i18nToolWorklogSummaryFromMap(map,kind,state,count){const n=Math.max(1,Number(count)||1);const entry=map[kind]||map.unknown||_I18N_TOOL_SUMMARY_TEXT_EN.unknown;const form=entry[state]||entry.running;return (n===1?form[0]:form[1]).replace('{n}',String(n));}
 function _i18nToolWorklogSummaryEn(...args){return _i18nToolWorklogSummaryFromMap(_I18N_TOOL_SUMMARY_TEXT_EN,...args);}
 function _i18nToolWorklogSummaryZh(...args){return _i18nToolWorklogSummaryFromMap(_I18N_TOOL_SUMMARY_TEXT_ZH,...args);}
 function _i18nToolWorklogSummaryZhHant(...args){return _i18nToolWorklogSummaryFromMap(_I18N_TOOL_SUMMARY_TEXT_ZH_HANT,...args);}
 function _i18nToolWorklogSummaryVi(...args){return _i18nToolWorklogSummaryFromMap(_I18N_TOOL_SUMMARY_TEXT_VI,...args);}
+function _i18nToolWorklogSummaryNl(...args){return _i18nToolWorklogSummaryFromMap(_I18N_TOOL_SUMMARY_TEXT_NL,...args);}
 function _i18nToolWorklogSummaryPl(...args){return _i18nToolWorklogSummaryFromMap(_I18N_TOOL_SUMMARY_TEXT_PL,...args);}
 function _i18nToolSummaryJoinEn(parts){return Array.isArray(parts)?parts.filter(Boolean).join(', '):'';}
 function _i18nToolSummaryJoinCjk(parts){const items=Array.isArray(parts)?parts.filter(Boolean):[];if(items.length<=1)return items[0]||'';if(items.length===2)return `${items[0]}和${items[1]}`;return `${items.slice(0,-1).join('、')}和${items.at(-1)}`;}
@@ -67,7 +76,20 @@ function resolveLocale(lang){
   if(lower.startsWith('zh-tw')||lower.startsWith('zh-hk')||lower.startsWith('zh-mo')||lower.startsWith('zh-hant'))return 'zh-Hant';
   return Object.keys(LOCALES).find(k=>k.toLowerCase()===lower.split('-')[0])||null;
 }
-function resolvePreferredLocale(primary,fallback){return resolveLocale(primary)||resolveLocale(fallback)||'en';}
+// SynthPulse: a language the person picked in Settings always wins. Without
+// an explicit pick, a Dutch browser gets Dutch (the server default is 'en',
+// which cannot be told apart from a real choice), unless the server setting
+// names another non-English language on purpose.
+function _spExplicitLocale(){try{return localStorage.getItem('sp-lang-explicit')||'';}catch(_){return '';}}
+function _spBrowserPrefersDutch(){try{const langs=(navigator.languages&&navigator.languages.length)?navigator.languages:[navigator.language||''];return String(langs[0]||'').toLowerCase().startsWith('nl');}catch(_){return false;}}
+function resolvePreferredLocale(primary,fallback){
+  const explicit=resolveLocale(_spExplicitLocale());
+  if(explicit)return explicit;
+  const fromPrimary=resolveLocale(primary);
+  if(fromPrimary&&fromPrimary!=='en')return fromPrimary;
+  if(_spBrowserPrefersDutch())return 'nl';
+  return fromPrimary||resolveLocale(fallback)||'en';
+}
 function _localeBundleUrl(code){
   return new URL(`static/i18n/${encodeURIComponent(code)}.js?v=${encodeURIComponent(_i18nVersion)}`,document.baseURI||location.href).href;
 }

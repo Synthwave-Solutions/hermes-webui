@@ -7994,6 +7994,7 @@ def _run_agent_streaming(
                         record_subagent(
                             session_id, subagent,
                             tool_name=name if event_type == 'subagent.tool' else None,
+                            child_session_id=cb_kwargs.get('child_session_id'),
                         )
                     except Exception:
                         logger.debug("subagent thread record failed", exc_info=True)

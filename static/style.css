@@ -8345,3 +8345,64 @@ html[data-nav-audience="member"]:not([data-advanced-chat-controls="1"]) #compose
 .sp-logout-btn[hidden]{display:none!important;}
 .sp-logout-emoji{font-size:17px;line-height:1;font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;filter:saturate(.85);}
 .sp-logout-btn:hover .sp-logout-emoji{filter:none;}
+
+/* ─────────────────────────────────────────────────────────────
+   Polish pass (18 Oct 2026, round 2): calmer hierarchy for tool
+   rows, aligned status column, quieter Details, dock and error
+   card on the same --sp-* tokens as the rest of the chat.
+   ───────────────────────────────────────────────────────────── */
+.sp-friendly-tool .tool-card-header{gap:9px;padding:4px 8px;border-radius:var(--sp-radius-sm,8px);}
+.sp-friendly-tool .tool-card-name{font-size:13.5px;}
+.sp-friendly-tool .tool-card-preview{font-size:12.5px;opacity:.7;}
+.sp-friendly-tool .sp-tool-status{min-width:58px;justify-content:flex-end;font-size:11.5px;}
+.sp-friendly-tool .sp-tool-status-done > span[aria-hidden]{opacity:.75;font-size:11px;}
+.sp-friendly-tool .sp-tool-dur{opacity:.65;}
+/* Details stays out of the way until you point at a row (always shown on touch). */
+.sp-details-toggle{min-width:58px;justify-content:flex-end;opacity:0;transition:opacity .15s var(--sp-ease,ease),border-color .15s;}
+.sp-friendly-tool .tool-card-header:hover .sp-details-toggle,
+.sp-friendly-tool .tool-card-header:focus-within .sp-details-toggle,
+.sp-friendly-tool.open .sp-details-toggle{opacity:1;}
+@media (hover:none){.sp-details-toggle{opacity:.7;}}
+.sp-friendly-tool.open{background:color-mix(in srgb,var(--sp-card-bg,var(--surface)) 70%,transparent)!important;border-radius:var(--sp-radius,10px);}
+.sp-friendly-tool.open .tool-card-detail{margin:2px 0 8px 29px;border-left:2px solid var(--border);padding-left:10px;}
+.tool-worklog-tool-group-body .tool-card-row + .tool-card-row{margin-top:1px;}
+.sp-steps-head{padding:5px 8px!important;border-radius:var(--sp-radius-sm,8px);}
+.sp-steps-head .tg-sum{font-size:13px;}
+.sp-steps-group[data-sp-running="1"] > .sp-steps-head .tg-sum{color:var(--accent-text);opacity:1;}
+
+/* Outer worklog line ("⚙️ Verwerkt in 4s · 11 stappen") */
+.tool-worklog-label{font-weight:500;letter-spacing:0;}
+
+/* Subagent dock: part of the conversation column */
+.sp-subagent-dock{max-width:var(--msg-max,780px);padding:0 24px;margin:0 auto 16px;}
+@media(min-width:1400px){.sp-subagent-dock{max-width:1100px;}}
+@media(min-width:1800px){.sp-subagent-dock{max-width:1200px;}}
+.sp-subagent-dock-inner{border-radius:var(--sp-radius-lg,14px);box-shadow:var(--sp-shadow-sm,none);border-color:var(--border-subtle,var(--border));}
+.sp-subagent-dock-head{padding:11px 16px;font-size:13px;}
+.sp-subagent-head{padding:10px 16px;}
+.sp-subagent-who{font-size:11px;letter-spacing:.02em;text-transform:uppercase;opacity:.8;}
+.sp-subagent-meta{min-width:96px;justify-content:flex-end;}
+.sp-subagent-list{border-top-color:var(--border-subtle,var(--border));}
+.sp-subagent-card{border-bottom-color:var(--border-subtle,var(--border));}
+.sp-subagent-body{padding:0 16px 12px 54px;}
+.sp-subagent-steps{border-left:2px solid var(--border-subtle,var(--border));padding-left:10px;}
+:root.dark .sp-subagent-dock-inner,.dark .sp-subagent-dock-inner{background:color-mix(in srgb,var(--sp-card-bg,#131f31) 92%,transparent);}
+
+/* Plain-language error card */
+.sp-error-card{border:1px solid color-mix(in srgb,var(--error,#e5484d) 28%,var(--border));background:color-mix(in srgb,var(--error,#e5484d) 6%,var(--sp-card-bg,var(--surface)));border-radius:var(--sp-radius-lg,14px);padding:12px 14px;margin:2px 0;box-shadow:var(--sp-shadow-xs,none);}
+.sp-error-card.sp-error-info{border-color:var(--border);background:var(--sp-card-bg,var(--surface));}
+.sp-error-head{display:flex;align-items:center;gap:9px;font-weight:600;color:var(--text);}
+.sp-error-emoji{font-size:16px;line-height:1;}
+.sp-error-hint{margin:4px 0 0 25px;color:var(--muted);font-size:13px;}
+.sp-error-details{margin:8px 0 0 25px;font-size:12.5px;}
+.sp-error-details > summary{cursor:pointer;color:var(--muted);width:max-content;list-style:none;}
+.sp-error-details > summary::-webkit-details-marker{display:none;}
+.sp-error-details > summary::after{content:" ›";display:inline-block;transition:transform .15s;}
+.sp-error-details[open] > summary::after{transform:rotate(90deg);}
+.sp-error-raw{margin-top:6px;padding:8px 10px;border-radius:var(--sp-radius-sm,8px);background:var(--surface-subtle,rgba(127,127,127,.06));color:var(--muted);overflow-wrap:anywhere;}
+.sp-error-raw p{margin:0 0 6px;}
+/* The friendly card replaces the legacy red error body frame. */
+.msg-row[data-error="1"] .msg-body:has(> .sp-error-card),
+.assistant-segment[data-error="1"] .msg-body:has(> .sp-error-card){background:none!important;border:0!important;box-shadow:none!important;padding:0!important;}
+.sp-subagent-open{display:inline-flex;align-items:center;gap:6px;margin-top:8px;padding:5px 10px;border:1px solid var(--border2,var(--border));border-radius:999px;background:var(--surface,transparent);color:var(--accent-text);font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;box-shadow:var(--sp-shadow-xs,none);}
+.sp-subagent-open:hover{background:var(--sp-active-bg,var(--hover-bg));border-color:var(--sp-active-border,var(--border2));}

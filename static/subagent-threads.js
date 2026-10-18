@@ -80,6 +80,9 @@
     const body=steps.length
       ?`<ol class="sp-subagent-steps">${steps.map(stepHtml).join('')}</ol>${hidden&&w.steps_truncated?`<div class="sp-subagent-note">${esc(tx('step_more',{n:hidden}))}</div>`:''}`
       :`<div class="sp-subagent-note">${esc(n?stepsLabel:tx('subagents_empty'))}</div>`;
+    const openLink=w.child_session_id
+      ?`<button type="button" class="sp-subagent-open" data-sp-subagent-open="${esc(w.child_session_id)}">💬 ${esc(tx('open_thread'))} <span aria-hidden="true">↗</span></button>`
+      :'';
     return `<article class="sp-subagent-card" data-state="${esc(st)}" data-worker-id="${esc(w.id)}">
       <button type="button" class="sp-subagent-head" aria-expanded="${isOpen?'true':'false'}" data-sp-subagent-toggle="${esc(w.id)}">
         <span class="sp-subagent-avatar" aria-hidden="true">🤖</span>
@@ -87,7 +90,7 @@
         <span class="sp-subagent-meta"><span class="sp-subagent-count" title="${esc(stepsLabel)}">🔧 ${n}</span>${chip}</span>
         <span class="sp-subagent-caret" aria-hidden="true">›</span>
       </button>
-      <div class="sp-subagent-body"${isOpen?'':' hidden'}>${body}</div>
+      <div class="sp-subagent-body"${isOpen?'':' hidden'}>${body}${openLink}</div>
     </article>`;
   }
 
@@ -104,7 +107,7 @@
     const done=states.filter(s=>s==='done').length;
     const failed=states.filter(s=>s==='failed').length;
     const tick=live?Math.floor(nowSec()/5):0; // refresh running durations every 5 s
-    const signature=JSON.stringify([currentSid,collapsed,[...open],tick,workers.map(w=>[w.id,w.status,w.tool_count,(w.steps||[]).length,w.duration_seconds,w.task])]);
+    const signature=JSON.stringify([currentSid,collapsed,[...open],tick,workers.map(w=>[w.id,w.status,w.tool_count,(w.steps||[]).length,w.duration_seconds,w.task,w.child_session_id||''])]);
     if(signature===lastSignature) return;
     lastSignature=signature;
     const parts=[];
@@ -122,7 +125,26 @@
     </div>`;
   }
 
+  // Open the worker's own conversation (state.db child session, view-only) the
+  // same way the sidebar opens nested subagent chats, so the same server-side
+  // visibility checks apply.
+  async function openThread(childSid){
+    if(!childSid) return;
+    let row=null;
+    try{ if(typeof _allSessions!=='undefined'&&Array.isArray(_allSessions)) row=_allSessions.find(s=>s&&s.session_id===childSid)||null; }catch(_){}
+    const session=row||{session_id:childSid,source_tag:'subagent',raw_source:'subagent',parent_session_id:currentSid,relationship_type:'child_session'};
+    try{
+      if(typeof _openSidebarSession==='function') await _openSidebarSession(session,{skipLineageResolve:true});
+      else if(typeof loadSession==='function') await loadSession(childSid);
+    }catch(_){
+      if(typeof root.showToast==='function') root.showToast(lang()==='nl'?'Dit gesprek kon niet worden geopend.':'This conversation could not be opened.',3000,'error');
+    }
+  }
+  function lang(){ const ft=FT(); return ft&&ft.lang?ft.lang():'en'; }
+
   function onClick(ev){
+    const o=ev.target&&ev.target.closest?ev.target.closest('[data-sp-subagent-open]'):null;
+    if(o){ ev.preventDefault(); openThread(o.getAttribute('data-sp-subagent-open')); return; }
     const t=ev.target&&ev.target.closest?ev.target.closest('[data-sp-subagent-toggle],[data-sp-subagent-dock-toggle]'):null;
     if(!t) return;
     const id=t.getAttribute('data-sp-subagent-toggle');
@@ -189,6 +211,7 @@
     for(const k of ['task_index','task_count']) if(Number.isInteger(data[k])) w[k]=data[k];
     if(Number.isInteger(data.tool_count)) w.tool_count=Math.max(w.tool_count||0,data.tool_count);
     if(typeof data.duration_seconds==='number') w.duration_seconds=data.duration_seconds;
+    if(typeof data.child_session_id==='string'&&/^[A-Za-z0-9_.:-]{1,128}$/.test(data.child_session_id)) w.child_session_id=data.child_session_id;
     w.updated_at=nowSec();
     delete w.restored;
     render();

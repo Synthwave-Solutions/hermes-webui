@@ -2,6 +2,14 @@
 (function () {
   'use strict';
   let session = '', rows = [], failed = false, timer = null, controller = null;
+  // `unavailable`: the server said this feature does not apply here (no
+  // signed-in email identity, conversation not visible to this person, bad
+  // request). Nothing to show and no reason to keep asking for this chat.
+  // `failures`: consecutive transient failures (timeout, 5xx, network). One
+  // slow reply under load is normal and stays silent; only a repeated
+  // failure shows a small notice, and earlier notices are kept meanwhile.
+  let unavailable = false, failures = 0;
+  const openNotices = new Set();
   let generation = 0, lastFetch = 0, pending = false;
   let renderedSession = '';
   const interval = 10000;
@@ -84,20 +92,81 @@
         ? tr('skill_learning_in_turn', 'This conversation · Visible only to you')
         : tr('skill_learning_private', 'Automatic · Visible only to you');
       meta.append(document.createTextNode(origin + ' · '), time);
-      card.append(copy, meta);
+      // Friendly card: icon + plain title up front, the itemised lines and
+      // origin/time behind a Details toggle (open state survives redraws).
+      card.className += ' sp-learning-card';
+      const head = document.createElement('button');
+      head.type = 'button'; head.className = 'sp-learning-head';
+      const isOpen = openNotices.has(row.id);
+      const setAria = (el, k, v) => { if (typeof el.setAttribute === 'function') el.setAttribute(k, v); };
+      setAria(head, 'aria-expanded', isOpen ? 'true' : 'false');
+      const icon = document.createElement('span');
+      icon.className = 'sp-learning-icon'; setAria(icon, 'aria-hidden', 'true');
+      const skillTotal = named.created + named.patched + named.updated +
+        Math.max(0, row.counts.created - named.created) + Math.max(0, row.counts.patched - named.patched) +
+        Math.max(0, row.counts.updated - named.updated);
+      icon.textContent = skillTotal ? '🧩' : '🧠';
+      const title = document.createElement('span');
+      title.className = 'sp-learning-title';
+      title.textContent = plainTitle(row, skillTotal);
+      const chip = document.createElement('span');
+      chip.className = 'sp-learning-chip';
+      chip.textContent = '🔒 ' + copyText('private');
+      const toggle = document.createElement('span');
+      toggle.className = 'sp-learning-toggle';
+      toggle.textContent = copyText('details');
+      head.append(icon, title, chip, toggle);
+      const body = document.createElement('div');
+      body.className = 'sp-learning-body';
+      body.hidden = !isOpen;
+      body.append(copy, meta);
+      head.addEventListener('click', () => {
+        const open = body.hidden;
+        body.hidden = !open;
+        setAria(head, 'aria-expanded', open ? 'true' : 'false');
+        if (open) openNotices.add(row.id); else openNotices.delete(row.id);
+      });
+      card.append(head, body);
       insertByTime(host, card, row.created_at);
     }
-    if (failed) {
+    if (failed && !unavailable && failures >= 2) {
       const card = document.createElement('div');
       card.dataset.skillLearningNotice = 'unavailable';
-      card.className = 'skill-learning-notice';
-      card.append(document.createTextNode(tr('skill_learning_unavailable', 'Skill update notices are unavailable.')));
+      card.className = 'skill-learning-notice skill-learning-notice-soft';
+      card.append(document.createTextNode('🧩 ' + tr('skill_learning_unavailable_soft', 'Skill updates could not be checked just now.')));
       const retry = document.createElement('button');
-      retry.type = 'button'; retry.className = 'btn secondary';
-      retry.textContent = tr('retry', 'Retry');
+      retry.type = 'button'; retry.className = 'btn-link skill-learning-retry';
+      retry.textContent = '🔄 ' + tr('retry', 'Retry');
       retry.addEventListener('click', () => refresh(true));
       card.append(retry); host.append(card);
     }
+  }
+  function lang() {
+    const ft = window.SynPulseFriendlyTools;
+    return ft && typeof ft.lang === 'function' ? ft.lang() : 'en';
+  }
+  const COPY = {
+    nl: {private: 'Alleen voor jou', details: 'Details', skill_one: 'Skill bijgewerkt: {name}', skill_new: 'Nieuwe skill: {name}',
+      skills: '{n} skills bijgewerkt', memory: 'Geheugen bijgewerkt', and_memory: ' en geheugen bijgewerkt'},
+    en: {private: 'Only you', details: 'Details', skill_one: 'Skill updated: {name}', skill_new: 'New skill: {name}',
+      skills: '{n} skills updated', memory: 'Memory updated', and_memory: ' and memory updated'},
+  };
+  function copyText(key, vars) {
+    let out = (COPY[lang()] || COPY.en)[key] || COPY.en[key] || key;
+    for (const k of Object.keys(vars || {})) out = out.replace('{' + k + '}', String(vars[k]));
+    return out;
+  }
+  function plainTitle(row, skillTotal) {
+    const skills = row.skills || [];
+    const memory = (row.memory || []).length > 0;
+    let text = '';
+    if (skillTotal === 1 && skills.length === 1) {
+      text = copyText(skills[0].kind === 'created' ? 'skill_new' : 'skill_one', {name: skills[0].name});
+    } else if (skillTotal) {
+      text = copyText('skills', {n: skillTotal});
+    }
+    if (!text) return copyText('memory');
+    return memory ? text + copyText('and_memory') : text;
   }
   const MEMORY_KEYS = ['memory', 'user', 'soul', 'profile_memory', 'profile_user', 'profile_soul'];
   function valid(row) {
@@ -130,19 +199,34 @@
   async function refresh(force = false) {
     const sid = current();
     if (!sid || sid !== session || pending || (!force && Date.now() - lastFetch < interval)) return;
+    if (unavailable && !force) return;
     const stamp = generation;
     pending = true; lastFetch = Date.now(); controller = new AbortController();
     try {
       const data = await api('/api/session/skill-updates?session_id=' + encodeURIComponent(sid), {
-        signal: controller.signal, cache: 'no-store', timeoutMs: 5000,
+        signal: controller.signal, cache: 'no-store', timeoutMs: 12000,
         timeoutToast: false, retries: 0, redirect401: false,
       });
       if (stamp !== generation || current() !== sid) return;
-      if (!data || !Array.isArray(data.events) || data.events.length > 100 || !data.events.every(valid)) throw new Error('Invalid activity');
-      rows = data.events; failed = false;
-    } catch (_) {
+      if (data === undefined) { // 401 with redirect401:false: not signed in
+        unavailable = true; failed = false; rows = []; return;
+      }
+      if (!data || !Array.isArray(data.events) || data.events.length > 100 || !data.events.every(valid)) {
+        const err = new Error('Invalid activity'); err.invalid = true; throw err;
+      }
+      rows = data.events; failed = false; failures = 0; unavailable = false;
+    } catch (err) {
       if (stamp !== generation || current() !== sid) return;
-      rows = []; failed = true;
+      const status = Number(err && err.status) || 0;
+      if (status >= 400 && status < 500 && status !== 408 && status !== 429) {
+        // 401 no email identity (auth off or local login without identity),
+        // 403/404 conversation not visible to this person, 400 bad request:
+        // not a failure the person can fix, so show nothing.
+        unavailable = true; failed = false; rows = [];
+      } else {
+        // One slow reply under load is normal; an unreadable payload is not.
+        failures += err && err.invalid ? 2 : 1; failed = true; // keep loaded notices
+      }
     } finally {
       if (stamp === generation) {
         pending = false; controller = null; draw(); schedule();
@@ -154,7 +238,7 @@
     const sid = current();
     if (sid !== session) {
       generation++; controller?.abort(); controller = null; pending = false;
-      session = sid; rows = []; failed = false; lastFetch = 0; clear();
+      session = sid; rows = []; failed = false; lastFetch = 0; unavailable = false; failures = 0; clear();
     }
     // renderMessages can rebuild the DOM synchronously after this hook.
     queueMicrotask(draw);

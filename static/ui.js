@@ -7113,9 +7113,17 @@ function _activityElapsedLabel(group){
   if(!started)return'';
   return _formatActiveElapsedTimer(_activityNowSeconds()-started);
 }
+function _friendlyProcessedLine(group, durationText, live){
+  const api=typeof window!=='undefined'&&window._friendlyToolRows!==false?window.SynPulseFriendlyTools:null;
+  if(!api||typeof api.processedLine!=='function') return '';
+  const steps=group&&group.querySelectorAll?group.querySelectorAll('.tool-card-row').length:0;
+  return api.processedLine({live:!!live,duration:durationText,steps});
+}
 function _activityProcessedElapsedLabel(group){
   const started=_activityElapsedStartedAt(group);
   if(!started)return'';
+  const friendly=_friendlyProcessedLine(group,_formatTurnDuration(_activityNowSeconds()-started),true);
+  if(friendly) return friendly;
   return _processedElapsedLabel(_activityNowSeconds()-started);
 }
 function _activitySettledProcessedLabel(group){
@@ -7125,6 +7133,8 @@ function _activitySettledProcessedLabel(group){
     const legacy=String(durationEl&&durationEl.textContent||'').replace(/^\s*Done in\s+/i,'').trim();
     if(legacy) durationText=legacy;
   }
+  const friendly=_friendlyProcessedLine(group,durationText,false);
+  if(friendly) return friendly;
   return durationText?t('processed_elapsed',durationText):'';
 }
 function _activityMarkObserved(group, ts){
@@ -17380,6 +17390,10 @@ function renderMessages(options){
       const summary=m.provider_details_label||'Provider details';
       bodyHtml += `<details class="provider-error-details"><summary>${esc(String(summary))}</summary><pre><code>${esc(String(m.provider_details))}</code></pre></details>`;
     }
+    if(!isUser&&typeof _friendlyErrorCardHtml==='function'){
+      const _errCard=_friendlyErrorCardHtml(displayContent, bodyHtml);
+      if(_errCard) bodyHtml=_errCard;
+    }
     const recoveryPayload=(!isUser&&m._compressionRecovery)
       ? m._compressionRecovery
       : (!isUser&&isLastAssistant&&isTurnFinalAssistant&&typeof _activeCompressionRecoveryPayload==='function' ? _activeCompressionRecoveryPayload() : null);
@@ -19139,12 +19153,27 @@ function _friendlyToolInfo(tc){
   if(!api||!tc) return null;
   try{ return api.describe(tc); }catch(_){ return null; }
 }
+// Assistant error replies ("**Gateway request failed:** ...") become a calm
+// card with a plain title and hint; the original text stays behind Details.
+function _friendlyErrorCardHtml(content, bodyHtml){
+  const api=typeof window!=='undefined'&&window._friendlyToolRows!==false?window.SynPulseFriendlyTools:null;
+  if(!api||typeof api.errorCard!=='function') return '';
+  const m=String(content||'').match(/^\*\*([^*\n]{1,80}):\*\*\s/);
+  if(!m) return '';
+  const card=api.errorCard(m[1]);
+  if(!card) return '';
+  return `<div class="sp-error-card sp-error-${card.tone}" role="${card.tone==='alert'?'alert':'status'}"><div class="sp-error-head"><span class="sp-error-emoji" aria-hidden="true">${card.emoji}</span><span class="sp-error-title">${esc(card.title)}</span></div><div class="sp-error-hint">${esc(card.hint)}</div><details class="sp-error-details"><summary>${esc(api.text('details'))}</summary><div class="sp-error-raw">${bodyHtml}</div></details></div>`;
+}
 function _friendlyRowsSummary(rows){
   const api=typeof window!=='undefined'&&window._friendlyToolRows!==false?window.SynPulseFriendlyTools:null;
   if(!api) return null;
   const items=Array.from(rows||[]).map(row=>{
     const ds=row&&row.dataset||{};
-    if(ds.toolFamily) return {family:ds.toolFamily,state:ds.toolState||'done'};
+    if(ds.toolFamily){
+      const label=String(ds.toolActionLabel||'');
+      const cut=label.indexOf(': ');
+      return {family:ds.toolFamily,state:ds.toolState||'done',title:cut>0?label.slice(0,cut):label,target:''};
+    }
     if(row&&row._tcData) return api.describe(row._tcData);
     return {family:'unknown',state:ds.toolError==='true'?'failed':(ds.toolDone==='false'?'running':'done')};
   });
@@ -19308,7 +19337,7 @@ function _syncToolCallGroupSummary(group){
       const processedLabel=isLiveWorklog
         ? _activityProcessedElapsedLabel(group)
         : _activitySettledProcessedLabel(group);
-      label.textContent=processedLabel||t('processed_elapsed','');
+      label.textContent=processedLabel||_friendlyProcessedLine(group,'',isLiveWorklog)||t('processed_elapsed','');
     }else{
       const rows=Array.from(group.querySelectorAll('.tool-card-row'));
       // Prefer the live _tcData classification; fall back to the durable data-*
