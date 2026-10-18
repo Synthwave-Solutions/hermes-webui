@@ -7676,6 +7676,61 @@
         "static/index.html"
       ],
       "feature_id": "webui.chat.bot_screens"
+    },
+    {
+      "control": "cronBotFilterSelect",
+      "tag": "select",
+      "label": "Show tasks of",
+      "source_refs": [
+        "static/panels.js:970"
+      ],
+      "feature_id": "webui.tasks.profile"
+    },
+    {
+      "control": "action:_saveCronBot",
+      "tag": "button",
+      "label": "Bot choice",
+      "source_refs": [
+        "static/panels.js:995"
+      ],
+      "feature_id": "webui.tasks.profile"
+    },
+    {
+      "control": "action:_closeCronBotPicker",
+      "tag": "button",
+      "label": "Cancel",
+      "source_refs": [
+        "static/panels.js:1008"
+      ],
+      "feature_id": "webui.tasks.profile"
+    },
+    {
+      "control": "action:openCronBotPicker",
+      "tag": "button",
+      "label": "Choose another bot",
+      "source_refs": [
+        "static/panels.js:2242"
+      ],
+      "feature_id": "webui.tasks.profile"
+    },
+    {
+      "control": "action:openCronJobChat",
+      "tag": "button",
+      "label": "Open task chat",
+      "source_refs": [
+        "static/panels.js:2245",
+        "static/panels.js:2280"
+      ],
+      "feature_id": "webui.tasks.results"
+    },
+    {
+      "control": "action:openCronFromBot",
+      "tag": "button",
+      "label": "Open in Scheduled tasks",
+      "source_refs": [
+        "static/panels.js:8214"
+      ],
+      "feature_id": "webui.tasks.profile"
     }
   ],
   "method": "Inventory of concrete HTML controls and inline handlers, supplemented by manual review of generated conversation menus, bot builder and knowledge controls, composer customization and the embedded read-only memory dashboard. Save/cancel and equivalent responsive controls share a feature. Hidden vendor login, server settings and inactive legacy visualizers are excluded from user workflows.",
