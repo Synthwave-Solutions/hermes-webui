@@ -8430,3 +8430,6 @@ html:not([data-nav-audience="admin"]) .ws-row-path{display:none;}
    composer folder chip reads "📁 Project: <name>". */
 html[data-sp-merged="1"] [data-panel="workspaces"]{display:none!important;}
 html[data-sp-merged="1"] #composerWorkspaceLabel::before{content:attr(data-sp-prefix);}
+
+/* Hint on shared attributes (name, category, members): changes apply to everyone */
+.sp-shared-hint{margin:8px 0 0;padding:7px 10px;border-radius:var(--sp-radius-sm,8px);background:var(--sp-active-bg,rgba(0,157,255,.08));color:var(--text);font-size:12.5px;}

@@ -2546,4 +2546,6 @@ window.__registerHermesLocale('en', {
     projects_my_work_no_chats: 'No chats without a project yet.',
     composer_project_prefix: 'Project: ',
     composer_project_title: 'Choose the project you work in',
+    shared_change_hint_space: 'This changes it for everyone who uses this space.',
+    shared_change_hint_project: 'This changes it for everyone in this project.',
 });

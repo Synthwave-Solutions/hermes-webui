@@ -2439,4 +2439,6 @@ window.__registerHermesLocale('nl', {
   projects_my_work_no_chats: 'Nog geen gesprekken zonder project.',
   composer_project_prefix: 'Project: ',
   composer_project_title: 'Kies het project waarin je werkt',
+  shared_change_hint_space: 'Dit verandert het voor iedereen die deze ruimte gebruikt.',
+  shared_change_hint_project: 'Dit verandert het voor iedereen in dit project.',
 });

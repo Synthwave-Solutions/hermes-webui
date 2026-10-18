@@ -7357,6 +7357,7 @@ function _renderWorkspaceForm({ name, path, category='', isEdit }){
           <input type="hidden" id="workspaceFormCategory" data-sp-picker data-sp-source="sp:categories" data-sp-custom="1" value="${esc(category || '')}" placeholder="${esc(t('cron_category_placeholder') || 'Pick a category or add one')}">
           <div class="detail-form-hint">${esc(t('cron_category_hint') || 'Groups the space in the list, for example per department.')}</div>
         </div>
+        ${isEdit ? `<div class="sp-shared-hint" role="note">👥 ${esc(spT('shared_change_hint_space', 'This changes it for everyone who uses this space.'))}</div>` : ''}
         <div id="workspaceFormError" class="detail-form-error" style="display:none"></div>
       </form>
     </div>`;
