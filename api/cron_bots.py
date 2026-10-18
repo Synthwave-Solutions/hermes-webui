@@ -268,6 +268,57 @@ def job_chat_title(job: dict) -> str:
     return f"{JOB_CHAT_EMOJI} {name}"[:120]
 
 
+_NL_DAYS = ("zondag", "maandag", "dinsdag", "woensdag", "donderdag", "vrijdag", "zaterdag")
+
+
+def _nl_time(hour: str, minute: str) -> str | None:
+    if not (hour.isdigit() and minute.isdigit()):
+        return None
+    h, m = int(hour), int(minute)
+    if not (0 <= h < 24 and 0 <= m < 60):
+        return None
+    return f"{h:02d}:{m:02d}"
+
+
+def schedule_in_words(expr) -> str:
+    """A cron expression or interval in plain Dutch ("0 9 * * 1" becomes
+    "elke maandag om 09:00"). Anything it does not recognise comes back as
+    it was. The Tasks panel has the same rules in static/panels.js
+    (_cronScheduleInWords), with the words from the language pack."""
+    raw = str(expr or "").strip()
+    low = raw.lower()
+    if low.startswith("every "):
+        amount = low[6:].strip()
+        for suffix, unit_one, unit_many in (("m", "minuut", "minuten"), ("h", "uur", "uur"), ("d", "dag", "dagen")):
+            if amount.endswith(suffix) and amount[:-1].isdigit():
+                n = int(amount[:-1])
+                return f"elke {unit_one}" if n == 1 else f"elke {n} {unit_many}"
+        return raw
+    parts = raw.split()
+    if len(parts) != 5:
+        return raw
+    minute, hour, dom, month, dow = parts
+    if month != "*":
+        return raw
+    if minute.startswith("*/") and minute[2:].isdigit() and hour == dom == dow == "*":
+        n = int(minute[2:])
+        return "elke minuut" if n == 1 else f"elke {n} minuten"
+    if minute.isdigit() and hour == dom == dow == "*":
+        return f"elk uur om {int(minute):02d} minuten over"
+    at = _nl_time(hour, minute)
+    if at is None:
+        return raw
+    if dom == "*" and dow == "*":
+        return f"elke dag om {at}"
+    if dom == "*" and dow in ("1-5", "mon-fri"):
+        return f"elke werkdag om {at}"
+    if dom == "*" and dow.isdigit() and 0 <= int(dow) <= 7:
+        return f"elke {_NL_DAYS[int(dow) % 7]} om {at}"
+    if dow == "*" and dom.isdigit() and 1 <= int(dom) <= 31:
+        return f"elke {int(dom)}e van de maand om {at}"
+    return raw
+
+
 def _schedule_text(job: dict) -> str:
     sched = job.get("schedule")
     display = job.get("schedule_display") or (sched.get("display") if isinstance(sched, dict) else None)
@@ -297,9 +348,12 @@ def job_chat_intro(job: dict, profile) -> str:
     ]
     schedule = _schedule_text(job)
     if schedule:
-        # The chat's markdown reads a cron expression's "* *" as emphasis even
-        # when escaped; the asterisk operator looks the same and stays put.
-        lines.append("- Wanneer: " + schedule.replace("*", "\u2217"))
+        words = schedule_in_words(schedule)
+        if words == schedule:
+            # The chat's markdown reads a cron expression's "* *" as emphasis
+            # even when escaped; the asterisk operator looks the same.
+            words = schedule.replace("*", "\u2217")
+        lines.append("- Wanneer: " + words)
     prompt = _excerpt(job.get("prompt"), 500)
     if prompt:
         lines.append(f"- Opdracht: {prompt}")
@@ -461,7 +515,7 @@ def job_context_text(job: dict, profile, home: Path) -> str:
     lines = [
         f"- Job: {job.get('name') or job_id} (job_id {job_id})",
         f"- Owning bot: {bot_label(profile)} (profile {normalize_profile(profile)})",
-        f"- Schedule: {_schedule_text(job) or 'unknown'}; state {state}; next run {job.get('next_run_at') or 'none'}",
+        f"- Schedule: {_schedule_text(job) or 'unknown'} ({schedule_in_words(_schedule_text(job))}); state {state}; next run {job.get('next_run_at') or 'none'}",
         f"- Delivers to: {job.get('deliver') or 'origin'}",
     ]
     notify = job.get("notify")

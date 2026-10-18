@@ -396,7 +396,7 @@ def latest_output_text(
 def _truncate_body(body: str) -> str:
     if len(body) <= MAX_DELIVERY_CHARS:
         return body
-    return body[:MAX_DELIVERY_CHARS].rstrip() + "\n\n(truncated: full output is in the Tasks panel)"
+    return body[:MAX_DELIVERY_CHARS].rstrip() + "\n\n(ingekort: de volledige uitkomst staat in Geplande taken)"
 
 
 def capacity_failure_text(job: dict, run_error: str | None) -> str | None:
@@ -463,34 +463,45 @@ def deliver_external_notice(destination: str, text: str) -> tuple[bool, str | No
         return False, str(exc)
 
 
+def _run_moment(job: dict) -> str:
+    """The run's time as the reader's clock shows it (server local time)."""
+    dt = _parse_run_at(job.get("last_run_at"))
+    if dt is None:
+        return ""
+    return dt.astimezone().strftime("%d-%m-%Y %H:%M")
+
+
 def build_update_text(job: dict, *, body: str | None, run_ok: bool, run_error: str | None) -> str:
-    """One concise update for the originating conversation."""
-    name = str(job.get("name") or job.get("id") or "scheduled task")
+    """One concise update for the chat the result belongs in (Dutch first,
+    like the rest of SynthPulse; the capacity notice keeps its own words)."""
+    name = str(job.get("name") or job.get("id") or "geplande taak")
+    when = _run_moment(job)
+    stamp = f", {when}" if when else ""
     if not run_ok:
         capacity_text = capacity_failure_text(job, run_error)
         if capacity_text is not None:
             return capacity_text
-        detail = (run_error or "no error detail recorded").strip()
+        detail = (run_error or "geen foutmelding bewaard").strip()
         return (
-            f"Scheduled task \"{name}\" failed on its last run: {detail}\n"
-            f"Details are in the Tasks panel (job {job.get('id', '?')})."
+            f"\U0001f5d3\ufe0f {name} is mislukt bij de run{stamp}: {detail}\n"
+            f"De details staan in Geplande taken (taak {job.get('id', '?')})."
         )
     if body:
-        return f"Scheduled task update: {name}\n\n{_truncate_body(body)}"
+        return f"\U0001f5d3\ufe0f Uitkomst van {name}{stamp}\n\n{_truncate_body(body)}"
     return (
-        f"Scheduled task \"{name}\" completed its run. No output was captured; "
-        f"see the Tasks panel (job {job.get('id', '?')}) for the run record."
+        f"\U0001f5d3\ufe0f {name} is klaar{stamp}, maar er is geen uitkomst bewaard. "
+        f"Kijk in Geplande taken (taak {job.get('id', '?')}) voor de run."
     )
 
 
 def build_external_failure_text(job: dict, delivery_error: str) -> str:
-    name = str(job.get("name") or job.get("id") or "scheduled task")
-    target = str(job.get("deliver") or "its configured target")
+    name = str(job.get("name") or job.get("id") or "geplande taak")
+    target = str(job.get("deliver") or "het ingestelde doel")
     return (
-        f"Scheduled task \"{name}\" ran, but delivering its result to {target} "
-        f"failed: {delivery_error.strip()}\n"
-        f"The output is saved in the Tasks panel (job {job.get('id', '?')}). "
-        f"Fix the delivery target or ask me to resend it."
+        f"\U0001f5d3\ufe0f {name} is uitgevoerd, maar het versturen naar {target} "
+        f"lukte niet: {delivery_error.strip()}\n"
+        f"De uitkomst staat in Geplande taken (taak {job.get('id', '?')}). "
+        f"Pas het doel aan of vraag me om het opnieuw te sturen."
     )
 
 

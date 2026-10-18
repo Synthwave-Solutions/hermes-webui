@@ -913,6 +913,31 @@ function _cronBotChipHtml(name, extraClass){
   const title = _cronBotTitle(name);
   return `<span class="cron-bot-chip ${extraClass || ''}" title="${esc((t('cron_bot_label') || 'Bot') + ': ' + title)}">${_cronBotAvatarHtml(name)}<span class="cron-bot-chip-name">${esc(title)}</span></span>`;
 }
+// A schedule in plain words ("0 9 * * 1" is "every Monday at 09:00"); the
+// same rules as api/cron_bots.schedule_in_words. Unknown shapes stay raw.
+function _cronScheduleInWords(expr){
+  const raw = String(expr || '').trim();
+  const tx = (key, ...args) => { const v = t(key, ...args); return v && v !== key ? v : ''; };
+  const every = raw.toLowerCase().match(/^every\s+(\d+)\s*([mhd])$/);
+  if (every) return tx({ m: 'cron_words_minutes', h: 'cron_words_hours', d: 'cron_words_days' }[every[2]], Number(every[1])) || raw;
+  const parts = raw.split(/\s+/);
+  if (parts.length !== 5 || parts[3] !== '*') return raw;
+  const [minute, hour, dom, , dow] = parts;
+  const step = minute.match(/^\*\/(\d+)$/);
+  if (step && hour === '*' && dom === '*' && dow === '*') return tx('cron_words_minutes', Number(step[1])) || raw;
+  if (/^\d+$/.test(minute) && hour === '*' && dom === '*' && dow === '*') return tx('cron_words_hourly', String(Number(minute)).padStart(2, '0')) || raw;
+  if (!/^\d+$/.test(minute) || !/^\d+$/.test(hour) || Number(hour) > 23 || Number(minute) > 59) return raw;
+  const time = `${String(Number(hour)).padStart(2, '0')}:${String(Number(minute)).padStart(2, '0')}`;
+  if (dom === '*' && dow === '*') return tx('cron_words_daily', time) || raw;
+  if (dom === '*' && (dow === '1-5' || dow.toLowerCase() === 'mon-fri')) return tx('cron_words_weekdays', time) || raw;
+  if (dom === '*' && /^[0-7]$/.test(dow)) {
+    const days = String(tx('cron_words_day_names') || '').split(',');
+    const day = days[Number(dow) % 7];
+    return day ? (tx('cron_words_weekly', day, time) || raw) : raw;
+  }
+  if (dow === '*' && /^\d+$/.test(dom) && Number(dom) >= 1 && Number(dom) <= 31) return tx('cron_words_monthly', Number(dom), time) || raw;
+  return raw;
+}
 function _cronCanChangeBot(job){
   if (!job) return false;
   return _cronCanEdit(Object.assign({}, job, { read_only: false }));
@@ -2236,10 +2261,10 @@ function _renderCronDetail(job){
       <div class="detail-card">
         <div class="detail-card-title">${esc(t('cron_status_active').replace(/./,c=>c.toUpperCase()))}</div>
         <div class="detail-row"><div class="detail-row-label">Status</div><div class="detail-row-value"><span class="detail-badge ${status.detailClass}">${esc(status.label)}</span></div></div>
-        <div class="detail-row"><div class="detail-row-label">Schedule</div><div class="detail-row-value"><code>${esc(schedule)}</code></div></div>
+        <div class="detail-row"><div class="detail-row-label">${esc(t('cron_schedule_label') || 'Schedule')}</div><div class="detail-row-value"><span class="cron-schedule-words" title="${esc(schedule)}">${esc(_cronScheduleInWords(schedule))}</span></div></div>
         <div class="detail-row"><div class="detail-row-label">${esc(t('cron_next'))}</div><div class="detail-row-value">${esc(nextRun)}</div></div>
         <div class="detail-row"><div class="detail-row-label">${esc(t('cron_last'))}</div><div class="detail-row-value">${esc(lastRun)}</div></div>
-        <div class="detail-row"><div class="detail-row-label">Deliver</div><div class="detail-row-value">${esc(deliver)}${deliveryMuted}</div></div>
+        <div class="detail-row"><div class="detail-row-label">${esc(t('cron_deliver_label') || 'Deliver')}</div><div class="detail-row-value">${esc(deliver)}${deliveryMuted}</div></div>
         <div class="detail-row"><div class="detail-row-label">${esc(t('cron_mode_label') || 'Mode')}</div><div class="detail-row-value"><span class="detail-badge cron-mode-badge ${isNoAgent ? 'script' : 'agent'}" id="cronJobMode">${esc(cronJobMode)}</span>${modelProvider ? ` <code>${modelProvider}</code>` : ''}</div></div>
         ${botRow}
         ${showOwnerRow && _cronProfileName(job.profile) ? `<div class="detail-row"><div class="detail-row-label">${esc(t('cron_profile_label') || 'Profile')}</div><div class="detail-row-value"><span class="detail-badge active" title="${esc(profileTitle)}">${esc(profileLabel)}</span></div></div>` : ''}
@@ -2250,7 +2275,11 @@ function _renderCronDetail(job){
       ${instructionCard}
       <div class="detail-card ${!isReadOnly && _cronNewJobIds.has(String(job.id)) ? 'has-new-run' : ''}" id="cronDetailRuns">
         <div class="detail-card-title">${esc(outputTitle)}</div>
-        <div style="color:var(--muted);font-size:12px">${esc(isReadOnly ? 'Live output is available only when this profile is active here.' : (t('loading') || 'Loading'))}</div>
+        <div style="color:var(--muted);font-size:12px">${isReadOnly
+          ? (job.job_chat_session_id
+            ? `<button type="button" class="cron-link-btn cron-job-chat-btn" onclick="openCronJobChat('${esc(job.job_chat_session_id)}','${esc(ownerBot)}')">💬 ${esc(t('cron_output_in_chat', ownerBotTitle) || ('See the result in the chat of ' + ownerBotTitle))}</button>`
+            : esc(t('cron_output_other_bot') || 'Live output is available only when this profile is active here.'))
+          : esc(t('loading') || 'Loading')}</div>
       </div>
     </div>`;
   body.style.display = '';

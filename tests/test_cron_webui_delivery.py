@@ -247,7 +247,7 @@ def test_failed_run_posts_concise_failure_update(bridge_env):
     actions = cwd.process_jobs_once([job], home=bridge_env.home)
     assert [a["outcome"] for a in actions] == [cwd.OUTCOME_DELIVERED]
     update = _read_session(bridge_env, sid)["messages"][-1]
-    assert "failed" in update["content"]
+    assert "mislukt" in update["content"]
     assert "agent crashed: boom" in update["content"]
 
 

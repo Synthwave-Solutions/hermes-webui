@@ -574,3 +574,37 @@ def test_new_copy_is_dutch_first_and_dash_free():
     for path in ("api/cron_bots.py", "scripts/cron_bot_owner_migration.py", "static/i18n/nl.js"):
         text = (ROOT / path).read_text(encoding="utf-8")
         assert chr(0x2013) not in text and chr(0x2014) not in text, path
+
+
+def test_schedule_in_plain_dutch_words():
+    words = cron_bots.schedule_in_words
+    assert words("0 9 * * 1") == "elke maandag om 09:00"
+    assert words("30 7 * * 1-5") == "elke werkdag om 07:30"
+    assert words("0 9 * * *") == "elke dag om 09:00"
+    assert words("*/15 * * * *") == "elke 15 minuten"
+    assert words("every 2h") == "elke 2 uur"
+    assert words("0 10 1 * *") == "elke 1e van de maand om 10:00"
+    assert words("*/30 8-18 * * 1-5") == "*/30 8-18 * * 1-5"
+    intro = cron_bots.job_chat_intro({"name": "Digest", "schedule_display": "0 9 * * 1"}, "default")
+    assert "Wanneer: elke maandag om 09:00" in intro
+
+
+def test_run_post_is_dutch_and_names_the_moment():
+    job = {"id": "d1", "name": "Digest", "last_run_at": "2026-10-19T07:00:00+00:00"}
+    text = cwd.build_update_text(job, body="Alles groen.", run_ok=True, run_error=None)
+    assert text.startswith("\U0001f5d3️ Uitkomst van Digest, 19-10-2026 ")
+    assert "Scheduled task" not in text
+    failed = cwd.build_update_text(job, body=None, run_ok=False, run_error="ValueError: stap 3")
+    assert "mislukt" in failed and "stap 3" in failed and "d1" in failed
+
+
+def test_job_detail_labels_and_output_card_are_translated():
+    panels = (ROOT / "static" / "panels.js").read_text(encoding="utf-8")
+    assert "Live output is available only when this profile is active here.' : (t('loading')" not in panels
+    assert "t('cron_output_in_chat', ownerBotTitle)" in panels
+    assert "function _cronScheduleInWords(" in panels
+    assert '<div class="detail-row-label">Schedule</div>' not in panels
+    assert '<div class="detail-row-label">Deliver</div>' not in panels
+    nl = (ROOT / "static" / "i18n" / "nl.js").read_text(encoding="utf-8")
+    for key in ("cron_words_weekly", "cron_output_in_chat", "cron_output_other_bot"):
+        assert f"  {key}: " in nl, key
