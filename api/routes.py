@@ -12753,11 +12753,11 @@ def handle_get(handler, parsed) -> bool:
         base_url = (query.get("base_url", [""])[0] or "").strip() or None
         return j(
             handler,
-            get_reasoning_status(
+            _overlay_personal_reasoning(handler, get_reasoning_status(
                 model_id=model_id,
                 provider_id=provider_id,
                 base_url=base_url,
-            ),
+            ), model_id, provider_id, base_url),
         )
 
     if parsed.path == "/api/onboarding/status":
@@ -14960,6 +14960,21 @@ def handle_post(handler, parsed) -> bool:
                 model_id = str(body.get("model") or "").strip() or None
                 provider_id = str(body.get("provider") or "").strip() or None
                 base_url = str(body.get("base_url") or "").strip() or None
+                # A signed-in person's composer pick is personal (it used to
+                # change the bot's config.yaml for everyone). Only an admin
+                # asking for scope "profile" changes the bot's default.
+                from api.ownership import request_is_admin, request_owner_email
+                _who = request_owner_email(handler)
+                if _who and not (str(body.get("scope") or "") == "profile" and request_is_admin(handler)):
+                    from api import user_prefs
+                    from api.config import VALID_REASONING_EFFORTS
+                    from api.profiles import get_active_profile_name
+                    _raw = str(effort or "").strip().lower()
+                    if _raw and _raw != "none" and _raw not in VALID_REASONING_EFFORTS:
+                        return bad(handler, f"Unknown reasoning effort '{effort}'")
+                    user_prefs.set_reasoning_effort(_who, get_active_profile_name(), _raw)
+                    _status = get_reasoning_status(model_id=model_id, provider_id=provider_id, base_url=base_url)
+                    return j(handler, _overlay_personal_reasoning(handler, _status, model_id, provider_id, base_url))
                 return j(
                     handler,
                     set_reasoning_effort(
@@ -24764,7 +24779,7 @@ def _workspaces_response_list(wss, handler) -> list:
 
     scope = request_owner_scope(handler)
     if scope == "all":
-        return [dict(w) for w in wss]
+        return _personal_workspace_order([dict(w) for w in wss], handler)
 
     from api.workspace_access import ensure_workspace_selection
     out = []
@@ -24782,7 +24797,36 @@ def _workspaces_response_list(wss, handler) -> list:
         if not emails:
             entry["legacy_unowned"] = True
         out.append(entry)
-    return out
+    return _personal_workspace_order(out, handler)
+
+
+def _personal_workspace_order(rows, handler):
+    """Each person's own order of their spaces (presentation, not shared)."""
+    try:
+        from api import user_prefs
+        from api.ownership import request_owner_email
+        from api.profiles import get_active_profile_name
+        who = request_owner_email(handler)
+        if not who:
+            return rows
+        return user_prefs.apply_order(rows, user_prefs.get_workspace_order(who, get_active_profile_name()))
+    except Exception:
+        logger.debug("personal workspace order failed", exc_info=True)
+        return rows
+
+
+def _workspace_manage_allowed(w, handler) -> bool:
+    """Shared attributes of a space (name, category) are owner/admin only.
+
+    Members may use a space but not rename or recategorise it for everyone;
+    legacy spaces without an owner are admin-managed.
+    """
+    from api.ownership import request_is_admin, request_owner_scope
+    scope = request_owner_scope(handler)
+    if scope == "all" or request_is_admin(handler):
+        return True
+    owner = str(w.get("owner_email") or "").strip().lower()
+    return bool(owner) and owner == scope
 
 
 def _handle_workspace_add(handler, body):
@@ -24878,10 +24922,13 @@ def _handle_workspace_rename(handler, body):
     wss = load_workspaces()
     for w in wss:
         if w["path"] == path_str:
-            # Ownership boundary (user isolation): only owner/members/admins
-            # may rename an owned entry; legacy ownerless stays open.
+            # Ownership boundary: the name and category are shared by
+            # everyone who uses this space, so only its owner or an admin may
+            # change them (members could rename it for everyone before).
             if not _workspace_visible_to(w, handler):
                 return bad(handler, "forbidden", 403)
+            if not _workspace_manage_allowed(w, handler):
+                return bad(handler, "Only the owner or an admin can rename this space; it changes it for everyone.", 403)
             if name:
                 w["name"] = name
             if has_category:
@@ -24906,9 +24953,21 @@ def _handle_workspace_reorder(handler, body):
     paths = body.get("paths", [])
     if not paths or not isinstance(paths, list):
         return bad(handler, "paths is required and must be a list")
-    from api.ownership import request_is_admin
+    from api.ownership import request_is_admin, request_owner_email
 
     wss = load_workspaces()
+    _who = request_owner_email(handler)
+    if _who and not (str(body.get("scope") or "") == "default" and request_is_admin(handler)):
+        # Order is a personal preference: store it for this person only. The
+        # shared registry order stays the default for everyone else (an admin
+        # can still change that default with scope "default").
+        from api import user_prefs
+        from api.profiles import get_active_profile_name
+        visible = {w["path"] for w in _workspaces_response_list(wss, handler)}
+        user_prefs.set_workspace_order(_who, get_active_profile_name(),
+                                       [str(p).strip() for p in paths if str(p).strip() in visible])
+        return j(handler, {"ok": True, "scope": "personal",
+                           "workspaces": _workspaces_response_list(wss, handler)})
     if request_is_admin(handler):
         # Admins reorder the full list: given order first, then any omitted
         # entries appended at the end (safety net, preserves data).
@@ -28345,3 +28404,27 @@ def _handle_project_folders_post(handler, parsed, body) -> bool:
     except ValueError as exc:
         return bad(handler, str(exc), 400)
     return j(handler, {"ok": True, "folders": project_folders.visible_folders(project, _project_folder_can_open(handler))})
+
+
+def _overlay_personal_reasoning(handler, status, model_id=None, provider_id=None, base_url=None):
+    """Show the signed-in person's own thinking level instead of the bot default."""
+    try:
+        from api import user_prefs
+        from api.ownership import request_owner_email
+        from api.profiles import get_active_profile_name
+        from api.config import coerce_reasoning_effort_for_model
+        who = request_owner_email(handler)
+        mine = user_prefs.get_reasoning_effort(who, get_active_profile_name()) if who else None
+        if mine is None or not isinstance(status, dict):
+            if isinstance(status, dict):
+                status = dict(status, reasoning_scope="profile")
+            return status
+        out = dict(status)
+        out["profile_reasoning_effort"] = status.get("reasoning_effort")
+        out["reasoning_effort"] = coerce_reasoning_effort_for_model(
+            mine, model_id, provider_id=provider_id, base_url=base_url) if model_id else mine
+        out["reasoning_scope"] = "personal"
+        return out
+    except Exception:
+        logger.debug("personal reasoning overlay failed", exc_info=True)
+        return status

@@ -8457,6 +8457,16 @@ def _run_agent_streaming(
             try:
                 _effort_cfg = _cfg.get('agent', {}) if isinstance(_cfg, dict) else {}
                 _effort_raw = _effort_cfg.get('reasoning_effort') if isinstance(_effort_cfg, dict) else None
+                # The person who started this turn may have their own level
+                # for this bot (api/user_prefs.py); it wins over the default.
+                try:
+                    from api import user_prefs as _user_prefs
+                    _mine = _user_prefs.get_reasoning_effort(
+                        _turn_principal, execution_profile or getattr(s, 'profile', None) or 'default')
+                    if _mine:
+                        _effort_raw = _mine
+                except Exception:
+                    pass
                 _effort = coerce_reasoning_effort_for_model(
                     _effort_raw,
                     resolved_model,
