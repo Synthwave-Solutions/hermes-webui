@@ -1236,6 +1236,7 @@ window.__registerHermesLocale('en', {
     bot_org_chart: 'Org chart',
     bot_org_chart_intro: 'Who reports to whom. Set this per bot under Edit, field Reports to. Click a bot to open it.',
     bot_org_chart_empty: 'No bots to show yet.',
+    bot_org_chart_unplaced: "Not placed: bots without a place in the org chart. Set 'Reports to' on a bot to place it.",
     bot_prompt: 'Prompt and instructions',
     bot_knowledge: 'Bot memory',
     bot_tools: 'Tools, MCP and settings',

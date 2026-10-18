@@ -7790,6 +7790,7 @@ main.main.showing-approvals > #mainApprovals{display:flex;}
 .bot-org-scroll{overflow-x:auto;padding:8px 0 16px;}
 .bot-org-tree,.bot-org-children{list-style:none;margin:0;padding:0;display:flex;justify-content:center;position:relative;}
 .bot-org-tree{flex-wrap:wrap;gap:24px 16px;align-items:flex-start;}
+.bot-org-loose-title{margin-top:32px;text-align:center;}
 .bot-org-children{padding-top:20px;}
 .bot-org-children::before{content:'';position:absolute;top:0;left:50%;height:20px;border-left:1px solid var(--border2);}
 .bot-org-node{display:flex;flex-direction:column;align-items:center;position:relative;}

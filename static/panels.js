@@ -8041,8 +8041,17 @@ async function openBotOrgChart(){
   else{
     const {roots,kids}=_botOrgTree(list),seen=new Set(),ul=document.createElement('ul');
     ul.className='bot-org-tree';ul.setAttribute('aria-label',t('bot_org_chart'));
-    roots.forEach(p=>{if(!seen.has(p.name))ul.appendChild(_botOrgNode(p,kids,seen));});
+    // Bots without a manager and without anyone below them are not part of the
+    // organisation yet: list them apart so the tree itself stays readable.
+    const placed=roots.filter(p=>kids.has(p.name)),loose=roots.filter(p=>!kids.has(p.name));
+    (placed.length?placed:loose).forEach(p=>{if(!seen.has(p.name))ul.appendChild(_botOrgNode(p,kids,seen));});
     scroll.appendChild(ul);
+    if(placed.length&&loose.length){
+      const h=document.createElement('p');h.className='bot-field-hint bot-org-loose-title';h.textContent=t('bot_org_chart_unplaced');
+      const lu=document.createElement('ul');lu.className='bot-org-tree bot-org-loose';
+      loose.forEach(p=>{if(!seen.has(p.name))lu.appendChild(_botOrgNode(p,kids,seen));});
+      scroll.appendChild(h);scroll.appendChild(lu);
+    }
   }
   document.querySelectorAll('.profile-card').forEach(e=>e.classList.remove('active'));
   body.style.display='';

@@ -35,11 +35,14 @@ const bots=[
    const node=li=>({name:li.querySelector(':scope>.bot-org-card').dataset.name,kids:[...li.querySelectorAll(':scope>.bot-org-children>.bot-org-node')].map(node)});
    return [...document.querySelectorAll('.bot-org-tree>.bot-org-node')].map(node);
   });
-  // Real roots first (a hidden manager makes a root), then a stored cycle surfaced once.
-  assert.deepEqual(shape.map(n=>n.name),['ceo','orphan','loopa']);
+  // Roots with people below them form the tree (a stored cycle surfaced once);
+  // a bot with no place (here: its manager is hidden) is listed apart.
+  assert.deepEqual(shape.map(n=>n.name),['ceo','loopa','orphan']);
   assert.deepEqual(shape[0].kids.map(n=>n.name),['cfo','coo']);
   assert.deepEqual(shape[0].kids[0].kids.map(n=>n.name),['books']);
-  assert.deepEqual(shape[2].kids.map(n=>n.name),['loopb']);
+  assert.deepEqual(shape[1].kids.map(n=>n.name),['loopb']);
+  assert.deepEqual(await p.evaluate(()=>[...document.querySelectorAll('.bot-org-loose>.bot-org-node>.bot-org-card')].map(c=>c.dataset.name)),['orphan']);
+  assert.equal(await p.locator('.bot-org-loose-title').count(),1);
   assert.equal(await p.locator('.bot-org-card').count(),bots.length);
   assert.equal(await p.textContent('#profileDetailTitle'),'bot_org_chart');
   await p.click('.bot-org-card[data-name="books"]');

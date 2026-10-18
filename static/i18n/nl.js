@@ -1128,6 +1128,7 @@ window.__registerHermesLocale('nl', {
   bot_org_chart: 'Organigram',
   bot_org_chart_intro: 'Wie rapporteert aan wie. Stel dit per bot in bij Bewerken, veld Rapporteert aan. Klik op een bot om hem te openen.',
   bot_org_chart_empty: 'Er zijn nog geen bots om te tonen.',
+  bot_org_chart_unplaced: "Niet ingedeeld: bots zonder plek in het organigram. Kies bij zo'n bot 'Rapporteert aan' om hem in te delen.",
   bot_prompt: 'Prompt en instructies',
   bot_knowledge: 'Geheugen van de bot',
   bot_tools: 'Tools, MCP en instellingen',
