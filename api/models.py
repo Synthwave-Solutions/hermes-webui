@@ -1080,6 +1080,7 @@ class Session:
                  anchor_activity_scenes=None,
                  cost_status=None, cost_source=None,
                  share_token=None, share_created_at=None,
+                 cron_job=None,
                  **kwargs):
         self.session_id = session_id or uuid.uuid4().hex[:12]
         self.title = title
@@ -1160,6 +1161,11 @@ class Session:
         self.bot_participants = normalize_bots(bot_participants)
         self.default_bot = kwargs.get("default_bot") if kwargs.get("default_bot") in self.bot_participants else None
         self.composer_draft = composer_draft if isinstance(composer_draft, dict) else {}
+        # Job chat link (Michael Ramirez, 18 Oct 2026): the scheduled job whose
+        # results land in this conversation, as {"job_id", "profile"}; None for
+        # every ordinary chat. See api/cron_bots.py.
+        from api.cron_bots import normalize_job_link
+        self.cron_job = normalize_job_link(cron_job)
         self.anchor_activity_scenes = anchor_activity_scenes if isinstance(anchor_activity_scenes, dict) else {}
         raw_message_count = kwargs.get('message_count')
         parsed_message_count = None
@@ -1233,6 +1239,7 @@ class Session:
             'worktree_path', 'worktree_branch', 'worktree_repo_root', 'worktree_created_at',
             'is_cli_session', 'source_tag', 'raw_source', 'session_source', 'source_label', 'read_only',
             'enabled_toolsets', 'chat_mode', 'participants', 'bot_participants', 'default_bot', 'project_shared', 'composer_draft', 'anchor_activity_scenes',
+            'cron_job',
         ]
         meta = {k: getattr(self, k, None) for k in METADATA_FIELDS}
         meta['message_count'] = len(self.messages or [])
@@ -1514,6 +1521,8 @@ class Session:
             'share_token': self.share_token,
             'share_created_at': self.share_created_at,
             'composer_draft': self.composer_draft if isinstance(self.composer_draft, dict) else {},
+            # Only job chats carry the link (api/cron_bots.py), like parent_session_id.
+            **({'cron_job': dict(self.cron_job)} if getattr(self, 'cron_job', None) else {}),
             'is_streaming': _is_streaming_session(
                 self.active_stream_id, active_stream_ids
             ) if include_runtime else False,

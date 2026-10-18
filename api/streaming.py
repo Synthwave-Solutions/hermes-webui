@@ -8811,6 +8811,17 @@ def _run_agent_streaming(
                 s, _turn_identity, execution_profile or getattr(s, 'profile', None) or 'default')
             if _bot_awareness:
                 agent.ephemeral_system_prompt += '\n\n' + _bot_awareness
+            # A chat about scheduled jobs (its job chat, or the chat a job
+            # posts its results into) gets that job's live context, so a
+            # follow-up like "why did this fail" works (api/cron_bots.py).
+            try:
+                from api.cron_bots import context_prompt as _cron_job_context_prompt
+                _cron_job_context = _cron_job_context_prompt(s, _turn_identity)
+            except Exception:
+                logger.debug("scheduled job context unavailable", exc_info=True)
+                _cron_job_context = ''
+            if _cron_job_context:
+                agent.ephemeral_system_prompt += '\n\n' + _cron_job_context
             _pending_started_at = getattr(s, 'pending_started_at', None)
             # Normal chat-start sets pending_started_at before spawning this thread;
             # fallback to now only for recovered/legacy flows where that marker is absent

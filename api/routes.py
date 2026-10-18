@@ -13853,8 +13853,11 @@ def handle_get(handler, parsed) -> bool:
             if exc.name in ("cron", "cron.jobs"):
                 return j(handler, {"jobs": [], "cron_unavailable": True})
             raise
-        all_profiles = _all_profiles_enabled(parsed) and _cron_admin_allowed(handler)
-        if not all_profiles:
+        # Every caller may list the jobs of all bots (bot-owned jobs, 18 Oct
+        # 2026: filter the Tasks panel by bot); non cron:admin callers only
+        # get the rows inside their scope, whichever bot owns them.
+        all_profiles = _all_profiles_enabled(parsed)
+        if not _cron_admin_allowed(handler):
             # Governance scope filter (26 Aug 2026 report): non cron:admin
             # callers only see rows from profiles inside their scope. Logic
             # lives in api/cron_scope.py to keep this shared route minimal.
@@ -13863,6 +13866,11 @@ def handle_get(handler, parsed) -> bool:
         _promote_prompt_diagrams(active_jobs)
         _promote_prompt_categories(active_jobs)
         jobs = active_jobs + other_jobs if all_profiles else active_jobs
+        try:
+            from api.cron_bots import annotate_job_chats
+            annotate_job_chats(jobs, _cron_request_email(handler))
+        except Exception:
+            logger.debug("cron job chat links unavailable", exc_info=True)
         hidden_other_count = 0 if all_profiles else len(other_jobs)
         return j(handler, {
             "jobs": jobs,
@@ -15852,6 +15860,14 @@ def handle_post(handler, parsed) -> bool:
         with cron_profile_context(), _cron_policy_file_pin(_cron_policy):
             _ensure_agent_cron_import_path()
             return _handle_cron_update(handler, body)
+
+    # Choose the bot that owns a job (bot-owned jobs, 18 Oct 2026). Acts on
+    # two named stores, so it does not use the active-store context.
+    if parsed.path == "/api/crons/owner":
+        _ensure_agent_cron_import_path()
+        _cron_policy = _cron_request_policy_path()
+        with _cron_policy_file_pin(_cron_policy):
+            return _handle_cron_owner(handler, body)
 
     # Set or clear the viewer's own mute for one job (plan 3.1).
     if parsed.path == "/api/crons/notifications":
@@ -20781,6 +20797,94 @@ def _handle_cron_status(handler, parsed):
     return j(handler, {"running": all_running})
 
 
+def _cron_recent_other_store_jobs(handler) -> list:
+    """Jobs of the bots other than the active one whose completions belong to
+    the caller (own, shared, or every job for admins), each with its
+    ``owner_profile``. Read-only and lock-free (api/cron_bots.read_store_jobs).
+    """
+    from api import cron_bots
+    from api.cron_scope import _identity_for, scope_cron_completions
+    from api.profiles import get_active_hermes_home
+
+    active_key = cron_bots._home_key(get_active_hermes_home())
+    rows = []
+    for owner, home in cron_bots.store_homes():
+        if cron_bots._home_key(home) == active_key:
+            continue
+        for job in cron_bots.read_store_jobs(home):
+            rows.append(dict(job, owner_profile=owner))
+    if not rows:
+        return []
+    return scope_cron_completions(_identity_for(handler), rows)
+
+
+def _handle_cron_owner(handler, body):
+    """POST /api/crons/owner: make another bot the owner of a job.
+
+    Body ``{job_id, from_profile, to_profile}``. The caller must see the job
+    (api/cron_scope.py), own it or hold ``cron:admin``, and be allowed to use
+    the new bot (``cron:admin`` may choose any). Moves the job record to that
+    bot's store (api/cron_bots.move_job), so it runs as that bot and reports
+    in its chats. Under ``report_only`` a refusal is audited and allowed.
+    """
+    import api.cron_scope as cron_scope
+    from api import cron_bots
+    from api.governance.enforce import _request_identity
+
+    job_id = _cron_body_job_id(body)
+    if job_id is None:
+        return bad(handler, "job_id required")
+    names = _available_cron_profile_names()
+    src = cron_bots.normalize_profile(body.get("from_profile"))
+    dst_raw = str(body.get("to_profile") or "").strip()
+    if not dst_raw:
+        return bad(handler, "to_profile required")
+    dst = cron_bots.normalize_profile(dst_raw)
+    if src not in names or dst not in names:
+        return bad(handler, "Bot not found", 404)
+    job, _owner = cron_bots.find_job(job_id, src)
+    identity = _request_identity(handler)
+    if job is None or not cron_scope.identity_sees_cron_row(identity, job, store_profile=src):
+        return bad(handler, "Job not found", 404)
+    is_admin = _cron_admin_allowed(handler)
+    path = "/api/crons/owner"
+    if not is_admin and not cron_scope.identity_owns_cron_job(identity, job):
+        refusal = _cron_write_refusal(identity, path, "cron_owner",
+                                      "Only the owner of this task or a cron admin can choose its bot.", job_id)
+        if refusal:
+            return j(handler, refusal[1], status=refusal[0])
+    if not is_admin and not _chat_profile_target_allowed(handler, dst):
+        refusal = _cron_write_refusal(identity, path, "profile_not_allowed",
+                                      "You cannot use this bot.", job_id)
+        if refusal:
+            return j(handler, refusal[1], status=refusal[0])
+    already_running, _elapsed = _is_cron_running(job_id)
+    if already_running:
+        return j(handler, {"error": "This task is running right now. Try again when the run is done.",
+                           "reason": "job_running"}, status=409)
+    try:
+        moved = cron_bots.move_job(job_id, src, dst)
+    except cron_bots.OwnerChangeError as e:
+        return j(handler, {"error": e.message, "reason": e.reason}, status=e.status)
+    except Exception as e:
+        logger.warning("cron owner change failed for %s", job_id, exc_info=True)
+        return j(handler, {"error": str(e)}, status=500)
+    try:
+        from api.governance.audit import append_audit_event
+        from api.governance.enforce import subject_from_identity
+
+        subject = subject_from_identity(identity)
+        append_audit_event(
+            "cron_owner_changed", subject_email=subject.email, subject_user_id=subject.user_id,
+            path=path, method="POST", reason="owner_changed",
+            extra={"job_id": job_id, "from_profile": src, "to_profile": dst},
+        )
+    except Exception:
+        logger.debug("cron owner change audit append failed", exc_info=True)
+    row = dict(moved, owner_profile=dst, read_only=not _profiles_match(dst, _get_active_profile_name() or "default"))
+    return j(handler, {"ok": True, "job": row, "from_profile": src, "to_profile": dst})
+
+
 def _handle_cron_recent(handler, parsed):
     """Return cron jobs that have completed since a given timestamp."""
     import datetime
@@ -20805,16 +20909,27 @@ def _handle_cron_recent(handler, parsed):
             jobs = scope_cron_completions_for_caller(handler, jobs)
         except Exception:
             logger.debug("cron completion scoping unavailable; serving unscoped", exc_info=True)
+        # Jobs owned by the other bots report to their person too (bot-owned
+        # jobs, 18 Oct 2026). Never unscoped: a scope failure drops them.
+        try:
+            jobs = list(jobs) + _cron_recent_other_store_jobs(handler)
+        except Exception:
+            logger.debug("cron completions of other bots unavailable", exc_info=True)
         # Delivery outcome is tracked SEPARATELY from run status (scheduler
         # delivery ticket, 2026-08-26): a run whose last_status is ok but whose
         # update never reached its target must not be reported as plain ok.
         # One ledger read serves the whole completion list.
         try:
-            from api.cron_webui_delivery import delivery_state_for_job, load_ledger
+            from api.cron_webui_delivery import (
+                delivered_session_for_job,
+                delivery_state_for_job,
+                load_ledger,
+            )
 
             _delivery_ledger = load_ledger()
         except Exception:
             delivery_state_for_job = None
+            delivered_session_for_job = None
             _delivery_ledger = None
         # Per-viewer in-app flags (plan 3.1): api/cron_notifications.py.
         try:
@@ -20845,6 +20960,16 @@ def _handle_cron_recent(handler, parsed):
                     "completed_at": ts,
                     "toast_notifications": job.get("toast_notifications") is not False,
                 }
+                if job.get("owner_profile"):
+                    completion["owner_profile"] = job.get("owner_profile")
+                if delivered_session_for_job is not None:
+                    # The chat the result was posted into: a notice opens it.
+                    try:
+                        chat_sid = delivered_session_for_job(job, _delivery_ledger)
+                    except Exception:
+                        chat_sid = None
+                    if chat_sid:
+                        completion["chat_session_id"] = chat_sid
                 if delivery_state_for_job is not None:
                     try:
                         delivery_status, delivery_error = delivery_state_for_job(

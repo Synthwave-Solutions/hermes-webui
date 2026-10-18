@@ -421,12 +421,12 @@ def test_watermark_is_persisted_before_delivery(bridge_env, monkeypatch):
     seen = {}
     real_deliver = cwd.deliver_update_to_session
 
-    def _spy(session_id, text, job_arg):
+    def _spy(session_id, text, job_arg, **kwargs):
         on_disk = json.loads(
             (bridge_env.state_dir / cwd.LEDGER_FILENAME).read_text(encoding="utf-8")
         )
         seen["entry"] = on_disk["jobs"].get("job13")
-        return real_deliver(session_id, text, job_arg)
+        return real_deliver(session_id, text, job_arg, **kwargs)
 
     monkeypatch.setattr(cwd, "deliver_update_to_session", _spy)
     actions = cwd.process_jobs_once([job], home=bridge_env.home)
