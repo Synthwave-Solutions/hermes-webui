@@ -7984,10 +7984,78 @@ function botAvatarHtml(p){
   const face=meta.shape==='hexagon'?'<polygon points="16,2 29,9 29,23 16,30 3,23 3,9"/>':meta.shape==='squircle'?'<rect x="2" y="2" width="28" height="28" rx="7"/>':'<circle cx="16" cy="16" r="14"/>';
   return `<svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true" style="vertical-align:middle;margin-right:8px"><g fill="${color}">${face}</g><g fill="white"><circle cx="11" cy="14" r="2"/><circle cx="21" cy="14" r="2"/></g><path d="M11 21 Q16 25 21 21" fill="none" stroke="white" stroke-width="2"/></svg>`;
 }
+// Org chart between bots: ui_meta.hermes-bots.reports_to names the manager bot.
+// The server rejects unknown managers, the bot itself and cycles; the editor
+// already leaves out the bot and everyone below it so a cycle cannot be picked.
+function _botOrgList(){ return (((_profilesCache||{}).profiles)||[]).filter(p=>p&&p.name); }
+function _botManagerOf(p){ return String((p&&p.bot&&p.bot.reports_to)||'').trim(); }
+function _botDescendants(name, list){
+  const below=new Set([name]);let grew=true;
+  while(grew){grew=false;for(const p of list){if(!below.has(p.name)&&below.has(_botManagerOf(p))){below.add(p.name);grew=true;}}}
+  return below;
+}
+function _botReportsToSelectHtml(p){
+  const list=_botOrgList(),current=_botManagerOf(p),blocked=_botDescendants(p.name,list);
+  const options=list.filter(x=>!blocked.has(x.name)).sort((a,b)=>botDisplayName(a).localeCompare(botDisplayName(b)));
+  let html=`<option value="">${esc(t('bot_reports_to_none'))}</option>`;
+  if(current&&!options.some(x=>x.name===current)) html+=`<option value="${esc(current)}" selected>${esc(t('bot_reports_to_hidden'))}</option>`;
+  for(const x of options) html+=`<option value="${esc(x.name)}" ${x.name===current?'selected':''}>${esc(botDisplayName(x))}</option>`;
+  return `<select id="botReportsTo">${html}</select>`;
+}
+function _botOrgTree(list){
+  const byName=new Map(list.map(p=>[p.name,p])),kids=new Map(),roots=[];
+  for(const p of list){
+    const m=_botManagerOf(p);
+    if(m&&m!==p.name&&byName.has(m)){if(!kids.has(m))kids.set(m,[]);kids.get(m).push(p);}else roots.push(p);
+  }
+  const order=(a,b)=>botDisplayName(a).localeCompare(botDisplayName(b));
+  roots.sort(order);for(const v of kids.values())v.sort(order);
+  // A stored cycle (written outside this UI) has no root; surface its members as roots.
+  const reached=new Set();const walk=p=>{if(reached.has(p.name))return;reached.add(p.name);(kids.get(p.name)||[]).forEach(walk);};
+  roots.forEach(walk);
+  for(const p of list.slice().sort(order)) if(!reached.has(p.name)){roots.push(p);walk(p);}
+  return {roots,kids};
+}
+function _botOrgNode(p, kids, seen){
+  const li=document.createElement('li');li.className='bot-org-node';
+  const card=document.createElement('button');card.type='button';card.className='bot-org-card';card.dataset.name=p.name;
+  if(_currentProfileDetail&&_currentProfileDetail.name===p.name)card.classList.add('active');
+  const label=[(p.bot&&p.bot.role)||'',(p.bot&&p.bot.category)||''].filter((v,i,a)=>v&&a.indexOf(v)===i).join(' \u00b7 ');
+  card.innerHTML=`<span class="bot-org-avatar">${botAvatarHtml(p)}</span><span class="bot-org-text"><span class="bot-org-name">${esc(botDisplayName(p))}</span>${label?`<span class="bot-org-meta">${esc(label)}</span>`:''}</span>`;
+  card.addEventListener('click',()=>openProfileDetail(p.name));
+  li.appendChild(card);seen.add(p.name);
+  const children=(kids.get(p.name)||[]).filter(c=>!seen.has(c.name));
+  if(children.length){const ul=document.createElement('ul');ul.className='bot-org-children';children.forEach(c=>ul.appendChild(_botOrgNode(c,kids,seen)));li.appendChild(ul);}
+  return li;
+}
+async function openBotOrgChart(){
+  if(window.BotBuilder)window.BotBuilder.invalidate();
+  const title=$('profileDetailTitle'),body=$('profileDetailBody'),empty=$('profileDetailEmpty');
+  if(!title||!body)return;
+  if(!_profilesCache){try{_profilesCache=await api('/api/profiles?fast=1');}catch(e){showToast(e.message);return;}}
+  title.textContent=t('bot_org_chart');
+  const list=_botOrgList();
+  body.innerHTML=`<div class="main-view-content bot-org-view"><p class="bot-field-hint">${esc(t('bot_org_chart_intro'))}</p><div class="bot-org-scroll"></div></div>`;
+  const scroll=body.querySelector('.bot-org-scroll');
+  if(!list.length){scroll.innerHTML=`<p class="bot-field-hint">${esc(t('bot_org_chart_empty'))}</p>`;}
+  else{
+    const {roots,kids}=_botOrgTree(list),seen=new Set(),ul=document.createElement('ul');
+    ul.className='bot-org-tree';ul.setAttribute('aria-label',t('bot_org_chart'));
+    roots.forEach(p=>{if(!seen.has(p.name))ul.appendChild(_botOrgNode(p,kids,seen));});
+    scroll.appendChild(ul);
+  }
+  document.querySelectorAll('.profile-card').forEach(e=>e.classList.remove('active'));
+  body.style.display='';
+  if(empty)empty.style.display='none';
+  _profileMode='read';
+  _currentProfileDetail=null;
+  _setProfileHeaderButtons('help');
+  _closeMobileSidebarAfterPanelSelection();
+}
 async function saveBotAppearance(){
   const p=_currentProfileDetail;if(!p)return;
   try{
-    await api('/api/profile/appearance',{method:'POST',body:JSON.stringify({name:p.name,revision:p.bot_revision||0,bot:{title:$('botTitle').value,description:$('botDescription').value,shape:$('botShape').value,color:$('botColor').value,knowledge_sources:p.bot_knowledge_sources||[],category:($('botCategory')?String($('botCategory').value||'').trim():'')}})});
+    await api('/api/profile/appearance',{method:'POST',body:JSON.stringify({name:p.name,revision:p.bot_revision||0,bot:{title:$('botTitle').value,description:$('botDescription').value,shape:$('botShape').value,color:$('botColor').value,knowledge_sources:p.bot_knowledge_sources||[],category:($('botCategory')?String($('botCategory').value||'').trim():''),role:($('botRole')?String($('botRole').value||'').trim():''),reports_to:($('botReportsTo')?String($('botReportsTo').value||''):'')}})});
     _profileDropdownClearStoredCache();
     window.dispatchEvent(new CustomEvent('synpulse:bot-updated'));
     await loadProfilesPanel();showToast(t('bot_saved'));
@@ -8181,6 +8249,8 @@ function _renderProfileDetail(p, activeName){
             <label for="botShape">${esc(t('bot_avatar'))}<select id="botShape">${['circle','squircle','hexagon'].map(shape=>`<option value="${shape}" ${(p.bot&&p.bot.shape)===shape?'selected':''}>${shape}</option>`).join('')}</select></label>
             <label for="botColor">${esc(t('bot_color'))}<input type="color" id="botColor" value="${/^#[0-9a-f]{6}$/i.test((p.bot&&p.bot.color)||'')?p.bot.color:'#6688aa'}"></label>
             <label class="bot-editor-wide" for="botCategory">${esc(t('category_label')||'Category')}<input type="hidden" id="botCategory" data-sp-picker data-sp-source="sp:categories" data-sp-custom="1" value="${esc((p.bot&&p.bot.category)||'')}" placeholder="${esc(t('cron_category_placeholder')||'Pick a category or add one')}"></label>
+            <label for="botRole">${esc(t('bot_role'))}<input id="botRole" value="${esc((p.bot&&p.bot.role)||'')}" maxlength="80" placeholder="${esc(t('bot_role_placeholder'))}"></label>
+            <label for="botReportsTo">${esc(t('bot_reports_to'))}${_botReportsToSelectHtml(p)}</label>
             <label class="bot-editor-wide" for="botAvatarFile">${esc(t('bot_upload'))}<input id="botAvatarFile" type="file" accept="image/png,image/jpeg,image/webp" onchange="uploadBotAvatar(this)" aria-describedby="botAvatarHint"></label>
           </div>
           <p class="bot-field-hint" id="botAvatarHint">${esc(t('bot_avatar_limit'))}</p>

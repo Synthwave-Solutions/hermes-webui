@@ -6,6 +6,7 @@
   'use strict';
   const entries = {
   "webui.chat.bot_screens": {"panel": "chat", "targets": ["#workspaceScreensTab"], "entryTargets": ["#btnWorkspacePanelToggle", "#btnWorkspacePanelEdgeToggle"], "entryHint": {"nl": "Open het rechterzijpaneel en kies Bot Screens. Het tabblad verschijnt als je schermrechten hebt.", "en": "Open the right panel and choose Bot Screens. The tab appears when you have screen access."}},
+  "webui.bots.org_chart": {"panel":"profiles", "targets":["#btnBotOrgChart"], "entryTargets":[".rail [data-panel=\"profiles\"]"], "entryHint":{"nl":"Open Bots en kies bovenaan de lijst Organigram. Rapporteert aan stel je per bot in bij Bewerken.","en":"Open Bots and choose Org chart at the top of the list. Set Reports to per bot under Edit."}},
   "webui.bots.screens": {"panel":"profiles", "targets":["#btnBotScreens"], "entryTargets":[".rail [data-panel=\"profiles\"]"], "entryHint":{"nl":"Open Bots. Met expliciete schermrechten verschijnt daar Bot Screens; zonder die rechten kan je beheerder toegang instellen.","en":"Open Bots. Bot Screens appears with explicit screen grants; otherwise your administrator can configure access."}},
   "webui.help.navigation": {
     "panel": "chat",

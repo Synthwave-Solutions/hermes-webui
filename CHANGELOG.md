@@ -5,6 +5,8 @@
 
 ### Changed
 
+- **Bots can report to another bot, and the Bots list has an org chart.** The bot editor gains Reports to (another bot or nobody) and an optional Department or role. The server rejects unknown bots, the bot itself and reporting cycles, and a new manager must be a bot the editor can see. The Org chart button on the Bots list shows the tree with avatars, names and department; clicking a bot opens it. Narrow screens show an indented list. Reports to is structure only: it grants no rights and does not route work between bots.
+
 - **Bots now have friendly names, uploaded photos and profile-specific configuration entry points.** Group conversations can include people and up to six bots, with explicit Talk to targeting and original-sender governance. Saved knowledge references are read through governed tools in the conversation workspace; they are not vector RAG. See [the Bots guide](docs/bots.md).
 
 - **Approval explanations are visible even when generated advice is unavailable.** New supported WebUI requests preserve the first original ask as a redacted summary of at most 400 characters. Historical missing context remains explicitly unknown.

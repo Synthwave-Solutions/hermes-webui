@@ -16308,6 +16308,14 @@ def handle_post(handler, parsed) -> bool:
             from api.governance.enforce import _request_identity
             if bot_builder.managed(name) is not None:
                 bot_builder.require_edit(_request_identity(handler), name)
+            # A new manager must be a bot this caller may see; an unchanged
+            # value (possibly hidden from this caller) is kept as is.
+            values = body.get("bot")
+            manager = values.get("reports_to") if isinstance(values, dict) else None
+            if isinstance(manager, str) and manager.strip() and not parsed.path.endswith("/avatar"):
+                stored = str(bot_metadata.read_profile(name).get("bot", {}).get("reports_to") or "").strip()
+                if manager.strip() != stored and not _chat_profile_target_allowed(handler, manager.strip()):
+                    return bad(handler, "Unknown manager bot", 400)
             result = bot_metadata.save_avatar(name,body.get("avatar")) if parsed.path.endswith("/avatar") else bot_metadata.save_profile(name,body.get("bot"),body.get("revision"))
             return j(handler,{"ok":True, **result})
         except PermissionError as exc:

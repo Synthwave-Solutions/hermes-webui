@@ -5065,6 +5065,57 @@ window.SynthPulseFeatureCatalog = {
       }
     },
     {
+      "id": "webui.bots.org_chart",
+      "area": "bots",
+      "status": "available",
+      "conditions": [],
+      "anchors": [
+        "?help_feature=webui.bots.org_chart",
+        "#btnBotOrgChart",
+        "#botReportsTo",
+        "#botRole"
+      ],
+      "source_refs": [
+        "static/index.html:352",
+        "static/panels.js:8031",
+        "static/panels.js:8252",
+        "static/panels.js:8253",
+        "api/bot_metadata.py"
+      ],
+      "related": [
+        "webui.bots.select",
+        "webui.bots.appearance"
+      ],
+      "locales": {
+        "en": {
+          "title": "Bot org chart",
+          "purpose": "See which bot reports to which bot, as a tree of your team of bots.",
+          "when": "When you organise bots like a team, for example a leading bot with specialists per department.",
+          "steps": [
+            "Open a bot, choose Edit and pick a manager under Reports to. Optionally fill in Department or role, then save.",
+            "Open Bots and click the Org chart button at the top of the list.",
+            "Click a bot in the org chart to open it."
+          ],
+          "permissions": "Editing who a bot reports to requires bot management rights. You only see bots you have access to.",
+          "limits": "Reports to is shown for structure only: it does not grant a bot rights or let it give instructions to other bots. A bot cannot report to itself or to a bot below it. On narrow screens the chart is shown as an indented list.",
+          "example": "Let the finance bots report to a CFO bot, which reports to the leading bot."
+        },
+        "nl": {
+          "title": "Organigram van bots",
+          "purpose": "Bekijk welke bot aan welke bot rapporteert, als boomstructuur van je botteam.",
+          "when": "Als je bots organiseert als een team, bijvoorbeeld een leidende bot met specialisten per afdeling.",
+          "steps": [
+            "Open een bot, kies Bewerken en kies bij Rapporteert aan een leidinggevende bot. Vul eventueel Afdeling of rol in en sla op.",
+            "Open Bots en klik bovenaan de lijst op de knop Organigram.",
+            "Klik op een bot in het organigram om hem te openen."
+          ],
+          "permissions": "Voor het wijzigen van Rapporteert aan heb je beheerrechten voor bots nodig. Je ziet alleen bots waar je toegang toe hebt.",
+          "limits": "Rapporteert aan is alleen voor de structuur: het geeft een bot geen rechten en laat hem geen opdrachten geven aan andere bots. Een bot kan niet aan zichzelf rapporteren of aan een bot onder hem. Op smalle schermen verschijnt het organigram als ingesprongen lijst.",
+          "example": "Laat de financebots rapporteren aan een CFO-bot, die weer rapporteert aan de leidende bot."
+        }
+      }
+    },
+    {
       "id": "webui.bots.manage",
       "area": "bots",
       "status": "available",

@@ -6,6 +6,9 @@ import yaml
 
 _LOCK = threading.RLock()
 SHAPES = ('circle','squircle','hexagon')
+BOT_TEXT_FIELDS = ('title','description','shape','color','category','role','reports_to')
+# Upper bound for walking a reports_to chain; real org charts are a few levels deep.
+_MAX_CHAIN = 256
 
 def _path(name):
     from api import profiles
@@ -43,7 +46,7 @@ def read_profile(name):
         image_url='/api/profile/avatar?profile='+quote(name)+'&v='+str(image.stat().st_mtime_ns) if image.is_file() and not image.is_symlink() else ''
         return {
             'bot_configuration':configuration_summary(path.parent),
-            'bot':{k:meta[k] for k in ('title','description','shape','color','category') if isinstance(meta.get(k),str)},
+            'bot':{k:meta[k] for k in BOT_TEXT_FIELDS if isinstance(meta.get(k),str)},
             'bot_knowledge_sources':meta.get('knowledge_sources',[]) if isinstance(meta.get('knowledge_sources'),list) else [],
             'bot_revision':max(0,revision) if isinstance(revision,int) and not isinstance(revision,bool) else 0,
             'bot_avatar_url':image_url,
@@ -52,7 +55,7 @@ def read_profile(name):
 
 
 def save_profile(name, values, revision):
-    if not isinstance(values,dict) or set(values)-{'title','description','shape','color','category','knowledge_sources'}: raise ValueError('Unknown bot appearance field')
+    if not isinstance(values,dict) or set(values)-{*BOT_TEXT_FIELDS,'knowledge_sources'}: raise ValueError('Unknown bot appearance field')
     if not isinstance(revision,int) or isinstance(revision,bool) or revision<0: raise ValueError('Revision required')
     if 'knowledge_sources' in values: validate_sources(values['knowledge_sources'])
     for key,value in values.items():
@@ -70,11 +73,45 @@ def save_profile(name, values, revision):
         if revision!=actual:raise RuntimeError('Bot changed elsewhere. Reload before saving.')
         meta=ui.setdefault('hermes-bots',{})
         if not isinstance(meta,dict):raise ValueError('Invalid existing bot metadata')
+        # Validate on change only: an unchanged value never adds an edge, and a
+        # manager that was deleted later must not block saving other fields.
+        if 'reports_to' in values:
+            stored=meta.get('reports_to');stored=stored.strip() if isinstance(stored,str) else ''
+            if values['reports_to'].strip()!=stored:_validate_reports_to(name,values['reports_to'].strip())
         meta.update({k:(v if k=='knowledge_sources' else v.strip()) for k,v in values.items()});meta['custom']=True
         revisions['hermes-bots']=actual+1
         from utils import atomic_yaml_write
         atomic_yaml_write(path,data,sort_keys=False)
     return read_profile(name)
+
+
+def _reports_to_of(name):
+    data=_load(_path(name))
+    ui=data.get('ui_meta');ui=ui if isinstance(ui,dict) else {}
+    meta=ui.get('hermes-bots');meta=meta if isinstance(meta,dict) else {}
+    value=meta.get('reports_to')
+    return value.strip() if isinstance(value,str) else ''
+
+
+def _validate_reports_to(name, manager):
+    """Reject an unknown manager, the bot itself, or a chain that leads back to it.
+
+    Called under _LOCK so concurrent saves of two bots cannot both pass the
+    cycle check against each other's old value.
+    """
+    if not manager:return
+    if manager==name:raise ValueError('A bot cannot report to itself')
+    try:_path(manager)
+    except (OSError,ValueError) as exc:raise ValueError('Unknown manager bot') from exc
+    seen={manager};current=manager
+    for _ in range(_MAX_CHAIN):
+        try:current=_reports_to_of(current)
+        except (OSError,ValueError,yaml.YAMLError):return
+        if not current:return
+        if current==name:raise ValueError('This would create a reporting cycle')
+        if current in seen:return
+        seen.add(current)
+    raise ValueError('Reporting chain is too long')
 
 
 def save_avatar(name, data):

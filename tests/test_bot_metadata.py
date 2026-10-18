@@ -87,3 +87,52 @@ def test_bot_target_access_is_fresh_and_fails_closed(monkeypatch):
     def broken(*args):raise RuntimeError('policy missing')
     monkeypatch.setattr(enforce,'is_profile_allowed_for',broken)
     assert not routes._chat_profile_target_allowed(object(),'allowed')
+
+
+@pytest.fixture
+def org(tmp_path,monkeypatch):
+    homes={}
+    for name in ('ceo','coo','finance','sales'):
+        homes[name]=tmp_path/name;homes[name].mkdir()
+    monkeypatch.setattr(profiles,'get_hermes_home_for_profile',lambda name:homes.get(name,tmp_path/'missing'))
+    return homes
+
+def _reports(name):
+    return bots.read_profile(name)['bot'].get('reports_to')
+
+def test_reports_to_accepts_existing_bot_and_is_returned(org):
+    result=bots.save_profile('coo',{'reports_to':'ceo','role':'Operations'},0)
+    assert result['bot']['reports_to']=='ceo' and result['bot']['role']=='Operations'
+    assert yaml.safe_load((org['coo']/'profile.yaml').read_text())['ui_meta']['hermes-bots']['reports_to']=='ceo'
+
+@pytest.mark.parametrize('manager',['ghost','../ceo','bad name'])
+def test_reports_to_unknown_bot_rejected(org,manager):
+    with pytest.raises(ValueError):bots.save_profile('coo',{'reports_to':manager},0)
+    assert not (org['coo']/'profile.yaml').exists()
+
+def test_reports_to_self_rejected(org):
+    with pytest.raises(ValueError,match='itself'):bots.save_profile('coo',{'reports_to':'coo'},0)
+    assert _reports('coo') is None
+
+def test_reports_to_cycle_rejected_and_nothing_persists(org):
+    bots.save_profile('coo',{'reports_to':'ceo'},0)
+    bots.save_profile('finance',{'reports_to':'coo'},0)
+    with pytest.raises(ValueError,match='cycle'):bots.save_profile('ceo',{'reports_to':'finance'},0)
+    with pytest.raises(ValueError,match='cycle'):bots.save_profile('ceo',{'reports_to':'coo'},0)
+    assert _reports('ceo') is None and bots.read_profile('ceo')['bot_revision']==0
+    # A sibling branch is not a cycle.
+    assert bots.save_profile('sales',{'reports_to':'finance'},0)['bot']['reports_to']=='finance'
+
+def test_reports_to_empty_clears_to_top_level(org):
+    bots.save_profile('coo',{'reports_to':'ceo'},0)
+    assert bots.save_profile('coo',{'reports_to':''},1)['bot']['reports_to']==''
+
+def test_unchanged_dangling_manager_does_not_block_other_edits(org,tmp_path):
+    bots.save_profile('coo',{'reports_to':'sales'},0)
+    org.pop('sales')
+    result=bots.save_profile('coo',{'title':'Chief Operating Bot','reports_to':'sales'},1)
+    assert result['bot']['title']=='Chief Operating Bot'
+    with pytest.raises(ValueError):bots.save_profile('finance',{'reports_to':'sales'},0)
+
+def test_role_is_short_text(org):
+    with pytest.raises(ValueError):bots.save_profile('coo',{'role':'x'*81},0)

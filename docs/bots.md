@@ -8,6 +8,12 @@ Open **Bots**, select a bot and edit its name, description, avatar shape or colo
 
 If another editor saved first, reload before saving again. Appearance uses the existing Hermes `ui_meta['hermes-bots']` metadata and revision contract. Concurrent editors in separate server processes are not covered by a shared cross-process lock.
 
+## Org chart
+
+In the same editor, **Reports to** links a bot to the bot it reports to, or to nobody (top level). **Department or role** is an optional short label of at most 80 characters. Both are stored as `reports_to` and `role` in `ui_meta['hermes-bots']` and follow the same revision contract. The server only accepts an existing bot, never the bot itself and never a choice that would create a reporting cycle; a new manager must also be a bot the editor can see. An unchanged value is kept even if that manager was removed later, so other fields stay editable.
+
+Choose **Org chart** at the top of the Bots list to see the tree. Bots without a manager, or whose manager you cannot see, appear at the top. Click a bot to open it. On narrow screens the chart becomes an indented list. Reports to describes structure only: it grants no permissions and does not route work between bots.
+
 ## Instructions, tools and knowledge
 
 Open **Bots**, select an existing bot and choose **Edit bot**, or choose a section shortcut. The editor has directly selectable **Identity & photo**, **Instructions**, **Memory & knowledge**, **Skills**, **Connections & tools**, and **Access** tabs. Keyboard users can move through tabs with Left/Right or Home/End. Each shortcut opens the requested section. Draft instructions and other configuration changes are retained when switching tabs. Choose **Save bot** to save configuration; editing does not switch the active chat profile.
