@@ -14968,7 +14968,6 @@ def handle_post(handler, parsed) -> bool:
                 if _who and not (str(body.get("scope") or "") == "profile" and request_is_admin(handler)):
                     from api import user_prefs
                     from api.config import VALID_REASONING_EFFORTS
-                    from api.profiles import get_active_profile_name
                     _raw = str(effort or "").strip().lower()
                     if _raw and _raw != "none" and _raw not in VALID_REASONING_EFFORTS:
                         return bad(handler, f"Unknown reasoning effort '{effort}'")
@@ -24962,9 +24961,9 @@ def _handle_workspace_reorder(handler, body):
         # shared registry order stays the default for everyone else (an admin
         # can still change that default with scope "default").
         from api import user_prefs
-        from api.profiles import get_active_profile_name
+        from api.profiles import get_active_profile_name as _active_profile_name
         visible = {w["path"] for w in _workspaces_response_list(wss, handler)}
-        user_prefs.set_workspace_order(_who, get_active_profile_name(),
+        user_prefs.set_workspace_order(_who, _active_profile_name(),
                                        [str(p).strip() for p in paths if str(p).strip() in visible])
         return j(handler, {"ok": True, "scope": "personal",
                            "workspaces": _workspaces_response_list(wss, handler)})
