@@ -3617,55 +3617,6 @@ def _handle_kanban_waiting(handler, parsed):
         board=_kanban_board_query(parsed))) or True)
 
 
-def _approval_waiting_session_visible(handler, session) -> bool:
-    """A chat with a pending approval is listed when the viewer could open it:
-    visible in the current bot, or (outside isolated profile mode) owned by
-    the viewer in a bot the viewer may switch to."""
-    if _session_visible_to_request(session, handler):
-        return True
-    if _is_isolated_profile_mode():
-        return False
-    profile = getattr(session, "profile", None) or "default"
-    return bool(_chat_profile_target_allowed(handler, profile)
-                and _session_owner_visible_to_request(getattr(session, "owner_email", None), handler))
-
-
-def _handle_approval_waiting(handler, parsed):
-    """GET /api/approval/waiting: chats with a pending tool approval this
-    viewer can open, read from the same in-memory queues as
-    /api/approval/pending. Nothing is approved here; the chat answers it."""
-    snapshot = {}
-    with _lock:
-        for sid, queue in list(_pending.items()):
-            items = queue if isinstance(queue, list) else ([queue] if queue else [])
-            if items:
-                snapshot[sid] = (dict(items[0]), len(items))
-        for sid, queue in list(_gateway_queues.items()):
-            if sid in snapshot or not queue:
-                continue
-            head = getattr(queue[0], "data", None) or {}
-            if head:
-                snapshot[sid] = (dict(head), len(queue))
-    rows = []
-    for sid, (head, count) in snapshot.items():
-        try:
-            session = get_session(sid, metadata_only=True)
-        except Exception:
-            session = None
-        if session is None or not _approval_waiting_session_visible(handler, session):
-            continue
-        rows.append({
-            "session_id": sid,
-            "title": str(getattr(session, "title", "") or "")[:120],
-            "profile": getattr(session, "profile", None) or "default",
-            "description": str(head.get("description") or "")[:300],
-            "command": str(head.get("command") or "")[:200],
-            "count": count,
-        })
-    rows.sort(key=lambda r: r["title"].casefold())
-    return j(handler, {"approvals": rows})
-
-
 def _handle_bot_scout(handler, body):
     """POST /api/bots/scout: the bot edit gate (profiles:admin, a bot this
     caller may use, the owner's edit right on a guided bot) plus cron admin."""
@@ -13961,9 +13912,6 @@ def handle_get(handler, parsed) -> bool:
 
     if parsed.path == "/api/approval/pending":
         return _handle_approval_pending(handler, parsed)
-
-    if parsed.path == "/api/approval/waiting":
-        return _handle_approval_waiting(handler, parsed)
 
     if parsed.path == "/api/approval/stream":
         return _handle_approval_sse_stream(handler, parsed)

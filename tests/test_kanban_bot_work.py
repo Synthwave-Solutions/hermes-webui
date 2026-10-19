@@ -150,42 +150,6 @@ def test_waiting_route_uses_the_bot_gate(board, monkeypatch):
     assert h.status == 200 and b"Needs Michael" in h.wfile.getvalue()
 
 
-def test_pending_approvals_list_only_chats_the_viewer_can_open(monkeypatch):
-    import json
-    from api import routes
-    sessions = {
-        "mine": SimpleNamespace(title="Deploy chat", profile="cfo", owner_email="ada@example.test"),
-        "other": SimpleNamespace(title="Not yours", profile="cfo", owner_email="bob@example.test"),
-        "gw": SimpleNamespace(title="Gateway chat", profile="default", owner_email="ada@example.test"),
-    }
-    monkeypatch.setattr(routes, "_pending", {"mine": [{"description": "rm -rf build", "command": "rm -rf build"}, {"description": "second"}],
-                                             "other": [{"description": "x"}], "gone": [{"description": "y"}], "empty": []})
-    monkeypatch.setattr(routes, "_gateway_queues", {"gw": [SimpleNamespace(data={"description": "gateway tool"})]})
-
-    def get_session(sid, metadata_only=False):
-        if sid not in sessions:
-            raise KeyError(sid)
-        return sessions[sid]
-
-    monkeypatch.setattr(routes, "get_session", get_session)
-    monkeypatch.setattr(routes, "_session_visible_to_request", lambda s, handler=None: False)
-    monkeypatch.setattr(routes, "_is_isolated_profile_mode", lambda: False)
-    monkeypatch.setattr(routes, "_chat_profile_target_allowed", lambda handler, name: True)
-    monkeypatch.setattr(routes, "_session_owner_visible_to_request", lambda owner, handler=None: owner == "ada@example.test")
-    h = _Handler("/api/approval/waiting")
-    routes._handle_approval_waiting(h, urlparse(h.path))
-    body = json.loads(h.wfile.getvalue().split(b"\r\n\r\n")[-1] or h.wfile.getvalue())
-    rows = {r["session_id"]: r for r in body["approvals"]}
-    assert set(rows) == {"mine", "gw"}
-    assert rows["mine"]["count"] == 2 and rows["mine"]["description"] == "rm -rf build" and rows["mine"]["profile"] == "cfo"
-    assert rows["gw"]["description"] == "gateway tool"
-    # Isolated profile mode keeps the plain session boundary.
-    monkeypatch.setattr(routes, "_is_isolated_profile_mode", lambda: True)
-    h = _Handler("/api/approval/waiting")
-    routes._handle_approval_waiting(h, urlparse(h.path))
-    assert b'"approvals": []' in h.wfile.getvalue() or b'"approvals":[]' in h.wfile.getvalue()
-
-
 def test_unassigned_attachment_only_for_its_creator_or_a_cron_admin(board, monkeypatch):
     routes = _routes(monkeypatch, set())
     from api import ownership

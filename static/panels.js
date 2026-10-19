@@ -15397,9 +15397,10 @@ window.loadMyAccessRequests=loadMyAccessRequests;
 // "Wacht op jou" on My approvals: what waits for this viewer elsewhere, next
 // to their own access requests. Kanban tasks in review or blocked for input
 // (GET /api/kanban/waiting, only bots the viewer may use or tasks they
-// created) with the board's own actions (open, comment, unblock), and chats
-// with a pending tool approval (GET /api/approval/waiting) that open the chat
-// where the approval is answered. A source the viewer may not read is left out.
+// created) with the board's own actions (open, comment, unblock), and bot
+// screens that wait for a person. Pending chat approvals are not listed: they
+// expire within a minute and are answered in the chat itself. A source the
+// viewer may not read is left out.
 let _waitingCommentTask='';
 function _waitingBotLabel(name){
   if(!name)return '';
@@ -15422,14 +15423,6 @@ function _waitingTaskHtml(task,screen){
         ${needsInput&&screen?`<a class="sm-btn primary waiting-screen-link" href="${esc(_botScreenUrl(screen.bot))}" target="_blank" rel="noopener" title="${esc(screen.reason||'')}">${esc(t('waiting_take_over'))}</a>`:''}
       </div>${comment}</li>`;
 }
-function _waitingApprovalHtml(row){
-  const more=row.count>1?` <span class="cron-group-count">${esc(String(row.count))}</span>`:'';
-  return `<li class="waiting-item" data-kind="approval" data-session-id="${esc(row.session_id)}">
-      <div class="waiting-item-main"><span class="waiting-item-title">${esc(row.title||t('untitled')||row.session_id)}${more}</span>
-        <span class="waiting-item-meta"><span class="bot-work-flag">${esc(t('waiting_tool_approval'))}</span> <span>${esc(_waitingBotLabel(row.profile))}</span></span>
-        ${row.description?`<span class="waiting-item-detail">${esc(row.description)}</span>`:''}</div>
-      <div class="waiting-item-actions"><button type="button" class="sm-btn primary" data-session-id="${esc(row.session_id)}" data-profile="${esc(row.profile||'')}" onclick="openCronJobChat(this.dataset.sessionId,this.dataset.profile)">${esc(t('waiting_open_chat'))}</button></div></li>`;
-}
 // A bot screen waits for a person when the agent asked for a takeover (with
 // its reason) and nobody holds it; listed only for viewers who may control
 // that screen (Bot Screens grants), opening the existing viewer.
@@ -15447,20 +15440,20 @@ let _waitingData=null;
 function _paintWaitingForYou(){
   const section=$('myWaitingSection'),box=$('myWaitingList');if(!section||!box)return;
   const data=_waitingData;
-  if(!data||(!data.tasks&&!data.approvals&&!data.screens)){section.hidden=true;return;}
-  const tasks=data.tasks||[],approvals=data.approvals||[];
+  if(!data||(!data.tasks&&!data.screens)){section.hidden=true;return;}
+  const tasks=data.tasks||[];
   const screens=_waitingScreensFor(data),byBot=new Map(screens.map(r=>[r.bot,r]));
   // A task blocked for input whose bot's screen waits for a person gets the
   // takeover link on its own card.
-  const items=screens.map(_waitingScreenHtml).concat(approvals.map(_waitingApprovalHtml),tasks.map(task=>_waitingTaskHtml(task,task.block_kind==='needs_input'?byBot.get(task.assignee):null)));
+  const items=screens.map(_waitingScreenHtml).concat(tasks.map(task=>_waitingTaskHtml(task,task.block_kind==='needs_input'?byBot.get(task.assignee):null)));
   box.innerHTML=items.length?`<ul class="waiting-list">${items.join('')}</ul>`:`<div class="access-requests-empty">${esc(t('waiting_empty'))}</div>`;
   section.hidden=false;
   const area=$('waitingComment');if(area)area.focus();
 }
 async function loadWaitingForYou(){
   const get=url=>api(url,{timeoutToast:false,redirect401:false}).catch(()=>null);
-  const [tasks,approvals,screens]=await Promise.all([get('/api/kanban/waiting'),get('/api/approval/waiting'),get('/api/bot-screen/status')]);
-  _waitingData={tasks:tasks&&Array.isArray(tasks.tasks)?tasks.tasks:null,approvals:approvals&&Array.isArray(approvals.approvals)?approvals.approvals:null,
+  const [tasks,screens]=await Promise.all([get('/api/kanban/waiting'),get('/api/bot-screen/status')]);
+  _waitingData={tasks:tasks&&Array.isArray(tasks.tasks)?tasks.tasks:null,
     screens:screens&&Array.isArray(screens.screens)?screens.screens:null};
   _paintWaitingForYou();
 }

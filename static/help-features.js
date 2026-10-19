@@ -5282,28 +5282,28 @@ window.SynthPulseFeatureCatalog = {
       "locales": {
         "en": {
           "title": "Waiting for you",
-          "purpose": "See in one place what bots are waiting on you: Kanban tasks to review or answer and chats with a tool approval.",
-          "when": "When a bot paused its work for your input, your review or your approval.",
+          "purpose": "See in one place what bots are waiting on you: Kanban tasks to review or answer and bot screens where a bot asks you to take over.",
+          "when": "When a bot paused its work for your input, your review or a login on its screen.",
           "steps": [
             "Open My approvals. Waiting for you is at the top.",
-            "For a chat with a pending approval choose Open chat and answer the approval there.",
+            "For a bot screen that waits for you choose Open screen and take over there.",
             "For a task choose Open task, Reply to add a comment, or Unblock when you gave the bot what it needed."
           ],
-          "permissions": "Only tasks of bots you may use or tasks you created, and only chats you could open yourself. Kanban rows need the right to read the board.",
-          "limits": "Nothing is approved from this list: approvals are answered in their chat. Pending approvals live in the running server and disappear after a restart. Your own access requests stay listed below as before.",
+          "permissions": "Only tasks of bots you may use or tasks you created, and only screens you may control. Kanban rows need the right to read the board.",
+          "limits": "Nothing is approved from this list. Tool approvals in a chat are not listed: they expire within a minute and are answered in the chat itself. Your own access requests stay listed below as before.",
           "example": "A bot is blocked because it needs a login: reply with what you did and unblock the task."
         },
         "nl": {
           "title": "Wacht op jou",
-          "purpose": "Zie op een plek waar bots op jou wachten: Kanban-taken om te beoordelen of te beantwoorden en chats met een goedkeuring voor een tool.",
-          "when": "Als een bot zijn werk heeft stilgezet voor jouw invoer, review of goedkeuring.",
+          "purpose": "Zie op een plek waar bots op jou wachten: Kanban-taken om te beoordelen of te beantwoorden en botschermen waarop een bot je vraagt over te nemen.",
+          "when": "Als een bot zijn werk heeft stilgezet voor jouw invoer, review of een login op zijn scherm.",
           "steps": [
             "Open Mijn goedkeuringen. Wacht op jou staat bovenaan.",
-            "Kies bij een chat met een openstaande goedkeuring Chat openen en beantwoord de goedkeuring daar.",
+            "Kies bij een botscherm dat op jou wacht Scherm openen en neem daar over.",
             "Kies bij een taak Taak openen, Reageren om een reactie te plaatsen, of Deblokkeren als je de bot hebt gegeven wat hij nodig had."
           ],
-          "permissions": "Alleen taken van bots die je mag gebruiken of die je zelf hebt aangemaakt, en alleen chats die je zelf zou kunnen openen. Kanban-regels vragen leesrechten op het bord.",
-          "limits": "In deze lijst wordt niets goedgekeurd: goedkeuringen beantwoord je in hun chat. Openstaande goedkeuringen leven in de draaiende server en verdwijnen na een herstart. Je eigen toegangsverzoeken staan er zoals voorheen onder.",
+          "permissions": "Alleen taken van bots die je mag gebruiken of die je zelf hebt aangemaakt, en alleen schermen die je mag bedienen. Kanban-regels vragen leesrechten op het bord.",
+          "limits": "In deze lijst wordt niets goedgekeurd. Goedkeuringen voor tools in een chat staan er niet in: die verlopen binnen een minuut en beantwoord je in de chat zelf. Je eigen toegangsverzoeken staan er zoals voorheen onder.",
           "example": "Een bot staat stil omdat hij moet inloggen: reageer met wat je hebt gedaan en deblokkeer de taak."
         }
       }
