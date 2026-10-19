@@ -8,6 +8,7 @@ import shutil
 import tempfile
 import threading
 import yaml
+from api.yaml_utils import safe_load
 
 _LOCK = threading.RLock()
 _KEY = "synpulse_builder"
@@ -33,7 +34,7 @@ def _yaml(path):
         raise PermissionError("Bot configuration cannot use symlinks")
     if not path.exists():
         return {}
-    result = yaml.safe_load(path.read_text()) or {}
+    result = safe_load(path.read_text()) or {}
     if not isinstance(result, dict):
         raise ValueError("Invalid bot configuration")
     return result

@@ -1699,9 +1699,11 @@ button identity and avoiding avatar/DOM reconstruction for ordinary keystrokes.
 
 ### Profile catalog cold reads
 
-The shared profile YAML cache uses libyaml’s `CSafeLoader` when available,
+The shared profile YAML cache, bot metadata and managed-bot ACL reads use
+`api.yaml_utils.safe_load`, preferring libyaml’s `CSafeLoader` when available,
 falling back to `SafeLoader` without libyaml or when its constructor/resolver
 registries are customized. Cache invalidation still follows file mtime and
 size, and callers receive independent values with fresh environment expansion.
-Bot avatar images load lazily and decode asynchronously so hidden bot panels
+Managed-bot ACL files are still read fresh on each authorization check; no
+identity or permission decisions are cached. Bot avatar images load lazily and decode asynchronously so hidden bot panels
 do not fetch every profile image during chat startup.

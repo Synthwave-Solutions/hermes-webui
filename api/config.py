@@ -663,16 +663,8 @@ def _load_yaml_config_file_raw(config_path: Path, *, _copy: bool = True) -> dict
     # Cache miss / stale: parse off disk. Done outside the lock so a slow parse
     # doesn't serialize unrelated paths; a concurrent duplicate parse is harmless.
     try:
-        # Prefer libyaml for cold profile catalogs (dozens of large configs).
-        # Respect applications that customized SafeLoader constructors/resolvers:
-        # CSafeLoader has separate registries and would otherwise ignore them.
-        loader = getattr(_yaml, "CSafeLoader", _yaml.SafeLoader)
-        if any(getattr(loader, name) != getattr(_yaml.SafeLoader, name) for name in (
-            "yaml_constructors", "yaml_multi_constructors", "yaml_implicit_resolvers",
-            "yaml_path_resolvers",
-        )):
-            loader = _yaml.SafeLoader
-        loaded = _yaml.load(config_path.read_text(encoding="utf-8"), Loader=loader)
+        from api.yaml_utils import safe_load
+        loaded = safe_load(config_path.read_text(encoding="utf-8"))
     except Exception:
         logger.debug("Failed to parse yaml config from %s", config_path)
         return {}

@@ -3,6 +3,7 @@ from pathlib import Path
 import re
 import threading
 import yaml
+from api.yaml_utils import safe_load
 
 _LOCK = threading.RLock()
 SHAPES = ('circle','squircle','hexagon')
@@ -27,15 +28,9 @@ def _path(name):
     if path.is_symlink(): raise ValueError('Bot metadata must be a regular file')
     return path
 
-# libyaml's C loader parses the same documents roughly ten times faster than
-# the pure-Python SafeLoader. Three profile config.yaml files on the VPS are
-# ~290 KB each; with the pure-Python loader a single /api/profiles response
-# spent 1.5 to 1.9 s inside this module. Fall back when libyaml is absent.
-_YAML_LOADER = getattr(yaml, 'CSafeLoader', yaml.SafeLoader)
-
 def _load(path):
     if not path.exists(): return {}
-    try:data=yaml.load(path.read_text(), Loader=_YAML_LOADER)
+    try:data=safe_load(path.read_text())
     # A damaged file is the server's problem, not an unhandled 500: callers
     # map ValueError to a clear JSON error, and nothing is written over it.
     except yaml.YAMLError:raise ValueError('Bot metadata file is not valid YAML; fix it on the server first') from None
