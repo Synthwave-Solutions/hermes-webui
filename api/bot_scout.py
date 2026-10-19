@@ -32,9 +32,12 @@ REQUIRED_FILES = ("scout_collect.py", "scout_ledger.py")
 MANAGED_BY = "scout"
 JOB_NAME = "Scout"
 JOB_CATEGORY = "Scout"
-# terminal runs scout_ledger.py, kanban files triage tasks; web only searches
-# the bot's topics, so it is left out while there are none.
-BASE_TOOLSETS = ("terminal", "kanban")
+# kanban files triage tasks; web only searches the bot's topics, so it is
+# left out while there are none. No terminal: the agent reports what it did
+# with each item in one SCOUT-LEDGER line at the end of its digest and the
+# next collector run records it (scout_collect.py), so it never runs code.
+BASE_TOOLSETS = ("kanban",)
+LEDGER_STATUSES = ("ignored", "saved", "attached", "notified")
 TOPIC_TOOLSETS = ("web",)
 # The user switched job notifications off; the digest still lands in the
 # bot's job chat (delivery all), a quiet run posts nothing.
@@ -50,9 +53,11 @@ Regels:
 - Stil bewaren: misschien later nuttig. Zet het kort onder Bewaard.
 - Aan project koppelen: hoort bij een lopend project. Noem het project en waarom.
 - Melden: vraagt aandacht of actie. Maak per actiepunt een kanbantaak in triage met een duidelijke titel, de bron en de voorgestelde volgende stap, in plaats van zelf te handelen.
-- Leg elk item dat je hebt beoordeeld vast met python3 "$HERMES_HOME/scripts/scout/scout_ledger.py", zodat je het morgen niet opnieuw ziet.
 - Schrijf hooguit een digest per run: kort, in het Nederlands, gegroepeerd per uitkomst, met bronlinks.
-- Is er niets om te melden, te koppelen of te bewaren, antwoord dan alleen met [SILENT]."""
+- Sluit de digest af met precies een machineregel, als laatste regel en zonder opmaak:
+  SCOUT-LEDGER: <hash8>=<status>,<hash8>=<status>
+  met voor elk beoordeeld item de eerste acht tekens van zijn hash en een status: ignored (negeren), saved (stil bewaren), attached (aan project koppelen) of notified (melden). De volgende run legt dit vast, zodat je die items niet opnieuw ziet. Voer zelf geen scripts of opdrachten uit.
+- Is er niets om te melden, te koppelen of te bewaren, antwoord dan alleen met [SILENT], zonder ledgerregel; dan gelden alle items van deze run als genegeerd."""
 
 _LOCK = threading.Lock()
 
@@ -175,6 +180,10 @@ def sync_job(home, scout: dict, owner_email: str | None):
         existing = scout_jobs(cj.load_jobs())
         if not scout["enabled"]:
             for job in existing:
+                # Older Scout jobs carried terminal; it goes on every sync.
+                toolsets = job.get("enabled_toolsets")
+                if isinstance(toolsets, list) and "terminal" in toolsets:
+                    cj.update_job(job["id"], {"enabled_toolsets": [t for t in toolsets if t != "terminal"]})
                 if job.get("enabled", True) and job.get("state") != "paused":
                     cj.pause_job(job["id"], reason="Scout uitgezet")
             return cj.get_job(existing[0]["id"]) if existing else None

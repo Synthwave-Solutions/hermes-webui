@@ -106,7 +106,7 @@ def test_turning_scout_on_creates_one_job_in_the_bots_own_store(scout_env):
     assert job["managed_by"] == "scout" and job["name"] == "Scout"
     assert job["script"] == "scout/scout_collect.py" and job["no_agent"] is False
     assert job["schedule"]["kind"] == "cron" and job["schedule"]["expr"] == "45 6 * * *"
-    assert job["enabled_toolsets"] == ["terminal", "kanban", "web"]
+    assert job["enabled_toolsets"] == ["kanban", "web"]
     assert job["prompt"].startswith("Eigen Scout prompt.") and "AI act; MKB automatisering" in job["prompt"]
     assert job["deliver"] == "local" and job["notify"] == {"in_app": "off", "delivery": "all"}
     assert job["owner_email"] == ALICE and job["origin"] == {"platform": "webui", "chat_id": None, "user_id": ALICE}
@@ -121,7 +121,7 @@ def test_on_again_is_idempotent_and_off_pauses_without_deleting(scout_env):
     _set("radar", enabled=True, digest_time="08:00")
     [job] = _jobs(scout_env.homes["radar"])
     assert job["id"] == first and job["schedule"]["expr"] == "0 8 * * *"
-    assert job["enabled_toolsets"] == ["terminal", "kanban"]
+    assert job["enabled_toolsets"] == ["kanban"]
     assert "geen onderwerpen" in job["prompt"]
     off = _set("radar", enabled=False)
     assert off["bot"]["scout"]["enabled"] is False and off["bot"]["scout"]["digest_time"] == "08:00"
@@ -145,8 +145,11 @@ def test_built_in_prompt_when_the_bot_has_none(scout_env):
     _set("radar", enabled=True)
     [job] = _jobs(scout_env.homes["radar"])
     assert job["prompt"].startswith(bot_scout.DEFAULT_PROMPT)
-    for word in ("negeren", "stil bewaren", "aan project koppelen", "melden", "triage", "[SILENT]", "scout_ledger.py"):
+    for word in ("negeren", "stil bewaren", "aan project koppelen", "melden", "triage", "[SILENT]",
+                 "SCOUT-LEDGER: <hash8>=<status>,<hash8>=<status>", *bot_scout.LEDGER_STATUSES):
         assert word in job["prompt"]
+    for word in ("python", "scout_ledger.py", "terminal", "$HERMES_HOME"):
+        assert word not in job["prompt"]
     assert chr(0x2014) not in bot_scout.DEFAULT_PROMPT and chr(0x2013) not in bot_scout.DEFAULT_PROMPT
 
 
@@ -250,3 +253,20 @@ def test_scout_route_lets_a_cron_admin_turn_it_on(scout_env, monkeypatch):
     h = _RouteHandler()
     routes._handle_bot_scout(h, {"name": "radar", "enabled": True, "revision": 0})
     assert h.status == 200 and len(_jobs(scout_env.homes["radar"])) == 1
+
+
+def test_an_older_scout_job_loses_terminal_on_the_next_sync(scout_env):
+    from api.profiles import cron_profile_context_for_home
+    first = _set("radar", enabled=True)["scout_job"]["id"]
+    with cron_profile_context_for_home(scout_env.homes["radar"]):
+        import cron.jobs as cj
+        cj.update_job(first, {"enabled_toolsets": ["terminal", "kanban"]})
+    _set("radar", enabled=False)
+    [job] = _jobs(scout_env.homes["radar"])
+    assert job["enabled_toolsets"] == ["kanban"] and job["state"] == "paused"
+    with cron_profile_context_for_home(scout_env.homes["radar"]):
+        import cron.jobs as cj
+        cj.update_job(first, {"enabled_toolsets": ["terminal", "kanban", "web"]})
+    _set("radar", enabled=True)
+    [job] = _jobs(scout_env.homes["radar"])
+    assert job["enabled_toolsets"] == ["kanban"]
