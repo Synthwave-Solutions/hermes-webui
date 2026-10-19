@@ -9,6 +9,9 @@ cached paths in hermes-agent modules (skills_tool, skill_manager_tool,
 cron/jobs) that snapshot HERMES_HOME at import time.
 """
 import json
+import copy
+from collections import OrderedDict
+from functools import lru_cache
 import logging
 import os
 import re
@@ -2324,38 +2327,44 @@ def _skill_tree_max_mtime_ns(skills_dir: Path, config_path: Path) -> int:
     return max_ns
 
 
-# Parsed SKILL.md frontmatter keyed by the resolved file, validated by
-# (size, mtime_ns). Every profile on the VPS symlinks the same ~70 skill
-# directories, so a skill-count scan for 21 profiles read and parsed the same
-# files 21 times over; any write into the shared tree (skill usage ledgers,
-# curator state) re-queued all of them. With the cache, one parse per distinct
-# file per change.
-_SKILL_FRONTMATTER_CACHE: dict = {}
+# Parsed SKILL.md frontmatter is shared across symlinked and copied skills.
+# Path signatures detect edits; bounded LRU caches retain hot entries when a
+# large catalog exceeds capacity, instead of flushing the entire cache.
+_SKILL_FRONTMATTER_CACHE: dict = OrderedDict()
 _SKILL_FRONTMATTER_CACHE_LOCK = threading.Lock()
 _SKILL_FRONTMATTER_CACHE_MAX = 4096
+
+
+@lru_cache(maxsize=4096)
+def _skill_frontmatter_by_content(content: str, parse_frontmatter) -> dict:
+    # Copied profile skills have different paths but identical content. Include
+    # the parser identity so alternate parsers never share incompatible results.
+    frontmatter, _ = parse_frontmatter(content)
+    return copy.deepcopy(frontmatter)
 
 
 def _skill_frontmatter_cached(skill_md: Path, parse_frontmatter) -> dict:
     try:
         resolved = skill_md.resolve()
         st = resolved.stat()
-        key = str(resolved)
+        key = (str(resolved), parse_frontmatter)
         sig = (st.st_size, st.st_mtime_ns)
     except OSError:
         content = skill_md.read_text(encoding="utf-8")[:4000]
-        frontmatter, _ = parse_frontmatter(content)
-        return frontmatter
+        return copy.deepcopy(_skill_frontmatter_by_content(content, parse_frontmatter))
     with _SKILL_FRONTMATTER_CACHE_LOCK:
         hit = _SKILL_FRONTMATTER_CACHE.get(key)
         if hit is not None and hit[0] == sig:
-            return hit[1]
+            _SKILL_FRONTMATTER_CACHE.move_to_end(key)
+            return copy.deepcopy(hit[1])
     content = resolved.read_text(encoding="utf-8")[:4000]
-    frontmatter, _ = parse_frontmatter(content)
+    frontmatter = _skill_frontmatter_by_content(content, parse_frontmatter)
     with _SKILL_FRONTMATTER_CACHE_LOCK:
-        if len(_SKILL_FRONTMATTER_CACHE) >= _SKILL_FRONTMATTER_CACHE_MAX:
-            _SKILL_FRONTMATTER_CACHE.clear()
         _SKILL_FRONTMATTER_CACHE[key] = (sig, frontmatter)
-    return frontmatter
+        _SKILL_FRONTMATTER_CACHE.move_to_end(key)
+        while len(_SKILL_FRONTMATTER_CACHE) > _SKILL_FRONTMATTER_CACHE_MAX:
+            _SKILL_FRONTMATTER_CACHE.popitem(last=False)
+    return copy.deepcopy(frontmatter)
 
 
 def _compute_profile_skills_stats(profile_dir: Path) -> tuple[int, int]:
