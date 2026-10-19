@@ -956,24 +956,58 @@ function _cronMatchesBotFilter(job){
   if (_cronBotFilter === '*') return true;
   return _cronJobBotName(job) === _cronBotFilter;
 }
-function _renderCronBotFilter(){
+// Filter bar of the Tasks list (19 Oct 2026): bot and category side by side.
+// Bot lists the active bot, all bots, then every bot that answers for a task
+// (with its count); category lists the categories of the tasks in view.
+let _cronCategoryFilter = (() => { try { return localStorage.getItem('cron-category-filter') || ''; } catch (_e) { return ''; } })();
+function _cronMatchesCategoryFilter(job){
+  if (!_cronCategoryFilter) return true;
+  const cat = String((job && job.category) || '').trim();
+  return _cronCategoryFilter === '__none__' ? !cat : cat === _cronCategoryFilter;
+}
+async function setCronCategoryFilter(value){
+  _cronCategoryFilter = String(value || '');
+  try { localStorage.setItem('cron-category-filter', _cronCategoryFilter); } catch (_e) {}
+  await loadCrons();
+}
+async function clearCronFilters(){
+  _cronCategoryFilter = '';
+  try { localStorage.setItem('cron-category-filter', ''); } catch (_e) {}
+  await setCronBotFilter('');
+}
+function _renderCronBotFilter(allJobs){
   const box = $('cronBotFilter');
   if (!box) return;
+  const all = Array.isArray(allJobs) ? allJobs : [];
   const rows = (Array.isArray(_cronProfilesCache) ? _cronProfilesCache : []).filter(p => p && p.name);
-  if (rows.length < 2 && !_cronBotFilterWantsAll()) { box.innerHTML = ''; box.style.display = 'none'; return; }
   const active = _cronActiveBotName();
   const current = _cronBotFilterWantsAll() ? _cronBotFilter : '';
+  const counts = {};
+  for (const j of all) { const b = _cronJobBotName(j); counts[b] = (counts[b] || 0) + 1; }
+  const label = (name) => _cronBotTitle(name) + (counts[name] ? ` (${counts[name]})` : '');
   const opts = [`<option value=""${current ? '' : ' selected'}>${esc(t('cron_bot_filter_active', _cronBotTitle(active)) || _cronBotTitle(active))}</option>`,
-    `<option value="*"${current === '*' ? ' selected' : ''}>${esc(t('cron_bot_filter_all') || 'All bots')}</option>`];
-  const others = rows.filter(p => p.name !== active)
+    `<option value="*"${current === '*' ? ' selected' : ''}>${esc(t('cron_bot_filter_all') || 'All bots')}${all.length ? ` (${all.length})` : ''}</option>`];
+  const others = rows.filter(p => p.name !== active && (counts[p.name] || p.name === current))
     .map(p => ({ name: p.name, title: _cronBotTitle(p.name) }))
     .sort((a, b) => a.title.localeCompare(b.title));
-  for (const b of others) opts.push(`<option value="${esc(b.name)}"${current === b.name ? ' selected' : ''}>${esc(b.title)}</option>`);
+  for (const b of others) opts.push(`<option value="${esc(b.name)}"${current === b.name ? ' selected' : ''}>${esc(label(b.name))}</option>`);
   if (current && current !== '*' && !others.some(b => b.name === current)) {
     opts.push(`<option value="${esc(current)}" selected>${esc(_cronBotTitle(current))}</option>`);
   }
-  box.innerHTML = `<label class="cron-bot-filter-label" for="cronBotFilterSelect">${esc(t('cron_bot_filter_label') || 'Show tasks of')}</label>
-    <span class="cron-bot-filter-field">${_cronBotAvatarHtml(current && current !== '*' ? current : (current === '*' ? '' : active))}<select id="cronBotFilterSelect" onchange="setCronBotFilter(this.value)">${opts.join('')}</select></span>`;
+  // Categories of the tasks this bot choice shows.
+  const inView = (all.length ? all : (_cronList || [])).filter(j => !current || current === '*' ? (current === '*' || !j.read_only || (_cronOwnerProfileName(j) || 'default') === active) : _cronJobBotName(j) === current);
+  const cats = {}; let none = 0;
+  for (const j of inView) { const c = String(j.category || '').trim(); if (c) cats[c] = (cats[c] || 0) + 1; else none++; }
+  const catOpts = [`<option value=""${_cronCategoryFilter ? '' : ' selected'}>${esc(t('cron_category_filter_all') || 'All categories')}</option>`]
+    .concat(Object.keys(cats).sort((a, b) => a.localeCompare(b)).map(c => `<option value="${esc(c)}"${_cronCategoryFilter === c ? ' selected' : ''}>${esc(c)} (${cats[c]})</option>`));
+  if (none) catOpts.push(`<option value="__none__"${_cronCategoryFilter === '__none__' ? ' selected' : ''}>${esc(t('cron_category_none') || 'No category')} (${none})</option>`);
+  if (_cronCategoryFilter && _cronCategoryFilter !== '__none__' && !cats[_cronCategoryFilter]) catOpts.push(`<option value="${esc(_cronCategoryFilter)}" selected>${esc(_cronCategoryFilter)}</option>`);
+  const filtered = !!current || !!_cronCategoryFilter;
+  box.innerHTML = `<div class="cron-filter-row">
+      <label class="cron-filter-field" title="${esc(t('cron_bot_filter_label') || 'Show tasks of')}">${_cronBotAvatarHtml(current && current !== '*' ? current : (current === '*' ? '' : active))}<span class="sr-only">${esc(t('cron_bot_filter_label') || 'Bot')}</span><select id="cronBotFilterSelect" onchange="setCronBotFilter(this.value)">${opts.join('')}</select></label>
+      <label class="cron-filter-field" title="${esc(t('cron_category_label') || 'Category')}"><span class="cron-filter-icon" aria-hidden="true">🏷️</span><span class="sr-only">${esc(t('cron_category_label') || 'Category')}</span><select id="cronCategoryFilterSelect" onchange="setCronCategoryFilter(this.value)">${catOpts.join('')}</select></label>
+    </div>
+    ${filtered ? `<button type="button" class="cron-filter-clear" onclick="clearCronFilters()">${esc(t('cron_filter_clear') || 'Clear filters')}</button>` : ''}`;
   if (current === '*') box.querySelector('.cron-bot-avatar').innerHTML = '🗂️';
   box.style.display = '';
 }
@@ -1235,7 +1269,9 @@ async function loadCrons(animate) {
     // notify: that request (404 before it) or a task carrying notify.
     _loadCronNotifyState().then(served => { if (served) _cronNotifySupported = true; });
     await loadCronProfiles();
-    _renderCronBotFilter();
+    let _allCronJobs = [];
+    try { _allCronJobs = await _botJobsAll(); } catch (_e) {}
+    _renderCronBotFilter(_allCronJobs);
     const allProfilesQS = (_showAllCronProfiles || _cronBotFilterWantsAll()) ? '?all_profiles=1' : '';
     const data = await api('/api/crons' + allProfilesQS);
     _cronList = data.jobs || [];
@@ -1252,7 +1288,7 @@ async function loadCrons(animate) {
     // which keeps openCronDetail, _cronNewJobIds, and detail refresh untouched.
     const _activeJobs = [];
     const _pausedJobs = [];
-    for (const job of _cronList.filter(_cronMatchesBotFilter)) {
+    for (const job of _cronList.filter(j => _cronMatchesBotFilter(j) && _cronMatchesCategoryFilter(j))) {
       const status = _cronStatusMeta(job);
       (status.state === 'paused' ? _pausedJobs : _activeJobs).push({ job, status });
     }
@@ -1749,6 +1785,7 @@ function openCronCategoryPopover(jobId){
   document.addEventListener('keydown', _cronCategoryEscape, true);
 }
 async function _saveCronCategory(jobId, category){
+  _botJobsCache = null;
   try {
     await api('/api/crons/update', { method: 'POST', body: JSON.stringify({ job_id: jobId, category: String(category || '').trim() }) });
     _closeCronCategoryPopover();
@@ -3204,6 +3241,7 @@ async function cronRun(id) {
 
 async function cronPause(id) {
   try {
+    _botJobsCache = null;
     await api('/api/crons/pause', {method:'POST', body: JSON.stringify({job_id: id})});
     showToast(t('cron_job_paused'));
     await loadCrons();
@@ -3212,6 +3250,7 @@ async function cronPause(id) {
 
 async function cronResume(id) {
   try {
+    _botJobsCache = null;
     await api('/api/crons/resume', {method:'POST', body: JSON.stringify({job_id: id})});
     showToast(t('cron_job_resumed'));
     await loadCrons();
@@ -8343,7 +8382,8 @@ function _botJobRowHtml(j){
     ? `<button type="button" class="bot-job-act" title="${esc(t('bot_jobs_resume') || 'Resume')}" aria-label="${esc(t('bot_jobs_resume') || 'Resume')}" onclick="event.stopPropagation();_botJobAct('resume','${id}')">↻</button>`
     : `<button type="button" class="bot-job-act" title="${esc(t('bot_jobs_pause') || 'Pause')}" aria-label="${esc(t('bot_jobs_pause') || 'Pause')}" onclick="event.stopPropagation();_botJobAct('pause','${id}')">⏸</button>`);
   const err = state === 'error' && j.last_error ? `<div class="bot-job-error">${esc(String(j.last_error).split('\n')[0].slice(0, 160))}</div>` : '';
-  return `<li class="bot-job is-${state}" tabindex="0" role="button" onclick="openCronFromBot('${id}','${storeEsc}')" onkeydown="if(event.key==='Enter'){openCronFromBot('${id}','${storeEsc}')}">
+  const botEsc = esc(_cronJobBotName(j));
+  return `<li class="bot-job is-${state}" tabindex="0" role="button" onclick="openCronFromBot('${id}','${storeEsc}','${botEsc}')" onkeydown="if(event.key==='Enter'){openCronFromBot('${id}','${storeEsc}','${botEsc}')}">
       <span class="bot-job-icon" aria-hidden="true">${esc(icon)}</span>
       <div class="bot-job-main">
         <div class="bot-job-name">${esc(j.name || j.id)}</div>
@@ -8385,7 +8425,7 @@ async function _loadProfileBotJobs(p){
     </header>
     ${active.length ? `<ul class="bot-jobs-list">${active.map(_botJobRowHtml).join('')}</ul>` : ''}
     ${paused.length ? `<details class="bot-jobs-paused"><summary>${esc(t('bot_jobs_paused_title', paused.length) || ('Paused (' + paused.length + ')'))}</summary><ul class="bot-jobs-list">${paused.map(_botJobRowHtml).join('')}</ul></details>` : ''}
-    ${jobs.length ? `<div class="bot-jobs-foot"><button type="button" class="sm-btn" onclick="setCronBotFilter('${esc(filterName)}').then(()=>switchPanel('tasks'))">${esc(t('profile_bot_jobs_open') || 'Open in Scheduled tasks')}</button></div>`
+    ${jobs.length ? `<div class="bot-jobs-foot"><button type="button" class="sm-btn" onclick="_cronCategoryFilter='';setCronBotFilter('${esc(filterName)}').then(()=>switchPanel('tasks'))">${esc(t('profile_bot_jobs_open') || 'Open in Scheduled tasks')}</button></div>`
       : `<div class="bot-jobs-empty"><span aria-hidden="true">🗓️</span><p>${esc(t('profile_bot_jobs_empty') || 'This bot has no scheduled tasks yet.')}</p></div>`}`;
   box.style.display = '';
 }
@@ -8406,13 +8446,23 @@ async function _decorateBotCardsWithJobs(profiles){
     card.appendChild(chip);
   }
 }
-async function openCronFromBot(jobId, ownerProfile){
-  _cronBotFilter = ownerProfile === _cronActiveBotName() ? '' : ownerProfile;
-  try { localStorage.setItem('cron-bot-filter', _cronBotFilter); } catch (_e) {}
+// From a bot's task list to Scheduled tasks: filtered on that bot, with the
+// task open and in view.
+async function openCronFromBot(jobId, ownerProfile, botName){
+  const bot = _cronProfileName(botName) || _cronProfileName(ownerProfile) || 'default';
+  _cronBotFilter = bot === _cronActiveBotName() ? '' : bot;
+  _cronCategoryFilter = '';
+  try { localStorage.setItem('cron-bot-filter', _cronBotFilter); localStorage.setItem('cron-category-filter', ''); } catch (_e) {}
   if (typeof switchPanel === 'function') await switchPanel('tasks');
-  await loadCrons();
-  const job = (_cronList || []).find(j => String(j.id) === String(jobId) && (_cronOwnerProfileName(j) || 'default') === ownerProfile);
-  if (job) openCronDetail(job);
+  else await loadCrons();
+  const store = _cronProfileName(ownerProfile) || 'default';
+  const find = () => (_cronList || []).find(j => String(j.id) === String(jobId) && (_cronOwnerProfileName(j) || 'default') === store);
+  let job = find();
+  if (!job) { _cronBotFilter = '*'; await loadCrons(); job = find(); }
+  if (!job) return;
+  const item = document.getElementById(_cronItemId(job));
+  openCronDetail(job, item || undefined);
+  if (item) { const group = item.closest('details'); if (group) group.open = true; item.scrollIntoView({ block: 'center' }); }
 }
 
 function _setProfileHeaderButtons(mode, p, activeName){

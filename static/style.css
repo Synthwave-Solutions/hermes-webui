@@ -8574,3 +8574,16 @@ html[data-sp-merged="1"] #composerWorkspaceLabel::before{content:attr(data-sp-pr
 .session-kind-count{font-size:10.5px;font-weight:600;padding:0 6px;min-width:18px;height:16px;line-height:16px;border-radius:999px;background:var(--border-subtle,var(--border));color:var(--muted);}
 .session-kind-btn.active .session-kind-count{background:var(--accent-bg);color:var(--accent-text,var(--accent));}
 .session-kind-unread{position:absolute;top:4px;right:4px;width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px var(--hover-bg);}
+
+/* Tasks filter bar: bot and category (19 Oct 2026). */
+.cron-bot-filter{flex-direction:column;align-items:stretch;gap:6px;}
+.cron-filter-row{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:6px;}
+.cron-filter-field{display:flex;align-items:center;gap:6px;min-width:0;height:32px;padding:0 8px;border:1px solid var(--border);border-radius:9px;background:var(--surface-subtle,var(--surface));cursor:pointer;transition:border-color .15s var(--sp-ease,ease);}
+.cron-filter-field:hover,.cron-filter-field:focus-within{border-color:var(--sp-active-border,var(--accent));}
+.cron-filter-field select{flex:1;min-width:0;height:100%;background:transparent;border:0;color:var(--text);font:inherit;font-size:12px;outline:none;cursor:pointer;text-overflow:ellipsis;}
+.cron-filter-field select option{background:var(--bg);color:var(--text);}
+.cron-filter-field .cron-bot-avatar{flex-shrink:0;}
+.cron-filter-icon{font-size:13px;flex-shrink:0;}
+.cron-filter-clear{align-self:flex-start;border:0;background:none;padding:0 2px;color:var(--accent-text,var(--accent));font:inherit;font-size:11.5px;cursor:pointer;}
+.cron-filter-clear:hover{text-decoration:underline;}
+.cron-filter-field .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}

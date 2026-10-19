@@ -2531,6 +2531,8 @@ window.__registerHermesLocale('en', {
     cron_job_chat_hint: 'Results of this task land in this chat. Ask a follow-up question there.',
     cron_job_chat_view_task: 'View task',
     cron_toast_open_chat: 'Click to open the chat',
+    cron_category_filter_all: 'All categories',
+    cron_filter_clear: 'Clear filters',
     profile_bot_jobs_title: 'Scheduled tasks',
     profile_bot_jobs_empty: 'This bot has no scheduled tasks yet. Tasks this bot creates in a chat show up here by themselves.',
     profile_bot_jobs_open: 'Open in Scheduled tasks',

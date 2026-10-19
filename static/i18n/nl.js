@@ -2424,6 +2424,8 @@ window.__registerHermesLocale('nl', {
   cron_job_chat_hint: 'De resultaten van deze taak komen in deze chat binnen. Stel daar gerust een vervolgvraag.',
   cron_job_chat_view_task: 'Bekijk de taak',
   cron_toast_open_chat: 'Klik om de chat te openen',
+  cron_category_filter_all: 'Alle categorieën',
+  cron_filter_clear: 'Filters wissen',
   profile_bot_jobs_title: 'Geplande taken',
   profile_bot_jobs_empty: 'Deze bot heeft nog geen geplande taken. Taken die deze bot in een chat aanmaakt, verschijnen hier vanzelf.',
   profile_bot_jobs_open: 'Open in Geplande taken',
