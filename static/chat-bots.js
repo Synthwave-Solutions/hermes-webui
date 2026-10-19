@@ -375,6 +375,17 @@
     toggle.disabled = !!scoutPending; toggle.appendChild(scoutIcon());
     toggle.onclick = async () => {
       if (scoutPending) return;
+      // The first time Scout goes on for a bot (no Scout settings yet), say
+      // what that means; turning it off needs no confirmation.
+      if (!on && !(p.bot && p.bot.scout) && typeof window.showConfirmDialog === 'function') {
+        const time = '07:30';
+        const ok = await window.showConfirmDialog({
+          title: tx('bot_scout_confirm_title', 'Turn Scout on?'),
+          message: tx('bot_scout_confirm_on', 'This bot gets a daily Scout task at {time}. Read only, notifications off.').replace('{time}', time),
+          confirmLabel: tx('bot_scout_confirm_ok', 'Turn Scout on'),
+        });
+        if (!ok) return;
+      }
       scoutPending = p.name; paintSidebarBots();
       try {
         await api('/api/bots/scout', {method: 'POST', body: JSON.stringify({name: p.name, enabled: !on, revision: p.bot_revision || 0})});

@@ -16,7 +16,7 @@ const fs=require('fs'),assert=require('node:assert/strict');
    window.botAvatarHtml=()=>'<svg aria-hidden="true" viewBox="0 0 32 32"><circle cx="16" cy="16" r="12" fill="currentColor"/></svg>';
    window.botDisplayName=p=>p.name;window.showToast=m=>window.lastError=m;
    window.esc=v=>String(v).replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
-   window.scoutCalls=[];window._botScreenSinceText=ts=>ts?'waiting since '+ts:'';
+   window.scoutCalls=[];window.confirms=[];window.confirmAnswer=false;window.showConfirmDialog=async o=>{confirms.push(o);return confirmAnswer;};window._botScreenSinceText=ts=>ts?'waiting since '+ts:'';
    window.api=async(url,opts)=>{if(url==='/api/bots/scout'){scoutCalls.push(JSON.parse(opts.body));return {ok:true};}
     if(url==='/api/bot-screen/status')return {screens:[{bot:'reviewer',state:'waiting',reason:'please log in',help_since:1760000000},{bot:'writer',state:'agent'}]};
     return url.includes('profiles')?{profiles:[{name:'default',is_default:true,bot_kind:'bot'},{name:'writer',bot_kind:'bot',bot_editable:true,bot_revision:3,bot:{category:'Content'}},{name:'reviewer',bot_kind:'bot',bot:{category:'Content',scout:{enabled:true,topics:[],digest_time:'07:30'}}},{name:'research',bot_kind:'person',bot_editable:true},{name:'hidden',visible:false}]}:{people:[]};};
@@ -51,6 +51,15 @@ const fs=require('fs'),assert=require('node:assert/strict');
   // A bot whose screen waits for a person carries a small dot, nothing else does.
   assert.deepEqual(await p.locator('.sidebar-bot-screen-wait').evaluateAll(d=>d.map(x=>[x.parentElement.querySelector('[data-sidebar-bot]').dataset.sidebarBot,x.title])),[['reviewer','Bot screen waits for you: please log in · waiting since 1760000000']]);
   assert.equal(await p.locator('button[data-scout-bot="writer"]').getAttribute('title'),'Scout on/off');
+  // Hit area of at least 24px.
+  const box=await p.locator('button[data-scout-bot="writer"]').boundingBox();
+  assert.ok(box.width>=24&&box.height>=24,'scout toggle hit area '+box.width+'x'+box.height);
+  // First time on for a bot: a confirm with the time; cancel changes nothing.
+  await p.locator('button[data-scout-bot="writer"]').click();
+  await p.waitForFunction(()=>confirms.length===1);
+  assert.deepEqual(await p.evaluate(()=>[confirms[0].title,confirms[0].message,confirms[0].confirmLabel]),['Turn Scout on?','This bot gets a daily Scout task at 07:30. Read only, notifications off.','Turn Scout on']);
+  assert.equal(await p.evaluate(()=>scoutCalls.length),0);
+  await p.evaluate(()=>{confirmAnswer=true;});
   await p.locator('button[data-scout-bot="writer"]').click();
   await p.waitForFunction(()=>scoutCalls.length===1);
   assert.deepEqual(await p.evaluate(()=>scoutCalls[0]),{name:'writer',enabled:true,revision:3});
