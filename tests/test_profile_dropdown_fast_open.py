@@ -57,7 +57,7 @@ def test_profile_dropdown_uses_shared_fetch_promise_and_validated_local_storage_
 
     fetch_body = _function_body(PANELS_JS, "function _profileDropdownFetchFresh(){")
     assert "if(_profileDropdownFetchPromise) return _profileDropdownFetchPromise;" in fetch_body
-    assert "api('/api/profiles?fast=1', {timeoutToast:false})" in fetch_body
+    assert "api('/api/profiles?fast=1&counts=0', {timeoutToast:false})" in fetch_body
     assert "if(_profileDropdownDataCacheUsable(data)) _profilesCache = data;" in fetch_body
     assert "_profileDropdownWriteStoredCache(data);" in fetch_body
     assert "\n    _profilesCache = data;\n" not in fetch_body
@@ -178,7 +178,7 @@ def test_poisoned_profile_cache_opens_then_switches_after_fresh_refresh():
           ],
         }};
         let apiResponse = multiProfileResponse;
-        globalThis.api = (path) => {{ assert.strictEqual(path, '/api/profiles?fast=1'); return Promise.resolve(apiResponse); }};
+        globalThis.api = (path) => {{ assert.strictEqual(path, '/api/profiles?fast=1&counts=0'); return Promise.resolve(apiResponse); }};
 
         eval(snippets.join(String.fromCharCode(10)) + String.fromCharCode(10) + `;globalThis.__profileTest={{
           key: PROFILE_DROPDOWN_CACHE_KEY,

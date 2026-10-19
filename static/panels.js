@@ -7932,7 +7932,7 @@ function _profileDropdownBestCachedData(){
 
 function _profileDropdownFetchFresh(){
   if(_profileDropdownFetchPromise) return _profileDropdownFetchPromise;
-  _profileDropdownFetchPromise = api('/api/profiles?fast=1', {timeoutToast:false}).then(data=>{
+  _profileDropdownFetchPromise = api('/api/profiles?fast=1&counts=0', {timeoutToast:false}).then(data=>{
     if(_profileDropdownDataCacheUsable(data)) _profilesCache = data;
     _profileDropdownWriteStoredCache(data);
     return data;

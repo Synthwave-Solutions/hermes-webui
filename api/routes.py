@@ -14201,7 +14201,12 @@ def handle_get(handler, parsed) -> bool:
     if parsed.path == "/api/profiles":
         from api import profiles as profiles_api, bot_metadata
 
-        rows = [{**p, **bot_metadata.read_profile(p["name"])} for p in profiles_api.list_profiles_api(fast=(parse_qs(parsed.query).get("fast") or [""])[0] == "1") if _chat_profile_target_allowed(handler,p["name"])]
+        query = parse_qs(parsed.query)
+        fast = (query.get("fast") or [""])[0] == "1"
+        options = {"fast": fast}
+        if fast and (query.get("counts") or [""])[0] == "0":
+            options["include_skill_counts"] = False
+        rows = [{**p, **bot_metadata.read_profile(p["name"])} for p in profiles_api.list_profiles_api(**options) if _chat_profile_target_allowed(handler,p["name"])]
         editable = _bot_editable_check(handler)
         for row in rows:
             row["bot_editable"] = editable(row["name"], bool(row.get("bot_managed")))

@@ -1713,3 +1713,8 @@ with parser identity included in the cache key. Bounded LRU eviction preserves
 other hot entries at capacity; filesystem signatures still detect changed
 files, and callers receive independent metadata values. Authorization and
 per-profile enabled-skill decisions remain outside the shared parse cache.
+
+Chat startup, the composer bot picker and profile prewarming omit skill counts.
+`GET /api/profiles?fast=1&counts=0` preserves profile metadata and access filtering
+without starting skill scans; the profile-management panel keeps the default
+count-enabled request and queues its counts on demand.

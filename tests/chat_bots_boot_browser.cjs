@@ -15,7 +15,7 @@ const assert=require('node:assert/strict'),{chromium}=require(process.env.PLAYWR
  assert.equal(await p.locator('.chat-bot-roster-state').textContent(),'Loading bots…');
  const resolve=async(index,value)=>p.evaluate(({index,value})=>calls[index].resolve(value),{index,value});
  const profiles=names=>({profiles:names.map(name=>({name}))});
- assert.deepEqual(await p.evaluate(()=>calls.map(c=>c.url)),['/api/profiles?fast=1','/api/people']);
+ assert.deepEqual(await p.evaluate(()=>calls.map(c=>c.url)),['/api/profiles?fast=1&counts=0','/api/people']);
  // The unresolved people request must not delay the fast bot roster.
  await resolve(0,profiles(['default','research']));
  await p.locator('[data-bot="research"]').waitFor();
@@ -54,7 +54,7 @@ const assert=require('node:assert/strict'),{chromium}=require(process.env.PLAYWR
  assert.equal(await p.locator('.chat-bot-roster-state').count(),0);
  await p.evaluate(()=>{window.__GOV_ME__={};refreshChatBots();});
  assert.equal(await p.evaluate(()=>calls.length),13);
- assert.equal(await p.evaluate(()=>calls[12].url),'/api/profiles?fast=1');
+ assert.equal(await p.evaluate(()=>calls[12].url),'/api/profiles?fast=1&counts=0');
  await resolve(12,profiles(['research']));
  await p.locator('[data-bot="research"]').waitFor();
  // Exercise the actual identity-settle hook, not a manual roster refresh.
@@ -65,7 +65,7 @@ const assert=require('node:assert/strict'),{chromium}=require(process.env.PLAYWR
  assert.equal(await p.evaluate(()=>calls[13].url),'/api/governance/me');
  await resolve(13,{email:'bob@example.test'});
  await p.evaluate(()=>identityPromise);
- assert.deepEqual(await p.evaluate(()=>calls.slice(14).map(c=>c.url)),['/api/profiles?fast=1','/api/people']);
+ assert.deepEqual(await p.evaluate(()=>calls.slice(14).map(c=>c.url)),['/api/profiles?fast=1&counts=0','/api/people']);
  await resolve(14,profiles(['research'])); await resolve(15,{people:[]});
  assert.ok(await p.evaluate(()=>screenCalls)>0);
  console.log('PASS early loading, slow people, no boot switch, retry retains people, stale context exclusion');
