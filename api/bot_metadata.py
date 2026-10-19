@@ -35,7 +35,10 @@ _YAML_LOADER = getattr(yaml, 'CSafeLoader', yaml.SafeLoader)
 
 def _load(path):
     if not path.exists(): return {}
-    data=yaml.load(path.read_text(), Loader=_YAML_LOADER)
+    try:data=yaml.load(path.read_text(), Loader=_YAML_LOADER)
+    # A damaged file is the server's problem, not an unhandled 500: callers
+    # map ValueError to a clear JSON error, and nothing is written over it.
+    except yaml.YAMLError:raise ValueError('Bot metadata file is not valid YAML; fix it on the server first') from None
     if data is None: return {}
     if not isinstance(data,dict): raise ValueError('Bot metadata is not an object')
     return data
@@ -77,7 +80,9 @@ def read_profile(name):
             'bot_revision':max(0,revision) if isinstance(revision,int) and not isinstance(revision,bool) else 0,
             'bot_avatar_url':image_url,
         }
-    except (OSError,ValueError,yaml.YAMLError):return {'bot':{},'bot_kind':'bot','bot_managed':False,'bot_revision':0,'bot_avatar_url':''}
+    # Unreadable metadata says nothing about the kind: "unknown", so nothing
+    # that is only for bots (Scout) treats it as one.
+    except (OSError,ValueError,yaml.YAMLError):return {'bot':{},'bot_kind':'unknown','bot_managed':False,'bot_revision':0,'bot_avatar_url':''}
 
 
 def save_profile(name, values, revision):

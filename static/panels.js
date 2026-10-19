@@ -8121,7 +8121,8 @@ async function saveBotAppearance(){
 let _botScoutTopics=[];
 const _BOT_SCOUT_MAX=12,_BOT_SCOUT_TOPIC_MAX=80;
 function _botScoutCardHtml(p){
-  if(_botKind(p)!=='bot')return '';
+  // An unreadable profile.yaml reads as kind "unknown": no Scout until fixed.
+  if(_botKind(p)!=='bot'||p.bot_kind==='unknown')return '';
   // Scout writes a scheduled job: the server also asks cron admin (POST /api/bots/scout).
   const scout=(p.bot&&p.bot.scout)||{},on=!!scout.enabled,editable=p.bot_editable===true&&(typeof _cronIsCronAdmin!=='function'||_cronIsCronAdmin());
   return `<section class="detail-card bot-scout-card" aria-labelledby="botScoutTitle">

@@ -362,7 +362,7 @@
     const on = !!(p.bot && p.bot.scout && p.bot.scout.enabled);
     // Scout writes a scheduled job, so the server also asks cron admin.
     const editable = !!p.bot_editable && (typeof window._cronIsCronAdmin !== 'function' || window._cronIsCronAdmin());
-    if (p.bot_kind === 'person' || (!editable && !on)) return null;
+    if (p.bot_kind === 'person' || p.bot_kind === 'unknown' || (!editable && !on)) return null;
     if (!editable) {
       const mark = document.createElement('span'); mark.className = 'sidebar-bot-scout is-on'; mark.setAttribute('role', 'img');
       mark.title = tx('bot_scout_on_passive', 'Scout is on'); mark.setAttribute('aria-label', mark.title + ': ' + botDisplayName(p));

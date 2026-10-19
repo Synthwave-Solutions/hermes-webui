@@ -270,3 +270,42 @@ def test_an_older_scout_job_loses_terminal_on_the_next_sync(scout_env):
     _set("radar", enabled=True)
     [job] = _jobs(scout_env.homes["radar"])
     assert job["enabled_toolsets"] == ["kanban"]
+
+
+def test_unreadable_bot_metadata_is_unknown_and_gets_no_scout(scout_env):
+    (scout_env.homes["radar"] / "profile.yaml").write_text("ui_meta: [unclosed\n")
+    assert bot_metadata.read_profile("radar")["bot_kind"] == "unknown"
+    assert bot_metadata.read_profile("missing-bot")["bot_kind"] == "unknown"
+    for enabled in (True, False):
+        with pytest.raises(bot_scout.ScoutError) as err:
+            bot_scout.apply("radar", {"enabled": enabled, "revision": 0}, ALICE)
+        assert err.value.status == 409
+    assert _jobs(scout_env.homes["radar"]) == [] and not (scout_env.homes["radar"] / "scripts").exists()
+    assert (scout_env.homes["radar"] / "profile.yaml").read_text() == "ui_meta: [unclosed\n"
+
+
+def test_corrupt_metadata_is_a_clear_value_error_on_save(scout_env):
+    path = scout_env.homes["radar"] / "profile.yaml"
+    path.write_text("ui_meta: [unclosed\n")
+    for call in (lambda: bot_metadata.save_profile("radar", {"title": "x"}, 0),
+                 lambda: bot_metadata.save_scout("radar", {"enabled": False}, 0)):
+        with pytest.raises(ValueError, match="not valid YAML"):
+            call()
+    assert path.read_text() == "ui_meta: [unclosed\n"
+
+
+def test_nothing_is_copied_when_the_settings_are_not_saved(scout_env):
+    _set("radar", enabled=False)
+    with pytest.raises(RuntimeError):
+        bot_scout.apply("radar", {"enabled": True, "revision": 0}, ALICE)
+    assert not (scout_env.homes["radar"] / "scripts").exists()
+
+
+def test_failed_copy_restores_the_previous_settings(scout_env, monkeypatch):
+    def broken(home):
+        raise OSError("disk full")
+    monkeypatch.setattr(bot_scout, "install_runner", broken)
+    with pytest.raises(OSError):
+        _set("radar", enabled=True, topics=["AI act"])
+    assert bot_metadata.read_profile("radar")["bot"]["scout"]["enabled"] is False
+    assert _jobs(scout_env.homes["radar"]) == []

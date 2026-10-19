@@ -86,20 +86,32 @@ def _same_dir(a: Path, b: Path) -> bool:
         return False
 
 
-def install_runner(home) -> Path:
-    """Copy the runner files into ``<home>/scripts/scout/`` (idempotent: only
-    files whose content differs are written). Returns that folder."""
+def check_runner(home) -> tuple:
+    """Everything install_runner needs, checked without writing: the source
+    files exist and the bot's scripts folders are no symlinks. Returns
+    ``(src, dest)``."""
     home = Path(home)
     src = source_dir()
     missing = [n for n in REQUIRED_FILES if not (src / n).is_file()]
     if missing:
         raise ScoutError(503, "Scout is not installed on this server yet (missing %s in %s)." % (", ".join(missing), src))
     dest = home / "scripts" / "scout"
+    if not _same_dir(dest, src):
+        for part in (home / "scripts", dest):
+            if part.is_symlink():
+                raise ScoutError(400, "The bot's scripts folder cannot be a symlink")
+        for name in RUNNER_FILES:
+            if (dest / name).is_symlink():
+                raise ScoutError(400, "Scout file %s in this bot is a symlink" % name)
+    return src, dest
+
+
+def install_runner(home) -> Path:
+    """Copy the runner files into ``<home>/scripts/scout/`` (idempotent: only
+    files whose content differs are written). Returns that folder."""
+    src, dest = check_runner(home)
     if _same_dir(dest, src):
         return dest
-    for part in (home / "scripts", dest):
-        if part.is_symlink():
-            raise ScoutError(400, "The bot's scripts folder cannot be a symlink")
     dest.mkdir(parents=True, exist_ok=True)
     for name in RUNNER_FILES:
         source = src / name
@@ -221,9 +233,11 @@ def sync_job(home, scout: dict, owner_email: str | None):
 def apply(name: str, body: dict, owner_email: str | None) -> dict:
     """Save the bot's Scout settings and bring its job in line.
 
-    Order: runner copy first (the likely failure, nothing saved yet), then the
-    settings (revision checked), then the job. A failing job write puts the
-    previous settings back, so the toggle never shows a state that is not real.
+    Order: validate and check the runner source without writing, then the
+    settings (revision checked), then the runner copy and the job. Nothing is
+    copied before the settings are saved; a failing copy or job write puts
+    the previous settings back, so the toggle never shows a state that is not
+    real.
     """
     if not isinstance(body, dict):
         raise ScoutError(400, "Invalid request")
@@ -231,7 +245,10 @@ def apply(name: str, body: dict, owner_email: str | None) -> dict:
 
     with _LOCK:
         current = bot_metadata.read_profile(name)
-        if body.get("enabled") is True and current.get("bot_kind") != "bot":
+        kind = current.get("bot_kind")
+        if kind not in ("bot", "person"):
+            raise ScoutError(409, "The settings of this bot cannot be read; Scout is left as it is")
+        if body.get("enabled") is True and kind != "bot":
             raise ScoutError(400, "Scout is only for bots, not for a person's profile")
         stored = (current.get("bot") or {}).get("scout") or {}
         scout = bot_metadata.validate_scout(
@@ -241,9 +258,11 @@ def apply(name: str, body: dict, owner_email: str | None) -> dict:
         )
         home = home_for_profile(name)
         if scout["enabled"]:
-            install_runner(home)
+            check_runner(home)
         saved = bot_metadata.save_scout(name, scout, body.get("revision"))
         try:
+            if scout["enabled"]:
+                install_runner(home)
             job = sync_job(home, scout, owner_email)
         except Exception:
             previous = stored or {"enabled": False, "topics": [], "digest_time": bot_metadata.SCOUT_DEFAULT_TIME}
