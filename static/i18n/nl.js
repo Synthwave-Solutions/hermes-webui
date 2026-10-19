@@ -1141,7 +1141,7 @@ window.__registerHermesLocale('nl', {
   bot_scout_on_passive: 'Scout staat aan',
   bot_scout_saved_on: 'Scout aan',
   bot_scout_saved_off: 'Scout uit',
-  bot_scout_intro: 'Scout kijkt elke dag rond naar nieuws over de onderwerpen van deze bot. Alleen lezen: hooguit een taak in triage en een digest in de chat van de bot, Scout verstuurt nooit berichten.',
+  bot_scout_intro: 'Scout kijkt dagelijks naar open werk, voortgang, kansen en knelpunten. Je krijgt een korte update, advies en concrete voorstellen voor wat deze bot voor je kan oppakken. Uitvoeren gebeurt pas na akkoord; Scout verstuurt zelf niets.',
   bot_scout_topics: 'Onderwerpen',
   bot_scout_topics_placeholder: 'Typ een onderwerp en druk op Enter',
   bot_scout_remove_topic: 'Onderwerp verwijderen',

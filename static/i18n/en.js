@@ -1249,7 +1249,7 @@ window.__registerHermesLocale('en', {
     bot_scout_on_passive: 'Scout is on',
     bot_scout_saved_on: 'Scout on',
     bot_scout_saved_off: 'Scout off',
-    bot_scout_intro: 'Once a day Scout looks around for news on the topics of this bot. Read only: at most it files a task in triage and one digest in the bot chat, it never sends messages.',
+    bot_scout_intro: 'Scout reviews open work, progress, opportunities and blockers daily. It gives you a brief update, advice and concrete proposals for work this bot can take on. Execution waits for approval; Scout never sends messages itself.',
     bot_scout_topics: 'Topics',
     bot_scout_topics_placeholder: 'Type a topic and press Enter',
     bot_scout_remove_topic: 'Remove topic',
