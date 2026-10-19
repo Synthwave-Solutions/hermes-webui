@@ -36,13 +36,13 @@ def test_second_read_uses_cache_no_reparse(tmp_path, monkeypatch, clean_cache):
 
     calls = {"n": 0}
     import yaml as _yaml
-    real_load = _yaml.safe_load
+    real_load = _yaml.load
 
-    def counting_load(text):
+    def counting_load(text, **kwargs):
         calls["n"] += 1
-        return real_load(text)
+        return real_load(text, **kwargs)
 
-    monkeypatch.setattr(_yaml, "safe_load", counting_load)
+    monkeypatch.setattr(_yaml, "load", counting_load)
 
     first = config._load_yaml_config_file(cfg)
     second = config._load_yaml_config_file(cfg)
@@ -58,13 +58,13 @@ def test_mtime_change_invalidates_cache(tmp_path, monkeypatch, clean_cache):
 
     calls = {"n": 0}
     import yaml as _yaml
-    real_load = _yaml.safe_load
+    real_load = _yaml.load
 
-    def counting_load(text):
+    def counting_load(text, **kwargs):
         calls["n"] += 1
-        return real_load(text)
+        return real_load(text, **kwargs)
 
-    monkeypatch.setattr(_yaml, "safe_load", counting_load)
+    monkeypatch.setattr(_yaml, "load", counting_load)
 
     assert config._load_yaml_config_file(cfg)["agent"]["reasoning_effort"] == "high"
     # Rewrite with different content + bump mtime so (mtime_ns, size) changes.
@@ -133,3 +133,31 @@ def test_save_evicts_cache_so_next_read_is_fresh(tmp_path, clean_cache):
     assert fresh["agent"]["reasoning_effort"] == "low", (
         "read after save must return the freshly-written config, not a stale cache hit"
     )
+
+
+@pytest.mark.parametrize('accelerated', [True, False])
+def test_safe_loader_variants_preserve_config_semantics(tmp_path, monkeypatch, clean_cache, accelerated):
+    import yaml
+    if not accelerated:
+        monkeypatch.delattr(yaml, 'CSafeLoader', raising=False)
+    text = 'defaults: &base\n  enabled: true\n  tools: [read, search]\nagent:\n  <<: *base\n  effort: low\n  temperature: 0.25\n  note: "héllo"\n'
+    cfg = tmp_path / 'config.yaml'
+    cfg.write_text(text, encoding='utf-8')
+    assert config.load_profile_yaml_cached(cfg) == yaml.safe_load(text)
+
+
+def test_custom_safe_constructor_still_applies(tmp_path, monkeypatch, clean_cache):
+    import yaml
+    constructors = dict(yaml.SafeLoader.yaml_constructors)
+    constructors['!setting'] = lambda loader, node: 'custom:' + loader.construct_scalar(node)
+    monkeypatch.setattr(yaml.SafeLoader, 'yaml_constructors', constructors)
+    cfg = tmp_path / 'config.yaml'
+    cfg.write_text('model: !setting test\n', encoding='utf-8')
+    assert config.load_profile_yaml_cached(cfg) == {'model': 'custom:test'}
+
+
+@pytest.mark.parametrize('text', ['model: [unterminated', 'model: !!python/object/apply:os.system [echo unsafe]', '[one, two]'])
+def test_invalid_or_unsafe_config_returns_empty(tmp_path, clean_cache, text):
+    cfg = tmp_path / 'config.yaml'
+    cfg.write_text(text, encoding='utf-8')
+    assert config.load_profile_yaml_cached(cfg) == {}

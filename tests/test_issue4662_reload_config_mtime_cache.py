@@ -18,13 +18,13 @@ def test_reload_config_uses_mtime_cache(tmp_path, monkeypatch):
     monkeypatch.setattr(cfg, "_get_config_path", lambda: config_path)
 
     parse_calls = {"n": 0}
-    real_safe_load = _yaml.safe_load
+    real_safe_load = _yaml.load
 
-    def _counting_safe_load(s):
+    def _counting_safe_load(s, **kwargs):
         parse_calls["n"] += 1
-        return real_safe_load(s)
+        return real_safe_load(s, **kwargs)
 
-    monkeypatch.setattr(_yaml, "safe_load", _counting_safe_load)
+    monkeypatch.setattr(_yaml, "load", _counting_safe_load)
     # Clear the shared file cache so the first reload is a genuine miss.
     with cfg._yaml_file_cache_lock:
         cfg._yaml_file_cache.clear()

@@ -1696,3 +1696,12 @@ authorization, session persistence, or streaming state.
 Composer input events update recipient selection and mention-hint visibility in
 place. The bot roster is rebuilt only on roster or UI state refreshes, preserving
 button identity and avoiding avatar/DOM reconstruction for ordinary keystrokes.
+
+### Profile catalog cold reads
+
+The shared profile YAML cache uses libyaml’s `CSafeLoader` when available,
+falling back to `SafeLoader` without libyaml or when its constructor/resolver
+registries are customized. Cache invalidation still follows file mtime and
+size, and callers receive independent values with fresh environment expansion.
+Bot avatar images load lazily and decode asynchronously so hidden bot panels
+do not fetch every profile image during chat startup.

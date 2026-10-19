@@ -8029,7 +8029,7 @@ function _botKind(p){ return (p&&p.bot_kind)==='person'?'person':'bot'; }
 function botDisplayName(p){ return (p.bot&&p.bot.title)||(typeof spProfileLabel==='function'?spProfileLabel(p.name):p.name); }
 function botAvatarHtml(p){
   const avatar=String(p.bot_avatar_url||'');
-  if(avatar.startsWith('/api/profile/avatar?')) return `<img src="${esc(avatar)}" width="32" height="32" alt="" style="border-radius:8px;object-fit:cover;vertical-align:middle;margin-right:8px">`;
+  if(avatar.startsWith('/api/profile/avatar?')) return `<img src="${esc(avatar)}" loading="lazy" decoding="async" width="32" height="32" alt="" style="border-radius:8px;object-fit:cover;vertical-align:middle;margin-right:8px">`;
   const meta=p.bot||{};let hash=0;for(const ch of p.name||'bot') hash=(hash*31+ch.charCodeAt(0))>>>0;
   const color=/^#[0-9a-f]{6}$/i.test(meta.color||'')?meta.color:['#6688aa','#8866aa','#668877','#aa8866'][hash%4];
   const face=meta.shape==='hexagon'?'<polygon points="16,2 29,9 29,23 16,30 3,23 3,9"/>':meta.shape==='squircle'?'<rect x="2" y="2" width="28" height="28" rx="7"/>':'<circle cx="16" cy="16" r="14"/>';
