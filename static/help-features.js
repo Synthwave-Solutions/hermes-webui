@@ -13700,6 +13700,106 @@ window.SynthPulseFeatureCatalog = {
       }
     },
     {
+      "id": "webui.apps.blender",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured app directory and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.blender",
+        "#mainApps [data-app-id=\"blender\"]"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "Blender openen",
+          "purpose": "Maak 3D-modellen, scènes en renders in Blender in je browser.",
+          "when": "Gebruik deze ingang voor een 3D-productshot opzetten en renderen.",
+          "steps": [
+            "Kies Apps in de navigatie en zoek Blender.",
+            "Bekijk de status en de beschrijving van de kaart.",
+            "Sluit de gids en kies Openen als een adres is ingesteld. Rond indien nodig de eigen aanmelding van de app af.",
+            "Werk verder in de doelapp en gebruik het oorspronkelijke tabblad om terug te keren naar SynthPulse."
+          ],
+          "permissions": "Toegang tot Apps en de bijbehorende actieve module; platformbeheerders kunnen ingestelde appadressen ook zonder die module bekijken. De doelapp controleert zelf je toegang.",
+          "limits": "Openen navigeert alleen naar het ingestelde adres. De app kan een eigen aanmelding vereisen. Niet ingesteld betekent dat er geen bruikbare link is; een ingestelde link garandeert niet dat de dienst bereikbaar is.",
+          "example": "Bijvoorbeeld: een 3D-productshot opzetten en renderen."
+        },
+        "en": {
+          "title": "Open Blender",
+          "purpose": "Create 3D models, scenes and renders in Blender in your browser.",
+          "when": "Use this entry point for setting up and rendering a 3D product shot.",
+          "steps": [
+            "Choose Apps in navigation and find Blender.",
+            "Review the card’s status and description.",
+            "Close the guide and choose Open when an address is configured. Complete the app’s own sign-in if required.",
+            "Continue in the destination app and use the original tab to return to SynthPulse."
+          ],
+          "permissions": "Access to Apps and the associated active module; platform administrators can discover configured app addresses even without that module. The destination app checks its own access.",
+          "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable.",
+          "example": "For example: setting up and rendering a 3D product shot."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.openseo",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured app directory and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.openseo",
+        "#mainApps [data-app-id=\"openseo\"]"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "OpenSEO openen",
+          "purpose": "Doe zoekwoordonderzoek, volg posities en audit websites voor SEO en AI-zichtbaarheid.",
+          "when": "Gebruik deze ingang voor zoekwoorden voor een nieuwe blog onderzoeken.",
+          "steps": [
+            "Kies Apps in de navigatie en zoek OpenSEO.",
+            "Bekijk de status en de beschrijving van de kaart.",
+            "Sluit de gids en kies Openen als een adres is ingesteld. Rond indien nodig de eigen aanmelding van de app af.",
+            "Werk verder in de doelapp en gebruik het oorspronkelijke tabblad om terug te keren naar SynthPulse."
+          ],
+          "permissions": "Toegang tot Apps en de bijbehorende actieve module; platformbeheerders kunnen ingestelde appadressen ook zonder die module bekijken. De doelapp controleert zelf je toegang.",
+          "limits": "Openen navigeert alleen naar het ingestelde adres. De app kan een eigen aanmelding vereisen. Niet ingesteld betekent dat er geen bruikbare link is; een ingestelde link garandeert niet dat de dienst bereikbaar is.",
+          "example": "Bijvoorbeeld: zoekwoorden voor een nieuwe blog onderzoeken."
+        },
+        "en": {
+          "title": "Open OpenSEO",
+          "purpose": "Research keywords, track rankings and audit websites for SEO and AI visibility.",
+          "when": "Use this entry point for researching keywords for a new blog post.",
+          "steps": [
+            "Choose Apps in navigation and find OpenSEO.",
+            "Review the card’s status and description.",
+            "Close the guide and choose Open when an address is configured. Complete the app’s own sign-in if required.",
+            "Continue in the destination app and use the original tab to return to SynthPulse."
+          ],
+          "permissions": "Access to Apps and the associated active module; platform administrators can discover configured app addresses even without that module. The destination app checks its own access.",
+          "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable.",
+          "example": "For example: researching keywords for a new blog post."
+        }
+      }
+    },
+    {
       "id": "webui.apps.n8n",
       "area": "apps",
       "status": "conditional",

@@ -2402,6 +2402,18 @@
       "#mainApps [data-app-id=\"hyperframes\"]"
     ]
   },
+  "webui.apps.blender": {
+    "panel": "apps",
+    "targets": [
+      "#mainApps [data-app-id=\"blender\"]"
+    ]
+  },
+  "webui.apps.openseo": {
+    "panel": "apps",
+    "targets": [
+      "#mainApps [data-app-id=\"openseo\"]"
+    ]
+  },
   "webui.apps.n8n": {
     "panel": "apps",
     "targets": [
