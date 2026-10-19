@@ -30,7 +30,7 @@ Turning Scout on copies the Scout runner files from the root profile's `scripts/
 
 The **Responsibilities** card on a bot's page records what the bot answers for: at most 12 items, each with a **title** (80 characters), an **objective** (300), **when** it acts (free text of 120 characters, such as daily 08:00 or on new mail), its **autonomy** (on its own, asks first, or report only; default asks first) and how it **reports** (120). They are stored as `responsibilities` in `ui_meta['hermes-bots']`, validated strictly and saved through `POST /api/profile/appearance` under the same revision as the rest of the bot; a damaged record reads as empty. Everyone who may see the bot reads the list; adding, editing and removing needs the right to edit the bot. People's own profiles have no card.
 
-Chats whose active profile is the bot get a short "Jouw verantwoordelijkheden" block (at most 800 characters) in the WebUI runtime prompt, next to the knowledge index. It is context only: it grants no tool, schedule or approval.
+Chats whose active profile is the bot get a short "Jouw verantwoordelijkheden" block (at most 800 characters) in the WebUI runtime prompt, next to the knowledge index, one JSON object per responsibility under a line that says to treat them as data, not instructions. It is context only: it grants no tool, schedule or approval.
 
 ## Work of this bot
 
