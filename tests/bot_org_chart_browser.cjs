@@ -91,6 +91,35 @@ async function render(p,list){
   assert.ok(fit.overflow<=0&&!fit.inner,'no horizontal scroll at '+width);
   assert.equal(fit.people,10);assert.equal(fit.open,false);
   if(width>=1440)assert.ok(fit.tree<=600,'the whole tree fits a 1440x900 screen, was '+fit.tree);
+  // 1440 with the workspace panel open: rail, a 300px sidebar and a 300px
+  // panel leave the detail view about 780px (720 here, to be safe). Four
+  // departments with long titles sit side by side, titles wrap to two lines
+  // instead of an ellipsis, still no sideways scroll.
+  if(width>=1440){
+   const depts=[{name:'lead',bot:{title:'Chief Operating Bot',category:'Board'}}];
+   for(const [i,title] of ['Finance and Administration','Marketing and Content Studio','Customer Success Office','Engineering and Platform'].entries()){
+    depts.push({name:'d'+i,bot:{title,reports_to:'lead',role:'Department head'}});
+    depts.push({name:'s'+i,bot:{title:'Specialist '+i,reports_to:'d'+i}});
+   }
+   await p.evaluate(()=>{document.getElementById('profileDetailBody').style.width='720px';});
+   await render(p,depts);
+   const narrow=await p.evaluate(()=>{
+    const heads=[...document.querySelectorAll('.bot-org-col .bot-org-chip[data-depth="0"]')];
+    const names=heads.map(h=>h.querySelector('.bot-org-name'));
+    const line=parseFloat(getComputedStyle(names[0]).lineHeight);
+    return {tops:heads.map(h=>Math.round(h.getBoundingClientRect().top)),
+     clipped:names.filter(n=>n.scrollHeight>n.clientHeight+1).length,
+     lines:names.map(n=>Math.round(n.getBoundingClientRect().height/line)),
+     ellipsis:names.map(n=>getComputedStyle(n).textOverflow),
+     overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,
+     inner:[...document.querySelectorAll('.bot-org-scroll,.bot-org-col')].some(e=>e.scrollWidth>e.clientWidth+1)};});
+   assert.equal(new Set(narrow.tops).size,1,'four department columns on one row: '+narrow.tops);
+   assert.equal(narrow.clipped,0,'department titles fit in two lines');
+   assert.ok(narrow.lines.some(n=>n===2)&&narrow.lines.every(n=>n<=2),'titles wrap to at most two lines: '+narrow.lines);
+   assert.ok(narrow.ellipsis.every(v=>v!=='ellipsis'));
+   assert.ok(narrow.overflow<=0&&!narrow.inner,'no horizontal scroll with the workspace panel open');
+   await p.evaluate(()=>{document.getElementById('profileDetailBody').style.width='';});
+  }
   // Editor select: no self, nothing below the bot; a hidden manager is preserved.
   await render(p,bots);
   const opts=await p.evaluate(()=>{const d=document.createElement('div');d.innerHTML=_botReportsToSelectHtml(_profilesCache.profiles.find(x=>x.name==='cfo'));return [...d.querySelectorAll('option')].map(o=>[o.value,o.selected]);});
