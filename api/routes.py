@@ -9846,6 +9846,13 @@ def _sidebar_session_response_item(session: dict, *, redact_enabled: bool | None
         for key, value in dict(session).items()
         if key in _SIDEBAR_SESSION_RESPONSE_FIELDS
     }
+    # The chat/task filter needs provenance even when session_source is unset.
+    # Keep only the bounded link, never additional job details or prompts.
+    from api.cron_bots import normalize_job_link
+
+    job_link = normalize_job_link(session.get("cron_job"))
+    if job_link:
+        item["cron_job"] = job_link
     if isinstance(item.get("title"), str):
         item["title"] = _redact_text(item["title"], _enabled=redact_enabled)
     item["attention"] = _session_attention_summary(str(item.get("session_id") or ""))
