@@ -8247,6 +8247,13 @@ async function _botDutiesStore(list){
 // latest attachments of its tasks). GET /api/kanban/bot-work; downloads go
 // through the read-only /api/kanban/attachment route.
 const _BOT_WORK_ORDER=['blocked','review','running','ready','todo','scheduled','triage'];
+// The board the Kanban panel has open (?board=, as _kanbanBoardQuery), so a
+// task opened from here and its files come from the same board.
+function _botWorkQuery(extra){
+  if(typeof _kanbanBoardQuery==='function')return _kanbanBoardQuery(extra);
+  const q=new URLSearchParams(Object.entries(extra||{}).filter(e=>e[1]!==''&&e[1]!=null)).toString();
+  return q?'?'+q:'';
+}
 function _botWorkStatusLabel(status){
   if(status==='review'||status==='scheduled')return t('bot_work_status_'+status);
   return typeof _kanbanColumnLabel==='function'?_kanbanColumnLabel(status):status;
@@ -8273,7 +8280,7 @@ function _botWorkHtml(data){
   const known=new Set(_BOT_WORK_ORDER),rest=tasks.filter(x=>!known.has(x.status));
   if(rest.length)groups.push(['other',rest]);
   const taskHtml=groups.map(([status,items])=>`<div class="bot-work-group" data-status="${esc(status)}"><div class="bot-work-group-head">${esc(status==='other'?t('bot_work_status_other'):_botWorkStatusLabel(status))} <span class="cron-group-count">${items.length}</span></div><ul class="bot-work-list">${items.map(_botWorkTaskHtml).join('')}</ul></div>`).join('');
-  const fileHtml=files.map(f=>`<li class="bot-work-file"><a href="/api/kanban/attachment?id=${encodeURIComponent(f.id)}" download="${esc(f.filename)}">${esc(f.filename)}</a>
+  const fileHtml=files.map(f=>`<li class="bot-work-file"><a href="${esc('/api/kanban/attachment'+_botWorkQuery({id:f.id}))}" download="${esc(f.filename)}">${esc(f.filename)}</a>
       <span class="bot-work-file-meta">${esc(f.task_title||'')} · ${esc(_botWorkWhen(f.created_at))} · ${esc(_botWorkSize(f.size))}</span></li>`).join('');
   return `<div class="detail-card-title">${esc(t('bot_work_title'))} <span class="cron-group-count">${tasks.length}</span></div>
     ${taskHtml||`<p class="bot-field-hint">${esc(t('bot_work_empty'))}</p>`}
@@ -8307,7 +8314,7 @@ async function _loadBotWork(p){
   const bot=p.is_default?'default':p.name;
   const kanban=typeof _canUseFeature!=='function'||_canUseFeature('sessions:read');
   const [data,screens]=await Promise.all([
-    kanban?api('/api/kanban/bot-work?profile='+encodeURIComponent(bot),{timeoutToast:false}).catch(()=>null):null,
+    kanban?api('/api/kanban/bot-work'+_botWorkQuery({profile:bot}),{timeoutToast:false}).catch(()=>null):null,
     api('/api/bot-screen/status?bot='+encodeURIComponent(bot),{timeoutToast:false,redirect401:false}).catch(()=>null),
   ]);
   if(!box.isConnected||!_currentProfileDetail||_currentProfileDetail.name!==p.name)return;
@@ -15452,7 +15459,7 @@ function _paintWaitingForYou(){
 }
 async function loadWaitingForYou(){
   const get=url=>api(url,{timeoutToast:false,redirect401:false}).catch(()=>null);
-  const [tasks,screens]=await Promise.all([get('/api/kanban/waiting'),get('/api/bot-screen/status')]);
+  const [tasks,screens]=await Promise.all([get('/api/kanban/waiting'+_botWorkQuery()),get('/api/bot-screen/status')]);
   _waitingData={tasks:tasks&&Array.isArray(tasks.tasks)?tasks.tasks:null,
     screens:screens&&Array.isArray(screens.screens)?screens.screens:null};
   _paintWaitingForYou();
@@ -15462,13 +15469,13 @@ async function _waitingSendComment(taskId){
   const text=String(($('waitingComment')||{}).value||'').trim();
   if(!text){const a=$('waitingComment');if(a)a.focus();return;}
   try{
-    await api('/api/kanban/tasks/'+encodeURIComponent(taskId)+'/comments',{method:'POST',body:JSON.stringify({body:text})});
+    await api('/api/kanban/tasks/'+encodeURIComponent(taskId)+'/comments'+_botWorkQuery(),{method:'POST',body:JSON.stringify({body:text})});
     _waitingCommentTask='';showToast(t('waiting_comment_sent'));await loadWaitingForYou();
   }catch(e){showToast(e.message);}
 }
 async function _waitingUnblock(taskId){
   try{
-    await api('/api/kanban/tasks/'+encodeURIComponent(taskId)+'/unblock',{method:'POST',body:JSON.stringify({})});
+    await api('/api/kanban/tasks/'+encodeURIComponent(taskId)+'/unblock'+_botWorkQuery(),{method:'POST',body:JSON.stringify({})});
     showToast(t('waiting_unblocked'));await loadWaitingForYou();
   }catch(e){showToast(e.message);}
 }

@@ -33,6 +33,7 @@ async function mountDuties(p,code,profile){
    _botDuties=((profile.bot||{}).responsibilities||[]).map(d=>({...d}));_botDutyEditing=-1;_paintBotDuties();
   },[code,profile]);
 }
+const boardQuery=slice('function _kanbanBoardQuery(extra){','async function nudgeKanbanDispatcher(){');
 const waiting=slice('// "Wacht op jou" on My approvals','window.loadWaitingForYou=loadWaitingForYou;').replace(/^(let|const) /gm,'var ');
 const DUTY={title:'Inbox triage',objective:'Sort new mail',trigger:'bij nieuwe mail',autonomy:'report_only',reporting:'digest in de botchat'};
 (async()=>{
@@ -115,6 +116,12 @@ const DUTY={title:'Inbox triage',objective:'Sort new mail',trigger:'bij nieuwe m
   assert.deepEqual(await p.$eval('.bot-work-file a',a=>[a.getAttribute('href'),a.textContent,a.getAttribute('download')]),['/api/kanban/attachment?id=7','report <1>.md','report <1>.md']);
   await p.click('.bot-work-task[data-task-id="t3"]');
   assert.deepEqual(await p.evaluate(()=>opened),['panel:kanban','task:t3']);
+  // With a board open in the Kanban panel, the work and its files come from that board.
+  await p.evaluate(code=>{window._kanbanCurrentBoard='ops';(0,eval)(code);},boardQuery.replace('function _kanbanBoardQuery','window._kanbanBoardQuery=function'));
+  await p.evaluate(()=>_loadBotWork(_currentProfileDetail));
+  assert.ok(await p.evaluate(()=>calls.some(c=>c[0]==='/api/kanban/bot-work?profile=cfo&board=ops')));
+  assert.equal(await p.getAttribute('.bot-work-file a','href'),'/api/kanban/attachment?id=7&board=ops');
+  await p.evaluate(()=>{delete window._kanbanBoardQuery;});
   // Without board rights only the screen line shows; without screen rights
   // too the section stays hidden.
   const remount=()=>p.evaluate(()=>{document.getElementById('botWork').remove();document.querySelector('.bot-detail-content').insertAdjacentHTML('beforeend',_botWorkSectionHtml(_currentProfileDetail));calls.length=0;});
@@ -137,7 +144,7 @@ const DUTY={title:'Inbox triage',objective:'Sort new mail',trigger:'bij nieuwe m
    window.openKanbanTaskFromBot=id=>opened.push('task:'+id);
    window.api=async(url,opts)=>{calls.push([url,opts&&opts.body?JSON.parse(opts.body):null]);
     if(deny.has(url))throw new Error('403');
-    if(url==='/api/kanban/waiting')return {tasks:[{id:'t2',title:'Login needed',status:'blocked',block_kind:'needs_input',assignee:'cfo'},{id:'t3',title:'Check me',status:'review',assignee:'coo'}]};
+    if(url.split('?')[0]==='/api/kanban/waiting')return {tasks:[{id:'t2',title:'Login needed',status:'blocked',block_kind:'needs_input',assignee:'cfo'},{id:'t3',title:'Check me',status:'review',assignee:'coo'}]};
     if(url==='/api/bot-screen/status')return {screens:[{bot:'cfo',state:'waiting',reason:'please log in to Exact',rights:{view:true,control:true}},
       {bot:'coo',state:'waiting',reason:'watch only',rights:{view:true,control:false}},{bot:'ceo',state:'agent',rights:{view:true,control:true}}]};
     return {ok:true};};
@@ -161,6 +168,12 @@ const DUTY={title:'Inbox triage',objective:'Sort new mail',trigger:'bij nieuwe m
   assert.deepEqual(await p.evaluate(()=>calls.find(c=>c[0].endsWith('/comments'))),['/api/kanban/tasks/t2/comments',{body:'Logged in, go ahead'}]);
   await p.click('.waiting-item[data-task-id="t2"] button:nth-child(3)');
   assert.ok(await p.evaluate(()=>calls.some(c=>c[0]==='/api/kanban/tasks/t2/unblock')));
+  await p.evaluate(code=>{window._kanbanCurrentBoard='ops';(0,eval)(code);calls.length=0;},boardQuery.replace('function _kanbanBoardQuery','window._kanbanBoardQuery=function'));
+  await p.evaluate(()=>loadWaitingForYou());
+  assert.ok(await p.evaluate(()=>calls.some(c=>c[0]==='/api/kanban/waiting?board=ops')));
+  await p.click('.waiting-item[data-task-id="t2"] button:nth-child(3)');
+  assert.ok(await p.evaluate(()=>calls.some(c=>c[0]==='/api/kanban/tasks/t2/unblock?board=ops')));
+  await p.evaluate(()=>{delete window._kanbanBoardQuery;});
   // No rights on either source: the section stays hidden; one source still shows.
   await p.evaluate(()=>{deny.add('/api/kanban/waiting');deny.add('/api/bot-screen/status');});
   await p.evaluate(()=>loadWaitingForYou());
