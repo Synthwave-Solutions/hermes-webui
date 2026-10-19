@@ -15991,6 +15991,13 @@ def handle_post(handler, parsed) -> bool:
         with _cron_policy_file_pin(_cron_policy):
             return _handle_cron_owner(handler, body)
 
+    # Name the bot that answers for a job without moving it (19 Oct 2026).
+    if parsed.path == "/api/crons/assign":
+        _ensure_agent_cron_import_path()
+        _cron_policy = _cron_request_policy_path()
+        with _cron_policy_file_pin(_cron_policy):
+            return _handle_cron_assign(handler, body)
+
     # Set or clear the viewer's own mute for one job (plan 3.1).
     if parsed.path == "/api/crons/notifications":
         from api import cron_notifications
@@ -21016,6 +21023,65 @@ def _handle_cron_owner(handler, body):
         logger.debug("cron owner change audit append failed", exc_info=True)
     row = dict(moved, owner_profile=dst, read_only=not _profiles_match(dst, _get_active_profile_name() or "default"))
     return j(handler, {"ok": True, "job": row, "from_profile": src, "to_profile": dst})
+
+
+def _handle_cron_assign(handler, body):
+    """POST /api/crons/assign: name the bot that answers for a job.
+
+    Body ``{job_id, owner_profile, bot}``; an empty ``bot`` clears it. Same
+    checks as /api/crons/owner, but the job stays in its store and runs as
+    before (api/cron_bots.assign_job): script jobs cannot move.
+    """
+    import api.cron_scope as cron_scope
+    from api import cron_bots
+    from api.governance.enforce import _request_identity
+
+    job_id = _cron_body_job_id(body)
+    if job_id is None:
+        return bad(handler, "job_id required")
+    names = _available_cron_profile_names()
+    store = cron_bots.normalize_profile(body.get("owner_profile"))
+    bot_raw = str(body.get("bot") or "").strip()
+    bot = cron_bots.normalize_profile(bot_raw) if bot_raw else ""
+    if store not in names or (bot and bot not in names):
+        return bad(handler, "Bot not found", 404)
+    job, _owner = cron_bots.find_job(job_id, store)
+    identity = _request_identity(handler)
+    if job is None or not cron_scope.identity_sees_cron_row(identity, job, store_profile=store):
+        return bad(handler, "Job not found", 404)
+    is_admin = _cron_admin_allowed(handler)
+    path = "/api/crons/assign"
+    if not is_admin and not cron_scope.identity_owns_cron_job(identity, job):
+        refusal = _cron_write_refusal(identity, path, "cron_owner",
+                                      "Only the owner of this task or a cron admin can choose its bot.", job_id)
+        if refusal:
+            return j(handler, refusal[1], status=refusal[0])
+    if bot and not is_admin and not _chat_profile_target_allowed(handler, bot):
+        refusal = _cron_write_refusal(identity, path, "profile_not_allowed",
+                                      "You cannot use this bot.", job_id)
+        if refusal:
+            return j(handler, refusal[1], status=refusal[0])
+    try:
+        saved = cron_bots.assign_job(job_id, store, bot)
+    except cron_bots.OwnerChangeError as e:
+        return j(handler, {"error": e.message, "reason": e.reason}, status=e.status)
+    except Exception as e:
+        logger.warning("cron assign failed for %s", job_id, exc_info=True)
+        return j(handler, {"error": str(e)}, status=500)
+    try:
+        from api.governance.audit import append_audit_event
+        from api.governance.enforce import subject_from_identity
+
+        subject = subject_from_identity(identity)
+        append_audit_event(
+            "cron_bot_assigned", subject_email=subject.email, subject_user_id=subject.user_id,
+            path=path, method="POST", reason="bot_assigned",
+            extra={"job_id": job_id, "owner_profile": store, "bot": bot or store},
+        )
+    except Exception:
+        logger.debug("cron assign audit append failed", exc_info=True)
+    row = dict(saved, owner_profile=store, read_only=not _profiles_match(store, _get_active_profile_name() or "default"))
+    return j(handler, {"ok": True, "job": row, "bot": cron_bots.job_bot(saved, store)})
 
 
 def _handle_cron_recent(handler, parsed):

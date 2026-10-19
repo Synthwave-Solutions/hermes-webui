@@ -8582,3 +8582,84 @@ html[data-sp-merged="1"] #composerWorkspaceLabel::before{content:attr(data-sp-pr
 .profile-bot-job-when{font-size:11px;color:var(--muted);flex-shrink:0;}
 .cron-job-topbar-badge{border:none;cursor:pointer;font-family:inherit;}
 .cron-job-topbar-badge:hover{filter:brightness(1.1);}
+
+/* ── Bot tasks and the conversations/tasks filter (19 Oct 2026) ──────────────
+   "What this bot does by itself" on the bot page (panels.js _loadProfileBotJobs),
+   a task count chip on every bot card, and the sidebar segmented filter
+   (sessions.js _renderSessionKindFilter). */
+.bot-jobs{margin:18px 0 6px;padding:18px 18px 12px;border:1px solid var(--border);border-radius:var(--sp-radius-lg,14px);background:var(--sp-card-bg,var(--surface));box-shadow:var(--sp-shadow-xs,none);}
+.bot-jobs-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:12px;}
+.bot-jobs-head h3{margin:0;font-size:15px;font-weight:650;color:var(--text);letter-spacing:-.01em;}
+.bot-jobs-hint{margin:3px 0 0;font-size:12px;color:var(--muted);max-width:52ch;}
+.bot-jobs-stats{display:flex;gap:6px;flex-wrap:wrap;}
+.bot-jobs-stat{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:999px;font-size:12px;color:var(--muted);background:var(--surface-subtle,var(--hover-bg));border:1px solid var(--border-subtle,var(--border));}
+.bot-jobs-stat b{color:var(--text);font-weight:650;}
+.bot-jobs-stat.is-ok{color:var(--success);}
+.bot-jobs-stat.is-error{color:var(--error);border-color:color-mix(in srgb,var(--error) 35%,transparent);background:color-mix(in srgb,var(--error) 8%,transparent);}
+.bot-jobs-stat.is-error b{color:var(--error);}
+.bot-jobs-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;}
+.bot-job{display:grid;grid-template-columns:34px minmax(0,1fr) auto auto;align-items:center;gap:12px;padding:10px 12px;border-radius:var(--sp-radius,10px);border:1px solid var(--border-subtle,var(--border));background:var(--surface);cursor:pointer;transition:border-color .15s var(--sp-ease,ease),box-shadow .15s var(--sp-ease,ease),transform .15s var(--sp-ease,ease);}
+.bot-job:hover,.bot-job:focus-visible{border-color:var(--sp-active-border,var(--accent));box-shadow:var(--sp-shadow-sm,none);outline:none;}
+.bot-job:focus-visible{box-shadow:0 0 0 3px var(--sp-ring,var(--focus-ring));}
+.bot-job-icon{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-size:17px;background:var(--accent-bg);}
+.bot-job.is-error .bot-job-icon{background:color-mix(in srgb,var(--error) 12%,transparent);}
+.bot-job.is-paused{opacity:.72;}
+.bot-job.is-paused .bot-job-icon{background:var(--hover-bg);filter:grayscale(1);}
+.bot-job-main{min-width:0;}
+.bot-job-name{font-size:13.5px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bot-job-sub{font-size:12px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bot-job-error{font-size:11.5px;color:var(--error);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bot-job-status{display:flex;flex-direction:column;align-items:flex-end;gap:3px;}
+.bot-job-pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap;}
+.bot-job-pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;}
+.bot-job-pill.is-ok{color:var(--success);background:color-mix(in srgb,var(--success) 12%,transparent);}
+.bot-job-pill.is-error{color:var(--error);background:color-mix(in srgb,var(--error) 12%,transparent);}
+.bot-job-pill.is-new{color:var(--muted);background:var(--hover-bg);}
+.bot-job-pill.is-paused{color:var(--warning);background:color-mix(in srgb,var(--warning) 12%,transparent);}
+.bot-job-last{font-size:11px;color:var(--muted);white-space:nowrap;}
+.bot-job-actions{display:flex;gap:4px;opacity:0;transition:opacity .15s var(--sp-ease,ease);}
+.bot-job:hover .bot-job-actions,.bot-job:focus-within .bot-job-actions{opacity:1;}
+.bot-job-act{width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-size:13px;line-height:1;display:grid;place-items:center;}
+.bot-job-act:hover{background:var(--accent-bg);border-color:var(--accent);}
+.bot-jobs-paused{margin-top:10px;}
+.bot-jobs-paused>summary{cursor:pointer;font-size:12px;color:var(--muted);padding:6px 2px;list-style:none;}
+.bot-jobs-paused>summary::before{content:"\25B8";display:inline-block;margin-right:6px;transition:transform .15s;}
+.bot-jobs-paused[open]>summary::before{transform:rotate(90deg);}
+.bot-jobs-paused[open]>.bot-jobs-list{margin-top:6px;}
+.bot-jobs-foot{display:flex;justify-content:flex-end;margin-top:12px;}
+.bot-jobs-empty{display:flex;align-items:center;gap:12px;padding:14px;border:1px dashed var(--border);border-radius:var(--sp-radius,10px);color:var(--muted);font-size:13px;}
+.bot-jobs-empty span{font-size:22px;}
+.bot-jobs-empty p{margin:0;}
+@media (hover:none){.bot-job-actions{opacity:1;}}
+@media (max-width:640px){
+  .bot-jobs{padding:14px 12px 10px;}
+  .bot-job{grid-template-columns:30px minmax(0,1fr) auto;gap:10px;}
+  .bot-job-icon{width:30px;height:30px;font-size:15px;}
+  .bot-job-actions{grid-column:2 / -1;justify-content:flex-start;opacity:1;}
+}
+.bot-card-jobs{display:inline-flex;align-items:center;gap:5px;margin-top:6px;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;color:var(--accent-text,var(--accent));background:var(--accent-bg);}
+.bot-card-jobs::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--success);}
+.bot-card-jobs.has-error::before{background:var(--error);}
+
+.session-kind-filter{display:flex;gap:2px;margin:6px 10px 4px;padding:3px;border-radius:10px;background:var(--hover-bg);border:1px solid var(--border-subtle,var(--border));}
+.session-kind-filter[hidden]{display:none;}
+.session-kind-btn{flex:1 1 0;min-width:0;position:relative;display:inline-flex;align-items:center;justify-content:center;gap:5px;height:28px;padding:0 6px;white-space:nowrap;border:0;border-radius:8px;background:transparent;color:var(--muted);font:inherit;font-size:12px;font-weight:550;cursor:pointer;transition:background .15s var(--sp-ease,ease),color .15s var(--sp-ease,ease);}
+.session-kind-btn:hover{color:var(--text);}
+.session-kind-btn.active{background:var(--surface);color:var(--text);box-shadow:var(--sp-shadow-xs,0 1px 2px rgba(0,0,0,.08));}
+.session-kind-btn:focus-visible{outline:none;box-shadow:0 0 0 2px var(--sp-ring,var(--focus-ring));}
+.session-kind-count{font-size:10.5px;font-weight:600;padding:0 6px;min-width:18px;height:16px;line-height:16px;border-radius:999px;background:var(--border-subtle,var(--border));color:var(--muted);}
+.session-kind-btn.active .session-kind-count{background:var(--accent-bg);color:var(--accent-text,var(--accent));}
+.session-kind-unread{position:absolute;top:4px;right:4px;width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px var(--hover-bg);}
+
+/* Tasks filter bar: bot and category (19 Oct 2026). */
+.cron-bot-filter{flex-direction:column;align-items:stretch;gap:6px;}
+.cron-filter-row{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;}
+.cron-filter-field{display:flex;align-items:center;gap:6px;min-width:0;height:32px;padding:0 8px;border:1px solid var(--border);border-radius:9px;background:var(--surface-subtle,var(--surface));cursor:pointer;transition:border-color .15s var(--sp-ease,ease);}
+.cron-filter-field:hover,.cron-filter-field:focus-within{border-color:var(--sp-active-border,var(--accent));}
+.cron-filter-field select{flex:1;min-width:0;height:100%;background:transparent;border:0;color:var(--text);font:inherit;font-size:12px;outline:none;cursor:pointer;text-overflow:ellipsis;}
+.cron-filter-field select option{background:var(--bg);color:var(--text);}
+.cron-filter-field .cron-bot-avatar{flex-shrink:0;}
+.cron-filter-icon{font-size:13px;flex-shrink:0;}
+.cron-filter-clear{align-self:flex-start;border:0;background:none;padding:0 2px;color:var(--accent-text,var(--accent));font:inherit;font-size:11.5px;cursor:pointer;}
+.cron-filter-clear:hover{text-decoration:underline;}
+.cron-filter-field .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}

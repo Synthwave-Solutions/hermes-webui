@@ -31,6 +31,14 @@ The model is the one the engine already runs on, made visible:
   person the job runs for, is created on the first result and reused.
   ``context_prompt`` gives every turn in such a chat the job's live context,
   so "waarom faalde dit?" or "pas de tijd aan" works with that bot.
+* **Responsible bot** (19 Oct 2026, "welke jobs ze ownen, alsof ze bepaalde
+  taken automatisch uitvoeren"): most business jobs are script jobs in the
+  root store, and moving a script job breaks it (the engine resolves scripts
+  inside the running profile only). ``assign_job`` therefore records the bot
+  that answers for a job in ``assigned_bot`` without moving it: the job keeps
+  running where it runs, and the Bots page, the Tasks list and its filter show
+  it under that bot. ``job_bot`` is the one rule: the assigned bot, else the
+  store's bot.
 """
 from __future__ import annotations
 
@@ -691,3 +699,42 @@ def move_job(job_id: str, from_profile, to_profile) -> dict:
         raise
     _move_outputs(src_home, dst_home, job_id)
     return moved
+
+
+# -- Responsible bot (no move) --------------------------------------------------
+
+def job_bot(job: dict, store_profile=None) -> str:
+    """The bot that answers for a job: ``assigned_bot`` when set, else the bot
+    whose store holds it."""
+    assigned = str((job or {}).get("assigned_bot") or "").strip()
+    if assigned:
+        return normalize_profile(assigned)
+    return normalize_profile(store_profile if store_profile is not None else (job or {}).get("owner_profile"))
+
+
+def assign_job(job_id: str, store_profile, bot) -> dict:
+    """Record ``bot`` as the responsible bot of a job in its own store, or
+    clear it when ``bot`` is empty or the store's own bot. The record stays
+    where it is, so the run itself does not change. Raises OwnerChangeError."""
+    from api.profiles import cron_profile_context_for_home
+
+    job_id = str(job_id or "")
+    store = normalize_profile(store_profile)
+    home = home_for_profile(store)
+    target = normalize_profile(bot) if str(bot or "").strip() else ""
+    if target and not Path(home_for_profile(target)).is_dir():
+        raise OwnerChangeError(404, "bot_not_found", "Bot not found")
+    with cron_profile_context_for_home(home):
+        import cron.jobs as cj
+
+        with _locked(cj):
+            jobs = cj.load_jobs()
+            match = next((j for j in jobs if str(j.get("id") or "") == job_id), None)
+            if match is None:
+                raise OwnerChangeError(404, "job_not_found", "Job not found")
+            if target and target != store:
+                match["assigned_bot"] = target
+            else:
+                match.pop("assigned_bot", None)
+            _save(cj, jobs)
+            return dict(match)

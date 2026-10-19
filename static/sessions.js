@@ -7760,6 +7760,39 @@ function _sidebarRowHasVisibleMessages(s, activeSidForSidebar){
     (S.session&&s.session_id===S.session.session_id&&(S.session.message_count||0)>0);
 }
 
+// Conversations or task chats (19 Oct 2026): every scheduled job reports in
+// a job chat (api/cron_bots.py, rows carry cron_job). The sidebar filter
+// "Alles | Gesprekken | Taken" keeps them apart; the choice is per browser and
+// the open chat always stays in view. Counts feed the chips.
+const SESSION_KIND_STORAGE_KEY='hermes-webui-session-kind';
+let _sessionKindFilter=(()=>{try{const v=localStorage.getItem(SESSION_KIND_STORAGE_KEY);return v==='all'||v==='jobs'||v==='chats'?v:'chats';}catch(_e){return 'chats';}})();
+let _sessionKindCounts={chats:0,jobs:0,jobsUnread:0};
+function _isJobChatSession(s){
+  return !!(s&&s.cron_job&&typeof s.cron_job==='object'&&s.cron_job.job_id);
+}
+function _sessionKindMatches(s, activeSid){
+  if(_sessionKindFilter==='all') return true;
+  if(activeSid&&s.session_id===activeSid) return true;
+  return _sessionKindFilter==='jobs'?_isJobChatSession(s):!_isJobChatSession(s);
+}
+function setSessionKindFilter(kind){
+  if(kind!=='all'&&kind!=='jobs'&&kind!=='chats') kind='chats';
+  if(_sessionKindFilter===kind) return;
+  _sessionKindFilter=kind;
+  try{localStorage.setItem(SESSION_KIND_STORAGE_KEY,kind);}catch(_e){}
+  if(typeof renderSessionListFromCache==='function') renderSessionListFromCache();
+}
+function _renderSessionKindFilter(){
+  const box=$('sessionKindFilter');
+  if(!box) return;
+  const c=_sessionKindCounts;
+  if(!c.jobs&&_sessionKindFilter!=='jobs'){box.hidden=true;return;}
+  box.hidden=false;
+  const tx=(k,f)=>{const v=(typeof t==='function')?t(k):'';return v&&v!==k?v:f;};
+  const opts=[['chats',tx('session_kind_chats','Conversations'),0,0],['jobs',tx('session_kind_jobs','Tasks'),c.jobs,c.jobsUnread],['all',tx('session_kind_all','All'),0,0]];
+  box.innerHTML=opts.map(([k,label,n,unread])=>`<button type="button" role="tab" class="session-kind-btn${_sessionKindFilter===k?' active':''}" aria-selected="${_sessionKindFilter===k}" onclick="setSessionKindFilter('${k}')">${esc(label)}${n?`<span class="session-kind-count">${n}</span>`:''}${unread?`<span class="session-kind-unread" title="${unread}"></span>`:''}</button>`).join('');
+}
+
 function _partitionSidebarSessionRows(allMatched, activeSidForSidebar){
   let cliSessionCount=0;
   const webuiProfileFiltered=[];
@@ -7770,6 +7803,7 @@ function _partitionSidebarSessionRows(allMatched, activeSidForSidebar){
   const cliSessionsRaw=[];
   let webuiArchivedCount=0;
   let cliArchivedCount=0;
+  const kindCounts={chats:0,jobs:0,jobsUnread:0};
   for(const s of allMatched){
     if(!_sidebarRowHasVisibleMessages(s, activeSidForSidebar)) continue;
     const isCli=_isCliSession(s);
@@ -7790,8 +7824,16 @@ function _partitionSidebarSessionRows(allMatched, activeSidForSidebar){
       else webuiArchivedCount++;
     }
     if(!_showArchived&&s.archived) continue;
+    if(!isCli&&typeof _isJobChatSession==='function'){
+      if(_isJobChatSession(s)){
+        kindCounts.jobs++;
+        if(typeof _hasUnreadForSession==='function'&&_hasUnreadForSession(s)) kindCounts.jobsUnread++;
+      } else kindCounts.chats++;
+    }
+    if(typeof _sessionKindMatches==='function'&&!_sessionKindMatches(s, activeSidForSidebar)) continue;
     sessionsRaw.push(s);
   }
+  if(typeof _sessionKindCounts!=='undefined') _sessionKindCounts=kindCounts;
   if(_sessionSourceFilter==='cli' && !window._showCliSessions && cliSessionCount===0){
     _sessionSourceFilter='webui';
   }
@@ -7932,6 +7974,7 @@ function renderSessionListFromCache(){
     webuiSessionsRaw,
     cliSessionsRaw,
   }=_partitionSidebarSessionRows(allMatched, activeSidForSidebar);
+  if(typeof _renderSessionKindFilter==='function') _renderSessionKindFilter();
   const referenceRaw=_sessionSourceFilter==='cli'?cliReferenceRaw:webuiReferenceRaw;
   const isCliView=_sessionSourceFilter==='cli';
   const sessions=_renderSidebarRowsFromRawSessions(sessionsRaw, [...referenceRaw, ..._scopedSidebarReferenceRows(isCliView)]);

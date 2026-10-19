@@ -247,6 +247,38 @@ def test_move_job_changes_owner_moves_output_and_clears_legacy_profile(bots_env,
     assert cron_bots.find_job("m1")[1] == "scout"
 
 
+def test_assign_job_names_the_bot_without_moving_it(bots_env, engine_store):
+    _write_jobs(bots_env.root, [_job("a1"), _job("keep")])
+    saved = cron_bots.assign_job("a1", "default", "scout")
+    assert saved["assigned_bot"] == "scout"
+    rows = _read_jobs(bots_env.root)
+    assert [j["id"] for j in rows] == ["a1", "keep"]
+    assert cron_bots.job_bot(rows[0], "default") == "scout"
+    assert cron_bots.job_bot(rows[1], "default") == "default"
+    assert cron_bots.find_job("a1")[1] == "default"
+    # The store's own bot or an empty choice clears it.
+    assert "assigned_bot" not in cron_bots.assign_job("a1", "default", "default")
+    cron_bots.assign_job("a1", "default", "scout")
+    assert "assigned_bot" not in cron_bots.assign_job("a1", "default", "")
+    with pytest.raises(cron_bots.OwnerChangeError) as missing:
+        cron_bots.assign_job("nope", "default", "scout")
+    assert missing.value.status == 404
+    with pytest.raises(cron_bots.OwnerChangeError) as no_bot:
+        cron_bots.assign_job("a1", "default", "ghost")
+    assert no_bot.value.reason == "bot_not_found"
+
+
+def test_sidebar_keeps_conversations_and_task_chats_apart():
+    sessions = (ROOT / "static" / "sessions.js").read_text(encoding="utf-8")
+    for needle in ("function _isJobChatSession(", "function setSessionKindFilter(",
+                   "function _renderSessionKindFilter(", "!_sessionKindMatches(s, activeSidForSidebar)"):
+        assert needle in sessions, needle
+    assert 'id="sessionKindFilter"' in (ROOT / "static" / "index.html").read_text(encoding="utf-8")
+    panels = (ROOT / "static" / "panels.js").read_text(encoding="utf-8")
+    for needle in ("function _cronJobBotName(", "function _decorateBotCardsWithJobs(", "bot-jobs-list"):
+        assert needle in panels, needle
+
+
 def test_move_job_refuses_running_jobs_and_taken_ids_and_rolls_back(bots_env, engine_store, monkeypatch):
     _write_jobs(bots_env.root, [_job("busy", run_claim={"pid": 1}), _job("dup"), _job("fail")])
     _write_jobs(bots_env.homes["scout"], [_job("dup")])
@@ -511,6 +543,22 @@ def test_owner_route_lets_the_owner_choose_a_bot_they_may_use(bots_env, monkeypa
     assert calls == [("own1", "default", "scout")]
 
 
+def test_assign_route_names_the_bot_and_refuses_strangers(bots_env, monkeypatch, engine_store):
+    _write_jobs(bots_env.root, [_job("as1")])
+    routes, _calls = _owner_route(monkeypatch, caller=ALICE)
+    handler = _JSONHandler()
+    routes._handle_cron_assign(handler, {"job_id": "as1", "owner_profile": "default", "bot": "scout"})
+    assert handler.status == 200, _payload(handler)
+    body = _payload(handler)
+    assert body["bot"] == "scout" and body["job"]["owner_profile"] == "default"
+    assert _read_jobs(bots_env.root)[0]["assigned_bot"] == "scout"
+    routes, _calls = _owner_route(monkeypatch, caller=BOB)
+    handler = _JSONHandler()
+    routes._handle_cron_assign(handler, {"job_id": "as1", "owner_profile": "default", "bot": "writer"})
+    assert handler.status == 404
+    assert _read_jobs(bots_env.root)[0]["assigned_bot"] == "scout"
+
+
 def test_owner_route_refuses_other_people_and_bots_they_may_not_use(bots_env, monkeypatch):
     _write_jobs(bots_env.root, [_job("own2")])
     # Bob cannot even see Alice's root-store job.
@@ -559,7 +607,7 @@ def test_session_keeps_its_job_link(bots_env):
 
 def test_tasks_panel_shows_filters_and_changes_the_bot():
     panels = (ROOT / "static" / "panels.js").read_text(encoding="utf-8")
-    for needle in ("function _renderCronBotFilter(", "function openCronBotPicker(", "'/api/crons/owner'",
+    for needle in ("function _renderCronBotFilter(", "function openCronBotPicker(", "'/api/crons/assign'",
                    "cron-bot-badge", "_cronMatchesBotFilter", "function _loadProfileBotJobs(",
                    "c.chat_session_id", "function _cronToastWithChat("):
         assert needle in panels, needle

@@ -879,6 +879,12 @@ function _cronOwnerProfileName(job){
   return _cronProfileName(job && (job.owner_profile ?? job.profile));
 }
 
+// The bot that answers for a job: the assigned bot (api/cron_bots.job_bot,
+// 19 Oct 2026), else the bot whose store holds it.
+function _cronJobBotName(job){
+  return _cronProfileName(job && job.assigned_bot) || _cronOwnerProfileName(job) || 'default';
+}
+
 function _cronJobKey(job){
   return `${_cronOwnerProfileName(job)}\u0000${String(job && job.id || '')}`;
 }
@@ -948,26 +954,60 @@ function _cronBotFilterWantsAll(){
 function _cronMatchesBotFilter(job){
   if (!_cronBotFilterWantsAll()) return _showAllCronProfiles || !job.read_only;
   if (_cronBotFilter === '*') return true;
-  return (_cronOwnerProfileName(job) || 'default') === _cronBotFilter;
+  return _cronJobBotName(job) === _cronBotFilter;
 }
-function _renderCronBotFilter(){
+// Filter bar of the Tasks list (19 Oct 2026): bot and category side by side.
+// Bot lists the active bot, all bots, then every bot that answers for a task
+// (with its count); category lists the categories of the tasks in view.
+let _cronCategoryFilter = (() => { try { return localStorage.getItem('cron-category-filter') || ''; } catch (_e) { return ''; } })();
+function _cronMatchesCategoryFilter(job){
+  if (!_cronCategoryFilter) return true;
+  const cat = String((job && job.category) || '').trim();
+  return _cronCategoryFilter === '__none__' ? !cat : cat === _cronCategoryFilter;
+}
+async function setCronCategoryFilter(value){
+  _cronCategoryFilter = String(value || '');
+  try { localStorage.setItem('cron-category-filter', _cronCategoryFilter); } catch (_e) {}
+  await loadCrons();
+}
+async function clearCronFilters(){
+  _cronCategoryFilter = '';
+  try { localStorage.setItem('cron-category-filter', ''); } catch (_e) {}
+  await setCronBotFilter('');
+}
+function _renderCronBotFilter(allJobs){
   const box = $('cronBotFilter');
   if (!box) return;
+  const all = Array.isArray(allJobs) ? allJobs : [];
   const rows = (Array.isArray(_cronProfilesCache) ? _cronProfilesCache : []).filter(p => p && p.name);
-  if (rows.length < 2 && !_cronBotFilterWantsAll()) { box.innerHTML = ''; box.style.display = 'none'; return; }
   const active = _cronActiveBotName();
   const current = _cronBotFilterWantsAll() ? _cronBotFilter : '';
+  const counts = {};
+  for (const j of all) { const b = _cronJobBotName(j); counts[b] = (counts[b] || 0) + 1; }
+  const label = (name) => _cronBotTitle(name) + (counts[name] ? ` (${counts[name]})` : '');
   const opts = [`<option value=""${current ? '' : ' selected'}>${esc(t('cron_bot_filter_active', _cronBotTitle(active)) || _cronBotTitle(active))}</option>`,
-    `<option value="*"${current === '*' ? ' selected' : ''}>${esc(t('cron_bot_filter_all') || 'All bots')}</option>`];
-  const others = rows.filter(p => p.name !== active)
+    `<option value="*"${current === '*' ? ' selected' : ''}>${esc(t('cron_bot_filter_all') || 'All bots')}${all.length ? ` (${all.length})` : ''}</option>`];
+  const others = rows.filter(p => p.name !== active && (counts[p.name] || p.name === current))
     .map(p => ({ name: p.name, title: _cronBotTitle(p.name) }))
     .sort((a, b) => a.title.localeCompare(b.title));
-  for (const b of others) opts.push(`<option value="${esc(b.name)}"${current === b.name ? ' selected' : ''}>${esc(b.title)}</option>`);
+  for (const b of others) opts.push(`<option value="${esc(b.name)}"${current === b.name ? ' selected' : ''}>${esc(label(b.name))}</option>`);
   if (current && current !== '*' && !others.some(b => b.name === current)) {
     opts.push(`<option value="${esc(current)}" selected>${esc(_cronBotTitle(current))}</option>`);
   }
-  box.innerHTML = `<label class="cron-bot-filter-label" for="cronBotFilterSelect">${esc(t('cron_bot_filter_label') || 'Show tasks of')}</label>
-    <span class="cron-bot-filter-field">${_cronBotAvatarHtml(current && current !== '*' ? current : (current === '*' ? '' : active))}<select id="cronBotFilterSelect" onchange="setCronBotFilter(this.value)">${opts.join('')}</select></span>`;
+  // Categories of the tasks this bot choice shows.
+  const inView = (all.length ? all : (_cronList || [])).filter(j => !current || current === '*' ? (current === '*' || !j.read_only || (_cronOwnerProfileName(j) || 'default') === active) : _cronJobBotName(j) === current);
+  const cats = {}; let none = 0;
+  for (const j of inView) { const c = String(j.category || '').trim(); if (c) cats[c] = (cats[c] || 0) + 1; else none++; }
+  const catOpts = [`<option value=""${_cronCategoryFilter ? '' : ' selected'}>${esc(t('cron_category_filter_all') || 'All categories')}</option>`]
+    .concat(Object.keys(cats).sort((a, b) => a.localeCompare(b)).map(c => `<option value="${esc(c)}"${_cronCategoryFilter === c ? ' selected' : ''}>${esc(c)} (${cats[c]})</option>`));
+  if (none) catOpts.push(`<option value="__none__"${_cronCategoryFilter === '__none__' ? ' selected' : ''}>${esc(t('cron_category_none') || 'No category')} (${none})</option>`);
+  if (_cronCategoryFilter && _cronCategoryFilter !== '__none__' && !cats[_cronCategoryFilter]) catOpts.push(`<option value="${esc(_cronCategoryFilter)}" selected>${esc(_cronCategoryFilter)}</option>`);
+  const filtered = !!current || !!_cronCategoryFilter;
+  box.innerHTML = `<div class="cron-filter-row">
+      <label class="cron-filter-field" title="${esc(t('cron_bot_filter_label') || 'Show tasks of')}">${_cronBotAvatarHtml(current && current !== '*' ? current : (current === '*' ? '' : active))}<span class="sr-only">${esc(t('cron_bot_filter_label') || 'Bot')}</span><select id="cronBotFilterSelect" onchange="setCronBotFilter(this.value)">${opts.join('')}</select></label>
+      <label class="cron-filter-field" title="${esc(t('cron_category_label') || 'Category')}"><span class="cron-filter-icon" aria-hidden="true">🏷️</span><span class="sr-only">${esc(t('cron_category_label') || 'Category')}</span><select id="cronCategoryFilterSelect" onchange="setCronCategoryFilter(this.value)">${catOpts.join('')}</select></label>
+    </div>
+    ${filtered ? `<button type="button" class="cron-filter-clear" onclick="clearCronFilters()">${esc(t('cron_filter_clear') || 'Clear filters')}</button>` : ''}`;
   if (current === '*') box.querySelector('.cron-bot-avatar').innerHTML = '🗂️';
   box.style.display = '';
 }
@@ -987,11 +1027,12 @@ async function openCronBotPicker(jobId, ownerProfile){
   if (!job || !_cronCanChangeBot(job)) return;
   await loadCronProfiles();
   _closeCronBotPicker();
+  const current = _cronJobBotName(job);
   const rows = (Array.isArray(_cronProfilesCache) ? _cronProfilesCache : []).filter(p => p && p.name)
     .map(p => ({ name: p.name, title: _cronBotTitle(p.name), description: String((p.bot && p.bot.description) || '').trim() }))
-    .sort((a, b) => (a.name === owner ? -1 : b.name === owner ? 1 : a.title.localeCompare(b.title)));
+    .sort((a, b) => (a.name === current ? -1 : b.name === current ? 1 : a.title.localeCompare(b.title)));
   const items = rows.map(b => {
-    const isCurrent = b.name === owner;
+    const isCurrent = b.name === current;
     return `<button type="button" class="cron-bot-option${isCurrent ? ' current' : ''}" data-bot="${esc(b.name)}" ${isCurrent ? 'aria-current="true" disabled' : ''} onclick="_saveCronBot('${esc(job.id)}','${esc(owner)}',this.dataset.bot)">
         ${_cronBotAvatarHtml(b.name)}
         <span class="cron-bot-option-text"><span class="cron-bot-option-name">${esc(b.title)}</span>${isCurrent ? `<span class="cron-bot-option-desc cron-bot-option-current">✓ ${esc(t('cron_bot_current') || 'Runs this task now')}</span>` : (b.description ? `<span class="cron-bot-option-desc">${esc(b.description)}</span>` : '')}</span>
@@ -1023,20 +1064,21 @@ function _filterCronBotOptions(input){
     btn.style.display = !q || btn.textContent.toLowerCase().includes(q) ? '' : 'none';
   });
 }
-async function _saveCronBot(jobId, fromProfile, toProfile){
-  if (!toProfile || toProfile === fromProfile) { _closeCronBotPicker(); return; }
+// Choosing a bot names the bot that answers for the task (POST
+// /api/crons/assign): the task stays in its store and runs as before, since a
+// script job cannot move. POST /api/crons/owner still moves a job for API use.
+async function _saveCronBot(jobId, storeProfile, toBot){
+  const store = _cronProfileName(storeProfile) || 'default';
+  if (!toBot) { _closeCronBotPicker(); return; }
   try {
-    const res = await api('/api/crons/owner', { method: 'POST', body: JSON.stringify({ job_id: jobId, from_profile: fromProfile, to_profile: toProfile }) });
+    await api('/api/crons/assign', { method: 'POST', body: JSON.stringify({ job_id: jobId, owner_profile: store, bot: toBot === store ? '' : toBot }) });
     _closeCronBotPicker();
-    showToast(t('cron_bot_changed', _cronBotTitle(toProfile)) || ('Moved to ' + toProfile), 4000, 'success');
-    // Keep the moved task in view: it now lives in another bot's list.
-    if (_cronBotFilterWantsAll() || toProfile !== _cronActiveBotName()) {
-      if (!_cronBotFilterWantsAll()) { _cronBotFilter = '*'; try { localStorage.setItem('cron-bot-filter', '*'); } catch (_e) {} }
-    }
+    showToast(t('cron_bot_changed', _cronBotTitle(toBot)) || ('Now with ' + toBot), 4000, 'success');
+    _botJobsCache = null;
     await loadCrons();
-    const moved = (_cronList || []).find(j => String(j.id) === String(jobId) && (_cronOwnerProfileName(j) || 'default') === toProfile) ||
-      (res && res.job ? Object.assign({}, res.job, { owner_profile: toProfile }) : null);
-    if (moved) openCronDetail(moved);
+    const saved = (_cronList || []).find(j => String(j.id) === String(jobId) && (_cronOwnerProfileName(j) || 'default') === store);
+    if (saved) openCronDetail(saved);
+    if (_currentProfileDetail && typeof _loadProfileBotJobs === 'function') _loadProfileBotJobs(_currentProfileDetail);
   } catch (e) { showToast((t('cron_bot_change_failed') || 'Could not change the bot') + ': ' + e.message, 5000, 'error'); }
 }
 // A job chat lives in the owning bot: switch to that bot first when it is
@@ -1227,7 +1269,9 @@ async function loadCrons(animate) {
     // notify: that request (404 before it) or a task carrying notify.
     _loadCronNotifyState().then(served => { if (served) _cronNotifySupported = true; });
     await loadCronProfiles();
-    _renderCronBotFilter();
+    let _allCronJobs = [];
+    try { _allCronJobs = await _botJobsAll(); } catch (_e) {}
+    _renderCronBotFilter(_allCronJobs);
     const allProfilesQS = (_showAllCronProfiles || _cronBotFilterWantsAll()) ? '?all_profiles=1' : '';
     const data = await api('/api/crons' + allProfilesQS);
     _cronList = data.jobs || [];
@@ -1244,7 +1288,7 @@ async function loadCrons(animate) {
     // which keeps openCronDetail, _cronNewJobIds, and detail refresh untouched.
     const _activeJobs = [];
     const _pausedJobs = [];
-    for (const job of _cronList.filter(_cronMatchesBotFilter)) {
+    for (const job of _cronList.filter(j => _cronMatchesBotFilter(j) && _cronMatchesCategoryFilter(j))) {
       const status = _cronStatusMeta(job);
       (status.state === 'paused' ? _pausedJobs : _activeJobs).push({ job, status });
     }
@@ -1258,7 +1302,7 @@ async function loadCrons(animate) {
       }
       const isNewRun = !job.read_only && _cronNewJobIds.has(String(job.id));
       const isAgentMode = !job.no_agent;
-      const ownerBotName = _cronOwnerProfileName(job) || 'default';
+      const ownerBotName = _cronJobBotName(job);
       const ownerProfileLabel = _cronBotTitle(ownerBotName);
       const ownerProfileTitle = `${t('cron_bot_label') || 'Bot'}: ${ownerProfileLabel}`;
       // With the bot on every row, "read-only" is the bot chip's job.
@@ -1741,6 +1785,7 @@ function openCronCategoryPopover(jobId){
   document.addEventListener('keydown', _cronCategoryEscape, true);
 }
 async function _saveCronCategory(jobId, category){
+  _botJobsCache = null;
   try {
     await api('/api/crons/update', { method: 'POST', body: JSON.stringify({ job_id: jobId, category: String(category || '').trim() }) });
     _closeCronCategoryPopover();
@@ -2233,6 +2278,7 @@ function _renderCronDetail(job){
       </div>` : '';
   const ownerBot = ownerProfileName || 'default';
   const ownerBotTitle = _cronBotTitle(ownerBot);
+  const answeringBot = _cronJobBotName(job);
   const readOnlyBanner = isReadOnly ? `
       <div class="detail-alert">
         <div class="detail-alert-title">${esc(t('cron_bot_other_readonly_title') || 'Read-only from another profile')}</div>
@@ -2244,7 +2290,7 @@ function _renderCronDetail(job){
   const jobChat = job.job_chat_session_id
     ? `<button type="button" class="cron-link-btn cron-job-chat-btn" onclick="openCronJobChat('${esc(job.job_chat_session_id)}','${esc(ownerBot)}')" title="${esc(t('cron_job_chat_hint') || '')}">💬 ${esc(t('cron_job_chat_open') || 'Open task chat')}</button>`
     : '';
-  const botRow = `<div class="detail-row cron-bot-row"><div class="detail-row-label">${esc(t('cron_bot_label') || 'Bot')}</div><div class="detail-row-value">${_cronBotChipHtml(ownerBot)}${botChange}${jobChat}</div></div>`;
+  const botRow = `<div class="detail-row cron-bot-row"><div class="detail-row-label">${esc(t('cron_bot_label') || 'Bot')}</div><div class="detail-row-value">${_cronBotChipHtml(answeringBot)}${botChange}${jobChat}</div></div>`;
   const deliveryMuted = job.delivery_status === 'muted'
     ? ` <span class="detail-badge cron-notify-muted-badge">${_CRON_BELL_OFF_SVG}${esc(t('cron_notify_muted'))}</span>`
     : '';
@@ -3195,6 +3241,7 @@ async function cronRun(id) {
 
 async function cronPause(id) {
   try {
+    _botJobsCache = null;
     await api('/api/crons/pause', {method:'POST', body: JSON.stringify({job_id: id})});
     showToast(t('cron_job_paused'));
     await loadCrons();
@@ -3203,6 +3250,7 @@ async function cronPause(id) {
 
 async function cronResume(id) {
   try {
+    _botJobsCache = null;
     await api('/api/crons/resume', {method:'POST', body: JSON.stringify({job_id: id})});
     showToast(t('cron_job_resumed'));
     await loadCrons();
@@ -8443,6 +8491,7 @@ async function loadProfilesPanel() {
       _profileCardEntries.push({ category: p.bot && p.bot.category, node: card });
     }
     spRenderGrouped(panel, _profileCardEntries, { storagePrefix: 'bots-group' });
+    _decorateBotCardsWithJobs(data.profiles);
     // Re-render detail with fresh data if we have one and we're not in a form
     if (_currentProfileDetail && _profileMode !== 'create') {
       const refreshed = data.profiles.find(p => p.name === _currentProfileDetail.name);
@@ -8518,7 +8567,7 @@ function _renderProfileDetail(p, activeName){
         <button type="button" class="sm-btn" onclick="openBotConfiguration('skills')">${esc(t('tab_skills'))}</button>
         ${window._navAudience==='admin'?`<button type="button" class="sm-btn" onclick="openBotConfiguration('settings')">${esc(t('bot_tools'))}</button>`:''}
       </div>
-      <section class="detail-card profile-bot-jobs" id="profileBotJobs" style="display:none"></section>
+      <section class="bot-jobs" id="profileBotJobs" style="display:none"></section>
       <form class="bot-editor" onsubmit="event.preventDefault();saveBotAppearance()">
         <fieldset ${editable?'':'disabled'}>
           <legend>${esc(t('bot_identity'))}</legend>
@@ -8556,34 +8605,142 @@ function _renderProfileDetail(p, activeName){
   _loadProfileBotJobs(p);
 }
 
-// The bot's own scheduled jobs on its page (bot-owned jobs, 18 Oct 2026).
+// What a bot does by itself (19 Oct 2026): the jobs it answers for
+// (_cronJobBotName: assigned bot, else the store's bot) as a task list with
+// status, rhythm, next and last run, and quick actions.
+let _botJobsCache = null;
+async function _botJobsAll(force){
+  if (!force && _botJobsCache && Date.now() - _botJobsCache.at < 60000) return _botJobsCache.jobs;
+  const data = await api('/api/crons?all_profiles=1', { timeoutToast: false });
+  _botJobsCache = { at: Date.now(), jobs: Array.isArray(data && data.jobs) ? data.jobs : [] };
+  return _botJobsCache.jobs;
+}
+function _botJobsFor(p, jobs){
+  const names = new Set([p.name]);
+  if (p.is_default) names.add('default');
+  return (jobs || []).filter(j => names.has(_cronJobBotName(j)));
+}
+function _botJobState(j){
+  if (j.enabled === false || j.state === 'paused') return 'paused';
+  const st = String(j.last_status || '').toLowerCase();
+  if (st === 'error' || st === 'failed' || st === 'failure' || Number(j.failure_streak || 0) > 0) return 'error';
+  if (st === 'ok' || st === 'success' || st === 'completed') return 'ok';
+  return 'new';
+}
+function _botJobRel(iso){
+  const ms = Date.parse(iso || '');
+  if (!ms) return '';
+  const diff = (ms - Date.now()) / 1000;
+  const abs = Math.abs(diff);
+  const lang = (document.documentElement.lang || 'nl').slice(0, 2);
+  let rtf; try { rtf = new Intl.RelativeTimeFormat(lang, { numeric: 'auto' }); } catch (_e) { return ''; }
+  if (abs < 60) return rtf.format(Math.round(diff), 'second');
+  if (abs < 3600) return rtf.format(Math.round(diff / 60), 'minute');
+  if (abs < 86400) return rtf.format(Math.round(diff / 3600), 'hour');
+  return rtf.format(Math.round(diff / 86400), 'day');
+}
+function _botJobRhythm(j){
+  const expr = (j.schedule && (j.schedule.expr || j.schedule.display)) || j.schedule_display || '';
+  return _cronScheduleInWords(expr) || j.schedule_display || '';
+}
+function _botJobRowHtml(j){
+  const state = _botJobState(j);
+  const store = _cronOwnerProfileName(j) || 'default';
+  const id = esc(j.id), storeEsc = esc(store);
+  const stateLabel = t('bot_jobs_state_' + state) || state;
+  const last = j.last_run_at ? _botJobRel(j.last_run_at) : '';
+  const next = state !== 'paused' && j.next_run_at ? _botJobRel(j.next_run_at) : '';
+  const sub = [_botJobRhythm(j), next ? (t('bot_jobs_next', next) || ('next ' + next)) : ''].filter(Boolean).join(' · ');
+  const icon = j.emoji || (j.no_agent ? '⚙️' : '✨');
+  const live = !j.read_only;
+  const actions = [];
+  if (j.job_chat_session_id) actions.push(`<button type="button" class="bot-job-act" title="${esc(t('cron_job_chat_open') || 'Open task chat')}" aria-label="${esc(t('cron_job_chat_open') || 'Open task chat')}" onclick="event.stopPropagation();openCronJobChat('${esc(j.job_chat_session_id)}','${storeEsc}')">💬</button>`);
+  if (live && state !== 'paused') actions.push(`<button type="button" class="bot-job-act" title="${esc(t('bot_jobs_run') || 'Run now')}" aria-label="${esc(t('bot_jobs_run') || 'Run now')}" onclick="event.stopPropagation();_botJobAct('run','${id}')">▶</button>`);
+  if (live) actions.push(state === 'paused'
+    ? `<button type="button" class="bot-job-act" title="${esc(t('bot_jobs_resume') || 'Resume')}" aria-label="${esc(t('bot_jobs_resume') || 'Resume')}" onclick="event.stopPropagation();_botJobAct('resume','${id}')">↻</button>`
+    : `<button type="button" class="bot-job-act" title="${esc(t('bot_jobs_pause') || 'Pause')}" aria-label="${esc(t('bot_jobs_pause') || 'Pause')}" onclick="event.stopPropagation();_botJobAct('pause','${id}')">⏸</button>`);
+  const err = state === 'error' && j.last_error ? `<div class="bot-job-error">${esc(String(j.last_error).split('\n')[0].slice(0, 160))}</div>` : '';
+  const botEsc = esc(_cronJobBotName(j));
+  return `<li class="bot-job is-${state}" tabindex="0" role="button" onclick="openCronFromBot('${id}','${storeEsc}','${botEsc}')" onkeydown="if(event.key==='Enter'){openCronFromBot('${id}','${storeEsc}','${botEsc}')}">
+      <span class="bot-job-icon" aria-hidden="true">${esc(icon)}</span>
+      <div class="bot-job-main">
+        <div class="bot-job-name">${esc(j.name || j.id)}</div>
+        <div class="bot-job-sub">${esc(sub)}</div>${err}
+      </div>
+      <div class="bot-job-status"><span class="bot-job-pill is-${state}">${esc(stateLabel)}</span>${last ? `<span class="bot-job-last">${esc(last)}</span>` : ''}</div>
+      <div class="bot-job-actions">${actions.join('')}</div>
+    </li>`;
+}
+async function _botJobAct(kind, jobId){
+  if (kind === 'run') await cronRun(jobId);
+  else if (kind === 'pause') await cronPause(jobId);
+  else if (kind === 'resume') await cronResume(jobId);
+  _botJobsCache = null;
+  if (_currentProfileDetail) _loadProfileBotJobs(_currentProfileDetail);
+}
 async function _loadProfileBotJobs(p){
   const box = $('profileBotJobs');
   if (!box || !p || (typeof _canUseFeature === 'function' && !_canUseFeature('cron:read'))) return;
-  const botName = p.is_default ? 'default' : p.name;
   let jobs = [];
-  try {
-    const data = await api('/api/crons?all_profiles=1', { timeoutToast: false });
-    jobs = (data.jobs || []).filter(j => (_cronOwnerProfileName(j) || 'default') === botName ||
-      (p.is_default && (_cronOwnerProfileName(j) || 'default') === p.name));
-  } catch (_e) { return; }
+  try { jobs = _botJobsFor(p, await _botJobsAll()); } catch (_e) { return; }
   if (!box.isConnected || !_currentProfileDetail || _currentProfileDetail.name !== p.name) return;
-  const items = jobs.slice(0, 25).map(j => `<button type="button" class="profile-bot-job" onclick="openCronFromBot('${esc(j.id)}','${esc(_cronOwnerProfileName(j) || 'default')}')">
-      <span aria-hidden="true">${esc(j.emoji || '🗓️')}</span>
-      <span class="profile-bot-job-name">${esc(j.name || j.id)}</span>
-      <span class="profile-bot-job-when">${esc(j.schedule_display || '')}</span>
-    </button>`).join('');
-  box.innerHTML = `<div class="detail-card-title">🗓️ ${esc(t('profile_bot_jobs_title') || 'Scheduled tasks')} <span class="cron-group-count">${jobs.length}</span></div>
-    ${items || `<p class="bot-field-hint">${esc(t('profile_bot_jobs_empty') || 'This bot has no scheduled tasks yet.')}</p>`}`;
+  const order = { error: 0, ok: 1, new: 2, paused: 3 };
+  jobs.sort((a, b) => (order[_botJobState(a)] - order[_botJobState(b)]) ||
+    ((Date.parse(a.next_run_at || '') || 9e15) - (Date.parse(b.next_run_at || '') || 9e15)));
+  const active = jobs.filter(j => _botJobState(j) !== 'paused');
+  const paused = jobs.filter(j => _botJobState(j) === 'paused');
+  const failing = jobs.filter(j => _botJobState(j) === 'error').length;
+  const stats = [
+    `<span class="bot-jobs-stat"><b>${active.length}</b> ${esc(t('bot_jobs_active') || 'active')}</span>`,
+    failing ? `<span class="bot-jobs-stat is-error"><b>${failing}</b> ${esc(t('bot_jobs_failing') || 'need attention')}</span>` : `<span class="bot-jobs-stat is-ok">${esc(t('bot_jobs_all_ok') || 'all fine')}</span>`,
+    paused.length ? `<span class="bot-jobs-stat"><b>${paused.length}</b> ${esc(t('bot_jobs_paused') || 'paused')}</span>` : '',
+  ].join('');
+  const filterName = p.is_default ? 'default' : p.name;
+  box.innerHTML = `<header class="bot-jobs-head">
+      <div><h3>${esc(t('bot_jobs_title') || 'What this bot does by itself')}</h3>
+      <p class="bot-jobs-hint">${esc(t('bot_jobs_hint') || 'Tasks this bot runs on a schedule. Click one for details and its runs.')}</p></div>
+      ${jobs.length ? `<div class="bot-jobs-stats">${stats}</div>` : ''}
+    </header>
+    ${active.length ? `<ul class="bot-jobs-list">${active.map(_botJobRowHtml).join('')}</ul>` : ''}
+    ${paused.length ? `<details class="bot-jobs-paused"><summary>${esc(t('bot_jobs_paused_title', paused.length) || ('Paused (' + paused.length + ')'))}</summary><ul class="bot-jobs-list">${paused.map(_botJobRowHtml).join('')}</ul></details>` : ''}
+    ${jobs.length ? `<div class="bot-jobs-foot"><button type="button" class="sm-btn" onclick="_cronCategoryFilter='';setCronBotFilter('${esc(filterName)}').then(()=>switchPanel('tasks'))">${esc(t('profile_bot_jobs_open') || 'Open in Scheduled tasks')}</button></div>`
+      : `<div class="bot-jobs-empty"><span aria-hidden="true">🗓️</span><p>${esc(t('profile_bot_jobs_empty') || 'This bot has no scheduled tasks yet.')}</p></div>`}`;
   box.style.display = '';
 }
-async function openCronFromBot(jobId, ownerProfile){
-  _cronBotFilter = ownerProfile === _cronActiveBotName() ? '' : ownerProfile;
-  try { localStorage.setItem('cron-bot-filter', _cronBotFilter); } catch (_e) {}
+// A small "n tasks" chip on every bot card, red dot when one needs attention.
+async function _decorateBotCardsWithJobs(profiles){
+  if (typeof _canUseFeature === 'function' && !_canUseFeature('cron:read')) return;
+  let jobs; try { jobs = await _botJobsAll(); } catch (_e) { return; }
+  for (const p of profiles || []) {
+    const card = document.querySelector(`.profile-card[data-name="${CSS.escape(p.name)}"] .profile-card-header > div`);
+    if (!card || card.querySelector('.bot-card-jobs')) continue;
+    const mine = _botJobsFor(p, jobs).filter(j => _botJobState(j) !== 'paused');
+    if (!mine.length) continue;
+    const bad = mine.some(j => _botJobState(j) === 'error');
+    const chip = document.createElement('span');
+    chip.className = 'bot-card-jobs' + (bad ? ' has-error' : '');
+    chip.textContent = t('bot_jobs_count', mine.length) || (mine.length + ' tasks');
+    if (bad) chip.title = t('bot_jobs_failing') || 'need attention';
+    card.appendChild(chip);
+  }
+}
+// From a bot's task list to Scheduled tasks: filtered on that bot, with the
+// task open and in view.
+async function openCronFromBot(jobId, ownerProfile, botName){
+  const bot = _cronProfileName(botName) || _cronProfileName(ownerProfile) || 'default';
+  _cronBotFilter = bot === _cronActiveBotName() ? '' : bot;
+  _cronCategoryFilter = '';
+  try { localStorage.setItem('cron-bot-filter', _cronBotFilter); localStorage.setItem('cron-category-filter', ''); } catch (_e) {}
   if (typeof switchPanel === 'function') await switchPanel('tasks');
-  await loadCrons();
-  const job = (_cronList || []).find(j => String(j.id) === String(jobId) && (_cronOwnerProfileName(j) || 'default') === ownerProfile);
-  if (job) openCronDetail(job);
+  else await loadCrons();
+  const store = _cronProfileName(ownerProfile) || 'default';
+  const find = () => (_cronList || []).find(j => String(j.id) === String(jobId) && (_cronOwnerProfileName(j) || 'default') === store);
+  let job = find();
+  if (!job) { _cronBotFilter = '*'; await loadCrons(); job = find(); }
+  if (!job) return;
+  const item = document.getElementById(_cronItemId(job));
+  openCronDetail(job, item || undefined);
+  if (item) { const group = item.closest('details'); if (group) group.open = true; item.scrollIntoView({ block: 'center' }); }
 }
 
 function _setProfileHeaderButtons(mode, p, activeName){
