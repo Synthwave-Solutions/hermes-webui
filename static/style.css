@@ -8577,7 +8577,7 @@ html[data-sp-merged="1"] #composerWorkspaceLabel::before{content:attr(data-sp-pr
 
 /* Tasks filter bar: bot and category (19 Oct 2026). */
 .cron-bot-filter{flex-direction:column;align-items:stretch;gap:6px;}
-.cron-filter-row{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:6px;}
+.cron-filter-row{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;}
 .cron-filter-field{display:flex;align-items:center;gap:6px;min-width:0;height:32px;padding:0 8px;border:1px solid var(--border);border-radius:9px;background:var(--surface-subtle,var(--surface));cursor:pointer;transition:border-color .15s var(--sp-ease,ease);}
 .cron-filter-field:hover,.cron-filter-field:focus-within{border-color:var(--sp-active-border,var(--accent));}
 .cron-filter-field select{flex:1;min-width:0;height:100%;background:transparent;border:0;color:var(--text);font:inherit;font-size:12px;outline:none;cursor:pointer;text-overflow:ellipsis;}
