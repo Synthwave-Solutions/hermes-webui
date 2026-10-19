@@ -471,7 +471,7 @@ def guard_profile_request(handler, parsed, method):
                 "/api/projects", "/api/stream", "/api/events", "/api/health")
     if (not path.startswith("/api/") or path.startswith(recovery)
             or path in ("/api/profiles", "/api/profile/switch", "/api/memory",
-                        "/api/memory/write", "/api/bots/builder", "/api/bots/knowledge", "/api/bots/knowledge/upload", "/api/version")):
+                        "/api/memory/write", "/api/bots/builder", "/api/bots/knowledge", "/api/bots/knowledge/upload", "/api/bots/scout", "/api/version")):
         return True
     from urllib.parse import parse_qs
     from api.profiles import get_active_profile_name

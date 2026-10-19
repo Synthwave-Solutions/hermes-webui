@@ -8307,6 +8307,27 @@ html[data-nav-audience="member"]:not([data-advanced-chat-controls="1"]) #compose
 .sidebar-bot-item svg,.sidebar-bot-item img{width:28px;height:28px;flex-shrink:0;margin-right:0!important;}
 .sidebar-bot-item span{min-width:0;overflow-wrap:anywhere;}
 .sidebar-bots-state{padding:8px 10px;color:var(--muted);font-size:12px;}
+/* Scout card on the bot page. */
+.bot-scout-card fieldset{border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;}
+.bot-scout-head{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.bot-scout-head h3{margin:0;font-size:14px;}
+.bot-scout-switch{display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;}
+.bot-scout-chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:6px;border:1px solid var(--border);border-radius:8px;background:var(--input-bg,transparent);}
+.bot-scout-chips input{flex:1;min-width:140px;border:0;background:transparent;color:var(--text);font:inherit;font-size:13px;padding:4px;}
+.bot-scout-chips input:focus{outline:none;}
+.bot-scout-chip{display:inline-flex;align-items:center;gap:4px;max-width:100%;padding:2px 4px 2px 8px;border-radius:999px;background:var(--accent-bg);color:var(--accent-text);font-size:12px;}
+.bot-scout-chip span{overflow-wrap:anywhere;}
+.bot-scout-chip button{border:0;background:transparent;color:inherit;cursor:pointer;font-size:14px;line-height:1;padding:0 4px;border-radius:999px;}
+.bot-scout-chip button:focus-visible{outline:2px solid var(--accent);}
+/* A bot row: the switch button plus its Scout toggle on the right. */
+.sidebar-bot-row{display:flex;align-items:center;gap:2px;min-width:0;}
+.sidebar-bot-row>.sidebar-bot-item{flex:1;min-width:0;}
+.sidebar-bot-scout{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:28px;height:28px;padding:0;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--muted);opacity:.55;cursor:pointer;}
+.sidebar-bot-scout:hover,.sidebar-bot-scout:focus-visible{opacity:1;background:var(--hover-bg);}
+.sidebar-bot-scout:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;}
+.sidebar-bot-scout.is-on{color:var(--accent);opacity:1;}
+span.sidebar-bot-scout{cursor:default;background:transparent;}
+.sidebar-bot-scout:disabled{cursor:wait;}
 /* Category groups inside the narrow sidebar: tighter than the panel lists. */
 .sidebar-bot-items .sp-group{margin:0;}
 .sidebar-bot-items .cron-group-summary{padding:6px 4px 4px;font-size:10px;}

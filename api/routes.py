@@ -16329,6 +16329,40 @@ def handle_post(handler, parsed) -> bool:
         except (ValueError,OSError) as exc:
             return bad(handler,str(exc),400)
 
+    if parsed.path == "/api/bots/scout":
+        # Same gate as editing the bot (/api/profile/appearance): profiles:admin,
+        # a bot this caller may use, and the owner's edit right on a guided bot.
+        from api import bot_scout
+        from api.governance.enforce import subject_from_identity
+        policy = governance_api.get_policy()
+        subject = subject_from_identity(governance_api._caller_identity(handler))
+        access = governance_api.resolve_effective_access(policy, subject)
+        if not governance_api._require(handler, access, subject, policy, "profiles:admin"):
+            return
+        name = str(body.get("name") or "").strip()
+        if not name or not _chat_profile_target_allowed(handler, name):
+            return bad(handler, "Bot not found", 404)
+        try:
+            from api import bot_builder
+            from api.governance.enforce import _request_identity
+            if bot_builder.managed(name) is not None:
+                bot_builder.require_edit(_request_identity(handler), name)
+            try:
+                from api.ownership import request_owner_email
+
+                owner = request_owner_email(handler)
+            except Exception:
+                owner = None
+            return j(handler, {"ok": True, **bot_scout.apply(name, body, owner)})
+        except bot_scout.ScoutError as exc:
+            return bad(handler, exc.message, exc.status)
+        except PermissionError as exc:
+            return bad(handler, str(exc), 403)
+        except RuntimeError as exc:
+            return bad(handler, str(exc), 409)
+        except (ValueError, OSError) as exc:
+            return bad(handler, str(exc), 400)
+
     if parsed.path == "/api/bots/knowledge":
         from api import bot_knowledge
         from api.governance.enforce import _request_identity

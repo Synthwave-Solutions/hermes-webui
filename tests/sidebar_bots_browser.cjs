@@ -16,7 +16,9 @@ const fs=require('fs'),assert=require('node:assert/strict');
    window.botAvatarHtml=()=>'<svg aria-hidden="true" viewBox="0 0 32 32"><circle cx="16" cy="16" r="12" fill="currentColor"/></svg>';
    window.botDisplayName=p=>p.name;window.showToast=m=>window.lastError=m;
    window.esc=v=>String(v).replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
-   window.api=async url=>url.includes('profiles')?{profiles:[{name:'default',is_default:true},{name:'writer',bot:{category:'Content'}},{name:'reviewer',bot:{category:'Content'}},{name:'research'},{name:'hidden',visible:false}]}:{people:[]};
+   window.scoutCalls=[];
+   window.api=async(url,opts)=>{if(url==='/api/bots/scout'){scoutCalls.push(JSON.parse(opts.body));return {ok:true};}
+    return url.includes('profiles')?{profiles:[{name:'default',is_default:true,bot_kind:'bot'},{name:'writer',bot_kind:'bot',bot_editable:true,bot_revision:3,bot:{category:'Content'}},{name:'reviewer',bot_kind:'bot',bot:{category:'Content',scout:{enabled:true,topics:[],digest_time:'07:30'}}},{name:'research',bot_kind:'person',bot_editable:true},{name:'hidden',visible:false}]}:{people:[]};};
    window.switches=[];window.switchPanel=()=>{throw Error('Must remain in chat');};
    window.switchToProfile=name=>{switches.push(name);return new Promise((resolve,reject)=>{window.completeSwitch=()=>{S.activeProfile=name;resolve(true)};window.failSwitch=()=>reject(Error('Switch failed'));});};
   });
@@ -39,7 +41,18 @@ const fs=require('fs'),assert=require('node:assert/strict');
   assert.deepEqual(await p.locator('[data-sidebar-bot]').evaluateAll(rows=>rows.map(r=>r.dataset.sidebarBot)),['default','writer','reviewer','research']);
   assert.equal(await p.locator('[data-sidebar-bot="hidden"]').count(),0);
   // SynthPulse on top outside the groups, then categories, "no category" last.
-  assert.equal(await p.locator('#sidebarBotItems > [data-sidebar-bot="default"]').count(),1);
+  assert.equal(await p.locator('#sidebarBotItems > .sidebar-bot-row > [data-sidebar-bot="default"]').count(),1);
+  // Scout: a toggle where this person may edit the bot, a mark where it is on
+  // but not theirs, nothing on a person's own profile.
+  assert.deepEqual(await p.locator('button[data-scout-bot]').evaluateAll(b=>b.map(x=>[x.dataset.scoutBot,x.getAttribute('aria-pressed')])),[['writer','false']]);
+  assert.equal(await p.locator('[data-sidebar-bot="reviewer"] + span.sidebar-bot-scout.is-on').count(),1);
+  assert.equal(await p.locator('[data-sidebar-bot="research"] + .sidebar-bot-scout').count(),0);
+  assert.equal(await p.locator('button[data-scout-bot="writer"]').getAttribute('title'),'Scout on/off');
+  await p.locator('button[data-scout-bot="writer"]').click();
+  await p.waitForFunction(()=>scoutCalls.length===1);
+  assert.deepEqual(await p.evaluate(()=>scoutCalls[0]),{name:'writer',enabled:true,revision:3});
+  assert.deepEqual(await p.evaluate(()=>switches),[]);
+  await p.waitForFunction(()=>!document.querySelector('button[data-scout-bot="writer"]').disabled);
   assert.deepEqual(await p.locator('#sidebarBotItems .sp-group .cron-group-name').allTextContents(),['Content','cron_category_none']);
   assert.deepEqual(await p.locator('#sidebarBotItems .sp-group .cron-group-count').allTextContents(),['2','1']);
   await p.locator('#sidebarBotItems .sp-group summary').first().click();

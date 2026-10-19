@@ -62,6 +62,8 @@ def read_profile(name):
         image_url='/api/profile/avatar?profile='+quote(name)+'&v='+str(image.stat().st_mtime_ns) if image.is_file() and not image.is_symlink() else ''
         managed=data.get(builder_key) is not None
         bot={k:meta[k] for k in BOT_TEXT_FIELDS if isinstance(meta.get(k),str)}
+        scout=_stored_scout(meta.get('scout'))
+        if scout:bot['scout']=scout
         return {
             'bot_configuration':configuration_summary(path.parent),
             'bot':bot,
@@ -101,6 +103,57 @@ def save_profile(name, values, revision):
             stored=meta.get('reports_to');stored=stored.strip() if isinstance(stored,str) else ''
             if values['reports_to'].strip()!=stored:_validate_reports_to(name,values['reports_to'].strip())
         meta.update({k:(v if k=='knowledge_sources' else v.strip()) for k,v in values.items()});meta['custom']=True
+        revisions['hermes-bots']=actual+1
+        from utils import atomic_yaml_write
+        atomic_yaml_write(path,data,sort_keys=False)
+    return read_profile(name)
+
+
+# Scout settings: ui_meta.hermes-bots.scout, read by the Scout collector
+# (scout_collect.py) from the bot's own profile.yaml and written only through
+# POST /api/bots/scout, which also keeps the bot's Scout job in step.
+SCOUT_MAX_TOPICS = 12
+SCOUT_TOPIC_MAX = 80
+SCOUT_DEFAULT_TIME = '07:30'
+_SCOUT_TIME = re.compile(r'(?:[01][0-9]|2[0-3]):[0-5][0-9]')
+
+def validate_scout(enabled, topics=None, digest_time=None):
+    """Strict check of what a caller sends; returns the normalized settings."""
+    if not isinstance(enabled,bool):raise ValueError('Scout enabled must be true or false')
+    topics=[] if topics is None else topics
+    if not isinstance(topics,list) or len(topics)>SCOUT_MAX_TOPICS:raise ValueError('Use at most %d Scout topics'%SCOUT_MAX_TOPICS)
+    clean=[]
+    for topic in topics:
+        if not isinstance(topic,str):raise ValueError('Scout topics must be text')
+        if any(ord(c)<32 or ord(c)==127 for c in topic):raise ValueError('Invalid Scout topic')
+        topic=' '.join(topic.split())
+        if not topic:continue
+        if len(topic)>SCOUT_TOPIC_MAX:raise ValueError('A Scout topic is at most %d characters'%SCOUT_TOPIC_MAX)
+        if topic.casefold() not in (t.casefold() for t in clean):clean.append(topic)
+    digest_time=SCOUT_DEFAULT_TIME if digest_time is None else digest_time
+    if not isinstance(digest_time,str) or not _SCOUT_TIME.fullmatch(digest_time):raise ValueError('Scout digest time must be HH:MM')
+    return {'enabled':enabled,'topics':clean,'digest_time':digest_time}
+
+def _stored_scout(value):
+    """The stored settings for display; a damaged record reads as absent."""
+    if not isinstance(value,dict):return None
+    try:return validate_scout(value.get('enabled',False),value.get('topics'),value.get('digest_time'))
+    except ValueError:return None
+
+def save_scout(name, scout, revision):
+    """Write the Scout settings under the same revision as the appearance."""
+    if not isinstance(scout,dict):raise ValueError('Scout settings must be an object')
+    scout=validate_scout(scout.get('enabled'),scout.get('topics'),scout.get('digest_time'))
+    if not isinstance(revision,int) or isinstance(revision,bool) or revision<0: raise ValueError('Revision required')
+    with _LOCK:
+        path=_path(name);data=_load(path)
+        ui=data.setdefault('ui_meta',{});revisions=data.setdefault('_ui_meta_revisions',{})
+        if not isinstance(ui,dict) or not isinstance(revisions,dict):raise ValueError('Invalid existing metadata')
+        actual=revisions.get('hermes-bots',0)
+        if revision!=actual:raise RuntimeError('Bot changed elsewhere. Reload before saving.')
+        meta=ui.setdefault('hermes-bots',{})
+        if not isinstance(meta,dict):raise ValueError('Invalid existing bot metadata')
+        meta['scout']=scout
         revisions['hermes-bots']=actual+1
         from utils import atomic_yaml_write
         atomic_yaml_write(path,data,sort_keys=False)

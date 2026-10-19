@@ -8073,6 +8073,63 @@ async function saveBotAppearance(){
     await loadProfilesPanel();showToast(t('bot_saved'));
   }catch(e){showToast(e.message);}
 }
+// Scout card (api/bot_scout.py): on/off, topics and digest time of the bot's
+// daily read-only look-out. The switch saves at once, topics and time on Save.
+let _botScoutTopics=[];
+const _BOT_SCOUT_MAX=12,_BOT_SCOUT_TOPIC_MAX=80;
+function _botScoutCardHtml(p){
+  if(_botKind(p)!=='bot')return '';
+  const scout=(p.bot&&p.bot.scout)||{},on=!!scout.enabled,editable=p.bot_editable===true;
+  return `<section class="detail-card bot-scout-card" aria-labelledby="botScoutTitle">
+      <div class="bot-scout-head"><h3 id="botScoutTitle">${esc(t('bot_scout'))}</h3>
+        <label class="bot-scout-switch"><input type="checkbox" role="switch" id="botScoutEnabled" ${on?'checked':''} ${editable?'':'disabled'} onchange="saveBotScout(this.checked)"><span>${esc(t(on?'bot_scout_saved_on':'bot_scout_saved_off'))}</span></label></div>
+      <p class="bot-field-hint">${esc(t('bot_scout_intro'))}</p>
+      <fieldset ${editable?'':'disabled'}>
+        <label for="botScoutTopicInput">${esc(t('bot_scout_topics'))}</label>
+        <div class="bot-scout-chips" id="botScoutChips"><input id="botScoutTopicInput" maxlength="${_BOT_SCOUT_TOPIC_MAX}" placeholder="${esc(t('bot_scout_topics_placeholder'))}" onkeydown="_botScoutTopicKey(event)" onblur="_botScoutAddTopic(this)"></div>
+        <label for="botScoutTime">${esc(t('bot_scout_time'))}<input type="time" id="botScoutTime" step="60" value="${esc(/^\d\d:\d\d$/.test(scout.digest_time||'')?scout.digest_time:'07:30')}"></label>
+        ${editable?`<div class="bot-editor-actions"><button type="button" class="sm-btn primary" onclick="saveBotScout()">${esc(t('bot_scout_save'))}</button></div>`:''}
+      </fieldset>
+    </section>`;
+}
+function _paintBotScoutTopics(){
+  const box=$('botScoutChips'),input=$('botScoutTopicInput');if(!box||!input)return;
+  box.querySelectorAll('.bot-scout-chip').forEach(n=>n.remove());
+  for(const topic of _botScoutTopics){
+    const chip=document.createElement('span');chip.className='bot-scout-chip';
+    const label=document.createElement('span');label.textContent=topic;
+    const remove=document.createElement('button');remove.type='button';remove.textContent='\u00d7';
+    remove.setAttribute('aria-label',t('bot_scout_remove_topic')+': '+topic);
+    remove.disabled=input.disabled||!!input.closest('fieldset:disabled');
+    remove.onclick=()=>{_botScoutTopics=_botScoutTopics.filter(x=>x!==topic);_paintBotScoutTopics();input.focus();};
+    chip.append(label,remove);box.insertBefore(chip,input);
+  }
+  input.hidden=_botScoutTopics.length>=_BOT_SCOUT_MAX;
+}
+function _botScoutAddTopic(input){
+  const topic=String(input.value||'').replace(/\s+/g,' ').trim().slice(0,_BOT_SCOUT_TOPIC_MAX);input.value='';
+  if(!topic||_botScoutTopics.length>=_BOT_SCOUT_MAX||_botScoutTopics.some(x=>x.toLowerCase()===topic.toLowerCase()))return;
+  _botScoutTopics.push(topic);_paintBotScoutTopics();
+}
+function _botScoutTopicKey(e){
+  if(e.key==='Enter'||e.key===','){e.preventDefault();_botScoutAddTopic(e.target);e.target.focus();}
+  else if(e.key==='Backspace'&&!e.target.value&&_botScoutTopics.length){_botScoutTopics.pop();_paintBotScoutTopics();}
+}
+async function saveBotScout(enabled){
+  const p=_currentProfileDetail;if(!p)return;
+  const input=$('botScoutTopicInput');if(input&&input.value)_botScoutAddTopic(input);
+  const on=typeof enabled==='boolean'?enabled:!!($('botScoutEnabled')&&$('botScoutEnabled').checked);
+  const time=$('botScoutTime')?String($('botScoutTime').value||'').slice(0,5):'';
+  try{
+    await api('/api/bots/scout',{method:'POST',body:JSON.stringify({name:p.name,revision:p.bot_revision||0,enabled:on,topics:_botScoutTopics,...(time?{digest_time:time}:{})})});
+    _profileDropdownClearStoredCache();
+    window.dispatchEvent(new CustomEvent('synpulse:bot-updated',{detail:{name:p.name}}));
+    await loadProfilesPanel();showToast(t(on?'bot_scout_saved_on':'bot_scout_saved_off'));
+  }catch(e){
+    if($('botScoutEnabled')&&typeof enabled==='boolean')$('botScoutEnabled').checked=!enabled;
+    showToast(e.message);
+  }
+}
 async function uploadBotAvatar(input){
   const p=_currentProfileDetail,file=input.files&&input.files[0];if(!p||!file)return;
   const name=p.name,hint=$('botAvatarHint');input.disabled=true;
@@ -8272,8 +8329,10 @@ function _renderProfileDetail(p, activeName){
         </fieldset>
         ${editable?'':`<p class="bot-field-hint">${esc(t('bot_read_only'))}</p>`}
       </form>
+      ${_botScoutCardHtml(p)}
       <details class="bot-technical-details"><summary>${esc(t('bot_configuration_details'))}</summary>${rows.join('')}</details>
     </div>`;
+  _botScoutTopics=(((p.bot||{}).scout||{}).topics||[]).slice();_paintBotScoutTopics();
   if (window.SpPicker) SpPicker.mountAll(body);
   body.style.display = '';
   if (empty) empty.style.display = 'none';

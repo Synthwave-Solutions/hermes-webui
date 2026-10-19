@@ -5116,6 +5116,55 @@ window.SynthPulseFeatureCatalog = {
       }
     },
     {
+      "id": "webui.bots.scout",
+      "area": "bots",
+      "status": "available",
+      "conditions": [],
+      "anchors": [
+        "?help_feature=webui.bots.scout",
+        "#botScoutEnabled",
+        "#botScoutTopicInput",
+        "#botScoutTime"
+      ],
+      "source_refs": [
+        "static/panels.js:8080",
+        "static/chat-bots.js",
+        "api/bot_scout.py"
+      ],
+      "related": [
+        "webui.bots.appearance",
+        "webui.tasks.profile"
+      ],
+      "locales": {
+        "en": {
+          "title": "Scout for a bot",
+          "purpose": "Let a bot look around once a day for news on its topics and bring you one short digest.",
+          "when": "When a bot should keep an eye on a subject, a market or its own tasks without you asking every day.",
+          "steps": [
+            "Open a bot and find the Scout card, or use the radar button next to the bot in the sidebar.",
+            "Add topics: type one and press Enter. Pick the time of the digest.",
+            "Turn Scout on and save. The scheduled task Scout appears with the bot's tasks."
+          ],
+          "permissions": "Turning Scout on or off and changing its topics requires the right to edit that bot. Others see a small mark when Scout is on.",
+          "limits": "Scout only reads. It files actionable items as tasks in triage and writes at most one digest per day in the bot's task chat; it never sends messages. People's own profiles have no Scout. Turning it off pauses the task, it is not deleted.",
+          "example": "Give the CFO bot the topics invoices and cash flow, with the digest at 07:30."
+        },
+        "nl": {
+          "title": "Scout voor een bot",
+          "purpose": "Laat een bot elke dag rondkijken naar nieuws over zijn onderwerpen en je een korte digest geven.",
+          "when": "Als een bot een onderwerp, markt of zijn eigen taken in de gaten moet houden zonder dat je er elke dag om vraagt.",
+          "steps": [
+            "Open een bot en zoek de kaart Scout, of gebruik de radarknop naast de bot in de zijbalk.",
+            "Voeg onderwerpen toe: typ er een en druk op Enter. Kies de tijd van de digest.",
+            "Zet Scout aan en sla op. De geplande taak Scout verschijnt bij de taken van de bot."
+          ],
+          "permissions": "Scout aan of uit zetten en de onderwerpen wijzigen kan alleen wie de bot mag bewerken. Anderen zien een klein teken als Scout aan staat.",
+          "limits": "Scout leest alleen. Actiepunten worden taken in triage en Scout schrijft hooguit een digest per dag in de taakchat van de bot; Scout verstuurt nooit berichten. Persoonlijke profielen van mensen hebben geen Scout. Uitzetten pauzeert de taak, die wordt niet verwijderd.",
+          "example": "Geef de CFO-bot de onderwerpen facturen en cashflow, met de digest om 07:30."
+        }
+      }
+    },
+    {
       "id": "webui.bots.manage",
       "area": "bots",
       "status": "available",

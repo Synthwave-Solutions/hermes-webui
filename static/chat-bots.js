@@ -333,7 +333,43 @@
     if (menuRows.length) input.setAttribute('aria-activedescendant','chatMentionOption-' + menuIndex);
     else { input.removeAttribute('aria-activedescendant'); const empty = document.createElement('span'); empty.textContent = tx('chat_mentions_empty', 'No matching people or bots'); popup.appendChild(empty); }
   }
-  let sidebarSwitchPending = false;
+  let sidebarSwitchPending = false, scoutPending = '';
+  // Scout (api/bot_scout.py): a daily read-only look-out per bot. People's
+  // own profiles get none; who may not edit the bot only sees that it is on.
+  function scoutIcon() {
+    const ns = 'http://www.w3.org/2000/svg', svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', '0 0 16 16'); svg.setAttribute('width', '14'); svg.setAttribute('height', '14'); svg.setAttribute('aria-hidden', 'true');
+    for (const d of ['M8 8L12.6 3.4', 'M13.5 8A5.5 5.5 0 1 1 8 2.5', 'M10.5 8A2.5 2.5 0 1 1 8 5.5']) {
+      const path = document.createElementNS(ns, 'path'); path.setAttribute('d', d);
+      path.setAttribute('fill', 'none'); path.setAttribute('stroke', 'currentColor'); path.setAttribute('stroke-width', '1.4'); path.setAttribute('stroke-linecap', 'round');
+      svg.appendChild(path);
+    }
+    return svg;
+  }
+  function scoutControl(p) {
+    const on = !!(p.bot && p.bot.scout && p.bot.scout.enabled);
+    if (p.bot_kind === 'person' || (!p.bot_editable && !on)) return null;
+    if (!p.bot_editable) {
+      const mark = document.createElement('span'); mark.className = 'sidebar-bot-scout is-on'; mark.setAttribute('role', 'img');
+      mark.title = tx('bot_scout_on_passive', 'Scout is on'); mark.setAttribute('aria-label', mark.title + ': ' + botDisplayName(p));
+      mark.appendChild(scoutIcon()); return mark;
+    }
+    const toggle = document.createElement('button'); toggle.type = 'button'; toggle.className = 'sidebar-bot-scout' + (on ? ' is-on' : '');
+    toggle.dataset.scoutBot = p.name; toggle.setAttribute('aria-pressed', String(on));
+    toggle.title = tx('bot_scout_toggle', 'Scout on/off'); toggle.setAttribute('aria-label', toggle.title + ': ' + botDisplayName(p));
+    toggle.disabled = !!scoutPending; toggle.appendChild(scoutIcon());
+    toggle.onclick = async () => {
+      if (scoutPending) return;
+      scoutPending = p.name; paintSidebarBots();
+      try {
+        await api('/api/bots/scout', {method: 'POST', body: JSON.stringify({name: p.name, enabled: !on, revision: p.bot_revision || 0})});
+        showToast(on ? tx('bot_scout_saved_off', 'Scout off') : tx('bot_scout_saved_on', 'Scout on'));
+        window.dispatchEvent(new CustomEvent('synpulse:bot-updated', {detail: {name: p.name}}));
+      } catch (error) { showToast(error.message); }
+      finally { scoutPending = ''; window.refreshChatBots(); paintSidebarBots(); }
+    };
+    return toggle;
+  }
   window.mountSidebarBots = function (list) {
     const nav = document.querySelector('.rail .nav-tab[data-panel="profiles"]');
     if (!nav) return;
@@ -356,7 +392,7 @@
     // The navigation shows the entire authorized catalog, not just the bots
     // participating in the currently open group conversation.
     const rows = profiles.filter(p => p && typeof p.name === 'string' && p.visible !== false);
-    const signature = JSON.stringify([actor(), rows, loading, S._bootReady, S.activeProfile, sidebarSwitchPending]);
+    const signature = JSON.stringify([actor(), rows, loading, S._bootReady, S.activeProfile, sidebarSwitchPending, scoutPending]);
     if (items.dataset.state === signature) return;
     items.dataset.state = signature; items.replaceChildren();
     // SynthPulse stays on top; the other bots are grouped by category in
@@ -375,8 +411,10 @@
         catch (error) { showToast(error.message); }
         finally { sidebarSwitchPending = false; window.refreshChatBots(); paintSidebarBots(); }
       };
-      if (p.name === 'default' || p.is_default) items.appendChild(button);
-      else entries.push({category: (p.bot && p.bot.category) || '', node: button});
+      const row = document.createElement('div'); row.className = 'sidebar-bot-row'; row.appendChild(button);
+      const scout = scoutControl(p); if (scout) row.appendChild(scout);
+      if (p.name === 'default' || p.is_default) items.appendChild(row);
+      else entries.push({category: (p.bot && p.bot.category) || '', node: row});
     }
     if (typeof window.spRenderGrouped === 'function') window.spRenderGrouped(items, entries, {storagePrefix: 'synpulse:sidebar-bots-group:' + (actor() || 'local')});
     else for (const entry of entries) items.appendChild(entry.node);
