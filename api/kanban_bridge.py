@@ -29,6 +29,13 @@ def _kb():
     """Lazily import hermes_cli.kanban_db to avoid circular imports at module load."""
     from hermes_cli import kanban_db as kb
 
+    # Newer engines moved connect/connect_closing into kanban_db_connect and
+    # no longer re-export them; graft them back so every caller keeps working.
+    if not hasattr(kb, "connect"):
+        from hermes_cli import kanban_db_connect as kc
+
+        kb.connect = kc.connect
+        kb.connect_closing = kc.connect_closing
     return kb
 
 
