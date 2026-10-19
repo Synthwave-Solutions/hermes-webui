@@ -334,6 +334,18 @@
     else { input.removeAttribute('aria-activedescendant'); const empty = document.createElement('span'); empty.textContent = tx('chat_mentions_empty', 'No matching people or bots'); popup.appendChild(empty); }
   }
   let sidebarSwitchPending = false, scoutPending = '';
+  // Bots whose screen waits for a person (bot -> reason), from
+  // /api/bot-screen/status with the viewer's own Bot Screens grants; read with
+  // the bot catalog, never on a faster timer.
+  let screensWaiting = new Map();
+  function screenWaitDot(p) {
+    if (!screensWaiting.has(p.name)) return null;
+    const dot = document.createElement('span'); dot.className = 'sidebar-bot-screen-wait'; dot.setAttribute('role', 'img');
+    const reason = screensWaiting.get(p.name);
+    dot.title = tx('waiting_screen', 'Bot screen waits for you') + (reason ? ': ' + reason : '');
+    dot.setAttribute('aria-label', dot.title + ' (' + botDisplayName(p) + ')');
+    return dot;
+  }
   // Scout (api/bot_scout.py): a daily read-only look-out per bot. People's
   // own profiles get none; who may not edit the bot only sees that it is on.
   function scoutIcon() {
@@ -392,7 +404,7 @@
     // The navigation shows the entire authorized catalog, not just the bots
     // participating in the currently open group conversation.
     const rows = profiles.filter(p => p && typeof p.name === 'string' && p.visible !== false);
-    const signature = JSON.stringify([actor(), rows, loading, S._bootReady, S.activeProfile, sidebarSwitchPending, scoutPending]);
+    const signature = JSON.stringify([actor(), rows, loading, S._bootReady, S.activeProfile, sidebarSwitchPending, scoutPending, [...screensWaiting]]);
     if (items.dataset.state === signature) return;
     items.dataset.state = signature; items.replaceChildren();
     // SynthPulse stays on top; the other bots are grouped by category in
@@ -413,6 +425,7 @@
       };
       const row = document.createElement('div'); row.className = 'sidebar-bot-row'; row.appendChild(button);
       const scout = scoutControl(p); if (scout) row.appendChild(scout);
+      const wait = screenWaitDot(p); if (wait) row.appendChild(wait);
       if (p.name === 'default' || p.is_default) items.appendChild(row);
       else entries.push({category: (p.bot && p.bot.category) || '', node: row});
     }
@@ -546,6 +559,11 @@
       loading = false; paint(); paintMenu(); scheduleDecorate();
     });
     if (!actor()) { people = []; peopleLoading = false; return; }
+    Promise.resolve(api('/api/bot-screen/status', {timeoutToast:false, redirect401:false})).then(result => {
+      if (!fresh()) return;
+      const rows = Array.isArray(result && result.screens) ? result.screens : [];
+      screensWaiting = new Map(rows.filter(r => r && r.state === 'waiting').map(r => [r.bot, String(r.reason || '')]));
+    }).catch(() => { if (fresh()) screensWaiting = new Map(); }).finally(() => { if (fresh()) paintSidebarBots(); });
     Promise.resolve(api('/api/people', {timeoutToast:false})).then(result => {
       if (!fresh()) return;
       if (!Array.isArray(result.people)) throw new Error('Invalid people catalog');

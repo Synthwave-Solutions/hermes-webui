@@ -45,6 +45,8 @@ With an explicit Bot Screen view grant, the section starts with a one-line **Bot
 Bot screens that wait for a person (the agent asked for a takeover with a reason and nobody holds the screen) come first, only for viewers with the Bot Screens right to control that screen; **Open screen** opens the existing viewer for that bot, where the takeover itself is confirmed.
 A task blocked for input whose bot's screen waits like that carries a **Take over screen** link on its own card as well.
 
+In the sidebar, a bot whose screen waits for a person has a small dot next to its name (the reason is in its tooltip). The state is read from the same status call when the bot list loads, never on a faster timer, and only for screens the viewer may watch.
+
 ## Instructions, tools and knowledge
 
 Open **Bots**, select an existing bot and choose **Edit bot**, or choose a section shortcut. The editor has directly selectable **Identity & photo**, **Instructions**, **Memory & knowledge**, **Skills**, **Connections & tools**, and **Access** tabs. Keyboard users can move through tabs with Left/Right or Home/End. Each shortcut opens the requested section. Draft instructions and other configuration changes are retained when switching tabs. Choose **Save bot** to save configuration; editing does not switch the active chat profile.
