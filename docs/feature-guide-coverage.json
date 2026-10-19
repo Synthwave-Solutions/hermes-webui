@@ -1064,6 +1064,57 @@
       ]
     },
     {
+      "id": "webui.bots.org_chart",
+      "area": "bots",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:352",
+        "static/panels.js:8031",
+        "static/panels.js:8252",
+        "static/panels.js:8253"
+      ]
+    },
+    {
+      "id": "webui.bots.scout",
+      "area": "bots",
+      "status": "available",
+      "source_refs": [
+        "static/panels.js:8080",
+        "static/chat-bots.js",
+        "api/bot_scout.py"
+      ]
+    },
+    {
+      "id": "webui.bots.responsibilities",
+      "area": "bots",
+      "status": "available",
+      "source_refs": [
+        "static/panels.js:8201",
+        "api/bot_metadata.py",
+        "api/streaming.py"
+      ]
+    },
+    {
+      "id": "webui.bots.work",
+      "area": "bots",
+      "status": "available",
+      "source_refs": [
+        "static/panels.js:8281",
+        "api/kanban_bridge.py",
+        "api/routes.py"
+      ]
+    },
+    {
+      "id": "webui.governance.waiting",
+      "area": "governance",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1081",
+        "static/panels.js:15418",
+        "api/routes.py"
+      ]
+    },
+    {
       "id": "webui.bots.manage",
       "area": "bots",
       "status": "available",
@@ -2773,6 +2824,26 @@
     },
     {
       "id": "webui.apps.hyperframes",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.apps.blender",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ]
+    },
+    {
+      "id": "webui.apps.openseo",
       "area": "apps",
       "status": "conditional",
       "source_refs": [
@@ -5291,6 +5362,24 @@
       "feature_id": "webui.settings.signout"
     },
     {
+      "control": "spLogoutMobile",
+      "tag": "button",
+      "label": "Log out",
+      "source_refs": [
+        "static/index.html"
+      ],
+      "feature_id": "webui.settings.signout"
+    },
+    {
+      "control": "spLogoutRail",
+      "tag": "button",
+      "label": "Log out",
+      "source_refs": [
+        "static/index.html"
+      ],
+      "feature_id": "webui.settings.signout"
+    },
+    {
       "control": "btnShutdownServer",
       "tag": "button",
       "label": "settings_btn_shutdown",
@@ -7099,6 +7188,33 @@
       "feature_id": "webui.bots.appearance"
     },
     {
+      "control": "botRole",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:8252"
+      ],
+      "feature_id": "webui.bots.org_chart"
+    },
+    {
+      "control": "botReportsTo",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:8031"
+      ],
+      "feature_id": "webui.bots.org_chart"
+    },
+    {
+      "control": "btnBotOrgChart",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/index.html:352"
+      ],
+      "feature_id": "webui.bots.org_chart"
+    },
+    {
       "control": "botAvatarFile",
       "tag": "input",
       "label": "",
@@ -7658,6 +7774,250 @@
         "static/index.html"
       ],
       "feature_id": "webui.chat.bot_screens"
+    },
+    {
+      "control": "cronBotFilterSelect",
+      "tag": "select",
+      "label": "Show tasks of",
+      "source_refs": [
+        "static/panels.js:970"
+      ],
+      "feature_id": "webui.tasks.profile"
+    },
+    {
+      "control": "action:_saveCronBot",
+      "tag": "button",
+      "label": "Bot choice",
+      "source_refs": [
+        "static/panels.js:995"
+      ],
+      "feature_id": "webui.tasks.profile"
+    },
+    {
+      "control": "action:_closeCronBotPicker",
+      "tag": "button",
+      "label": "Cancel",
+      "source_refs": [
+        "static/panels.js:1008"
+      ],
+      "feature_id": "webui.tasks.profile"
+    },
+    {
+      "control": "action:openCronBotPicker",
+      "tag": "button",
+      "label": "Choose another bot",
+      "source_refs": [
+        "static/panels.js:2242"
+      ],
+      "feature_id": "webui.tasks.profile"
+    },
+    {
+      "control": "action:openCronJobChat",
+      "tag": "button",
+      "label": "Open task chat",
+      "source_refs": [
+        "static/panels.js:2245",
+        "static/panels.js:2280"
+      ],
+      "feature_id": "webui.tasks.results"
+    },
+    {
+      "control": "action:openCronFromBot",
+      "tag": "button",
+      "label": "Open in Scheduled tasks",
+      "source_refs": [
+        "static/panels.js:8214"
+      ],
+      "feature_id": "webui.tasks.profile"
+    },
+    {
+      "control": "botKind",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:8323"
+      ],
+      "feature_id": "webui.bots.appearance"
+    },
+    {
+      "control": "botScoutEnabled",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:8085"
+      ],
+      "feature_id": "webui.bots.scout"
+    },
+    {
+      "control": "botScoutTopicInput",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:8089"
+      ],
+      "feature_id": "webui.bots.scout"
+    },
+    {
+      "control": "botScoutTime",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:8090"
+      ],
+      "feature_id": "webui.bots.scout"
+    },
+    {
+      "control": "action:saveBotScout",
+      "tag": "button",
+      "label": "Save Scout",
+      "source_refs": [
+        "static/panels.js:8091"
+      ],
+      "feature_id": "webui.bots.scout"
+    },
+    {
+      "control": "botOrgSearch",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:8061"
+      ],
+      "feature_id": "webui.bots.org_chart"
+    },
+    {
+      "control": "action:_botDutyEdit",
+      "tag": "button",
+      "label": "Edit",
+      "source_refs": [
+        "static/panels.js:8187"
+      ],
+      "feature_id": "webui.bots.responsibilities"
+    },
+    {
+      "control": "action:_botDutyRemove",
+      "tag": "button",
+      "label": "Remove",
+      "source_refs": [
+        "static/panels.js:8187"
+      ],
+      "feature_id": "webui.bots.responsibilities"
+    },
+    {
+      "control": "botDutyTitle",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:8193"
+      ],
+      "feature_id": "webui.bots.responsibilities"
+    },
+    {
+      "control": "botDutyObjective",
+      "tag": "textarea",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:8194"
+      ],
+      "feature_id": "webui.bots.responsibilities"
+    },
+    {
+      "control": "botDutyTrigger",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:8195"
+      ],
+      "feature_id": "webui.bots.responsibilities"
+    },
+    {
+      "control": "botDutyAutonomy",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:8196"
+      ],
+      "feature_id": "webui.bots.responsibilities"
+    },
+    {
+      "control": "botDutyReporting",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:8197"
+      ],
+      "feature_id": "webui.bots.responsibilities"
+    },
+    {
+      "control": "action:_botDutyCancel",
+      "tag": "button",
+      "label": "Cancel",
+      "source_refs": [
+        "static/panels.js:8198"
+      ],
+      "feature_id": "webui.bots.responsibilities"
+    },
+    {
+      "control": "action:_botDutySave",
+      "tag": "button",
+      "label": "Save",
+      "source_refs": [
+        "static/panels.js:8198"
+      ],
+      "feature_id": "webui.bots.responsibilities"
+    },
+    {
+      "control": "botDutyAdd",
+      "tag": "button",
+      "label": "Add responsibility",
+      "source_refs": [
+        "static/panels.js:8214"
+      ],
+      "feature_id": "webui.bots.responsibilities"
+    },
+    {
+      "control": "action:openKanbanTaskFromBot",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:8265"
+      ],
+      "feature_id": "webui.bots.work"
+    },
+    {
+      "control": "waitingComment",
+      "tag": "textarea",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:15388"
+      ],
+      "feature_id": "webui.governance.waiting"
+    },
+    {
+      "control": "action:_waitingComment",
+      "tag": "button",
+      "label": "Reply",
+      "source_refs": [
+        "static/panels.js:15389"
+      ],
+      "feature_id": "webui.governance.waiting"
+    },
+    {
+      "control": "action:_waitingSendComment",
+      "tag": "button",
+      "label": "Send",
+      "source_refs": [
+        "static/panels.js:15389"
+      ],
+      "feature_id": "webui.governance.waiting"
+    },
+    {
+      "control": "action:_waitingUnblock",
+      "tag": "button",
+      "label": "Unblock",
+      "source_refs": [
+        "static/panels.js:15396"
+      ],
+      "feature_id": "webui.governance.waiting"
     }
   ],
   "method": "Inventory of concrete HTML controls and inline handlers, supplemented by manual review of generated conversation menus, bot builder and knowledge controls, composer customization and the embedded read-only memory dashboard. Save/cancel and equivalent responsive controls share a feature. Hidden vendor login, server settings and inactive legacy visualizers are excluded from user workflows.",

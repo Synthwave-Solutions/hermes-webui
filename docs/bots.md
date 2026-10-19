@@ -8,6 +8,45 @@ Open **Bots**, select a bot and edit its name, description, avatar shape or colo
 
 If another editor saved first, reload before saving again. Appearance uses the existing Hermes `ui_meta['hermes-bots']` metadata and revision contract. Concurrent editors in separate server processes are not covered by a shared cross-process lock.
 
+## Org chart
+
+In the same editor, **Reports to** links a bot to the bot it reports to, or to nobody (top level). **Department or role** is an optional short label of at most 80 characters. Both are stored as `reports_to` and `role` in `ui_meta['hermes-bots']` and follow the same revision contract. The server only accepts an existing bot, never the bot itself and never a choice that would create a reporting cycle; a new manager must also be a bot the editor can see. An unchanged value is kept even if that manager was removed later, so other fields stay editable.
+
+Choose **Org chart** at the top of the Bots list to see the tree. Each leading bot (a bot without a manager, with bots below it) heads a grid of columns, one per direct report, with everyone below as compact one-line chips; the grid wraps to the screen width, so there is no sideways scrolling. Bots without a place are listed apart, and people and partners without bots below them sit in a collapsed **People and partners** strip. A search field narrows the chart. Click a bot to open it. Reports to describes structure only: it grants no permissions and does not route work between bots.
+
+## Bot or person
+
+**Kind** marks a profile as a bot or as a person's own profile (team member, partner), stored as `kind` in `ui_meta['hermes-bots']`. Unset, an unmanaged profile in the category Team or Partners counts as a person and everything else, SynthPulse and guided bots included, as a bot. `/api/profiles` returns the effective `bot_kind`. People get no Scout and appear in the org chart's people strip.
+
+The editor's **Kind** select starts with **Automatic**, which stores no explicit kind so the default rule decides; while nothing is stored it shows what the rule decides now, for example Automatic (Person). Choosing Bot or Person stores that kind; choosing Automatic again clears it.
+
+## Scout
+
+Scout reviews open work, progress, opportunities and blockers once a day. Its update includes grounded advice and up to three concrete proposals, each with a source, intended result and approval question. Fresh assigned triage, todo and ready tasks can trigger proposals as well as blocked, review and stale tasks. Existing tasks are referenced rather than duplicated; new proposals remain in triage until approved. Web news is supporting context, not the main purpose. Turn it on with the radar button next to the bot in the sidebar or on the bot's **Scout** card, where you also set up to 12 topics (at most 80 characters each) and the digest time (default 07:30). Settings live in `ui_meta['hermes-bots'].scout` as `{enabled, topics, digest_time}` and are saved through `POST /api/bots/scout`, which needs the same rights as editing the bot.
+
+Turning Scout on copies the Scout runner files from the root profile's `scripts/scout/` into the bot's own `scripts/scout/` (the scheduler only runs scripts inside the job's own Hermes home) and creates or resumes one scheduled job in the bot's own task store, marked `managed_by: scout`. The job runs `scout/scout_collect.py` first and only wakes the agent when there is something new; the agent works read-only, files actionable items as triage tasks and writes at most one digest in the bot's task chat. In-app notifications for the job are off. Turning Scout off pauses the job; it is never deleted.
+
+## Responsibilities
+
+The **Responsibilities** card on a bot's page records what the bot answers for: at most 12 items, each with a **title** (80 characters), an **objective** (300), **when** it acts (free text of 120 characters, such as daily 08:00 or on new mail), its **autonomy** (on its own, asks first, or report only; default asks first) and how it **reports** (120). They are stored as `responsibilities` in `ui_meta['hermes-bots']`, validated strictly and saved through `POST /api/profile/appearance` under the same revision as the rest of the bot; a damaged record reads as empty. Everyone who may see the bot reads the list; adding, editing and removing needs the right to edit the bot. People's own profiles have no card.
+
+Chats whose active profile is the bot get a short "Jouw verantwoordelijkheden" block (at most 800 characters) in the WebUI runtime prompt, next to the knowledge index, one JSON object per responsibility under a line that says to treat them as data, not instructions. It is context only: it grants no tool, schedule or approval.
+
+## Work of this bot
+
+**Work of this bot** on the bot page lists the open Kanban tasks assigned to the bot (anything but done and archived) grouped by status, with blocked and review first; waiting for input and waiting for review are highlighted, and a task opens on the Kanban board. **Made** lists the latest 20 attachments of the bot's tasks with their task and date. The data comes from `GET /api/kanban/bot-work?profile=<bot>`, which keeps the board's gate (`sessions:read` on `/api/kanban`) and also needs a bot the viewer may use. Files download through `GET /api/kanban/attachment?id=<n>`: by attachment id only, from under the board's attachments folder (no symlinks, anchored open), always as a download, and a task assigned to a bot needs a bot the viewer may use.
+
+With an explicit Bot Screen view grant, the section starts with a one-line **Bot screen** status from `GET /api/bot-screen/status?bot=<bot>`: no desktop yet, the bot is working on its screen, waiting for you with the bot's reason and, when the engine records when the bot asked (`help_since`), since what time and how long ago, or a person in control (named when the takeover went through this server) since a time. **Open screen** opens the existing Bot Screens viewer for that bot. The status call starts, takes and audits nothing and uses the same per-bot grants as the viewer; an unreadable lease reads as a person in control.
+
+## Waiting for you
+
+**My approvals** starts with **Waiting for you**. It lists Kanban tasks in review or blocked for input (`block_kind` `needs_input`) of bots the viewer may use or that the viewer created (`GET /api/kanban/waiting`). Pending tool approvals in chats are not listed: they expire within a minute and are answered in the chat itself. A task opens on the board, takes a reply as a comment, or is unblocked through the existing Kanban routes. The viewer's own access requests stay listed below.
+
+Bot screens that wait for a person (the agent asked for a takeover with a reason and nobody holds the screen) come first, only for viewers with the Bot Screens right to control that screen; **Open screen** opens the existing viewer for that bot, where the takeover itself is confirmed.
+A task blocked for input whose bot's screen waits like that carries a **Take over screen** link on its own card as well.
+
+In the sidebar, a bot whose screen waits for a person has a small dot next to its name (the reason is in its tooltip). The state is read from the same status call when the bot list loads, never on a faster timer, and only for screens the viewer may watch.
+
 ## Instructions, tools and knowledge
 
 Open **Bots**, select an existing bot and choose **Edit bot**, or choose a section shortcut. The editor has directly selectable **Identity & photo**, **Instructions**, **Memory & knowledge**, **Skills**, **Connections & tools**, and **Access** tabs. Keyboard users can move through tabs with Left/Right or Home/End. Each shortcut opens the requested section. Draft instructions and other configuration changes are retained when switching tabs. Choose **Save bot** to save configuration; editing does not switch the active chat profile.

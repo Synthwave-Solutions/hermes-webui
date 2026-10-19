@@ -29,6 +29,13 @@ def _kb():
     """Lazily import hermes_cli.kanban_db to avoid circular imports at module load."""
     from hermes_cli import kanban_db as kb
 
+    # Newer engines moved connect/connect_closing into kanban_db_connect and
+    # no longer re-export them; graft them back so every caller keeps working.
+    if not hasattr(kb, "connect"):
+        from hermes_cli import kanban_db_connect as kc
+
+        kb.connect = kc.connect
+        kb.connect_closing = kc.connect_closing
     return kb
 
 
@@ -981,6 +988,125 @@ def _switch_board_payload(slug):
         raise LookupError(f"board {slug!r} does not exist")
     kb.set_current_board(normed)
     return {"current": normed, "read_only": False}
+
+
+# ---------------------------------------------------------------------------
+# Work of one bot (bot page): open tasks and what it made
+# ---------------------------------------------------------------------------
+# Read-only views for the bot page. The caller (api/routes.py) keeps the
+# same gate as the board (sessions:read on /api/kanban) and adds that the
+# viewer may use the bot. Files are served only from the board's attachments
+# root, by attachment id, never by a path from the request.
+
+_CLOSED_STATUSES = ("done", "archived")
+BOT_WORK_ATTACHMENTS = 20
+
+
+def _work_task_row(task) -> dict:
+    """The few fields a task list outside the board needs."""
+    return {
+        "id": task.id,
+        "title": task.title,
+        "status": task.status,
+        "block_kind": getattr(task, "block_kind", None),
+        "priority": task.priority,
+        "assignee": task.assignee,
+        "created_by": task.created_by,
+        "created_at": task.created_at,
+        "started_at": task.started_at,
+    }
+
+
+def bot_work_payload(profile: str, *, board=None, limit: int = BOT_WORK_ATTACHMENTS) -> dict:
+    """Open tasks assigned to ``profile`` (not done or archived) and the most
+    recent attachments of its tasks, newest first."""
+    kb = _kb()
+    assignee = kb._canonical_assignee(profile)
+    if not assignee:
+        raise ValueError("profile is required")
+    with _conn(board=board) as conn:
+        tasks = [t for t in kb.list_tasks(conn, assignee=assignee) if t.status not in _CLOSED_STATUSES]
+        rows = conn.execute(
+            "SELECT a.id, a.task_id, a.filename, a.content_type, a.size, a.created_at, t.title "
+            "FROM task_attachments a JOIN tasks t ON t.id = a.task_id "
+            "WHERE t.assignee = ? ORDER BY a.created_at DESC, a.id DESC LIMIT ?",
+            (assignee, int(limit)),
+        ).fetchall()
+    tasks.sort(key=lambda t: (-(t.priority or 0), -(t.created_at or 0)))
+    return {
+        "profile": assignee,
+        "board": board,
+        "tasks": [_work_task_row(t) for t in tasks],
+        "attachments": [
+            {
+                "id": r["id"], "task_id": r["task_id"], "filename": r["filename"],
+                "content_type": r["content_type"], "size": r["size"] or 0,
+                "created_at": r["created_at"], "task_title": r["title"],
+            }
+            for r in rows
+        ],
+    }
+
+
+def _waits_for_a_person(task) -> bool:
+    return task.status == "review" or (task.status == "blocked" and getattr(task, "block_kind", None) == "needs_input")
+
+
+def waiting_tasks_payload(may_use, viewer_email=None, *, board=None) -> dict:
+    """Tasks that wait for a person: in review, or blocked for input
+    (block_kind ``needs_input``). Only tasks this viewer can act on: the
+    assignee is a bot ``may_use(name)`` allows, or the viewer created it."""
+    kb = _kb()
+    viewer = str(viewer_email or "").strip().casefold()
+    with _conn(board=board) as conn:
+        tasks = [t for t in kb.list_tasks(conn) if _waits_for_a_person(t)]
+    allowed = {}
+
+    def visible(task):
+        if viewer and str(task.created_by or "").strip().casefold() == viewer:
+            return True
+        name = task.assignee
+        if not name:
+            return False
+        if name not in allowed:
+            allowed[name] = bool(may_use(name))
+        return allowed[name]
+
+    rows = [_work_task_row(t) for t in tasks if visible(t)]
+    rows.sort(key=lambda r: (r["status"] != "blocked", -(r["created_at"] or 0)))
+    return {"board": board, "tasks": rows}
+
+
+def attachment_file(attachment_id, *, board=None):
+    """Resolve an attachment id to ``(path, root, filename, content_type,
+    assignee, created_by)``. Raises LookupError when the row or file is missing and
+    ValueError when the stored path leaves the attachments root."""
+    from pathlib import Path
+
+    try:
+        att_id = int(str(attachment_id))
+    except (TypeError, ValueError):
+        raise ValueError("attachment id must be a number")
+    if att_id < 1:
+        raise ValueError("attachment id must be a number")
+    kb = _kb()
+    with _conn(board=board) as conn:
+        att = kb.get_attachment(conn, att_id)
+        if att is None:
+            raise LookupError("attachment not found")
+        task = kb.get_task(conn, att.task_id)
+    if task is None:
+        raise LookupError("attachment not found")
+    root = Path(kb.attachments_root(board=board)).resolve()
+    stored = Path(att.stored_path)
+    if not stored.is_absolute() or stored.is_symlink():
+        raise ValueError("attachment is outside the attachments folder")
+    target = stored.resolve()
+    if not target.is_relative_to(root) or target == root:
+        raise ValueError("attachment is outside the attachments folder")
+    if not target.is_file():
+        raise LookupError("attachment file is missing")
+    return target, root, att.filename, att.content_type, task.assignee, task.created_by
 
 
 # ---------------------------------------------------------------------------

@@ -490,7 +490,9 @@ class TestToolCallGroupingStatic:
         assert "if(explicit) return explicit;" not in preview_fn
         assert "const hasRawDetail=!!(tc.snippet)" in build_fn
         assert "const allowsDetail=typeof _toolCardAllowsDetail==='function'?_toolCardAllowsDetail(toolKind,tc):true;" in build_fn
-        assert "const hasDetail=hasRawDetail&&allowsDetail" in build_fn
+        # Friendly rows (static/tool-friendly.js) put raw input/output behind a
+        # "Details" toggle for every tool, so the gate also admits friendly rows.
+        assert "const hasDetail=hasRawDetail&&(allowsDetail||!!friendly)" in build_fn
         assert "if(toolKind==='shell'||previewText===argPreview" in build_fn, (
             "Individual tool rows should show input targets in the row title and "
             "keep result previews inside the expanded detail."

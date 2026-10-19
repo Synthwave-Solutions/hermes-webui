@@ -277,6 +277,13 @@ def _restore_profile_home_globals():
     """
     saved_home = os.environ.get('HERMES_HOME')
     saved_base = os.environ.get('HERMES_BASE_HOME')
+    # The state dir and default workspace must also survive a test that pops
+    # them (test_mcp_server did): without HERMES_WEBUI_STATE_DIR a later
+    # subprocess resolves the REAL ~/.hermes/webui while still carrying the
+    # test workspace, and api.config's startup write then stored that temp
+    # path as the live default workspace (the 2026 leak into real chats).
+    saved_state_dir = os.environ.get('HERMES_WEBUI_STATE_DIR')
+    saved_default_ws = os.environ.get('HERMES_WEBUI_DEFAULT_WORKSPACE')
     # Snapshot the process-global active-profile name too. Several tests call
     # switch_profile() (process_wide=True), which mutates api.profiles._active_profile
     # in place and never restores it. In a sequential run the next test usually
@@ -297,7 +304,9 @@ def _restore_profile_home_globals():
     # starts from a base root that matches the current (restored) env.
     _rederive_default_hermes_home()
     yield
-    for key, val in (('HERMES_HOME', saved_home), ('HERMES_BASE_HOME', saved_base)):
+    for key, val in (('HERMES_HOME', saved_home), ('HERMES_BASE_HOME', saved_base),
+                     ('HERMES_WEBUI_STATE_DIR', saved_state_dir),
+                     ('HERMES_WEBUI_DEFAULT_WORKSPACE', saved_default_ws)):
         if val is None:
             os.environ.pop(key, None)
         else:
@@ -1373,3 +1382,34 @@ def make_session_tracked(created_list, ws=None):
     ws_path = pathlib.Path(d["session"]["workspace"])
     created_list.append(sid)
     return sid, ws_path
+
+
+
+# ── Production leak guard ────────────────────────────────────────────────────
+# A test run must never write its temp workspace into the real WebUI state.
+# Checked once at the end of the session against the real ~/.hermes tree (not
+# $HERMES_HOME, which points at the test dir): if any of these files now names
+# a hermes-webui-tests path that was not there before the run, fail loudly.
+def _prod_leak_snapshot():
+    prod = _PROD_HERMES_HOME
+    files = [prod / 'webui' / 'settings.json', prod / 'webui' / 'last_workspace.txt']
+    files += sorted((prod / 'profiles').glob('*/webui_state/last_workspace.txt'))
+    out = {}
+    for f in files:
+        try:
+            out[str(f)] = 'hermes-webui-tests' in f.read_text(encoding='utf-8', errors='replace')
+        except OSError:
+            out[str(f)] = False
+    return out
+
+
+_PROD_LEAK_BEFORE = _prod_leak_snapshot()
+
+
+def pytest_sessionfinish(session, exitstatus):
+    after = _prod_leak_snapshot()
+    leaked = [f for f, bad in after.items() if bad and not _PROD_LEAK_BEFORE.get(f, False)]
+    if leaked:
+        sys.stderr.write("\nERROR: tests wrote a temp test workspace into production state: "
+                         + ", ".join(leaked) + "\n")
+        session.exitstatus = 1

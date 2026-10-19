@@ -86,6 +86,15 @@ def _current_request_email() -> str | None:
         return None
 
 
+def _request_bound() -> bool:
+    """Whether this thread is serving an HTTP request (vs background work)."""
+    try:
+        from api.ownership import _CURRENT_REQUEST
+        return getattr(_CURRENT_REQUEST, 'handler', None) is not None
+    except Exception:
+        return False
+
+
 def _user_last_workspace_file(email: str) -> Path:
     import re
 
@@ -460,7 +469,7 @@ def get_profile_default_workspace() -> str:
     remote_cwd = _remote_terminal_cwd()
 
     def _valid(raw: str) -> str | None:
-        if not raw:
+        if not raw or _foreign_test_path(raw):
             return None
         if remote_cwd:
             if _remote_terminal_workspace_candidate(raw) is not None:
@@ -473,6 +482,8 @@ def get_profile_default_workspace() -> str:
     personal = _read_user_last_workspace(_valid)
     if personal:
         return personal
+    if _current_request_email():
+        return _profile_default_workspace()
     lw_file = _last_workspace_file()
     if lw_file.exists():
         try:
@@ -484,11 +495,19 @@ def get_profile_default_workspace() -> str:
     return _profile_default_workspace()
 
 
+def _foreign_test_path(raw) -> bool:
+    try:
+        from api.config import is_foreign_test_workspace
+        return is_foreign_test_workspace(raw)
+    except Exception:
+        return False
+
+
 def get_last_workspace() -> str:
     remote_cwd = _remote_terminal_cwd()
 
     def valid_last_workspace(raw: str) -> str | None:
-        if not raw:
+        if not raw or _foreign_test_path(raw):
             return None
         if remote_cwd:
             # For remote/SSH profiles, last_workspace is target-side state. Do
@@ -504,6 +523,11 @@ def get_last_workspace() -> str:
     personal = _read_user_last_workspace(valid_last_workspace)
     if personal:
         return personal
+    if _current_request_email():
+        # A signed-in person who never picked a folder gets the admin-set
+        # default, never the folder a colleague happened to pick last (the
+        # profile-level file below is shared by everyone on that profile).
+        return _profile_default_workspace()
     lw_file = _last_workspace_file()
     if lw_file.exists():
         try:
@@ -524,6 +548,12 @@ def get_last_workspace() -> str:
 
 
 def set_last_workspace(path: str) -> None:
+    if _foreign_test_path(path):
+        return
+    if not _request_bound():
+        # Background work (scheduled jobs, async delegation, bot hand-offs)
+        # is nobody's pick: it must not move anyone's remembered folder.
+        return
     try:
         email = _current_request_email()
         # A signed-in person only moves their own remembered workspace; the

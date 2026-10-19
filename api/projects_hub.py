@@ -86,11 +86,52 @@ def visible_projects_by_owner(projects, owner_scope) -> list:
         return [p for p in (projects or []) if not p.get("deleted")]
     return [
         p for p in (projects or [])
-        if isinstance(p, dict)
-        and str(p.get("owner_email") or "").strip().lower()
-        and not p.get("deleted")
-        and (str(p.get("owner_email") or "").strip().lower() == owner_scope or owner_scope in p.get("members", []))
+        if isinstance(p, dict) and not p.get("deleted")
+        and (space_project_visible(p, owner_scope) if is_space_project(p) else (
+            str(p.get("owner_email") or "").strip().lower()
+            and (str(p.get("owner_email") or "").strip().lower() == owner_scope or owner_scope in p.get("members", []))))
     ]
+
+
+def is_space_project(project) -> bool:
+    """A project created from a space by the Projects + Spaces merge."""
+    return isinstance(project, dict) and project.get("kind") == "space"
+
+
+def space_project_visible(project, owner_scope) -> bool:
+    """Exactly the space rule (api/routes._workspace_visible_to): owner or
+    member, or everyone when the space had no owner and no members."""
+    if owner_scope == "all":
+        return True
+    emails = {str(project.get("owner_email") or "").strip().lower()}
+    emails |= {str(m or "").strip().lower() for m in project.get("members") or []}
+    emails.discard("")
+    if not emails:
+        return bool(project.get("shared_with_all"))
+    return bool(owner_scope) and owner_scope in emails
+
+
+def _path_inside(path, root) -> bool:
+    import os
+    try:
+        p = os.path.realpath(os.path.expanduser(str(path)))
+        r = os.path.realpath(os.path.expanduser(str(root)))
+    except (OSError, ValueError):
+        return False
+    return p == r or p.startswith(r.rstrip("/") + "/")
+
+
+def project_sessions(project, seen_rows) -> list:
+    """Chats that belong to a project: filed under it, or for a space project
+    the chats without a project whose working folder is that space."""
+    pid = str((project or {}).get("project_id") or "")
+    if not is_space_project(project):
+        return [r for r in seen_rows if str(r.get("project_id") or "") == pid]
+    folders = [f.get("path") for f in project.get("folders") or [] if isinstance(f, dict) and f.get("path")]
+    return [r for r in seen_rows
+            if str(r.get("project_id") or "") == pid
+            or (not r.get("project_id") and not r.get("project_shared")
+                and r.get("workspace") and any(_path_inside(r.get("workspace"), f) for f in folders))]
 
 
 def visible_projects(projects, owner_scope, active_profile) -> list:
@@ -156,7 +197,7 @@ def project_rollups(projects, session_rows, owner_scope, active_profile) -> list
     out = []
     for project in rows:
         pid = str(project.get("project_id") or "")
-        mine = by_project.get(pid, [])
+        mine = project_sessions(project, seen) if is_space_project(project) else by_project.get(pid, [])
         workspaces = {
             str(s.get("workspace") or "").strip()
             for s in mine if str(s.get("workspace") or "").strip()
@@ -387,10 +428,7 @@ def project_detail(
     if not isinstance(project, dict):
         raise ValueError("project must be a record")
     capabilities = capabilities or {}
-    sessions = [
-        row for row in visible_sessions(session_rows, owner_scope, active_profile)
-        if str(row.get("project_id") or "") == str(project.get("project_id") or "")
-    ]
+    sessions = project_sessions(project, visible_sessions(session_rows, owner_scope, active_profile))
     sessions.sort(key=_activity_at, reverse=True)
 
     detail = {

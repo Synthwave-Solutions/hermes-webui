@@ -753,6 +753,10 @@ def _webui_ephemeral_system_prompt(
         from api.bot_metadata import knowledge_prompt
         knowledge = knowledge_prompt(surface_context.get('profile'), surface_context.get('workspace'))
         if knowledge: parts.append(knowledge)
+        # What this bot answers for (ui_meta.hermes-bots.responsibilities).
+        from api.bot_metadata import responsibilities_prompt
+        duties = responsibilities_prompt(surface_context.get('profile'))
+        if duties: parts.append(duties)
         from api import bot_knowledge, bot_builder
         shared_knowledge = bot_knowledge.prompt(surface_context.get("profile"), actor_email)
         if shared_knowledge:
@@ -7987,6 +7991,17 @@ def _run_agent_streaming(
                 if subagent:
                     if stream_id in STREAM_LIVE_TOOL_CALLS:
                         remember_subagent(STREAM_LIVE_TOOL_CALLS[stream_id], subagent)
+                    # Background workers outlive this turn's stream: keep a
+                    # conversation-scoped record the browser can poll.
+                    try:
+                        from api.subagent_progress import record as record_subagent
+                        record_subagent(
+                            session_id, subagent,
+                            tool_name=name if event_type == 'subagent.tool' else None,
+                            child_session_id=cb_kwargs.get('child_session_id'),
+                        )
+                    except Exception:
+                        logger.debug("subagent thread record failed", exc_info=True)
                     put('subagent', subagent)
                     return
 
@@ -8446,6 +8461,16 @@ def _run_agent_streaming(
             try:
                 _effort_cfg = _cfg.get('agent', {}) if isinstance(_cfg, dict) else {}
                 _effort_raw = _effort_cfg.get('reasoning_effort') if isinstance(_effort_cfg, dict) else None
+                # The person who started this turn may have their own level
+                # for this bot (api/user_prefs.py); it wins over the default.
+                try:
+                    from api import user_prefs as _user_prefs
+                    _mine = _user_prefs.get_reasoning_effort(
+                        _turn_principal, execution_profile or getattr(s, 'profile', None) or 'default')
+                    if _mine:
+                        _effort_raw = _mine
+                except Exception:
+                    pass
                 _effort = coerce_reasoning_effort_for_model(
                     _effort_raw,
                     resolved_model,
@@ -8790,6 +8815,17 @@ def _run_agent_streaming(
                 s, _turn_identity, execution_profile or getattr(s, 'profile', None) or 'default')
             if _bot_awareness:
                 agent.ephemeral_system_prompt += '\n\n' + _bot_awareness
+            # A chat about scheduled jobs (its job chat, or the chat a job
+            # posts its results into) gets that job's live context, so a
+            # follow-up like "why did this fail" works (api/cron_bots.py).
+            try:
+                from api.cron_bots import context_prompt as _cron_job_context_prompt
+                _cron_job_context = _cron_job_context_prompt(s, _turn_identity)
+            except Exception:
+                logger.debug("scheduled job context unavailable", exc_info=True)
+                _cron_job_context = ''
+            if _cron_job_context:
+                agent.ephemeral_system_prompt += '\n\n' + _cron_job_context
             _pending_started_at = getattr(s, 'pending_started_at', None)
             # Normal chat-start sets pending_started_at before spawning this thread;
             # fallback to now only for recovered/legacy flows where that marker is absent

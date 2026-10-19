@@ -107,8 +107,12 @@ INDEX_RULES: tuple[tuple[str, str, int], ...] = (
     ),
     (
         '<script src="/static/app.js?v=stream-v2"></script>',
+        # crossorigin: app.js imports three.js with a relative URL. From the
+        # opaque origin a plain (no-cors) script resolves that against
+        # about:blank and the 3D visualiser never loads; a CORS script keeps
+        # its own URL as the base (the route sends Access-Control-Allow-Origin).
         '<script src="memdash-shim.js?v={memdash-shim.js}"></script>'
-        '<script src="app.js?v={app.js}"></script>',
+        '<script src="app.js?v={app.js}" crossorigin="anonymous"></script>',
         1,
     ),
     (FOOTER_OLD, '      <footer class="app-footer"></footer>\n', 1),

@@ -252,6 +252,10 @@ class TestWorkspaceReorderOwnership:
     hidden foreign entries keep their original indices. Admins keep the full
     reorder. No entry is ever lost either way."""
 
+    # These cover the shared registry order, used for identities without an
+    # email (and for an admin's scope "default" reorder). A signed-in person's
+    # reorder is personal since 18 Oct 2026 (tests/test_shared_attributes_owner_only.py),
+    # so request_owner_email is pinned to None here to keep them deterministic.
     WSS = [
         {"path": "/home/user/foreign1", "name": "F1", "owner_email": MICHAEL},
         {"path": "/home/user/own-a", "name": "A", "owner_email": STEVE},
@@ -260,11 +264,12 @@ class TestWorkspaceReorderOwnership:
         {"path": "/home/user/legacy", "name": "L"},
     ]
 
+    @patch("api.ownership.request_owner_email", return_value=None)
     @patch("api.ownership.request_owner_scope", return_value=STEVE)
     @patch("api.ownership.request_is_admin", return_value=False)
     @patch("api.routes.save_workspaces")
     @patch("api.routes.load_workspaces")
-    def test_non_admin_reorder_keeps_hidden_positions(self, mock_load, mock_save, _admin, _scope):
+    def test_non_admin_reorder_keeps_hidden_positions(self, mock_load, mock_save, _admin, _scope, _email):
         mock_load.return_value = [dict(w) for w in self.WSS]
         handler = _make_handler()
         _handle_workspace_reorder(handler, {
@@ -282,11 +287,12 @@ class TestWorkspaceReorderOwnership:
             "/home/user/legacy",
         ]
 
+    @patch("api.ownership.request_owner_email", return_value=None)
     @patch("api.ownership.request_owner_scope", return_value=STEVE)
     @patch("api.ownership.request_is_admin", return_value=False)
     @patch("api.routes.save_workspaces")
     @patch("api.routes.load_workspaces")
-    def test_non_admin_cannot_move_foreign_entries(self, mock_load, mock_save, _admin, _scope):
+    def test_non_admin_cannot_move_foreign_entries(self, mock_load, mock_save, _admin, _scope, _email):
         """Foreign paths smuggled into the request are ignored, not moved."""
         mock_load.return_value = [dict(w) for w in self.WSS]
         handler = _make_handler()
@@ -298,11 +304,12 @@ class TestWorkspaceReorderOwnership:
         assert saved.index("/home/user/foreign2") == 2
         assert len(saved) == len(self.WSS)  # nothing lost
 
+    @patch("api.ownership.request_owner_email", return_value=None)
     @patch("api.ownership.request_owner_scope", return_value="all")
     @patch("api.ownership.request_is_admin", return_value=True)
     @patch("api.routes.save_workspaces")
     @patch("api.routes.load_workspaces")
-    def test_admin_keeps_full_reorder(self, mock_load, mock_save, _admin, _scope):
+    def test_admin_keeps_full_reorder(self, mock_load, mock_save, _admin, _scope, _email):
         mock_load.return_value = [dict(w) for w in self.WSS]
         handler = _make_handler()
         _handle_workspace_reorder(handler, {

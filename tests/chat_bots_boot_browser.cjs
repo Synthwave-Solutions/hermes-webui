@@ -8,7 +8,7 @@ const assert=require('node:assert/strict'),{chromium}=require(process.env.PLAYWR
  window.__GOV_ME__={email:'alice@example.test'};
  window.S={session:null,activeProfile:'default',_bootReady:false};
  window.t=k=>k; window.botAvatarHtml=()=>''; window.botDisplayName=p=>p.name;
- window.calls=[]; window.api=url=>new Promise((resolve,reject)=>calls.push({url,resolve,reject}));
+ window.screenCalls=0; window.calls=[]; window.api=url=>url==='/api/bot-screen/status'?(screenCalls++,Promise.resolve({screens:[]})):new Promise((resolve,reject)=>calls.push({url,resolve,reject}));
  window.switches=[]; window.switchToProfile=async name=>switches.push(name);
  });
  await p.addScriptTag({path:'static/chat-bots.js'});
@@ -67,6 +67,7 @@ const assert=require('node:assert/strict'),{chromium}=require(process.env.PLAYWR
  await p.evaluate(()=>identityPromise);
  assert.deepEqual(await p.evaluate(()=>calls.slice(14).map(c=>c.url)),['/api/profiles?fast=1','/api/people']);
  await resolve(14,profiles(['research'])); await resolve(15,{people:[]});
+ assert.ok(await p.evaluate(()=>screenCalls)>0);
  console.log('PASS early loading, slow people, no boot switch, retry retains people, stale context exclusion');
  }finally{await b.close();}
 })().catch(e=>{console.error(e);process.exit(1)});

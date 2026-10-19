@@ -2182,6 +2182,24 @@ def switch_profile(name: str, *, process_wide: bool = True) -> dict:
     try:
         from api.config import DEFAULT_WORKSPACE as _DW
         lw_file = home / 'webui_state' / 'last_workspace.txt'
+        # Per person: their own remembered folder for the target profile;
+        # signed-in people never inherit the profile-wide file, which holds
+        # whatever a colleague (or legacy single-user mode) picked last.
+        _email = None
+        try:
+            from api.workspace import _current_request_email, _user_last_workspace_file  # noqa: F401
+            _email = _current_request_email()
+        except Exception:
+            _email = None
+        if _email:
+            import re as _re_ws
+            _slug = _re_ws.sub(r'[^a-z0-9._@+-]', '_', str(_email).strip().lower())[:160] or 'unknown'
+            try:
+                from api.config import STATE_DIR as _SD
+                _base_state = Path(_SD) if _is_root_profile(name) else home / 'webui_state'
+            except Exception:
+                _base_state = home / 'webui_state'
+            lw_file = _base_state / 'last_workspace_by_user' / f'{_slug}.txt'
         if lw_file.exists():
             _p = lw_file.read_text(encoding='utf-8').strip()
             if _p:

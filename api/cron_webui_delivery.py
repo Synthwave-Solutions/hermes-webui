@@ -37,6 +37,13 @@ output posted. Jobs that deliver to an external platform are not mirrored,
 but an external delivery FAILURE recorded by the engine is posted into the
 originating conversation as an actionable notice.
 
+Bot-owned jobs (18 Oct 2026, api/cron_bots.py): the bridge reads every
+bot's cron store, and a run's result goes to a chat of the bot that owns the
+job: the chat it was created in while that chat belongs to the bot, else the
+job's own chat ("🗓️ <name>") of the person it runs for, opened on its first
+result. Jobs made outside the WebUI only take part once their person turned
+their notifications on in the Tasks panel (``_bridge_scope``).
+
 Per-job notify settings (plan 3.1): the job's ``notify.delivery`` level gates
 every post, as the engine gates its own delivery. ``failures`` mutes the post
 of a successful run, ``off`` mutes every post; a muted run is recorded as
@@ -168,14 +175,21 @@ def _record_outcome(
     outcome: str,
     error: str | None = None,
     session_id: str | None = None,
+    profile: str | None = None,
+    target: str | None = None,
 ) -> None:
-    ledger.setdefault("jobs", {})[str(job.get("id", ""))] = {
+    entry = {
         "run_at": job.get("last_run_at"),
         "outcome": outcome,
         "error": error,
         "session_id": session_id,
         "recorded_at": datetime.now(timezone.utc).isoformat(),
     }
+    if profile is not None:
+        entry["profile"] = profile
+    if target is not None:
+        entry["target"] = target
+    ledger.setdefault("jobs", {})[str(job.get("id", ""))] = entry
 
 
 def _record_and_persist(
@@ -185,6 +199,8 @@ def _record_and_persist(
     outcome: str,
     error: str | None = None,
     session_id: str | None = None,
+    profile: str | None = None,
+    target: str | None = None,
 ) -> bool:
     """Record the outcome in the ledger, the in-memory watermark AND on disk.
 
@@ -193,7 +209,8 @@ def _record_and_persist(
     persistently unwritable state dir cannot re-post the same run on later
     ticks; at worst a process restart with a still-broken disk re-posts once.
     """
-    _record_outcome(ledger, job, outcome=outcome, error=error, session_id=session_id)
+    _record_outcome(ledger, job, outcome=outcome, error=error, session_id=session_id,
+                    profile=profile, target=target)
     job_id = str(job.get("id", ""))
     _MEMORY_WATERMARKS[job_id] = dict(ledger["jobs"][job_id])
     try:
@@ -229,6 +246,29 @@ def _webui_origin_session_id(job: dict) -> str | None:
     return chat_id
 
 
+def _has_explicit_notify(job: dict) -> bool:
+    notify = job.get("notify")
+    return isinstance(notify, dict) and bool(notify.get("delivery"))
+
+
+def _bridge_scope(job: dict) -> str | None:
+    """Which jobs this bridge reports into a chat of the owning bot.
+
+    ``webui``: every job made in the WebUI (a chat or the Tasks panel), as
+    before; a Tasks panel job has no originating chat and now gets its job
+    chat. ``owner``: a job made elsewhere (CLI, Telegram, imported) whose
+    person turned on its notifications in the Tasks panel (an explicit
+    ``notify.delivery``) and who can be named (api/cron_bots.job_person_email).
+    Everything else stays where it was: Telegram-made jobs answer in Telegram.
+    """
+    origin = job.get("origin")
+    if isinstance(origin, dict) and str(origin.get("platform") or "").strip().lower() == "webui":
+        return "webui"
+    if _has_explicit_notify(job) and str(job.get("owner_email") or "").strip():
+        return "owner"
+    return None
+
+
 def _deliver_tokens(job: dict) -> list[str]:
     raw = job.get("deliver")
     if raw is None:
@@ -247,6 +287,12 @@ def _job_wants_webui_delivery(job: dict) -> bool:
     all ``deliver=local`` WebUI-origin jobs).
     """
     tokens = _deliver_tokens(job)
+    if _bridge_scope(job) == "owner":
+        # A job from a messaging platform delivers "origin" (or nothing) to
+        # that platform; only its saved-locally runs are the chat's to post.
+        origin = job.get("origin")
+        has_platform = isinstance(origin, dict) and bool(origin.get("platform"))
+        return "local" in tokens or (not tokens and not has_platform)
     if not tokens:
         return True
     return "origin" in tokens or "local" in tokens
@@ -350,7 +396,7 @@ def latest_output_text(
 def _truncate_body(body: str) -> str:
     if len(body) <= MAX_DELIVERY_CHARS:
         return body
-    return body[:MAX_DELIVERY_CHARS].rstrip() + "\n\n(truncated: full output is in the Tasks panel)"
+    return body[:MAX_DELIVERY_CHARS].rstrip() + "\n\n(ingekort: de volledige uitkomst staat in Geplande taken)"
 
 
 def capacity_failure_text(job: dict, run_error: str | None) -> str | None:
@@ -417,43 +463,58 @@ def deliver_external_notice(destination: str, text: str) -> tuple[bool, str | No
         return False, str(exc)
 
 
+def _run_moment(job: dict) -> str:
+    """The run's time as the reader's clock shows it (server local time)."""
+    dt = _parse_run_at(job.get("last_run_at"))
+    if dt is None:
+        return ""
+    return dt.astimezone().strftime("%d-%m-%Y %H:%M")
+
+
 def build_update_text(job: dict, *, body: str | None, run_ok: bool, run_error: str | None) -> str:
-    """One concise update for the originating conversation."""
-    name = str(job.get("name") or job.get("id") or "scheduled task")
+    """One concise update for the chat the result belongs in (Dutch first,
+    like the rest of SynthPulse; the capacity notice keeps its own words)."""
+    name = str(job.get("name") or job.get("id") or "geplande taak")
+    when = _run_moment(job)
+    stamp = f", {when}" if when else ""
     if not run_ok:
         capacity_text = capacity_failure_text(job, run_error)
         if capacity_text is not None:
             return capacity_text
-        detail = (run_error or "no error detail recorded").strip()
+        detail = (run_error or "geen foutmelding bewaard").strip()
         return (
-            f"Scheduled task \"{name}\" failed on its last run: {detail}\n"
-            f"Details are in the Tasks panel (job {job.get('id', '?')})."
+            f"\U0001f5d3\ufe0f {name} is mislukt bij de run{stamp}: {detail}\n"
+            f"De details staan in Geplande taken (taak {job.get('id', '?')})."
         )
     if body:
-        return f"Scheduled task update: {name}\n\n{_truncate_body(body)}"
+        return f"\U0001f5d3\ufe0f Uitkomst van {name}{stamp}\n\n{_truncate_body(body)}"
     return (
-        f"Scheduled task \"{name}\" completed its run. No output was captured; "
-        f"see the Tasks panel (job {job.get('id', '?')}) for the run record."
+        f"\U0001f5d3\ufe0f {name} is klaar{stamp}, maar er is geen uitkomst bewaard. "
+        f"Kijk in Geplande taken (taak {job.get('id', '?')}) voor de run."
     )
 
 
 def build_external_failure_text(job: dict, delivery_error: str) -> str:
-    name = str(job.get("name") or job.get("id") or "scheduled task")
-    target = str(job.get("deliver") or "its configured target")
+    name = str(job.get("name") or job.get("id") or "geplande taak")
+    target = str(job.get("deliver") or "het ingestelde doel")
     return (
-        f"Scheduled task \"{name}\" ran, but delivering its result to {target} "
-        f"failed: {delivery_error.strip()}\n"
-        f"The output is saved in the Tasks panel (job {job.get('id', '?')}). "
-        f"Fix the delivery target or ask me to resend it."
+        f"\U0001f5d3\ufe0f {name} is uitgevoerd, maar het versturen naar {target} "
+        f"lukte niet: {delivery_error.strip()}\n"
+        f"De uitkomst staat in Geplande taken (taak {job.get('id', '?')}). "
+        f"Pas het doel aan of vraag me om het opnieuw te sturen."
     )
 
 
 # -- Conversation delivery ---------------------------------------------------
 
-def deliver_update_to_session(session_id: str, text: str, job: dict) -> tuple[bool, str | None]:
+def deliver_update_to_session(
+    session_id: str, text: str, job: dict, *, profile: str | None = None,
+) -> tuple[bool, str | None]:
     """Append one assistant update to the WebUI session and notify open tabs.
 
-    Returns (ok, error). Never raises.
+    ``profile`` is the owning bot; it rides on the message so a follow-up in
+    that chat finds the job (api/cron_bots.job_refs_for_session). Returns
+    (ok, error). Never raises.
     """
     try:
         from api.models import get_session
@@ -475,6 +536,8 @@ def deliver_update_to_session(session_id: str, text: str, job: dict) -> tuple[bo
                     "job_id": job.get("id"),
                     "job_name": job.get("name"),
                     "run_at": job.get("last_run_at"),
+                    "profile": profile,
+                    "status": str(job.get("last_status") or "ok"),
                 },
             }
         )
@@ -593,20 +656,93 @@ def _session_busy(session_id: str) -> bool:
         return False
 
 
+# -- Where a result goes (bot-owned jobs, 18 Oct 2026) ----------------------
+
+TARGET_ORIGIN = "origin"
+TARGET_JOB_CHAT = "job_chat"
+
+
+def _load_session_quiet(session_id: str):
+    try:
+        from api.models import get_session
+
+        return get_session(session_id, metadata_only=True)
+    except Exception:
+        return None
+
+
+def _resolve_target(job: dict, profile: str, *, create: bool) -> dict:
+    """The chat a job's result belongs in, inside its owning bot ``profile``.
+
+    The chat the job was created in, while it exists and belongs to that bot;
+    otherwise the job chat of the job's person (api/cron_bots.py), made only
+    when ``create`` (the moment there is something to post). Returns
+    ``{"session_id", "kind", "error"}``; ``session_id`` is None when there is
+    nowhere to post yet (no job chat made so far) or nowhere at all
+    (``error`` set: no chat and nobody to make one for).
+    """
+    from api import cron_bots
+
+    origin_sid = _webui_origin_session_id(job)
+    origin_session = _load_session_quiet(origin_sid) if origin_sid else None
+    if origin_session is not None and cron_bots.session_serves_bot(origin_session, profile):
+        return {"session_id": origin_sid, "kind": TARGET_ORIGIN, "error": None}
+    person = cron_bots.job_person_email(job)
+    if not person:
+        if origin_sid:
+            return {"session_id": None, "kind": TARGET_ORIGIN,
+                    "error": f"originating session {origin_sid} not found"}
+        return {"session_id": None, "kind": TARGET_JOB_CHAT,
+                "error": "nobody to report this task to"}
+    sid = cron_bots.find_job_chat(job.get("id"), profile, person)
+    if sid is None and create:
+        try:
+            sid, _created = cron_bots.ensure_job_chat(job, profile, person)
+        except Exception as exc:
+            logger.warning("cron delivery bridge: job chat for %s not created", job.get("id"), exc_info=True)
+            return {"session_id": None, "kind": TARGET_JOB_CHAT,
+                    "error": f"could not open the task chat: {exc}"}
+    return {"session_id": sid, "kind": TARGET_JOB_CHAT, "error": None}
+
+
+def _store_homes() -> list[tuple[str, Path]]:
+    try:
+        from api.cron_bots import store_homes
+
+        return store_homes()
+    except Exception:
+        logger.debug("cron delivery bridge: store listing failed; active store only", exc_info=True)
+        home = _active_hermes_home()
+        from api.cron_bots import profile_for_home
+
+        return [(profile_for_home(home), home)]
+
+
 def process_jobs_once(
     jobs: list[dict] | None = None,
     *,
     home: Path | None = None,
     now: datetime | None = None,
+    profile: str | None = None,
 ) -> list[dict]:
     """Run one bridge pass; returns a list of action records (for tests/logs).
 
-    Each record: {"job_id", "outcome", "error", "session_id"}. Jobs skipped
-    because nothing changed produce no record.
+    Without ``jobs`` and ``home`` every bot's cron store is read (each job's
+    result goes to a chat of the bot that owns it). With ``home`` only that
+    store; with ``jobs`` those rows, owned by ``profile`` (default: the
+    profile of ``home``).
+
+    Each record: {"job_id", "outcome", "error", "session_id", "profile",
+    "target"}. Jobs skipped because nothing changed produce no record.
     """
-    resolved_home = Path(home) if home is not None else _active_hermes_home()
-    if jobs is None:
-        jobs = _load_jobs_from_home(resolved_home)
+    from api.cron_bots import normalize_profile, profile_for_home
+
+    if jobs is not None or home is not None:
+        resolved_home = Path(home) if home is not None else _active_hermes_home()
+        owner = normalize_profile(profile) if profile else profile_for_home(resolved_home)
+        batches = [(owner, resolved_home, jobs if jobs is not None else _load_jobs_from_home(resolved_home))]
+    else:
+        batches = [(name, store, _load_jobs_from_home(store)) for name, store in _store_homes()]
     now_dt = now or datetime.now(timezone.utc)
 
     actions: list[dict] = []
@@ -618,12 +754,13 @@ def process_jobs_once(
         jobs_map = ledger.setdefault("jobs", {})
         for jid, entry in _MEMORY_WATERMARKS.items():
             jobs_map[jid] = dict(entry)
-        for job in jobs:
-            action = _process_one_job(
-                job, ledger, resolved_home, now_dt, ledger_corrupt=ledger_corrupt
-            )
-            if action is not None:
-                actions.append(action)
+        for owner, store, store_jobs in batches:
+            for job in store_jobs:
+                action = _process_one_job(
+                    job, ledger, store, now_dt, ledger_corrupt=ledger_corrupt, profile=owner
+                )
+                if action is not None:
+                    actions.append(action)
     return actions
 
 
@@ -660,13 +797,12 @@ def record_run_outcome(job: dict, outcome: str, *, error: str | None = None) -> 
 
 def _process_one_job(
     job: dict, ledger: dict, home: Path, now_dt: datetime, *,
-    ledger_corrupt: bool = False,
+    ledger_corrupt: bool = False, profile: str = "default",
 ) -> dict | None:
     job_id = str(job.get("id") or "")
     if not job_id:
         return None
-    session_id = _webui_origin_session_id(job)
-    if session_id is None:
+    if _bridge_scope(job) is None:
         return None
     last_run_at = job.get("last_run_at")
     if not last_run_at:
@@ -678,6 +814,26 @@ def _process_one_job(
         # bumps last_run_at, so it lands here and cannot double-post; the
         # NEXT completed run gets a fresh last_run_at and is delivered.
         return None
+
+    # Where this run's result belongs, without creating anything yet.
+    target = _resolve_target(job, profile, create=False)
+    session_id = target["session_id"]
+
+    def _action(outcome, error=None):
+        return {
+            "job_id": job_id,
+            "outcome": outcome,
+            "error": error,
+            "session_id": session_id,
+            "profile": profile,
+            "target": target["kind"],
+        }
+
+    def _persist(outcome, error=None):
+        return _record_and_persist(
+            ledger, job, outcome=outcome, error=error, session_id=session_id,
+            profile=profile, target=target["kind"],
+        )
 
     run_dt = _parse_run_at(last_run_at)
     if entry is None and (
@@ -694,17 +850,10 @@ def _process_one_job(
         # delivered before the ledger got damaged, and dropping at most one
         # genuine update beats replaying the whole fresh window into the
         # conversation.
-        _record_and_persist(
-            ledger, job, outcome=OUTCOME_SKIPPED_STALE, session_id=session_id
-        )
-        return {
-            "job_id": job_id,
-            "outcome": OUTCOME_SKIPPED_STALE,
-            "error": None,
-            "session_id": session_id,
-        }
+        _persist(OUTCOME_SKIPPED_STALE)
+        return _action(OUTCOME_SKIPPED_STALE)
 
-    if _session_busy(session_id):
+    if session_id and _session_busy(session_id):
         # A live turn owns the transcript; deliver on the next tick. The
         # watermark is NOT advanced, so the update is deferred, never lost.
         return None
@@ -755,16 +904,27 @@ def _process_one_job(
             )
             outcome = OUTCOME_DELIVERED
 
+    if text is not None and session_id is None and target["error"] is None:
+        # First result of a job without a chat to post in: open its job chat.
+        target = _resolve_target(job, profile, create=True)
+        session_id = target["session_id"]
+
+    if text is not None and session_id is None:
+        # Nowhere to post: record the failure so it shows in the Tasks panel.
+        outcome = OUTCOME_FAILED
+        error = target["error"] or "no conversation to post this update into"
+        logger.warning("cron delivery bridge: job %s update NOT delivered: %s", job_id, error)
+        _persist(outcome, error)
+        return _action(outcome, error)
+
     if text is not None:
         # Persist-then-deliver, on purpose: the watermark (with the optimistic
         # outcome) is written to memory and disk BEFORE the update is posted.
         # A crash between persist and deliver loses at most one notification,
         # which beats the deliver-then-persist alternative where a failed or
         # crashed ledger write re-posts the same update on every later tick.
-        _record_and_persist(
-            ledger, job, outcome=outcome, error=error, session_id=session_id
-        )
-        ok, deliver_error = deliver_update_to_session(session_id, text, job)
+        _persist(outcome, error)
+        ok, deliver_error = deliver_update_to_session(session_id, text, job, profile=profile)
         if not ok:
             outcome = OUTCOME_FAILED
             error = deliver_error
@@ -774,24 +934,15 @@ def _process_one_job(
             )
             # Correct the optimistic record so the failure stays visible in
             # /api/crons/recent; the watermark itself does not move.
-            _record_and_persist(
-                ledger, job, outcome=outcome, error=error, session_id=session_id
-            )
+            _persist(outcome, error)
         else:
             logger.info(
-                "cron delivery bridge: job %s run %s delivered to session %s",
-                job_id, last_run_at, session_id,
+                "cron delivery bridge: job %s run %s delivered to session %s (%s)",
+                job_id, last_run_at, session_id, target["kind"],
             )
     else:
-        _record_and_persist(
-            ledger, job, outcome=outcome, error=error, session_id=session_id
-        )
-    return {
-        "job_id": job_id,
-        "outcome": outcome,
-        "error": error,
-        "session_id": session_id,
-    }
+        _persist(outcome, error)
+    return _action(outcome, error)
 
 
 # -- Status surfacing --------------------------------------------------------
@@ -814,9 +965,8 @@ def delivery_state_for_job(job: dict, ledger: dict | None = None) -> tuple[str, 
     # "pending" (and, worse, be re-posted) after a disk failure. dict() takes
     # an atomic snapshot, so no lock is needed on this read-only path.
     entry = dict(_MEMORY_WATERMARKS).get(job_id) or (ledger.get("jobs") or {}).get(job_id)
-    webui_session = _webui_origin_session_id(job)
 
-    if webui_session is not None:
+    if _bridge_scope(job) is not None:
         if entry and entry.get("run_at") == job.get("last_run_at"):
             outcome = str(entry.get("outcome") or "")
             if outcome == OUTCOME_DELIVERED:
@@ -832,8 +982,12 @@ def delivery_state_for_job(job: dict, ledger: dict | None = None) -> tuple[str, 
             if outcome == OUTCOME_EXTERNAL_FAILED:
                 return "failed", entry.get("error") or job.get("last_delivery_error")
             return "failed", entry.get("error") or "delivery to originating conversation failed"
-        # The bridge has not processed this run yet.
-        return "pending", None
+        # The bridge has not processed this run yet. A job made in a chat
+        # always waits for it; a job without a chat that delivers elsewhere
+        # (a Tasks panel or opted-in job) is reported by the engine's own
+        # delivery record below until the bridge has seen the run.
+        if _webui_origin_session_id(job) is not None or _job_wants_webui_delivery(job):
+            return "pending", None
 
     local_only = _deliver_tokens(job) in ([], ["local"])
     if not local_only:
@@ -854,6 +1008,24 @@ def delivery_state_for_job(job: dict, ledger: dict | None = None) -> tuple[str, 
     if local_only:
         return "local", None
     return "delivered", None
+
+
+def delivered_session_for_job(job: dict, ledger: dict | None = None) -> str | None:
+    """The chat the bridge posted the job's latest run into, or None.
+
+    Lets a completion notice open that chat (the job chat, or the chat the job
+    was made in) instead of the engine's raw run transcript.
+    """
+    if ledger is None:
+        ledger = load_ledger()
+    job_id = str(job.get("id") or "")
+    entry = dict(_MEMORY_WATERMARKS).get(job_id) or (ledger.get("jobs") or {}).get(job_id)
+    if not entry or entry.get("run_at") != job.get("last_run_at"):
+        return None
+    if str(entry.get("outcome") or "") not in (OUTCOME_DELIVERED, OUTCOME_EXTERNAL_FAILED):
+        return None
+    sid = str(entry.get("session_id") or "")
+    return sid or None
 
 
 # -- Daemon thread -----------------------------------------------------------

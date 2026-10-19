@@ -3546,6 +3546,118 @@ def _kanban_unknown_endpoint(handler, parsed, method: str) -> bool:
     ) or True
 
 
+def _kanban_board_query(parsed):
+    from api.kanban_bridge import _resolve_board
+    return _resolve_board(parsed)
+
+
+def _kanban_read_errors(handler, fn):
+    """Run a read-only Kanban view with the bridge's error mapping."""
+    try:
+        return fn()
+    except ImportError as exc:
+        return bad(handler, f"kanban unavailable: {exc}", status=503)
+    except LookupError as exc:
+        return bad(handler, str(exc), status=404)
+    except ValueError as exc:
+        return bad(handler, str(exc))
+
+
+def _handle_kanban_bot_work(handler, parsed):
+    """GET /api/kanban/bot-work?profile=<bot>: the bot's open tasks and its
+    recent attachments, for the bot page. Gate: sessions:read on /api/kanban
+    (route catalog), plus a bot this viewer may use."""
+    from api import kanban_bridge
+
+    profile = str((parse_qs(parsed.query).get("profile") or [""])[0]).strip()
+    if not profile or not _chat_profile_target_allowed(handler, profile):
+        return bad(handler, "Bot not found", 404)
+    return _kanban_read_errors(handler, lambda: j(
+        handler, kanban_bridge.bot_work_payload(profile, board=_kanban_board_query(parsed))) or True)
+
+
+def _handle_kanban_attachment(handler, parsed):
+    """GET /api/kanban/attachment?id=<n>: download one task attachment.
+
+    Read-only, by attachment id only; the file must sit under the board's
+    attachments root (no symlinks, anchored open). Same gate as the board,
+    and a task assigned to a bot needs a bot this viewer may use. Ids are
+    sequential, so an unassigned task is no open door: only its creator or a
+    cron admin gets the file, everyone else a 404."""
+    from api import kanban_bridge
+    from api.ownership import request_owner_email
+    import mimetypes
+
+    def serve():
+        target, root, filename, content_type, assignee, created_by = kanban_bridge.attachment_file(
+            (parse_qs(parsed.query).get("id") or [""])[0], board=_kanban_board_query(parsed))
+        if assignee:
+            allowed = _chat_profile_target_allowed(handler, assignee)
+        else:
+            viewer = str(request_owner_email(handler) or "").strip().casefold()
+            allowed = (bool(viewer) and str(created_by or "").strip().casefold() == viewer) or _cron_admin_allowed(handler)
+        if not allowed:
+            return bad(handler, "attachment not found", 404)
+        mime = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+        # Always a download: an attachment may be HTML or SVG written by a worker.
+        return _serve_file_bytes(handler, target, mime, "attachment", "private, no-store", anchor_root=root)
+
+    return _kanban_read_errors(handler, serve)
+
+
+def _handle_kanban_waiting(handler, parsed):
+    """GET /api/kanban/waiting: Kanban tasks that wait for this viewer (My
+    approvals, "Wacht op jou"). Same gate as the board; only tasks of bots
+    the viewer may use, or tasks the viewer created."""
+    from api import kanban_bridge
+    from api.ownership import request_owner_email
+
+    return _kanban_read_errors(handler, lambda: j(handler, kanban_bridge.waiting_tasks_payload(
+        lambda name: _chat_profile_target_allowed(handler, name), request_owner_email(handler),
+        board=_kanban_board_query(parsed))) or True)
+
+
+def _handle_bot_scout(handler, body):
+    """POST /api/bots/scout: the bot edit gate (profiles:admin, a bot this
+    caller may use, the owner's edit right on a guided bot) plus cron admin."""
+    # Same gate as editing the bot (/api/profile/appearance): profiles:admin,
+    # a bot this caller may use, and the owner's edit right on a guided bot.
+    from api import bot_scout
+    from api.governance.enforce import subject_from_identity
+    policy = governance_api.get_policy()
+    subject = subject_from_identity(governance_api._caller_identity(handler))
+    access = governance_api.resolve_effective_access(policy, subject)
+    if not governance_api._require(handler, access, subject, policy, "profiles:admin"):
+        return
+    name = str(body.get("name") or "").strip()
+    if not name or not _chat_profile_target_allowed(handler, name):
+        return bad(handler, "Bot not found", 404)
+    # The Scout job runs a script with in-app notifications off, values the
+    # normal job routes keep for cron admins: the same right is needed here.
+    if not _cron_admin_allowed(handler):
+        return bad(handler, "Scout needs the right to manage scheduled tasks (cron admin).", 403)
+    try:
+        from api import bot_builder
+        from api.governance.enforce import _request_identity
+        if bot_builder.managed(name) is not None:
+            bot_builder.require_edit(_request_identity(handler), name)
+        try:
+            from api.ownership import request_owner_email
+
+            owner = request_owner_email(handler)
+        except Exception:
+            owner = None
+        return j(handler, {"ok": True, **bot_scout.apply(name, body, owner)})
+    except bot_scout.ScoutError as exc:
+        return bad(handler, exc.message, exc.status)
+    except PermissionError as exc:
+        return bad(handler, str(exc), 403)
+    except RuntimeError as exc:
+        return bad(handler, str(exc), 409)
+    except (ValueError, OSError) as exc:
+        return bad(handler, str(exc), 400)
+
+
 def _clear_stale_stream_state(session) -> bool:
     """Clear persisted streaming flags when the in-memory stream no longer exists.
 
@@ -9734,6 +9846,13 @@ def _sidebar_session_response_item(session: dict, *, redact_enabled: bool | None
         for key, value in dict(session).items()
         if key in _SIDEBAR_SESSION_RESPONSE_FIELDS
     }
+    # The chat/task filter needs provenance even when session_source is unset.
+    # Keep only the bounded link, never additional job details or prompts.
+    from api.cron_bots import normalize_job_link
+
+    job_link = normalize_job_link(session.get("cron_job"))
+    if job_link:
+        item["cron_job"] = job_link
     if isinstance(item.get("title"), str):
         item["title"] = _redact_text(item["title"], _enabled=redact_enabled)
     item["attention"] = _session_attention_summary(str(item.get("session_id") or ""))
@@ -12194,7 +12313,7 @@ def handle_get(handler, parsed) -> bool:
     if governance_api.handle_governance_api(handler, parsed, "GET"):
         return True
 
-    if parsed.path in ("/api/bot-screen", "/api/bot-screen/ws"):
+    if parsed.path in ("/api/bot-screen", "/api/bot-screen/ws", "/api/bot-screen/status"):
         from api import bot_screens
         return bot_screens.handle_get(handler, parsed)
 
@@ -12485,6 +12604,12 @@ def handle_get(handler, parsed) -> bool:
     if parsed.path == "/api/project-os/dashboard":
         return _handle_project_os_dashboard(handler, parsed)
 
+    if parsed.path == "/api/kanban/bot-work":
+        return _handle_kanban_bot_work(handler, parsed)
+    if parsed.path == "/api/kanban/attachment":
+        return _handle_kanban_attachment(handler, parsed)
+    if parsed.path == "/api/kanban/waiting":
+        return _handle_kanban_waiting(handler, parsed)
     if parsed.path.startswith("/api/kanban/"):
         from api.kanban_bridge import handle_kanban_get
 
@@ -12753,11 +12878,11 @@ def handle_get(handler, parsed) -> bool:
         base_url = (query.get("base_url", [""])[0] or "").strip() or None
         return j(
             handler,
-            get_reasoning_status(
+            _overlay_personal_reasoning(handler, get_reasoning_status(
                 model_id=model_id,
                 provider_id=provider_id,
                 base_url=base_url,
-            ),
+            ), model_id, provider_id, base_url),
         )
 
     if parsed.path == "/api/onboarding/status":
@@ -13298,6 +13423,35 @@ def handle_get(handler, parsed) -> bool:
         except KeyError:
             return bad(handler, "Session not found", 404)
 
+    if parsed.path == "/api/session/subagents":
+        # Delegated workers of one conversation, readable after the turn that
+        # started them has finished (background delegation outlives the stream).
+        sid = parse_qs(parsed.query).get("session_id", [""])[0]
+        if not sid:
+            return bad(handler, "Missing session_id")
+        try:
+            meta = get_session(sid, metadata_only=True)
+        except KeyError:
+            return bad(handler, "Session not found", 404)
+        if not _session_visible_to_request(meta, handler):
+            return bad(handler, "Session not found", 404)
+        from api import subagent_progress as _subagent_threads
+        workers = _subagent_threads.snapshot(sid)
+        if not workers:
+            try:
+                full = get_session(sid)
+                rows = []
+                for record in (getattr(full, "anchor_activity_scenes", None) or {}).values():
+                    scene = record.get("scene") if isinstance(record, dict) else None
+                    if isinstance(scene, dict) and isinstance(scene.get("activity_rows"), list):
+                        rows.extend(scene["activity_rows"])
+                workers = _subagent_threads.seed_from_rows(rows)
+            except Exception:
+                logger.debug("subagent thread restore failed for %s", sid, exc_info=True)
+                workers = []
+        active = any(w.get("status") in {"queued", "running"} and not w.get("restored") for w in workers)
+        return j(handler, {"session_id": sid, "subagents": workers, "active": active, "server_time": time.time()})
+
     if parsed.path == "/api/session/yolo":
         sid = parse_qs(parsed.query).get("session_id", [""])[0]
         if not sid:
@@ -13432,6 +13586,9 @@ def handle_get(handler, parsed) -> bool:
     if parsed.path == "/api/projects/hub":
         return _handle_projects_hub(handler)
 
+    if parsed.path in ("/api/projects/folders", "/api/projects/folders/config", "/api/projects/my-work"):
+        return _handle_project_folders_get(handler, parsed)
+
     if parsed.path == "/api/projects/hub/detail":
         return _handle_projects_hub_detail(handler, parsed)
 
@@ -13454,6 +13611,10 @@ def handle_get(handler, parsed) -> bool:
         from api import projects_hub
 
         all_projects = projects_hub.visible_projects_by_owner(all_projects, owner_scope)
+        # Space projects (Projects + Spaces merge) live in the Projects screen;
+        # keep them out of the chat sidebar chips unless explicitly requested.
+        if (parse_qs(parsed.query).get("include_spaces") or ["0"])[0] != "1":
+            all_projects = [p for p in all_projects if not projects_hub.is_space_project(p)]
         isolated_profile_mode = _is_isolated_profile_mode()
         all_profiles = _all_profiles_enabled(parsed)
         if all_profiles:
@@ -13817,8 +13978,11 @@ def handle_get(handler, parsed) -> bool:
             if exc.name in ("cron", "cron.jobs"):
                 return j(handler, {"jobs": [], "cron_unavailable": True})
             raise
-        all_profiles = _all_profiles_enabled(parsed) and _cron_admin_allowed(handler)
-        if not all_profiles:
+        # Every caller may list the jobs of all bots (bot-owned jobs, 18 Oct
+        # 2026: filter the Tasks panel by bot); non cron:admin callers only
+        # get the rows inside their scope, whichever bot owns them.
+        all_profiles = _all_profiles_enabled(parsed)
+        if not _cron_admin_allowed(handler):
             # Governance scope filter (26 Aug 2026 report): non cron:admin
             # callers only see rows from profiles inside their scope. Logic
             # lives in api/cron_scope.py to keep this shared route minimal.
@@ -13827,6 +13991,11 @@ def handle_get(handler, parsed) -> bool:
         _promote_prompt_diagrams(active_jobs)
         _promote_prompt_categories(active_jobs)
         jobs = active_jobs + other_jobs if all_profiles else active_jobs
+        try:
+            from api.cron_bots import annotate_job_chats
+            annotate_job_chats(jobs, _cron_request_email(handler))
+        except Exception:
+            logger.debug("cron job chat links unavailable", exc_info=True)
         hidden_other_count = 0 if all_profiles else len(other_jobs)
         return j(handler, {
             "jobs": jobs,
@@ -14032,10 +14201,14 @@ def handle_get(handler, parsed) -> bool:
     if parsed.path == "/api/profiles":
         from api import profiles as profiles_api, bot_metadata
 
+        rows = [{**p, **bot_metadata.read_profile(p["name"])} for p in profiles_api.list_profiles_api(fast=(parse_qs(parsed.query).get("fast") or [""])[0] == "1") if _chat_profile_target_allowed(handler,p["name"])]
+        editable = _bot_editable_check(handler)
+        for row in rows:
+            row["bot_editable"] = editable(row["name"], bool(row.get("bot_managed")))
         return j(
             handler,
             {
-                "profiles": [{**p, **bot_metadata.read_profile(p["name"])} for p in profiles_api.list_profiles_api(fast=(parse_qs(parsed.query).get("fast") or [""])[0] == "1") if _chat_profile_target_allowed(handler,p["name"])],
+                "profiles": rows,
                 "active": profiles_api.get_active_profile_name(),
                 "single_profile_mode": _is_isolated_profile_mode(),
             },
@@ -14924,6 +15097,20 @@ def handle_post(handler, parsed) -> bool:
                 model_id = str(body.get("model") or "").strip() or None
                 provider_id = str(body.get("provider") or "").strip() or None
                 base_url = str(body.get("base_url") or "").strip() or None
+                # A signed-in person's composer pick is personal (it used to
+                # change the bot's config.yaml for everyone). Only an admin
+                # asking for scope "profile" changes the bot's default.
+                from api.ownership import request_is_admin, request_owner_email
+                _who = request_owner_email(handler)
+                if _who and not (str(body.get("scope") or "") == "profile" and request_is_admin(handler)):
+                    from api import user_prefs
+                    from api.config import VALID_REASONING_EFFORTS
+                    _raw = str(effort or "").strip().lower()
+                    if _raw and _raw != "none" and _raw not in VALID_REASONING_EFFORTS:
+                        return bad(handler, f"Unknown reasoning effort '{effort}'")
+                    user_prefs.set_reasoning_effort(_who, get_active_profile_name(), _raw)
+                    _status = get_reasoning_status(model_id=model_id, provider_id=provider_id, base_url=base_url)
+                    return j(handler, _overlay_personal_reasoning(handler, _status, model_id, provider_id, base_url))
                 return j(
                     handler,
                     set_reasoning_effort(
@@ -15803,6 +15990,21 @@ def handle_post(handler, parsed) -> bool:
             _ensure_agent_cron_import_path()
             return _handle_cron_update(handler, body)
 
+    # Choose the bot that owns a job (bot-owned jobs, 18 Oct 2026). Acts on
+    # two named stores, so it does not use the active-store context.
+    if parsed.path == "/api/crons/owner":
+        _ensure_agent_cron_import_path()
+        _cron_policy = _cron_request_policy_path()
+        with _cron_policy_file_pin(_cron_policy):
+            return _handle_cron_owner(handler, body)
+
+    # Name the bot that answers for a job without moving it (19 Oct 2026).
+    if parsed.path == "/api/crons/assign":
+        _ensure_agent_cron_import_path()
+        _cron_policy = _cron_request_policy_path()
+        with _cron_policy_file_pin(_cron_policy):
+            return _handle_cron_assign(handler, body)
+
     # Set or clear the viewer's own mute for one job (plan 3.1).
     if parsed.path == "/api/crons/notifications":
         from api import cron_notifications
@@ -16242,6 +16444,14 @@ def handle_post(handler, parsed) -> bool:
             from api.governance.enforce import _request_identity
             if bot_builder.managed(name) is not None:
                 bot_builder.require_edit(_request_identity(handler), name)
+            # A new manager must be a bot this caller may see; an unchanged
+            # value (possibly hidden from this caller) is kept as is.
+            values = body.get("bot")
+            manager = values.get("reports_to") if isinstance(values, dict) else None
+            if isinstance(manager, str) and manager.strip() and not parsed.path.endswith("/avatar"):
+                stored = str(bot_metadata.read_profile(name).get("bot", {}).get("reports_to") or "").strip()
+                if manager.strip() != stored and not _chat_profile_target_allowed(handler, manager.strip()):
+                    return bad(handler, "Unknown manager bot", 400)
             result = bot_metadata.save_avatar(name,body.get("avatar")) if parsed.path.endswith("/avatar") else bot_metadata.save_profile(name,body.get("bot"),body.get("revision"))
             return j(handler,{"ok":True, **result})
         except PermissionError as exc:
@@ -16250,6 +16460,9 @@ def handle_post(handler, parsed) -> bool:
             return bad(handler,str(exc),409)
         except (ValueError,OSError) as exc:
             return bad(handler,str(exc),400)
+
+    if parsed.path == "/api/bots/scout":
+        return _handle_bot_scout(handler, body)
 
     if parsed.path == "/api/bots/knowledge":
         from api import bot_knowledge
@@ -16850,6 +17063,9 @@ def handle_post(handler, parsed) -> bool:
         return j(handler, {"ok": True, "session": s.compact()})
 
     # ── Project CRUD (POST) ──
+    if parsed.path in ("/api/projects/folders/add", "/api/projects/folders/remove"):
+        return _handle_project_folders_post(handler, parsed, body)
+
     if parsed.path == "/api/projects/create":
         if _request_owner_email_for_new_session(handler):
             if not _body_profile_allowed(handler, str(body.get('profile') or '')):
@@ -20728,6 +20944,153 @@ def _handle_cron_status(handler, parsed):
     return j(handler, {"running": all_running})
 
 
+def _cron_recent_other_store_jobs(handler) -> list:
+    """Jobs of the bots other than the active one whose completions belong to
+    the caller (own, shared, or every job for admins), each with its
+    ``owner_profile``. Read-only and lock-free (api/cron_bots.read_store_jobs).
+    """
+    from api import cron_bots
+    from api.cron_scope import _identity_for, scope_cron_completions
+    from api.profiles import get_active_hermes_home
+
+    active_key = cron_bots._home_key(get_active_hermes_home())
+    rows = []
+    for owner, home in cron_bots.store_homes():
+        if cron_bots._home_key(home) == active_key:
+            continue
+        for job in cron_bots.read_store_jobs(home):
+            rows.append(dict(job, owner_profile=owner))
+    if not rows:
+        return []
+    return scope_cron_completions(_identity_for(handler), rows)
+
+
+def _handle_cron_owner(handler, body):
+    """POST /api/crons/owner: make another bot the owner of a job.
+
+    Body ``{job_id, from_profile, to_profile}``. The caller must see the job
+    (api/cron_scope.py), own it or hold ``cron:admin``, and be allowed to use
+    the new bot (``cron:admin`` may choose any). Moves the job record to that
+    bot's store (api/cron_bots.move_job), so it runs as that bot and reports
+    in its chats. Under ``report_only`` a refusal is audited and allowed.
+    """
+    import api.cron_scope as cron_scope
+    from api import cron_bots
+    from api.governance.enforce import _request_identity
+
+    job_id = _cron_body_job_id(body)
+    if job_id is None:
+        return bad(handler, "job_id required")
+    names = _available_cron_profile_names()
+    src = cron_bots.normalize_profile(body.get("from_profile"))
+    dst_raw = str(body.get("to_profile") or "").strip()
+    if not dst_raw:
+        return bad(handler, "to_profile required")
+    dst = cron_bots.normalize_profile(dst_raw)
+    if src not in names or dst not in names:
+        return bad(handler, "Bot not found", 404)
+    job, _owner = cron_bots.find_job(job_id, src)
+    identity = _request_identity(handler)
+    if job is None or not cron_scope.identity_sees_cron_row(identity, job, store_profile=src):
+        return bad(handler, "Job not found", 404)
+    is_admin = _cron_admin_allowed(handler)
+    path = "/api/crons/owner"
+    if not is_admin and not cron_scope.identity_owns_cron_job(identity, job):
+        refusal = _cron_write_refusal(identity, path, "cron_owner",
+                                      "Only the owner of this task or a cron admin can choose its bot.", job_id)
+        if refusal:
+            return j(handler, refusal[1], status=refusal[0])
+    if not is_admin and not _chat_profile_target_allowed(handler, dst):
+        refusal = _cron_write_refusal(identity, path, "profile_not_allowed",
+                                      "You cannot use this bot.", job_id)
+        if refusal:
+            return j(handler, refusal[1], status=refusal[0])
+    already_running, _elapsed = _is_cron_running(job_id)
+    if already_running:
+        return j(handler, {"error": "This task is running right now. Try again when the run is done.",
+                           "reason": "job_running"}, status=409)
+    try:
+        moved = cron_bots.move_job(job_id, src, dst)
+    except cron_bots.OwnerChangeError as e:
+        return j(handler, {"error": e.message, "reason": e.reason}, status=e.status)
+    except Exception as e:
+        logger.warning("cron owner change failed for %s", job_id, exc_info=True)
+        return j(handler, {"error": str(e)}, status=500)
+    try:
+        from api.governance.audit import append_audit_event
+        from api.governance.enforce import subject_from_identity
+
+        subject = subject_from_identity(identity)
+        append_audit_event(
+            "cron_owner_changed", subject_email=subject.email, subject_user_id=subject.user_id,
+            path=path, method="POST", reason="owner_changed",
+            extra={"job_id": job_id, "from_profile": src, "to_profile": dst},
+        )
+    except Exception:
+        logger.debug("cron owner change audit append failed", exc_info=True)
+    row = dict(moved, owner_profile=dst, read_only=not _profiles_match(dst, _get_active_profile_name() or "default"))
+    return j(handler, {"ok": True, "job": row, "from_profile": src, "to_profile": dst})
+
+
+def _handle_cron_assign(handler, body):
+    """POST /api/crons/assign: name the bot that answers for a job.
+
+    Body ``{job_id, owner_profile, bot}``; an empty ``bot`` clears it. Same
+    checks as /api/crons/owner, but the job stays in its store and runs as
+    before (api/cron_bots.assign_job): script jobs cannot move.
+    """
+    import api.cron_scope as cron_scope
+    from api import cron_bots
+    from api.governance.enforce import _request_identity
+
+    job_id = _cron_body_job_id(body)
+    if job_id is None:
+        return bad(handler, "job_id required")
+    names = _available_cron_profile_names()
+    store = cron_bots.normalize_profile(body.get("owner_profile"))
+    bot_raw = str(body.get("bot") or "").strip()
+    bot = cron_bots.normalize_profile(bot_raw) if bot_raw else ""
+    if store not in names or (bot and bot not in names):
+        return bad(handler, "Bot not found", 404)
+    job, _owner = cron_bots.find_job(job_id, store)
+    identity = _request_identity(handler)
+    if job is None or not cron_scope.identity_sees_cron_row(identity, job, store_profile=store):
+        return bad(handler, "Job not found", 404)
+    is_admin = _cron_admin_allowed(handler)
+    path = "/api/crons/assign"
+    if not is_admin and not cron_scope.identity_owns_cron_job(identity, job):
+        refusal = _cron_write_refusal(identity, path, "cron_owner",
+                                      "Only the owner of this task or a cron admin can choose its bot.", job_id)
+        if refusal:
+            return j(handler, refusal[1], status=refusal[0])
+    if bot and not is_admin and not _chat_profile_target_allowed(handler, bot):
+        refusal = _cron_write_refusal(identity, path, "profile_not_allowed",
+                                      "You cannot use this bot.", job_id)
+        if refusal:
+            return j(handler, refusal[1], status=refusal[0])
+    try:
+        saved = cron_bots.assign_job(job_id, store, bot)
+    except cron_bots.OwnerChangeError as e:
+        return j(handler, {"error": e.message, "reason": e.reason}, status=e.status)
+    except Exception as e:
+        logger.warning("cron assign failed for %s", job_id, exc_info=True)
+        return j(handler, {"error": str(e)}, status=500)
+    try:
+        from api.governance.audit import append_audit_event
+        from api.governance.enforce import subject_from_identity
+
+        subject = subject_from_identity(identity)
+        append_audit_event(
+            "cron_bot_assigned", subject_email=subject.email, subject_user_id=subject.user_id,
+            path=path, method="POST", reason="bot_assigned",
+            extra={"job_id": job_id, "owner_profile": store, "bot": bot or store},
+        )
+    except Exception:
+        logger.debug("cron assign audit append failed", exc_info=True)
+    row = dict(saved, owner_profile=store, read_only=not _profiles_match(store, _get_active_profile_name() or "default"))
+    return j(handler, {"ok": True, "job": row, "bot": cron_bots.job_bot(saved, store)})
+
+
 def _handle_cron_recent(handler, parsed):
     """Return cron jobs that have completed since a given timestamp."""
     import datetime
@@ -20752,16 +21115,27 @@ def _handle_cron_recent(handler, parsed):
             jobs = scope_cron_completions_for_caller(handler, jobs)
         except Exception:
             logger.debug("cron completion scoping unavailable; serving unscoped", exc_info=True)
+        # Jobs owned by the other bots report to their person too (bot-owned
+        # jobs, 18 Oct 2026). Never unscoped: a scope failure drops them.
+        try:
+            jobs = list(jobs) + _cron_recent_other_store_jobs(handler)
+        except Exception:
+            logger.debug("cron completions of other bots unavailable", exc_info=True)
         # Delivery outcome is tracked SEPARATELY from run status (scheduler
         # delivery ticket, 2026-08-26): a run whose last_status is ok but whose
         # update never reached its target must not be reported as plain ok.
         # One ledger read serves the whole completion list.
         try:
-            from api.cron_webui_delivery import delivery_state_for_job, load_ledger
+            from api.cron_webui_delivery import (
+                delivered_session_for_job,
+                delivery_state_for_job,
+                load_ledger,
+            )
 
             _delivery_ledger = load_ledger()
         except Exception:
             delivery_state_for_job = None
+            delivered_session_for_job = None
             _delivery_ledger = None
         # Per-viewer in-app flags (plan 3.1): api/cron_notifications.py.
         try:
@@ -20792,6 +21166,16 @@ def _handle_cron_recent(handler, parsed):
                     "completed_at": ts,
                     "toast_notifications": job.get("toast_notifications") is not False,
                 }
+                if job.get("owner_profile"):
+                    completion["owner_profile"] = job.get("owner_profile")
+                if delivered_session_for_job is not None:
+                    # The chat the result was posted into: a notice opens it.
+                    try:
+                        chat_sid = delivered_session_for_job(job, _delivery_ledger)
+                    except Exception:
+                        chat_sid = None
+                    if chat_sid:
+                        completion["chat_session_id"] = chat_sid
                 if delivery_state_for_job is not None:
                     try:
                         delivery_status, delivery_error = delivery_state_for_job(
@@ -23395,6 +23779,36 @@ def _cron_ownerless_task_stamp(handler, path, *, job=None, job_id=None):
         str(job.get("id") or ""))
 
 
+def _bot_editable_check(handler):
+    """``editable(name, managed)``: whether this caller may edit a bot, decided
+    as POST /api/profile/appearance decides it (profiles:admin, and for a
+    guided bot the owner's edit right). Any doubt reads as not editable."""
+    try:
+        from api import bot_builder
+        from api.governance.enforce import subject_from_identity, _request_identity
+
+        policy = governance_api.get_policy()
+        subject = subject_from_identity(governance_api._caller_identity(handler))
+        access = governance_api.resolve_effective_access(policy, subject)
+        admin = governance_api._is_bootstrap(subject, policy) or access.has_permission("profiles:admin")
+        identity = _request_identity(handler)
+    except Exception:
+        return lambda name, managed: False
+
+    def editable(name, managed):
+        if not admin:
+            return False
+        if not managed:
+            return True
+        try:
+            bot_builder.require_edit(identity, name)
+            return True
+        except Exception:
+            return False
+
+    return editable
+
+
 def _handle_cron_create(handler, body):
     try:
         require(body, "prompt", "schedule")
@@ -24725,7 +25139,7 @@ def _workspaces_response_list(wss, handler) -> list:
 
     scope = request_owner_scope(handler)
     if scope == "all":
-        return [dict(w) for w in wss]
+        return _personal_workspace_order([dict(w) for w in wss], handler)
 
     from api.workspace_access import ensure_workspace_selection
     out = []
@@ -24743,7 +25157,36 @@ def _workspaces_response_list(wss, handler) -> list:
         if not emails:
             entry["legacy_unowned"] = True
         out.append(entry)
-    return out
+    return _personal_workspace_order(out, handler)
+
+
+def _personal_workspace_order(rows, handler):
+    """Each person's own order of their spaces (presentation, not shared)."""
+    try:
+        from api import user_prefs
+        from api.ownership import request_owner_email
+        from api.profiles import get_active_profile_name
+        who = request_owner_email(handler)
+        if not who:
+            return rows
+        return user_prefs.apply_order(rows, user_prefs.get_workspace_order(who, get_active_profile_name()))
+    except Exception:
+        logger.debug("personal workspace order failed", exc_info=True)
+        return rows
+
+
+def _workspace_manage_allowed(w, handler) -> bool:
+    """Shared attributes of a space (name, category) are owner/admin only.
+
+    Members may use a space but not rename or recategorise it for everyone;
+    legacy spaces without an owner are admin-managed.
+    """
+    from api.ownership import request_is_admin, request_owner_scope
+    scope = request_owner_scope(handler)
+    if scope == "all" or request_is_admin(handler):
+        return True
+    owner = str(w.get("owner_email") or "").strip().lower()
+    return bool(owner) and owner == scope
 
 
 def _handle_workspace_add(handler, body):
@@ -24839,10 +25282,13 @@ def _handle_workspace_rename(handler, body):
     wss = load_workspaces()
     for w in wss:
         if w["path"] == path_str:
-            # Ownership boundary (user isolation): only owner/members/admins
-            # may rename an owned entry; legacy ownerless stays open.
+            # Ownership boundary: the name and category are shared by
+            # everyone who uses this space, so only its owner or an admin may
+            # change them (members could rename it for everyone before).
             if not _workspace_visible_to(w, handler):
                 return bad(handler, "forbidden", 403)
+            if not _workspace_manage_allowed(w, handler):
+                return bad(handler, "Only the owner or an admin can rename this space; it changes it for everyone.", 403)
             if name:
                 w["name"] = name
             if has_category:
@@ -24867,9 +25313,21 @@ def _handle_workspace_reorder(handler, body):
     paths = body.get("paths", [])
     if not paths or not isinstance(paths, list):
         return bad(handler, "paths is required and must be a list")
-    from api.ownership import request_is_admin
+    from api.ownership import request_is_admin, request_owner_email
 
     wss = load_workspaces()
+    _who = request_owner_email(handler)
+    if _who and not (str(body.get("scope") or "") == "default" and request_is_admin(handler)):
+        # Order is a personal preference: store it for this person only. The
+        # shared registry order stays the default for everyone else (an admin
+        # can still change that default with scope "default").
+        from api import user_prefs
+        from api.profiles import get_active_profile_name as _active_profile_name
+        visible = {w["path"] for w in _workspaces_response_list(wss, handler)}
+        user_prefs.set_workspace_order(_who, _active_profile_name(),
+                                       [str(p).strip() for p in paths if str(p).strip() in visible])
+        return j(handler, {"ok": True, "scope": "personal",
+                           "workspaces": _workspaces_response_list(wss, handler)})
     if request_is_admin(handler):
         # Admins reorder the full list: given order first, then any omitted
         # entries appended at the end (safety net, preserves data).
@@ -28204,3 +28662,129 @@ def _handle_mcp_server_update(handler, name, body):
     _save_yaml_config_file(_get_config_path(), cfg)
     reload_config()
     return j(handler, {"ok": True, "server": _server_summary(name, server_cfg)})
+
+# ── Project folders (Projects + Spaces merge, step 2; behind a flag) ────────
+def _project_folders_flag() -> bool:
+    from api import project_folders
+    try:
+        return project_folders.enabled(load_settings())
+    except Exception:
+        return project_folders.enabled(None)
+
+
+def _project_folder_can_open(handler):
+    from api.ownership import request_owner_scope
+    from api.workspace_access import ensure_scope_access
+    scope = request_owner_scope(handler)
+
+    def can_open(path):
+        try:
+            ensure_scope_access(scope, path)
+            return True
+        except PermissionError:
+            return False
+    return can_open
+
+
+def _handle_project_folders_get(handler, parsed) -> bool:
+    from api import project_folders, projects_hub
+    if parsed.path == "/api/projects/folders/config":
+        try:
+            _settings = load_settings()
+        except Exception:
+            _settings = {}
+        return j(handler, {"enabled": _project_folders_flag(), "merged": project_folders.merged(),
+                           "classic_spaces": project_folders.classic_spaces(_settings)})
+    if not _project_folders_flag():
+        return bad(handler, "Not found", 404)
+    active_profile, owner_scope, capabilities = _projects_hub_context(handler)
+    if parsed.path == "/api/projects/my-work":
+        from api.ownership import request_owner_email
+        spaces = []
+        if capabilities.get("workspaces"):
+            try:
+                spaces = _workspaces_response_list(load_workspaces(), handler)
+            except Exception:
+                logger.debug("my-work space read failed", exc_info=True)
+        rows = projects_hub.visible_sessions(all_sessions(), owner_scope, active_profile)
+        return j(handler, project_folders.my_work(rows, request_owner_email(handler) or "", spaces))
+    project_id = str((parse_qs(parsed.query).get("project_id") or [""])[0] or "").strip()
+    visible = projects_hub.visible_projects(load_projects(), owner_scope, active_profile)
+    project = next((p for p in visible if str(p.get("project_id") or "") == project_id), None)
+    if project is None:
+        return bad(handler, "Project not found", 404)
+    if not capabilities.get("workspaces"):
+        return j(handler, {"project_id": project_id, "folders": [], "can_manage": False})
+    from api.ownership import request_is_admin, request_owner_email
+    folders = project_folders.visible_folders(project, _project_folder_can_open(handler))
+    return j(handler, {"project_id": project_id, "folders": folders,
+                       "can_manage": project_folders.can_manage(project, (request_owner_email(handler) or "").lower(),
+                                                                request_is_admin(handler))})
+
+
+def _handle_project_folders_post(handler, parsed, body) -> bool:
+    from api import project_folders
+    from api.models import PROJECTS_LOCK
+    from api.ownership import request_is_admin, request_owner_email
+    if not _project_folders_flag():
+        return bad(handler, "Not found", 404)
+    body = body or {}
+    email = (request_owner_email(handler) or "").lower()
+    is_admin = request_is_admin(handler)
+    project_id = str(body.get("project_id") or "").strip()
+    try:
+        from api.governance.resource_scope import access_for
+        access = access_for(handler)
+        may_write = bool(access is None or access.has_permission("files:write"))
+    except Exception:
+        may_write = False
+    try:
+        with PROJECTS_LOCK:
+            projects = load_projects()
+            # Same visibility gate as reading: a project you cannot see is "not found".
+            from api import projects_hub
+            active_profile, owner_scope, _caps = _projects_hub_context(handler)
+            visible_ids = {str(p.get("project_id") or "")
+                           for p in projects_hub.visible_projects(projects, owner_scope, active_profile)}
+            if project_id not in visible_ids:
+                return bad(handler, "Project not found", 404)
+            if parsed.path.endswith("/add"):
+                spaces = _workspaces_response_list(load_workspaces(), handler)
+                project = project_folders.add_folder(
+                    projects, project_id, body.get("path"), body.get("name"), email=email, is_admin=is_admin,
+                    may_write_files=may_write, visible_space_paths={w.get("path") for w in spaces if w.get("path")})
+            else:
+                project = project_folders.remove_folder(projects, project_id, str(body.get("path") or ""),
+                                                        email=email, is_admin=is_admin)
+            save_projects(projects)
+    except LookupError:
+        return bad(handler, "Project not found", 404)
+    except PermissionError as exc:
+        return bad(handler, str(exc), 403)
+    except ValueError as exc:
+        return bad(handler, str(exc), 400)
+    return j(handler, {"ok": True, "folders": project_folders.visible_folders(project, _project_folder_can_open(handler))})
+
+
+def _overlay_personal_reasoning(handler, status, model_id=None, provider_id=None, base_url=None):
+    """Show the signed-in person's own thinking level instead of the bot default."""
+    try:
+        from api import user_prefs
+        from api.ownership import request_owner_email
+        from api.profiles import get_active_profile_name
+        from api.config import coerce_reasoning_effort_for_model
+        who = request_owner_email(handler)
+        mine = user_prefs.get_reasoning_effort(who, get_active_profile_name()) if who else None
+        if mine is None or not isinstance(status, dict):
+            if isinstance(status, dict):
+                status = dict(status, reasoning_scope="profile")
+            return status
+        out = dict(status)
+        out["profile_reasoning_effort"] = status.get("reasoning_effort")
+        out["reasoning_effort"] = coerce_reasoning_effort_for_model(
+            mine, model_id, provider_id=provider_id, base_url=base_url) if model_id else mine
+        out["reasoning_scope"] = "personal"
+        return out
+    except Exception:
+        logger.debug("personal reasoning overlay failed", exc_info=True)
+        return status

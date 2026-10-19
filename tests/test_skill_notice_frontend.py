@@ -85,4 +85,5 @@ def test_late_named_response_cannot_cross_chat_navigation():
 ])
 def test_invalid_name_metadata_is_not_rendered_as_content(skills):
     result=execute(event(skills))
-    assert result['notices']==['Skill update notices are unavailable.Retry']
+    # An unreadable payload is never rendered; a calm retry line is shown instead.
+    assert result['notices']==['🧩 Skill updates could not be checked just now.🔄 Retry']

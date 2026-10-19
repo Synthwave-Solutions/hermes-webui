@@ -6,6 +6,7 @@
   'use strict';
   const entries = {
   "webui.chat.bot_screens": {"panel": "chat", "targets": ["#workspaceScreensTab"], "entryTargets": ["#btnWorkspacePanelToggle", "#btnWorkspacePanelEdgeToggle"], "entryHint": {"nl": "Open het rechterzijpaneel en kies Bot Screens. Het tabblad verschijnt als je schermrechten hebt.", "en": "Open the right panel and choose Bot Screens. The tab appears when you have screen access."}},
+  "webui.bots.org_chart": {"panel":"profiles", "targets":["#btnBotOrgChart"], "entryTargets":[".rail [data-panel=\"profiles\"]"], "entryHint":{"nl":"Open Bots en kies bovenaan de lijst Organigram. Rapporteert aan stel je per bot in bij Bewerken.","en":"Open Bots and choose Org chart at the top of the list. Set Reports to per bot under Edit."}},
   "webui.bots.screens": {"panel":"profiles", "targets":["#btnBotScreens"], "entryTargets":[".rail [data-panel=\"profiles\"]"], "entryHint":{"nl":"Open Bots. Met expliciete schermrechten verschijnt daar Bot Screens; zonder die rechten kan je beheerder toegang instellen.","en":"Open Bots. Bot Screens appears with explicit screen grants; otherwise your administrator can configure access."}},
   "webui.help.navigation": {
     "panel": "chat",
@@ -1101,6 +1102,54 @@
       "nl": "De markering wijst een bot in de lijst aan. Open na de uitleg de bot die je wilt beheren om de beschikbare acties te zien.",
       "en": "The highlight marks a bot in the list. Open the bot you want to manage after the guide to see its available actions."
     }
+  },
+  "webui.bots.scout": {
+    "panel": "profiles",
+    "targets": [
+      "#botScoutEnabled",
+      "#botScoutTopicInput",
+      "#botScoutTime"
+    ],
+    "entryTargets": [
+      ".profile-card[data-name]"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst een bot in de lijst aan. Open na de uitleg een bot om dit onderdeel op zijn pagina te zien.",
+      "en": "The highlight marks a bot in the list. Open a bot after the guide to see this part on its page."
+    }
+  },
+  "webui.bots.responsibilities": {
+    "panel": "profiles",
+    "targets": [
+      "#botDutiesCard",
+      "#botDutyAdd"
+    ],
+    "entryTargets": [
+      ".profile-card[data-name]"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst een bot in de lijst aan. Open na de uitleg een bot om dit onderdeel op zijn pagina te zien.",
+      "en": "The highlight marks a bot in the list. Open a bot after the guide to see this part on its page."
+    }
+  },
+  "webui.bots.work": {
+    "panel": "profiles",
+    "targets": [
+      "#botWork"
+    ],
+    "entryTargets": [
+      ".profile-card[data-name]"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst een bot in de lijst aan. Open na de uitleg een bot om dit onderdeel op zijn pagina te zien.",
+      "en": "The highlight marks a bot in the list. Open a bot after the guide to see this part on its page."
+    }
+  },
+  "webui.governance.waiting": {
+    "panel": "approvals",
+    "targets": [
+      "#myWaitingSection"
+    ]
   },
   "webui.projects.create": {
     "panel": "projects",
@@ -2400,6 +2449,18 @@
     "panel": "apps",
     "targets": [
       "#mainApps [data-app-id=\"hyperframes\"]"
+    ]
+  },
+  "webui.apps.blender": {
+    "panel": "apps",
+    "targets": [
+      "#mainApps [data-app-id=\"blender\"]"
+    ]
+  },
+  "webui.apps.openseo": {
+    "panel": "apps",
+    "targets": [
+      "#mainApps [data-app-id=\"openseo\"]"
     ]
   },
   "webui.apps.n8n": {

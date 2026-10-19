@@ -4299,7 +4299,7 @@ window.SynthPulseFeatureCatalog = {
             "Choose an available bank and inspect its scope and source label."
           ],
           "permissions": "Only stores and documents permitted for your identity are available. Admin status does not open another person’s private memory.",
-          "limits": "The explorer is read-only. Legacy sources are labeled separately; a failed required access-log write blocks the read. Private banks remain owner-only, including for other administrators.",
+          "limits": "The explorer is read-only. Legacy sources are labeled separately; a failed required access-log write blocks the read. Private banks remain owner-only, including for other administrators. It follows your Appearance settings (theme, skin and font size, also in the 3D view and the knowledge graph) and your language: Dutch when SynthPulse is in Dutch, English otherwise, also when you change them while it is open. Your memories themselves are shown as they were saved.",
           "example": "Inspect your personal store without opening another person’s bank."
         },
         "nl": {
@@ -4311,7 +4311,7 @@ window.SynthPulseFeatureCatalog = {
             "Kies een beschikbare bank en bekijk scope en bronlabel."
           ],
           "permissions": "Alleen opslag en documenten die voor jouw identiteit zijn toegestaan zijn beschikbaar. Beheerdersrechten openen geen privégeheugen van een ander.",
-          "limits": "De verkenner is alleen-lezen. Oudere bronnen hebben een eigen label; als verplichte toegangsregistratie mislukt wordt lezen geblokkeerd. Privébanken blijven alleen voor de eigenaar, ook tegenover andere beheerders.",
+          "limits": "De verkenner is alleen-lezen. Oudere bronnen hebben een eigen label; als verplichte toegangsregistratie mislukt wordt lezen geblokkeerd. Privébanken blijven alleen voor de eigenaar, ook tegenover andere beheerders. De verkenner volgt je weergave-instellingen (thema, skin en lettergrootte, ook in de 3D-weergave en het kennisnetwerk) en je taal: Nederlands als SynthPulse in het Nederlands staat, anders Engels, ook als je dat wijzigt terwijl hij open staat. Je herinneringen zelf staan er zoals ze zijn opgeslagen.",
           "example": "Bekijk je persoonlijke opslag zonder de bank van een ander te openen."
         }
       }
@@ -5061,6 +5061,250 @@ window.SynthPulseFeatureCatalog = {
           "permissions": "Zichtbaarheid van bots, bewerkrechten en toegestane tools worden afzonderlijk gecontroleerd.",
           "limits": "Een bot kan zichzelf geen rechten geven of onbeschikbare koppelingen bruikbaar maken.",
           "example": "Geef een specialist een herkenbare teamidentiteit."
+        }
+      }
+    },
+    {
+      "id": "webui.bots.org_chart",
+      "area": "bots",
+      "status": "available",
+      "conditions": [],
+      "anchors": [
+        "?help_feature=webui.bots.org_chart",
+        "#btnBotOrgChart",
+        "#botReportsTo",
+        "#botRole",
+        "#botOrgSearch"
+      ],
+      "source_refs": [
+        "static/index.html:352",
+        "static/panels.js:8031",
+        "static/panels.js:8252",
+        "static/panels.js:8253",
+        "api/bot_metadata.py"
+      ],
+      "related": [
+        "webui.bots.select",
+        "webui.bots.appearance"
+      ],
+      "locales": {
+        "en": {
+          "title": "Bot org chart",
+          "purpose": "See which bot reports to which bot, as a tree of your team of bots.",
+          "when": "When you organise bots like a team, for example a leading bot with specialists per department.",
+          "steps": [
+            "Open a bot, choose Edit and pick a manager under Reports to. Optionally fill in Department or role, then save.",
+            "Open Bots and click the Org chart button at the top of the list.",
+            "Click a bot in the org chart to open it. Use the search field to find a bot quickly."
+          ],
+          "permissions": "Editing who a bot reports to requires bot management rights. You only see bots you have access to.",
+          "limits": "Reports to is shown for structure only: it does not grant a bot rights or let it give instructions to other bots. A bot cannot report to itself or to a bot below it. Each leading bot gets a column per direct report that wraps to the screen width; people and partners without bots below them are listed in a collapsed strip.",
+          "example": "Let the finance bots report to a CFO bot, which reports to the leading bot."
+        },
+        "nl": {
+          "title": "Organigram van bots",
+          "purpose": "Bekijk welke bot aan welke bot rapporteert, als boomstructuur van je botteam.",
+          "when": "Als je bots organiseert als een team, bijvoorbeeld een leidende bot met specialisten per afdeling.",
+          "steps": [
+            "Open een bot, kies Bewerken en kies bij Rapporteert aan een leidinggevende bot. Vul eventueel Afdeling of rol in en sla op.",
+            "Open Bots en klik bovenaan de lijst op de knop Organigram.",
+            "Klik op een bot in het organigram om hem te openen. Gebruik het zoekveld om snel een bot te vinden."
+          ],
+          "permissions": "Voor het wijzigen van Rapporteert aan heb je beheerrechten voor bots nodig. Je ziet alleen bots waar je toegang toe hebt.",
+          "limits": "Rapporteert aan is alleen voor de structuur: het geeft een bot geen rechten en laat hem geen opdrachten geven aan andere bots. Een bot kan niet aan zichzelf rapporteren of aan een bot onder hem. Elke leidende bot krijgt een kolom per directe rapportage die meeschuift met de schermbreedte; mensen en partners zonder bots onder zich staan in een ingeklapte strook.",
+          "example": "Laat de financebots rapporteren aan een CFO-bot, die weer rapporteert aan de leidende bot."
+        }
+      }
+    },
+    {
+      "id": "webui.bots.scout",
+      "area": "bots",
+      "status": "available",
+      "conditions": [],
+      "anchors": [
+        "?help_feature=webui.bots.scout",
+        "#botScoutEnabled",
+        "#botScoutTopicInput",
+        "#botScoutTime"
+      ],
+      "source_refs": [
+        "static/panels.js:8080",
+        "static/chat-bots.js",
+        "api/bot_scout.py"
+      ],
+      "related": [
+        "webui.bots.appearance",
+        "webui.tasks.profile"
+      ],
+      "locales": {
+        "en": {
+          "title": "Scout for a bot",
+          "purpose": "Let a bot look around once a day for news on its topics and bring you one short digest.",
+          "when": "When a bot should keep an eye on a subject, a market or its own tasks without you asking every day.",
+          "steps": [
+            "Open a bot and find the Scout card, or use the radar button next to the bot in the sidebar.",
+            "Add topics: type one and press Enter. Pick the time of the digest.",
+            "Turn Scout on and save. The scheduled task Scout appears with the bot's tasks."
+          ],
+          "permissions": "Turning Scout on or off and changing its topics requires the right to edit that bot. Others see a small mark when Scout is on.",
+          "limits": "Scout only reads. It files actionable items as tasks in triage and writes at most one digest per day in the bot's task chat; it never sends messages. People's own profiles have no Scout. Turning it off pauses the task, it is not deleted.",
+          "example": "Give the CFO bot the topics invoices and cash flow, with the digest at 07:30."
+        },
+        "nl": {
+          "title": "Scout voor een bot",
+          "purpose": "Laat een bot elke dag rondkijken naar nieuws over zijn onderwerpen en je een korte digest geven.",
+          "when": "Als een bot een onderwerp, markt of zijn eigen taken in de gaten moet houden zonder dat je er elke dag om vraagt.",
+          "steps": [
+            "Open een bot en zoek de kaart Scout, of gebruik de radarknop naast de bot in de zijbalk.",
+            "Voeg onderwerpen toe: typ er een en druk op Enter. Kies de tijd van de digest.",
+            "Zet Scout aan en sla op. De geplande taak Scout verschijnt bij de taken van de bot."
+          ],
+          "permissions": "Scout aan of uit zetten en de onderwerpen wijzigen kan alleen wie de bot mag bewerken. Anderen zien een klein teken als Scout aan staat.",
+          "limits": "Scout leest alleen. Actiepunten worden taken in triage en Scout schrijft hooguit een digest per dag in de taakchat van de bot; Scout verstuurt nooit berichten. Persoonlijke profielen van mensen hebben geen Scout. Uitzetten pauzeert de taak, die wordt niet verwijderd.",
+          "example": "Geef de CFO-bot de onderwerpen facturen en cashflow, met de digest om 07:30."
+        }
+      }
+    },
+    {
+      "id": "webui.bots.responsibilities",
+      "area": "bots",
+      "status": "available",
+      "conditions": [],
+      "anchors": [
+        "?help_feature=webui.bots.responsibilities",
+        "#botDutiesCard",
+        "#botDutyAdd"
+      ],
+      "source_refs": [
+        "static/panels.js:8201",
+        "api/bot_metadata.py",
+        "api/streaming.py"
+      ],
+      "related": [
+        "webui.bots.appearance",
+        "webui.bots.work",
+        "webui.bots.scout"
+      ],
+      "locales": {
+        "en": {
+          "title": "Responsibilities of a bot",
+          "purpose": "Write down what a bot answers for: what, why, when it acts, how far it may go on its own and how it reports back.",
+          "when": "When a bot takes over a recurring duty and everyone, the bot included, should know what it is responsible for.",
+          "steps": [
+            "Open a bot and find the Responsibilities card.",
+            "Choose Add responsibility, fill in a title, the objective, when it acts (for example daily 08:00 or on new mail), its autonomy and how it reports.",
+            "Save. Edit or remove a row with the buttons next to it."
+          ],
+          "permissions": "Adding, editing and removing requires the right to edit that bot. Everyone who may see the bot reads the list.",
+          "limits": "At most 12 responsibilities. The list is context only: the bot reads it in its own chats, but it grants no tool, schedule or approval, and existing approvals still apply. People's own profiles have no responsibilities.",
+          "example": "Give the inbox bot the responsibility Inbox triage, on new mail, report only, with a digest in the bot chat."
+        },
+        "nl": {
+          "title": "Verantwoordelijkheden van een bot",
+          "purpose": "Leg vast waar een bot voor staat: wat, waarom, wanneer hij in actie komt, hoe zelfstandig hij mag werken en hoe hij rapporteert.",
+          "when": "Als een bot een terugkerende taak overneemt en iedereen, de bot zelf ook, moet weten waarvoor hij verantwoordelijk is.",
+          "steps": [
+            "Open een bot en zoek de kaart Verantwoordelijkheden.",
+            "Kies Verantwoordelijkheid toevoegen en vul titel, doel, wanneer (bijvoorbeeld dagelijks 08:00 of bij nieuwe mail), zelfstandigheid en rapportage in.",
+            "Sla op. Bewerk of verwijder een regel met de knoppen ernaast."
+          ],
+          "permissions": "Toevoegen, bewerken en verwijderen kan alleen wie de bot mag bewerken. Iedereen die de bot mag zien, leest de lijst.",
+          "limits": "Maximaal 12 verantwoordelijkheden. De lijst is alleen context: de bot leest hem in zijn eigen chats, maar krijgt er geen tools, planning of goedkeuring door, en bestaande goedkeuringen blijven gelden. Persoonlijke profielen van mensen hebben geen verantwoordelijkheden.",
+          "example": "Geef de inboxbot de verantwoordelijkheid Inbox triage, bij nieuwe mail, alleen melden, met een samenvatting in de botchat."
+        }
+      }
+    },
+    {
+      "id": "webui.bots.work",
+      "area": "bots",
+      "status": "available",
+      "conditions": [],
+      "anchors": [
+        "?help_feature=webui.bots.work",
+        "#botWork"
+      ],
+      "source_refs": [
+        "static/panels.js:8281",
+        "api/kanban_bridge.py",
+        "api/routes.py"
+      ],
+      "related": [
+        "webui.bots.responsibilities",
+        "webui.governance.waiting"
+      ],
+      "locales": {
+        "en": {
+          "title": "Work of a bot",
+          "purpose": "See on the bot page which Kanban tasks the bot still has open and which files it made.",
+          "when": "When you want to know what a bot is working on, what waits for a person and where its results are.",
+          "steps": [
+            "Open a bot and scroll to Work of this bot.",
+            "Tasks are grouped by status; waiting for input and waiting for review are highlighted. Click a task to open it on the Kanban board.",
+            "Under Made, download one of the latest files of the bot's tasks."
+          ],
+          "permissions": "Needs the right to read the Kanban board and a bot you may use. Files of a task assigned to another bot are not served.",
+          "limits": "Shows open tasks (not done or archived) on the current board and the latest 20 files. Files always download; nothing opens inside the page.",
+          "example": "Open the CFO bot to see its blocked invoice task and download the report it attached."
+        },
+        "nl": {
+          "title": "Werk van een bot",
+          "purpose": "Zie op de botpagina welke Kanban-taken de bot nog open heeft en welke bestanden hij heeft gemaakt.",
+          "when": "Als je wilt weten waar een bot mee bezig is, wat op een mens wacht en waar zijn resultaten staan.",
+          "steps": [
+            "Open een bot en ga naar Werk van deze bot.",
+            "Taken staan per status; wacht op invoer en wacht op review vallen op. Klik een taak om hem op het Kanban-bord te openen.",
+            "Download onder Gemaakt een van de nieuwste bestanden bij de taken van de bot."
+          ],
+          "permissions": "Vraagt leesrechten op het Kanban-bord en een bot die je mag gebruiken. Bestanden bij een taak van een andere bot worden niet geleverd.",
+          "limits": "Toont open taken (niet klaar of gearchiveerd) op het huidige bord en de nieuwste 20 bestanden. Bestanden worden altijd gedownload; er opent niets in de pagina.",
+          "example": "Open de CFO-bot om zijn geblokkeerde factuurtaak te zien en het rapport te downloaden dat hij heeft bijgevoegd."
+        }
+      }
+    },
+    {
+      "id": "webui.governance.waiting",
+      "area": "governance",
+      "status": "available",
+      "conditions": [],
+      "anchors": [
+        "?help_feature=webui.governance.waiting",
+        "#myWaitingSection"
+      ],
+      "source_refs": [
+        "static/index.html:1081",
+        "static/panels.js:15418",
+        "api/routes.py"
+      ],
+      "related": [
+        "webui.governance.requests",
+        "webui.bots.work"
+      ],
+      "locales": {
+        "en": {
+          "title": "Waiting for you",
+          "purpose": "See in one place what bots are waiting on you: Kanban tasks to review or answer and bot screens where a bot asks you to take over.",
+          "when": "When a bot paused its work for your input, your review or a login on its screen.",
+          "steps": [
+            "Open My approvals. Waiting for you is at the top.",
+            "For a bot screen that waits for you choose Open screen and take over there.",
+            "For a task choose Open task, Reply to add a comment, or Unblock when you gave the bot what it needed."
+          ],
+          "permissions": "Only tasks of bots you may use or tasks you created, and only screens you may control. Kanban rows need the right to read the board.",
+          "limits": "Nothing is approved from this list. Tool approvals in a chat are not listed: they expire within a minute and are answered in the chat itself. Your own access requests stay listed below as before.",
+          "example": "A bot is blocked because it needs a login: reply with what you did and unblock the task."
+        },
+        "nl": {
+          "title": "Wacht op jou",
+          "purpose": "Zie op een plek waar bots op jou wachten: Kanban-taken om te beoordelen of te beantwoorden en botschermen waarop een bot je vraagt over te nemen.",
+          "when": "Als een bot zijn werk heeft stilgezet voor jouw invoer, review of een login op zijn scherm.",
+          "steps": [
+            "Open Mijn goedkeuringen. Wacht op jou staat bovenaan.",
+            "Kies bij een botscherm dat op jou wacht Scherm openen en neem daar over.",
+            "Kies bij een taak Taak openen, Reageren om een reactie te plaatsen, of Deblokkeren als je de bot hebt gegeven wat hij nodig had."
+          ],
+          "permissions": "Alleen taken van bots die je mag gebruiken of die je zelf hebt aangemaakt, en alleen schermen die je mag bedienen. Kanban-regels vragen leesrechten op het bord.",
+          "limits": "In deze lijst wordt niets goedgekeurd. Goedkeuringen voor tools in een chat staan er niet in: die verlopen binnen een minuut en beantwoord je in de chat zelf. Je eigen toegangsverzoeken staan er zoals voorheen onder.",
+          "example": "Een bot staat stil omdat hij moet inloggen: reageer met wat je hebt gedaan en deblokkeer de taak."
         }
       }
     },
@@ -13696,6 +13940,106 @@ window.SynthPulseFeatureCatalog = {
           "permissions": "Access to Apps and the associated active module; platform administrators can discover configured app addresses even without that module. The destination app checks its own access.",
           "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable.",
           "example": "For example: previewing an animation or video composition."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.blender",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured app directory and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.blender",
+        "#mainApps [data-app-id=\"blender\"]"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "Blender openen",
+          "purpose": "Maak 3D-modellen, scènes en renders in Blender in je browser.",
+          "when": "Gebruik deze ingang voor een 3D-productshot opzetten en renderen.",
+          "steps": [
+            "Kies Apps in de navigatie en zoek Blender.",
+            "Bekijk de status en de beschrijving van de kaart.",
+            "Sluit de gids en kies Openen als een adres is ingesteld. Rond indien nodig de eigen aanmelding van de app af.",
+            "Werk verder in de doelapp en gebruik het oorspronkelijke tabblad om terug te keren naar SynthPulse."
+          ],
+          "permissions": "Toegang tot Apps en de bijbehorende actieve module; platformbeheerders kunnen ingestelde appadressen ook zonder die module bekijken. De doelapp controleert zelf je toegang.",
+          "limits": "Openen navigeert alleen naar het ingestelde adres. De app kan een eigen aanmelding vereisen. Niet ingesteld betekent dat er geen bruikbare link is; een ingestelde link garandeert niet dat de dienst bereikbaar is.",
+          "example": "Bijvoorbeeld: een 3D-productshot opzetten en renderen."
+        },
+        "en": {
+          "title": "Open Blender",
+          "purpose": "Create 3D models, scenes and renders in Blender in your browser.",
+          "when": "Use this entry point for setting up and rendering a 3D product shot.",
+          "steps": [
+            "Choose Apps in navigation and find Blender.",
+            "Review the card’s status and description.",
+            "Close the guide and choose Open when an address is configured. Complete the app’s own sign-in if required.",
+            "Continue in the destination app and use the original tab to return to SynthPulse."
+          ],
+          "permissions": "Access to Apps and the associated active module; platform administrators can discover configured app addresses even without that module. The destination app checks its own access.",
+          "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable.",
+          "example": "For example: setting up and rendering a 3D product shot."
+        }
+      }
+    },
+    {
+      "id": "webui.apps.openseo",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured app directory and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.openseo",
+        "#mainApps [data-app-id=\"openseo\"]"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "OpenSEO openen",
+          "purpose": "Doe zoekwoordonderzoek, volg posities en audit websites voor SEO en AI-zichtbaarheid.",
+          "when": "Gebruik deze ingang voor zoekwoorden voor een nieuwe blog onderzoeken.",
+          "steps": [
+            "Kies Apps in de navigatie en zoek OpenSEO.",
+            "Bekijk de status en de beschrijving van de kaart.",
+            "Sluit de gids en kies Openen als een adres is ingesteld. Rond indien nodig de eigen aanmelding van de app af.",
+            "Werk verder in de doelapp en gebruik het oorspronkelijke tabblad om terug te keren naar SynthPulse."
+          ],
+          "permissions": "Toegang tot Apps en de bijbehorende actieve module; platformbeheerders kunnen ingestelde appadressen ook zonder die module bekijken. De doelapp controleert zelf je toegang.",
+          "limits": "Openen navigeert alleen naar het ingestelde adres. De app kan een eigen aanmelding vereisen. Niet ingesteld betekent dat er geen bruikbare link is; een ingestelde link garandeert niet dat de dienst bereikbaar is.",
+          "example": "Bijvoorbeeld: zoekwoorden voor een nieuwe blog onderzoeken."
+        },
+        "en": {
+          "title": "Open OpenSEO",
+          "purpose": "Research keywords, track rankings and audit websites for SEO and AI visibility.",
+          "when": "Use this entry point for researching keywords for a new blog post.",
+          "steps": [
+            "Choose Apps in navigation and find OpenSEO.",
+            "Review the card’s status and description.",
+            "Close the guide and choose Open when an address is configured. Complete the app’s own sign-in if required.",
+            "Continue in the destination app and use the original tab to return to SynthPulse."
+          ],
+          "permissions": "Access to Apps and the associated active module; platform administrators can discover configured app addresses even without that module. The destination app checks its own access.",
+          "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable.",
+          "example": "For example: researching keywords for a new blog post."
         }
       }
     },

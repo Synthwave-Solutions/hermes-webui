@@ -64,7 +64,7 @@ _SELF_ROUTES: frozenset[str] = frozenset({
     "/api/crons/notifications",
     "/api/client-errors",
     "/api/apps",
-    "/api/bot-screen", "/api/bot-screen/ws",
+    "/api/bot-screen", "/api/bot-screen/ws", "/api/bot-screen/status",
     "/api/msp/invoice", "/api/msp/order", "/api/msp/job-cost", "/api/msp/package", "/api/msp/overview", "/api/msp/tickets", "/api/msp/ticket", "/api/msp/comment",
     "/api/msp/app-state", "/api/msp/app-request", "/api/msp/app-support",
     "/api/org/modules",
@@ -117,6 +117,7 @@ ROUTE_CATALOG: tuple[RouteRule, ...] = (
 
     # profiles
     RouteRule("/api/bots/knowledge", "profiles:admin", "profiles:admin", match="exact"),
+    RouteRule("/api/bots/scout", "profiles:admin", "profiles:admin", match="exact"),
     RouteRule("/api/bots/builder", "profiles:admin", "profiles:admin", match="exact"),
     RouteRule("/api/profiles",            "profiles:read"),
     RouteRule("/api/profile/active",      "profiles:read", match="exact"),

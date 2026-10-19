@@ -122,6 +122,31 @@ def _actor(value):
     return value
 
 
+def _resolve_actor(value, *, local_ok=None):
+    """Actor for record and read alike.
+
+    With sign-in switched off (trusted single-user mode) requests and turns
+    carry no email unless governance names a bootstrap admin, so notices were
+    never recorded and every read answered 401, which the chat showed as a
+    permanent "unavailable" box. In that mode only, both sides fall back to
+    the same local identity the password login uses. With sign-in on, a
+    missing email still means "not signed in".
+    """
+    try:
+        return _actor(value)
+    except ValueError:
+        try:
+            from api.auth import _local_login_identity, is_auth_enabled
+            allowed_local = (not is_auth_enabled()) if local_ok is None else bool(local_ok)
+            if allowed_local:
+                return _actor((_local_login_identity() or {}).get("email"))
+        except ValueError:
+            pass
+        except Exception:
+            pass
+        raise
+
+
 def successful_skill_changes(messages, prior, *, resolutions=None):
     """Join native structured calls/results. Ambiguous evidence is ignored."""
     counts = dict.fromkeys(_KINDS, 0)
@@ -496,7 +521,7 @@ def record_turn_changes(changes, *, now=None):
 @contextmanager
 def turn_scope(actor, run_id, profile_home, session_id):
     try:
-        scope = ReviewScope(_actor(actor), str(run_id), str(profile_home), str(session_id))
+        scope = ReviewScope(_resolve_actor(actor), str(run_id), str(profile_home), str(session_id))
     except ValueError:
         scope = None
     install_adapter()
@@ -513,7 +538,10 @@ def handle_get(handler, query):
     headers = {"Cache-Control": "no-store"}
     identity = _request_identity(handler)
     try:
-        actor = _actor((identity or {}).get("email"))
+        # Only the trusted auth-off identity may fall back to the local actor;
+        # a request without any identity stays "not signed in" (401).
+        actor = _resolve_actor((identity or {}).get("email"),
+                               local_ok=(identity or {}).get("method") == "auth_disabled")
     except ValueError:
         return j(handler, {"error": "Sign in to view your skill activity"}, status=401, extra_headers=headers)
     params = parse_qs(query, keep_blank_values=True)
@@ -521,7 +549,13 @@ def handle_get(handler, query):
     if set(params) != {"session_id"} or len(ids) != 1 or not re.fullmatch(r"[A-Za-z0-9_-]{1,200}", ids[0]):
         return j(handler, {"error": "A single conversation is required"}, status=400, extra_headers=headers)
     try:
-        if session_for(identity, ids[0]) is None:
+        if (identity or {}).get("method") == "auth_disabled":
+            # Trusted single-user mode: every conversation is the local
+            # person's, but the auth-off identity often has no email, which
+            # the membership check would read as "not a member" (404).
+            from api.models import get_session
+            get_session(ids[0])
+        elif session_for(identity, ids[0]) is None:
             raise KeyError("Missing conversation")
     except (KeyError, PermissionError):
         return j(handler, {"error": "Conversation unavailable"}, status=404, extra_headers=headers)

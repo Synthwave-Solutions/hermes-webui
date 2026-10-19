@@ -444,7 +444,7 @@ async function switchPanel(name, opts = {}) {
   // callers (server enforces regardless), so fall back to the chat panel.
   if (nextPanel === 'governance' && !(await loadGovernance())) return switchPanel('chat');
   if (nextPanel === 'integrations') await loadIntegrations();
-  if (nextPanel === 'approvals') await loadMyAccessRequests(false,{pendingOnly:true});
+  if (nextPanel === 'approvals') { loadWaitingForYou(); await loadMyAccessRequests(false,{pendingOnly:true}); }
   if (nextPanel === 'projects') await loadProjectsHub();
   _syncLogsAutoRefresh();
   if (typeof _syncSystemHealthMonitorVisibility === 'function') _syncSystemHealthMonitorVisibility();
@@ -879,8 +879,218 @@ function _cronOwnerProfileName(job){
   return _cronProfileName(job && (job.owner_profile ?? job.profile));
 }
 
+// The bot that answers for a job: the assigned bot (api/cron_bots.job_bot,
+// 19 Oct 2026), else the bot whose store holds it.
+function _cronJobBotName(job){
+  return _cronProfileName(job && job.assigned_bot) || _cronOwnerProfileName(job) || 'default';
+}
+
 function _cronJobKey(job){
   return `${_cronOwnerProfileName(job)}\u0000${String(job && job.id || '')}`;
+}
+
+// ── Bot-owned scheduled jobs (Michael Ramirez, 18 Oct 2026) ──────────────────
+// A job belongs to the bot whose job store holds it (owner_profile): that bot
+// runs it and reports each result in its own chat (api/cron_bots.py). The list
+// shows the bot on every job and filters by bot; the detail lets the owner or
+// a cron admin choose another bot (POST /api/crons/owner).
+let _cronBotFilter = (() => { try { return localStorage.getItem('cron-bot-filter') || ''; } catch (_e) { return ''; } })();
+function _cronActiveBotName(){
+  return _cronProfileName((typeof S !== 'undefined' && S && S.activeProfile) || '') || 'default';
+}
+function _cronBotFor(name){
+  const key = _cronProfileName(name) || 'default';
+  const rows = Array.isArray(_cronProfilesCache) ? _cronProfilesCache : [];
+  return rows.find(p => p && p.name === key) ||
+    (key === 'default' ? rows.find(p => p && p.is_default) : null) ||
+    { name: key, bot: {} };
+}
+function _cronBotTitle(name){
+  const p = _cronBotFor(name);
+  if (typeof botDisplayName === 'function') return botDisplayName(p);
+  return (p.bot && p.bot.title) || p.name || 'default';
+}
+function _cronBotAvatarHtml(name){
+  const p = _cronBotFor(name);
+  const face = typeof botAvatarHtml === 'function' ? botAvatarHtml(p) : '';
+  return `<span class="cron-bot-avatar" aria-hidden="true">${face || '🤖'}</span>`;
+}
+function _cronBotChipHtml(name, extraClass){
+  const title = _cronBotTitle(name);
+  return `<span class="cron-bot-chip ${extraClass || ''}" title="${esc((t('cron_bot_label') || 'Bot') + ': ' + title)}">${_cronBotAvatarHtml(name)}<span class="cron-bot-chip-name">${esc(title)}</span></span>`;
+}
+// A schedule in plain words ("0 9 * * 1" is "every Monday at 09:00"); the
+// same rules as api/cron_bots.schedule_in_words. Unknown shapes stay raw.
+function _cronScheduleInWords(expr){
+  const raw = String(expr || '').trim();
+  const tx = (key, ...args) => { const v = t(key, ...args); return v && v !== key ? v : ''; };
+  const every = raw.toLowerCase().match(/^every\s+(\d+)\s*([mhd])$/);
+  if (every) return tx({ m: 'cron_words_minutes', h: 'cron_words_hours', d: 'cron_words_days' }[every[2]], Number(every[1])) || raw;
+  const parts = raw.split(/\s+/);
+  if (parts.length !== 5 || parts[3] !== '*') return raw;
+  const [minute, hour, dom, , dow] = parts;
+  const step = minute.match(/^\*\/(\d+)$/);
+  if (step && hour === '*' && dom === '*' && dow === '*') return tx('cron_words_minutes', Number(step[1])) || raw;
+  if (/^\d+$/.test(minute) && hour === '*' && dom === '*' && dow === '*') return tx('cron_words_hourly', String(Number(minute)).padStart(2, '0')) || raw;
+  if (!/^\d+$/.test(minute) || !/^\d+$/.test(hour) || Number(hour) > 23 || Number(minute) > 59) return raw;
+  const time = `${String(Number(hour)).padStart(2, '0')}:${String(Number(minute)).padStart(2, '0')}`;
+  if (dom === '*' && dow === '*') return tx('cron_words_daily', time) || raw;
+  if (dom === '*' && (dow === '1-5' || dow.toLowerCase() === 'mon-fri')) return tx('cron_words_weekdays', time) || raw;
+  if (dom === '*' && /^[0-7]$/.test(dow)) {
+    const days = String(tx('cron_words_day_names') || '').split(',');
+    const day = days[Number(dow) % 7];
+    return day ? (tx('cron_words_weekly', day, time) || raw) : raw;
+  }
+  if (dow === '*' && /^\d+$/.test(dom) && Number(dom) >= 1 && Number(dom) <= 31) return tx('cron_words_monthly', Number(dom), time) || raw;
+  return raw;
+}
+function _cronCanChangeBot(job){
+  if (!job) return false;
+  return _cronCanEdit(Object.assign({}, job, { read_only: false }));
+}
+function _cronBotFilterWantsAll(){
+  return !!_cronBotFilter && _cronBotFilter !== _cronActiveBotName();
+}
+function _cronMatchesBotFilter(job){
+  if (!_cronBotFilterWantsAll()) return _showAllCronProfiles || !job.read_only;
+  if (_cronBotFilter === '*') return true;
+  return _cronJobBotName(job) === _cronBotFilter;
+}
+// Filter bar of the Tasks list (19 Oct 2026): bot and category side by side.
+// Bot lists the active bot, all bots, then every bot that answers for a task
+// (with its count); category lists the categories of the tasks in view.
+let _cronCategoryFilter = (() => { try { return localStorage.getItem('cron-category-filter') || ''; } catch (_e) { return ''; } })();
+function _cronMatchesCategoryFilter(job){
+  if (!_cronCategoryFilter) return true;
+  const cat = String((job && job.category) || '').trim();
+  return _cronCategoryFilter === '__none__' ? !cat : cat === _cronCategoryFilter;
+}
+async function setCronCategoryFilter(value){
+  _cronCategoryFilter = String(value || '');
+  try { localStorage.setItem('cron-category-filter', _cronCategoryFilter); } catch (_e) {}
+  await loadCrons();
+}
+async function clearCronFilters(){
+  _cronCategoryFilter = '';
+  try { localStorage.setItem('cron-category-filter', ''); } catch (_e) {}
+  await setCronBotFilter('');
+}
+function _renderCronBotFilter(allJobs){
+  const box = $('cronBotFilter');
+  if (!box) return;
+  const all = Array.isArray(allJobs) ? allJobs : [];
+  const rows = (Array.isArray(_cronProfilesCache) ? _cronProfilesCache : []).filter(p => p && p.name);
+  const active = _cronActiveBotName();
+  const current = _cronBotFilterWantsAll() ? _cronBotFilter : '';
+  const counts = {};
+  for (const j of all) { const b = _cronJobBotName(j); counts[b] = (counts[b] || 0) + 1; }
+  const label = (name) => _cronBotTitle(name) + (counts[name] ? ` (${counts[name]})` : '');
+  const opts = [`<option value=""${current ? '' : ' selected'}>${esc(t('cron_bot_filter_active', _cronBotTitle(active)) || _cronBotTitle(active))}</option>`,
+    `<option value="*"${current === '*' ? ' selected' : ''}>${esc(t('cron_bot_filter_all') || 'All bots')}${all.length ? ` (${all.length})` : ''}</option>`];
+  const others = rows.filter(p => p.name !== active && (counts[p.name] || p.name === current))
+    .map(p => ({ name: p.name, title: _cronBotTitle(p.name) }))
+    .sort((a, b) => a.title.localeCompare(b.title));
+  for (const b of others) opts.push(`<option value="${esc(b.name)}"${current === b.name ? ' selected' : ''}>${esc(label(b.name))}</option>`);
+  if (current && current !== '*' && !others.some(b => b.name === current)) {
+    opts.push(`<option value="${esc(current)}" selected>${esc(_cronBotTitle(current))}</option>`);
+  }
+  // Categories of the tasks this bot choice shows.
+  const inView = (all.length ? all : (_cronList || [])).filter(j => !current || current === '*' ? (current === '*' || !j.read_only || (_cronOwnerProfileName(j) || 'default') === active) : _cronJobBotName(j) === current);
+  const cats = {}; let none = 0;
+  for (const j of inView) { const c = String(j.category || '').trim(); if (c) cats[c] = (cats[c] || 0) + 1; else none++; }
+  const catOpts = [`<option value=""${_cronCategoryFilter ? '' : ' selected'}>${esc(t('cron_category_filter_all') || 'All categories')}</option>`]
+    .concat(Object.keys(cats).sort((a, b) => a.localeCompare(b)).map(c => `<option value="${esc(c)}"${_cronCategoryFilter === c ? ' selected' : ''}>${esc(c)} (${cats[c]})</option>`));
+  if (none) catOpts.push(`<option value="__none__"${_cronCategoryFilter === '__none__' ? ' selected' : ''}>${esc(t('cron_category_none') || 'No category')} (${none})</option>`);
+  if (_cronCategoryFilter && _cronCategoryFilter !== '__none__' && !cats[_cronCategoryFilter]) catOpts.push(`<option value="${esc(_cronCategoryFilter)}" selected>${esc(_cronCategoryFilter)}</option>`);
+  const filtered = !!current || !!_cronCategoryFilter;
+  box.innerHTML = `<div class="cron-filter-row">
+      <label class="cron-filter-field" title="${esc(t('cron_bot_filter_label') || 'Show tasks of')}">${_cronBotAvatarHtml(current && current !== '*' ? current : (current === '*' ? '' : active))}<span class="sr-only">${esc(t('cron_bot_filter_label') || 'Bot')}</span><select id="cronBotFilterSelect" onchange="setCronBotFilter(this.value)">${opts.join('')}</select></label>
+      <label class="cron-filter-field" title="${esc(t('cron_category_label') || 'Category')}"><span class="cron-filter-icon" aria-hidden="true">🏷️</span><span class="sr-only">${esc(t('cron_category_label') || 'Category')}</span><select id="cronCategoryFilterSelect" onchange="setCronCategoryFilter(this.value)">${catOpts.join('')}</select></label>
+    </div>
+    ${filtered ? `<button type="button" class="cron-filter-clear" onclick="clearCronFilters()">${esc(t('cron_filter_clear') || 'Clear filters')}</button>` : ''}`;
+  if (current === '*') box.querySelector('.cron-bot-avatar').innerHTML = '🗂️';
+  box.style.display = '';
+}
+async function setCronBotFilter(value){
+  _cronBotFilter = String(value || '');
+  try { localStorage.setItem('cron-bot-filter', _cronBotFilter); } catch (_e) {}
+  if (!_cronBotFilterWantsAll()) _showAllCronProfiles = false;
+  await loadCrons();
+}
+
+let _cronBotOverlay = null;
+function _closeCronBotPicker(){ if (_cronBotOverlay) { _cronBotOverlay.remove(); _cronBotOverlay = null; } document.removeEventListener('keydown', _cronBotEscape, true); }
+function _cronBotEscape(e){ if (e.key === 'Escape') { e.preventDefault(); _closeCronBotPicker(); } }
+async function openCronBotPicker(jobId, ownerProfile){
+  const owner = _cronProfileName(ownerProfile) || 'default';
+  const job = (_cronList || []).find(j => String(j.id) === String(jobId) && (_cronOwnerProfileName(j) || 'default') === owner) || _currentCronDetail;
+  if (!job || !_cronCanChangeBot(job)) return;
+  await loadCronProfiles();
+  _closeCronBotPicker();
+  const current = _cronJobBotName(job);
+  const rows = (Array.isArray(_cronProfilesCache) ? _cronProfilesCache : []).filter(p => p && p.name)
+    .map(p => ({ name: p.name, title: _cronBotTitle(p.name), description: String((p.bot && p.bot.description) || '').trim() }))
+    .sort((a, b) => (a.name === current ? -1 : b.name === current ? 1 : a.title.localeCompare(b.title)));
+  const items = rows.map(b => {
+    const isCurrent = b.name === current;
+    return `<button type="button" class="cron-bot-option${isCurrent ? ' current' : ''}" data-bot="${esc(b.name)}" ${isCurrent ? 'aria-current="true" disabled' : ''} onclick="_saveCronBot('${esc(job.id)}','${esc(owner)}',this.dataset.bot)">
+        ${_cronBotAvatarHtml(b.name)}
+        <span class="cron-bot-option-text"><span class="cron-bot-option-name">${esc(b.title)}</span>${isCurrent ? `<span class="cron-bot-option-desc cron-bot-option-current">✓ ${esc(t('cron_bot_current') || 'Runs this task now')}</span>` : (b.description ? `<span class="cron-bot-option-desc">${esc(b.description)}</span>` : '')}</span>
+      </button>`;
+  }).join('');
+  const overlay = document.createElement('div');
+  overlay.className = 'cron-share-overlay';
+  overlay.innerHTML = `<div class="cron-share-dialog detail-card cron-bot-dialog" role="dialog" aria-modal="true" aria-labelledby="cronBotPickerTitle">
+      <div class="detail-card-title" id="cronBotPickerTitle">🤖 ${esc(t('cron_bot_picker_title') || 'Which bot runs this task?')}</div>
+      <p class="cron-share-hint">${esc(t('cron_bot_picker_hint') || 'The bot runs the task with its own skills and settings and reports every result in its own chat.')}</p>
+      ${rows.length > 8 ? `<input type="search" class="cron-bot-search" placeholder="${esc(t('search') || 'Search')}" oninput="_filterCronBotOptions(this)">` : ''}
+      <div class="cron-bot-options">${items}</div>
+      <div class="cron-share-actions">
+        <button type="button" class="cron-btn" onclick="_closeCronBotPicker()">${esc(t('cancel') || 'Cancel')}</button>
+      </div>
+    </div>`;
+  overlay.addEventListener('click', e => { if (e.target === overlay) _closeCronBotPicker(); });
+  document.body.appendChild(overlay);
+  _cronBotOverlay = overlay;
+  document.addEventListener('keydown', _cronBotEscape, true);
+  const first = overlay.querySelector('.cron-bot-search') || overlay.querySelector('.cron-bot-option:not([disabled])');
+  if (first) first.focus();
+}
+function _filterCronBotOptions(input){
+  const q = String(input && input.value || '').trim().toLowerCase();
+  const list = input && input.closest('.cron-bot-dialog');
+  if (!list) return;
+  list.querySelectorAll('.cron-bot-option').forEach(btn => {
+    btn.style.display = !q || btn.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+// Choosing a bot names the bot that answers for the task (POST
+// /api/crons/assign): the task stays in its store and runs as before, since a
+// script job cannot move. POST /api/crons/owner still moves a job for API use.
+async function _saveCronBot(jobId, storeProfile, toBot){
+  const store = _cronProfileName(storeProfile) || 'default';
+  if (!toBot) { _closeCronBotPicker(); return; }
+  try {
+    await api('/api/crons/assign', { method: 'POST', body: JSON.stringify({ job_id: jobId, owner_profile: store, bot: toBot === store ? '' : toBot }) });
+    _closeCronBotPicker();
+    showToast(t('cron_bot_changed', _cronBotTitle(toBot)) || ('Now with ' + toBot), 4000, 'success');
+    _botJobsCache = null;
+    await loadCrons();
+    const saved = (_cronList || []).find(j => String(j.id) === String(jobId) && (_cronOwnerProfileName(j) || 'default') === store);
+    if (saved) openCronDetail(saved);
+    if (_currentProfileDetail && typeof _loadProfileBotJobs === 'function') _loadProfileBotJobs(_currentProfileDetail);
+  } catch (e) { showToast((t('cron_bot_change_failed') || 'Could not change the bot') + ': ' + e.message, 5000, 'error'); }
+}
+// A job chat lives in the owning bot: switch to that bot first when it is
+// not the active one (sessions load inside the active bot only).
+async function openCronJobChat(sessionId, profile){
+  if (!sessionId || typeof loadSession !== 'function') return;
+  const bot = _cronProfileName(profile) || '';
+  if (bot && bot !== _cronActiveBotName() && !(bot === 'default' && _cronBotFor(_cronActiveBotName()).is_default) && typeof switchToProfile === 'function') {
+    try { await switchToProfile(bot); } catch (_e) {}
+  }
+  if (typeof switchPanel === 'function') { try { await switchPanel('chat'); } catch (_e) {} }
+  await loadSession(sessionId);
 }
 
 function _cronItemId(job){
@@ -1011,10 +1221,17 @@ function _cronGatewayNoticeHtml(status) {
   const helpLink = notConfigured || isRemoteUnreachable || isStaleMetadata
     ? `<p><a href="${docsHref}" target="_blank" rel="noopener">How to enable scheduled jobs in Docker ↗</a></p>`
     : '';
+  // Plain words first; the technical explanation stays one click away.
+  const plainTitle = spT('cron_paused_title', 'Scheduled tasks are paused');
+  const plainBody = spT('cron_paused_body', 'Tasks are saved and you can run them by hand, but they do not start on their own right now. Ask your administrator to turn on scheduling.');
   return `
-    <div class="detail-alert-title">${esc(title)}</div>
-    <p>${esc(body)}</p>
-    ${helpLink}
+    <div class="detail-alert-title">⏸️ ${esc(plainTitle)}</div>
+    <p>${esc(plainBody)}</p>
+    <details class="sp-tech-details"><summary>${esc(spT('details_label', 'Details'))}</summary>
+      <p><strong>${esc(title)}</strong></p>
+      <p>${esc(body)}</p>
+      ${helpLink}
+    </details>
   `;
 }
 
@@ -1052,22 +1269,26 @@ async function loadCrons(animate) {
     // notify: that request (404 before it) or a task carrying notify.
     _loadCronNotifyState().then(served => { if (served) _cronNotifySupported = true; });
     await loadCronProfiles();
-    const allProfilesQS = _showAllCronProfiles ? '?all_profiles=1' : '';
+    let _allCronJobs = [];
+    try { _allCronJobs = await _botJobsAll(); } catch (_e) {}
+    _renderCronBotFilter(_allCronJobs);
+    const allProfilesQS = (_showAllCronProfiles || _cronBotFilterWantsAll()) ? '?all_profiles=1' : '';
     const data = await api('/api/crons' + allProfilesQS);
     _cronList = data.jobs || [];
     if (_cronList.some(job => !!(job && job.notify && typeof job.notify === 'object'))) _cronNotifySupported = true;
     _cronOtherProfileCount = Number(data.other_profile_count || 0);
-    if (_showAllCronProfiles && !_cronList.some(job => job && job.read_only)) {
+    if (_showAllCronProfiles && !_cronBotFilterWantsAll() && !_cronList.some(job => job && job.read_only)) {
       _showAllCronProfiles = false;
       _cronOtherProfileCount = 0;
     }
+    if (_cronBotFilterWantsAll()) _cronOtherProfileCount = 0;
     box.innerHTML = '';
     // Partition active vs paused so paused jobs don't drown the list (#4026).
     // _cronList stays the single source of truth — only the render is split,
     // which keeps openCronDetail, _cronNewJobIds, and detail refresh untouched.
     const _activeJobs = [];
     const _pausedJobs = [];
-    for (const job of _cronList) {
+    for (const job of _cronList.filter(j => _cronMatchesBotFilter(j) && _cronMatchesCategoryFilter(j))) {
       const status = _cronStatusMeta(job);
       (status.state === 'paused' ? _pausedJobs : _activeJobs).push({ job, status });
     }
@@ -1081,9 +1302,11 @@ async function loadCrons(animate) {
       }
       const isNewRun = !job.read_only && _cronNewJobIds.has(String(job.id));
       const isAgentMode = !job.no_agent;
-      const ownerProfileLabel = _cronProfileLabel(_cronOwnerProfileName(job));
-      const ownerProfileTitle = `Owner profile: ${ownerProfileLabel}`;
-      const readOnlyBadge = job.read_only
+      const ownerBotName = _cronJobBotName(job);
+      const ownerProfileLabel = _cronBotTitle(ownerBotName);
+      const ownerProfileTitle = `${t('cron_bot_label') || 'Bot'}: ${ownerProfileLabel}`;
+      // With the bot on every row, "read-only" is the bot chip's job.
+      const readOnlyBadge = job.read_only && !_cronBotFilterWantsAll()
         ? '<span class="cron-status disabled" title="Read-only from another profile">Read-only</span>'
         : '';
       item.innerHTML = `
@@ -1092,7 +1315,7 @@ async function loadCrons(animate) {
           ${job.emoji ? `<span class="cron-emoji" aria-hidden="true">${esc(job.emoji)}</span>` : isAgentMode ? '<span class="cron-agent-badge" title="Agent mode">🤖</span>' : `<span class="cron-script-badge" title="${esc(t('cron_script_badge_title') || 'Script job (no agent)')}">📜</span>`}
           <span class="cron-name" title="${esc(job.name)}">${esc(job.name)}</span>
           ${_cronNotifyListIconHtml(job)}
-          <span class="cron-profile-badge" title="${esc(ownerProfileTitle)}">${esc(ownerProfileLabel)}</span>
+          <span class="cron-profile-badge cron-bot-badge" title="${esc(ownerProfileTitle)}">${_cronBotAvatarHtml(ownerBotName)}<span class="cron-bot-chip-name">${esc(ownerProfileLabel)}</span></span>
           ${Array.isArray(job.shared_with) && job.shared_with.length ? `<span class="cron-shared-badge" title="${esc((t('cron_shared_with_label') || 'Shared with') + ': ' + job.shared_with.join(', '))}">${esc(t('cron_shared_badge') || 'shared')}</span>` : ''}
           <span class="cron-status ${status.listClass}">${esc(status.label)}</span>
           ${readOnlyBadge}
@@ -1101,8 +1324,11 @@ async function loadCrons(animate) {
       if (_currentCronDetailKey && _currentCronDetailKey === _cronJobKey(job)) item.classList.add('active');
       parent.appendChild(item);
     };
-    if (!_cronList.length) {
-      const emptyText = (!_showAllCronProfiles && _cronOtherProfileCount > 0)
+    if (typeof spSetFirstRun === 'function') spSetFirstRun('taskDetailEmpty', !_cronList.length && !(_cronOtherProfileCount > 0));
+    if (!_activeJobs.length && !_pausedJobs.length) {
+      const emptyText = (_cronBotFilterWantsAll() && _cronBotFilter !== '*')
+        ? (t('cron_bot_filter_none') || 'This bot has no scheduled tasks yet.')
+        : (!_showAllCronProfiles && _cronOtherProfileCount > 0)
         ? 'No cron jobs in the active profile.'
         : (t('cron_no_jobs') || 'No jobs yet');
       box.innerHTML = `<div style="padding:16px;color:var(--muted);font-size:12px">${esc(emptyText)}</div>`;
@@ -1559,6 +1785,7 @@ function openCronCategoryPopover(jobId){
   document.addEventListener('keydown', _cronCategoryEscape, true);
 }
 async function _saveCronCategory(jobId, category){
+  _botJobsCache = null;
   try {
     await api('/api/crons/update', { method: 'POST', body: JSON.stringify({ job_id: jobId, category: String(category || '').trim() }) });
     _closeCronCategoryPopover();
@@ -2049,11 +2276,21 @@ function _renderCronDetail(job){
           <button type="button" class="cron-btn" onclick="copyCurrentCronDiagnostics()">${esc(t('cron_attention_copy_diagnostics'))}</button>
         </div>
       </div>` : '';
+  const ownerBot = ownerProfileName || 'default';
+  const ownerBotTitle = _cronBotTitle(ownerBot);
+  const answeringBot = _cronJobBotName(job);
   const readOnlyBanner = isReadOnly ? `
       <div class="detail-alert">
-        <div class="detail-alert-title">Read-only from another profile</div>
-        <p>Switch to ${esc(ownerProfileLabel)} to run, edit, or inspect live status and output for this cron job.</p>
+        <div class="detail-alert-title">${esc(t('cron_bot_other_readonly_title') || 'Read-only from another profile')}</div>
+        <p>${esc(t('cron_bot_other_readonly_body', ownerBotTitle) || `Switch to ${ownerProfileLabel} to run, edit, or inspect live status and output for this cron job.`)}</p>
       </div>` : '';
+  const botChange = _cronCanChangeBot(job)
+    ? `<button type="button" class="cron-link-btn" onclick="openCronBotPicker('${esc(job.id)}','${esc(ownerBot)}')">${esc(t('cron_bot_change') || 'Choose another bot')}</button>`
+    : '';
+  const jobChat = job.job_chat_session_id
+    ? `<button type="button" class="cron-link-btn cron-job-chat-btn" onclick="openCronJobChat('${esc(job.job_chat_session_id)}','${esc(ownerBot)}')" title="${esc(t('cron_job_chat_hint') || '')}">💬 ${esc(t('cron_job_chat_open') || 'Open task chat')}</button>`
+    : '';
+  const botRow = `<div class="detail-row cron-bot-row"><div class="detail-row-label">${esc(t('cron_bot_label') || 'Bot')}</div><div class="detail-row-value">${_cronBotChipHtml(answeringBot)}${botChange}${jobChat}</div></div>`;
   const deliveryMuted = job.delivery_status === 'muted'
     ? ` <span class="detail-badge cron-notify-muted-badge">${_CRON_BELL_OFF_SVG}${esc(t('cron_notify_muted'))}</span>`
     : '';
@@ -2070,13 +2307,13 @@ function _renderCronDetail(job){
       <div class="detail-card">
         <div class="detail-card-title">${esc(t('cron_status_active').replace(/./,c=>c.toUpperCase()))}</div>
         <div class="detail-row"><div class="detail-row-label">Status</div><div class="detail-row-value"><span class="detail-badge ${status.detailClass}">${esc(status.label)}</span></div></div>
-        <div class="detail-row"><div class="detail-row-label">Schedule</div><div class="detail-row-value"><code>${esc(schedule)}</code></div></div>
+        <div class="detail-row"><div class="detail-row-label">${esc(t('cron_schedule_label') || 'Schedule')}</div><div class="detail-row-value"><span class="cron-schedule-words" title="${esc(schedule)}">${esc(_cronScheduleInWords(schedule))}</span></div></div>
         <div class="detail-row"><div class="detail-row-label">${esc(t('cron_next'))}</div><div class="detail-row-value">${esc(nextRun)}</div></div>
         <div class="detail-row"><div class="detail-row-label">${esc(t('cron_last'))}</div><div class="detail-row-value">${esc(lastRun)}</div></div>
-        <div class="detail-row"><div class="detail-row-label">Deliver</div><div class="detail-row-value">${esc(deliver)}${deliveryMuted}</div></div>
+        <div class="detail-row"><div class="detail-row-label">${esc(t('cron_deliver_label') || 'Deliver')}</div><div class="detail-row-value">${esc(deliver)}${deliveryMuted}</div></div>
         <div class="detail-row"><div class="detail-row-label">${esc(t('cron_mode_label') || 'Mode')}</div><div class="detail-row-value"><span class="detail-badge cron-mode-badge ${isNoAgent ? 'script' : 'agent'}" id="cronJobMode">${esc(cronJobMode)}</span>${modelProvider ? ` <code>${modelProvider}</code>` : ''}</div></div>
-        ${showOwnerRow ? `<div class="detail-row"><div class="detail-row-label">Owner profile</div><div class="detail-row-value"><span class="detail-badge active" title="${esc(ownerProfileTitle)}">${esc(ownerProfileLabel)}</span></div></div>` : ''}
-        <div class="detail-row"><div class="detail-row-label">${esc(t('cron_profile_label') || 'Profile')}</div><div class="detail-row-value"><span class="detail-badge active" title="${esc(profileTitle)}">${esc(profileLabel)}</span></div></div>
+        ${botRow}
+        ${showOwnerRow && _cronProfileName(job.profile) ? `<div class="detail-row"><div class="detail-row-label">${esc(t('cron_profile_label') || 'Profile')}</div><div class="detail-row-value"><span class="detail-badge active" title="${esc(profileTitle)}">${esc(profileLabel)}</span></div></div>` : ''}
         ${_cronNotifyDetailRowHtml(job)}
         ${skillsRow}
         ${lastError}
@@ -2084,7 +2321,11 @@ function _renderCronDetail(job){
       ${instructionCard}
       <div class="detail-card ${!isReadOnly && _cronNewJobIds.has(String(job.id)) ? 'has-new-run' : ''}" id="cronDetailRuns">
         <div class="detail-card-title">${esc(outputTitle)}</div>
-        <div style="color:var(--muted);font-size:12px">${esc(isReadOnly ? 'Live output is available only when this profile is active here.' : (t('loading') || 'Loading'))}</div>
+        <div style="color:var(--muted);font-size:12px">${isReadOnly
+          ? (job.job_chat_session_id
+            ? `<button type="button" class="cron-link-btn cron-job-chat-btn" onclick="openCronJobChat('${esc(job.job_chat_session_id)}','${esc(ownerBot)}')">💬 ${esc(t('cron_output_in_chat', ownerBotTitle) || ('See the result in the chat of ' + ownerBotTitle))}</button>`
+            : esc(t('cron_output_other_bot') || 'Live output is available only when this profile is active here.'))
+          : esc(t('loading') || 'Loading')}</div>
       </div>
     </div>`;
   body.style.display = '';
@@ -3000,6 +3241,7 @@ async function cronRun(id) {
 
 async function cronPause(id) {
   try {
+    _botJobsCache = null;
     await api('/api/crons/pause', {method:'POST', body: JSON.stringify({job_id: id})});
     showToast(t('cron_job_paused'));
     await loadCrons();
@@ -3008,6 +3250,7 @@ async function cronPause(id) {
 
 async function cronResume(id) {
   try {
+    _botJobsCache = null;
     await api('/api/crons/resume', {method:'POST', body: JSON.stringify({job_id: id})});
     showToast(t('cron_job_resumed'));
     await loadCrons();
@@ -6269,13 +6512,13 @@ let _currentMemorySection = 'mnemosyne'; // 'memory' | 'user' | 'soul' | 'projec
 let _memoryMode = 'empty'; // 'empty' | 'read' | 'edit'
 
 const MEMORY_SECTIONS = [
-  { key: 'company', label: 'Company memory', iconKey: 'building', readOnly: true },
-  { key: 'mnemosyne', label: 'Saved memories', iconKey: 'brain', readOnly: true },
+  { key: 'company', labelKey: 'memory_section_company', label: 'Company knowledge', iconKey: 'building', readOnly: true },
+  { key: 'mnemosyne', labelKey: 'memory_section_saved', label: 'What SynthPulse remembers', iconKey: 'brain', readOnly: true },
   { key: 'memory', labelKey: 'my_notes', emptyKey: 'no_notes_yet', iconKey: 'brain' },
   { key: 'user',   labelKey: 'user_profile', emptyKey: 'no_profile_yet', iconKey: 'user' },
-  { key: 'soul', label: 'Personal agent preferences', empty: 'How should agents work with you? This does not change a shared bot persona.', iconKey: 'sparkles' },
-  { key: 'project_context', label: 'My project notes', empty: 'Your private notes for this project. Without a project, these are your general project notes.', iconKey: 'file-text' },
-  { key: 'shared_project_context', label: 'Shared project instructions', empty: 'No shared instructions.', iconKey: 'file-text', readOnly: true },
+  { key: 'soul', labelKey: 'memory_section_soul', emptyKey: 'memory_section_soul_empty', label: 'How bots work with you', empty: 'How should bots work with you? This does not change a shared bot.', iconKey: 'sparkles' },
+  { key: 'project_context', labelKey: 'memory_section_project_notes', emptyKey: 'memory_section_project_notes_empty', label: 'My project notes', empty: 'Your private notes for this project. Without a project, these are your general notes.', iconKey: 'file-text' },
+  { key: 'shared_project_context', labelKey: 'memory_section_shared_project', emptyKey: 'memory_section_shared_project_empty', label: 'Shared project instructions', empty: 'No shared instructions.', iconKey: 'file-text', readOnly: true },
   { key: 'external_notes', labelKey: 'external_notes_sources', emptyKey: 'external_notes_empty', iconKey: 'book-open' },
 ];
 
@@ -6284,13 +6527,13 @@ function _memorySectionMeta(key) {
 }
 
 function _memorySectionLabel(meta) {
-  if (meta.label) return meta.label;
-  return t(meta.labelKey);
+  if (meta.labelKey) return spT(meta.labelKey, meta.label || meta.labelKey);
+  return meta.label || '';
 }
 
 function _memorySectionEmpty(meta) {
-  if (meta.empty) return meta.empty;
-  return t(meta.emptyKey);
+  if (meta.emptyKey) return spT(meta.emptyKey, meta.empty || meta.emptyKey);
+  return meta.empty || '';
 }
 
 function _memorySectionContent(key) {
@@ -6409,7 +6652,7 @@ function _renderExternalNotesSources() {
 function _renderMemoryDetail(section) {
   if (section === 'mnemosyne' || section === 'company') {
     const body = $('memoryDetailBody');
-    $('memoryDetailTitle').textContent = section === 'company' ? 'Company memory' : 'Saved memories';
+    $('memoryDetailTitle').textContent = section === 'company' ? spT('memory_section_company','Company knowledge') : spT('memory_section_saved','What SynthPulse remembers');
     body.style.display = '';
     $('memoryDetailEmpty').style.display = 'none';
     _memoryMode = 'read';
@@ -6433,7 +6676,7 @@ function _renderMemoryDetail(section) {
   if (!title || !body) return;
   if (meta.provider) {
     // A registered section renders itself (memory section registry).
-    title.textContent = t(meta.labelKey);
+    title.textContent = _memorySectionLabel(meta);
     try {
       const pending = meta.provider.render(section, {title, body, empty});
       if (pending && typeof pending.catch === 'function') pending.catch(e => console.warn('[memory] section render failed', e));
@@ -7078,6 +7321,7 @@ function renderWorkspacesPanel(workspaces){
     // Ownership badge: owner's local-part for owned entries, "Shared" for legacy ownerless ones.
     const ownerLabel = w.owner_email ? String(w.owner_email).split('@')[0] : (w.legacy_unowned ? 'Shared' : '');
     const ownerBadge = ownerLabel ? `<span class="detail-badge" style="margin-left:6px;font-size:9px;padding:1px 6px">${esc(ownerLabel)}</span>` : '';
+    row.title = w.path;
     row.innerHTML=`
       <span class="ws-drag-handle" title="${esc(t('workspace_drag_hint'))}">${li('grip-vertical',12)}</span>
       <div class="ws-row-info">
@@ -7348,6 +7592,7 @@ function _renderWorkspaceForm({ name, path, category='', isEdit }){
           <input type="hidden" id="workspaceFormCategory" data-sp-picker data-sp-source="sp:categories" data-sp-custom="1" value="${esc(category || '')}" placeholder="${esc(t('cron_category_placeholder') || 'Pick a category or add one')}">
           <div class="detail-form-hint">${esc(t('cron_category_hint') || 'Groups the space in the list, for example per department.')}</div>
         </div>
+        ${isEdit ? `<div class="sp-shared-hint" role="note">👥 ${esc(spT('shared_change_hint_space', 'This changes it for everyone who uses this space.'))}</div>` : ''}
         <div id="workspaceFormError" class="detail-form-error" style="display:none"></div>
       </form>
     </div>`;
@@ -7778,7 +8023,10 @@ function _refreshProfileSwitchBackground(gen){
   }).catch(function(){});
 }
 
-function botDisplayName(p){ return (p.bot&&p.bot.title)||p.name; }
+// Bot or a person's own profile (team member, partner): the server sends the
+// effective kind, its default rule lives in api/bot_metadata.default_kind.
+function _botKind(p){ return (p&&p.bot_kind)==='person'?'person':'bot'; }
+function botDisplayName(p){ return (p.bot&&p.bot.title)||(typeof spProfileLabel==='function'?spProfileLabel(p.name):p.name); }
 function botAvatarHtml(p){
   const avatar=String(p.bot_avatar_url||'');
   if(avatar.startsWith('/api/profile/avatar?')) return `<img src="${esc(avatar)}" width="32" height="32" alt="" style="border-radius:8px;object-fit:cover;vertical-align:middle;margin-right:8px">`;
@@ -7787,14 +8035,359 @@ function botAvatarHtml(p){
   const face=meta.shape==='hexagon'?'<polygon points="16,2 29,9 29,23 16,30 3,23 3,9"/>':meta.shape==='squircle'?'<rect x="2" y="2" width="28" height="28" rx="7"/>':'<circle cx="16" cy="16" r="14"/>';
   return `<svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true" style="vertical-align:middle;margin-right:8px"><g fill="${color}">${face}</g><g fill="white"><circle cx="11" cy="14" r="2"/><circle cx="21" cy="14" r="2"/></g><path d="M11 21 Q16 25 21 21" fill="none" stroke="white" stroke-width="2"/></svg>`;
 }
+// Org chart between bots: ui_meta.hermes-bots.reports_to names the manager bot.
+// The server rejects unknown managers, the bot itself and cycles; the editor
+// already leaves out the bot and everyone below it so a cycle cannot be picked.
+function _botOrgList(){ return (((_profilesCache||{}).profiles)||[]).filter(p=>p&&p.name); }
+function _botManagerOf(p){ return String((p&&p.bot&&p.bot.reports_to)||'').trim(); }
+function _botDescendants(name, list){
+  const below=new Set([name]);let grew=true;
+  while(grew){grew=false;for(const p of list){if(!below.has(p.name)&&below.has(_botManagerOf(p))){below.add(p.name);grew=true;}}}
+  return below;
+}
+function _botReportsToSelectHtml(p){
+  const list=_botOrgList(),current=_botManagerOf(p),blocked=_botDescendants(p.name,list);
+  const options=list.filter(x=>!blocked.has(x.name)).sort((a,b)=>botDisplayName(a).localeCompare(botDisplayName(b)));
+  let html=`<option value="">${esc(t('bot_reports_to_none'))}</option>`;
+  if(current&&!options.some(x=>x.name===current)) html+=`<option value="${esc(current)}" selected>${esc(t('bot_reports_to_hidden'))}</option>`;
+  for(const x of options) html+=`<option value="${esc(x.name)}" ${x.name===current?'selected':''}>${esc(botDisplayName(x))}</option>`;
+  return `<select id="botReportsTo">${html}</select>`;
+}
+// Kind: Automatic (no explicit kind, the default rule decides) or an explicit
+// bot or person. Automatic names what the rule decides right now.
+function _botKindSelectHtml(p){
+  const stored=String((p&&p.bot&&p.bot.kind)||'').trim(),explicit=['bot','person'].includes(stored)?stored:'';
+  const autoLabel=explicit?t('bot_kind_auto'):`${t('bot_kind_auto')} (${t('bot_kind_'+_botKind(p))})`;
+  return `<select id="botKind"><option value="" ${explicit?'':'selected'}>${esc(autoLabel)}</option>${['bot','person'].map(kind=>`<option value="${kind}" ${explicit===kind?'selected':''}>${esc(t('bot_kind_'+kind))}</option>`).join('')}</select>`;
+}
+function _botOrgTree(list){
+  const byName=new Map(list.map(p=>[p.name,p])),kids=new Map(),roots=[];
+  for(const p of list){
+    const m=_botManagerOf(p);
+    if(m&&m!==p.name&&byName.has(m)){if(!kids.has(m))kids.set(m,[]);kids.get(m).push(p);}else roots.push(p);
+  }
+  const order=(a,b)=>botDisplayName(a).localeCompare(botDisplayName(b));
+  roots.sort(order);for(const v of kids.values())v.sort(order);
+  // A stored cycle (written outside this UI) has no root; surface its members as roots.
+  const reached=new Set();const walk=p=>{if(reached.has(p.name))return;reached.add(p.name);(kids.get(p.name)||[]).forEach(walk);};
+  roots.forEach(walk);
+  for(const p of list.slice().sort(order)) if(!reached.has(p.name)){roots.push(p);walk(p);}
+  return {roots,kids};
+}
+// Compact org chart: per leading bot a row of columns, one per direct report,
+// with everyone below as one-line chips. Fits the width and wraps instead of
+// scrolling sideways. People (kind person) without bots below them sit in a
+// collapsed strip of their own; bots without a place are listed apart.
+function _botOrgChip(p, depth, inherited){
+  const chip=document.createElement('button');chip.type='button';chip.className='bot-org-chip';
+  chip.dataset.name=p.name;chip.dataset.depth=String(depth||0);
+  if(_currentProfileDetail&&_currentProfileDetail.name===p.name)chip.classList.add('active');
+  const meta=[(p.bot&&p.bot.role)||'',(p.bot&&p.bot.category)||''].filter((v,i,a)=>v&&a.indexOf(v)===i).join(' \u00b7 ');
+  // Below a column head the shared category is noise: only a different one shows.
+  const shown=meta&&meta!==inherited?meta:'';
+  chip.innerHTML=`<span class="bot-org-avatar">${botAvatarHtml(p)}</span><span class="bot-org-name">${esc(botDisplayName(p))}</span>${shown?`<span class="bot-org-meta">${esc(shown)}</span>`:''}`;
+  chip.title=meta?botDisplayName(p)+' \u00b7 '+meta:botDisplayName(p);
+  chip.dataset.search=(botDisplayName(p)+' '+p.name+' '+meta).toLowerCase();
+  chip.addEventListener('click',()=>openProfileDetail(p.name));
+  return chip;
+}
+function _botOrgColumn(head, kids, seen){
+  const col=document.createElement('section');col.className='bot-org-col';col.dataset.head=head.name;
+  const shared=(head.bot&&head.bot.category)||'';
+  const add=(p,depth)=>{if(seen.has(p.name))return;seen.add(p.name);col.appendChild(_botOrgChip(p,depth,depth?shared:''));(kids.get(p.name)||[]).forEach(c=>add(c,depth+1));};
+  add(head,0);
+  return col;
+}
+function _botOrgFilter(view, query){
+  const q=String(query||'').trim().toLowerCase();let shown=0;
+  view.querySelectorAll('.bot-org-chip').forEach(c=>{const hit=!q||c.dataset.search.includes(q);c.hidden=!hit;if(hit)shown++;});
+  view.querySelectorAll('.bot-org-col,.bot-org-block,.bot-org-section').forEach(box=>{box.hidden=!!q&&!box.querySelector('.bot-org-chip:not([hidden])');});
+  const people=view.querySelector('.bot-org-people');
+  if(people&&q&&!people.hidden)people.open=true;
+  const none=view.querySelector('.bot-org-no-match');if(none)none.hidden=shown>0;
+}
+async function openBotOrgChart(){
+  if(window.BotBuilder)window.BotBuilder.invalidate();
+  const title=$('profileDetailTitle'),body=$('profileDetailBody'),empty=$('profileDetailEmpty');
+  if(!title||!body)return;
+  if(!_profilesCache){try{_profilesCache=await api('/api/profiles?fast=1');}catch(e){showToast(e.message);return;}}
+  title.textContent=t('bot_org_chart');
+  const list=_botOrgList();
+  body.innerHTML=`<div class="main-view-content bot-org-view"><div class="bot-org-toolbar"><p class="bot-field-hint">${esc(t('bot_org_chart_intro'))}</p><input type="search" id="botOrgSearch" placeholder="${esc(t('bot_org_chart_search'))}" aria-label="${esc(t('bot_org_chart_search'))}"></div><div class="bot-org-scroll"></div></div>`;
+  const scroll=body.querySelector('.bot-org-scroll');
+  if(!list.length){scroll.innerHTML=`<p class="bot-field-hint">${esc(t('bot_org_chart_empty'))}</p>`;}
+  else{
+    const {roots,kids}=_botOrgTree(list),seen=new Set();
+    // A person stays in the tree only while bots report to them.
+    const person=p=>_botKind(p)==='person'&&!kids.has(p.name);
+    const placed=roots.filter(p=>kids.has(p.name)),loose=roots.filter(p=>!kids.has(p.name)&&!person(p));
+    const tree=document.createElement('div');tree.className='bot-org-tree';tree.setAttribute('role','group');tree.setAttribute('aria-label',t('bot_org_chart'));
+    for(const root of placed){
+      if(seen.has(root.name))continue;seen.add(root.name);
+      const block=document.createElement('div');block.className='bot-org-block';block.dataset.root=root.name;
+      const top=document.createElement('div');top.className='bot-org-top';top.appendChild(_botOrgChip(root,0));
+      const cols=document.createElement('div');cols.className='bot-org-columns';
+      (kids.get(root.name)||[]).forEach(c=>{if(!seen.has(c.name))cols.appendChild(_botOrgColumn(c,kids,seen));});
+      block.append(top,cols);tree.appendChild(block);
+    }
+    scroll.appendChild(tree);
+    const strip=(cls,items)=>{const box=document.createElement('div');box.className='bot-org-strip '+cls;items.forEach(p=>{if(!seen.has(p.name)){seen.add(p.name);box.appendChild(_botOrgChip(p,0));}});return box;};
+    if(loose.length){
+      const sec=document.createElement('section');sec.className='bot-org-section';
+      if(placed.length){const h=document.createElement('p');h.className='bot-field-hint bot-org-loose-title';h.textContent=t('bot_org_chart_unplaced');sec.appendChild(h);}
+      sec.appendChild(strip('bot-org-loose',loose));scroll.appendChild(sec);
+    }
+    const people=list.filter(p=>person(p)&&!seen.has(p.name));
+    if(people.length){
+      const det=document.createElement('details');det.className='bot-org-people bot-org-section';
+      det.innerHTML=`<summary>${esc(t('bot_org_chart_people'))} <span class="cron-group-count">${people.length}</span></summary>`;
+      det.appendChild(strip('',people.sort((a,b)=>botDisplayName(a).localeCompare(botDisplayName(b)))));scroll.appendChild(det);
+    }
+    const none=document.createElement('p');none.className='bot-field-hint bot-org-no-match';none.hidden=true;none.textContent=t('bot_org_chart_no_match');scroll.appendChild(none);
+    const search=body.querySelector('#botOrgSearch');
+    search.addEventListener('input',()=>_botOrgFilter(scroll,search.value));
+  }
+  document.querySelectorAll('.profile-card').forEach(e=>e.classList.remove('active'));
+  body.style.display='';
+  if(empty)empty.style.display='none';
+  _profileMode='read';
+  _currentProfileDetail=null;
+  _setProfileHeaderButtons('help');
+  _closeMobileSidebarAfterPanelSelection();
+}
 async function saveBotAppearance(){
   const p=_currentProfileDetail;if(!p)return;
   try{
-    await api('/api/profile/appearance',{method:'POST',body:JSON.stringify({name:p.name,revision:p.bot_revision||0,bot:{title:$('botTitle').value,description:$('botDescription').value,shape:$('botShape').value,color:$('botColor').value,knowledge_sources:p.bot_knowledge_sources||[],category:($('botCategory')?String($('botCategory').value||'').trim():'')}})});
+    await api('/api/profile/appearance',{method:'POST',body:JSON.stringify({name:p.name,revision:p.bot_revision||0,bot:{title:$('botTitle').value,description:$('botDescription').value,shape:$('botShape').value,color:$('botColor').value,knowledge_sources:p.bot_knowledge_sources||[],category:($('botCategory')?String($('botCategory').value||'').trim():''),role:($('botRole')?String($('botRole').value||'').trim():''),reports_to:($('botReportsTo')?String($('botReportsTo').value||''):''),kind:($('botKind')?String($('botKind').value||''):'')}})});
     _profileDropdownClearStoredCache();
     window.dispatchEvent(new CustomEvent('synpulse:bot-updated'));
     await loadProfilesPanel();showToast(t('bot_saved'));
   }catch(e){showToast(e.message);}
+}
+// Scout card (api/bot_scout.py): on/off, topics and digest time of the bot's
+// daily read-only look-out. The switch saves at once, topics and time on Save.
+let _botScoutTopics=[];
+const _BOT_SCOUT_MAX=12,_BOT_SCOUT_TOPIC_MAX=80;
+function _botScoutCardHtml(p){
+  // An unreadable profile.yaml reads as kind "unknown": no Scout until fixed.
+  if(_botKind(p)!=='bot'||p.bot_kind==='unknown')return '';
+  // Scout writes a scheduled job: the server also asks cron admin (POST /api/bots/scout).
+  const scout=(p.bot&&p.bot.scout)||{},on=!!scout.enabled,editable=p.bot_editable===true&&(typeof _cronIsCronAdmin!=='function'||_cronIsCronAdmin());
+  return `<section class="detail-card bot-scout-card" aria-labelledby="botScoutTitle">
+      <div class="bot-scout-head"><h3 id="botScoutTitle">${esc(t('bot_scout'))}</h3>
+        <label class="bot-scout-switch"><input type="checkbox" role="switch" id="botScoutEnabled" ${on?'checked':''} ${editable?'':'disabled'} onchange="saveBotScout(this.checked)"><span>${esc(t(on?'bot_scout_saved_on':'bot_scout_saved_off'))}</span></label></div>
+      <p class="bot-field-hint">${esc(t('bot_scout_intro'))}</p>
+      <fieldset ${editable?'':'disabled'}>
+        <label for="botScoutTopicInput">${esc(t('bot_scout_topics'))}</label>
+        <div class="bot-scout-chips" id="botScoutChips"><input id="botScoutTopicInput" maxlength="${_BOT_SCOUT_TOPIC_MAX}" placeholder="${esc(t('bot_scout_topics_placeholder'))}" onkeydown="_botScoutTopicKey(event)" onblur="_botScoutAddTopic(this)"></div>
+        <label for="botScoutTime">${esc(t('bot_scout_time'))}<input type="time" id="botScoutTime" step="60" value="${esc(/^\d\d:\d\d$/.test(scout.digest_time||'')?scout.digest_time:'07:30')}"></label>
+        ${editable?`<div class="bot-editor-actions"><button type="button" class="sm-btn primary" onclick="saveBotScout()">${esc(t('bot_scout_save'))}</button></div>`:''}
+      </fieldset>
+    </section>`;
+}
+function _paintBotScoutTopics(){
+  const box=$('botScoutChips'),input=$('botScoutTopicInput');if(!box||!input)return;
+  box.querySelectorAll('.bot-scout-chip').forEach(n=>n.remove());
+  for(const topic of _botScoutTopics){
+    const chip=document.createElement('span');chip.className='bot-scout-chip';
+    const label=document.createElement('span');label.textContent=topic;
+    const remove=document.createElement('button');remove.type='button';remove.textContent='\u00d7';
+    remove.setAttribute('aria-label',t('bot_scout_remove_topic')+': '+topic);
+    remove.disabled=input.disabled||!!input.closest('fieldset:disabled');
+    remove.onclick=()=>{_botScoutTopics=_botScoutTopics.filter(x=>x!==topic);_paintBotScoutTopics();input.focus();};
+    chip.append(label,remove);box.insertBefore(chip,input);
+  }
+  input.hidden=_botScoutTopics.length>=_BOT_SCOUT_MAX;
+}
+function _botScoutAddTopic(input){
+  const topic=String(input.value||'').replace(/\s+/g,' ').trim().slice(0,_BOT_SCOUT_TOPIC_MAX);input.value='';
+  if(!topic||_botScoutTopics.length>=_BOT_SCOUT_MAX||_botScoutTopics.some(x=>x.toLowerCase()===topic.toLowerCase()))return;
+  _botScoutTopics.push(topic);_paintBotScoutTopics();
+}
+function _botScoutTopicKey(e){
+  if(e.key==='Enter'||e.key===','){e.preventDefault();_botScoutAddTopic(e.target);e.target.focus();}
+  else if(e.key==='Backspace'&&!e.target.value&&_botScoutTopics.length){_botScoutTopics.pop();_paintBotScoutTopics();}
+}
+async function saveBotScout(enabled){
+  const p=_currentProfileDetail;if(!p)return;
+  const input=$('botScoutTopicInput');if(input&&input.value)_botScoutAddTopic(input);
+  const on=typeof enabled==='boolean'?enabled:!!($('botScoutEnabled')&&$('botScoutEnabled').checked);
+  const time=$('botScoutTime')?String($('botScoutTime').value||'').slice(0,5):'';
+  try{
+    await api('/api/bots/scout',{method:'POST',body:JSON.stringify({name:p.name,revision:p.bot_revision||0,enabled:on,topics:_botScoutTopics,...(time?{digest_time:time}:{})})});
+    _profileDropdownClearStoredCache();
+    window.dispatchEvent(new CustomEvent('synpulse:bot-updated',{detail:{name:p.name}}));
+    await loadProfilesPanel();showToast(t(on?'bot_scout_saved_on':'bot_scout_saved_off'));
+  }catch(e){
+    if($('botScoutEnabled')&&typeof enabled==='boolean')$('botScoutEnabled').checked=!enabled;
+    showToast(e.message);
+  }
+}
+// Responsibilities card (ui_meta.hermes-bots.responsibilities): what the bot
+// answers for. Everyone who sees the bot reads the list; an editor adds, edits
+// and removes rows, each change saved at once under the bot revision through
+// /api/profile/appearance. The bot gets the list as context in its own chats.
+const _BOT_DUTY_MAX=12,_BOT_DUTY_AUTONOMY=['ask','auto','report_only'];
+let _botDuties=[],_botDutyEditing=-1;
+function _botDutyRowHtml(d,i,editable){
+  const meta=[];
+  if(d.trigger)meta.push(`<span class="bot-duty-chip">${esc(t('bot_duty_trigger'))}: ${esc(d.trigger)}</span>`);
+  meta.push(`<span class="bot-duty-chip bot-duty-autonomy-${esc(d.autonomy||'ask')}">${esc(t('bot_duty_autonomy_'+(d.autonomy||'ask')))}</span>`);
+  if(d.reporting)meta.push(`<span class="bot-duty-chip">${esc(t('bot_duty_reports'))}: ${esc(d.reporting)}</span>`);
+  const actions=editable?`<div class="bot-duty-actions"><button type="button" class="sm-btn" onclick="_botDutyEdit(${i})">${esc(t('bot_duty_edit'))}</button><button type="button" class="sm-btn" onclick="_botDutyRemove(${i})">${esc(t('bot_duty_remove'))}</button></div>`:'';
+  return `<li class="bot-duty" data-index="${i}"><div class="bot-duty-main"><strong class="bot-duty-title">${esc(d.title)}</strong>${d.objective?`<p class="bot-duty-objective">${esc(d.objective)}</p>`:''}<div class="bot-duty-meta">${meta.join('')}</div></div>${actions}</li>`;
+}
+function _botDutyFormHtml(d){
+  d=d||{};
+  return `<div class="bot-duty-form" id="botDutyForm">
+      <label for="botDutyTitle">${esc(t('bot_duty_title'))}<input id="botDutyTitle" maxlength="80" required value="${esc(d.title||'')}"></label>
+      <label for="botDutyObjective">${esc(t('bot_duty_objective'))}<textarea id="botDutyObjective" maxlength="300" rows="2">${esc(d.objective||'')}</textarea></label>
+      <label for="botDutyTrigger">${esc(t('bot_duty_trigger'))}<input id="botDutyTrigger" maxlength="120" placeholder="${esc(t('bot_duty_trigger_placeholder'))}" value="${esc(d.trigger||'')}"></label>
+      <label for="botDutyAutonomy">${esc(t('bot_duty_autonomy'))}<select id="botDutyAutonomy">${_BOT_DUTY_AUTONOMY.map(a=>`<option value="${a}" ${(d.autonomy||'ask')===a?'selected':''}>${esc(t('bot_duty_autonomy_'+a))}</option>`).join('')}</select></label>
+      <label for="botDutyReporting">${esc(t('bot_duty_reporting'))}<input id="botDutyReporting" maxlength="120" placeholder="${esc(t('bot_duty_reporting_placeholder'))}" value="${esc(d.reporting||'')}"></label>
+      <div class="bot-editor-actions"><button type="button" class="sm-btn" onclick="_botDutyCancel()">${esc(t('bot_duty_cancel'))}</button><button type="button" class="sm-btn primary" onclick="_botDutySave()">${esc(t('bot_duty_save'))}</button></div>
+    </div>`;
+}
+function _botDutiesCardHtml(p){
+  if(_botKind(p)!=='bot')return '';
+  return `<section class="detail-card bot-duties-card" id="botDutiesCard" aria-labelledby="botDutiesTitle"></section>`;
+}
+function _paintBotDuties(){
+  const box=$('botDutiesCard'),p=_currentProfileDetail;if(!box||!p)return;
+  const editable=p.bot_editable===true,full=_botDuties.length>=_BOT_DUTY_MAX;
+  const rows=_botDuties.map((d,i)=>_botDutyEditing===i&&editable?`<li class="bot-duty is-editing">${_botDutyFormHtml(d)}</li>`:_botDutyRowHtml(d,i,editable)).join('');
+  const adding=editable&&_botDutyEditing===_botDuties.length;
+  box.innerHTML=`<div class="bot-duties-head"><h3 id="botDutiesTitle">${esc(t('bot_duties'))}</h3><span class="cron-group-count">${_botDuties.length}</span></div>
+    <p class="bot-field-hint">${esc(t('bot_duties_intro'))}</p>
+    ${rows?`<ol class="bot-duties-list">${rows}</ol>`:(adding?'':`<p class="bot-field-hint bot-duties-empty">${esc(t('bot_duties_empty'))}</p>`)}
+    ${adding?_botDutyFormHtml():''}
+    ${editable&&_botDutyEditing<0?`<div class="bot-editor-actions"><button type="button" class="sm-btn" id="botDutyAdd" onclick="_botDutyEdit(${_botDuties.length})" ${full?'disabled':''} title="${esc(full?t('bot_duties_max'):'')}">${esc(t('bot_duties_add'))}</button></div>`:''}`;
+  const first=box.querySelector('#botDutyTitle');if(first)first.focus();
+}
+function _botDutyEdit(i){ _botDutyEditing=i;_paintBotDuties(); }
+function _botDutyCancel(){ _botDutyEditing=-1;_paintBotDuties(); }
+function _botDutyFromForm(){
+  const v=id=>String(($(id)||{}).value||'');
+  return {title:v('botDutyTitle').replace(/\s+/g,' ').trim(),objective:v('botDutyObjective').trim(),trigger:v('botDutyTrigger').replace(/\s+/g,' ').trim(),autonomy:v('botDutyAutonomy')||'ask',reporting:v('botDutyReporting').replace(/\s+/g,' ').trim()};
+}
+async function _botDutySave(){
+  const row=_botDutyFromForm();
+  if(!row.title){const f=$('botDutyTitle');if(f)f.focus();showToast(t('bot_duty_title_required'));return;}
+  const next=_botDuties.slice();
+  if(_botDutyEditing>=0&&_botDutyEditing<next.length)next[_botDutyEditing]=row;else next.push(row);
+  await _botDutiesStore(next.slice(0,_BOT_DUTY_MAX));
+}
+async function _botDutyRemove(i){
+  await _botDutiesStore(_botDuties.filter((_,k)=>k!==i));
+}
+async function _botDutiesStore(list){
+  const p=_currentProfileDetail;if(!p)return;
+  try{
+    await api('/api/profile/appearance',{method:'POST',body:JSON.stringify({name:p.name,revision:p.bot_revision||0,bot:{responsibilities:list}})});
+    _botDuties=list;_botDutyEditing=-1;_paintBotDuties();
+    _profileDropdownClearStoredCache();
+    window.dispatchEvent(new CustomEvent('synpulse:bot-updated',{detail:{name:p.name}}));
+    await loadProfilesPanel();showToast(t('bot_duties_saved'));
+  }catch(e){showToast(e.message);}
+}
+// "Werk van deze bot" (bot page): open Kanban tasks assigned to the bot,
+// grouped by status with what needs a person on top, and what it made (the
+// latest attachments of its tasks). GET /api/kanban/bot-work; downloads go
+// through the read-only /api/kanban/attachment route.
+const _BOT_WORK_ORDER=['blocked','review','running','ready','todo','scheduled','triage'];
+// The board the Kanban panel has open (?board=, as _kanbanBoardQuery), so a
+// task opened from here and its files come from the same board.
+function _botWorkQuery(extra){
+  if(typeof _kanbanBoardQuery==='function')return _kanbanBoardQuery(extra);
+  const q=new URLSearchParams(Object.entries(extra||{}).filter(e=>e[1]!==''&&e[1]!=null)).toString();
+  return q?'?'+q:'';
+}
+function _botWorkStatusLabel(status){
+  if(status==='review'||status==='scheduled')return t('bot_work_status_'+status);
+  return typeof _kanbanColumnLabel==='function'?_kanbanColumnLabel(status):status;
+}
+function _botWorkNeedsYou(task){
+  return !!task&&(task.status==='review'||(task.status==='blocked'&&task.block_kind==='needs_input'));
+}
+function _botWorkWhen(ts){
+  const n=Number(ts||0);if(!n)return '';
+  try{return new Date(n*1000).toLocaleString();}catch(_){return '';}
+}
+function _botWorkSize(bytes){
+  const n=Number(bytes||0);
+  return n<1024?n+' B':n<1048576?Math.round(n/1024)+' KB':(n/1048576).toFixed(1)+' MB';
+}
+function _botWorkTaskHtml(task){
+  const flag=task.status==='review'?t('bot_work_flag_review'):task.block_kind==='needs_input'&&task.status==='blocked'?t('bot_work_flag_needs_input'):'';
+  return `<li><button type="button" class="bot-work-task${_botWorkNeedsYou(task)?' is-attention':''}" data-task-id="${esc(task.id)}" onclick="openKanbanTaskFromBot(this.dataset.taskId)">
+      <span class="bot-work-task-title">${esc(task.title||task.id)}</span>${flag?`<span class="bot-work-flag">${esc(flag)}</span>`:''}</button></li>`;
+}
+function _botWorkHtml(data){
+  const tasks=Array.isArray(data&&data.tasks)?data.tasks:[],files=Array.isArray(data&&data.attachments)?data.attachments:[];
+  const groups=_BOT_WORK_ORDER.map(status=>[status,tasks.filter(x=>x.status===status)]).filter(g=>g[1].length);
+  const known=new Set(_BOT_WORK_ORDER),rest=tasks.filter(x=>!known.has(x.status));
+  if(rest.length)groups.push(['other',rest]);
+  const taskHtml=groups.map(([status,items])=>`<div class="bot-work-group" data-status="${esc(status)}"><div class="bot-work-group-head">${esc(status==='other'?t('bot_work_status_other'):_botWorkStatusLabel(status))} <span class="cron-group-count">${items.length}</span></div><ul class="bot-work-list">${items.map(_botWorkTaskHtml).join('')}</ul></div>`).join('');
+  const fileHtml=files.map(f=>`<li class="bot-work-file"><a href="${esc('/api/kanban/attachment'+_botWorkQuery({id:f.id}))}" download="${esc(f.filename)}">${esc(f.filename)}</a>
+      <span class="bot-work-file-meta">${esc(f.task_title||'')} · ${esc(_botWorkWhen(f.created_at))} · ${esc(_botWorkSize(f.size))}</span></li>`).join('');
+  return `<div class="detail-card-title">${esc(t('bot_work_title'))} <span class="cron-group-count">${tasks.length}</span></div>
+    ${taskHtml||`<p class="bot-field-hint">${esc(t('bot_work_empty'))}</p>`}
+    <h4 class="bot-work-subtitle">${esc(t('bot_work_made'))}</h4>
+    ${fileHtml?`<ul class="bot-work-files">${fileHtml}</ul>`:`<p class="bot-field-hint">${esc(t('bot_work_made_empty'))}</p>`}`;
+}
+function _botWorkSectionHtml(p){
+  if(_botKind(p)!=='bot')return '';
+  return `<section class="detail-card bot-work" id="botWork" style="display:none" aria-live="polite"></section>`;
+}
+// Bot Screen status line (api/bot_screens.py /api/bot-screen/status): only
+// for viewers with an explicit Bot Screen view grant; opens the existing viewer.
+function _botScreenUrl(bot){ return '/static/bot-screens.html?'+new URLSearchParams({bot:bot||'default'}); }
+// "wacht sinds 14:05 (12 min geleden)" from the lease's help_since (epoch
+// seconds); empty when the engine did not write one.
+function _botScreenSinceText(ts,now){
+  const n=Number(ts||0);if(!(n>0))return '';
+  const d=new Date(n*1000),mins=Math.max(0,Math.floor(((now||Date.now())-n*1000)/60000));
+  const time=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+  const ago=mins<1?t('bot_screen_ago_now'):mins<60?t('bot_screen_ago_min').replace('{n}',mins):t('bot_screen_ago_hours').replace('{n}',Math.floor(mins/60));
+  return t('bot_screen_waiting_since').replace('{time}',time).replace('{ago}',ago);
+}
+window._botScreenSinceText=_botScreenSinceText;
+function _botScreenStatusText(row){
+  if(!row)return '';
+  if(row.state==='none')return t('bot_screen_none');
+  if(row.state==='waiting'){
+    const since=_botScreenSinceText(row.help_since);
+    return t('bot_screen_waiting').replace('{reason}',row.reason||'')+(since?' · '+since:'');
+  }
+  if(row.state==='human'){
+    const when=_botWorkWhen(row.since);
+    return (row.mine?t('bot_screen_human_you'):t('bot_screen_human').replace('{who}',row.by||t('bot_screen_someone'))).replace('{since}',when);
+  }
+  return t('bot_screen_agent');
+}
+function _botScreenLineHtml(row){
+  if(!row)return '';
+  const link=row.state==='none'?'':`<a class="sm-btn bot-screen-open" href="${esc(_botScreenUrl(row.bot))}" target="_blank" rel="noopener">${esc(t('bot_screen_open'))}</a>`;
+  return `<div class="bot-screen-line" data-state="${esc(row.state)}"><span class="bot-screen-dot" aria-hidden="true"></span><span class="bot-screen-text"><strong>${esc(t('bot_screen'))}:</strong> ${esc(_botScreenStatusText(row))}</span>${link}</div>`;
+}
+async function _loadBotWork(p){
+  const box=$('botWork');if(!box||!p)return;
+  const bot=p.is_default?'default':p.name;
+  const kanban=typeof _canUseFeature!=='function'||_canUseFeature('sessions:read');
+  const [data,screens]=await Promise.all([
+    kanban?api('/api/kanban/bot-work'+_botWorkQuery({profile:bot}),{timeoutToast:false}).catch(()=>null):null,
+    api('/api/bot-screen/status?bot='+encodeURIComponent(bot),{timeoutToast:false,redirect401:false}).catch(()=>null),
+  ]);
+  if(!box.isConnected||!_currentProfileDetail||_currentProfileDetail.name!==p.name)return;
+  const screen=screens&&Array.isArray(screens.screens)?screens.screens.find(r=>r&&r.bot===bot):null;
+  if(!data&&!screen)return;
+  box.innerHTML=_botScreenLineHtml(screen)+(data?_botWorkHtml(data):`<div class="detail-card-title">${esc(t('bot_work_title'))}</div>`);
+  box.style.display='';
+}
+async function openKanbanTaskFromBot(taskId){
+  if(!taskId)return;
+  if(typeof switchPanel==='function')await switchPanel('kanban');
+  if(typeof loadKanbanTask==='function')await loadKanbanTask(taskId);
 }
 async function uploadBotAvatar(input){
   const p=_currentProfileDetail,file=input.files&&input.files[0];if(!p||!file)return;
@@ -7851,6 +8444,10 @@ async function loadProfilesPanel() {
       panel.appendChild(explainer);
     }
 
+    if (typeof spSetFirstRun === 'function') {
+      const own = (data.profiles || []).filter(p => p && p.name && p.name !== 'default');
+      spSetFirstRun('profileDetailEmpty', own.length === 0);
+    }
     if (!data.profiles || !data.profiles.length) {
       const emptyMsg = document.createElement('div');
       emptyMsg.style.cssText = 'padding:16px;color:var(--muted);font-size:12px';
@@ -7894,6 +8491,7 @@ async function loadProfilesPanel() {
       _profileCardEntries.push({ category: p.bot && p.bot.category, node: card });
     }
     spRenderGrouped(panel, _profileCardEntries, { storagePrefix: 'bots-group' });
+    _decorateBotCardsWithJobs(data.profiles);
     // Re-render detail with fresh data if we have one and we're not in a form
     if (_currentProfileDetail && _profileMode !== 'create') {
       const refreshed = data.profiles.find(p => p.name === _currentProfileDetail.name);
@@ -7969,6 +8567,7 @@ function _renderProfileDetail(p, activeName){
         <button type="button" class="sm-btn" onclick="openBotConfiguration('skills')">${esc(t('tab_skills'))}</button>
         ${window._navAudience==='admin'?`<button type="button" class="sm-btn" onclick="openBotConfiguration('settings')">${esc(t('bot_tools'))}</button>`:''}
       </div>
+      <section class="bot-jobs" id="profileBotJobs" style="display:none"></section>
       <form class="bot-editor" onsubmit="event.preventDefault();saveBotAppearance()">
         <fieldset ${editable?'':'disabled'}>
           <legend>${esc(t('bot_identity'))}</legend>
@@ -7979,6 +8578,9 @@ function _renderProfileDetail(p, activeName){
             <label for="botShape">${esc(t('bot_avatar'))}<select id="botShape">${['circle','squircle','hexagon'].map(shape=>`<option value="${shape}" ${(p.bot&&p.bot.shape)===shape?'selected':''}>${shape}</option>`).join('')}</select></label>
             <label for="botColor">${esc(t('bot_color'))}<input type="color" id="botColor" value="${/^#[0-9a-f]{6}$/i.test((p.bot&&p.bot.color)||'')?p.bot.color:'#6688aa'}"></label>
             <label class="bot-editor-wide" for="botCategory">${esc(t('category_label')||'Category')}<input type="hidden" id="botCategory" data-sp-picker data-sp-source="sp:categories" data-sp-custom="1" value="${esc((p.bot&&p.bot.category)||'')}" placeholder="${esc(t('cron_category_placeholder')||'Pick a category or add one')}"></label>
+            <label for="botRole">${esc(t('bot_role'))}<input id="botRole" value="${esc((p.bot&&p.bot.role)||'')}" maxlength="80" placeholder="${esc(t('bot_role_placeholder'))}"></label>
+            <label for="botReportsTo">${esc(t('bot_reports_to'))}${_botReportsToSelectHtml(p)}</label>
+            <label for="botKind">${esc(t('bot_kind'))}${_botKindSelectHtml(p)}</label>
             <label class="bot-editor-wide" for="botAvatarFile">${esc(t('bot_upload'))}<input id="botAvatarFile" type="file" accept="image/png,image/jpeg,image/webp" onchange="uploadBotAvatar(this)" aria-describedby="botAvatarHint"></label>
           </div>
           <p class="bot-field-hint" id="botAvatarHint">${esc(t('bot_avatar_limit'))}</p>
@@ -7987,13 +8589,158 @@ function _renderProfileDetail(p, activeName){
         </fieldset>
         ${editable?'':`<p class="bot-field-hint">${esc(t('bot_read_only'))}</p>`}
       </form>
+      ${_botDutiesCardHtml(p)}
+      ${_botWorkSectionHtml(p)}
+      ${_botScoutCardHtml(p)}
       <details class="bot-technical-details"><summary>${esc(t('bot_configuration_details'))}</summary>${rows.join('')}</details>
     </div>`;
+  _botScoutTopics=(((p.bot||{}).scout||{}).topics||[]).slice();_paintBotScoutTopics();
+  _botDuties=(((p.bot||{}).responsibilities)||[]).map(d=>({...d}));_botDutyEditing=-1;_paintBotDuties();
+  _loadBotWork(p);
   if (window.SpPicker) SpPicker.mountAll(body);
   body.style.display = '';
   if (empty) empty.style.display = 'none';
   _profileMode = 'read';
   _setProfileHeaderButtons('read', p, activeName);
+  _loadProfileBotJobs(p);
+}
+
+// What a bot does by itself (19 Oct 2026): the jobs it answers for
+// (_cronJobBotName: assigned bot, else the store's bot) as a task list with
+// status, rhythm, next and last run, and quick actions.
+let _botJobsCache = null;
+async function _botJobsAll(force){
+  if (!force && _botJobsCache && Date.now() - _botJobsCache.at < 60000) return _botJobsCache.jobs;
+  const data = await api('/api/crons?all_profiles=1', { timeoutToast: false });
+  _botJobsCache = { at: Date.now(), jobs: Array.isArray(data && data.jobs) ? data.jobs : [] };
+  return _botJobsCache.jobs;
+}
+function _botJobsFor(p, jobs){
+  const names = new Set([p.name]);
+  if (p.is_default) names.add('default');
+  return (jobs || []).filter(j => names.has(_cronJobBotName(j)));
+}
+function _botJobState(j){
+  if (j.enabled === false || j.state === 'paused') return 'paused';
+  const st = String(j.last_status || '').toLowerCase();
+  if (st === 'error' || st === 'failed' || st === 'failure' || Number(j.failure_streak || 0) > 0) return 'error';
+  if (st === 'ok' || st === 'success' || st === 'completed') return 'ok';
+  return 'new';
+}
+function _botJobRel(iso){
+  const ms = Date.parse(iso || '');
+  if (!ms) return '';
+  const diff = (ms - Date.now()) / 1000;
+  const abs = Math.abs(diff);
+  const lang = (document.documentElement.lang || 'nl').slice(0, 2);
+  let rtf; try { rtf = new Intl.RelativeTimeFormat(lang, { numeric: 'auto' }); } catch (_e) { return ''; }
+  if (abs < 60) return rtf.format(Math.round(diff), 'second');
+  if (abs < 3600) return rtf.format(Math.round(diff / 60), 'minute');
+  if (abs < 86400) return rtf.format(Math.round(diff / 3600), 'hour');
+  return rtf.format(Math.round(diff / 86400), 'day');
+}
+function _botJobRhythm(j){
+  const expr = (j.schedule && (j.schedule.expr || j.schedule.display)) || j.schedule_display || '';
+  return _cronScheduleInWords(expr) || j.schedule_display || '';
+}
+function _botJobRowHtml(j){
+  const state = _botJobState(j);
+  const store = _cronOwnerProfileName(j) || 'default';
+  const id = esc(j.id), storeEsc = esc(store);
+  const stateLabel = t('bot_jobs_state_' + state) || state;
+  const last = j.last_run_at ? _botJobRel(j.last_run_at) : '';
+  const next = state !== 'paused' && j.next_run_at ? _botJobRel(j.next_run_at) : '';
+  const sub = [_botJobRhythm(j), next ? (t('bot_jobs_next', next) || ('next ' + next)) : ''].filter(Boolean).join(' · ');
+  const icon = j.emoji || (j.no_agent ? '⚙️' : '✨');
+  const live = !j.read_only;
+  const actions = [];
+  if (j.job_chat_session_id) actions.push(`<button type="button" class="bot-job-act" title="${esc(t('cron_job_chat_open') || 'Open task chat')}" aria-label="${esc(t('cron_job_chat_open') || 'Open task chat')}" onclick="event.stopPropagation();openCronJobChat('${esc(j.job_chat_session_id)}','${storeEsc}')">💬</button>`);
+  if (live && state !== 'paused') actions.push(`<button type="button" class="bot-job-act" title="${esc(t('bot_jobs_run') || 'Run now')}" aria-label="${esc(t('bot_jobs_run') || 'Run now')}" onclick="event.stopPropagation();_botJobAct('run','${id}')">▶</button>`);
+  if (live) actions.push(state === 'paused'
+    ? `<button type="button" class="bot-job-act" title="${esc(t('bot_jobs_resume') || 'Resume')}" aria-label="${esc(t('bot_jobs_resume') || 'Resume')}" onclick="event.stopPropagation();_botJobAct('resume','${id}')">↻</button>`
+    : `<button type="button" class="bot-job-act" title="${esc(t('bot_jobs_pause') || 'Pause')}" aria-label="${esc(t('bot_jobs_pause') || 'Pause')}" onclick="event.stopPropagation();_botJobAct('pause','${id}')">⏸</button>`);
+  const err = state === 'error' && j.last_error ? `<div class="bot-job-error">${esc(String(j.last_error).split('\n')[0].slice(0, 160))}</div>` : '';
+  const botEsc = esc(_cronJobBotName(j));
+  return `<li class="bot-job is-${state}" tabindex="0" role="button" onclick="openCronFromBot('${id}','${storeEsc}','${botEsc}')" onkeydown="if(event.key==='Enter'){openCronFromBot('${id}','${storeEsc}','${botEsc}')}">
+      <span class="bot-job-icon" aria-hidden="true">${esc(icon)}</span>
+      <div class="bot-job-main">
+        <div class="bot-job-name">${esc(j.name || j.id)}</div>
+        <div class="bot-job-sub">${esc(sub)}</div>${err}
+      </div>
+      <div class="bot-job-status"><span class="bot-job-pill is-${state}">${esc(stateLabel)}</span>${last ? `<span class="bot-job-last">${esc(last)}</span>` : ''}</div>
+      <div class="bot-job-actions">${actions.join('')}</div>
+    </li>`;
+}
+async function _botJobAct(kind, jobId){
+  if (kind === 'run') await cronRun(jobId);
+  else if (kind === 'pause') await cronPause(jobId);
+  else if (kind === 'resume') await cronResume(jobId);
+  _botJobsCache = null;
+  if (_currentProfileDetail) _loadProfileBotJobs(_currentProfileDetail);
+}
+async function _loadProfileBotJobs(p){
+  const box = $('profileBotJobs');
+  if (!box || !p || (typeof _canUseFeature === 'function' && !_canUseFeature('cron:read'))) return;
+  let jobs = [];
+  try { jobs = _botJobsFor(p, await _botJobsAll()); } catch (_e) { return; }
+  if (!box.isConnected || !_currentProfileDetail || _currentProfileDetail.name !== p.name) return;
+  const order = { error: 0, ok: 1, new: 2, paused: 3 };
+  jobs.sort((a, b) => (order[_botJobState(a)] - order[_botJobState(b)]) ||
+    ((Date.parse(a.next_run_at || '') || 9e15) - (Date.parse(b.next_run_at || '') || 9e15)));
+  const active = jobs.filter(j => _botJobState(j) !== 'paused');
+  const paused = jobs.filter(j => _botJobState(j) === 'paused');
+  const failing = jobs.filter(j => _botJobState(j) === 'error').length;
+  const stats = [
+    `<span class="bot-jobs-stat"><b>${active.length}</b> ${esc(t('bot_jobs_active') || 'active')}</span>`,
+    failing ? `<span class="bot-jobs-stat is-error"><b>${failing}</b> ${esc(t('bot_jobs_failing') || 'need attention')}</span>` : `<span class="bot-jobs-stat is-ok">${esc(t('bot_jobs_all_ok') || 'all fine')}</span>`,
+    paused.length ? `<span class="bot-jobs-stat"><b>${paused.length}</b> ${esc(t('bot_jobs_paused') || 'paused')}</span>` : '',
+  ].join('');
+  const filterName = p.is_default ? 'default' : p.name;
+  box.innerHTML = `<header class="bot-jobs-head">
+      <div><h3>${esc(t('bot_jobs_title') || 'What this bot does by itself')}</h3>
+      <p class="bot-jobs-hint">${esc(t('bot_jobs_hint') || 'Tasks this bot runs on a schedule. Click one for details and its runs.')}</p></div>
+      ${jobs.length ? `<div class="bot-jobs-stats">${stats}</div>` : ''}
+    </header>
+    ${active.length ? `<ul class="bot-jobs-list">${active.map(_botJobRowHtml).join('')}</ul>` : ''}
+    ${paused.length ? `<details class="bot-jobs-paused"><summary>${esc(t('bot_jobs_paused_title', paused.length) || ('Paused (' + paused.length + ')'))}</summary><ul class="bot-jobs-list">${paused.map(_botJobRowHtml).join('')}</ul></details>` : ''}
+    ${jobs.length ? `<div class="bot-jobs-foot"><button type="button" class="sm-btn" onclick="_cronCategoryFilter='';setCronBotFilter('${esc(filterName)}').then(()=>switchPanel('tasks'))">${esc(t('profile_bot_jobs_open') || 'Open in Scheduled tasks')}</button></div>`
+      : `<div class="bot-jobs-empty"><span aria-hidden="true">🗓️</span><p>${esc(t('profile_bot_jobs_empty') || 'This bot has no scheduled tasks yet.')}</p></div>`}`;
+  box.style.display = '';
+}
+// A small "n tasks" chip on every bot card, red dot when one needs attention.
+async function _decorateBotCardsWithJobs(profiles){
+  if (typeof _canUseFeature === 'function' && !_canUseFeature('cron:read')) return;
+  let jobs; try { jobs = await _botJobsAll(); } catch (_e) { return; }
+  for (const p of profiles || []) {
+    const card = document.querySelector(`.profile-card[data-name="${CSS.escape(p.name)}"] .profile-card-header > div`);
+    if (!card || card.querySelector('.bot-card-jobs')) continue;
+    const mine = _botJobsFor(p, jobs).filter(j => _botJobState(j) !== 'paused');
+    if (!mine.length) continue;
+    const bad = mine.some(j => _botJobState(j) === 'error');
+    const chip = document.createElement('span');
+    chip.className = 'bot-card-jobs' + (bad ? ' has-error' : '');
+    chip.textContent = t('bot_jobs_count', mine.length) || (mine.length + ' tasks');
+    if (bad) chip.title = t('bot_jobs_failing') || 'need attention';
+    card.appendChild(chip);
+  }
+}
+// From a bot's task list to Scheduled tasks: filtered on that bot, with the
+// task open and in view.
+async function openCronFromBot(jobId, ownerProfile, botName){
+  const bot = _cronProfileName(botName) || _cronProfileName(ownerProfile) || 'default';
+  _cronBotFilter = bot === _cronActiveBotName() ? '' : bot;
+  _cronCategoryFilter = '';
+  try { localStorage.setItem('cron-bot-filter', _cronBotFilter); localStorage.setItem('cron-category-filter', ''); } catch (_e) {}
+  if (typeof switchPanel === 'function') await switchPanel('tasks');
+  else await loadCrons();
+  const store = _cronProfileName(ownerProfile) || 'default';
+  const find = () => (_cronList || []).find(j => String(j.id) === String(jobId) && (_cronOwnerProfileName(j) || 'default') === store);
+  let job = find();
+  if (!job) { _cronBotFilter = '*'; await loadCrons(); job = find(); }
+  if (!job) return;
+  const item = document.getElementById(_cronItemId(job));
+  openCronDetail(job, item || undefined);
+  if (item) { const group = item.closest('details'); if (group) group.open = true; item.scrollIntoView({ block: 'center' }); }
 }
 
 function _setProfileHeaderButtons(mode, p, activeName){
@@ -8805,8 +9552,9 @@ let _settingsSkinOnOpen = null; // track skin at open time for discard revert
 let _settingsFontSizeOnOpen = null; // track font size at open time for discard revert
 let _settingsHermesDefaultModelOnOpen = '';
 let _settingsHermesDefaultModelProviderOnOpen = null;
-let _settingsSection = 'conversation';
-let _currentSettingsSection = 'conversation';
+// SynthPulse: settings open on Preferences (language, theme, send key).
+let _settingsSection = 'preferences';
+let _currentSettingsSection = 'preferences';
 let _settingsIndex = null;
 let _settingsIndexPromise = null;
 let _settingsSearchSeq = 0;
@@ -8944,7 +9692,7 @@ window._navAudience = 'member';
 window._capabilityNavigation = false;
 // Navigation order agreed with Michaël (20 Sep 2026): daily work first, then
 // admin surfaces. Also the default order of the markup in index.html.
-const _MEMBER_NAV_ORDER = ['modules','tasks', 'skills', 'projects', 'profiles', 'memory', 'integrations', 'workspaces', 'files', 'todos', 'insights', 'approvals', 'governance', 'logs', 'apps', 'msp'];
+const _MEMBER_NAV_ORDER = ['profiles', 'modules','tasks', 'skills', 'projects', 'memory', 'integrations', 'workspaces', 'files', 'todos', 'insights', 'approvals', 'governance', 'logs', 'apps', 'msp'];
 function _canUseFeature(permission){
   const me=window.__GOV_ME__;
   if(!me)return false;
@@ -10608,6 +11356,7 @@ async function loadSettingsPanel(){
       langSel.addEventListener('change',function(){
         if(typeof setLocale==='function'){setLocale(this.value);if(typeof applyLocaleToDOM==='function')applyLocaleToDOM();}
         _schedulePreferencesAutosave();
+        try{localStorage.setItem('sp-lang-explicit',this.value);}catch(_){}
       },{once:false});
     }
     const showUsageCb=$('settingsShowTokenUsage');
@@ -14179,11 +14928,16 @@ function startCronPolling(){
           // toast_notifications when a server does not send them.
           const flags=_cronCompletionFlags(c);
           const statusText=t('cron_completion_status', c.name, c.status==='error' ? t('status_failed') : t('status_completed'));
+          // The chat the result was posted into (the job's own chat, or the
+          // chat it was made in) is where a click on the notice leads.
+          const chatSid=c.chat_session_id||'';
           if(flags.toast){
-            showToast(statusText,4000);
+            if(chatSid) _cronToastWithChat(statusText, chatSid, c.owner_profile);
+            else showToast(statusText,4000);
           }
           if(flags.desktop && typeof sendBrowserNotification==='function'){
-            sendBrowserNotification(c.name, statusText, c.session_id ? {sid:c.session_id} : {});
+            const sid=chatSid||c.session_id;
+            sendBrowserNotification(c.name, statusText, sid ? {sid} : {});
           }
           _cronPollSince=Math.max(_cronPollSince,c.completed_at);
           if(!flags.badge) continue;
@@ -14195,12 +14949,28 @@ function startCronPolling(){
               profile:activeProfile,
             });
           }
+          if(chatSid && chatSid!==c.session_id && typeof _markSessionCompletionUnreadIfBackground === 'function'){
+            _markSessionCompletionUnreadIfBackground(chatSid, null, {
+              source:'cron_chat',
+              profile:c.owner_profile||((typeof S!=='undefined'&&S&&S.activeProfile)||'default'),
+            });
+          }
         }
         // _cronUnreadCount is derived from _cronNewJobIds.size in updateCronBadge.
         updateCronBadge();
       }
     }catch(e){}
   },30000);
+}
+
+function _cronToastWithChat(statusText, sessionId, profile){
+  showToast(`${statusText} · ${t('cron_toast_open_chat') || 'Click to open the chat'}`, 6000);
+  const el=$('toast');
+  if(!el) return;
+  el.onclick=()=>{
+    if(typeof dismissToast==='function') dismissToast(el);
+    openCronJobChat(sessionId, profile);
+  };
 }
 
 function updateCronBadge(){
@@ -14801,6 +15571,85 @@ async function loadMyAccessRequests(animate,options={}){
   }
 }
 window.loadMyAccessRequests=loadMyAccessRequests;
+// "Wacht op jou" on My approvals: what waits for this viewer elsewhere, next
+// to their own access requests. Kanban tasks in review or blocked for input
+// (GET /api/kanban/waiting, only bots the viewer may use or tasks they
+// created) with the board's own actions (open, comment, unblock), and bot
+// screens that wait for a person. Pending chat approvals are not listed: they
+// expire within a minute and are answered in the chat itself. A source the
+// viewer may not read is left out.
+let _waitingCommentTask='';
+function _waitingBotLabel(name){
+  if(!name)return '';
+  try{if(typeof _cronBotTitle==='function')return _cronBotTitle(name);}catch(_){}
+  return name;
+}
+function _waitingTaskHtml(task,screen){
+  const needsInput=task.status==='blocked';
+  const flag=needsInput?t('bot_work_flag_needs_input'):t('bot_work_flag_review');
+  const id=esc(task.id);
+  const comment=_waitingCommentTask===task.id?`<div class="waiting-comment"><label class="sr-only" for="waitingComment">${esc(t('waiting_comment'))}</label><textarea id="waitingComment" rows="2" maxlength="4000" placeholder="${esc(t('waiting_comment_placeholder'))}"></textarea>
+      <div class="bot-editor-actions"><button type="button" class="sm-btn" onclick="_waitingComment('')">${esc(t('bot_duty_cancel'))}</button><button type="button" class="sm-btn primary" data-task-id="${id}" onclick="_waitingSendComment(this.dataset.taskId)">${esc(t('waiting_comment_send'))}</button></div></div>`:'';
+  return `<li class="waiting-item" data-kind="task" data-task-id="${id}">
+      <div class="waiting-item-main"><span class="waiting-item-title">${esc(task.title||task.id)}</span>
+        <span class="waiting-item-meta"><span class="bot-work-flag">${esc(flag)}</span>${task.assignee?` <span>${esc(_waitingBotLabel(task.assignee))}</span>`:''}</span></div>
+      <div class="waiting-item-actions">
+        <button type="button" class="sm-btn" data-task-id="${id}" onclick="openKanbanTaskFromBot(this.dataset.taskId)">${esc(t('waiting_open_task'))}</button>
+        <button type="button" class="sm-btn" data-task-id="${id}" onclick="_waitingComment(this.dataset.taskId)">${esc(t('waiting_comment'))}</button>
+        ${needsInput?`<button type="button" class="sm-btn" data-task-id="${id}" onclick="_waitingUnblock(this.dataset.taskId)">${esc(t('kanban_unblock'))}</button>`:''}
+        ${needsInput&&screen?`<a class="sm-btn primary waiting-screen-link" href="${esc(_botScreenUrl(screen.bot))}" target="_blank" rel="noopener" title="${esc(screen.reason||'')}">${esc(t('waiting_take_over'))}</a>`:''}
+      </div>${comment}</li>`;
+}
+// A bot screen waits for a person when the agent asked for a takeover (with
+// its reason) and nobody holds it; listed only for viewers who may control
+// that screen (Bot Screens grants), opening the existing viewer.
+function _waitingScreensFor(data){
+  return (data&&data.screens||[]).filter(r=>r&&r.state==='waiting'&&r.rights&&r.rights.control);
+}
+function _waitingScreenHtml(row){
+  return `<li class="waiting-item" data-kind="screen" data-bot="${esc(row.bot)}">
+      <div class="waiting-item-main"><span class="waiting-item-title">${esc(_waitingBotLabel(row.bot))}</span>
+        <span class="waiting-item-meta"><span class="bot-work-flag">${esc(t('waiting_screen'))}</span>${_botScreenSinceText(row.help_since)?` <span class="waiting-screen-since">${esc(_botScreenSinceText(row.help_since))}</span>`:''}</span>
+        ${row.reason?`<span class="waiting-item-detail">${esc(row.reason)}</span>`:''}</div>
+      <div class="waiting-item-actions"><a class="sm-btn primary" href="${esc(_botScreenUrl(row.bot))}" target="_blank" rel="noopener">${esc(t('bot_screen_open'))}</a></div></li>`;
+}
+let _waitingData=null;
+function _paintWaitingForYou(){
+  const section=$('myWaitingSection'),box=$('myWaitingList');if(!section||!box)return;
+  const data=_waitingData;
+  if(!data||(!data.tasks&&!data.screens)){section.hidden=true;return;}
+  const tasks=data.tasks||[];
+  const screens=_waitingScreensFor(data),byBot=new Map(screens.map(r=>[r.bot,r]));
+  // A task blocked for input whose bot's screen waits for a person gets the
+  // takeover link on its own card.
+  const items=screens.map(_waitingScreenHtml).concat(tasks.map(task=>_waitingTaskHtml(task,task.block_kind==='needs_input'?byBot.get(task.assignee):null)));
+  box.innerHTML=items.length?`<ul class="waiting-list">${items.join('')}</ul>`:`<div class="access-requests-empty">${esc(t('waiting_empty'))}</div>`;
+  section.hidden=false;
+  const area=$('waitingComment');if(area)area.focus();
+}
+async function loadWaitingForYou(){
+  const get=url=>api(url,{timeoutToast:false,redirect401:false}).catch(()=>null);
+  const [tasks,screens]=await Promise.all([get('/api/kanban/waiting'+_botWorkQuery()),get('/api/bot-screen/status')]);
+  _waitingData={tasks:tasks&&Array.isArray(tasks.tasks)?tasks.tasks:null,
+    screens:screens&&Array.isArray(screens.screens)?screens.screens:null};
+  _paintWaitingForYou();
+}
+function _waitingComment(taskId){ _waitingCommentTask=taskId||'';_paintWaitingForYou(); }
+async function _waitingSendComment(taskId){
+  const text=String(($('waitingComment')||{}).value||'').trim();
+  if(!text){const a=$('waitingComment');if(a)a.focus();return;}
+  try{
+    await api('/api/kanban/tasks/'+encodeURIComponent(taskId)+'/comments'+_botWorkQuery(),{method:'POST',body:JSON.stringify({body:text})});
+    _waitingCommentTask='';showToast(t('waiting_comment_sent'));await loadWaitingForYou();
+  }catch(e){showToast(e.message);}
+}
+async function _waitingUnblock(taskId){
+  try{
+    await api('/api/kanban/tasks/'+encodeURIComponent(taskId)+'/unblock'+_botWorkQuery(),{method:'POST',body:JSON.stringify({})});
+    showToast(t('waiting_unblocked'));await loadWaitingForYou();
+  }catch(e){showToast(e.message);}
+}
+window.loadWaitingForYou=loadWaitingForYou;
 // Your own access requests, surfaced without opening the screen: a count of
 // what is still waiting, and a one-time notice for anything decided since you
 // last looked. The watermark is per browser on purpose: this is a nudge, and
