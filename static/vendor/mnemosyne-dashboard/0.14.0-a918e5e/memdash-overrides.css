@@ -44,3 +44,373 @@ nav button[data-tab="settings"],
   font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   z-index: 1000;
 }
+
+/* SynthPulse appearance (Settings, Appearance). The shim sets the WebUI's own
+   tokens as --sp-* and marks the root with data-sp-appearance; from then on the
+   dashboard draws with them: theme, skin accent, font, font size and radii.
+   Derived shades are color-mix() of those tokens, never fixed colours. */
+:root[data-sp-appearance],
+:root[data-sp-appearance][data-theme="light"],
+:root[data-sp-appearance][data-theme="dark"] {
+  --sp-tint: color-mix(in srgb, var(--sp-text) 4%, transparent);
+  --sp-tint-strong: color-mix(in srgb, var(--sp-text) 7%, transparent);
+  --bg: var(--sp-bg);
+  --panel: var(--sp-surface);
+  --panel2: var(--sp-code-bg, var(--sp-surface));
+  --panel3: color-mix(in srgb, var(--sp-surface) 88%, var(--sp-text));
+  --text: var(--sp-text);
+  --soft: color-mix(in srgb, var(--sp-text) 82%, var(--sp-muted));
+  --muted: var(--sp-muted);
+  --faint: color-mix(in srgb, var(--sp-muted) 72%, var(--sp-bg));
+  --line: var(--sp-border);
+  --line2: var(--sp-border2, var(--sp-border));
+  --border: var(--sp-border);
+  --accent: var(--sp-accent);
+  --accent2: var(--sp-accent-text, var(--sp-accent));
+  --green: var(--sp-success, var(--sp-accent));
+  --amber: var(--sp-warning, var(--sp-accent));
+  --red: var(--sp-error, var(--sp-accent));
+  --shadow: 0 1px 2px color-mix(in srgb, var(--sp-text) 8%, transparent);
+  --sidebar-bg: var(--sp-sidebar, var(--sp-surface));
+  --hero-bg: transparent;
+  --card-bg: var(--sp-surface);
+  --item-bg: var(--sp-surface);
+  --glass-bg: var(--sp-tint);
+  --input-bg: var(--sp-input-bg, var(--sp-surface));
+  --table-bg: var(--sp-surface);
+  --graph-bg: var(--sp-bg);
+  --aurora-opacity: 0;
+  --aurora-two-opacity: 0;
+  --font-brand-serif: var(--sp-font-ui);
+  --font-brand-script: var(--sp-font-ui);
+  --font-brand-alt: var(--sp-font-ui);
+  font-family: var(--sp-font-ui);
+  font-size: var(--sp-font-size, 14px);
+  color-scheme: light;
+}
+:root[data-sp-appearance][data-theme="dark"] { color-scheme: dark; }
+
+/* Font and font size like the rest of the WebUI. */
+:root[data-sp-appearance] body,
+:root[data-sp-appearance][data-theme="light"] body {
+  font-family: var(--sp-font-ui) !important;
+  font-size: var(--sp-font-size, 14px);
+  letter-spacing: 0;
+  background: var(--sp-bg) !important;
+  color: var(--sp-text);
+}
+:root[data-sp-appearance] button,
+:root[data-sp-appearance] input,
+:root[data-sp-appearance] select,
+:root[data-sp-appearance] textarea { font-family: inherit; }
+:root[data-sp-appearance][data-sp-font-size="small"] .card .num { font-size: 32px; }
+:root[data-sp-appearance][data-sp-font-size="large"] .card .num { font-size: 44px; }
+:root[data-sp-appearance][data-sp-font-size="xlarge"] .card .num { font-size: 48px; }
+:root[data-sp-appearance] .hero h1 { font-family: var(--sp-font-ui); letter-spacing: 0; font-weight: 650; }
+:root[data-sp-appearance] .card .num {
+  font-family: var(--sp-font-ui);
+  letter-spacing: -.02em;
+  background: none;
+  color: var(--sp-text) !important;
+  -webkit-text-fill-color: var(--sp-text) !important;
+}
+
+/* Surfaces: flat, the WebUI's surface and border tokens. */
+:root[data-sp-appearance] .sidebar { background: var(--sp-sidebar, var(--sp-surface)); box-shadow: none; backdrop-filter: none; }
+:root[data-sp-appearance] .aurora-one,
+:root[data-sp-appearance] .aurora-two { display: none; }
+:root[data-sp-appearance] .brand-mark,
+:root[data-sp-appearance][data-theme="light"] .brand-mark,
+:root[data-sp-appearance][data-theme="dark"] .brand-mark {
+  background: var(--sp-accent-bg-strong, var(--sp-tint-strong)) !important;
+  color: var(--sp-accent-text, var(--sp-accent)) !important;
+  border-color: var(--sp-border) !important;
+  text-shadow: none !important;
+}
+:root[data-sp-appearance] .card,
+:root[data-sp-appearance] .item,
+:root[data-sp-appearance] .status-card,
+:root[data-sp-appearance] .profile-item,
+:root[data-sp-appearance] .session-event,
+:root[data-sp-appearance] .realtime-event,
+:root[data-sp-appearance] .realtime-kv,
+:root[data-sp-appearance] .context-summary > div:not(.context-types),
+:root[data-sp-appearance] .review-card {
+  background: var(--sp-surface) !important;
+  border-color: var(--sp-border) !important;
+  box-shadow: none !important;
+}
+:root[data-sp-appearance] .breakdown-card,
+:root[data-sp-appearance] .glass,
+:root[data-sp-appearance] .glass-mini,
+:root[data-sp-appearance] .profile-section,
+:root[data-sp-appearance] .settings-card,
+:root[data-sp-appearance] .timeline-group,
+:root[data-sp-appearance] .pattern-panel,
+:root[data-sp-appearance] .quick-actions,
+:root[data-sp-appearance] .section-tabs,
+:root[data-sp-appearance] .toolbar,
+:root[data-sp-appearance] .bulk-bar,
+:root[data-sp-appearance] .menu-search,
+:root[data-sp-appearance] .state-card,
+:root[data-sp-appearance] .why-panel,
+:root[data-sp-appearance] .diag-pill,
+:root[data-sp-appearance] .detail-content,
+:root[data-sp-appearance] .graph-inspector,
+:root[data-sp-appearance] .live-event-feed,
+:root[data-sp-appearance] .realtime-panel,
+:root[data-sp-appearance] .pattern-summary > div,
+:root[data-sp-appearance][data-theme="light"] .profile-section,
+:root[data-sp-appearance][data-theme="light"] .graph-inspector {
+  background: var(--sp-tint) !important;
+  border-color: var(--sp-border) !important;
+  box-shadow: none !important;
+}
+:root[data-sp-appearance] .item:before { display: none; }
+:root[data-sp-appearance] .item:hover,
+:root[data-sp-appearance] .profile-item:hover,
+:root[data-sp-appearance] .review-card:hover {
+  border-color: color-mix(in srgb, var(--sp-accent) 45%, var(--sp-border)) !important;
+  background: var(--sp-hover-bg, var(--sp-surface)) !important;
+  transform: none;
+}
+
+/* Navigation, buttons and fields: the skin accent instead of the dashboard's own. */
+:root[data-sp-appearance] nav button,
+:root[data-sp-appearance][data-theme="light"] nav button { color: var(--sp-muted) !important; }
+:root[data-sp-appearance] nav button:hover,
+:root[data-sp-appearance][data-theme="light"] nav button:hover {
+  background: var(--sp-hover-bg, var(--sp-tint)) !important;
+  color: var(--sp-text) !important;
+}
+:root[data-sp-appearance] nav button.active,
+:root[data-sp-appearance][data-theme="light"] nav button.active {
+  background: var(--sp-accent-bg, var(--sp-tint)) !important;
+  border-color: color-mix(in srgb, var(--sp-accent) 35%, transparent) !important;
+  color: var(--sp-accent-text, var(--sp-text)) !important;
+}
+:root[data-sp-appearance] nav button span,
+:root[data-sp-appearance][data-theme="light"] nav button span {
+  background: var(--sp-tint);
+  border-color: var(--sp-border);
+  color: var(--sp-muted);
+}
+:root[data-sp-appearance] nav button.active span,
+:root[data-sp-appearance][data-theme="light"] nav button.active span {
+  background: var(--sp-accent-bg-strong, var(--sp-tint-strong));
+  border-color: color-mix(in srgb, var(--sp-accent) 35%, transparent);
+  color: var(--sp-accent-text, var(--sp-accent));
+}
+:root[data-sp-appearance] button,
+:root[data-sp-appearance] .quick-actions button,
+:root[data-sp-appearance] .section-tabs button,
+:root[data-sp-appearance] .toolbar button,
+:root[data-sp-appearance] .drawer-action,
+:root[data-sp-appearance][data-theme="light"] .quick-actions button,
+:root[data-sp-appearance][data-theme="light"] .section-tabs button,
+:root[data-sp-appearance][data-theme="light"] .toolbar button,
+:root[data-sp-appearance][data-theme="light"] .drawer .drawer-action,
+:root[data-sp-appearance][data-theme="light"] .drawer button {
+  background: var(--sp-surface) !important;
+  border-color: var(--sp-border) !important;
+  color: var(--sp-text) !important;
+  box-shadow: none !important;
+  font-weight: 560;
+}
+:root[data-sp-appearance] button:hover,
+:root[data-sp-appearance] .quick-actions button:hover,
+:root[data-sp-appearance] .toolbar button:hover,
+:root[data-sp-appearance] .drawer .drawer-action:hover,
+:root[data-sp-appearance][data-theme="light"] .drawer button:hover {
+  background: var(--sp-hover-bg, var(--sp-surface)) !important;
+  border-color: var(--sp-border2, var(--sp-border)) !important;
+  color: var(--sp-text) !important;
+}
+:root[data-sp-appearance] .primary,
+:root[data-sp-appearance] button.primary,
+:root[data-sp-appearance] .section-tabs button.active,
+:root[data-sp-appearance] .drawer .drawer-action.primary,
+:root[data-sp-appearance] .html-detail .drawer-action.primary,
+:root[data-sp-appearance][data-theme="light"] button.primary,
+:root[data-sp-appearance][data-theme="light"] .section-tabs button.active,
+:root[data-sp-appearance][data-theme="light"] .drawer .drawer-action.primary {
+  background: var(--sp-accent) !important;
+  border-color: var(--sp-accent) !important;
+  color: var(--sp-bg) !important;
+}
+:root[data-sp-appearance] .primary:hover,
+:root[data-sp-appearance] button.primary:hover {
+  background: var(--sp-accent-hover, var(--sp-accent)) !important;
+  border-color: var(--sp-accent-hover, var(--sp-accent)) !important;
+  color: var(--sp-bg) !important;
+}
+:root[data-sp-appearance] input,
+:root[data-sp-appearance] select,
+:root[data-sp-appearance] textarea,
+:root[data-sp-appearance] .memory-select,
+:root[data-sp-appearance] .modal-field input,
+:root[data-sp-appearance] .modal-field textarea,
+:root[data-sp-appearance] .modal-field select,
+:root[data-sp-appearance][data-theme="light"] input,
+:root[data-sp-appearance][data-theme="light"] select,
+:root[data-sp-appearance][data-theme="light"] textarea,
+:root[data-sp-appearance][data-theme="light"] .memory-select {
+  background: var(--sp-input-bg, var(--sp-surface)) !important;
+  border-color: var(--sp-border) !important;
+  color: var(--sp-text) !important;
+}
+:root[data-sp-appearance] input:focus,
+:root[data-sp-appearance] select:focus,
+:root[data-sp-appearance] textarea:focus,
+:root[data-sp-appearance] .modal-field input:focus,
+:root[data-sp-appearance] .modal-field textarea:focus,
+:root[data-sp-appearance] .modal-field select:focus {
+  border-color: var(--sp-accent) !important;
+  box-shadow: 0 0 0 3px var(--sp-focus-ring, var(--sp-accent-bg)) !important;
+}
+:root[data-sp-appearance] :focus-visible { outline-color: var(--sp-accent); }
+
+/* Chips, badges and tables. */
+:root[data-sp-appearance] .badge,
+:root[data-sp-appearance] .session-chip,
+:root[data-sp-appearance] .context-type-chip,
+:root[data-sp-appearance] .context-meta span,
+:root[data-sp-appearance] .role,
+:root[data-sp-appearance] .trust-chip,
+:root[data-sp-appearance] #lifecycleThresholds span,
+:root[data-sp-appearance][data-theme="light"] .badge,
+:root[data-sp-appearance][data-theme="light"] .session-chip,
+:root[data-sp-appearance][data-theme="light"] .role,
+:root[data-sp-appearance][data-theme="light"] .trust-chip {
+  background: var(--sp-tint) !important;
+  border-color: var(--sp-border) !important;
+  color: var(--soft) !important;
+}
+:root[data-sp-appearance] .importance-badge,
+:root[data-sp-appearance] button.badge.session-link,
+:root[data-sp-appearance] .review-reasons span,
+:root[data-sp-appearance] .trust-tool,
+:root[data-sp-appearance] .role-assistant,
+:root[data-sp-appearance][data-theme="light"] .importance-badge,
+:root[data-sp-appearance][data-theme="light"] button.badge.session-link,
+:root[data-sp-appearance][data-theme="light"] .trust-tool,
+:root[data-sp-appearance][data-theme="light"] .role-assistant {
+  background: var(--sp-accent-bg, var(--sp-tint)) !important;
+  border-color: color-mix(in srgb, var(--sp-accent) 30%, transparent) !important;
+  color: var(--sp-accent-text, var(--sp-accent)) !important;
+}
+:root[data-sp-appearance] .role-user,
+:root[data-sp-appearance][data-theme="light"] .role-user { color: var(--sp-info, var(--sp-text)) !important; }
+:root[data-sp-appearance] .role-system,
+:root[data-sp-appearance][data-theme="light"] .role-system { color: var(--sp-warning, var(--sp-text)) !important; }
+:root[data-sp-appearance] .trust-stated,
+:root[data-sp-appearance] .lifecycle-hot,
+:root[data-sp-appearance] .status-active,
+:root[data-sp-appearance][data-theme="light"] .trust-stated,
+:root[data-sp-appearance][data-theme="light"] .lifecycle-hot {
+  color: var(--sp-success) !important;
+  border-color: color-mix(in srgb, var(--sp-success) 35%, transparent) !important;
+  background: color-mix(in srgb, var(--sp-success) 8%, transparent) !important;
+}
+:root[data-sp-appearance] .trust-inferred,
+:root[data-sp-appearance] .lifecycle-warm,
+:root[data-sp-appearance] .status-expired,
+:root[data-sp-appearance] .trust-chip.review,
+:root[data-sp-appearance][data-theme="light"] .trust-inferred,
+:root[data-sp-appearance][data-theme="light"] .lifecycle-warm {
+  color: var(--sp-warning) !important;
+  border-color: color-mix(in srgb, var(--sp-warning) 38%, transparent) !important;
+  background: color-mix(in srgb, var(--sp-warning) 8%, transparent) !important;
+}
+:root[data-sp-appearance] .lifecycle-cold,
+:root[data-sp-appearance] .status-superseded,
+:root[data-sp-appearance] .state-error,
+:root[data-sp-appearance][data-theme="light"] .lifecycle-cold {
+  color: var(--sp-error) !important;
+  border-color: color-mix(in srgb, var(--sp-error) 38%, transparent) !important;
+  background: color-mix(in srgb, var(--sp-error) 7%, transparent) !important;
+}
+:root[data-sp-appearance] table,
+:root[data-sp-appearance][data-theme="light"] table { background: var(--sp-surface); color: var(--sp-text); }
+:root[data-sp-appearance] th,
+:root[data-sp-appearance][data-theme="light"] th {
+  background: var(--sp-surface) !important;
+  color: var(--sp-muted) !important;
+  border-bottom-color: var(--sp-border) !important;
+}
+:root[data-sp-appearance] td,
+:root[data-sp-appearance][data-theme="light"] td { color: var(--sp-text); border-bottom-color: var(--sp-border); }
+:root[data-sp-appearance] tr:hover td,
+:root[data-sp-appearance] .triple-row:hover td,
+:root[data-sp-appearance][data-theme="light"] tr:hover td { background: var(--sp-hover-bg, var(--sp-tint)); }
+:root[data-sp-appearance] .breakdown-row { border-bottom-color: var(--sp-border); }
+:root[data-sp-appearance] .meta,
+:root[data-sp-appearance][data-theme="light"] .meta-time { color: var(--sp-muted); }
+:root[data-sp-appearance][data-theme="light"] .content { color: var(--sp-text); }
+
+/* Drawer, dialogs and the graph views. */
+:root[data-sp-appearance] .drawer,
+:root[data-sp-appearance] .action-modal-card,
+:root[data-sp-appearance] .login-card,
+:root[data-sp-appearance][data-theme="light"] .drawer,
+:root[data-sp-appearance][data-theme="light"] .action-modal-card {
+  background: var(--sp-surface) !important;
+  color: var(--sp-text) !important;
+  border-color: var(--sp-border2, var(--sp-border)) !important;
+  box-shadow: 0 24px 64px color-mix(in srgb, var(--sp-text) 14%, transparent) !important;
+}
+:root[data-sp-appearance] .drawer pre,
+:root[data-sp-appearance][data-theme="light"] .drawer pre {
+  background: var(--sp-code-bg, var(--sp-bg)) !important;
+  color: var(--sp-text) !important;
+  border-color: var(--sp-border) !important;
+}
+:root[data-sp-appearance] .action-modal,
+:root[data-sp-appearance][data-theme="light"] .action-modal { background: color-mix(in srgb, var(--sp-bg) 60%, transparent); }
+:root[data-sp-appearance] .graph-wrap,
+:root[data-sp-appearance] .table-wrap { background: var(--sp-surface); border-color: var(--sp-border) !important; box-shadow: none !important; }
+
+/* Radii from the WebUI's scale. */
+:root[data-sp-appearance] .card,
+:root[data-sp-appearance] .item,
+:root[data-sp-appearance] .status-card,
+:root[data-sp-appearance] .breakdown-card,
+:root[data-sp-appearance] .glass,
+:root[data-sp-appearance] .profile-section,
+:root[data-sp-appearance] .settings-card,
+:root[data-sp-appearance] .timeline-group,
+:root[data-sp-appearance] .pattern-panel,
+:root[data-sp-appearance] .table-wrap,
+:root[data-sp-appearance] .graph-wrap,
+:root[data-sp-appearance] .graph-inspector,
+:root[data-sp-appearance] .three-viewport,
+:root[data-sp-appearance] .constellation-wrap,
+:root[data-sp-appearance] .palace-viewport,
+:root[data-sp-appearance] .drawer,
+:root[data-sp-appearance] .action-modal-card,
+:root[data-sp-appearance] .realtime-panel,
+:root[data-sp-appearance] .live-event-feed,
+:root[data-sp-appearance] .state-card,
+:root[data-sp-appearance] .search-summary { border-radius: var(--sp-radius-lg, 12px) !important; }
+:root[data-sp-appearance] button,
+:root[data-sp-appearance] input,
+:root[data-sp-appearance] select,
+:root[data-sp-appearance] textarea,
+:root[data-sp-appearance] .quick-actions,
+:root[data-sp-appearance] .section-tabs,
+:root[data-sp-appearance] .toolbar,
+:root[data-sp-appearance] .bulk-bar,
+:root[data-sp-appearance] .menu-search,
+:root[data-sp-appearance] .brand-mark,
+:root[data-sp-appearance] .profile-item,
+:root[data-sp-appearance] .session-event,
+:root[data-sp-appearance] .realtime-event,
+:root[data-sp-appearance] .detail-content,
+:root[data-sp-appearance] .why-panel,
+:root[data-sp-appearance] .modal-field input,
+:root[data-sp-appearance] .modal-field textarea,
+:root[data-sp-appearance] .modal-field select { border-radius: var(--sp-radius-md, 8px) !important; }
+:root[data-sp-appearance] nav button span,
+:root[data-sp-appearance] .badge,
+:root[data-sp-appearance] .role,
+:root[data-sp-appearance] .session-chip { border-radius: var(--sp-radius-sm, 4px) !important; }

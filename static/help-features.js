@@ -4299,7 +4299,7 @@ window.SynthPulseFeatureCatalog = {
             "Choose an available bank and inspect its scope and source label."
           ],
           "permissions": "Only stores and documents permitted for your identity are available. Admin status does not open another person’s private memory.",
-          "limits": "The explorer is read-only. Legacy sources are labeled separately; a failed required access-log write blocks the read. Private banks remain owner-only, including for other administrators.",
+          "limits": "The explorer is read-only. Legacy sources are labeled separately; a failed required access-log write blocks the read. Private banks remain owner-only, including for other administrators. It follows your Appearance settings (theme, skin and font size), also when you change them while it is open; the screens inside the explorer are in English.",
           "example": "Inspect your personal store without opening another person’s bank."
         },
         "nl": {
@@ -4311,7 +4311,7 @@ window.SynthPulseFeatureCatalog = {
             "Kies een beschikbare bank en bekijk scope en bronlabel."
           ],
           "permissions": "Alleen opslag en documenten die voor jouw identiteit zijn toegestaan zijn beschikbaar. Beheerdersrechten openen geen privégeheugen van een ander.",
-          "limits": "De verkenner is alleen-lezen. Oudere bronnen hebben een eigen label; als verplichte toegangsregistratie mislukt wordt lezen geblokkeerd. Privébanken blijven alleen voor de eigenaar, ook tegenover andere beheerders.",
+          "limits": "De verkenner is alleen-lezen. Oudere bronnen hebben een eigen label; als verplichte toegangsregistratie mislukt wordt lezen geblokkeerd. Privébanken blijven alleen voor de eigenaar, ook tegenover andere beheerders. De verkenner volgt je weergave-instellingen (thema, skin en lettergrootte), ook als je ze wijzigt terwijl hij open staat; de schermen binnen de verkenner zijn in het Engels.",
           "example": "Bekijk je persoonlijke opslag zonder de bank van een ander te openen."
         }
       }

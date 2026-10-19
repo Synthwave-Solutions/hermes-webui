@@ -64,6 +64,7 @@
     explorerRoot: null,
     accessRoot: null,
     themeObserver: null,
+    themeTimer: null,
     panelObserver: null
   };
 
@@ -186,26 +187,88 @@
     }).join('');
   }
 
+  // The SynthPulse appearance the frame takes over (Settings, Appearance: theme,
+  // skin and font size), as the computed values of the WebUI's own tokens. The
+  // frame accepts only hex and plain rgb()/rgba() colours, a font stack of
+  // plain characters and pixel lengths.
+  var COLOUR_TOKENS = {
+    'bg': '--bg', 'surface': '--surface', 'sidebar': '--sidebar', 'code-bg': '--code-bg',
+    'text': '--text', 'muted': '--muted', 'border': '--border', 'border2': '--border2',
+    'accent': '--accent', 'accent-hover': '--accent-hover', 'accent-text': '--accent-text',
+    'accent-bg': '--accent-bg', 'accent-bg-strong': '--accent-bg-strong', 'focus-ring': '--focus-ring',
+    'input-bg': '--input-bg', 'hover-bg': '--hover-bg', 'success': '--success', 'warning': '--warning',
+    'error': '--error', 'info': '--info'
+  };
+  var LENGTH_TOKENS = { 'radius-sm': '--radius-sm', 'radius-md': '--radius-md', 'radius-lg': '--radius-lg' };
+  var RGB_RE = /^rgba?\(\s*\d{1,3}(\s*,\s*|\s+)\d{1,3}(\s*,\s*|\s+)\d{1,3}(\s*[,/]\s*(0|1|0?\.\d+|\d{1,3}%))?\s*\)$/;
+  var FONT_RE = /^[A-Za-z0-9 ,"'._-]{1,240}$/;
+  var LENGTH_RE = /^\d{1,3}(\.\d{1,3})?px$/;
+
+  function cleanColour(value) {
+    var text = String(value || '').trim().toLowerCase();
+    return COLOUR_RE.test(text) || RGB_RE.test(text) ? text : '';
+  }
+
   function themeMessage() {
-    var style = getComputedStyle(document.documentElement);
+    var root = document.documentElement;
+    var style = getComputedStyle(root);
+    var tokens = {};
+    Object.keys(COLOUR_TOKENS).forEach(function (name) {
+      var value = cleanColour(style.getPropertyValue(COLOUR_TOKENS[name]));
+      if (value) tokens[name] = value;
+    });
+    Object.keys(LENGTH_TOKENS).forEach(function (name) {
+      var value = String(style.getPropertyValue(LENGTH_TOKENS[name]) || '').trim();
+      if (LENGTH_RE.test(value)) tokens[name] = value;
+    });
+    var font = String(style.getPropertyValue('--font-ui') || '').trim() || String(style.fontFamily || '').trim();
+    if (FONT_RE.test(font)) tokens['font-ui'] = font;
+    var size = String(style.fontSize || '').trim();
+    if (LENGTH_RE.test(size)) tokens['font-size'] = size;
+    // The four colours of the first bridge version, for a frame still on the old shim.
     var colours = {};
     [['accent', '--accent'], ['bg', '--bg'], ['panel', '--surface'], ['text', '--text']].forEach(function (pair) {
       var hex = toHex(style.getPropertyValue(pair[1]));
       if (hex) colours[pair[0]] = hex;
     });
-    return { theme: isDark() ? 'dark' : 'light', colours: colours };
+    var fontSize = root.dataset ? root.dataset.fontSize : '';
+    return {
+      theme: isDark() ? 'dark' : 'light',
+      colours: colours,
+      tokens: tokens,
+      fontSize: fontSize === 'small' || fontSize === 'large' || fontSize === 'xlarge' ? fontSize : 'default'
+    };
   }
 
-  function sendTheme(bridge) {
+  function sendTheme(bridge, force) {
     if (!bridge || bridge.closed || !bridge.iframe.contentWindow) return;
     var msg = themeMessage();
-    bridge.iframe.contentWindow.postMessage({ v: 1, type: 'memdash:theme', k: bridge.key, theme: msg.theme, colours: msg.colours }, '*');
+    var signature = JSON.stringify(msg);
+    if (!force && bridge.themeSent === signature) return;
+    bridge.themeSent = signature;
+    bridge.iframe.contentWindow.postMessage({
+      v: 1, type: 'memdash:theme', k: bridge.key, theme: msg.theme, colours: msg.colours,
+      tokens: msg.tokens, fontSize: msg.fontSize
+    }, '*');
+  }
+
+  function scheduleTheme() {
+    // A theme or skin change sets several attributes at once: send once, after.
+    if (state.themeTimer) return;
+    state.themeTimer = setTimeout(function () {
+      state.themeTimer = null;
+      sendTheme(state.bridge, false);
+    }, 30);
   }
 
   function watchTheme() {
     if (state.themeObserver || typeof MutationObserver !== 'function') return;
-    state.themeObserver = new MutationObserver(function () { sendTheme(state.bridge); });
-    state.themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme', 'data-skin'] });
+    state.themeObserver = new MutationObserver(scheduleTheme);
+    state.themeObserver.observe(document.documentElement, {
+      attributes: true, attributeFilter: ['class', 'data-theme', 'data-skin', 'data-font-size', 'style']
+    });
+    // A skin that an extension registers arrives as a style element in the head.
+    if (document.head) state.themeObserver.observe(document.head, { childList: true });
   }
 
   // ── The bridge ─────────────────────────────────────────────────────────────
@@ -314,7 +377,7 @@
     if (event.origin !== 'null') return;
     var msg = event.data;
     if (!validMessage(msg) || msg.k !== bridge.key) return;
-    if (msg.type === 'memdash:ready') { bridge.ready = true; sendTheme(bridge); return; }
+    if (msg.type === 'memdash:ready') { bridge.ready = true; sendTheme(bridge, true); return; }
     handleRequest(bridge, msg);
   }
 
@@ -326,7 +389,7 @@
     } catch (_) { /* the vendored document is opaque */ }
     bridge.loads += 1;
     if (bridge.loads > 1) { replaceFrame(bridge); return; }
-    sendTheme(bridge);
+    sendTheme(bridge, true);
   }
 
   function replaceFrame(bridge) {
@@ -473,6 +536,18 @@
 
   // ── Memory explorer ────────────────────────────────────────────────────────
 
+  // The interim registry names a person's own stores in English; show them
+  // in the WebUI language.
+  function storeLabel(label) {
+    var text = String(label || '');
+    var legacy = / \(legacy\)$/.test(text);
+    if (legacy) text = text.slice(0, -' (legacy)'.length);
+    var conversation = text.match(/^Conversation memories ([0-9a-f]{8})$/);
+    if (text === 'Personal memories') text = tr('memdash_store_personal');
+    else if (conversation) text = tr('memdash_store_conversation', conversation[1]);
+    return legacy ? tr('memdash_store_legacy', text) : text;
+  }
+
   function pickerOptions(select, stores, filter) {
     select.replaceChildren();
     var groups = { mine: [], people: [], assistants: [], shared: [] };
@@ -481,7 +556,7 @@
       (groups[store.group] || groups.shared).push(store);
     });
     var labelFor = function (store) {
-      var text = store.own && store.primary ? tr('memdash_picker_me') : store.label;
+      var text = store.own && store.primary ? tr('memdash_picker_me') : storeLabel(store.label);
       return store.last_write ? text + ' · ' + tr('memdash_store_last_write', formatWhen(store.last_write)) : text;
     };
     [['mine', null], ['people', 'memdash_picker_group_people'], ['assistants', 'memdash_picker_group_assistants'], ['shared', 'memdash_picker_group_shared']].forEach(function (pair) {
@@ -562,7 +637,8 @@
       select.addEventListener('change', function () { selectStore(select.value); });
       toolbar.appendChild(el('label', { className: 'memdash-picker-label', for: 'memdashPicker', text: tr('memdash_picker_label') }));
       toolbar.appendChild(select);
-      if (banks.viewer && banks.viewer.admin) {
+      var othersListed = banks.stores.some(function (s) { return !s.own; });
+      if (banks.viewer && banks.viewer.admin && othersListed) {
         var search = el('input', { type: 'search', className: 'memdash-picker-search', placeholder: tr('memdash_picker_search'), 'aria-label': tr('memdash_picker_search') });
         search.addEventListener('input', function () { pickerOptions(select, banks.stores, search.value.trim().toLowerCase()); });
         toolbar.appendChild(search);

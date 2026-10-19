@@ -9,7 +9,9 @@
  *   - removes EventSource, so live updates are off;
  *   - replaces fetch: a URL that starts with /api/ becomes a message to the
  *     parent WebUI panel, which answers it; anything else is refused;
- *   - applies theme messages from the parent (dark or light, four colours).
+ *   - applies theme messages from the parent: dark or light, the WebUI's
+ *     appearance tokens (colours, font, font size, radii) as --sp-* custom
+ *     properties that memdash-overrides.css maps onto the dashboard.
  * It never builds HTML from strings.
  */
 (function () {
@@ -57,6 +59,28 @@
   var TIMEOUT_MS = 30000;
   var COLOUR_RE = /^#[0-9a-f]{3,8}$/;
   var COLOUR_VARS = { accent: '--accent', bg: '--bg', panel: '--panel', text: '--text' };
+  var RGB_RE = /^rgba?\(\s*\d{1,3}(\s*,\s*|\s+)\d{1,3}(\s*,\s*|\s+)\d{1,3}(\s*[,/]\s*(0|1|0?\.\d+|\d{1,3}%))?\s*\)$/;
+  var FONT_RE = /^[A-Za-z0-9 ,"'._-]{1,240}$/;
+  var LENGTH_RE = /^\d{1,3}(\.\d{1,3})?px$/;
+  var TOKEN_KINDS = {
+    'bg': 'colour', 'surface': 'colour', 'sidebar': 'colour', 'code-bg': 'colour', 'text': 'colour',
+    'muted': 'colour', 'border': 'colour', 'border2': 'colour', 'accent': 'colour',
+    'accent-hover': 'colour', 'accent-text': 'colour', 'accent-bg': 'colour',
+    'accent-bg-strong': 'colour', 'focus-ring': 'colour', 'input-bg': 'colour', 'hover-bg': 'colour',
+    'success': 'colour', 'warning': 'colour', 'error': 'colour', 'info': 'colour',
+    'radius-sm': 'length', 'radius-md': 'length', 'radius-lg': 'length', 'font-size': 'length',
+    'font-ui': 'font'
+  };
+  var FONT_SIZES = { small: 1, 'default': 1, large: 1, xlarge: 1 };
+
+  function tokenValue(kind, value) {
+    if (typeof value !== 'string') return '';
+    var text = value.trim();
+    if (kind === 'colour') { text = text.toLowerCase(); return COLOUR_RE.test(text) || RGB_RE.test(text) ? text : ''; }
+    if (kind === 'length') return LENGTH_RE.test(text) ? text : '';
+    if (kind === 'font') return FONT_RE.test(text) ? text : '';
+    return '';
+  }
 
   function refuse() {
     return Promise.reject(new TypeError('Network access is not available here.'));
@@ -86,6 +110,21 @@
       try { window.setTheme(mode); } catch (_) { root.dataset.theme = mode; }
     } else {
       root.dataset.theme = mode;
+    }
+    var tokens = msg.tokens && typeof msg.tokens === 'object' ? msg.tokens : null;
+    if (tokens) {
+      // The full WebUI appearance: memdash-overrides.css maps --sp-* onto the
+      // dashboard's own variables while data-sp-appearance is set.
+      var applied = 0;
+      Object.keys(TOKEN_KINDS).forEach(function (name) {
+        var value = tokenValue(TOKEN_KINDS[name], tokens[name]);
+        if (value) { root.style.setProperty('--sp-' + name, value); applied += 1; }
+        else root.style.removeProperty('--sp-' + name);
+      });
+      if (applied) root.setAttribute('data-sp-appearance', '');
+      else root.removeAttribute('data-sp-appearance');
+      root.setAttribute('data-sp-font-size', FONT_SIZES[msg.fontSize] === 1 ? msg.fontSize : 'default');
+      return;
     }
     var colours = msg.colours && typeof msg.colours === 'object' ? msg.colours : {};
     Object.keys(COLOUR_VARS).forEach(function (name) {
