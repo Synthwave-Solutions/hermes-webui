@@ -6,7 +6,11 @@ import yaml
 
 _LOCK = threading.RLock()
 SHAPES = ('circle','squircle','hexagon')
-BOT_TEXT_FIELDS = ('title','description','shape','color','category','role','reports_to')
+BOT_TEXT_FIELDS = ('title','description','shape','color','category','role','reports_to','kind')
+# A profile is a bot or the personal profile of a person (team member, partner).
+KINDS = ('bot','person')
+# Categories whose unmanaged profiles are people unless the editor says otherwise.
+_PERSON_CATEGORIES = ('Team','Partners')
 # Upper bound for walking a reports_to chain; real org charts are a few levels deep.
 _MAX_CHAIN = 256
 
@@ -34,8 +38,20 @@ def _load(path):
     if not isinstance(data,dict): raise ValueError('Bot metadata is not an object')
     return data
 
+def default_kind(name, category, managed):
+    """The kind of a profile nobody set one for: an unmanaged Team or Partners
+    profile is a person's own, everything else (SynthPulse, guided bots, other
+    categories) is a bot."""
+    if name=='default' or managed: return 'bot'
+    return 'person' if str(category or '').strip() in _PERSON_CATEGORIES else 'bot'
+
+def effective_kind(name, meta, managed):
+    kind=meta.get('kind')
+    return kind if kind in KINDS else default_kind(name,meta.get('category'),managed)
+
 def read_profile(name):
     from urllib.parse import quote
+    from api.bot_builder import _KEY as builder_key
     try:
         path=_path(name);data=_load(path)
         ui=data.get('ui_meta');ui=ui if isinstance(ui,dict) else {}
@@ -44,14 +60,18 @@ def read_profile(name):
         revision=revisions.get('hermes-bots',0)
         image=path.parent/'assets/avatar.png'
         image_url='/api/profile/avatar?profile='+quote(name)+'&v='+str(image.stat().st_mtime_ns) if image.is_file() and not image.is_symlink() else ''
+        managed=data.get(builder_key) is not None
+        bot={k:meta[k] for k in BOT_TEXT_FIELDS if isinstance(meta.get(k),str)}
         return {
             'bot_configuration':configuration_summary(path.parent),
-            'bot':{k:meta[k] for k in BOT_TEXT_FIELDS if isinstance(meta.get(k),str)},
+            'bot':bot,
+            'bot_kind':effective_kind(name,meta,managed),
+            'bot_managed':managed,
             'bot_knowledge_sources':meta.get('knowledge_sources',[]) if isinstance(meta.get('knowledge_sources'),list) else [],
             'bot_revision':max(0,revision) if isinstance(revision,int) and not isinstance(revision,bool) else 0,
             'bot_avatar_url':image_url,
         }
-    except (OSError,ValueError,yaml.YAMLError):return {'bot':{},'bot_revision':0,'bot_avatar_url':''}
+    except (OSError,ValueError,yaml.YAMLError):return {'bot':{},'bot_kind':'bot','bot_managed':False,'bot_revision':0,'bot_avatar_url':''}
 
 
 def save_profile(name, values, revision):
@@ -65,6 +85,8 @@ def save_profile(name, values, revision):
         if any(ord(c)<32 and c not in '\n\t' for c in value):raise ValueError('Invalid appearance text')
     if values.get('shape','circle') not in SHAPES:raise ValueError('Unknown avatar shape')
     if 'color' in values and not re.fullmatch(r'#[0-9a-fA-F]{6}',values['color']):raise ValueError('Invalid avatar color')
+    # Empty clears the choice back to the default rule (default_kind).
+    if values.get('kind','').strip() not in ('',*KINDS):raise ValueError('Unknown bot kind')
     with _LOCK:
         path=_path(name);data=_load(path)
         ui=data.setdefault('ui_meta',{});revisions=data.setdefault('_ui_meta_revisions',{})

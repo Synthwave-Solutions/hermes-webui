@@ -14076,10 +14076,14 @@ def handle_get(handler, parsed) -> bool:
     if parsed.path == "/api/profiles":
         from api import profiles as profiles_api, bot_metadata
 
+        rows = [{**p, **bot_metadata.read_profile(p["name"])} for p in profiles_api.list_profiles_api(fast=(parse_qs(parsed.query).get("fast") or [""])[0] == "1") if _chat_profile_target_allowed(handler,p["name"])]
+        editable = _bot_editable_check(handler)
+        for row in rows:
+            row["bot_editable"] = editable(row["name"], bool(row.get("bot_managed")))
         return j(
             handler,
             {
-                "profiles": [{**p, **bot_metadata.read_profile(p["name"])} for p in profiles_api.list_profiles_api(fast=(parse_qs(parsed.query).get("fast") or [""])[0] == "1") if _chat_profile_target_allowed(handler,p["name"])],
+                "profiles": rows,
                 "active": profiles_api.get_active_profile_name(),
                 "single_profile_mode": _is_isolated_profile_mode(),
             },
@@ -23579,6 +23583,36 @@ def _cron_ownerless_task_stamp(handler, path, *, job=None, job_id=None):
         identity, path, "cron_run_ungoverned",
         "This task has no owner, so its runs would not be governed. Ask a cron admin to change it.",
         str(job.get("id") or ""))
+
+
+def _bot_editable_check(handler):
+    """``editable(name, managed)``: whether this caller may edit a bot, decided
+    as POST /api/profile/appearance decides it (profiles:admin, and for a
+    guided bot the owner's edit right). Any doubt reads as not editable."""
+    try:
+        from api import bot_builder
+        from api.governance.enforce import subject_from_identity, _request_identity
+
+        policy = governance_api.get_policy()
+        subject = subject_from_identity(governance_api._caller_identity(handler))
+        access = governance_api.resolve_effective_access(policy, subject)
+        admin = governance_api._is_bootstrap(subject, policy) or access.has_permission("profiles:admin")
+        identity = _request_identity(handler)
+    except Exception:
+        return lambda name, managed: False
+
+    def editable(name, managed):
+        if not admin:
+            return False
+        if not managed:
+            return True
+        try:
+            bot_builder.require_edit(identity, name)
+            return True
+        except Exception:
+            return False
+
+    return editable
 
 
 def _handle_cron_create(handler, body):

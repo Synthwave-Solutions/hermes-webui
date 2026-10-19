@@ -7975,6 +7975,9 @@ function _refreshProfileSwitchBackground(gen){
   }).catch(function(){});
 }
 
+// Bot or a person's own profile (team member, partner): the server sends the
+// effective kind, its default rule lives in api/bot_metadata.default_kind.
+function _botKind(p){ return (p&&p.bot_kind)==='person'?'person':'bot'; }
 function botDisplayName(p){ return (p.bot&&p.bot.title)||(typeof spProfileLabel==='function'?spProfileLabel(p.name):p.name); }
 function botAvatarHtml(p){
   const avatar=String(p.bot_avatar_url||'');
@@ -8064,7 +8067,7 @@ async function openBotOrgChart(){
 async function saveBotAppearance(){
   const p=_currentProfileDetail;if(!p)return;
   try{
-    await api('/api/profile/appearance',{method:'POST',body:JSON.stringify({name:p.name,revision:p.bot_revision||0,bot:{title:$('botTitle').value,description:$('botDescription').value,shape:$('botShape').value,color:$('botColor').value,knowledge_sources:p.bot_knowledge_sources||[],category:($('botCategory')?String($('botCategory').value||'').trim():''),role:($('botRole')?String($('botRole').value||'').trim():''),reports_to:($('botReportsTo')?String($('botReportsTo').value||''):'')}})});
+    await api('/api/profile/appearance',{method:'POST',body:JSON.stringify({name:p.name,revision:p.bot_revision||0,bot:{title:$('botTitle').value,description:$('botDescription').value,shape:$('botShape').value,color:$('botColor').value,knowledge_sources:p.bot_knowledge_sources||[],category:($('botCategory')?String($('botCategory').value||'').trim():''),role:($('botRole')?String($('botRole').value||'').trim():''),reports_to:($('botReportsTo')?String($('botReportsTo').value||''):''),kind:($('botKind')?String($('botKind').value||''):'')}})});
     _profileDropdownClearStoredCache();
     window.dispatchEvent(new CustomEvent('synpulse:bot-updated'));
     await loadProfilesPanel();showToast(t('bot_saved'));
@@ -8260,6 +8263,7 @@ function _renderProfileDetail(p, activeName){
             <label class="bot-editor-wide" for="botCategory">${esc(t('category_label')||'Category')}<input type="hidden" id="botCategory" data-sp-picker data-sp-source="sp:categories" data-sp-custom="1" value="${esc((p.bot&&p.bot.category)||'')}" placeholder="${esc(t('cron_category_placeholder')||'Pick a category or add one')}"></label>
             <label for="botRole">${esc(t('bot_role'))}<input id="botRole" value="${esc((p.bot&&p.bot.role)||'')}" maxlength="80" placeholder="${esc(t('bot_role_placeholder'))}"></label>
             <label for="botReportsTo">${esc(t('bot_reports_to'))}${_botReportsToSelectHtml(p)}</label>
+            <label for="botKind">${esc(t('bot_kind'))}<select id="botKind">${['bot','person'].map(kind=>`<option value="${kind}" ${_botKind(p)===kind?'selected':''}>${esc(t('bot_kind_'+kind))}</option>`).join('')}</select></label>
             <label class="bot-editor-wide" for="botAvatarFile">${esc(t('bot_upload'))}<input id="botAvatarFile" type="file" accept="image/png,image/jpeg,image/webp" onchange="uploadBotAvatar(this)" aria-describedby="botAvatarHint"></label>
           </div>
           <p class="bot-field-hint" id="botAvatarHint">${esc(t('bot_avatar_limit'))}</p>

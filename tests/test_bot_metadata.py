@@ -136,3 +136,43 @@ def test_unchanged_dangling_manager_does_not_block_other_edits(org,tmp_path):
 
 def test_role_is_short_text(org):
     with pytest.raises(ValueError):bots.save_profile('coo',{'role':'x'*81},0)
+
+
+# -- Kind: bot or a person's own profile ---------------------------------------
+
+@pytest.mark.parametrize('name,category,managed,kind',[
+    ('odis','Team',False,'person'),('iflair','Partners',False,'person'),
+    ('family-ops','Family',False,'bot'),('synthwave-cfo','Team',True,'bot'),
+    ('default','Team',False,'bot'),('helper','',False,'bot'),('helper',' Team ',False,'person'),
+])
+def test_default_kind_rule(name,category,managed,kind):
+    assert bots.default_kind(name,category,managed)==kind
+
+def test_kind_follows_default_until_set_and_is_validated(home):
+    (home/'profile.yaml').write_text(yaml.safe_dump({'ui_meta':{'hermes-bots':{'category':'Team'}}}))
+    assert bots.read_profile('helper')['bot_kind']=='person'
+    assert bots.save_profile('helper',{'kind':'bot'},0)['bot_kind']=='bot'
+    with pytest.raises(ValueError):bots.save_profile('helper',{'kind':'robot'},1)
+    assert bots.save_profile('helper',{'kind':''},1)['bot_kind']=='person'
+
+def test_guided_bot_in_team_stays_a_bot(home):
+    (home/'profile.yaml').write_text(yaml.safe_dump({'synpulse_builder':{'owner_email':'a@example.test'},'ui_meta':{'hermes-bots':{'category':'Team'}}}))
+    row=bots.read_profile('helper')
+    assert row['bot_kind']=='bot' and row['bot_managed'] is True
+
+def test_bot_editable_follows_the_appearance_permission(monkeypatch):
+    from types import SimpleNamespace
+    from api import routes, governance_api, bot_builder
+    from api.governance import enforce
+    admin={'value':True}
+    monkeypatch.setattr(governance_api,'get_policy',lambda:SimpleNamespace(bootstrap_admins=[]))
+    monkeypatch.setattr(governance_api,'_caller_identity',lambda handler:{'email':'a@example.test'})
+    monkeypatch.setattr(governance_api,'resolve_effective_access',lambda policy,subject:SimpleNamespace(has_permission=lambda perm:admin['value'] and perm=='profiles:admin'))
+    monkeypatch.setattr(enforce,'_request_identity',lambda handler:{'email':'a@example.test'})
+    def require_edit(identity,name):
+        if name!='mine':raise PermissionError('Only the bot owner can edit its configuration')
+    monkeypatch.setattr(bot_builder,'require_edit',require_edit)
+    editable=routes._bot_editable_check(object())
+    assert editable('legacy',False) and editable('mine',True) and not editable('theirs',True)
+    admin['value']=False
+    assert not routes._bot_editable_check(object())('legacy',False)
