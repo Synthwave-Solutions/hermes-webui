@@ -3167,28 +3167,7 @@ def _build_session_list_cache_payload(
     # runner. Coerce their sidebar rows to read_only=True + is_cli_session=False
     # so the UI never offers delete / edit / truncate / pin affordances on them
     # (defense-in-depth is also enforced server-side on the mutation routes).
-    def _coerce_subagent_rows(_rows):
-        for _r in _rows:
-            if not isinstance(_r, dict):
-                continue
-            _src = (
-                str(_r.get("source_tag") or _r.get("raw_source")
-                    or _r.get("session_source") or _r.get("source") or "").strip().lower()
-            )
-            _is_sa = _src == "subagent"
-            # A stale index row can say webui/fork while state.db records the
-            # row as source='subagent' (the child shares the parent's lineage).
-            # For rows not already read-only, confirm via the state.db source so
-            # a delegated child can't surface as a writable/CLI sidebar row.
-            if not _is_sa and not _r.get("read_only"):
-                _sid = str(_r.get("session_id") or "").strip()
-                if _sid and _is_subagent_child_session_id(_sid):
-                    _is_sa = True
-            if _is_sa:
-                _r["read_only"] = True
-                _r["is_cli_session"] = False
-    _coerce_subagent_rows(scoped)
-    _coerce_subagent_rows(sidebar_reference_sessions)
+    _coerce_subagent_rows(scoped, sidebar_reference_sessions)
     return {
         "sessions": [
             dict(s) if isinstance(s, dict) else {}
@@ -7985,6 +7964,52 @@ def _session_deleted_tombstone_marks_was_webui(sid: str) -> bool:
         return sid in _load_webui_deleted_session_tombstone()
     except Exception:
         return False
+
+
+def _state_db_session_sources(sids) -> dict[str, str]:
+    """Fresh batched source lookup for sidebar classification, never cached."""
+    ids = sorted({sid for sid in sids if isinstance(sid, str) and is_safe_session_id(sid)})
+    if not ids:
+        return {}
+    try:
+        from api.models import _active_state_db_path
+        import sqlite3
+        path = Path(_active_state_db_path())
+        if not path.is_file():
+            return {}
+        sources = {}
+        with closing(sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)) as conn:
+            for offset in range(0, len(ids), 500):
+                chunk = ids[offset:offset + 500]
+                placeholders = ",".join("?" for _ in chunk)
+                for sid, source in conn.execute(
+                    f"SELECT id, source FROM sessions WHERE id IN ({placeholders})", chunk
+                ):
+                    sources[sid] = str(source or "").strip().lower()
+        return sources
+    except Exception:
+        return {}
+
+
+def _coerce_subagent_rows(*row_sets):
+    """Preserve child read-only flags with one source lookup per rebuild."""
+    candidates = []
+    for rows in row_sets:
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            source = str(row.get("source_tag") or row.get("raw_source")
+                         or row.get("session_source") or row.get("source") or "").strip().lower()
+            if source == "subagent":
+                row["read_only"] = True
+                row["is_cli_session"] = False
+            elif not row.get("read_only"):
+                candidates.append(row)
+    sources = _state_db_session_sources(str(row.get("session_id") or "").strip() for row in candidates)
+    for row in candidates:
+        if sources.get(str(row.get("session_id") or "").strip()) == "subagent":
+            row["read_only"] = True
+            row["is_cli_session"] = False
 
 
 def _state_db_session_source(sid: str) -> str:

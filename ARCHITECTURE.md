@@ -1718,3 +1718,9 @@ Chat startup, the composer bot picker and profile prewarming omit skill counts.
 `GET /api/profiles?fast=1&counts=0` preserves profile metadata and access filtering
 without starting skill scans; the profile-management panel keeps the default
 count-enabled request and queues its counts on demand.
+
+Sidebar rebuilds batch delegated-child source checks across visible and reference
+rows using one read-only state.db connection and bounded SQL chunks. The lookup
+is request-local, not cached: stale index sources are still corrected to
+read-only subagent rows, while mutation endpoints retain their independent
+single-session guards. No transcript or authorization state is changed.
