@@ -8019,17 +8019,37 @@ function _botOrgTree(list){
   for(const p of list.slice().sort(order)) if(!reached.has(p.name)){roots.push(p);walk(p);}
   return {roots,kids};
 }
-function _botOrgNode(p, kids, seen){
-  const li=document.createElement('li');li.className='bot-org-node';
-  const card=document.createElement('button');card.type='button';card.className='bot-org-card';card.dataset.name=p.name;
-  if(_currentProfileDetail&&_currentProfileDetail.name===p.name)card.classList.add('active');
-  const label=[(p.bot&&p.bot.role)||'',(p.bot&&p.bot.category)||''].filter((v,i,a)=>v&&a.indexOf(v)===i).join(' \u00b7 ');
-  card.innerHTML=`<span class="bot-org-avatar">${botAvatarHtml(p)}</span><span class="bot-org-text"><span class="bot-org-name">${esc(botDisplayName(p))}</span>${label?`<span class="bot-org-meta">${esc(label)}</span>`:''}</span>`;
-  card.addEventListener('click',()=>openProfileDetail(p.name));
-  li.appendChild(card);seen.add(p.name);
-  const children=(kids.get(p.name)||[]).filter(c=>!seen.has(c.name));
-  if(children.length){const ul=document.createElement('ul');ul.className='bot-org-children';children.forEach(c=>ul.appendChild(_botOrgNode(c,kids,seen)));li.appendChild(ul);}
-  return li;
+// Compact org chart: per leading bot a row of columns, one per direct report,
+// with everyone below as one-line chips. Fits the width and wraps instead of
+// scrolling sideways. People (kind person) without bots below them sit in a
+// collapsed strip of their own; bots without a place are listed apart.
+function _botOrgChip(p, depth, inherited){
+  const chip=document.createElement('button');chip.type='button';chip.className='bot-org-chip';
+  chip.dataset.name=p.name;chip.dataset.depth=String(depth||0);
+  if(_currentProfileDetail&&_currentProfileDetail.name===p.name)chip.classList.add('active');
+  const meta=[(p.bot&&p.bot.role)||'',(p.bot&&p.bot.category)||''].filter((v,i,a)=>v&&a.indexOf(v)===i).join(' \u00b7 ');
+  // Below a column head the shared category is noise: only a different one shows.
+  const shown=meta&&meta!==inherited?meta:'';
+  chip.innerHTML=`<span class="bot-org-avatar">${botAvatarHtml(p)}</span><span class="bot-org-name">${esc(botDisplayName(p))}</span>${shown?`<span class="bot-org-meta">${esc(shown)}</span>`:''}`;
+  chip.title=meta?botDisplayName(p)+' \u00b7 '+meta:botDisplayName(p);
+  chip.dataset.search=(botDisplayName(p)+' '+p.name+' '+meta).toLowerCase();
+  chip.addEventListener('click',()=>openProfileDetail(p.name));
+  return chip;
+}
+function _botOrgColumn(head, kids, seen){
+  const col=document.createElement('section');col.className='bot-org-col';col.dataset.head=head.name;
+  const shared=(head.bot&&head.bot.category)||'';
+  const add=(p,depth)=>{if(seen.has(p.name))return;seen.add(p.name);col.appendChild(_botOrgChip(p,depth,depth?shared:''));(kids.get(p.name)||[]).forEach(c=>add(c,depth+1));};
+  add(head,0);
+  return col;
+}
+function _botOrgFilter(view, query){
+  const q=String(query||'').trim().toLowerCase();let shown=0;
+  view.querySelectorAll('.bot-org-chip').forEach(c=>{const hit=!q||c.dataset.search.includes(q);c.hidden=!hit;if(hit)shown++;});
+  view.querySelectorAll('.bot-org-col,.bot-org-block,.bot-org-section').forEach(box=>{box.hidden=!!q&&!box.querySelector('.bot-org-chip:not([hidden])');});
+  const people=view.querySelector('.bot-org-people');
+  if(people&&q&&!people.hidden)people.open=true;
+  const none=view.querySelector('.bot-org-no-match');if(none)none.hidden=shown>0;
 }
 async function openBotOrgChart(){
   if(window.BotBuilder)window.BotBuilder.invalidate();
@@ -8038,23 +8058,39 @@ async function openBotOrgChart(){
   if(!_profilesCache){try{_profilesCache=await api('/api/profiles?fast=1');}catch(e){showToast(e.message);return;}}
   title.textContent=t('bot_org_chart');
   const list=_botOrgList();
-  body.innerHTML=`<div class="main-view-content bot-org-view"><p class="bot-field-hint">${esc(t('bot_org_chart_intro'))}</p><div class="bot-org-scroll"></div></div>`;
+  body.innerHTML=`<div class="main-view-content bot-org-view"><div class="bot-org-toolbar"><p class="bot-field-hint">${esc(t('bot_org_chart_intro'))}</p><input type="search" id="botOrgSearch" placeholder="${esc(t('bot_org_chart_search'))}" aria-label="${esc(t('bot_org_chart_search'))}"></div><div class="bot-org-scroll"></div></div>`;
   const scroll=body.querySelector('.bot-org-scroll');
   if(!list.length){scroll.innerHTML=`<p class="bot-field-hint">${esc(t('bot_org_chart_empty'))}</p>`;}
   else{
-    const {roots,kids}=_botOrgTree(list),seen=new Set(),ul=document.createElement('ul');
-    ul.className='bot-org-tree';ul.setAttribute('aria-label',t('bot_org_chart'));
-    // Bots without a manager and without anyone below them are not part of the
-    // organisation yet: list them apart so the tree itself stays readable.
-    const placed=roots.filter(p=>kids.has(p.name)),loose=roots.filter(p=>!kids.has(p.name));
-    (placed.length?placed:loose).forEach(p=>{if(!seen.has(p.name))ul.appendChild(_botOrgNode(p,kids,seen));});
-    scroll.appendChild(ul);
-    if(placed.length&&loose.length){
-      const h=document.createElement('p');h.className='bot-field-hint bot-org-loose-title';h.textContent=t('bot_org_chart_unplaced');
-      const lu=document.createElement('ul');lu.className='bot-org-tree bot-org-loose';
-      loose.forEach(p=>{if(!seen.has(p.name))lu.appendChild(_botOrgNode(p,kids,seen));});
-      scroll.appendChild(h);scroll.appendChild(lu);
+    const {roots,kids}=_botOrgTree(list),seen=new Set();
+    // A person stays in the tree only while bots report to them.
+    const person=p=>_botKind(p)==='person'&&!kids.has(p.name);
+    const placed=roots.filter(p=>kids.has(p.name)),loose=roots.filter(p=>!kids.has(p.name)&&!person(p));
+    const tree=document.createElement('div');tree.className='bot-org-tree';tree.setAttribute('role','group');tree.setAttribute('aria-label',t('bot_org_chart'));
+    for(const root of placed){
+      if(seen.has(root.name))continue;seen.add(root.name);
+      const block=document.createElement('div');block.className='bot-org-block';block.dataset.root=root.name;
+      const top=document.createElement('div');top.className='bot-org-top';top.appendChild(_botOrgChip(root,0));
+      const cols=document.createElement('div');cols.className='bot-org-columns';
+      (kids.get(root.name)||[]).forEach(c=>{if(!seen.has(c.name))cols.appendChild(_botOrgColumn(c,kids,seen));});
+      block.append(top,cols);tree.appendChild(block);
     }
+    scroll.appendChild(tree);
+    const strip=(cls,items)=>{const box=document.createElement('div');box.className='bot-org-strip '+cls;items.forEach(p=>{if(!seen.has(p.name)){seen.add(p.name);box.appendChild(_botOrgChip(p,0));}});return box;};
+    if(loose.length){
+      const sec=document.createElement('section');sec.className='bot-org-section';
+      if(placed.length){const h=document.createElement('p');h.className='bot-field-hint bot-org-loose-title';h.textContent=t('bot_org_chart_unplaced');sec.appendChild(h);}
+      sec.appendChild(strip('bot-org-loose',loose));scroll.appendChild(sec);
+    }
+    const people=list.filter(p=>person(p)&&!seen.has(p.name));
+    if(people.length){
+      const det=document.createElement('details');det.className='bot-org-people bot-org-section';
+      det.innerHTML=`<summary>${esc(t('bot_org_chart_people'))} <span class="cron-group-count">${people.length}</span></summary>`;
+      det.appendChild(strip('',people.sort((a,b)=>botDisplayName(a).localeCompare(botDisplayName(b)))));scroll.appendChild(det);
+    }
+    const none=document.createElement('p');none.className='bot-field-hint bot-org-no-match';none.hidden=true;none.textContent=t('bot_org_chart_no_match');scroll.appendChild(none);
+    const search=body.querySelector('#botOrgSearch');
+    search.addEventListener('input',()=>_botOrgFilter(scroll,search.value));
   }
   document.querySelectorAll('.profile-card').forEach(e=>e.classList.remove('active'));
   body.style.display='';

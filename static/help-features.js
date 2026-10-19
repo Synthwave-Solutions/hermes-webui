@@ -5073,7 +5073,8 @@ window.SynthPulseFeatureCatalog = {
         "?help_feature=webui.bots.org_chart",
         "#btnBotOrgChart",
         "#botReportsTo",
-        "#botRole"
+        "#botRole",
+        "#botOrgSearch"
       ],
       "source_refs": [
         "static/index.html:352",
@@ -5094,10 +5095,10 @@ window.SynthPulseFeatureCatalog = {
           "steps": [
             "Open a bot, choose Edit and pick a manager under Reports to. Optionally fill in Department or role, then save.",
             "Open Bots and click the Org chart button at the top of the list.",
-            "Click a bot in the org chart to open it."
+            "Click a bot in the org chart to open it. Use the search field to find a bot quickly."
           ],
           "permissions": "Editing who a bot reports to requires bot management rights. You only see bots you have access to.",
-          "limits": "Reports to is shown for structure only: it does not grant a bot rights or let it give instructions to other bots. A bot cannot report to itself or to a bot below it. On narrow screens the chart is shown as an indented list.",
+          "limits": "Reports to is shown for structure only: it does not grant a bot rights or let it give instructions to other bots. A bot cannot report to itself or to a bot below it. Each leading bot gets a column per direct report that wraps to the screen width; people and partners without bots below them are listed in a collapsed strip.",
           "example": "Let the finance bots report to a CFO bot, which reports to the leading bot."
         },
         "nl": {
@@ -5107,10 +5108,10 @@ window.SynthPulseFeatureCatalog = {
           "steps": [
             "Open een bot, kies Bewerken en kies bij Rapporteert aan een leidinggevende bot. Vul eventueel Afdeling of rol in en sla op.",
             "Open Bots en klik bovenaan de lijst op de knop Organigram.",
-            "Klik op een bot in het organigram om hem te openen."
+            "Klik op een bot in het organigram om hem te openen. Gebruik het zoekveld om snel een bot te vinden."
           ],
           "permissions": "Voor het wijzigen van Rapporteert aan heb je beheerrechten voor bots nodig. Je ziet alleen bots waar je toegang toe hebt.",
-          "limits": "Rapporteert aan is alleen voor de structuur: het geeft een bot geen rechten en laat hem geen opdrachten geven aan andere bots. Een bot kan niet aan zichzelf rapporteren of aan een bot onder hem. Op smalle schermen verschijnt het organigram als ingesprongen lijst.",
+          "limits": "Rapporteert aan is alleen voor de structuur: het geeft een bot geen rechten en laat hem geen opdrachten geven aan andere bots. Een bot kan niet aan zichzelf rapporteren of aan een bot onder hem. Elke leidende bot krijgt een kolom per directe rapportage die meeschuift met de schermbreedte; mensen en partners zonder bots onder zich staan in een ingeklapte strook.",
           "example": "Laat de financebots rapporteren aan een CFO-bot, die weer rapporteert aan de leidende bot."
         }
       }

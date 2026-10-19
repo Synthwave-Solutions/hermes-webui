@@ -7786,44 +7786,39 @@ main.main.showing-approvals > #mainApprovals{display:flex;}
 .bot-editor :disabled{opacity:.8;cursor:default;}
 .bot-technical-details{margin-top:24px;border-top:1px solid var(--border);padding-top:16px;}
 .bot-technical-details summary{cursor:pointer;color:var(--muted);font-size:13px;padding:8px 0;}
-/* Bot org chart: a connector tree on wide screens, an indented list on narrow ones. */
-.bot-org-scroll{overflow-x:auto;padding:8px 0 16px;}
-.bot-org-tree,.bot-org-children{list-style:none;margin:0;padding:0;display:flex;justify-content:center;position:relative;}
-.bot-org-tree{flex-wrap:wrap;gap:24px 16px;align-items:flex-start;}
-.bot-org-loose-title{margin-top:32px;text-align:center;}
-/* A wide tree grows to its full width and scrolls inside .bot-org-scroll; nodes never shrink,
-   so centring can not push the left branches out of reach. */
-.bot-org-tree:not(.bot-org-loose){width:max-content;min-width:100%;flex-wrap:nowrap;}
-.bot-org-node{flex-shrink:0;}
-.bot-org-children{padding-top:20px;}
-.bot-org-children::before{content:'';position:absolute;top:0;left:50%;height:20px;border-left:1px solid var(--border2);}
-.bot-org-node{display:flex;flex-direction:column;align-items:center;position:relative;}
-.bot-org-children>.bot-org-node{padding:20px 6px 0;}
-.bot-org-children>.bot-org-node::before,.bot-org-children>.bot-org-node::after{content:'';position:absolute;top:0;right:50%;width:50%;height:20px;border-top:1px solid var(--border2);}
-.bot-org-children>.bot-org-node::after{right:auto;left:50%;border-left:1px solid var(--border2);}
-.bot-org-children>.bot-org-node:only-child{padding-top:0;}
-.bot-org-children>.bot-org-node:only-child::before,.bot-org-children>.bot-org-node:only-child::after{display:none;}
-.bot-org-children>.bot-org-node:first-child::before,.bot-org-children>.bot-org-node:last-child::after{border:0;}
-.bot-org-children>.bot-org-node:last-child::before{border-right:1px solid var(--border2);border-top-right-radius:6px;}
-.bot-org-children>.bot-org-node:first-child::after{border-top-left-radius:6px;}
-.bot-org-card{display:flex;align-items:center;gap:8px;min-width:160px;max-width:220px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font:inherit;text-align:left;cursor:pointer;}
-.bot-org-card:hover{background:var(--hover-bg);}
-.bot-org-card.active{border-color:var(--accent);}
-.bot-org-card:focus-visible{outline:2px solid var(--accent);outline-offset:3px;}
+/* Bot org chart, compact: per leading bot a grid of columns (one per direct
+   report) that fits the width and wraps; everyone below as one-line chips. */
+.bot-org-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 16px;margin-bottom:8px;}
+.bot-org-toolbar .bot-field-hint{margin:0;flex:1 1 280px;}
+.bot-org-toolbar input{flex:0 1 240px;min-width:0;padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font:inherit;font-size:13px;}
+.bot-org-scroll{padding:4px 0 16px;min-width:0;}
+.bot-org-block+.bot-org-block{margin-top:16px;}
+.bot-org-top{display:flex;justify-content:center;padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--border2);}
+.bot-org-top .bot-org-chip{width:auto;max-width:320px;border-color:var(--border2);font-weight:600;}
+.bot-org-columns{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;align-items:start;}
+.bot-org-col{display:flex;flex-direction:column;gap:2px;min-width:0;padding:6px;border:1px solid var(--border);border-radius:8px;background:var(--surface);}
+.bot-org-chip{display:flex;align-items:center;gap:6px;width:100%;min-width:0;min-height:26px;padding:2px 6px;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--text);font:inherit;font-size:12px;text-align:left;cursor:pointer;box-sizing:border-box;}
+.bot-org-chip[data-depth="0"]{font-weight:600;}
+.bot-org-col .bot-org-chip[data-depth="1"]{padding-left:14px;}
+.bot-org-col .bot-org-chip[data-depth="2"]{padding-left:24px;}
+.bot-org-col .bot-org-chip:not([data-depth="0"]):not([data-depth="1"]):not([data-depth="2"]){padding-left:34px;}
+.bot-org-chip:hover{background:var(--hover-bg);}
+.bot-org-chip.active{border-color:var(--accent);}
+.bot-org-chip:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;}
+.bot-org-chip[hidden],.bot-org-col[hidden],.bot-org-block[hidden],.bot-org-section[hidden]{display:none;}
 .bot-org-avatar{flex:0 0 auto;display:flex;}
-.bot-org-avatar img,.bot-org-avatar svg{margin:0!important;}
-.bot-org-text{display:flex;flex-direction:column;min-width:0;}
-.bot-org-name{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.bot-org-meta{font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bot-org-avatar img,.bot-org-avatar svg{width:20px!important;height:20px!important;margin:0!important;border-radius:5px;}
+.bot-org-name{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bot-org-meta{flex:0 100 auto;min-width:0;margin-left:auto;padding-left:6px;max-width:40%;font-size:10px;font-weight:400;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bot-org-section{margin-top:16px;}
+.bot-org-loose-title{margin:0 0 6px;}
+.bot-org-strip{display:flex;flex-wrap:wrap;gap:4px;}
+.bot-org-strip .bot-org-chip{width:auto;max-width:220px;border-color:var(--border);}
+.bot-org-strip .bot-org-meta{display:none;}
+.bot-org-people>summary{cursor:pointer;color:var(--muted);font-size:12px;padding:4px 0 8px;}
 @media(max-width:640px){
-  .bot-org-scroll{overflow-x:visible;}
-  .bot-org-tree,.bot-org-children{display:block;}
-  .bot-org-tree:not(.bot-org-loose){width:auto;min-width:0;}
-  .bot-org-children{padding:0 0 0 16px;margin-left:16px;border-left:1px solid var(--border2);}
-  .bot-org-children::before,.bot-org-children>.bot-org-node::before,.bot-org-children>.bot-org-node::after{display:none;}
-  .bot-org-node,.bot-org-children>.bot-org-node{display:block;padding:8px 0 0;}
-  .bot-org-tree>.bot-org-node+.bot-org-node{margin-top:8px;}
-  .bot-org-card{width:100%;max-width:none;min-width:0;min-height:44px;}
+  .bot-org-columns{grid-template-columns:1fr;}
+  .bot-org-chip{min-height:40px;}
 }
 html[data-nav-audience="member"] [data-dashboard-link]{display:none!important;}
 @media(min-width:641px){

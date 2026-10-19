@@ -12,7 +12,17 @@ If another editor saved first, reload before saving again. Appearance uses the e
 
 In the same editor, **Reports to** links a bot to the bot it reports to, or to nobody (top level). **Department or role** is an optional short label of at most 80 characters. Both are stored as `reports_to` and `role` in `ui_meta['hermes-bots']` and follow the same revision contract. The server only accepts an existing bot, never the bot itself and never a choice that would create a reporting cycle; a new manager must also be a bot the editor can see. An unchanged value is kept even if that manager was removed later, so other fields stay editable.
 
-Choose **Org chart** at the top of the Bots list to see the tree. Bots without a manager, or whose manager you cannot see, appear at the top. Click a bot to open it. On narrow screens the chart becomes an indented list. Reports to describes structure only: it grants no permissions and does not route work between bots.
+Choose **Org chart** at the top of the Bots list to see the tree. Each leading bot (a bot without a manager, with bots below it) heads a grid of columns, one per direct report, with everyone below as compact one-line chips; the grid wraps to the screen width, so there is no sideways scrolling. Bots without a place are listed apart, and people and partners without bots below them sit in a collapsed **People and partners** strip. A search field narrows the chart. Click a bot to open it. Reports to describes structure only: it grants no permissions and does not route work between bots.
+
+## Bot or person
+
+**Kind** marks a profile as a bot or as a person's own profile (team member, partner), stored as `kind` in `ui_meta['hermes-bots']`. Unset, an unmanaged profile in the category Team or Partners counts as a person and everything else, SynthPulse and guided bots included, as a bot. `/api/profiles` returns the effective `bot_kind`. People get no Scout and appear in the org chart's people strip.
+
+## Scout
+
+Scout lets a bot look around once a day for news on its topics. Turn it on with the radar button next to the bot in the sidebar or on the bot's **Scout** card, where you also set up to 12 topics (at most 80 characters each) and the digest time (default 07:30). Settings live in `ui_meta['hermes-bots'].scout` as `{enabled, topics, digest_time}` and are saved through `POST /api/bots/scout`, which needs the same rights as editing the bot.
+
+Turning Scout on copies the Scout runner files from the root profile's `scripts/scout/` into the bot's own `scripts/scout/` (the scheduler only runs scripts inside the job's own Hermes home) and creates or resumes one scheduled job in the bot's own task store, marked `managed_by: scout`. The job runs `scout/scout_collect.py` first and only wakes the agent when there is something new; the agent works read-only, files actionable items as triage tasks and writes at most one digest in the bot's task chat. In-app notifications for the job are off. Turning Scout off pauses the job; it is never deleted.
 
 ## Instructions, tools and knowledge
 
