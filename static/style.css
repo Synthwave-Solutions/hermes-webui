@@ -8345,6 +8345,14 @@ html[data-nav-audience="member"]:not([data-advanced-chat-controls="1"]) #compose
 .bot-work-file{display:flex;flex-direction:column;gap:2px;font-size:13px;}
 .bot-work-file a{overflow-wrap:anywhere;}
 .bot-work-file-meta{font-size:11px;color:var(--muted);overflow-wrap:anywhere;}
+/* Bot Screen status line on the bot page and the sidebar waiting dot. */
+.bot-screen-line{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:0 0 8px;font-size:12px;}
+.bot-screen-text{flex:1 1 200px;min-width:0;overflow-wrap:anywhere;}
+.bot-screen-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;background:var(--muted);}
+.bot-screen-line[data-state="agent"] .bot-screen-dot{background:var(--success,#3a9a5b);}
+.bot-screen-line[data-state="waiting"] .bot-screen-dot,.sidebar-bot-screen-wait{background:var(--warning,#c98a00);}
+.bot-screen-line[data-state="human"] .bot-screen-dot{background:var(--accent);}
+.sidebar-bot-screen-wait{display:inline-block;width:8px;height:8px;border-radius:50%;flex-shrink:0;margin:0 4px;}
 /* My approvals: Waiting for you. */
 .waiting-for-you{margin:0 0 16px;}
 .waiting-for-you h3{margin:0 0 8px;font-size:14px;}

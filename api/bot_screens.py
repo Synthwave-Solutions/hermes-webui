@@ -22,6 +22,9 @@ _LOCK = threading.RLock()
 _CHALLENGES = {}
 _SCREEN_LOCKS = {}
 _STREAMS = threading.BoundedSemaphore(8)
+# Who took over a screen through this server: str(home) -> (viewer id, email),
+# only to name the person on the status line. After a restart it is unknown.
+_HOLDERS = {}
 
 
 class ScreenError(Exception):
@@ -140,11 +143,62 @@ def _confirm(key, challenge, action):
         raise ScreenError('confirmation_required', 409)
 
 
+_REASON_MAX = 200
+
+
+def _status_row(email, bot, rights):
+    """A compact, read-only screen state for one bot: ``none`` (no desktop
+    yet), ``agent`` (the bot works), ``waiting`` (the agent holds the screen
+    and asks a person to take over, with its reason) or ``human`` (a person
+    holds it). An unreadable lease reads as ``human`` (the engine fails closed)."""
+    home = _home(bot)
+    row = {'bot': bot, 'rights': rights}
+    if not (home / 'bot-desktop').is_dir():
+        return {**row, 'state': 'none'}
+    with _runtime(home) as (_runtime_mod, leases):
+        lease = leases.get(profile_key=str(home))
+    reason = ' '.join(str(lease.reason or '').split())[:_REASON_MAX]
+    row['since'] = lease.since
+    if lease.holder == 'human':
+        with _LOCK:
+            holder = _HOLDERS.get(str(home))
+        by = holder[1] if holder and holder[0] == lease.viewer_id else ''
+        return {**row, 'state': 'human', 'by': by, 'mine': bool(by) and by == email}
+    if reason:
+        return {**row, 'state': 'waiting', 'reason': reason}
+    return {**row, 'state': 'agent'}
+
+
+def _status(handler, query):
+    """GET /api/bot-screen/status[?bot=<id>]: screen states for the bots this
+    viewer may watch (explicit Bot Screen view grant). Nothing is started,
+    taken or audited here."""
+    email, _cookie = _identity(handler)
+    bot = query.get('bot', [''])[0]
+    if bot and (not isinstance(bot, str) or len(bot) > 64):
+        raise ScreenError('invalid_bot', 422)
+    rows = []
+    for name in ([bot] if bot else list(_policy())):
+        rights = _rights(email, name)
+        if not rights['view']:
+            if bot:
+                raise ScreenError('screen_forbidden')
+            continue
+        try:
+            rows.append(_status_row(email, name, rights))
+        except ScreenError:
+            if bot:
+                raise
+    return j(handler, {'screens': rows}, extra_headers={'Cache-Control': 'no-store'})
+
+
 def handle_get(handler, parsed):
     try:
         query = parse_qs(parsed.query)
         if parsed.path == '/api/bot-screen/ws':
             return _stream(handler, query)
+        if parsed.path == '/api/bot-screen/status':
+            return _status(handler, query)
         if parsed.path != '/api/bot-screen':
             return False
         email, cookie = _identity(handler)
@@ -200,6 +254,8 @@ def handle_post(handler, body):
                     raise ScreenError('another_controller', 409)
                 _audit(email, bot, action)
                 leases.acquire(viewer, profile_key=str(home), reason='SynthPulse private takeover')
+                with _LOCK:
+                    _HOLDERS[str(home)] = (viewer, email)
             elif action == 'release':
                 if lease.holder == 'human' and lease.viewer_id != viewer:
                     raise ScreenError('another_controller', 409)

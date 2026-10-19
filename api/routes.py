@@ -12306,7 +12306,7 @@ def handle_get(handler, parsed) -> bool:
     if governance_api.handle_governance_api(handler, parsed, "GET"):
         return True
 
-    if parsed.path in ("/api/bot-screen", "/api/bot-screen/ws"):
+    if parsed.path in ("/api/bot-screen", "/api/bot-screen/ws", "/api/bot-screen/status"):
         from api import bot_screens
         return bot_screens.handle_get(handler, parsed)
 

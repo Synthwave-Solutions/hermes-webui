@@ -139,3 +139,43 @@ def test_expired_confirmation_does_not_acquire_lease(setup, monkeypatch):
     monkeypatch.setattr(screens.time,'monotonic',lambda:10**20)
     assert post('takeover',challenge=token).status==409
     assert not lease.human_holds(str(homes['one']))
+
+
+def status(query=''):
+    h=_Handler();screens.handle_get(h,urlsplit('/api/bot-screen/status'+query));return h
+
+
+def _ask(lease, home, reason):
+    def ask(row):
+        row.reason=reason;return True
+    lease._transition(str(home), ask)
+
+
+def test_status_states_and_scope(setup):
+    state, _, homes, lease=setup
+    screens._HOLDERS.clear()
+    assert status().body=={'screens':[{'bot':'one','rights':{'view':True,'control':True,'admin':True},'state':'none'}]}
+    _ask(lease, homes['one'], '  please   log in to Exact ')
+    row=status('?bot=one').body['screens'][0]
+    assert row['state']=='waiting' and row['reason']=='please log in to Exact'
+    post('takeover',challenge=challenge())
+    row=status('?bot=one').body['screens'][0]
+    assert row['state']=='human' and row['by']=='admin@example.test' and row['mine'] is True
+    # A watcher sees who holds it, not as their own; a bot without a grant is absent.
+    state.email='watch@example.test';state.cookie='watch-cookie'
+    rows=status().body['screens']
+    assert [r['bot'] for r in rows]==['one'] and rows[0]['mine'] is False and rows[0]['rights']['control'] is False
+    assert status('?bot=two').status==403
+    state.email='second@example.test'
+    assert [r['bot'] for r in status().body['screens']]==['two']
+    state.email=None
+    assert status().status==401
+
+
+def test_status_after_hand_back_and_unreadable_lease(setup):
+    _, _, homes, lease=setup
+    post('takeover',challenge=challenge());post('release')
+    assert status('?bot=one').body['screens'][0]['state']=='agent'
+    (homes['one']/'bot-desktop'/'lease.json').write_text('{broken')
+    row=status('?bot=one').body['screens'][0]
+    assert row['state']=='human' and row['by']=='' and row['mine'] is False

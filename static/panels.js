@@ -8282,14 +8282,37 @@ function _botWorkSectionHtml(p){
   if(_botKind(p)!=='bot')return '';
   return `<section class="detail-card bot-work" id="botWork" style="display:none" aria-live="polite"></section>`;
 }
+// Bot Screen status line (api/bot_screens.py /api/bot-screen/status): only
+// for viewers with an explicit Bot Screen view grant; opens the existing viewer.
+function _botScreenUrl(bot){ return '/static/bot-screens.html?'+new URLSearchParams({bot:bot||'default'}); }
+function _botScreenStatusText(row){
+  if(!row)return '';
+  if(row.state==='none')return t('bot_screen_none');
+  if(row.state==='waiting')return t('bot_screen_waiting').replace('{reason}',row.reason||'');
+  if(row.state==='human'){
+    const when=_botWorkWhen(row.since);
+    return (row.mine?t('bot_screen_human_you'):t('bot_screen_human').replace('{who}',row.by||t('bot_screen_someone'))).replace('{since}',when);
+  }
+  return t('bot_screen_agent');
+}
+function _botScreenLineHtml(row){
+  if(!row)return '';
+  const link=row.state==='none'?'':`<a class="sm-btn bot-screen-open" href="${esc(_botScreenUrl(row.bot))}" target="_blank" rel="noopener">${esc(t('bot_screen_open'))}</a>`;
+  return `<div class="bot-screen-line" data-state="${esc(row.state)}"><span class="bot-screen-dot" aria-hidden="true"></span><span class="bot-screen-text"><strong>${esc(t('bot_screen'))}:</strong> ${esc(_botScreenStatusText(row))}</span>${link}</div>`;
+}
 async function _loadBotWork(p){
-  const box=$('botWork');
-  if(!box||!p||(typeof _canUseFeature==='function'&&!_canUseFeature('sessions:read')))return;
-  let data;
-  try{data=await api('/api/kanban/bot-work?profile='+encodeURIComponent(p.is_default?'default':p.name),{timeoutToast:false});}
-  catch(_e){return;}
+  const box=$('botWork');if(!box||!p)return;
+  const bot=p.is_default?'default':p.name;
+  const kanban=typeof _canUseFeature!=='function'||_canUseFeature('sessions:read');
+  const [data,screens]=await Promise.all([
+    kanban?api('/api/kanban/bot-work?profile='+encodeURIComponent(bot),{timeoutToast:false}).catch(()=>null):null,
+    api('/api/bot-screen/status?bot='+encodeURIComponent(bot),{timeoutToast:false,redirect401:false}).catch(()=>null),
+  ]);
   if(!box.isConnected||!_currentProfileDetail||_currentProfileDetail.name!==p.name)return;
-  box.innerHTML=_botWorkHtml(data);box.style.display='';
+  const screen=screens&&Array.isArray(screens.screens)?screens.screens.find(r=>r&&r.bot===bot):null;
+  if(!data&&!screen)return;
+  box.innerHTML=_botScreenLineHtml(screen)+(data?_botWorkHtml(data):`<div class="detail-card-title">${esc(t('bot_work_title'))}</div>`);
+  box.style.display='';
 }
 async function openKanbanTaskFromBot(taskId){
   if(!taskId)return;
