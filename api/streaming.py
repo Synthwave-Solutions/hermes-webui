@@ -753,6 +753,10 @@ def _webui_ephemeral_system_prompt(
         from api.bot_metadata import knowledge_prompt
         knowledge = knowledge_prompt(surface_context.get('profile'), surface_context.get('workspace'))
         if knowledge: parts.append(knowledge)
+        # What this bot answers for (ui_meta.hermes-bots.responsibilities).
+        from api.bot_metadata import responsibilities_prompt
+        duties = responsibilities_prompt(surface_context.get('profile'))
+        if duties: parts.append(duties)
         from api import bot_knowledge, bot_builder
         shared_knowledge = bot_knowledge.prompt(surface_context.get("profile"), actor_email)
         if shared_knowledge:

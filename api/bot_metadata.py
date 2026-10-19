@@ -7,6 +7,8 @@ import yaml
 _LOCK = threading.RLock()
 SHAPES = ('circle','squircle','hexagon')
 BOT_TEXT_FIELDS = ('title','description','shape','color','category','role','reports_to','kind')
+# Appearance fields that hold a list and are validated by their own checker.
+_LIST_FIELDS = ('knowledge_sources','responsibilities')
 # A profile is a bot or the personal profile of a person (team member, partner).
 KINDS = ('bot','person')
 # Categories whose unmanaged profiles are people unless the editor says otherwise.
@@ -64,6 +66,8 @@ def read_profile(name):
         bot={k:meta[k] for k in BOT_TEXT_FIELDS if isinstance(meta.get(k),str)}
         scout=_stored_scout(meta.get('scout'))
         if scout:bot['scout']=scout
+        duties=_stored_responsibilities(meta.get('responsibilities'))
+        if duties:bot['responsibilities']=duties
         return {
             'bot_configuration':configuration_summary(path.parent),
             'bot':bot,
@@ -77,11 +81,13 @@ def read_profile(name):
 
 
 def save_profile(name, values, revision):
-    if not isinstance(values,dict) or set(values)-{*BOT_TEXT_FIELDS,'knowledge_sources'}: raise ValueError('Unknown bot appearance field')
+    if not isinstance(values,dict) or set(values)-{*BOT_TEXT_FIELDS,*_LIST_FIELDS}: raise ValueError('Unknown bot appearance field')
     if not isinstance(revision,int) or isinstance(revision,bool) or revision<0: raise ValueError('Revision required')
+    values=dict(values)
     if 'knowledge_sources' in values: validate_sources(values['knowledge_sources'])
+    if 'responsibilities' in values: values['responsibilities']=validate_responsibilities(values['responsibilities'])
     for key,value in values.items():
-        if key=='knowledge_sources': continue
+        if key in _LIST_FIELDS: continue
         if not isinstance(value,str): raise ValueError('Appearance values must be text')
         if len(value)> (400 if key=='description' else 80): raise ValueError('Appearance value too long')
         if any(ord(c)<32 and c not in '\n\t' for c in value):raise ValueError('Invalid appearance text')
@@ -102,11 +108,78 @@ def save_profile(name, values, revision):
         if 'reports_to' in values:
             stored=meta.get('reports_to');stored=stored.strip() if isinstance(stored,str) else ''
             if values['reports_to'].strip()!=stored:_validate_reports_to(name,values['reports_to'].strip())
-        meta.update({k:(v if k=='knowledge_sources' else v.strip()) for k,v in values.items()});meta['custom']=True
+        meta.update({k:(v if k in _LIST_FIELDS else v.strip()) for k,v in values.items()});meta['custom']=True
         revisions['hermes-bots']=actual+1
         from utils import atomic_yaml_write
         atomic_yaml_write(path,data,sort_keys=False)
     return read_profile(name)
+
+
+# Responsibilities: ui_meta.hermes-bots.responsibilities, what a bot answers
+# for. Each item names what (title), why (objective), when it acts (trigger,
+# free text such as "dagelijks 08:00" or "bij nieuwe mail"), how far it may go
+# on its own (autonomy) and how it reports back. Display and chat context only:
+# it never grants a tool, a schedule or an approval.
+RESP_MAX = 12
+RESP_LIMITS = {'title':80,'objective':300,'trigger':120,'reporting':120}
+RESP_AUTONOMY = ('auto','ask','report_only')
+RESP_PROMPT_MAX = 800
+
+def validate_responsibilities(items):
+    """Strict check of a responsibilities list; returns the normalized list."""
+    if not isinstance(items,list) or len(items)>RESP_MAX:raise ValueError('Use at most %d responsibilities'%RESP_MAX)
+    clean=[]
+    for item in items:
+        if not isinstance(item,dict) or set(item)-{*RESP_LIMITS,'autonomy'}:raise ValueError('Unknown responsibility field')
+        row={}
+        for key,limit in RESP_LIMITS.items():
+            value=item.get(key,'')
+            if not isinstance(value,str):raise ValueError('Responsibility values must be text')
+            if any((ord(c)<32 and not (key=='objective' and c=='\n')) or ord(c)==127 for c in value):raise ValueError('Invalid responsibility text')
+            value=value.strip() if key=='objective' else ' '.join(value.split())
+            if len(value)>limit:raise ValueError('Responsibility %s is at most %d characters'%(key,limit))
+            row[key]=value
+        if not row['title']:raise ValueError('A responsibility needs a title')
+        autonomy=item.get('autonomy','ask')
+        if autonomy not in RESP_AUTONOMY:raise ValueError('Unknown responsibility autonomy')
+        row['autonomy']=autonomy
+        clean.append(row)
+    return clean
+
+def _stored_responsibilities(value):
+    """The stored list for display; a damaged record reads as absent."""
+    if value is None:return []
+    try:return validate_responsibilities(value)
+    except ValueError:return []
+
+_AUTONOMY_PROMPT = {'auto':'zelfstandig uitvoeren','ask':'eerst vragen','report_only':'alleen melden, niet zelf handelen'}
+
+def responsibilities_prompt(name):
+    """A compact "your responsibilities" block for a bot's own chats, at most
+    RESP_PROMPT_MAX characters. Context, not authorization: approvals, access
+    rules and tool limits still apply."""
+    if not name:return ''
+    try:
+        row=read_profile(name)
+        if row.get('bot_kind')!='bot':return ''
+        duties=(row.get('bot') or {}).get('responsibilities') or []
+    except (OSError,ValueError):return ''
+    if not duties:return ''
+    head='Jouw verantwoordelijkheden (context, geen toestemming; goedkeuringen en toegangsregels blijven gelden):'
+    lines=[head]
+    for d in duties:
+        parts=[d['title']]
+        if d.get('objective'):parts.append(' '.join(d['objective'].split()))
+        if d.get('trigger'):parts.append('wanneer: '+d['trigger'])
+        parts.append(_AUTONOMY_PROMPT[d['autonomy']])
+        if d.get('reporting'):parts.append('rapporteer: '+d['reporting'])
+        line='- '+'; '.join(parts)
+        if len('\n'.join(lines+[line]))>RESP_PROMPT_MAX:
+            room=RESP_PROMPT_MAX-len('\n'.join(lines))-2
+            if room>20:lines.append(line[:room-3].rstrip()+'...')
+            break
+        lines.append(line)
+    return '\n'.join(lines) if len(lines)>1 else ''
 
 
 # Scout settings: ui_meta.hermes-bots.scout, read by the Scout collector

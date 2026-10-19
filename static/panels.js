@@ -8173,6 +8173,73 @@ async function saveBotScout(enabled){
     showToast(e.message);
   }
 }
+// Responsibilities card (ui_meta.hermes-bots.responsibilities): what the bot
+// answers for. Everyone who sees the bot reads the list; an editor adds, edits
+// and removes rows, each change saved at once under the bot revision through
+// /api/profile/appearance. The bot gets the list as context in its own chats.
+const _BOT_DUTY_MAX=12,_BOT_DUTY_AUTONOMY=['ask','auto','report_only'];
+let _botDuties=[],_botDutyEditing=-1;
+function _botDutyRowHtml(d,i,editable){
+  const meta=[];
+  if(d.trigger)meta.push(`<span class="bot-duty-chip">${esc(t('bot_duty_trigger'))}: ${esc(d.trigger)}</span>`);
+  meta.push(`<span class="bot-duty-chip bot-duty-autonomy-${esc(d.autonomy||'ask')}">${esc(t('bot_duty_autonomy_'+(d.autonomy||'ask')))}</span>`);
+  if(d.reporting)meta.push(`<span class="bot-duty-chip">${esc(t('bot_duty_reports'))}: ${esc(d.reporting)}</span>`);
+  const actions=editable?`<div class="bot-duty-actions"><button type="button" class="sm-btn" onclick="_botDutyEdit(${i})">${esc(t('bot_duty_edit'))}</button><button type="button" class="sm-btn" onclick="_botDutyRemove(${i})">${esc(t('bot_duty_remove'))}</button></div>`:'';
+  return `<li class="bot-duty" data-index="${i}"><div class="bot-duty-main"><strong class="bot-duty-title">${esc(d.title)}</strong>${d.objective?`<p class="bot-duty-objective">${esc(d.objective)}</p>`:''}<div class="bot-duty-meta">${meta.join('')}</div></div>${actions}</li>`;
+}
+function _botDutyFormHtml(d){
+  d=d||{};
+  return `<div class="bot-duty-form" id="botDutyForm">
+      <label for="botDutyTitle">${esc(t('bot_duty_title'))}<input id="botDutyTitle" maxlength="80" required value="${esc(d.title||'')}"></label>
+      <label for="botDutyObjective">${esc(t('bot_duty_objective'))}<textarea id="botDutyObjective" maxlength="300" rows="2">${esc(d.objective||'')}</textarea></label>
+      <label for="botDutyTrigger">${esc(t('bot_duty_trigger'))}<input id="botDutyTrigger" maxlength="120" placeholder="${esc(t('bot_duty_trigger_placeholder'))}" value="${esc(d.trigger||'')}"></label>
+      <label for="botDutyAutonomy">${esc(t('bot_duty_autonomy'))}<select id="botDutyAutonomy">${_BOT_DUTY_AUTONOMY.map(a=>`<option value="${a}" ${(d.autonomy||'ask')===a?'selected':''}>${esc(t('bot_duty_autonomy_'+a))}</option>`).join('')}</select></label>
+      <label for="botDutyReporting">${esc(t('bot_duty_reporting'))}<input id="botDutyReporting" maxlength="120" placeholder="${esc(t('bot_duty_reporting_placeholder'))}" value="${esc(d.reporting||'')}"></label>
+      <div class="bot-editor-actions"><button type="button" class="sm-btn" onclick="_botDutyCancel()">${esc(t('bot_duty_cancel'))}</button><button type="button" class="sm-btn primary" onclick="_botDutySave()">${esc(t('bot_duty_save'))}</button></div>
+    </div>`;
+}
+function _botDutiesCardHtml(p){
+  if(_botKind(p)!=='bot')return '';
+  return `<section class="detail-card bot-duties-card" id="botDutiesCard" aria-labelledby="botDutiesTitle"></section>`;
+}
+function _paintBotDuties(){
+  const box=$('botDutiesCard'),p=_currentProfileDetail;if(!box||!p)return;
+  const editable=p.bot_editable===true,full=_botDuties.length>=_BOT_DUTY_MAX;
+  const rows=_botDuties.map((d,i)=>_botDutyEditing===i&&editable?`<li class="bot-duty is-editing">${_botDutyFormHtml(d)}</li>`:_botDutyRowHtml(d,i,editable)).join('');
+  const adding=editable&&_botDutyEditing===_botDuties.length;
+  box.innerHTML=`<div class="bot-duties-head"><h3 id="botDutiesTitle">${esc(t('bot_duties'))}</h3><span class="cron-group-count">${_botDuties.length}</span></div>
+    <p class="bot-field-hint">${esc(t('bot_duties_intro'))}</p>
+    ${rows?`<ol class="bot-duties-list">${rows}</ol>`:(adding?'':`<p class="bot-field-hint bot-duties-empty">${esc(t('bot_duties_empty'))}</p>`)}
+    ${adding?_botDutyFormHtml():''}
+    ${editable&&_botDutyEditing<0?`<div class="bot-editor-actions"><button type="button" class="sm-btn" id="botDutyAdd" onclick="_botDutyEdit(${_botDuties.length})" ${full?'disabled':''} title="${esc(full?t('bot_duties_max'):'')}">${esc(t('bot_duties_add'))}</button></div>`:''}`;
+  const first=box.querySelector('#botDutyTitle');if(first)first.focus();
+}
+function _botDutyEdit(i){ _botDutyEditing=i;_paintBotDuties(); }
+function _botDutyCancel(){ _botDutyEditing=-1;_paintBotDuties(); }
+function _botDutyFromForm(){
+  const v=id=>String(($(id)||{}).value||'');
+  return {title:v('botDutyTitle').replace(/\s+/g,' ').trim(),objective:v('botDutyObjective').trim(),trigger:v('botDutyTrigger').replace(/\s+/g,' ').trim(),autonomy:v('botDutyAutonomy')||'ask',reporting:v('botDutyReporting').replace(/\s+/g,' ').trim()};
+}
+async function _botDutySave(){
+  const row=_botDutyFromForm();
+  if(!row.title){const f=$('botDutyTitle');if(f)f.focus();showToast(t('bot_duty_title_required'));return;}
+  const next=_botDuties.slice();
+  if(_botDutyEditing>=0&&_botDutyEditing<next.length)next[_botDutyEditing]=row;else next.push(row);
+  await _botDutiesStore(next.slice(0,_BOT_DUTY_MAX));
+}
+async function _botDutyRemove(i){
+  await _botDutiesStore(_botDuties.filter((_,k)=>k!==i));
+}
+async function _botDutiesStore(list){
+  const p=_currentProfileDetail;if(!p)return;
+  try{
+    await api('/api/profile/appearance',{method:'POST',body:JSON.stringify({name:p.name,revision:p.bot_revision||0,bot:{responsibilities:list}})});
+    _botDuties=list;_botDutyEditing=-1;_paintBotDuties();
+    _profileDropdownClearStoredCache();
+    window.dispatchEvent(new CustomEvent('synpulse:bot-updated',{detail:{name:p.name}}));
+    await loadProfilesPanel();showToast(t('bot_duties_saved'));
+  }catch(e){showToast(e.message);}
+}
 async function uploadBotAvatar(input){
   const p=_currentProfileDetail,file=input.files&&input.files[0];if(!p||!file)return;
   const name=p.name,hint=$('botAvatarHint');input.disabled=true;
@@ -8372,10 +8439,12 @@ function _renderProfileDetail(p, activeName){
         </fieldset>
         ${editable?'':`<p class="bot-field-hint">${esc(t('bot_read_only'))}</p>`}
       </form>
+      ${_botDutiesCardHtml(p)}
       ${_botScoutCardHtml(p)}
       <details class="bot-technical-details"><summary>${esc(t('bot_configuration_details'))}</summary>${rows.join('')}</details>
     </div>`;
   _botScoutTopics=(((p.bot||{}).scout||{}).topics||[]).slice();_paintBotScoutTopics();
+  _botDuties=(((p.bot||{}).responsibilities)||[]).map(d=>({...d}));_botDutyEditing=-1;_paintBotDuties();
   if (window.SpPicker) SpPicker.mountAll(body);
   body.style.display = '';
   if (empty) empty.style.display = 'none';

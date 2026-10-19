@@ -176,3 +176,58 @@ def test_bot_editable_follows_the_appearance_permission(monkeypatch):
     assert editable('legacy',False) and editable('mine',True) and not editable('theirs',True)
     admin['value']=False
     assert not routes._bot_editable_check(object())('legacy',False)
+
+
+# -- Responsibilities: what a bot answers for ----------------------------------
+
+DUTY={'title':'Inbox triage','objective':'Sort new mail\nand flag what needs Michael.','trigger':'bij nieuwe mail','autonomy':'report_only','reporting':'digest in de botchat'}
+
+def test_responsibilities_round_trip_under_the_revision(home):
+    result=bots.save_profile('helper',{'responsibilities':[DUTY,{'title':'  Weekly  report ','autonomy':'auto'}]},0)
+    duties=result['bot']['responsibilities']
+    assert duties[0]==DUTY and result['bot_revision']==1
+    assert duties[1]=={'title':'Weekly report','objective':'','trigger':'','reporting':'','autonomy':'auto'}
+    # Other fields keep their values, an empty list clears.
+    assert bots.save_profile('helper',{'title':'Helper'},1)['bot']['responsibilities'][0]['title']=='Inbox triage'
+    assert 'responsibilities' not in bots.save_profile('helper',{'responsibilities':[]},2)['bot']
+    with pytest.raises(RuntimeError):bots.save_profile('helper',{'responsibilities':[DUTY]},2)
+
+def test_responsibility_autonomy_defaults_to_ask(home):
+    assert bots.validate_responsibilities([{'title':'x'}])[0]['autonomy']=='ask'
+
+@pytest.mark.parametrize('items',[
+    'not a list',[DUTY]*13,['text'],[{'title':''}],[{'title':'x','tools':['terminal']}],
+    [{'title':'x'*81}],[{'title':'x','objective':'y'*301}],[{'title':'x','trigger':'y'*121}],
+    [{'title':'x','reporting':'y'*121}],[{'title':'x','autonomy':'always'}],[{'title':'x','autonomy':None}],
+    [{'title':5}],[{'title':'a\nb'}],[{'title':'x','trigger':'a\x00'}],[{'title':'x','objective':'a\tb'}],
+])
+def test_invalid_responsibilities_never_persist(home,items):
+    with pytest.raises(ValueError):bots.save_profile('helper',{'responsibilities':items},0)
+    assert not (home/'profile.yaml').exists()
+
+def test_damaged_stored_responsibilities_read_as_absent(home):
+    (home/'profile.yaml').write_text(yaml.safe_dump({'ui_meta':{'hermes-bots':{'responsibilities':[{'title':'ok','autonomy':'nope'}]}}}))
+    assert 'responsibilities' not in bots.read_profile('helper')['bot']
+
+def test_responsibilities_prompt_is_compact_and_for_bots_only(home):
+    assert bots.responsibilities_prompt('helper')==''
+    bots.save_profile('helper',{'responsibilities':[DUTY]},0)
+    text=bots.responsibilities_prompt('helper')
+    assert text.startswith('Jouw verantwoordelijkheden')
+    assert 'Inbox triage; Sort new mail and flag what needs Michael.; wanneer: bij nieuwe mail; alleen melden' in text
+    long=[{'title':'T%d'%i+'x'*70,'objective':'o'*300,'trigger':'t'*120,'reporting':'r'*120} for i in range(12)]
+    bots.save_profile('helper',{'responsibilities':long},1)
+    text=bots.responsibilities_prompt('helper')
+    assert len(text)<=bots.RESP_PROMPT_MAX and text.count('\n- ')>=1
+    # A person's own profile gets no block.
+    bots.save_profile('helper',{'kind':'person'},2)
+    assert bots.responsibilities_prompt('helper')==''
+    assert bots.responsibilities_prompt('')=='' and bots.responsibilities_prompt('missing')==''
+
+def test_responsibilities_reach_the_bot_chat_prompt(monkeypatch):
+    from api import streaming
+    monkeypatch.setattr(bots,'responsibilities_prompt',lambda name:'Jouw verantwoordelijkheden: X' if name=='helper' else '')
+    monkeypatch.setattr(bots,'knowledge_prompt',lambda name,workspace:'')
+    text=streaming._webui_ephemeral_system_prompt('',surface_context={'profile':'helper','workspace':''})
+    assert text.count('Jouw verantwoordelijkheden: X')==1
+    assert 'Jouw verantwoordelijkheden' not in streaming._webui_ephemeral_system_prompt('',surface_context={'profile':'other','workspace':''})
