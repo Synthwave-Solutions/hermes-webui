@@ -146,7 +146,8 @@ def test_built_in_prompt_when_the_bot_has_none(scout_env):
     [job] = _jobs(scout_env.homes["radar"])
     assert job["prompt"].startswith(bot_scout.DEFAULT_PROMPT)
     for word in ("negeren", "stil bewaren", "aan project koppelen", "melden", "triage", "[SILENT]",
-                 "SCOUT-LEDGER: <hash8>=<status>,<hash8>=<status>", *bot_scout.LEDGER_STATUSES):
+                 "SCOUT-LEDGER: <hash8>=<status>,<hash8>=<status>", "hooguit 3 kanbantaken per run",
+                 *bot_scout.LEDGER_STATUSES):
         assert word in job["prompt"]
     for word in ("python", "scout_ledger.py", "terminal", "$HERMES_HOME"):
         assert word not in job["prompt"]

@@ -56,6 +56,7 @@ Regels:
 - Stil bewaren: misschien later nuttig. Zet het kort onder Bewaard.
 - Aan project koppelen: hoort bij een lopend project. Noem het project en waarom.
 - Melden: vraagt aandacht of actie. Maak per actiepunt een kanbantaak in triage met een duidelijke titel, de bron en de voorgestelde volgende stap, in plaats van zelf te handelen.
+- Maak hooguit 3 kanbantaken per run. Zijn er meer actiepunten, kies de 3 belangrijkste en noem de rest kort in de digest onder Melden.
 - Schrijf hooguit een digest per run: kort, in het Nederlands, gegroepeerd per uitkomst, met bronlinks.
 - Sluit de digest af met precies een machineregel, als laatste regel en zonder opmaak:
   SCOUT-LEDGER: <hash8>=<status>,<hash8>=<status>
