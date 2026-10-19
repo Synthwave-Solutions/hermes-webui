@@ -8240,6 +8240,62 @@ async function _botDutiesStore(list){
     await loadProfilesPanel();showToast(t('bot_duties_saved'));
   }catch(e){showToast(e.message);}
 }
+// "Werk van deze bot" (bot page): open Kanban tasks assigned to the bot,
+// grouped by status with what needs a person on top, and what it made (the
+// latest attachments of its tasks). GET /api/kanban/bot-work; downloads go
+// through the read-only /api/kanban/attachment route.
+const _BOT_WORK_ORDER=['blocked','review','running','ready','todo','scheduled','triage'];
+function _botWorkStatusLabel(status){
+  if(status==='review'||status==='scheduled')return t('bot_work_status_'+status);
+  return typeof _kanbanColumnLabel==='function'?_kanbanColumnLabel(status):status;
+}
+function _botWorkNeedsYou(task){
+  return !!task&&(task.status==='review'||(task.status==='blocked'&&task.block_kind==='needs_input'));
+}
+function _botWorkWhen(ts){
+  const n=Number(ts||0);if(!n)return '';
+  try{return new Date(n*1000).toLocaleString();}catch(_){return '';}
+}
+function _botWorkSize(bytes){
+  const n=Number(bytes||0);
+  return n<1024?n+' B':n<1048576?Math.round(n/1024)+' KB':(n/1048576).toFixed(1)+' MB';
+}
+function _botWorkTaskHtml(task){
+  const flag=task.status==='review'?t('bot_work_flag_review'):task.block_kind==='needs_input'&&task.status==='blocked'?t('bot_work_flag_needs_input'):'';
+  return `<li><button type="button" class="bot-work-task${_botWorkNeedsYou(task)?' is-attention':''}" data-task-id="${esc(task.id)}" onclick="openKanbanTaskFromBot(this.dataset.taskId)">
+      <span class="bot-work-task-title">${esc(task.title||task.id)}</span>${flag?`<span class="bot-work-flag">${esc(flag)}</span>`:''}</button></li>`;
+}
+function _botWorkHtml(data){
+  const tasks=Array.isArray(data&&data.tasks)?data.tasks:[],files=Array.isArray(data&&data.attachments)?data.attachments:[];
+  const groups=_BOT_WORK_ORDER.map(status=>[status,tasks.filter(x=>x.status===status)]).filter(g=>g[1].length);
+  const known=new Set(_BOT_WORK_ORDER),rest=tasks.filter(x=>!known.has(x.status));
+  if(rest.length)groups.push(['other',rest]);
+  const taskHtml=groups.map(([status,items])=>`<div class="bot-work-group" data-status="${esc(status)}"><div class="bot-work-group-head">${esc(status==='other'?t('bot_work_status_other'):_botWorkStatusLabel(status))} <span class="cron-group-count">${items.length}</span></div><ul class="bot-work-list">${items.map(_botWorkTaskHtml).join('')}</ul></div>`).join('');
+  const fileHtml=files.map(f=>`<li class="bot-work-file"><a href="/api/kanban/attachment?id=${encodeURIComponent(f.id)}" download="${esc(f.filename)}">${esc(f.filename)}</a>
+      <span class="bot-work-file-meta">${esc(f.task_title||'')} · ${esc(_botWorkWhen(f.created_at))} · ${esc(_botWorkSize(f.size))}</span></li>`).join('');
+  return `<div class="detail-card-title">${esc(t('bot_work_title'))} <span class="cron-group-count">${tasks.length}</span></div>
+    ${taskHtml||`<p class="bot-field-hint">${esc(t('bot_work_empty'))}</p>`}
+    <h4 class="bot-work-subtitle">${esc(t('bot_work_made'))}</h4>
+    ${fileHtml?`<ul class="bot-work-files">${fileHtml}</ul>`:`<p class="bot-field-hint">${esc(t('bot_work_made_empty'))}</p>`}`;
+}
+function _botWorkSectionHtml(p){
+  if(_botKind(p)!=='bot')return '';
+  return `<section class="detail-card bot-work" id="botWork" style="display:none" aria-live="polite"></section>`;
+}
+async function _loadBotWork(p){
+  const box=$('botWork');
+  if(!box||!p||(typeof _canUseFeature==='function'&&!_canUseFeature('sessions:read')))return;
+  let data;
+  try{data=await api('/api/kanban/bot-work?profile='+encodeURIComponent(p.is_default?'default':p.name),{timeoutToast:false});}
+  catch(_e){return;}
+  if(!box.isConnected||!_currentProfileDetail||_currentProfileDetail.name!==p.name)return;
+  box.innerHTML=_botWorkHtml(data);box.style.display='';
+}
+async function openKanbanTaskFromBot(taskId){
+  if(!taskId)return;
+  if(typeof switchPanel==='function')await switchPanel('kanban');
+  if(typeof loadKanbanTask==='function')await loadKanbanTask(taskId);
+}
 async function uploadBotAvatar(input){
   const p=_currentProfileDetail,file=input.files&&input.files[0];if(!p||!file)return;
   const name=p.name,hint=$('botAvatarHint');input.disabled=true;
@@ -8440,11 +8496,13 @@ function _renderProfileDetail(p, activeName){
         ${editable?'':`<p class="bot-field-hint">${esc(t('bot_read_only'))}</p>`}
       </form>
       ${_botDutiesCardHtml(p)}
+      ${_botWorkSectionHtml(p)}
       ${_botScoutCardHtml(p)}
       <details class="bot-technical-details"><summary>${esc(t('bot_configuration_details'))}</summary>${rows.join('')}</details>
     </div>`;
   _botScoutTopics=(((p.bot||{}).scout||{}).topics||[]).slice();_paintBotScoutTopics();
   _botDuties=(((p.bot||{}).responsibilities)||[]).map(d=>({...d}));_botDutyEditing=-1;_paintBotDuties();
+  _loadBotWork(p);
   if (window.SpPicker) SpPicker.mountAll(body);
   body.style.display = '';
   if (empty) empty.style.display = 'none';

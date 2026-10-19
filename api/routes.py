@@ -3546,6 +3546,57 @@ def _kanban_unknown_endpoint(handler, parsed, method: str) -> bool:
     ) or True
 
 
+def _kanban_board_query(parsed):
+    from api.kanban_bridge import _resolve_board
+    return _resolve_board(parsed)
+
+
+def _kanban_read_errors(handler, fn):
+    """Run a read-only Kanban view with the bridge's error mapping."""
+    try:
+        return fn()
+    except ImportError as exc:
+        return bad(handler, f"kanban unavailable: {exc}", status=503)
+    except LookupError as exc:
+        return bad(handler, str(exc), status=404)
+    except ValueError as exc:
+        return bad(handler, str(exc))
+
+
+def _handle_kanban_bot_work(handler, parsed):
+    """GET /api/kanban/bot-work?profile=<bot>: the bot's open tasks and its
+    recent attachments, for the bot page. Gate: sessions:read on /api/kanban
+    (route catalog), plus a bot this viewer may use."""
+    from api import kanban_bridge
+
+    profile = str((parse_qs(parsed.query).get("profile") or [""])[0]).strip()
+    if not profile or not _chat_profile_target_allowed(handler, profile):
+        return bad(handler, "Bot not found", 404)
+    return _kanban_read_errors(handler, lambda: j(
+        handler, kanban_bridge.bot_work_payload(profile, board=_kanban_board_query(parsed))) or True)
+
+
+def _handle_kanban_attachment(handler, parsed):
+    """GET /api/kanban/attachment?id=<n>: download one task attachment.
+
+    Read-only, by attachment id only; the file must sit under the board's
+    attachments root (no symlinks, anchored open). Same gate as the board,
+    and a task assigned to a bot needs a bot this viewer may use."""
+    from api import kanban_bridge
+    import mimetypes
+
+    def serve():
+        target, root, filename, content_type, assignee = kanban_bridge.attachment_file(
+            (parse_qs(parsed.query).get("id") or [""])[0], board=_kanban_board_query(parsed))
+        if assignee and not _chat_profile_target_allowed(handler, assignee):
+            return bad(handler, "attachment not found", 404)
+        mime = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+        # Always a download: an attachment may be HTML or SVG written by a worker.
+        return _serve_file_bytes(handler, target, mime, "attachment", "private, no-store", anchor_root=root)
+
+    return _kanban_read_errors(handler, serve)
+
+
 def _clear_stale_stream_state(session) -> bool:
     """Clear persisted streaming flags when the in-memory stream no longer exists.
 
@@ -12485,6 +12536,10 @@ def handle_get(handler, parsed) -> bool:
     if parsed.path == "/api/project-os/dashboard":
         return _handle_project_os_dashboard(handler, parsed)
 
+    if parsed.path == "/api/kanban/bot-work":
+        return _handle_kanban_bot_work(handler, parsed)
+    if parsed.path == "/api/kanban/attachment":
+        return _handle_kanban_attachment(handler, parsed)
     if parsed.path.startswith("/api/kanban/"):
         from api.kanban_bridge import handle_kanban_get
 

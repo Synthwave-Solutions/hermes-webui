@@ -82,6 +82,30 @@ const DUTY={title:'Inbox triage',objective:'Sort new mail',trigger:'bij nieuwe m
   // Twelve is the limit: the add button is disabled.
   await mountDuties(p,duties,{name:'cfo',bot_revision:1,bot_editable:true,bot:{responsibilities:Array.from({length:12},(_,i)=>({title:'D'+i,autonomy:'ask'}))}});
   assert.equal(await p.locator('#botDutyAdd').isDisabled(),true);
+  // Work of this bot: open tasks by status, what needs a person on top and
+  // highlighted, the made files as downloads, a task opens on the board.
+  await p.evaluate(()=>{
+   window._canUseFeature=()=>true;window.opened=[];
+   window.switchPanel=async name=>opened.push('panel:'+name);window.loadKanbanTask=async id=>opened.push('task:'+id);
+   window.api=async url=>{calls.push([url,null]);return {tasks:[
+     {id:'t1',title:'Draft',status:'todo'},{id:'t2',title:'Login needed',status:'blocked',block_kind:'needs_input'},
+     {id:'t3',title:'Check me',status:'review'},{id:'t4',title:'Waiting on parent',status:'blocked',block_kind:'dependency'}],
+    attachments:[{id:7,task_id:'t9',filename:'report <1>.md',size:2048,created_at:1760000000,task_title:'Weekly'}]};};
+   const body=document.querySelector('.bot-detail-content');body.insertAdjacentHTML('beforeend',_botWorkSectionHtml(_currentProfileDetail));
+  });
+  await p.evaluate(()=>_loadBotWork(_currentProfileDetail));
+  assert.equal(await p.evaluate(()=>calls.at(-1)[0]),'/api/kanban/bot-work?profile=cfo');
+  assert.deepEqual(await p.$$eval('.bot-work-group',n=>n.map(g=>g.dataset.status)),['blocked','review','todo']);
+  assert.deepEqual(await p.$$eval('.bot-work-task.is-attention',n=>n.map(b=>b.dataset.taskId)),['t2','t3']);
+  assert.deepEqual(await p.$$eval('.bot-work-flag',n=>n.map(b=>b.textContent)),['bot_work_flag_needs_input','bot_work_flag_review']);
+  assert.deepEqual(await p.$eval('.bot-work-file a',a=>[a.getAttribute('href'),a.textContent,a.getAttribute('download')]),['/api/kanban/attachment?id=7','report <1>.md','report <1>.md']);
+  await p.click('.bot-work-task[data-task-id="t3"]');
+  assert.deepEqual(await p.evaluate(()=>opened),['panel:kanban','task:t3']);
+  // Without board rights the section stays hidden and nothing is fetched.
+  await p.evaluate(()=>{window._canUseFeature=()=>false;document.getElementById('botWork').remove();document.querySelector('.bot-detail-content').insertAdjacentHTML('beforeend',_botWorkSectionHtml(_currentProfileDetail));calls.length=0;});
+  await p.evaluate(()=>_loadBotWork(_currentProfileDetail));
+  assert.equal(await p.evaluate(()=>calls.length),0);
+  assert.equal(await p.locator('#botWork').isVisible(),false);
   const overflow=await p.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);
   assert.ok(overflow<=0,'no sideways scroll at '+width);
   await p.close();
