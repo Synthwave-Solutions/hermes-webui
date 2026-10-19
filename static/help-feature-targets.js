@@ -1103,6 +1103,54 @@
       "en": "The highlight marks a bot in the list. Open the bot you want to manage after the guide to see its available actions."
     }
   },
+  "webui.bots.scout": {
+    "panel": "profiles",
+    "targets": [
+      "#botScoutEnabled",
+      "#botScoutTopicInput",
+      "#botScoutTime"
+    ],
+    "entryTargets": [
+      ".profile-card[data-name]"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst een bot in de lijst aan. Open na de uitleg een bot om dit onderdeel op zijn pagina te zien.",
+      "en": "The highlight marks a bot in the list. Open a bot after the guide to see this part on its page."
+    }
+  },
+  "webui.bots.responsibilities": {
+    "panel": "profiles",
+    "targets": [
+      "#botDutiesCard",
+      "#botDutyAdd"
+    ],
+    "entryTargets": [
+      ".profile-card[data-name]"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst een bot in de lijst aan. Open na de uitleg een bot om dit onderdeel op zijn pagina te zien.",
+      "en": "The highlight marks a bot in the list. Open a bot after the guide to see this part on its page."
+    }
+  },
+  "webui.bots.work": {
+    "panel": "profiles",
+    "targets": [
+      "#botWork"
+    ],
+    "entryTargets": [
+      ".profile-card[data-name]"
+    ],
+    "entryHint": {
+      "nl": "De markering wijst een bot in de lijst aan. Open na de uitleg een bot om dit onderdeel op zijn pagina te zien.",
+      "en": "The highlight marks a bot in the list. Open a bot after the guide to see this part on its page."
+    }
+  },
+  "webui.governance.waiting": {
+    "panel": "approvals",
+    "targets": [
+      "#myWaitingSection"
+    ]
+  },
   "webui.projects.create": {
     "panel": "projects",
     "targets": [

@@ -18,11 +18,27 @@ Choose **Org chart** at the top of the Bots list to see the tree. Each leading b
 
 **Kind** marks a profile as a bot or as a person's own profile (team member, partner), stored as `kind` in `ui_meta['hermes-bots']`. Unset, an unmanaged profile in the category Team or Partners counts as a person and everything else, SynthPulse and guided bots included, as a bot. `/api/profiles` returns the effective `bot_kind`. People get no Scout and appear in the org chart's people strip.
 
+The editor's **Kind** select starts with **Automatic**, which stores no explicit kind so the default rule decides; while nothing is stored it shows what the rule decides now, for example Automatic (Person). Choosing Bot or Person stores that kind; choosing Automatic again clears it.
+
 ## Scout
 
 Scout lets a bot look around once a day for news on its topics. Turn it on with the radar button next to the bot in the sidebar or on the bot's **Scout** card, where you also set up to 12 topics (at most 80 characters each) and the digest time (default 07:30). Settings live in `ui_meta['hermes-bots'].scout` as `{enabled, topics, digest_time}` and are saved through `POST /api/bots/scout`, which needs the same rights as editing the bot.
 
 Turning Scout on copies the Scout runner files from the root profile's `scripts/scout/` into the bot's own `scripts/scout/` (the scheduler only runs scripts inside the job's own Hermes home) and creates or resumes one scheduled job in the bot's own task store, marked `managed_by: scout`. The job runs `scout/scout_collect.py` first and only wakes the agent when there is something new; the agent works read-only, files actionable items as triage tasks and writes at most one digest in the bot's task chat. In-app notifications for the job are off. Turning Scout off pauses the job; it is never deleted.
+
+## Responsibilities
+
+The **Responsibilities** card on a bot's page records what the bot answers for: at most 12 items, each with a **title** (80 characters), an **objective** (300), **when** it acts (free text of 120 characters, such as daily 08:00 or on new mail), its **autonomy** (on its own, asks first, or report only; default asks first) and how it **reports** (120). They are stored as `responsibilities` in `ui_meta['hermes-bots']`, validated strictly and saved through `POST /api/profile/appearance` under the same revision as the rest of the bot; a damaged record reads as empty. Everyone who may see the bot reads the list; adding, editing and removing needs the right to edit the bot. People's own profiles have no card.
+
+Chats whose active profile is the bot get a short "Jouw verantwoordelijkheden" block (at most 800 characters) in the WebUI runtime prompt, next to the knowledge index. It is context only: it grants no tool, schedule or approval.
+
+## Work of this bot
+
+**Work of this bot** on the bot page lists the open Kanban tasks assigned to the bot (anything but done and archived) grouped by status, with blocked and review first; waiting for input and waiting for review are highlighted, and a task opens on the Kanban board. **Made** lists the latest 20 attachments of the bot's tasks with their task and date. The data comes from `GET /api/kanban/bot-work?profile=<bot>`, which keeps the board's gate (`sessions:read` on `/api/kanban`) and also needs a bot the viewer may use. Files download through `GET /api/kanban/attachment?id=<n>`: by attachment id only, from under the board's attachments folder (no symlinks, anchored open), always as a download, and a task assigned to a bot needs a bot the viewer may use.
+
+## Waiting for you
+
+**My approvals** starts with **Waiting for you**. It lists chats with a pending tool approval that the viewer could open (`GET /api/approval/waiting`, read from the same in-memory queues as the chat's own approval prompt; they are gone after a server restart) and Kanban tasks in review or blocked for input (`block_kind` `needs_input`) of bots the viewer may use or that the viewer created (`GET /api/kanban/waiting`). A chat opens where its approval is answered; nothing is approved from the list. A task opens on the board, takes a reply as a comment, or is unblocked through the existing Kanban routes. The viewer's own access requests stay listed below.
 
 ## Instructions, tools and knowledge
 

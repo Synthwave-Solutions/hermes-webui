@@ -5166,6 +5166,149 @@ window.SynthPulseFeatureCatalog = {
       }
     },
     {
+      "id": "webui.bots.responsibilities",
+      "area": "bots",
+      "status": "available",
+      "conditions": [],
+      "anchors": [
+        "?help_feature=webui.bots.responsibilities",
+        "#botDutiesCard",
+        "#botDutyAdd"
+      ],
+      "source_refs": [
+        "static/panels.js:8201",
+        "api/bot_metadata.py",
+        "api/streaming.py"
+      ],
+      "related": [
+        "webui.bots.appearance",
+        "webui.bots.work",
+        "webui.bots.scout"
+      ],
+      "locales": {
+        "en": {
+          "title": "Responsibilities of a bot",
+          "purpose": "Write down what a bot answers for: what, why, when it acts, how far it may go on its own and how it reports back.",
+          "when": "When a bot takes over a recurring duty and everyone, the bot included, should know what it is responsible for.",
+          "steps": [
+            "Open a bot and find the Responsibilities card.",
+            "Choose Add responsibility, fill in a title, the objective, when it acts (for example daily 08:00 or on new mail), its autonomy and how it reports.",
+            "Save. Edit or remove a row with the buttons next to it."
+          ],
+          "permissions": "Adding, editing and removing requires the right to edit that bot. Everyone who may see the bot reads the list.",
+          "limits": "At most 12 responsibilities. The list is context only: the bot reads it in its own chats, but it grants no tool, schedule or approval, and existing approvals still apply. People's own profiles have no responsibilities.",
+          "example": "Give the inbox bot the responsibility Inbox triage, on new mail, report only, with a digest in the bot chat."
+        },
+        "nl": {
+          "title": "Verantwoordelijkheden van een bot",
+          "purpose": "Leg vast waar een bot voor staat: wat, waarom, wanneer hij in actie komt, hoe zelfstandig hij mag werken en hoe hij rapporteert.",
+          "when": "Als een bot een terugkerende taak overneemt en iedereen, de bot zelf ook, moet weten waarvoor hij verantwoordelijk is.",
+          "steps": [
+            "Open een bot en zoek de kaart Verantwoordelijkheden.",
+            "Kies Verantwoordelijkheid toevoegen en vul titel, doel, wanneer (bijvoorbeeld dagelijks 08:00 of bij nieuwe mail), zelfstandigheid en rapportage in.",
+            "Sla op. Bewerk of verwijder een regel met de knoppen ernaast."
+          ],
+          "permissions": "Toevoegen, bewerken en verwijderen kan alleen wie de bot mag bewerken. Iedereen die de bot mag zien, leest de lijst.",
+          "limits": "Maximaal 12 verantwoordelijkheden. De lijst is alleen context: de bot leest hem in zijn eigen chats, maar krijgt er geen tools, planning of goedkeuring door, en bestaande goedkeuringen blijven gelden. Persoonlijke profielen van mensen hebben geen verantwoordelijkheden.",
+          "example": "Geef de inboxbot de verantwoordelijkheid Inbox triage, bij nieuwe mail, alleen melden, met een samenvatting in de botchat."
+        }
+      }
+    },
+    {
+      "id": "webui.bots.work",
+      "area": "bots",
+      "status": "available",
+      "conditions": [],
+      "anchors": [
+        "?help_feature=webui.bots.work",
+        "#botWork"
+      ],
+      "source_refs": [
+        "static/panels.js:8281",
+        "api/kanban_bridge.py",
+        "api/routes.py"
+      ],
+      "related": [
+        "webui.bots.responsibilities",
+        "webui.governance.waiting"
+      ],
+      "locales": {
+        "en": {
+          "title": "Work of a bot",
+          "purpose": "See on the bot page which Kanban tasks the bot still has open and which files it made.",
+          "when": "When you want to know what a bot is working on, what waits for a person and where its results are.",
+          "steps": [
+            "Open a bot and scroll to Work of this bot.",
+            "Tasks are grouped by status; waiting for input and waiting for review are highlighted. Click a task to open it on the Kanban board.",
+            "Under Made, download one of the latest files of the bot's tasks."
+          ],
+          "permissions": "Needs the right to read the Kanban board and a bot you may use. Files of a task assigned to another bot are not served.",
+          "limits": "Shows open tasks (not done or archived) on the current board and the latest 20 files. Files always download; nothing opens inside the page.",
+          "example": "Open the CFO bot to see its blocked invoice task and download the report it attached."
+        },
+        "nl": {
+          "title": "Werk van een bot",
+          "purpose": "Zie op de botpagina welke Kanban-taken de bot nog open heeft en welke bestanden hij heeft gemaakt.",
+          "when": "Als je wilt weten waar een bot mee bezig is, wat op een mens wacht en waar zijn resultaten staan.",
+          "steps": [
+            "Open een bot en ga naar Werk van deze bot.",
+            "Taken staan per status; wacht op invoer en wacht op review vallen op. Klik een taak om hem op het Kanban-bord te openen.",
+            "Download onder Gemaakt een van de nieuwste bestanden bij de taken van de bot."
+          ],
+          "permissions": "Vraagt leesrechten op het Kanban-bord en een bot die je mag gebruiken. Bestanden bij een taak van een andere bot worden niet geleverd.",
+          "limits": "Toont open taken (niet klaar of gearchiveerd) op het huidige bord en de nieuwste 20 bestanden. Bestanden worden altijd gedownload; er opent niets in de pagina.",
+          "example": "Open de CFO-bot om zijn geblokkeerde factuurtaak te zien en het rapport te downloaden dat hij heeft bijgevoegd."
+        }
+      }
+    },
+    {
+      "id": "webui.governance.waiting",
+      "area": "governance",
+      "status": "available",
+      "conditions": [],
+      "anchors": [
+        "?help_feature=webui.governance.waiting",
+        "#myWaitingSection"
+      ],
+      "source_refs": [
+        "static/index.html:1081",
+        "static/panels.js:15418",
+        "api/routes.py"
+      ],
+      "related": [
+        "webui.governance.requests",
+        "webui.bots.work"
+      ],
+      "locales": {
+        "en": {
+          "title": "Waiting for you",
+          "purpose": "See in one place what bots are waiting on you: Kanban tasks to review or answer and chats with a tool approval.",
+          "when": "When a bot paused its work for your input, your review or your approval.",
+          "steps": [
+            "Open My approvals. Waiting for you is at the top.",
+            "For a chat with a pending approval choose Open chat and answer the approval there.",
+            "For a task choose Open task, Reply to add a comment, or Unblock when you gave the bot what it needed."
+          ],
+          "permissions": "Only tasks of bots you may use or tasks you created, and only chats you could open yourself. Kanban rows need the right to read the board.",
+          "limits": "Nothing is approved from this list: approvals are answered in their chat. Pending approvals live in the running server and disappear after a restart. Your own access requests stay listed below as before.",
+          "example": "A bot is blocked because it needs a login: reply with what you did and unblock the task."
+        },
+        "nl": {
+          "title": "Wacht op jou",
+          "purpose": "Zie op een plek waar bots op jou wachten: Kanban-taken om te beoordelen of te beantwoorden en chats met een goedkeuring voor een tool.",
+          "when": "Als een bot zijn werk heeft stilgezet voor jouw invoer, review of goedkeuring.",
+          "steps": [
+            "Open Mijn goedkeuringen. Wacht op jou staat bovenaan.",
+            "Kies bij een chat met een openstaande goedkeuring Chat openen en beantwoord de goedkeuring daar.",
+            "Kies bij een taak Taak openen, Reageren om een reactie te plaatsen, of Deblokkeren als je de bot hebt gegeven wat hij nodig had."
+          ],
+          "permissions": "Alleen taken van bots die je mag gebruiken of die je zelf hebt aangemaakt, en alleen chats die je zelf zou kunnen openen. Kanban-regels vragen leesrechten op het bord.",
+          "limits": "In deze lijst wordt niets goedgekeurd: goedkeuringen beantwoord je in hun chat. Openstaande goedkeuringen leven in de draaiende server en verdwijnen na een herstart. Je eigen toegangsverzoeken staan er zoals voorheen onder.",
+          "example": "Een bot staat stil omdat hij moet inloggen: reageer met wat je hebt gedaan en deblokkeer de taak."
+        }
+      }
+    },
+    {
       "id": "webui.bots.manage",
       "area": "bots",
       "status": "available",

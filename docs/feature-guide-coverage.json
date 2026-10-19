@@ -1085,6 +1085,36 @@
       ]
     },
     {
+      "id": "webui.bots.responsibilities",
+      "area": "bots",
+      "status": "available",
+      "source_refs": [
+        "static/panels.js:8201",
+        "api/bot_metadata.py",
+        "api/streaming.py"
+      ]
+    },
+    {
+      "id": "webui.bots.work",
+      "area": "bots",
+      "status": "available",
+      "source_refs": [
+        "static/panels.js:8281",
+        "api/kanban_bridge.py",
+        "api/routes.py"
+      ]
+    },
+    {
+      "id": "webui.governance.waiting",
+      "area": "governance",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:1081",
+        "static/panels.js:15418",
+        "api/routes.py"
+      ]
+    },
+    {
       "id": "webui.bots.manage",
       "area": "bots",
       "status": "available",
@@ -7853,6 +7883,141 @@
         "static/panels.js:8061"
       ],
       "feature_id": "webui.bots.org_chart"
+    },
+    {
+      "control": "action:_botDutyEdit",
+      "tag": "button",
+      "label": "Edit",
+      "source_refs": [
+        "static/panels.js:8187"
+      ],
+      "feature_id": "webui.bots.responsibilities"
+    },
+    {
+      "control": "action:_botDutyRemove",
+      "tag": "button",
+      "label": "Remove",
+      "source_refs": [
+        "static/panels.js:8187"
+      ],
+      "feature_id": "webui.bots.responsibilities"
+    },
+    {
+      "control": "botDutyTitle",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:8193"
+      ],
+      "feature_id": "webui.bots.responsibilities"
+    },
+    {
+      "control": "botDutyObjective",
+      "tag": "textarea",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:8194"
+      ],
+      "feature_id": "webui.bots.responsibilities"
+    },
+    {
+      "control": "botDutyTrigger",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:8195"
+      ],
+      "feature_id": "webui.bots.responsibilities"
+    },
+    {
+      "control": "botDutyAutonomy",
+      "tag": "select",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:8196"
+      ],
+      "feature_id": "webui.bots.responsibilities"
+    },
+    {
+      "control": "botDutyReporting",
+      "tag": "input",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:8197"
+      ],
+      "feature_id": "webui.bots.responsibilities"
+    },
+    {
+      "control": "action:_botDutyCancel",
+      "tag": "button",
+      "label": "Cancel",
+      "source_refs": [
+        "static/panels.js:8198"
+      ],
+      "feature_id": "webui.bots.responsibilities"
+    },
+    {
+      "control": "action:_botDutySave",
+      "tag": "button",
+      "label": "Save",
+      "source_refs": [
+        "static/panels.js:8198"
+      ],
+      "feature_id": "webui.bots.responsibilities"
+    },
+    {
+      "control": "botDutyAdd",
+      "tag": "button",
+      "label": "Add responsibility",
+      "source_refs": [
+        "static/panels.js:8214"
+      ],
+      "feature_id": "webui.bots.responsibilities"
+    },
+    {
+      "control": "action:openKanbanTaskFromBot",
+      "tag": "button",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:8265"
+      ],
+      "feature_id": "webui.bots.work"
+    },
+    {
+      "control": "waitingComment",
+      "tag": "textarea",
+      "label": "",
+      "source_refs": [
+        "static/panels.js:15388"
+      ],
+      "feature_id": "webui.governance.waiting"
+    },
+    {
+      "control": "action:_waitingComment",
+      "tag": "button",
+      "label": "Reply",
+      "source_refs": [
+        "static/panels.js:15389"
+      ],
+      "feature_id": "webui.governance.waiting"
+    },
+    {
+      "control": "action:_waitingSendComment",
+      "tag": "button",
+      "label": "Send",
+      "source_refs": [
+        "static/panels.js:15389"
+      ],
+      "feature_id": "webui.governance.waiting"
+    },
+    {
+      "control": "action:_waitingUnblock",
+      "tag": "button",
+      "label": "Unblock",
+      "source_refs": [
+        "static/panels.js:15396"
+      ],
+      "feature_id": "webui.governance.waiting"
     }
   ],
   "method": "Inventory of concrete HTML controls and inline handlers, supplemented by manual review of generated conversation menus, bot builder and knowledge controls, composer customization and the embedded read-only memory dashboard. Save/cancel and equivalent responsive controls share a feature. Hidden vendor login, server settings and inactive legacy visualizers are excluded from user workflows.",
