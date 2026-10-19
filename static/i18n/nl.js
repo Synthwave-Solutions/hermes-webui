@@ -1135,6 +1135,7 @@ window.__registerHermesLocale('nl', {
   bot_kind: 'Soort',
   bot_kind_bot: 'Bot',
   bot_kind_person: 'Persoon',
+  bot_kind_auto: 'Automatisch',
   bot_scout: 'Scout',
   bot_scout_toggle: 'Scout aan/uit',
   bot_scout_on_passive: 'Scout staat aan',

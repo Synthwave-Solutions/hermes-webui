@@ -8005,6 +8005,13 @@ function _botReportsToSelectHtml(p){
   for(const x of options) html+=`<option value="${esc(x.name)}" ${x.name===current?'selected':''}>${esc(botDisplayName(x))}</option>`;
   return `<select id="botReportsTo">${html}</select>`;
 }
+// Kind: Automatic (no explicit kind, the default rule decides) or an explicit
+// bot or person. Automatic names what the rule decides right now.
+function _botKindSelectHtml(p){
+  const stored=String((p&&p.bot&&p.bot.kind)||'').trim(),explicit=['bot','person'].includes(stored)?stored:'';
+  const autoLabel=explicit?t('bot_kind_auto'):`${t('bot_kind_auto')} (${t('bot_kind_'+_botKind(p))})`;
+  return `<select id="botKind"><option value="" ${explicit?'':'selected'}>${esc(autoLabel)}</option>${['bot','person'].map(kind=>`<option value="${kind}" ${explicit===kind?'selected':''}>${esc(t('bot_kind_'+kind))}</option>`).join('')}</select>`;
+}
 function _botOrgTree(list){
   const byName=new Map(list.map(p=>[p.name,p])),kids=new Map(),roots=[];
   for(const p of list){
@@ -8356,7 +8363,7 @@ function _renderProfileDetail(p, activeName){
             <label class="bot-editor-wide" for="botCategory">${esc(t('category_label')||'Category')}<input type="hidden" id="botCategory" data-sp-picker data-sp-source="sp:categories" data-sp-custom="1" value="${esc((p.bot&&p.bot.category)||'')}" placeholder="${esc(t('cron_category_placeholder')||'Pick a category or add one')}"></label>
             <label for="botRole">${esc(t('bot_role'))}<input id="botRole" value="${esc((p.bot&&p.bot.role)||'')}" maxlength="80" placeholder="${esc(t('bot_role_placeholder'))}"></label>
             <label for="botReportsTo">${esc(t('bot_reports_to'))}${_botReportsToSelectHtml(p)}</label>
-            <label for="botKind">${esc(t('bot_kind'))}<select id="botKind">${['bot','person'].map(kind=>`<option value="${kind}" ${_botKind(p)===kind?'selected':''}>${esc(t('bot_kind_'+kind))}</option>`).join('')}</select></label>
+            <label for="botKind">${esc(t('bot_kind'))}${_botKindSelectHtml(p)}</label>
             <label class="bot-editor-wide" for="botAvatarFile">${esc(t('bot_upload'))}<input id="botAvatarFile" type="file" accept="image/png,image/jpeg,image/webp" onchange="uploadBotAvatar(this)" aria-describedby="botAvatarHint"></label>
           </div>
           <p class="bot-field-hint" id="botAvatarHint">${esc(t('bot_avatar_limit'))}</p>

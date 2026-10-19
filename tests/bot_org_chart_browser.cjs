@@ -99,6 +99,13 @@ async function render(p,list){
   assert.deepEqual(opts.find(o=>o[1]),['ceo',true]);
   const hidden=await p.evaluate(()=>{const d=document.createElement('div');d.innerHTML=_botReportsToSelectHtml(_profilesCache.profiles.find(x=>x.name==='orphan'));const o=d.querySelector('option:checked');return [o.value,o.textContent];});
   assert.deepEqual(hidden,['invisible','bot_reports_to_hidden']);
+  // Kind select: Automatic (empty, the default rule) first and chosen while no
+  // kind is stored; an explicit kind stays selected.
+  const kinds=await p.evaluate(()=>[{name:'a',bot_kind:'person',bot:{}},{name:'b',bot_kind:'bot',bot:{kind:'bot'}},{name:'c',bot_kind:'person',bot:{kind:'person'}}].map(x=>{const d=document.createElement('div');d.innerHTML=_botKindSelectHtml(x);return [...d.querySelectorAll('option')].map(o=>[o.value,o.selected,o.textContent]);}));
+  assert.deepEqual(kinds[0],[['',true,'bot_kind_auto (bot_kind_person)'],['bot',false,'bot_kind_bot'],['person',false,'bot_kind_person']]);
+  assert.deepEqual(kinds[1].map(o=>o[1]),[false,true,false]);
+  assert.deepEqual(kinds[2].map(o=>o[1]),[false,false,true]);
+  assert.equal(kinds[2][0][2],'bot_kind_auto');
   if(process.env.ORG_CHART_SHOT){await render(p,big);await p.screenshot({path:process.env.ORG_CHART_SHOT.replace('.png','-'+width+'.png'),fullPage:true});}
   await p.close();
  }}finally{await browser.close();}

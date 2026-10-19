@@ -1243,6 +1243,7 @@ window.__registerHermesLocale('en', {
     bot_kind: 'Kind',
     bot_kind_bot: 'Bot',
     bot_kind_person: 'Person',
+    bot_kind_auto: 'Automatic',
     bot_scout: 'Scout',
     bot_scout_toggle: 'Scout on/off',
     bot_scout_on_passive: 'Scout is on',
