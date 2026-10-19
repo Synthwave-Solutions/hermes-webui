@@ -1707,3 +1707,9 @@ size, and callers receive independent values with fresh environment expansion.
 Managed-bot ACL files are still read fresh on each authorization check; no
 identity or permission decisions are cached. Bot avatar images load lazily and decode asynchronously so hidden bot panels
 do not fetch every profile image during chat startup.
+
+Skill-count warming shares parsed frontmatter across identical copied skills,
+with parser identity included in the cache key. Bounded LRU eviction preserves
+other hot entries at capacity; filesystem signatures still detect changed
+files, and callers receive independent metadata values. Authorization and
+per-profile enabled-skill decisions remain outside the shared parse cache.
