@@ -53,3 +53,33 @@ def test_cli_profile_enumeration_uses_metadata_without_counts(monkeypatch, tmp_p
     monkeypatch.setattr(profiles, 'list_profiles_api', rows)
     contexts, _ = models._all_profiles_cli_contexts()
     assert {row[2] for row in contexts} == {'default', 'research'}
+
+
+def test_profile_prewarm_does_not_queue_counts(monkeypatch):
+    from api import prewarm, profiles, bot_metadata
+    calls = []
+    monkeypatch.setattr(profiles, 'list_profiles_api', lambda **kw: calls.append(kw) or [{'name': 'default'}])
+    monkeypatch.setattr(bot_metadata, 'read_profile', lambda name: {})
+    prewarm._warm_profile_rows()
+    assert calls == [{'fast': True, 'include_skill_counts': False}]
+
+
+@pytest.mark.parametrize('query,expected', [
+    ('?fast=1&counts=0', {'fast': True, 'include_skill_counts': False}),
+    ('?fast=1', {'fast': True}),
+    ('?counts=0', {'fast': False}),
+])
+def test_profile_route_counts_opt_out_keeps_access_filter(monkeypatch, query, expected):
+    from types import SimpleNamespace
+    from urllib.parse import urlparse
+    from api import routes, profiles, bot_metadata
+    calls = []
+    monkeypatch.setattr(profiles, 'list_profiles_api', lambda **kw: calls.append(kw) or [{'name': 'visible'}, {'name': 'private'}])
+    monkeypatch.setattr(profiles, 'get_active_profile_name', lambda: 'visible')
+    monkeypatch.setattr(routes, '_chat_profile_target_allowed', lambda handler, name: name == 'visible')
+    monkeypatch.setattr(routes, '_bot_editable_check', lambda handler: lambda *a: False)
+    monkeypatch.setattr(bot_metadata, 'read_profile', lambda name: {})
+    monkeypatch.setattr(routes, 'j', lambda handler, payload, **kw: payload)
+    result = routes.handle_get(SimpleNamespace(), urlparse('/api/profiles' + query))
+    assert calls == [expected]
+    assert [p['name'] for p in result['profiles']] == ['visible']

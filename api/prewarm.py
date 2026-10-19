@@ -88,13 +88,13 @@ def _warm_cli_sessions() -> None:
 
 def _warm_profile_rows() -> None:
     # 3. Profile rows + bot metadata (every dropdown and the boot sequence ask
-    # for these; the first build parses 21 configs and kicks off the skill
-    # scans, which otherwise land on the first human request after a restart).
+    # for these. Counts belong to profile management on demand; starting skill
+    # scans here competes with the first conversation for CPU and disk).
     try:
         from api import profiles as profiles_api, bot_metadata
 
         t = time.time()
-        rows = profiles_api.list_profiles_api(fast=True)
+        rows = profiles_api.list_profiles_api(fast=True, include_skill_counts=False)
         for row in rows:
             try:
                 bot_metadata.read_profile(row["name"])

@@ -564,7 +564,7 @@
     if (changed) { profiles = []; people = []; }
     loading = true; peopleLoading = true; closeMenu(); const current = ++generation; paint();
     const fresh = () => generation === current && contextKey() === next;
-    Promise.resolve(api('/api/profiles?fast=1', {timeoutToast:false})).then(result => {
+    Promise.resolve(api('/api/profiles?fast=1&counts=0', {timeoutToast:false})).then(result => {
       if (!fresh()) return;
       if (!Array.isArray(result.profiles)) throw new Error('Invalid bot catalog');
       profiles = result.profiles;

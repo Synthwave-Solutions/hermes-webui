@@ -5776,7 +5776,7 @@ async function _loadGroupPeopleDirectory() {
       dir = dir.filter(p => String(p.email || '').trim().toLowerCase() !== me);
     }
     try {
-      const bots = await api('/api/profiles?fast=1', {timeoutToast:false});
+      const bots = await api('/api/profiles?fast=1&counts=0', {timeoutToast:false});
       dir = dir.concat((bots.profiles || bots || []).map(bot => ({
         email:'bot:' + bot.name,
         display_name:(bot.bot && bot.bot.title) || bot.name,
