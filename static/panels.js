@@ -8294,10 +8294,23 @@ function _botWorkSectionHtml(p){
 // Bot Screen status line (api/bot_screens.py /api/bot-screen/status): only
 // for viewers with an explicit Bot Screen view grant; opens the existing viewer.
 function _botScreenUrl(bot){ return '/static/bot-screens.html?'+new URLSearchParams({bot:bot||'default'}); }
+// "wacht sinds 14:05 (12 min geleden)" from the lease's help_since (epoch
+// seconds); empty when the engine did not write one.
+function _botScreenSinceText(ts,now){
+  const n=Number(ts||0);if(!(n>0))return '';
+  const d=new Date(n*1000),mins=Math.max(0,Math.floor(((now||Date.now())-n*1000)/60000));
+  const time=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+  const ago=mins<1?t('bot_screen_ago_now'):mins<60?t('bot_screen_ago_min').replace('{n}',mins):t('bot_screen_ago_hours').replace('{n}',Math.floor(mins/60));
+  return t('bot_screen_waiting_since').replace('{time}',time).replace('{ago}',ago);
+}
+window._botScreenSinceText=_botScreenSinceText;
 function _botScreenStatusText(row){
   if(!row)return '';
   if(row.state==='none')return t('bot_screen_none');
-  if(row.state==='waiting')return t('bot_screen_waiting').replace('{reason}',row.reason||'');
+  if(row.state==='waiting'){
+    const since=_botScreenSinceText(row.help_since);
+    return t('bot_screen_waiting').replace('{reason}',row.reason||'')+(since?' · '+since:'');
+  }
   if(row.state==='human'){
     const when=_botWorkWhen(row.since);
     return (row.mine?t('bot_screen_human_you'):t('bot_screen_human').replace('{who}',row.by||t('bot_screen_someone'))).replace('{since}',when);
@@ -15439,7 +15452,7 @@ function _waitingScreensFor(data){
 function _waitingScreenHtml(row){
   return `<li class="waiting-item" data-kind="screen" data-bot="${esc(row.bot)}">
       <div class="waiting-item-main"><span class="waiting-item-title">${esc(_waitingBotLabel(row.bot))}</span>
-        <span class="waiting-item-meta"><span class="bot-work-flag">${esc(t('waiting_screen'))}</span></span>
+        <span class="waiting-item-meta"><span class="bot-work-flag">${esc(t('waiting_screen'))}</span>${_botScreenSinceText(row.help_since)?` <span class="waiting-screen-since">${esc(_botScreenSinceText(row.help_since))}</span>`:''}</span>
         ${row.reason?`<span class="waiting-item-detail">${esc(row.reason)}</span>`:''}</div>
       <div class="waiting-item-actions"><a class="sm-btn primary" href="${esc(_botScreenUrl(row.bot))}" target="_blank" rel="noopener">${esc(t('bot_screen_open'))}</a></div></li>`;
 }

@@ -159,13 +159,17 @@ def _status_row(email, bot, rights):
         lease = leases.get(profile_key=str(home))
     reason = ' '.join(str(lease.reason or '').split())[:_REASON_MAX]
     row['since'] = lease.since
+    # help_since: set by the engine when the agent asks for help
+    # (computer_use request_help); older engines do not write it.
+    help_since = getattr(lease, 'help_since', None)
+    help_since = float(help_since) if isinstance(help_since, (int, float)) and not isinstance(help_since, bool) and help_since > 0 else None
     if lease.holder == 'human':
         with _LOCK:
             holder = _HOLDERS.get(str(home))
         by = holder[1] if holder and holder[0] == lease.viewer_id else ''
         return {**row, 'state': 'human', 'by': by, 'mine': bool(by) and by == email}
-    if reason:
-        return {**row, 'state': 'waiting', 'reason': reason}
+    if reason or help_since:
+        return {**row, 'state': 'waiting', 'reason': reason, 'help_since': help_since}
     return {**row, 'state': 'agent'}
 
 

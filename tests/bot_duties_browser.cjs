@@ -109,6 +109,12 @@ const DUTY={title:'Inbox triage',objective:'Sort new mail',trigger:'bij nieuwe m
   assert.equal(await p.evaluate(()=>_botScreenStatusText({state:'waiting',reason:'log in'})),'waiting: log in');
   assert.match(await p.evaluate(()=>_botScreenStatusText({state:'human',by:'ada@example.test',since:1760000000})),/^ada@example\.test since \S/);
   assert.equal(await p.evaluate(()=>_botScreenLineHtml({bot:'cfo',state:'none'}).includes('bot-screen-open')),false);
+  // help_since: "waiting since HH:MM (age)"; missing or junk adds nothing.
+  await p.evaluate(()=>{window.t=k=>({bot_screen_waiting:'waiting: {reason}',bot_screen_waiting_since:'since {time} ({ago})',bot_screen_ago_min:'{n} min',bot_screen_ago_hours:'{n} h',bot_screen_ago_now:'now'}[k]||k);});
+  const since=await p.evaluate(()=>{const ts=new Date(2026,9,19,14,5).getTime()/1000;return [
+    _botScreenSinceText(ts,ts*1000+12*60000),_botScreenSinceText(ts,ts*1000+3*3600000),_botScreenSinceText(ts,ts*1000+5000),_botScreenSinceText(null),_botScreenSinceText('x'),
+    _botScreenStatusText({state:'waiting',reason:'log in',help_since:ts}).startsWith('waiting: log in · since 14:05 (')];});
+  assert.deepEqual(since,['since 14:05 (12 min)','since 14:05 (3 h)','since 14:05 (now)','','',true]);
   await p.evaluate(()=>{window.t=k=>k;});
   assert.deepEqual(await p.$$eval('.bot-work-group',n=>n.map(g=>g.dataset.status)),['blocked','review','todo']);
   assert.deepEqual(await p.$$eval('.bot-work-task.is-attention',n=>n.map(b=>b.dataset.taskId)),['t2','t3']);
@@ -145,7 +151,7 @@ const DUTY={title:'Inbox triage',objective:'Sort new mail',trigger:'bij nieuwe m
    window.api=async(url,opts)=>{calls.push([url,opts&&opts.body?JSON.parse(opts.body):null]);
     if(deny.has(url))throw new Error('403');
     if(url.split('?')[0]==='/api/kanban/waiting')return {tasks:[{id:'t2',title:'Login needed',status:'blocked',block_kind:'needs_input',assignee:'cfo'},{id:'t3',title:'Check me',status:'review',assignee:'coo'}]};
-    if(url==='/api/bot-screen/status')return {screens:[{bot:'cfo',state:'waiting',reason:'please log in to Exact',rights:{view:true,control:true}},
+    if(url==='/api/bot-screen/status')return {screens:[{bot:'cfo',state:'waiting',reason:'please log in to Exact',help_since:Date.now()/1000-600,rights:{view:true,control:true}},
       {bot:'coo',state:'waiting',reason:'watch only',rights:{view:true,control:false}},{bot:'ceo',state:'agent',rights:{view:true,control:true}}]};
     return {ok:true};};
   },waiting);
@@ -154,6 +160,7 @@ const DUTY={title:'Inbox triage',objective:'Sort new mail',trigger:'bij nieuwe m
   assert.deepEqual(await p.$$eval('.waiting-item',n=>n.map(x=>x.dataset.kind+':'+(x.dataset.taskId||x.dataset.sessionId||x.dataset.bot))),['screen:cfo','task:t2','task:t3']);
   // Pending chat approvals are not listed (they expire within a minute).
   assert.ok(await p.evaluate(()=>!calls.some(c=>c[0].startsWith('/api/approval'))));
+  assert.equal(await p.textContent('.waiting-item[data-kind="screen"] .waiting-screen-since'),'bot_screen_waiting_since');
   assert.deepEqual(await p.$eval('.waiting-item[data-kind="screen"]',li=>[li.querySelector('.waiting-item-detail').textContent,li.querySelector('a').getAttribute('href'),li.querySelector('a').target]),['please log in to Exact','/static/bot-screens.html?bot=cfo','_blank']);
   assert.equal(await p.locator('.waiting-item[data-task-id="t3"] button',{hasText:'kanban_unblock'}).count(),0);
   // The blocked task of cfo (screen waiting, may control) carries the takeover link; the review task does not.

@@ -179,3 +179,22 @@ def test_status_after_hand_back_and_unreadable_lease(setup):
     (homes['one']/'bot-desktop'/'lease.json').write_text('{broken')
     row=status('?bot=one').body['screens'][0]
     assert row['state']=='human' and row['by']=='' and row['mine'] is False
+
+
+def test_status_carries_help_since_when_the_engine_writes_it(setup, monkeypatch):
+    _, _, homes, lease = setup
+    (homes['one'] / 'bot-desktop').mkdir(exist_ok=True)
+    asked = SimpleNamespace(holder='agent', viewer_id=None, since=1.0, reason='please log in', help_since=1760000000.5)
+    monkeypatch.setattr(lease, 'get', lambda profile_key=None: asked)
+    row = status('?bot=one').body['screens'][0]
+    assert row['state'] == 'waiting' and row['help_since'] == 1760000000.5 and row['reason'] == 'please log in'
+    # An ask without a reason still waits; a missing or junk help_since is tolerated.
+    asked.reason, asked.help_since = '', 1760000100
+    assert status('?bot=one').body['screens'][0]['state'] == 'waiting'
+    for junk in (None, 'soon', True, -5):
+        asked.reason, asked.help_since = 'x', junk
+        row = status('?bot=one').body['screens'][0]
+        assert row['state'] == 'waiting' and row['help_since'] is None
+    del asked.help_since
+    asked.reason = ''
+    assert status('?bot=one').body['screens'][0]['state'] == 'agent'

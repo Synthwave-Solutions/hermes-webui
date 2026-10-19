@@ -334,15 +334,16 @@
     else { input.removeAttribute('aria-activedescendant'); const empty = document.createElement('span'); empty.textContent = tx('chat_mentions_empty', 'No matching people or bots'); popup.appendChild(empty); }
   }
   let sidebarSwitchPending = false, scoutPending = '';
-  // Bots whose screen waits for a person (bot -> reason), from
+  // Bots whose screen waits for a person (bot -> {reason, help_since}), from
   // /api/bot-screen/status with the viewer's own Bot Screens grants; read with
   // the bot catalog, never on a faster timer.
   let screensWaiting = new Map();
   function screenWaitDot(p) {
     if (!screensWaiting.has(p.name)) return null;
     const dot = document.createElement('span'); dot.className = 'sidebar-bot-screen-wait'; dot.setAttribute('role', 'img');
-    const reason = screensWaiting.get(p.name);
-    dot.title = tx('waiting_screen', 'Bot screen waits for you') + (reason ? ': ' + reason : '');
+    const wait = screensWaiting.get(p.name) || {};
+    const since = typeof window._botScreenSinceText === 'function' ? window._botScreenSinceText(wait.help_since) : '';
+    dot.title = tx('waiting_screen', 'Bot screen waits for you') + (wait.reason ? ': ' + wait.reason : '') + (since ? ' · ' + since : '');
     dot.setAttribute('aria-label', dot.title + ' (' + botDisplayName(p) + ')');
     return dot;
   }
@@ -564,7 +565,7 @@
     Promise.resolve(api('/api/bot-screen/status', {timeoutToast:false, redirect401:false})).then(result => {
       if (!fresh()) return;
       const rows = Array.isArray(result && result.screens) ? result.screens : [];
-      screensWaiting = new Map(rows.filter(r => r && r.state === 'waiting').map(r => [r.bot, String(r.reason || '')]));
+      screensWaiting = new Map(rows.filter(r => r && r.state === 'waiting').map(r => [r.bot, {reason: String(r.reason || ''), help_since: r.help_since || null}]));
     }).catch(() => { if (fresh()) screensWaiting = new Map(); }).finally(() => { if (fresh()) paintSidebarBots(); });
     Promise.resolve(api('/api/people', {timeoutToast:false})).then(result => {
       if (!fresh()) return;
