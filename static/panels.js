@@ -15404,7 +15404,7 @@ function _waitingBotLabel(name){
   try{if(typeof _cronBotTitle==='function')return _cronBotTitle(name);}catch(_){}
   return name;
 }
-function _waitingTaskHtml(task){
+function _waitingTaskHtml(task,screen){
   const needsInput=task.status==='blocked';
   const flag=needsInput?t('bot_work_flag_needs_input'):t('bot_work_flag_review');
   const id=esc(task.id);
@@ -15417,6 +15417,7 @@ function _waitingTaskHtml(task){
         <button type="button" class="sm-btn" data-task-id="${id}" onclick="openKanbanTaskFromBot(this.dataset.taskId)">${esc(t('waiting_open_task'))}</button>
         <button type="button" class="sm-btn" data-task-id="${id}" onclick="_waitingComment(this.dataset.taskId)">${esc(t('waiting_comment'))}</button>
         ${needsInput?`<button type="button" class="sm-btn" data-task-id="${id}" onclick="_waitingUnblock(this.dataset.taskId)">${esc(t('kanban_unblock'))}</button>`:''}
+        ${needsInput&&screen?`<a class="sm-btn primary waiting-screen-link" href="${esc(_botScreenUrl(screen.bot))}" target="_blank" rel="noopener" title="${esc(screen.reason||'')}">${esc(t('waiting_take_over'))}</a>`:''}
       </div>${comment}</li>`;
 }
 function _waitingApprovalHtml(row){
@@ -15446,7 +15447,10 @@ function _paintWaitingForYou(){
   const data=_waitingData;
   if(!data||(!data.tasks&&!data.approvals&&!data.screens)){section.hidden=true;return;}
   const tasks=data.tasks||[],approvals=data.approvals||[];
-  const items=_waitingScreensFor(data).map(_waitingScreenHtml).concat(approvals.map(_waitingApprovalHtml),tasks.map(_waitingTaskHtml));
+  const screens=_waitingScreensFor(data),byBot=new Map(screens.map(r=>[r.bot,r]));
+  // A task blocked for input whose bot's screen waits for a person gets the
+  // takeover link on its own card.
+  const items=screens.map(_waitingScreenHtml).concat(approvals.map(_waitingApprovalHtml),tasks.map(task=>_waitingTaskHtml(task,task.block_kind==='needs_input'?byBot.get(task.assignee):null)));
   box.innerHTML=items.length?`<ul class="waiting-list">${items.join('')}</ul>`:`<div class="access-requests-empty">${esc(t('waiting_empty'))}</div>`;
   section.hidden=false;
   const area=$('waitingComment');if(area)area.focus();

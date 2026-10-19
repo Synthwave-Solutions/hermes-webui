@@ -149,6 +149,9 @@ const DUTY={title:'Inbox triage',objective:'Sort new mail',trigger:'bij nieuwe m
   assert.deepEqual(await p.$$eval('.waiting-item',n=>n.map(x=>x.dataset.kind+':'+(x.dataset.taskId||x.dataset.sessionId||x.dataset.bot))),['screen:cfo','approval:s1','task:t2','task:t3']);
   assert.deepEqual(await p.$eval('.waiting-item[data-kind="screen"]',li=>[li.querySelector('.waiting-item-detail').textContent,li.querySelector('a').getAttribute('href'),li.querySelector('a').target]),['please log in to Exact','/static/bot-screens.html?bot=cfo','_blank']);
   assert.equal(await p.locator('.waiting-item[data-task-id="t3"] button',{hasText:'kanban_unblock'}).count(),0);
+  // The blocked task of cfo (screen waiting, may control) carries the takeover link; the review task does not.
+  assert.equal(await p.getAttribute('.waiting-item[data-task-id="t2"] .waiting-screen-link','href'),'/static/bot-screens.html?bot=cfo');
+  assert.equal(await p.locator('.waiting-item[data-task-id="t3"] .waiting-screen-link').count(),0);
   await p.click('.waiting-item[data-session-id="s1"] button');
   await p.click('.waiting-item[data-task-id="t3"] button:first-child');
   assert.deepEqual(await p.evaluate(()=>opened),['chat:s1:cfo','task:t3']);

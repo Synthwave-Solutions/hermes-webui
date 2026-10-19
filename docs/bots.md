@@ -43,6 +43,7 @@ With an explicit Bot Screen view grant, the section starts with a one-line **Bot
 **My approvals** starts with **Waiting for you**. It lists chats with a pending tool approval that the viewer could open (`GET /api/approval/waiting`, read from the same in-memory queues as the chat's own approval prompt; they are gone after a server restart) and Kanban tasks in review or blocked for input (`block_kind` `needs_input`) of bots the viewer may use or that the viewer created (`GET /api/kanban/waiting`). A chat opens where its approval is answered; nothing is approved from the list. A task opens on the board, takes a reply as a comment, or is unblocked through the existing Kanban routes. The viewer's own access requests stay listed below.
 
 Bot screens that wait for a person (the agent asked for a takeover with a reason and nobody holds the screen) come first, only for viewers with the Bot Screens right to control that screen; **Open screen** opens the existing viewer for that bot, where the takeover itself is confirmed.
+A task blocked for input whose bot's screen waits like that carries a **Take over screen** link on its own card as well.
 
 ## Instructions, tools and knowledge
 

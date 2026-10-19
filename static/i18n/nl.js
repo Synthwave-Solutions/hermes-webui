@@ -1189,6 +1189,7 @@ window.__registerHermesLocale('nl', {
   waiting_unblocked: 'Taak gaat weer verder',
   waiting_tool_approval: 'Wacht op goedkeuring',
   waiting_screen: 'Botscherm wacht op jou',
+  waiting_take_over: 'Scherm overnemen',
   bot_screen: 'Botscherm',
   bot_screen_none: 'nog geen desktop',
   bot_screen_agent: 'de bot werkt op zijn scherm',
