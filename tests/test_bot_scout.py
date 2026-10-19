@@ -190,7 +190,63 @@ def test_scout_route_needs_the_bot_edit_permission():
 
     assert route_permission("/api/bots/scout", "POST") == "profiles:admin"
     src = (Path(__file__).resolve().parents[1] / "api" / "routes.py").read_text(encoding="utf-8")
-    block = src[src.index('if parsed.path == "/api/bots/scout":'):]
-    block = block[:block.index("if parsed.path ==", 10)]
+    route = src[src.index('if parsed.path == "/api/bots/scout":'):]
+    assert route[:route.index("if parsed.path ==", 10)].strip().endswith("return _handle_bot_scout(handler, body)")
+    block = src[src.index("def _handle_bot_scout(handler, body):"):]
+    block = block[:block.index("\ndef ", 10)]
+    assert "_cron_admin_allowed(handler)" in block
     assert '"profiles:admin"' in block and "_chat_profile_target_allowed(handler, name)" in block
     assert "bot_builder.require_edit(_request_identity(handler), name)" in block
+
+
+class _RouteHandler:
+    def __init__(self):
+        self.status = None
+        self.body = b""
+        self.headers = {}
+
+    def send_response(self, code, *a):
+        self.status = code
+
+    def send_header(self, *a):
+        pass
+
+    def end_headers(self):
+        pass
+
+    @property
+    def wfile(self):
+        handler = self
+
+        class _W:
+            def write(self, data):
+                handler.body += data
+        return _W()
+
+
+def _route_env(monkeypatch, cron_admin):
+    from api import routes, governance_api
+    monkeypatch.setattr(governance_api, "get_policy", lambda: SimpleNamespace(bootstrap_admins=[]))
+    monkeypatch.setattr(governance_api, "_caller_identity", lambda handler: {"email": ALICE})
+    monkeypatch.setattr(governance_api, "resolve_effective_access", lambda policy, subject: None)
+    monkeypatch.setattr(governance_api, "_require", lambda *a: True)
+    monkeypatch.setattr(routes, "_chat_profile_target_allowed", lambda handler, name: True)
+    monkeypatch.setattr(routes, "_cron_admin_allowed", lambda handler: cron_admin)
+    return routes
+
+
+def test_scout_route_refuses_a_non_cron_admin_and_changes_nothing(scout_env, monkeypatch):
+    routes = _route_env(monkeypatch, cron_admin=False)
+    for enabled in (True, False):
+        h = _RouteHandler()
+        routes._handle_bot_scout(h, {"name": "radar", "enabled": enabled, "revision": 0})
+        assert h.status == 403 and b"cron admin" in h.body
+    assert _jobs(scout_env.homes["radar"]) == [] and _revision("radar") == 0
+    assert not (scout_env.homes["radar"] / "scripts").exists()
+
+
+def test_scout_route_lets_a_cron_admin_turn_it_on(scout_env, monkeypatch):
+    routes = _route_env(monkeypatch, cron_admin=True)
+    h = _RouteHandler()
+    routes._handle_bot_scout(h, {"name": "radar", "enabled": True, "revision": 0})
+    assert h.status == 200 and len(_jobs(scout_env.homes["radar"])) == 1
