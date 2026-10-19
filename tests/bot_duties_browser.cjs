@@ -140,11 +140,14 @@ const DUTY={title:'Inbox triage',objective:'Sort new mail',trigger:'bij nieuwe m
     if(deny.has(url))throw new Error('403');
     if(url==='/api/kanban/waiting')return {tasks:[{id:'t2',title:'Login needed',status:'blocked',block_kind:'needs_input',assignee:'cfo'},{id:'t3',title:'Check me',status:'review',assignee:'coo'}]};
     if(url==='/api/approval/waiting')return {approvals:[{session_id:'s1',title:'Deploy chat',profile:'cfo',description:'rm -rf build',count:2}]};
+    if(url==='/api/bot-screen/status')return {screens:[{bot:'cfo',state:'waiting',reason:'please log in to Exact',rights:{view:true,control:true}},
+      {bot:'coo',state:'waiting',reason:'watch only',rights:{view:true,control:false}},{bot:'ceo',state:'agent',rights:{view:true,control:true}}]};
     return {ok:true};};
   },waiting);
   await p.evaluate(()=>loadWaitingForYou());
   assert.equal(await p.locator('#myWaitingSection').isVisible(),true);
-  assert.deepEqual(await p.$$eval('.waiting-item',n=>n.map(x=>x.dataset.kind+':'+(x.dataset.taskId||x.dataset.sessionId))),['approval:s1','task:t2','task:t3']);
+  assert.deepEqual(await p.$$eval('.waiting-item',n=>n.map(x=>x.dataset.kind+':'+(x.dataset.taskId||x.dataset.sessionId||x.dataset.bot))),['screen:cfo','approval:s1','task:t2','task:t3']);
+  assert.deepEqual(await p.$eval('.waiting-item[data-kind="screen"]',li=>[li.querySelector('.waiting-item-detail').textContent,li.querySelector('a').getAttribute('href'),li.querySelector('a').target]),['please log in to Exact','/static/bot-screens.html?bot=cfo','_blank']);
   assert.equal(await p.locator('.waiting-item[data-task-id="t3"] button',{hasText:'kanban_unblock'}).count(),0);
   await p.click('.waiting-item[data-session-id="s1"] button');
   await p.click('.waiting-item[data-task-id="t3"] button:first-child');
@@ -157,7 +160,7 @@ const DUTY={title:'Inbox triage',objective:'Sort new mail',trigger:'bij nieuwe m
   await p.click('.waiting-item[data-task-id="t2"] button:nth-child(3)');
   assert.ok(await p.evaluate(()=>calls.some(c=>c[0]==='/api/kanban/tasks/t2/unblock')));
   // No rights on either source: the section stays hidden; one source still shows.
-  await p.evaluate(()=>{deny.add('/api/kanban/waiting');deny.add('/api/approval/waiting');});
+  await p.evaluate(()=>{deny.add('/api/kanban/waiting');deny.add('/api/approval/waiting');deny.add('/api/bot-screen/status');});
   await p.evaluate(()=>loadWaitingForYou());
   assert.equal(await p.locator('#myWaitingSection').isVisible(),false);
   await p.evaluate(()=>{deny.delete('/api/approval/waiting');});

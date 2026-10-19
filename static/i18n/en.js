@@ -1296,6 +1296,7 @@ window.__registerHermesLocale('en', {
     waiting_comment_sent: 'Reply posted',
     waiting_unblocked: 'The task continues',
     waiting_tool_approval: 'Waiting for approval',
+    waiting_screen: 'Bot screen waits for you',
     bot_screen: 'Bot screen',
     bot_screen_none: 'no desktop yet',
     bot_screen_agent: 'the bot is working on its screen',

@@ -15427,21 +15427,35 @@ function _waitingApprovalHtml(row){
         ${row.description?`<span class="waiting-item-detail">${esc(row.description)}</span>`:''}</div>
       <div class="waiting-item-actions"><button type="button" class="sm-btn primary" data-session-id="${esc(row.session_id)}" data-profile="${esc(row.profile||'')}" onclick="openCronJobChat(this.dataset.sessionId,this.dataset.profile)">${esc(t('waiting_open_chat'))}</button></div></li>`;
 }
+// A bot screen waits for a person when the agent asked for a takeover (with
+// its reason) and nobody holds it; listed only for viewers who may control
+// that screen (Bot Screens grants), opening the existing viewer.
+function _waitingScreensFor(data){
+  return (data&&data.screens||[]).filter(r=>r&&r.state==='waiting'&&r.rights&&r.rights.control);
+}
+function _waitingScreenHtml(row){
+  return `<li class="waiting-item" data-kind="screen" data-bot="${esc(row.bot)}">
+      <div class="waiting-item-main"><span class="waiting-item-title">${esc(_waitingBotLabel(row.bot))}</span>
+        <span class="waiting-item-meta"><span class="bot-work-flag">${esc(t('waiting_screen'))}</span></span>
+        ${row.reason?`<span class="waiting-item-detail">${esc(row.reason)}</span>`:''}</div>
+      <div class="waiting-item-actions"><a class="sm-btn primary" href="${esc(_botScreenUrl(row.bot))}" target="_blank" rel="noopener">${esc(t('bot_screen_open'))}</a></div></li>`;
+}
 let _waitingData=null;
 function _paintWaitingForYou(){
   const section=$('myWaitingSection'),box=$('myWaitingList');if(!section||!box)return;
   const data=_waitingData;
-  if(!data||(!data.tasks&&!data.approvals)){section.hidden=true;return;}
+  if(!data||(!data.tasks&&!data.approvals&&!data.screens)){section.hidden=true;return;}
   const tasks=data.tasks||[],approvals=data.approvals||[];
-  const items=approvals.map(_waitingApprovalHtml).concat(tasks.map(_waitingTaskHtml));
+  const items=_waitingScreensFor(data).map(_waitingScreenHtml).concat(approvals.map(_waitingApprovalHtml),tasks.map(_waitingTaskHtml));
   box.innerHTML=items.length?`<ul class="waiting-list">${items.join('')}</ul>`:`<div class="access-requests-empty">${esc(t('waiting_empty'))}</div>`;
   section.hidden=false;
   const area=$('waitingComment');if(area)area.focus();
 }
 async function loadWaitingForYou(){
   const get=url=>api(url,{timeoutToast:false,redirect401:false}).catch(()=>null);
-  const [tasks,approvals]=await Promise.all([get('/api/kanban/waiting'),get('/api/approval/waiting')]);
-  _waitingData={tasks:tasks&&Array.isArray(tasks.tasks)?tasks.tasks:null,approvals:approvals&&Array.isArray(approvals.approvals)?approvals.approvals:null};
+  const [tasks,approvals,screens]=await Promise.all([get('/api/kanban/waiting'),get('/api/approval/waiting'),get('/api/bot-screen/status')]);
+  _waitingData={tasks:tasks&&Array.isArray(tasks.tasks)?tasks.tasks:null,approvals:approvals&&Array.isArray(approvals.approvals)?approvals.approvals:null,
+    screens:screens&&Array.isArray(screens.screens)?screens.screens:null};
   _paintWaitingForYou();
 }
 function _waitingComment(taskId){ _waitingCommentTask=taskId||'';_paintWaitingForYou(); }
