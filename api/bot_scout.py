@@ -29,6 +29,9 @@ from api import bot_metadata
 SCRIPT = "scout/scout_collect.py"
 RUNNER_FILES = ("scout_collect.py", "scout_ledger.py", "prompt.md")
 REQUIRED_FILES = ("scout_collect.py", "scout_ledger.py")
+# Copied once; later edits in the bot's own folder are kept. The scripts
+# follow the shared source whenever it changes.
+KEEP_FILES = ("prompt.md",)
 MANAGED_BY = "scout"
 JOB_NAME = "Scout"
 JOB_CATEGORY = "Scout"
@@ -120,6 +123,9 @@ def install_runner(home) -> Path:
         target = dest / name
         if target.is_symlink():
             raise ScoutError(400, "Scout file %s in this bot is a symlink" % name)
+        # The prompt is the bot's own once it has one: never overwritten.
+        if name in KEEP_FILES and target.exists():
+            continue
         blob = source.read_bytes()
         if target.is_file() and target.read_bytes() == blob:
             continue

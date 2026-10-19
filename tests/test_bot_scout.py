@@ -309,3 +309,17 @@ def test_failed_copy_restores_the_previous_settings(scout_env, monkeypatch):
         _set("radar", enabled=True, topics=["AI act"])
     assert bot_metadata.read_profile("radar")["bot"]["scout"]["enabled"] is False
     assert _jobs(scout_env.homes["radar"]) == []
+
+
+def test_the_bots_own_prompt_is_copied_once_and_then_kept(scout_env):
+    dest = bot_scout.install_runner(scout_env.homes["radar"])
+    assert (dest / "prompt.md").read_text() == "Eigen Scout prompt.\n"
+    (dest / "prompt.md").write_text("Prompt van deze bot.\n")
+    (scout_env.src / "prompt.md").write_text("Nieuwe gedeelde prompt.\n")
+    (scout_env.src / "scout_ledger.py").write_text("print('ledger v2')\n")
+    bot_scout.install_runner(scout_env.homes["radar"])
+    assert (dest / "prompt.md").read_text() == "Prompt van deze bot.\n"
+    assert (dest / "scout_ledger.py").read_text() == "print('ledger v2')\n"
+    _set("radar", enabled=True)
+    [job] = _jobs(scout_env.homes["radar"])
+    assert job["prompt"].startswith("Prompt van deze bot.")
