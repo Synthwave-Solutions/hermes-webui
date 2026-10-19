@@ -160,7 +160,10 @@ def test_app_rewrites_are_applied():
     assert "Backups and audit entries will be created." not in app
     assert "'Expire" not in app and "Forget selected" in app
     index = (SERVED / "index.html").read_text(encoding="utf-8")
-    assert re.search(r'<script src="memdash-shim\.js\?v=[0-9a-f]{12}"></script><script src="app\.js\?v=[0-9a-f]{12}"></script>', index)
+    # app.js is a CORS script, so its relative three.js import resolves (the
+    # 3D visualiser); the shim stays a plain script before it.
+    assert re.search(r'<script src="memdash-shim\.js\?v=[0-9a-f]{12}"></script>'
+                     r'<script src="app\.js\?v=[0-9a-f]{12}" crossorigin="anonymous"></script>', index)
     assert index.index('href="style.css') < index.index('href="memdash-overrides.css')
     assert "<a " not in index.split('<footer class="app-footer">', 1)[1].split("</footer>", 1)[0]
 

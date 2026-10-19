@@ -414,3 +414,91 @@ nav button[data-tab="settings"],
 :root[data-sp-appearance] .badge,
 :root[data-sp-appearance] .role,
 :root[data-sp-appearance] .session-chip { border-radius: var(--sp-radius-sm, 4px) !important; }
+
+/* The 3D visualiser and the knowledge graph in the same tokens. The scene
+   colours themselves come from memdash-shim.js (wrapped palette functions);
+   these are the backgrounds, the labels over the scene, the legend and the
+   SVG graph. Topics take the accent, memories the warning tone. */
+:root[data-sp-appearance] .three-viewport,
+:root[data-sp-appearance] .three-viewport[data-three-mode="neural"],
+:root[data-sp-appearance] .constellation-wrap,
+:root[data-sp-appearance] .constellation-wrap[data-visualiser="neural"],
+:root[data-sp-appearance][data-theme="light"] .three-viewport,
+:root[data-sp-appearance][data-theme="light"] .three-viewport[data-three-mode="neural"],
+:root[data-sp-appearance][data-theme="light"] .constellation-wrap,
+:root[data-sp-appearance][data-theme="light"] .constellation-wrap[data-visualiser="neural"] {
+  background: radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--sp-accent) 12%, transparent), transparent 42%), var(--sp-bg) !important;
+}
+:root[data-sp-appearance] .constellation-wrap:before,
+:root[data-sp-appearance] .constellation-wrap:after { display: none; }
+:root[data-sp-appearance] .three-label,
+:root[data-sp-appearance][data-theme="light"] .three-label {
+  background: color-mix(in srgb, var(--sp-surface) 84%, transparent);
+  color: var(--sp-text);
+  border-color: var(--sp-border);
+  text-shadow: none;
+  box-shadow: none;
+}
+:root[data-sp-appearance] .three-label.memory,
+:root[data-sp-appearance][data-theme="light"] .three-label.memory {
+  color: color-mix(in srgb, var(--sp-warning, var(--sp-accent)) 70%, var(--sp-text));
+  border-color: color-mix(in srgb, var(--sp-warning, var(--sp-accent)) 35%, transparent);
+}
+:root[data-sp-appearance] .three-aura-oval,
+:root[data-sp-appearance][data-theme="light"] .three-aura-oval {
+  background: radial-gradient(ellipse at center, color-mix(in srgb, var(--sp-accent) 14%, transparent) 0%, color-mix(in srgb, var(--sp-accent) 5%, transparent) 60%, transparent 100%);
+  border-color: color-mix(in srgb, var(--sp-accent) 10%, transparent);
+  box-shadow: none;
+}
+:root[data-sp-appearance] .constellation-legend,
+:root[data-sp-appearance][data-theme="light"] .constellation-legend { color: var(--sp-muted); }
+:root[data-sp-appearance] .legend-dot,
+:root[data-sp-appearance] .three-viewport[data-three-mode="neural"] .legend-dot,
+:root[data-sp-appearance][data-theme="light"] .legend-dot {
+  background: var(--sp-accent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--sp-accent) 60%, transparent);
+}
+:root[data-sp-appearance] .legend-dot.memory,
+:root[data-sp-appearance] .three-viewport[data-three-mode="neural"] .legend-dot.memory,
+:root[data-sp-appearance][data-theme="light"] .legend-dot.memory {
+  background: var(--sp-warning, var(--sp-accent));
+  box-shadow: 0 0 8px color-mix(in srgb, var(--sp-warning, var(--sp-accent)) 60%, transparent);
+}
+:root[data-sp-appearance] .legend-line,
+:root[data-sp-appearance] .three-viewport[data-three-mode="neural"] .legend-line,
+:root[data-sp-appearance][data-theme="light"] .legend-line {
+  border-top-color: color-mix(in srgb, var(--sp-accent) 55%, var(--sp-text));
+}
+:root[data-sp-appearance] .fullscreen-exit {
+  background: var(--sp-surface);
+  color: var(--sp-text);
+  border-color: var(--sp-border);
+}
+:root[data-sp-appearance] #edgeGradient stop { stop-color: var(--sp-accent); }
+:root[data-sp-appearance] .edge,
+:root[data-sp-appearance][data-theme="light"] .edge {
+  stroke: color-mix(in srgb, var(--sp-muted) 65%, var(--sp-surface));
+  opacity: .8;
+}
+:root[data-sp-appearance] .edge:hover,
+:root[data-sp-appearance] .edge.selected { stroke: var(--sp-accent); opacity: 1; }
+:root[data-sp-appearance] .node,
+:root[data-sp-appearance][data-theme="light"] .node {
+  fill: var(--sp-accent);
+  stroke: var(--sp-surface);
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--sp-accent) 40%, transparent));
+}
+:root[data-sp-appearance] .node:hover,
+:root[data-sp-appearance] .node.selected,
+:root[data-sp-appearance][data-theme="light"] .node:hover,
+:root[data-sp-appearance][data-theme="light"] .node.selected {
+  fill: var(--sp-warning, var(--sp-accent-hover, var(--sp-accent)));
+  stroke: var(--sp-text);
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--sp-warning, var(--sp-accent)) 50%, transparent));
+}
+:root[data-sp-appearance] .nodeText,
+:root[data-sp-appearance][data-theme="light"] .nodeText { fill: var(--sp-text); stroke: var(--sp-surface) !important; }
+:root[data-sp-appearance] .edgeLabel,
+:root[data-sp-appearance][data-theme="light"] .edgeLabel { fill: var(--sp-muted); stroke: var(--sp-surface) !important; }
+:root[data-sp-appearance] .edgeLabel:hover,
+:root[data-sp-appearance] .edgeLabel.selected { fill: var(--sp-accent-text, var(--sp-accent)); }

@@ -26,8 +26,13 @@ frame runs with `Content-Security-Policy: sandbox allow-scripts` and
 | `dashboard_core.py` | unmodified, in `api/third_party/mnemosyne_dashboard/`, hardened at import by `patches.py` (reader child only) | `836cd334bf7f26b45e886c92c60362092163ba0211cb0df553ba8d43c7e871b7` |
 
 Our own files here: `memdash-shim.js` (the fetch, storage and EventSource
-shim), `memdash-overrides.css` (hidden settings, login and footer, the system
-font stack, the light-theme stat number fix) and this file.
+shim; the WebUI appearance tokens; the Dutch string table applied with a
+MutationObserver when the WebUI is Dutch; the 3D visualiser palette functions
+wrapped so the scene follows the tokens), `memdash-overrides.css` (hidden
+settings, login and footer, the system font stack, the light-theme stat
+number fix, the appearance tokens for the dashboard, the 3D view and the SVG
+knowledge graph) and this file. `app.js` itself is not changed for any of
+this.
 
 ## Files not taken
 
@@ -42,7 +47,7 @@ write methods, full-database backups and content audit log are never used
 
 | File | Rule |
 |------|------|
-| `index.html` | title "Memory explorer"; no favicon and font links; `style.css`, then `memdash-overrides.css`, and `memdash-shim.js` before `app.js`, all relative with a content hash; footer credit links removed; brand, labyrinth, structured memory and settings copy without internal product names; "Expire selected" becomes "Forget selected"; no em or en dash |
+| `index.html` | title "Memory explorer"; no favicon and font links; `style.css`, then `memdash-overrides.css`, and `memdash-shim.js` before `app.js`, all relative with a content hash; `app.js` as a CORS script (`crossorigin="anonymous"`), so its relative three.js import resolves from the opaque origin; footer credit links removed; brand, labyrinth, structured memory and settings copy without internal product names; "Expire selected" becomes "Forget selected"; no em or en dash |
 | `app.js` | `localStorage` becomes `__mdStore` (4); the three.js import becomes `import('./vendor/three.module.min.js')`; pattern provider label, graph empty state and labyrinth copy without internal product names; "Expire ..." becomes "Forget ..."; "Backups and audit entries will be created." becomes "This is recorded."; the Settings hint becomes the read-only note; no em or en dash |
 
 `fetch` and `EventSource` stay untouched in `app.js`; the shim handles them.

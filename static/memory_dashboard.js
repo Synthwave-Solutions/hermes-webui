@@ -169,6 +169,15 @@
 
   // ── Theme ──────────────────────────────────────────────────────────────────
 
+  // The explorer screens follow the WebUI language: Dutch when the WebUI is
+  // Dutch, English otherwise (the frame shim holds the Dutch string table).
+  function frameLang() {
+    var code = '';
+    try { if (typeof _localeCode === 'string') code = _localeCode; } catch (_) { code = ''; }
+    if (!code) code = document.documentElement.getAttribute('lang') || '';
+    return /^nl\b/i.test(code) ? 'nl' : 'en';
+  }
+
   function isDark() {
     var root = document.documentElement;
     if (root.classList.contains('dark')) return true;
@@ -234,6 +243,7 @@
     var fontSize = root.dataset ? root.dataset.fontSize : '';
     return {
       theme: isDark() ? 'dark' : 'light',
+      lang: frameLang(),
       colours: colours,
       tokens: tokens,
       fontSize: fontSize === 'small' || fontSize === 'large' || fontSize === 'xlarge' ? fontSize : 'default'
@@ -248,12 +258,12 @@
     bridge.themeSent = signature;
     bridge.iframe.contentWindow.postMessage({
       v: 1, type: 'memdash:theme', k: bridge.key, theme: msg.theme, colours: msg.colours,
-      tokens: msg.tokens, fontSize: msg.fontSize
+      tokens: msg.tokens, fontSize: msg.fontSize, lang: msg.lang
     }, '*');
   }
 
   function scheduleTheme() {
-    // A theme or skin change sets several attributes at once: send once, after.
+    // A theme, skin or language change sets several attributes at once: send once, after.
     if (state.themeTimer) return;
     state.themeTimer = setTimeout(function () {
       state.themeTimer = null;
@@ -265,7 +275,7 @@
     if (state.themeObserver || typeof MutationObserver !== 'function') return;
     state.themeObserver = new MutationObserver(scheduleTheme);
     state.themeObserver.observe(document.documentElement, {
-      attributes: true, attributeFilter: ['class', 'data-theme', 'data-skin', 'data-font-size', 'style']
+      attributes: true, attributeFilter: ['class', 'data-theme', 'data-skin', 'data-font-size', 'style', 'lang']
     });
     // A skin that an extension registers arrives as a style element in the head.
     if (document.head) state.themeObserver.observe(document.head, { childList: true });
@@ -416,7 +426,7 @@
     iframe.className = 'memdash-frame';
     var bridge = { key: key, ref: ref, iframe: iframe, loads: 0, inflight: 0, closed: false, ready: false };
     iframe.addEventListener('load', function () { onFrameLoad(bridge); });
-    iframe.src = VENDOR_DIR + 'index.html#theme=' + (isDark() ? 'dark' : 'light') + '&k=' + key;
+    iframe.src = VENDOR_DIR + 'index.html#theme=' + (isDark() ? 'dark' : 'light') + '&lang=' + frameLang() + '&k=' + key;
     state.bridge = bridge;
     holder.replaceChildren(iframe);
     watchTheme();

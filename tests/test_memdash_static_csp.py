@@ -167,6 +167,6 @@ def test_the_routes_seam_serves_the_document_with_its_csp_and_refuses_the_rest(m
 
 def test_the_served_document_loads_the_shim_before_the_app_and_only_relative_urls():
     html = _get(BASE + "index.html").raw.decode("utf-8")
-    scripts = re.findall(r'<script src="([^"]+)"></script>', html)
+    scripts = re.findall(r'<script src="([^"]+)"(?: crossorigin="anonymous")?></script>', html)
     assert [s.split("?")[0] for s in scripts] == ["memdash-shim.js", "app.js"]
     assert "/static/" not in html and 'src="/' not in html and 'href="/' not in html
