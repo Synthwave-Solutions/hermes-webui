@@ -1079,7 +1079,7 @@ def waiting_tasks_payload(may_use, viewer_email=None, *, board=None) -> dict:
 
 def attachment_file(attachment_id, *, board=None):
     """Resolve an attachment id to ``(path, root, filename, content_type,
-    assignee)``. Raises LookupError when the row or file is missing and
+    assignee, created_by)``. Raises LookupError when the row or file is missing and
     ValueError when the stored path leaves the attachments root."""
     from pathlib import Path
 
@@ -1106,7 +1106,7 @@ def attachment_file(attachment_id, *, board=None):
         raise ValueError("attachment is outside the attachments folder")
     if not target.is_file():
         raise LookupError("attachment file is missing")
-    return target, root, att.filename, att.content_type, task.assignee
+    return target, root, att.filename, att.content_type, task.assignee, task.created_by
 
 
 # ---------------------------------------------------------------------------

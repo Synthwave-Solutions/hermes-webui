@@ -3581,14 +3581,22 @@ def _handle_kanban_attachment(handler, parsed):
 
     Read-only, by attachment id only; the file must sit under the board's
     attachments root (no symlinks, anchored open). Same gate as the board,
-    and a task assigned to a bot needs a bot this viewer may use."""
+    and a task assigned to a bot needs a bot this viewer may use. Ids are
+    sequential, so an unassigned task is no open door: only its creator or a
+    cron admin gets the file, everyone else a 404."""
     from api import kanban_bridge
+    from api.ownership import request_owner_email
     import mimetypes
 
     def serve():
-        target, root, filename, content_type, assignee = kanban_bridge.attachment_file(
+        target, root, filename, content_type, assignee, created_by = kanban_bridge.attachment_file(
             (parse_qs(parsed.query).get("id") or [""])[0], board=_kanban_board_query(parsed))
-        if assignee and not _chat_profile_target_allowed(handler, assignee):
+        if assignee:
+            allowed = _chat_profile_target_allowed(handler, assignee)
+        else:
+            viewer = str(request_owner_email(handler) or "").strip().casefold()
+            allowed = (bool(viewer) and str(created_by or "").strip().casefold() == viewer) or _cron_admin_allowed(handler)
+        if not allowed:
             return bad(handler, "attachment not found", 404)
         mime = mimetypes.guess_type(filename)[0] or "application/octet-stream"
         # Always a download: an attachment may be HTML or SVG written by a worker.

@@ -50,9 +50,9 @@ def test_bot_work_lists_open_tasks_and_recent_attachments(board):
 
 def test_attachment_file_is_contained_to_the_attachments_root(board, tmp_path):
     att = kanban_bridge.bot_work_payload("cfo")["attachments"][0]
-    target, root, name, _ctype, assignee = kanban_bridge.attachment_file(att["id"])
+    target, root, name, _ctype, assignee, created_by = kanban_bridge.attachment_file(att["id"])
     assert target.read_bytes() == b"# report" and target.is_relative_to(root)
-    assert (name, assignee) == ("report.md", "cfo")
+    assert (name, assignee, created_by) == ("report.md", "cfo", "ada@example.test")
     for bad in ("x", "0", "-1", "../1", None):
         with pytest.raises(ValueError):
             kanban_bridge.attachment_file(bad)
@@ -184,3 +184,29 @@ def test_pending_approvals_list_only_chats_the_viewer_can_open(monkeypatch):
     h = _Handler("/api/approval/waiting")
     routes._handle_approval_waiting(h, urlparse(h.path))
     assert b'"approvals": []' in h.wfile.getvalue() or b'"approvals":[]' in h.wfile.getvalue()
+
+
+def test_unassigned_attachment_only_for_its_creator_or_a_cron_admin(board, monkeypatch):
+    routes = _routes(monkeypatch, set())
+    from api import ownership
+    with kb.connect_closing() as conn:
+        loose = kb.create_task(conn, title="No bot", created_by="ada@example.test")
+        att = kb.store_attachment_bytes(conn, loose, "loose.txt", b"loose file")
+    viewer = {"email": "ada@example.test", "admin": False}
+    monkeypatch.setattr(ownership, "request_owner_email", lambda handler: viewer["email"])
+    monkeypatch.setattr(routes, "_cron_admin_allowed", lambda handler: viewer["admin"])
+
+    def fetch():
+        h = _Handler(f"/api/kanban/attachment?id={att}")
+        routes._handle_kanban_attachment(h, urlparse(h.path))
+        return h
+
+    h = fetch()
+    assert h.status == 200 and h.wfile.getvalue().endswith(b"loose file")
+    viewer["email"] = "bob@example.test"
+    h = fetch()
+    assert h.status == 404 and b"loose file" not in h.wfile.getvalue()
+    viewer["email"] = None
+    assert fetch().status == 404
+    viewer["admin"] = True
+    assert fetch().status == 200
