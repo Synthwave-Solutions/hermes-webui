@@ -8307,6 +8307,10 @@ html[data-nav-audience="member"]:not([data-advanced-chat-controls="1"]) #compose
 .sidebar-bot-item svg,.sidebar-bot-item img{width:28px;height:28px;flex-shrink:0;margin-right:0!important;}
 .sidebar-bot-item span{min-width:0;overflow-wrap:anywhere;}
 .sidebar-bots-state{padding:8px 10px;color:var(--muted);font-size:12px;}
+/* Category groups inside the narrow sidebar: tighter than the panel lists. */
+.sidebar-bot-items .sp-group{margin:0;}
+.sidebar-bot-items .cron-group-summary{padding:6px 4px 4px;font-size:10px;}
+.sidebar-bot-items .cron-group-inner{display:flex;flex-direction:column;gap:2px;padding:0;}
 
 /* ─────────────────────────────────────────────────────────────
    SynthPulse friendly tool rows and subagent cards (18 Oct 2026)

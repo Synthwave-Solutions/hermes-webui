@@ -359,6 +359,9 @@
     const signature = JSON.stringify([actor(), rows, loading, S._bootReady, S.activeProfile, sidebarSwitchPending]);
     if (items.dataset.state === signature) return;
     items.dataset.state = signature; items.replaceChildren();
+    // SynthPulse stays on top; the other bots are grouped by category in
+    // collapsible groups whose open state each person keeps (spRenderGrouped).
+    const entries = [];
     for (const p of rows) {
       const button = document.createElement('button'); button.type = 'button'; button.className = 'sidebar-bot-item';
       button.dataset.sidebarBot = p.name; button.setAttribute('aria-pressed', String(S.activeProfile === p.name));
@@ -372,8 +375,11 @@
         catch (error) { showToast(error.message); }
         finally { sidebarSwitchPending = false; window.refreshChatBots(); paintSidebarBots(); }
       };
-      items.appendChild(button);
+      if (p.name === 'default' || p.is_default) items.appendChild(button);
+      else entries.push({category: (p.bot && p.bot.category) || '', node: button});
     }
+    if (typeof window.spRenderGrouped === 'function') window.spRenderGrouped(items, entries, {storagePrefix: 'synpulse:sidebar-bots-group:' + (actor() || 'local')});
+    else for (const entry of entries) items.appendChild(entry.node);
     if (!rows.length) {
       const state = document.createElement('span'); state.className = 'sidebar-bots-state'; state.setAttribute('role', 'status');
       state.textContent = loading ? tx('chat_bots_loading', 'Loading bots…') : tx('chat_bots_unavailable', 'No available bots'); items.appendChild(state);
