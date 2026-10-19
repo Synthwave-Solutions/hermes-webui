@@ -3597,6 +3597,67 @@ def _handle_kanban_attachment(handler, parsed):
     return _kanban_read_errors(handler, serve)
 
 
+def _handle_kanban_waiting(handler, parsed):
+    """GET /api/kanban/waiting: Kanban tasks that wait for this viewer (My
+    approvals, "Wacht op jou"). Same gate as the board; only tasks of bots
+    the viewer may use, or tasks the viewer created."""
+    from api import kanban_bridge
+    from api.ownership import request_owner_email
+
+    return _kanban_read_errors(handler, lambda: j(handler, kanban_bridge.waiting_tasks_payload(
+        lambda name: _chat_profile_target_allowed(handler, name), request_owner_email(handler),
+        board=_kanban_board_query(parsed))) or True)
+
+
+def _approval_waiting_session_visible(handler, session) -> bool:
+    """A chat with a pending approval is listed when the viewer could open it:
+    visible in the current bot, or (outside isolated profile mode) owned by
+    the viewer in a bot the viewer may switch to."""
+    if _session_visible_to_request(session, handler):
+        return True
+    if _is_isolated_profile_mode():
+        return False
+    profile = getattr(session, "profile", None) or "default"
+    return bool(_chat_profile_target_allowed(handler, profile)
+                and _session_owner_visible_to_request(getattr(session, "owner_email", None), handler))
+
+
+def _handle_approval_waiting(handler, parsed):
+    """GET /api/approval/waiting: chats with a pending tool approval this
+    viewer can open, read from the same in-memory queues as
+    /api/approval/pending. Nothing is approved here; the chat answers it."""
+    snapshot = {}
+    with _lock:
+        for sid, queue in list(_pending.items()):
+            items = queue if isinstance(queue, list) else ([queue] if queue else [])
+            if items:
+                snapshot[sid] = (dict(items[0]), len(items))
+        for sid, queue in list(_gateway_queues.items()):
+            if sid in snapshot or not queue:
+                continue
+            head = getattr(queue[0], "data", None) or {}
+            if head:
+                snapshot[sid] = (dict(head), len(queue))
+    rows = []
+    for sid, (head, count) in snapshot.items():
+        try:
+            session = get_session(sid, metadata_only=True)
+        except Exception:
+            session = None
+        if session is None or not _approval_waiting_session_visible(handler, session):
+            continue
+        rows.append({
+            "session_id": sid,
+            "title": str(getattr(session, "title", "") or "")[:120],
+            "profile": getattr(session, "profile", None) or "default",
+            "description": str(head.get("description") or "")[:300],
+            "command": str(head.get("command") or "")[:200],
+            "count": count,
+        })
+    rows.sort(key=lambda r: r["title"].casefold())
+    return j(handler, {"approvals": rows})
+
+
 def _clear_stale_stream_state(session) -> bool:
     """Clear persisted streaming flags when the in-memory stream no longer exists.
 
@@ -12540,6 +12601,8 @@ def handle_get(handler, parsed) -> bool:
         return _handle_kanban_bot_work(handler, parsed)
     if parsed.path == "/api/kanban/attachment":
         return _handle_kanban_attachment(handler, parsed)
+    if parsed.path == "/api/kanban/waiting":
+        return _handle_kanban_waiting(handler, parsed)
     if parsed.path.startswith("/api/kanban/"):
         from api.kanban_bridge import handle_kanban_get
 
@@ -13849,6 +13912,9 @@ def handle_get(handler, parsed) -> bool:
 
     if parsed.path == "/api/approval/pending":
         return _handle_approval_pending(handler, parsed)
+
+    if parsed.path == "/api/approval/waiting":
+        return _handle_approval_waiting(handler, parsed)
 
     if parsed.path == "/api/approval/stream":
         return _handle_approval_sse_stream(handler, parsed)

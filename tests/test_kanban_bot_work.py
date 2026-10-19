@@ -116,3 +116,71 @@ def test_routes_gate_on_the_bot_and_download_as_attachment(board, monkeypatch):
     h = _Handler(f"/api/kanban/attachment?id={theirs}")
     routes._handle_kanban_attachment(h, urlparse(h.path))
     assert h.status == 404 and b"not yours" not in h.wfile.getvalue()
+
+
+def test_waiting_tasks_are_review_or_needs_input_the_viewer_can_act_on(board):
+    with kb.connect_closing() as conn:
+        review = kb.create_task(conn, title="Check copy", assignee="coo", created_by="ada@example.test")
+        conn.execute("UPDATE tasks SET status='review' WHERE id=?", (review,))
+        plain = kb.create_task(conn, title="Needs a tool", assignee="cfo")
+        kb.block_task(conn, plain, reason="later", kind="capability")
+        hidden = kb.create_task(conn, title="Hidden bot", assignee="ceo")
+        kb.block_task(conn, hidden, reason="log in", kind="needs_input")
+        conn.commit()
+    seen = []
+
+    def may_use(name):
+        seen.append(name)
+        return name == "cfo"
+
+    data = kanban_bridge.waiting_tasks_payload(may_use, "ADA@example.test")
+    assert [t["title"] for t in data["tasks"]] == ["Needs Michael", "Check copy"]
+    assert len(seen) == len(set(seen))  # one check per bot
+    # Another viewer only sees the bot it may use.
+    assert [t["title"] for t in kanban_bridge.waiting_tasks_payload(lambda n: n == "cfo", "bob@example.test")["tasks"]] == ["Needs Michael"]
+    assert kanban_bridge.waiting_tasks_payload(lambda n: False, None)["tasks"] == []
+
+
+def test_waiting_route_uses_the_bot_gate(board, monkeypatch):
+    routes = _routes(monkeypatch, {"cfo"})
+    from api import ownership
+    monkeypatch.setattr(ownership, "request_owner_email", lambda handler: "nobody@example.test")
+    h = _Handler("/api/kanban/waiting")
+    routes._handle_kanban_waiting(h, urlparse(h.path))
+    assert h.status == 200 and b"Needs Michael" in h.wfile.getvalue()
+
+
+def test_pending_approvals_list_only_chats_the_viewer_can_open(monkeypatch):
+    import json
+    from api import routes
+    sessions = {
+        "mine": SimpleNamespace(title="Deploy chat", profile="cfo", owner_email="ada@example.test"),
+        "other": SimpleNamespace(title="Not yours", profile="cfo", owner_email="bob@example.test"),
+        "gw": SimpleNamespace(title="Gateway chat", profile="default", owner_email="ada@example.test"),
+    }
+    monkeypatch.setattr(routes, "_pending", {"mine": [{"description": "rm -rf build", "command": "rm -rf build"}, {"description": "second"}],
+                                             "other": [{"description": "x"}], "gone": [{"description": "y"}], "empty": []})
+    monkeypatch.setattr(routes, "_gateway_queues", {"gw": [SimpleNamespace(data={"description": "gateway tool"})]})
+
+    def get_session(sid, metadata_only=False):
+        if sid not in sessions:
+            raise KeyError(sid)
+        return sessions[sid]
+
+    monkeypatch.setattr(routes, "get_session", get_session)
+    monkeypatch.setattr(routes, "_session_visible_to_request", lambda s, handler=None: False)
+    monkeypatch.setattr(routes, "_is_isolated_profile_mode", lambda: False)
+    monkeypatch.setattr(routes, "_chat_profile_target_allowed", lambda handler, name: True)
+    monkeypatch.setattr(routes, "_session_owner_visible_to_request", lambda owner, handler=None: owner == "ada@example.test")
+    h = _Handler("/api/approval/waiting")
+    routes._handle_approval_waiting(h, urlparse(h.path))
+    body = json.loads(h.wfile.getvalue().split(b"\r\n\r\n")[-1] or h.wfile.getvalue())
+    rows = {r["session_id"]: r for r in body["approvals"]}
+    assert set(rows) == {"mine", "gw"}
+    assert rows["mine"]["count"] == 2 and rows["mine"]["description"] == "rm -rf build" and rows["mine"]["profile"] == "cfo"
+    assert rows["gw"]["description"] == "gateway tool"
+    # Isolated profile mode keeps the plain session boundary.
+    monkeypatch.setattr(routes, "_is_isolated_profile_mode", lambda: True)
+    h = _Handler("/api/approval/waiting")
+    routes._handle_approval_waiting(h, urlparse(h.path))
+    assert b'"approvals": []' in h.wfile.getvalue() or b'"approvals":[]' in h.wfile.getvalue()

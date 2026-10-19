@@ -8345,6 +8345,18 @@ html[data-nav-audience="member"]:not([data-advanced-chat-controls="1"]) #compose
 .bot-work-file{display:flex;flex-direction:column;gap:2px;font-size:13px;}
 .bot-work-file a{overflow-wrap:anywhere;}
 .bot-work-file-meta{font-size:11px;color:var(--muted);overflow-wrap:anywhere;}
+/* My approvals: Waiting for you. */
+.waiting-for-you{margin:0 0 16px;}
+.waiting-for-you h3{margin:0 0 8px;font-size:14px;}
+.waiting-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;}
+.waiting-item{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:8px 12px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;}
+.waiting-item-main{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1 1 220px;}
+.waiting-item-title{font-size:13px;font-weight:600;overflow-wrap:anywhere;}
+.waiting-item-meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:12px;color:var(--muted);}
+.waiting-item-detail{font-size:12px;color:var(--muted);overflow-wrap:anywhere;}
+.waiting-item-actions{display:flex;flex-wrap:wrap;gap:6px;}
+.waiting-comment{flex-basis:100%;display:flex;flex-direction:column;gap:6px;}
+.waiting-comment textarea{width:100%;box-sizing:border-box;font:inherit;font-size:13px;}
 /* A bot row: the switch button plus its Scout toggle on the right. */
 .sidebar-bot-row{display:flex;align-items:center;gap:2px;min-width:0;}
 .sidebar-bot-row>.sidebar-bot-item{flex:1;min-width:0;}

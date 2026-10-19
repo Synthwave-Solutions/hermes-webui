@@ -1041,6 +1041,35 @@ def bot_work_payload(profile: str, *, board=None, limit: int = BOT_WORK_ATTACHME
     }
 
 
+def _waits_for_a_person(task) -> bool:
+    return task.status == "review" or (task.status == "blocked" and getattr(task, "block_kind", None) == "needs_input")
+
+
+def waiting_tasks_payload(may_use, viewer_email=None, *, board=None) -> dict:
+    """Tasks that wait for a person: in review, or blocked for input
+    (block_kind ``needs_input``). Only tasks this viewer can act on: the
+    assignee is a bot ``may_use(name)`` allows, or the viewer created it."""
+    kb = _kb()
+    viewer = str(viewer_email or "").strip().casefold()
+    with _conn(board=board) as conn:
+        tasks = [t for t in kb.list_tasks(conn) if _waits_for_a_person(t)]
+    allowed = {}
+
+    def visible(task):
+        if viewer and str(task.created_by or "").strip().casefold() == viewer:
+            return True
+        name = task.assignee
+        if not name:
+            return False
+        if name not in allowed:
+            allowed[name] = bool(may_use(name))
+        return allowed[name]
+
+    rows = [_work_task_row(t) for t in tasks if visible(t)]
+    rows.sort(key=lambda r: (r["status"] != "blocked", -(r["created_at"] or 0)))
+    return {"board": board, "tasks": rows}
+
+
 def attachment_file(attachment_id, *, board=None):
     """Resolve an attachment id to ``(path, root, filename, content_type,
     assignee)``. Raises LookupError when the row or file is missing and

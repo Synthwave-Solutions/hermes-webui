@@ -33,6 +33,7 @@ async function mountDuties(p,code,profile){
    _botDuties=((profile.bot||{}).responsibilities||[]).map(d=>({...d}));_botDutyEditing=-1;_paintBotDuties();
   },[code,profile]);
 }
+const waiting=slice('// "Wacht op jou" on My approvals','window.loadWaitingForYou=loadWaitingForYou;').replace(/^(let|const) /gm,'var ');
 const DUTY={title:'Inbox triage',objective:'Sort new mail',trigger:'bij nieuwe mail',autonomy:'report_only',reporting:'digest in de botchat'};
 (async()=>{
  const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH||undefined});
@@ -108,7 +109,44 @@ const DUTY={title:'Inbox triage',objective:'Sort new mail',trigger:'bij nieuwe m
   assert.equal(await p.locator('#botWork').isVisible(),false);
   const overflow=await p.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);
   assert.ok(overflow<=0,'no sideways scroll at '+width);
+  // My approvals, Waiting for you: chats with a pending approval first, then
+  // tasks; reply, unblock and open use the existing routes.
+  await p.evaluate(code=>{
+   (0,eval)(code);
+   document.getElementById('mainApprovals').style.display='flex';
+   window.opened=[];window.calls=[];window.deny=new Set();
+   window.openCronJobChat=(sid,profile)=>opened.push('chat:'+sid+':'+profile);
+   window.openKanbanTaskFromBot=id=>opened.push('task:'+id);
+   window.api=async(url,opts)=>{calls.push([url,opts&&opts.body?JSON.parse(opts.body):null]);
+    if(deny.has(url))throw new Error('403');
+    if(url==='/api/kanban/waiting')return {tasks:[{id:'t2',title:'Login needed',status:'blocked',block_kind:'needs_input',assignee:'cfo'},{id:'t3',title:'Check me',status:'review',assignee:'coo'}]};
+    if(url==='/api/approval/waiting')return {approvals:[{session_id:'s1',title:'Deploy chat',profile:'cfo',description:'rm -rf build',count:2}]};
+    return {ok:true};};
+  },waiting);
+  await p.evaluate(()=>loadWaitingForYou());
+  assert.equal(await p.locator('#myWaitingSection').isVisible(),true);
+  assert.deepEqual(await p.$$eval('.waiting-item',n=>n.map(x=>x.dataset.kind+':'+(x.dataset.taskId||x.dataset.sessionId))),['approval:s1','task:t2','task:t3']);
+  assert.equal(await p.locator('.waiting-item[data-task-id="t3"] button',{hasText:'kanban_unblock'}).count(),0);
+  await p.click('.waiting-item[data-session-id="s1"] button');
+  await p.click('.waiting-item[data-task-id="t3"] button:first-child');
+  assert.deepEqual(await p.evaluate(()=>opened),['chat:s1:cfo','task:t3']);
+  await p.click('.waiting-item[data-task-id="t2"] button:nth-child(2)');
+  assert.equal(await p.evaluate(()=>document.activeElement.id),'waitingComment');
+  await p.fill('#waitingComment','Logged in, go ahead');
+  await p.click('.waiting-comment .primary');
+  assert.deepEqual(await p.evaluate(()=>calls.find(c=>c[0].endsWith('/comments'))),['/api/kanban/tasks/t2/comments',{body:'Logged in, go ahead'}]);
+  await p.click('.waiting-item[data-task-id="t2"] button:nth-child(3)');
+  assert.ok(await p.evaluate(()=>calls.some(c=>c[0]==='/api/kanban/tasks/t2/unblock')));
+  // No rights on either source: the section stays hidden; one source still shows.
+  await p.evaluate(()=>{deny.add('/api/kanban/waiting');deny.add('/api/approval/waiting');});
+  await p.evaluate(()=>loadWaitingForYou());
+  assert.equal(await p.locator('#myWaitingSection').isVisible(),false);
+  await p.evaluate(()=>{deny.delete('/api/approval/waiting');});
+  await p.evaluate(()=>loadWaitingForYou());
+  assert.deepEqual(await p.$$eval('.waiting-item',n=>n.map(x=>x.dataset.kind)),['approval']);
+  const overflow2=await p.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);
+  assert.ok(overflow2<=0,'no sideways scroll on approvals at '+width);
   await p.close();
  }}finally{await browser.close();}
- console.log('bot responsibilities browser checks passed');
+ console.log('bot responsibilities, work and waiting browser checks passed');
 })().catch(e=>{console.error(e);process.exit(1);});

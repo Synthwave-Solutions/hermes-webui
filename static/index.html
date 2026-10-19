@@ -1074,10 +1074,14 @@
     <div id="mainApprovals" class="main-view">
       <div class="main-view-header">
         <h2 class="main-view-title" data-i18n="tab_approvals">My approvals</h2>
-        <button type="button" class="sm-btn" id="btnMyApprovalsRefresh" onclick="loadMyAccessRequests(true,{pendingOnly:true})" data-i18n="refresh">Refresh</button>
+        <button type="button" class="sm-btn" id="btnMyApprovalsRefresh" onclick="loadMyAccessRequests(true,{pendingOnly:true});loadWaitingForYou()" data-i18n="refresh">Refresh</button>
       </div>
       <div class="main-view-body"><div class="main-view-content">
         <p class="synpulse-panel-intro" data-i18n="my_approvals_description">Track requests waiting for approval. Only your requests appear here.</p>
+        <section class="waiting-for-you" id="myWaitingSection" aria-labelledby="myWaitingTitle" hidden>
+          <h3 id="myWaitingTitle" data-i18n="waiting_for_you">Waiting for you</h3>
+          <div id="myWaitingList" aria-live="polite"></div>
+        </section>
         <div id="myApprovalsList" aria-live="polite"></div>
         <button type="button" class="btn-link" onclick="switchPanel('settings');switchSettingsSection('access')" data-i18n="my_approvals_history">View request history</button>
       </div></div>

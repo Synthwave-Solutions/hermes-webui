@@ -444,7 +444,7 @@ async function switchPanel(name, opts = {}) {
   // callers (server enforces regardless), so fall back to the chat panel.
   if (nextPanel === 'governance' && !(await loadGovernance())) return switchPanel('chat');
   if (nextPanel === 'integrations') await loadIntegrations();
-  if (nextPanel === 'approvals') await loadMyAccessRequests(false,{pendingOnly:true});
+  if (nextPanel === 'approvals') { loadWaitingForYou(); await loadMyAccessRequests(false,{pendingOnly:true}); }
   if (nextPanel === 'projects') await loadProjectsHub();
   _syncLogsAutoRefresh();
   if (typeof _syncSystemHealthMonitorVisibility === 'function') _syncSystemHealthMonitorVisibility();
@@ -15369,6 +15369,74 @@ async function loadMyAccessRequests(animate,options={}){
   }
 }
 window.loadMyAccessRequests=loadMyAccessRequests;
+// "Wacht op jou" on My approvals: what waits for this viewer elsewhere, next
+// to their own access requests. Kanban tasks in review or blocked for input
+// (GET /api/kanban/waiting, only bots the viewer may use or tasks they
+// created) with the board's own actions (open, comment, unblock), and chats
+// with a pending tool approval (GET /api/approval/waiting) that open the chat
+// where the approval is answered. A source the viewer may not read is left out.
+let _waitingCommentTask='';
+function _waitingBotLabel(name){
+  if(!name)return '';
+  try{if(typeof _cronBotTitle==='function')return _cronBotTitle(name);}catch(_){}
+  return name;
+}
+function _waitingTaskHtml(task){
+  const needsInput=task.status==='blocked';
+  const flag=needsInput?t('bot_work_flag_needs_input'):t('bot_work_flag_review');
+  const id=esc(task.id);
+  const comment=_waitingCommentTask===task.id?`<div class="waiting-comment"><label class="sr-only" for="waitingComment">${esc(t('waiting_comment'))}</label><textarea id="waitingComment" rows="2" maxlength="4000" placeholder="${esc(t('waiting_comment_placeholder'))}"></textarea>
+      <div class="bot-editor-actions"><button type="button" class="sm-btn" onclick="_waitingComment('')">${esc(t('bot_duty_cancel'))}</button><button type="button" class="sm-btn primary" data-task-id="${id}" onclick="_waitingSendComment(this.dataset.taskId)">${esc(t('waiting_comment_send'))}</button></div></div>`:'';
+  return `<li class="waiting-item" data-kind="task" data-task-id="${id}">
+      <div class="waiting-item-main"><span class="waiting-item-title">${esc(task.title||task.id)}</span>
+        <span class="waiting-item-meta"><span class="bot-work-flag">${esc(flag)}</span>${task.assignee?` <span>${esc(_waitingBotLabel(task.assignee))}</span>`:''}</span></div>
+      <div class="waiting-item-actions">
+        <button type="button" class="sm-btn" data-task-id="${id}" onclick="openKanbanTaskFromBot(this.dataset.taskId)">${esc(t('waiting_open_task'))}</button>
+        <button type="button" class="sm-btn" data-task-id="${id}" onclick="_waitingComment(this.dataset.taskId)">${esc(t('waiting_comment'))}</button>
+        ${needsInput?`<button type="button" class="sm-btn" data-task-id="${id}" onclick="_waitingUnblock(this.dataset.taskId)">${esc(t('kanban_unblock'))}</button>`:''}
+      </div>${comment}</li>`;
+}
+function _waitingApprovalHtml(row){
+  const more=row.count>1?` <span class="cron-group-count">${esc(String(row.count))}</span>`:'';
+  return `<li class="waiting-item" data-kind="approval" data-session-id="${esc(row.session_id)}">
+      <div class="waiting-item-main"><span class="waiting-item-title">${esc(row.title||t('untitled')||row.session_id)}${more}</span>
+        <span class="waiting-item-meta"><span class="bot-work-flag">${esc(t('waiting_tool_approval'))}</span> <span>${esc(_waitingBotLabel(row.profile))}</span></span>
+        ${row.description?`<span class="waiting-item-detail">${esc(row.description)}</span>`:''}</div>
+      <div class="waiting-item-actions"><button type="button" class="sm-btn primary" data-session-id="${esc(row.session_id)}" data-profile="${esc(row.profile||'')}" onclick="openCronJobChat(this.dataset.sessionId,this.dataset.profile)">${esc(t('waiting_open_chat'))}</button></div></li>`;
+}
+let _waitingData=null;
+function _paintWaitingForYou(){
+  const section=$('myWaitingSection'),box=$('myWaitingList');if(!section||!box)return;
+  const data=_waitingData;
+  if(!data||(!data.tasks&&!data.approvals)){section.hidden=true;return;}
+  const tasks=data.tasks||[],approvals=data.approvals||[];
+  const items=approvals.map(_waitingApprovalHtml).concat(tasks.map(_waitingTaskHtml));
+  box.innerHTML=items.length?`<ul class="waiting-list">${items.join('')}</ul>`:`<div class="access-requests-empty">${esc(t('waiting_empty'))}</div>`;
+  section.hidden=false;
+  const area=$('waitingComment');if(area)area.focus();
+}
+async function loadWaitingForYou(){
+  const get=url=>api(url,{timeoutToast:false,redirect401:false}).catch(()=>null);
+  const [tasks,approvals]=await Promise.all([get('/api/kanban/waiting'),get('/api/approval/waiting')]);
+  _waitingData={tasks:tasks&&Array.isArray(tasks.tasks)?tasks.tasks:null,approvals:approvals&&Array.isArray(approvals.approvals)?approvals.approvals:null};
+  _paintWaitingForYou();
+}
+function _waitingComment(taskId){ _waitingCommentTask=taskId||'';_paintWaitingForYou(); }
+async function _waitingSendComment(taskId){
+  const text=String(($('waitingComment')||{}).value||'').trim();
+  if(!text){const a=$('waitingComment');if(a)a.focus();return;}
+  try{
+    await api('/api/kanban/tasks/'+encodeURIComponent(taskId)+'/comments',{method:'POST',body:JSON.stringify({body:text})});
+    _waitingCommentTask='';showToast(t('waiting_comment_sent'));await loadWaitingForYou();
+  }catch(e){showToast(e.message);}
+}
+async function _waitingUnblock(taskId){
+  try{
+    await api('/api/kanban/tasks/'+encodeURIComponent(taskId)+'/unblock',{method:'POST',body:JSON.stringify({})});
+    showToast(t('waiting_unblocked'));await loadWaitingForYou();
+  }catch(e){showToast(e.message);}
+}
+window.loadWaitingForYou=loadWaitingForYou;
 // Your own access requests, surfaced without opening the screen: a count of
 // what is still waiting, and a one-time notice for anything decided since you
 // last looked. The watermark is per browser on purpose: this is a nudge, and
