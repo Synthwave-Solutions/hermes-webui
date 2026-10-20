@@ -213,19 +213,21 @@ def test_process_wakeup_uses_compact_status_row_not_normal_user_bubble():
     assert "@media(max-width:700px){.process-wakeup-notice{margin-left:0;}}" in STYLE_CSS
 
 
-def test_process_wakeup_label_key_exists_in_all_locales():
-    locale_pattern = re.compile(
-        r"^\s{2}(?:'(?P<quoted>[A-Za-z0-9-]+)'|(?P<plain>[A-Za-z0-9-]+))\s*:\s*\{",
-        re.MULTILINE,
-    )
-    locale_matches = list(locale_pattern.finditer(I18N_JS))
-    assert locale_matches, "expected at least the English locale"
-    for idx, match in enumerate(locale_matches):
-        name = match.group("quoted") or match.group("plain")
-        start = match.end()
-        end = locale_matches[idx + 1].start() if idx + 1 < len(locale_matches) else I18N_JS.find("\n};", start)
-        block = I18N_JS[start:end]
-        assert re.search(r"\bprocess_wakeup_label\s*:", block), (
-            f"process_wakeup_label missing from locale {name}"
-        )
-    assert "process_wakeup_label:'Background wakeup'" in I18N_JS
+def test_process_wakeup_labels_resolve_through_lazy_locale_fallback():
+    script = r"""
+const fs=require('fs'),vm=require('vm'),path=require('path');
+const root=process.argv[1];
+const ctx=vm.createContext({window:{},document:{currentScript:null},console});
+vm.runInContext(fs.readFileSync(path.join(root,'static/i18n.js'),'utf8').split('window.i18nReady=')[0],ctx);
+for(const file of fs.readdirSync(path.join(root,'static/i18n'))){
+  if(file.endsWith('.js'))vm.runInContext(fs.readFileSync(path.join(root,'static/i18n',file),'utf8'),ctx);
+}
+const result=vm.runInContext(`Object.keys(LOCALES).map(code=>{
+  _locale=LOCALES[code];return ['process_wakeup_label','process_wakeup_success','process_wakeup_failed','process_wakeup_unknown'].map(key=>[key,t(key)]);
+})`,ctx);
+console.log(JSON.stringify(result));
+"""
+    proc = subprocess.run([NODE, '-e', script, str(ROOT)], text=True, capture_output=True, check=True)
+    for locale in json.loads(proc.stdout):
+        for key, value in locale:
+            assert value and value != key

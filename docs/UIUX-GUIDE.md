@@ -57,6 +57,12 @@ A chat turn should read as one coherent story:
    adjacent to the assistant turn.
 4. Raw logs and verbose details: hidden until explicitly expanded.
 
+Background-process notices show the task label and a translated outcome (completed,
+failed, or unknown). Commands, exit codes and verbatim output remain inside the
+keyboard-accessible disclosure. Unknown exit status must never appear successful.
+These rows bypass the Markdown render cache: their dedicated plain-text renderer
+owns escaping, while the original stored message and copy action remain intact.
+
 Do not render every internal event as a first-class chat card. A turn that used
 many tools should summarize the work as inspectable activity, not make the user
 read a stack of unrelated-looking cards.

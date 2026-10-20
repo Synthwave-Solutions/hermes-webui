@@ -95,6 +95,7 @@ const metaOverParse = _processWakeupInfo(
 const extras = {timeHtml: '<span class="msg-time">14:32</span>', filesHtml: '', footHtml: '<div class="msg-foot"></div>'};
 
 process.stdout.write(JSON.stringify({
+  unknownCard: _processWakeupCardHtml({type:'completion',exitCode:null,command:'example'}, '', extras),
   okInfo, failInfo, watchInfo, metaOnlyInfo,
   metaOverParseTaskId: metaOverParse.taskId,
   unparseableIsNull: _processWakeupInfo({}, 'plain text') === null,
