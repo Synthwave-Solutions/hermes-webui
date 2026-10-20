@@ -62,7 +62,7 @@ def read_profile(name):
         image_url='/api/profile/avatar?profile='+quote(name)+'&v='+str(image.stat().st_mtime_ns) if image.is_file() and not image.is_symlink() else ''
         managed=data.get(builder_key) is not None
         bot={k:meta[k] for k in BOT_TEXT_FIELDS if isinstance(meta.get(k),str)}
-        scout=_stored_scout(meta.get('scout'))
+        scout=_stored_scout(meta.get('scout'),path.parent)
         if scout:bot['scout']=scout
         duties=_stored_responsibilities(meta.get('responsibilities'))
         if duties:bot['responsibilities']=duties
@@ -194,15 +194,93 @@ def responsibilities_prompt(name):
 
 # Scout settings: ui_meta.hermes-bots.scout, read by the Scout collector
 # (scout_collect.py) from the bot's own profile.yaml and written only through
-# POST /api/bots/scout, which also keeps the bot's Scout job in step.
+# POST /api/bots/scout, which also keeps the bot's Scout jobs in step.
+#
+# Per person per bot: ``people`` maps a lowercase email to that person's own
+# switch ``{enabled, digest_time?, prompt?, spaces?}``; each person who is on
+# gets their own Scout job in the bot's store. ``topics``, ``digest_time`` (the
+# bot default) and ``spaces`` (Google Chat spaces to watch) belong to the bot.
+# A derived top-level ``enabled`` (anyone on) stays for older readers. A record
+# from before ``people`` existed reads its ``enabled`` as the switch of the
+# owner of the bot's existing Scout job (else SCOUT_LEGACY_OWNER).
 SCOUT_MAX_TOPICS = 12
 SCOUT_TOPIC_MAX = 80
 SCOUT_DEFAULT_TIME = '07:30'
+SCOUT_MAX_PEOPLE = 50
+SCOUT_PROMPT_MAX = 2000
+SCOUT_MAX_SPACES = 6
+SCOUT_LEGACY_OWNER = 'michael@synthwave.solutions'
 _SCOUT_TIME = re.compile(r'(?:[01][0-9]|2[0-3]):[0-5][0-9]')
+_SCOUT_EMAIL = re.compile(r'[a-z0-9._%+\'-]+@[a-z0-9-]+(?:\.[a-z0-9-]+)+')
+# The internal Google Chat spaces a Scout may watch (gchat-routing.md). Partner,
+# customer and DM spaces are left out on purpose. The collector reads them as
+# the person the job runs for, so Google itself only returns spaces that
+# person is a member of.
+SCOUT_SPACES = (
+    ('spaces/AAQAmgXjlvg', 'Synthwave MT'),
+    ('spaces/AAAAfKlzKs0', 'Quick Proposals Check'),
+    ('spaces/AAAAx1FA_3s', 'Financial chat'),
+    ('spaces/AAQASUfEemQ', 'Synth-sales chat'),
+    ('spaces/AAQAvA2-ans', 'Synthwave SDR'),
+    ('spaces/AAQACnjPgQE', 'Inbound Leads'),
+    ('spaces/AAQAmW7QwVQ', 'Operations & Coordination'),
+    ('spaces/AAQA4mW2YII', 'Tech Coordination'),
+    ('spaces/AAQAKDWx9dI', 'Automations & Development Huddle'),
+    ('spaces/AAQAIBxaSC8', 'Support Tickets'),
+    ('spaces/AAQA5pSQYoM', 'Branding & Marketing'),
+    ('spaces/AAAAyYHbEbQ', 'Content quickcheck'),
+    ('spaces/AAQA7ihyn7A', 'Junior AI Chat'),
+)
+_SCOUT_SPACE_IDS = tuple(s for s, _ in SCOUT_SPACES)
 
-def validate_scout(enabled, topics=None, digest_time=None):
-    """Strict check of what a caller sends; returns the normalized settings."""
-    if not isinstance(enabled,bool):raise ValueError('Scout enabled must be true or false')
+def normalize_email(value):
+    """A lowercase email, or ValueError."""
+    if not isinstance(value,str):raise ValueError('Scout person must be an email address')
+    email=value.strip().lower()
+    if len(email)>254 or not _SCOUT_EMAIL.fullmatch(email):raise ValueError('Scout person must be an email address')
+    return email
+
+def _scout_time(value, default=SCOUT_DEFAULT_TIME):
+    value=default if value is None else value
+    if not isinstance(value,str) or not _SCOUT_TIME.fullmatch(value):raise ValueError('Scout digest time must be HH:MM')
+    return value
+
+def _scout_spaces(value):
+    if value is None:return []
+    if not isinstance(value,list) or len(value)>SCOUT_MAX_SPACES:raise ValueError('Choose at most %d Google Chat spaces'%SCOUT_MAX_SPACES)
+    clean=[]
+    for space in value:
+        if not isinstance(space,str) or space not in _SCOUT_SPACE_IDS:raise ValueError('Unknown Google Chat space for Scout')
+        if space not in clean:clean.append(space)
+    return clean
+
+def _scout_prompt(value):
+    if value is None:return ''
+    if not isinstance(value,str):raise ValueError('Scout instructions must be text')
+    text=''.join(c for c in value if c in '\n\t' or (ord(c)>=32 and ord(c)!=127))
+    text='\n'.join(' '.join(line.split()) for line in text.strip().splitlines()).strip()
+    text=re.sub(r'\n{3,}','\n\n',text)
+    if len(text)>SCOUT_PROMPT_MAX:raise ValueError('Scout instructions are at most %d characters'%SCOUT_PROMPT_MAX)
+    return text
+
+def validate_scout_person(entry):
+    """One person's entry: ``{enabled, digest_time?, prompt?, spaces?}``."""
+    if not isinstance(entry,dict) or set(entry)-{'enabled','digest_time','prompt','spaces'}:raise ValueError('Unknown Scout person field')
+    if not isinstance(entry.get('enabled'),bool):raise ValueError('Scout enabled must be true or false')
+    row={'enabled':entry['enabled']}
+    if entry.get('digest_time') not in (None,''):row['digest_time']=_scout_time(entry['digest_time'])
+    prompt=_scout_prompt(entry.get('prompt'))
+    if prompt:row['prompt']=prompt
+    spaces=_scout_spaces(entry.get('spaces'))
+    if spaces:row['spaces']=spaces
+    return row
+
+def validate_scout(enabled, topics=None, digest_time=None, people=None, spaces=None):
+    """Strict check of what a caller sends; returns the normalized settings.
+
+    Without ``people`` the result is the bot-wide record of before (``enabled``
+    as given). With ``people`` the top-level ``enabled`` is derived: true when
+    anyone is on."""
     topics=[] if topics is None else topics
     if not isinstance(topics,list) or len(topics)>SCOUT_MAX_TOPICS:raise ValueError('Use at most %d Scout topics'%SCOUT_MAX_TOPICS)
     clean=[]
@@ -213,20 +291,87 @@ def validate_scout(enabled, topics=None, digest_time=None):
         if not topic:continue
         if len(topic)>SCOUT_TOPIC_MAX:raise ValueError('A Scout topic is at most %d characters'%SCOUT_TOPIC_MAX)
         if topic.casefold() not in (t.casefold() for t in clean):clean.append(topic)
-    digest_time=SCOUT_DEFAULT_TIME if digest_time is None else digest_time
-    if not isinstance(digest_time,str) or not _SCOUT_TIME.fullmatch(digest_time):raise ValueError('Scout digest time must be HH:MM')
-    return {'enabled':enabled,'topics':clean,'digest_time':digest_time}
+    out={'enabled':enabled,'topics':clean,'digest_time':_scout_time(digest_time)}
+    space_list=_scout_spaces(spaces)
+    if space_list:out['spaces']=space_list
+    if people is None:
+        if not isinstance(enabled,bool):raise ValueError('Scout enabled must be true or false')
+        return out
+    if not isinstance(people,dict) or len(people)>SCOUT_MAX_PEOPLE:raise ValueError('Scout has at most %d people per bot'%SCOUT_MAX_PEOPLE)
+    rows={}
+    for email,entry in people.items():
+        email=normalize_email(email)
+        if email in rows:raise ValueError('Scout person listed twice')
+        rows[email]=validate_scout_person(entry)
+    out['enabled']=any(r['enabled'] for r in rows.values())
+    out['people']=rows
+    return out
 
-def _stored_scout(value):
-    """The stored settings for display; a damaged record reads as absent."""
+def _legacy_scout_owner(home):
+    """The owner of the bot's existing Scout job, else SCOUT_LEGACY_OWNER."""
+    import json
+    try:
+        path=Path(home)/'cron'/'jobs.json'
+        if path.is_file() and not path.is_symlink():
+            data=json.loads(path.read_text(encoding='utf-8-sig'))
+            jobs=data.get('jobs',[]) if isinstance(data,dict) else data
+            for job in jobs if isinstance(jobs,list) else []:
+                if isinstance(job,dict) and job.get('managed_by')=='scout':
+                    owner=str(job.get('scout_person') or job.get('owner_email') or '').strip().lower()
+                    if _SCOUT_EMAIL.fullmatch(owner):return owner
+    except (OSError,ValueError):
+        pass
+    return SCOUT_LEGACY_OWNER
+
+def _stored_scout(value, home=None):
+    """The stored settings, always with ``people``; a damaged record reads as
+    absent. A record from before ``people`` existed gives its switch to the
+    owner of the bot's Scout job."""
     if not isinstance(value,dict):return None
-    try:return validate_scout(value.get('enabled',False),value.get('topics'),value.get('digest_time'))
+    try:
+        people=value.get('people')
+        if people is None:
+            people={}
+            if value.get('enabled') is True:
+                people={_legacy_scout_owner(home) if home is not None else SCOUT_LEGACY_OWNER:{'enabled':True}}
+        return validate_scout(bool(value.get('enabled',False)),value.get('topics'),value.get('digest_time'),people,value.get('spaces'))
     except ValueError:return None
+
+def scout_person_view(scout, email):
+    """One person's own Scout state for that person (``scout_me``)."""
+    scout=scout or {}
+    entry=((scout.get('people') or {}).get(str(email or '').strip().lower())) or {}
+    return {'enabled':bool(entry.get('enabled')),
+            'known':bool(entry),
+            'digest_time':entry.get('digest_time') or scout.get('digest_time') or SCOUT_DEFAULT_TIME,
+            'own_time':bool(entry.get('digest_time')),
+            'prompt':entry.get('prompt',''),
+            'spaces':list(entry.get('spaces') or [])}
+
+def scout_public_view(row, email, editor):
+    """Shape a read_profile row for one caller: the bot's Scout settings
+    without other people's addresses, plus the caller's own state
+    (``scout_me``). Bot editors also get the people (they may change anyone's
+    entry) and ``scout_people_count``."""
+    row=dict(row)
+    bot=dict(row.get('bot') or {})
+    scout=bot.get('scout')
+    if isinstance(scout,dict):
+        people=scout.get('people') or {}
+        public={k:v for k,v in scout.items() if k!='people'}
+        if editor:
+            public['people']={k:dict(v) for k,v in people.items()}
+            row['scout_people_count']=sum(1 for v in people.values() if v.get('enabled'))
+        bot['scout']=public
+        row['bot']=bot
+    if row.get('bot_kind')=='bot':
+        row['scout_me']=scout_person_view(scout if isinstance(scout,dict) else None,email)
+    return row
 
 def save_scout(name, scout, revision):
     """Write the Scout settings under the same revision as the appearance."""
     if not isinstance(scout,dict):raise ValueError('Scout settings must be an object')
-    scout=validate_scout(scout.get('enabled'),scout.get('topics'),scout.get('digest_time'))
+    scout=validate_scout(scout.get('enabled'),scout.get('topics'),scout.get('digest_time'),scout.get('people'),scout.get('spaces'))
     if not isinstance(revision,int) or isinstance(revision,bool) or revision<0: raise ValueError('Revision required')
     with _LOCK:
         path=_path(name);data=_load(path)

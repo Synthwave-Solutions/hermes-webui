@@ -19,7 +19,7 @@ const fs=require('fs'),assert=require('node:assert/strict');
    window.scoutCalls=[];window.confirms=[];window.confirmAnswer=false;window.showConfirmDialog=async o=>{confirms.push(o);return confirmAnswer;};window._botScreenSinceText=ts=>ts?'waiting since '+ts:'';
    window.api=async(url,opts)=>{if(url==='/api/bots/scout'){scoutCalls.push(JSON.parse(opts.body));return {ok:true};}
     if(url==='/api/bot-screen/status')return {screens:[{bot:'reviewer',state:'waiting',reason:'please log in',help_since:1760000000},{bot:'writer',state:'agent'}]};
-    return url.includes('profiles')?{profiles:[{name:'default',is_default:true,bot_kind:'bot'},{name:'writer',bot_kind:'bot',bot_editable:true,bot_revision:3,bot:{category:'Content'}},{name:'reviewer',bot_kind:'bot',bot:{category:'Content',scout:{enabled:true,topics:[],digest_time:'07:30'}}},{name:'research',bot_kind:'person',bot_editable:true},{name:'hidden',visible:false}]}:{people:[]};};
+    return url.includes('profiles')?{profiles:[{name:'default',is_default:true,bot_kind:'bot'},{name:'writer',bot_kind:'bot',bot_editable:true,bot_revision:3,bot:{category:'Content'},scout_me:{enabled:false,known:false,digest_time:'07:30'}},{name:'reviewer',bot_kind:'bot',bot:{category:'Content',scout:{enabled:true,topics:[],digest_time:'07:30'}},scout_me:{enabled:true,known:true,digest_time:'07:30'}},{name:'research',bot_kind:'person',bot_editable:true},{name:'hidden',visible:false}]}:{people:[]};};
    window.switches=[];window.switchPanel=()=>{throw Error('Must remain in chat');};
    window.switchToProfile=name=>{switches.push(name);return new Promise((resolve,reject)=>{window.completeSwitch=()=>{S.activeProfile=name;resolve(true)};window.failSwitch=()=>reject(Error('Switch failed'));});};
   });
@@ -43,21 +43,20 @@ const fs=require('fs'),assert=require('node:assert/strict');
   assert.equal(await p.locator('[data-sidebar-bot="hidden"]').count(),0);
   // SynthPulse on top outside the groups, then categories, "no category" last.
   assert.equal(await p.locator('#sidebarBotItems > .sidebar-bot-row > [data-sidebar-bot="default"]').count(),1);
-  // Scout: a toggle where this person may edit the bot, a mark where it is on
-  // but not theirs, nothing on a person's own profile.
-  assert.deepEqual(await p.locator('button[data-scout-bot]').evaluateAll(b=>b.map(x=>[x.dataset.scoutBot,x.getAttribute('aria-pressed')])),[['writer','false']]);
-  assert.equal(await p.locator('[data-sidebar-bot="reviewer"] + span.sidebar-bot-scout.is-on').count(),1);
+  // Scout per person: a toggle for the viewer's own Scout on every bot they
+  // may chat with (also without edit rights), nothing on a person's profile.
+  assert.deepEqual(await p.locator('button[data-scout-bot]').evaluateAll(b=>b.map(x=>[x.dataset.scoutBot,x.getAttribute('aria-pressed')])),[['writer','false'],['reviewer','true']]);
   assert.equal(await p.locator('[data-sidebar-bot="research"] + .sidebar-bot-scout').count(),0);
   // A bot whose screen waits for a person carries a small dot, nothing else does.
   assert.deepEqual(await p.locator('.sidebar-bot-screen-wait').evaluateAll(d=>d.map(x=>[x.parentElement.querySelector('[data-sidebar-bot]').dataset.sidebarBot,x.title])),[['reviewer','Bot screen waits for you: please log in · waiting since 1760000000']]);
-  assert.equal(await p.locator('button[data-scout-bot="writer"]').getAttribute('title'),'Scout on/off');
+  assert.equal(await p.locator('button[data-scout-bot="writer"]').getAttribute('title'),'Scout for you on/off');
   // Hit area of at least 24px.
   const box=await p.locator('button[data-scout-bot="writer"]').boundingBox();
   assert.ok(box.width>=24&&box.height>=24,'scout toggle hit area '+box.width+'x'+box.height);
   // First time on for a bot: a confirm with the time; cancel changes nothing.
   await p.locator('button[data-scout-bot="writer"]').click();
   await p.waitForFunction(()=>confirms.length===1);
-  assert.deepEqual(await p.evaluate(()=>[confirms[0].title,confirms[0].message,confirms[0].confirmLabel]),['Turn Scout on?','This bot gets a daily Scout task at 07:30. Read only, notifications off.','Turn Scout on']);
+  assert.deepEqual(await p.evaluate(()=>[confirms[0].title,confirms[0].message,confirms[0].confirmLabel]),['Turn Scout on?','You get a daily Scout from this bot at 07:30. Read only, notifications off.','Turn Scout on']);
   assert.equal(await p.evaluate(()=>scoutCalls.length),0);
   await p.evaluate(()=>{confirmAnswer=true;});
   await p.locator('button[data-scout-bot="writer"]').click();

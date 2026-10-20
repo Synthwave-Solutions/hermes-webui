@@ -3597,36 +3597,45 @@ def _handle_kanban_waiting(handler, parsed):
 
 
 def _handle_bot_scout(handler, body):
-    """POST /api/bots/scout: the bot edit gate (profiles:admin, a bot this
-    caller may use, the owner's edit right on a guided bot) plus cron admin."""
-    # Same gate as editing the bot (/api/profile/appearance): profiles:admin,
-    # a bot this caller may use, and the owner's edit right on a guided bot.
+    """POST /api/bots/scout: Scout per person per bot.
+
+    Anyone who may chat with the bot (chat:use on the route, plus a fresh
+    grant for this bot) switches their own Scout for it on or off, with their
+    own digest time and wishes. Another person's entry, the topics, the
+    Google Chat spaces and the bot's default time need the bot edit gate
+    (profiles:admin, and the owner's edit right on a guided bot; the same
+    rule as /api/profile/appearance). The job is always created as the person
+    it is for (owner_email), so cron admin is not needed for one's own Scout.
+    """
     from api import bot_scout
-    from api.governance.enforce import subject_from_identity
-    policy = governance_api.get_policy()
-    subject = subject_from_identity(governance_api._caller_identity(handler))
-    access = governance_api.resolve_effective_access(policy, subject)
-    if not governance_api._require(handler, access, subject, policy, "profiles:admin"):
-        return
+    from api.ownership import request_owner_email
+
+    if not isinstance(body, dict):
+        return bad(handler, "Invalid request", 400)
     name = str(body.get("name") or "").strip()
     if not name or not _chat_profile_target_allowed(handler, name):
         return bad(handler, "Bot not found", 404)
-    # The Scout job runs a script with in-app notifications off, values the
-    # normal job routes keep for cron admins: the same right is needed here.
-    if not _cron_admin_allowed(handler):
-        return bad(handler, "Scout needs the right to manage scheduled tasks (cron admin).", 403)
     try:
-        from api import bot_builder
-        from api.governance.enforce import _request_identity
-        if bot_builder.managed(name) is not None:
-            bot_builder.require_edit(_request_identity(handler), name)
-        try:
-            from api.ownership import request_owner_email
+        caller = str(request_owner_email(handler) or "").strip().lower()
+    except Exception:
+        caller = ""
+    person = str(body.get("person") or "").strip().lower()
+    needs_edit = bool(person and person != caller) or any(k in body for k in bot_scout.BOT_FIELDS)
+    try:
+        from api import bot_metadata
 
-            owner = request_owner_email(handler)
-        except Exception:
-            owner = None
-        return j(handler, {"ok": True, **bot_scout.apply(name, body, owner)})
+        managed = bot_metadata.read_profile(name).get("bot_managed")
+    except Exception:
+        managed = False
+    editor = bool(_bot_editable_check(handler)(name, bool(managed)))
+    # Without an email (auth off) a bot editor still names the person.
+    if not caller and not (editor and person):
+        return bad(handler, "Scout needs a signed in person with an email address.", 403)
+    if needs_edit and not editor:
+        return bad(handler, "Only a bot editor can change Scout for someone else, or its topics, spaces or default time.", 403)
+    body = {k: v for k, v in body.items() if k != "name"}
+    try:
+        return j(handler, {"ok": True, **bot_scout.apply(name, body, caller, editor=editor)})
     except bot_scout.ScoutError as exc:
         return bad(handler, exc.message, exc.status)
     except PermissionError as exc:
@@ -14233,8 +14242,19 @@ def handle_get(handler, parsed) -> bool:
             options["include_skill_counts"] = False
         rows = [{**p, **bot_metadata.read_profile(p["name"])} for p in profiles_api.list_profiles_api(**options) if _chat_profile_target_allowed(handler,p["name"])]
         editable = _bot_editable_check(handler)
-        for row in rows:
+        try:
+            from api.ownership import request_owner_email
+
+            viewer = str(request_owner_email(handler) or "").strip().lower()
+        except Exception:
+            viewer = ""
+        for index, row in enumerate(rows):
             row["bot_editable"] = editable(row["name"], bool(row.get("bot_managed")))
+            # Scout per person: the viewer's own state (scout_me); other
+            # people's addresses only for who may edit the bot.
+            rows[index] = bot_metadata.scout_public_view(row, viewer, row["bot_editable"])
+            if row["bot_editable"] and rows[index].get("bot_kind") == "bot":
+                rows[index]["scout_space_options"] = [{"id": s, "name": n} for s, n in bot_metadata.SCOUT_SPACES]
         return j(
             handler,
             {
