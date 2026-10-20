@@ -246,3 +246,16 @@ Private `run_timing` journal records distinguish prompt context, bot directory,
 cron context, history preparation, checkpoint save, attachment preparation,
 persistent-state scan, and history sanitization. They contain fixed stage names,
 durations and outcomes only; never prompt text, model credentials or identity.
+
+Text-only conversation history skips image-capability resolution entirely. The
+first actual `image_url` part still resolves the existing image policy once per
+history sanitization; native/text routing and attachment handling are unchanged.
+This avoids a cold model-catalog lookup on a plain-text follow-up.
+
+Deployment optimization: the default SynthPulse profile's 25 enabled MCP servers
+use their existing `lazy: true` option. Disabled servers remain disabled. Tools
+remain in the agent schema through validated per-profile manifests and connect on
+first use. Expired/missing manifests fall back to eager discovery. This depends on
+the agent's SDK cache-hint presence fix; refresh old manifests from their servers
+instead of stripping their recorded zero TTL. Other profiles and model/effort
+settings are unchanged.

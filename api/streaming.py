@@ -4175,7 +4175,9 @@ def _sanitize_messages_for_api(
     remaining replay gap where an older native image in the saved transcript kept
     causing 400s on every later text-only turn (#2297).
     """
-    strip_native_images = cfg is not None and _resolve_image_input_mode(cfg) == "text"
+    # Capability resolution may consult a cold model catalog. Text-only history
+    # needs no image decision; resolve once, only when an actual image is found.
+    strip_native_images = None
     # First pass: collect all tool_call_ids declared by assistant messages.
     # Handles both OpenAI ('id') and Anthropic ('call_id') field names.
     valid_tool_call_ids: set = set()
@@ -4238,6 +4240,11 @@ def _sanitize_messages_for_api(
             sanitized['_recovered'] = True  # temporary marker — stripped before return
         if 'content' in sanitized:
             sanitized['content'] = _strip_oob_blocks(sanitized['content'])
+        if (strip_native_images is None and cfg is not None
+                and isinstance(sanitized.get('content'), list)
+                and any(isinstance(part, dict) and (part.get('type') == 'image_url' or 'image_url' in part)
+                        for part in sanitized['content'])):
+            strip_native_images = _resolve_image_input_mode(cfg) == "text"
         if strip_native_images and 'content' in sanitized:
             sanitized['content'] = _strip_native_image_parts_from_content(sanitized.get('content'))
         if sanitized.get('role'):
