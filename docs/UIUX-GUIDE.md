@@ -209,3 +209,20 @@ Don't:
 - introduce a frontend framework, bundler, or build step for ordinary UI work,
 - hide important recovery, error, or approval state,
 - treat proposal mockups as shipped behavior without code/test evidence.
+
+## Background work and optional guide loading
+
+The existing composer task counter opens a keyboard-accessible overview of
+`/background` tasks, with the requested task, running/result-ready state and a
+link to its conversation. Results from the consuming status endpoint are handled
+by one poller per parent session and rendered in one batch. A response arriving
+during navigation stays in that parent session's client state until the chat is
+ready; it must not be appended to the newly selected conversation. Deleting a
+session releases its poller, pending results and badge entries. This is browser
+state, not new durable task recovery across a full page reload.
+
+The optional bilingual feature catalogs load together only when requested from
+Help or a feature deep link. Their guide script executes after all catalogs have
+loaded. Concurrent requests share one load and network failures can be retried.
+The service worker caches these assets after use without downloading them during
+installation. Basic text help remains available if a catalog cannot be loaded.

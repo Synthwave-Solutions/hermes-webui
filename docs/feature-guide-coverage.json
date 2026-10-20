@@ -3090,6 +3090,15 @@
   ],
   "controls": [
     {
+      "control": "bgBadge",
+      "tag": "button",
+      "label": "Background tasks",
+      "source_refs": [
+        "static/index.html"
+      ],
+      "feature_id": "webui.chat.background"
+    },
+    {
       "control": "titlebarProfileBtn",
       "tag": "button",
       "label": "Switch bot",
