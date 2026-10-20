@@ -8007,8 +8007,9 @@ function _stripXmlToolCallsDisplay(s){
   // Also handles DSML-prefixed variants from DeepSeek/Bedrock, including
   // spacing variants like "<｜DSML |function_calls" and truncated prefixes.
   if(!s) return s;
-  const lo=String(s).toLowerCase();
-  if(lo.indexOf('function_calls')===-1 && lo.indexOf('dsml')===-1) return s;
+  // Match the streaming path: avoid allocating a lowercase copy of a long
+  // reasoning/answer buffer on each paint.
+  if(!/function_calls|dsml/i.test(String(s))) return s;
   // Support both plain <function_calls> and DSML-prefixed variants.
   s=s.replace(/<(?:\s*｜\s*DSML\s*[｜|]\s*)?function_calls>[\s\S]*?<\/(?:\s*｜\s*DSML\s*[｜|]\s*)?function_calls>/gi,'');
   // Also remove truncated opening tags (missing closing ">" at stream tail).
@@ -20671,7 +20672,9 @@ function _renderThinkingInto(row,text=''){
   }
   const pre=row.querySelector('.thinking-card-body pre');
   if(pre){
-    pre.textContent=clean;
+    // Token frames often carry unchanged reasoning. Preserve the text node
+    // (and selection) instead of forcing another DOM mutation/layout.
+    if(pre.textContent!==clean) pre.textContent=clean;
     return;
   }
   row.innerHTML=_thinkingMarkup(text);

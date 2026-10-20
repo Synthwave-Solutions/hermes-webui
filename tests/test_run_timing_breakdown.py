@@ -106,6 +106,8 @@ def test_real_turn_reports_separate_setup_and_posttoken_intervals(
         "agent_constructor",
         "agent_run",
         "checkpoint_join",
+        "prompt_context", "bot_directory", "cron_context", "history_prepare",
+        "checkpoint_save", "attachment_prepare", "persistent_state_before", "history_sanitize",
     }
     assert all(
         set(r) == {"stage", "elapsed_ms", "duration_ms", "outcome"} for r in timings
