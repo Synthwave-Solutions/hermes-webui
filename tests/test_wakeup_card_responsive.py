@@ -121,3 +121,39 @@ def test_tablet_820_no_horizontal_overflow():
     m = _measure(820)
     assert m["summaryScrollWidth"] <= m["summaryClientWidth"] + 1, m
     assert m["docScrollWidth"] <= m["docClientWidth"] + 1, m
+
+
+@pytest.mark.parametrize('width,code,status', [(390, 0, 'success'), (820, 2, 'failed'), (1440, None, 'unknown')])
+def test_completion_details_are_keyboard_accessible_without_command_in_summary(width, code, status):
+    playwright_api = pytest.importorskip('playwright.sync_api')
+    with playwright_api.sync_playwright() as playwright:
+        try:
+            browser = playwright.chromium.launch(headless=True, args=['--no-sandbox'])
+        except Exception as exc:
+            pytest.skip(f'chromium unavailable: {exc}')
+        try:
+            page = browser.new_page(viewport={'width': width, 'height': 800})
+            page.set_content('<html><body><main style="width:100%;min-width:0"></main></body></html>')
+            page.add_style_tag(content=STYLE_CSS)
+            page.add_script_tag(content=_fixture_script())
+            command = 'AZURE_CONFIG_DIR=/example/azure az account show && python3 -B stage32/apply.py 2>&1 | grep -v account'
+            output = '    exact output <script>not executable</script>\n\n'
+            page.evaluate('''({command,output,code}) => {
+              document.querySelector('main').innerHTML=_processWakeupCardHtml(
+                {type:'completion',command,output,exitCode:code}, '', {});
+            }''', {'command': command, 'output': output, 'code': code})
+            summary = page.locator('summary')
+            assert command not in summary.inner_text()
+            assert f'process_wakeup_{status}' in summary.inner_text()
+            assert not page.locator('.process-wakeup-text').is_visible()
+            summary.focus()
+            page.keyboard.press('Enter')
+            page.locator('.process-wakeup-text').wait_for(state='visible')
+            assert page.locator('.process-wakeup-text').text_content() == output
+            assert page.locator('.process-wakeup-cmd-row').inner_text() == command
+            assert page.locator('.process-wakeup-detail script').count() == 0
+            assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+            page.keyboard.press('Enter')
+            page.locator('.process-wakeup-text').wait_for(state='hidden')
+        finally:
+            browser.close()
