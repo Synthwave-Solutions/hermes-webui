@@ -226,3 +226,5 @@ Help or a feature deep link. Their guide script executes after all catalogs have
 loaded. Concurrent requests share one load and network failures can be retried.
 The service worker caches these assets after use without downloading them during
 installation. Basic text help remains available if a catalog cannot be loaded.
+
+Background process updates show a plain-language status explanation when expanded. Command, exit code, and verbatim logs live behind a separate keyboard-accessible disclosure. An exit code only describes process completion, not whether a business goal succeeded. Both disclosure states survive message rerenders.
