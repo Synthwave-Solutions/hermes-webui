@@ -413,7 +413,13 @@
   }
   function guideButton(pageId){
     const guide=window.SynthPulseFeatureGuide;
-    if(!guide)return null;
+    if(!guide){
+      if(typeof window.loadSynthPulseFeatureGuide!=='function')return null;
+      return button('sp-help-chip',typeof t==='function'?t('help_browse_features'):'Browse all features',async()=>{
+        try{const loaded=await window.loadSynthPulseFeatureGuide();loaded.open({area:pageId,trigger:document.getElementById('btnPageHelp')});}
+        catch(_){if(typeof showToast==='function')showToast(t('help_guide_load_failed'));}
+      });
+    }
     return button('sp-help-chip',guide.contextLabel(),()=>guide.open({area:pageId,trigger:document.getElementById('btnPageHelp')}));
   }
 
@@ -986,6 +992,9 @@
     recordEvent('explain_clicked',{page:pageId});
     const panel=parentOf(entry)||pageId;
     if(asked&&panel!==currentPanel()&&panelView(panel))await goToPanel(panel);
+    if(typeof window.loadSynthPulseFeatureGuide==='function'){
+      try{await window.loadSynthPulseFeatureGuide();}catch(_){} // Text help remains available offline.
+    }
     const catalog=window.SynthPulseFeatureGuide;
     const allFeatures=catalog?.featuresForPage(pageId)||[];
     if(allFeatures.length&&startFeatureTour(allFeatures.map(f=>f.id),{trigger,locale:catalog.language()}))return true;

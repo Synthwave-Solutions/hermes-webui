@@ -12811,7 +12811,7 @@ window.SynthPulseFeatureCatalog = {
           "when": "While preparing a request or reviewing a response in the active conversation.",
           "steps": [
             "Enter /background followed by a bounded prompt.",
-            "Inspect the background indicator and completion result.",
+            "Open the task counter to see running tasks and ready results, then open the associated conversation.",
             "Composer shortcut: /background. Review any required arguments in the command suggestions."
           ],
           "permissions": "Work in a conversation you can access. Tools and models still follow your permissions.",
@@ -12824,7 +12824,7 @@ window.SynthPulseFeatureCatalog = {
           "when": "Bij het voorbereiden van een verzoek of beoordelen van een antwoord in het actieve gesprek.",
           "steps": [
             "Typ /background gevolgd door een afgebakende prompt.",
-            "Bekijk de achtergrondindicator en het voltooiingsresultaat.",
+            "Open de taakteller om lopende taken en klaarliggende resultaten te zien en het bijbehorende gesprek te openen.",
             "Snelopdracht in het berichtveld: /background. Controleer eventuele argumenten in de opdrachtsuggesties."
           ],
           "permissions": "Werk in een gesprek waartoe je toegang hebt. Tools en modellen blijven gebonden aan je rechten.",
