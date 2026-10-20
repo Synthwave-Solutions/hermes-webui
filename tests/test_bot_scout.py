@@ -1,9 +1,9 @@
-"""Scout per bot (api/bot_scout.py, POST /api/bots/scout).
+"""Scout per person per bot (api/bot_scout.py, POST /api/bots/scout).
 
-One Scout job per bot in the bot's own cron store, recognised by
-managed_by "scout"; on creates or resumes it, off pauses it, the runner files
-are the bot's own copies, and the settings in profile.yaml stay the truth.
-All state lives in a temporary Hermes root.
+One Scout job per (bot, person) in the bot's own cron store, recognised by
+managed_by "scout" plus scout_person; on creates or resumes it, off pauses it,
+the runner files are the bot's own copies, and the settings in profile.yaml
+stay the truth. All state lives in a temporary Hermes root.
 """
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ import yaml
 from api import bot_metadata, bot_scout
 
 ALICE = "alice@example.com"
+BOB = "bob.de.vries@example.com"
 
 
 @pytest.fixture
@@ -52,7 +53,9 @@ def _revision(name):
 
 def _set(name, **body):
     body.setdefault("revision", _revision(name))
-    return bot_scout.apply(name, body, ALICE)
+    if "digest_time" in body:
+        body["default_time"] = body.pop("digest_time")
+    return bot_scout.apply(name, body, ALICE, editor=True)
 
 
 # -- Runner copies -------------------------------------------------------------
@@ -100,13 +103,14 @@ def test_symlinked_runner_target_is_refused(scout_env, tmp_path):
 
 def test_turning_scout_on_creates_one_job_in_the_bots_own_store(scout_env):
     result = _set("radar", enabled=True, topics=["AI act", " MKB  automatisering ", "ai ACT"], digest_time="06:45")
-    assert result["bot"]["scout"] == {"enabled": True, "topics": ["AI act", "MKB automatisering"], "digest_time": "06:45"}
+    assert result["bot"]["scout"] == {"enabled": True, "topics": ["AI act", "MKB automatisering"], "digest_time": "06:45",
+                                      "people": {ALICE: {"enabled": True}}}
     assert _jobs(scout_env.root) == []
     [job] = _jobs(scout_env.homes["radar"])
-    assert job["managed_by"] == "scout" and job["name"] == "Scout"
+    assert job["managed_by"] == "scout" and job["name"] == "Scout \u00b7 Alice" and job["scout_person"] == ALICE
     assert job["script"] == "scout/scout_collect.py" and job["no_agent"] is False
     assert job["schedule"]["kind"] == "cron" and job["schedule"]["expr"] == "45 6 * * *"
-    assert job["enabled_toolsets"] == ["kanban", "web"]
+    assert job["enabled_toolsets"] == ["kanban", "web", "no_mcp"]
     assert job["prompt"].startswith("Eigen Scout prompt.") and "AI act; MKB automatisering" in job["prompt"]
     assert job["deliver"] == "local" and job["notify"] == {"in_app": "off", "delivery": "all"}
     assert job["owner_email"] == ALICE and job["origin"] == {"platform": "webui", "chat_id": None, "user_id": ALICE}
@@ -121,7 +125,7 @@ def test_on_again_is_idempotent_and_off_pauses_without_deleting(scout_env):
     _set("radar", enabled=True, digest_time="08:00")
     [job] = _jobs(scout_env.homes["radar"])
     assert job["id"] == first and job["schedule"]["expr"] == "0 8 * * *"
-    assert job["enabled_toolsets"] == ["kanban"]
+    assert job["enabled_toolsets"] == ["kanban", "no_mcp"]
     assert "geen onderwerpen" in job["prompt"]
     off = _set("radar", enabled=False)
     assert off["bot"]["scout"]["enabled"] is False and off["bot"]["scout"]["digest_time"] == "08:00"
@@ -189,18 +193,17 @@ def test_failed_job_write_restores_the_previous_settings(scout_env, monkeypatch)
     assert scout["enabled"] is False and scout["topics"] == []
 
 
-def test_scout_route_needs_the_bot_edit_permission():
+def test_scout_route_is_chat_use_with_the_bot_edit_gate_inside():
     from api.governance.catalog import route_permission
 
-    assert route_permission("/api/bots/scout", "POST") == "profiles:admin"
+    assert route_permission("/api/bots/scout", "POST") == "chat:use"
     src = (Path(__file__).resolve().parents[1] / "api" / "routes.py").read_text(encoding="utf-8")
     route = src[src.index('if parsed.path == "/api/bots/scout":'):]
     assert route[:route.index("if parsed.path ==", 10)].strip().endswith("return _handle_bot_scout(handler, body)")
     block = src[src.index("def _handle_bot_scout(handler, body):"):]
     block = block[:block.index("\ndef ", 10)]
-    assert "_cron_admin_allowed(handler)" in block
-    assert '"profiles:admin"' in block and "_chat_profile_target_allowed(handler, name)" in block
-    assert "bot_builder.require_edit(_request_identity(handler), name)" in block
+    assert "_chat_profile_target_allowed(handler, name)" in block
+    assert "_bot_editable_check(handler)" in block
 
 
 class _RouteHandler:
@@ -228,32 +231,63 @@ class _RouteHandler:
         return _W()
 
 
-def _route_env(monkeypatch, cron_admin):
-    from api import routes, governance_api
-    monkeypatch.setattr(governance_api, "get_policy", lambda: SimpleNamespace(bootstrap_admins=[]))
-    monkeypatch.setattr(governance_api, "_caller_identity", lambda handler: {"email": ALICE})
-    monkeypatch.setattr(governance_api, "resolve_effective_access", lambda policy, subject: None)
-    monkeypatch.setattr(governance_api, "_require", lambda *a: True)
-    monkeypatch.setattr(routes, "_chat_profile_target_allowed", lambda handler, name: True)
-    monkeypatch.setattr(routes, "_cron_admin_allowed", lambda handler: cron_admin)
+def _route_env(monkeypatch, editor, caller=ALICE, chat=True):
+    from api import routes
+    import api.ownership as ownership
+    monkeypatch.setattr(ownership, "request_owner_email", lambda handler: caller)
+    monkeypatch.setattr(routes, "_chat_profile_target_allowed", lambda handler, name: chat)
+    monkeypatch.setattr(routes, "_bot_editable_check", lambda handler: (lambda name, managed: editor))
+    monkeypatch.setattr(routes, "_cron_admin_allowed", lambda handler: False)
     return routes
 
 
-def test_scout_route_refuses_a_non_cron_admin_and_changes_nothing(scout_env, monkeypatch):
-    routes = _route_env(monkeypatch, cron_admin=False)
-    for enabled in (True, False):
-        h = _RouteHandler()
-        routes._handle_bot_scout(h, {"name": "radar", "enabled": enabled, "revision": 0})
-        assert h.status == 403 and b"cron admin" in h.body
-    assert _jobs(scout_env.homes["radar"]) == [] and _revision("radar") == 0
-    assert not (scout_env.homes["radar"] / "scripts").exists()
-
-
-def test_scout_route_lets_a_cron_admin_turn_it_on(scout_env, monkeypatch):
-    routes = _route_env(monkeypatch, cron_admin=True)
+def _post(routes, body):
     h = _RouteHandler()
-    routes._handle_bot_scout(h, {"name": "radar", "enabled": True, "revision": 0})
-    assert h.status == 200 and len(_jobs(scout_env.homes["radar"])) == 1
+    routes._handle_bot_scout(h, body)
+    return h.status, (json.loads(h.body.decode()) if h.body else {})
+
+
+def test_scout_route_lets_a_chat_user_switch_their_own_scout_without_cron_admin(scout_env, monkeypatch):
+    routes = _route_env(monkeypatch, editor=False, caller=BOB)
+    status, body = _post(routes, {"name": "radar", "enabled": True, "revision": 0})
+    assert status == 200 and body["scout_me"]["enabled"] is True and body["scout_me"]["job"]["enabled"] is True
+    [job] = _jobs(scout_env.homes["radar"])
+    assert job["owner_email"] == BOB and job["scout_person"] == BOB and job["origin"]["user_id"] == BOB
+    # A non editor never sees who else has Scout on.
+    assert "people" not in body["bot"]["scout"] and "scout_people_count" not in body
+
+
+@pytest.mark.parametrize("extra", [{"person": ALICE}, {"topics": ["x"]}, {"default_time": "06:00"},
+                                   {"spaces": ["spaces/AAQASUfEemQ"]}])
+def test_scout_route_needs_the_bot_edit_gate_for_others_and_bot_fields(scout_env, monkeypatch, extra):
+    routes = _route_env(monkeypatch, editor=False, caller=BOB)
+    status, _ = _post(routes, {"name": "radar", "enabled": True, "revision": 0, **extra})
+    assert status == 403
+    assert _jobs(scout_env.homes["radar"]) == [] and _revision("radar") == 0
+
+
+def test_scout_route_refuses_a_bot_without_chat_access(scout_env, monkeypatch):
+    routes = _route_env(monkeypatch, editor=True, chat=False)
+    status, _ = _post(routes, {"name": "radar", "enabled": True, "revision": 0})
+    assert status == 404 and _jobs(scout_env.homes["radar"]) == []
+
+
+def test_scout_route_refuses_a_caller_without_email(scout_env, monkeypatch):
+    routes = _route_env(monkeypatch, editor=False, caller=None)
+    status, _ = _post(routes, {"name": "radar", "enabled": True, "revision": 0})
+    assert status == 403 and _jobs(scout_env.homes["radar"]) == []
+
+
+def test_scout_route_lets_an_editor_set_someone_else(scout_env, monkeypatch):
+    routes = _route_env(monkeypatch, editor=True)
+    status, body = _post(routes, {"name": "radar", "person": BOB, "enabled": True, "digest_time": "09:15",
+                                  "prompt": "Let op klantvragen", "revision": 0})
+    assert status == 200 and body["scout_person"] == BOB
+    assert body["scout_people_count"] == 1 and BOB in body["bot"]["scout"]["people"]
+    assert body["scout_me"]["enabled"] is False
+    [job] = _jobs(scout_env.homes["radar"])
+    assert job["owner_email"] == BOB and job["schedule"]["expr"] == "15 9 * * *"
+    assert "Wensen van Bob" in job["prompt"] and "Let op klantvragen" in job["prompt"]
 
 
 def test_an_older_scout_job_loses_terminal_on_the_next_sync(scout_env):
@@ -270,7 +304,7 @@ def test_an_older_scout_job_loses_terminal_on_the_next_sync(scout_env):
         cj.update_job(first, {"enabled_toolsets": ["terminal", "kanban", "web"]})
     _set("radar", enabled=True)
     [job] = _jobs(scout_env.homes["radar"])
-    assert job["enabled_toolsets"] == ["kanban"]
+    assert job["enabled_toolsets"] == ["kanban", "no_mcp"]
 
 
 def test_unreadable_bot_metadata_is_unknown_and_gets_no_scout(scout_env):

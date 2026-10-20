@@ -347,8 +347,9 @@
     dot.setAttribute('aria-label', dot.title + ' (' + botDisplayName(p) + ')');
     return dot;
   }
-  // Scout (api/bot_scout.py): a daily read-only look-out per bot. People's
-  // own profiles get none; who may not edit the bot only sees that it is on.
+  // Scout (api/bot_scout.py): a daily read-only look-out per person per bot.
+  // Everyone who may chat with a bot switches their own Scout for it here;
+  // people's own profiles get none.
   function scoutIcon() {
     const ns = 'http://www.w3.org/2000/svg', svg = document.createElementNS(ns, 'svg');
     svg.setAttribute('viewBox', '0 0 16 16'); svg.setAttribute('width', '14'); svg.setAttribute('height', '14'); svg.setAttribute('aria-hidden', 'true');
@@ -360,28 +361,21 @@
     return svg;
   }
   function scoutControl(p) {
-    const on = !!(p.bot && p.bot.scout && p.bot.scout.enabled);
-    // Scout writes a scheduled job, so the server also asks cron admin.
-    const editable = !!p.bot_editable && (typeof window._cronIsCronAdmin !== 'function' || window._cronIsCronAdmin());
-    if (p.bot_kind === 'person' || p.bot_kind === 'unknown' || (!editable && !on)) return null;
-    if (!editable) {
-      const mark = document.createElement('span'); mark.className = 'sidebar-bot-scout is-on'; mark.setAttribute('role', 'img');
-      mark.title = tx('bot_scout_on_passive', 'Scout is on'); mark.setAttribute('aria-label', mark.title + ': ' + botDisplayName(p));
-      mark.appendChild(scoutIcon()); return mark;
-    }
+    if (p.bot_kind !== 'bot' || !p.scout_me) return null;
+    const me = p.scout_me, on = !!me.enabled;
     const toggle = document.createElement('button'); toggle.type = 'button'; toggle.className = 'sidebar-bot-scout' + (on ? ' is-on' : '');
     toggle.dataset.scoutBot = p.name; toggle.setAttribute('aria-pressed', String(on));
-    toggle.title = tx('bot_scout_toggle', 'Scout on/off'); toggle.setAttribute('aria-label', toggle.title + ': ' + botDisplayName(p));
+    toggle.title = tx('bot_scout_toggle', 'Scout for you on/off'); toggle.setAttribute('aria-label', toggle.title + ': ' + botDisplayName(p));
     toggle.disabled = !!scoutPending; toggle.appendChild(scoutIcon());
     toggle.onclick = async () => {
       if (scoutPending) return;
-      // The first time Scout goes on for a bot (no Scout settings yet), say
-      // what that means; turning it off needs no confirmation.
-      if (!on && !(p.bot && p.bot.scout) && typeof window.showConfirmDialog === 'function') {
-        const time = '07:30';
+      // The first time someone turns Scout on for a bot, say what that means;
+      // turning it off needs no confirmation.
+      if (!on && !me.known && typeof window.showConfirmDialog === 'function') {
+        const time = /^\d\d:\d\d$/.test(me.digest_time || '') ? me.digest_time : '07:30';
         const ok = await window.showConfirmDialog({
           title: tx('bot_scout_confirm_title', 'Turn Scout on?'),
-          message: tx('bot_scout_confirm_on', 'This bot gets a daily Scout task at {time}. Read only, notifications off.').replace('{time}', time),
+          message: tx('bot_scout_confirm_on', 'You get a daily Scout from this bot at {time}. Read only, notifications off.').replace('{time}', time),
           confirmLabel: tx('bot_scout_confirm_ok', 'Turn Scout on'),
         });
         if (!ok) return;

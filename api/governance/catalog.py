@@ -117,7 +117,9 @@ ROUTE_CATALOG: tuple[RouteRule, ...] = (
 
     # profiles
     RouteRule("/api/bots/knowledge", "profiles:admin", "profiles:admin", match="exact"),
-    RouteRule("/api/bots/scout", "profiles:admin", "profiles:admin", match="exact"),
+    # Scout per person: one's own Scout for a bot is chat use; the handler
+    # asks profiles:admin for anyone else's entry and the bot's own settings.
+    RouteRule("/api/bots/scout", "chat:use", "chat:use", match="exact"),
     RouteRule("/api/bots/builder", "profiles:admin", "profiles:admin", match="exact"),
     RouteRule("/api/profiles",            "profiles:read"),
     RouteRule("/api/profile/active",      "profiles:read", match="exact"),
