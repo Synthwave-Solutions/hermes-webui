@@ -796,7 +796,7 @@
                 </div>
               </div>
             </div>
-            <span class="bg-badge" id="bgBadge" style="display:none" title="Background tasks running">0</span>
+            <button type="button" class="bg-badge" id="bgBadge" style="display:none" title="Background tasks" aria-haspopup="dialog" aria-controls="bgTaskDialog" onclick="openBackgroundTasks()">0</button>
             <button class="send-btn has-tooltip has-tooltip--left" id="btnSend" data-tooltip="Send message" data-i18n-title="composer_send" data-i18n-aria-label="composer_send" disabled>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
             </button>
@@ -1937,7 +1937,7 @@
                   <div class="help-card-title" data-i18n="help_card_explain_title">Explain this page</div>
                   <div class="help-card-desc" data-i18n="help_card_explain_body">See what the current page is for and how to use it.</div>
                   <button type="button" class="help-card-link" id="helpCardExplain" data-help-action="explain"><span data-i18n="help_page_button">Explain this page</span></button>
-                  <button type="button" class="help-card-link" id="helpCardGuide" data-help-guide="">Browse all features</button>
+                  <button type="button" class="help-card-link" id="helpCardGuide" data-help-guide="" data-i18n="help_browse_features">Browse all features</button>
                 </div>
               </div>
               <div class="help-card">
@@ -2111,10 +2111,7 @@
 <script src="static/error-reporter.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/help-content.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/help-tour.js?v=__WEBUI_VERSION__" defer></script>
-<script src="static/help-features.js?v=__WEBUI_VERSION__" defer></script>
-<script src="static/help-msp-features.js?v=__WEBUI_VERSION__" defer></script>
-<script src="static/help-feature-targets.js?v=__WEBUI_VERSION__" defer></script>
-<script src="static/help-guide.js?v=__WEBUI_VERSION__" defer></script>
+<script src="static/help-guide-loader.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/boot.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/outline.js?v=__WEBUI_VERSION__" defer></script>
 

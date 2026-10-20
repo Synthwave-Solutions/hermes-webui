@@ -4578,6 +4578,7 @@ function _renderBatchActionBar(){
       const results=await Promise.all(ids.map(async sid=>{
         _invalidateSessionSceneCache(sid);
         const response=await api('/api/session/delete',{method:'POST',body:JSON.stringify({session_id:sid})});
+        if(typeof stopBackgroundPolling==='function')stopBackgroundPolling(sid);
         return {response,session:sessionsById.get(sid)||null};
       }));
       const retainedCount=_worktreeResponseCount(results);
@@ -9395,6 +9396,7 @@ async function deleteSession(sid, beforeDelete=null){
   let optimisticRendered=false;
   _invalidateSessionSceneCache(sid);
   const deleteRequest=api('/api/session/delete',{method:'POST',body:JSON.stringify({session_id:sid})}).then(response=>{
+    if(typeof stopBackgroundPolling==='function')stopBackgroundPolling(sid);
     _clearHandoffStorageForSession(sid);
     return {response};
   }, error=>({error}));

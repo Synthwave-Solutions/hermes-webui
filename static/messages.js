@@ -9180,47 +9180,114 @@ function attachBtwStream(parentSid, streamId, question){
 
 // ── /background task tracking ────────────────────────────────────────────────
 
-let _bgPollTimers={};
+let _bgPollTimers=new Map(); // one owner per parent chat, including in-flight fetches
 let _bgActiveTasks=new Set();
 
-function showBackgroundBadge(taskId){
-  _bgActiveTasks.add(taskId);
+function _syncBackgroundBadge(){
   const badge=$('bgBadge');
-  if(badge){
-    badge.textContent=String(_bgActiveTasks.size);
-    badge.style.display=_bgActiveTasks.size?'':'none';
-  }
+  if(!badge)return;
+  badge.textContent=String(_bgActiveTasks.size);
+  badge.style.display=_bgActiveTasks.size?'':'none';
+  badge.setAttribute('aria-live','polite');
+  badge.setAttribute('aria-atomic','true');
+  badge.title=t('bg_task_count',_bgActiveTasks.size);
+  badge.setAttribute('aria-label',badge.title);
+  if($('bgTaskDialog')?.open)_renderBackgroundTasks();
 }
-function hideBackgroundBadge(taskId){
-  _bgActiveTasks.delete(taskId);
-  const badge=$('bgBadge');
-  if(badge){
-    badge.textContent=String(_bgActiveTasks.size);
-    badge.style.display=_bgActiveTasks.size?'':'none';
+function _renderBackgroundTasks(){
+  const list=$('bgTaskList');if(!list)return;
+  const rows=[];
+  for(const [sid,state] of _bgPollTimers){
+    const ready=new Set(state.pending.map(result=>result.task_id));
+    for(const [id,prompt] of state.tasks)rows.push([sid,id,prompt,t(ready.has(id)?'bg_result_ready':'bg_running')]);
   }
+  const signature=JSON.stringify([rows,t('bg_open_chat'),t('bg_none_running')]);
+  if(list._bgSignature===signature)return;
+  const focused=list.contains(document.activeElement)?document.activeElement.dataset.taskId:null;
+  list._bgSignature=signature;list.replaceChildren();
+  for(const [sid,id,prompt,statusText] of rows){
+    const row=document.createElement('li');
+    const title=document.createElement('p');title.textContent=String(prompt||'').slice(0,160);row.append(title);
+    const status=document.createElement('span');status.textContent=statusText;row.append(status);
+    const open=document.createElement('button');open.type='button';open.dataset.taskId=id;open.textContent=t('bg_open_chat');
+    open.onclick=()=>{$('bgTaskDialog').close();loadSession(sid);};row.append(open);list.append(row);
+  }
+  if(!rows.length){const empty=document.createElement('li');empty.textContent=t('bg_none_running');list.append(empty);}
+  if(focused){const target=[...list.querySelectorAll('button')].find(button=>button.dataset.taskId===focused);(target||$('bgTaskDialog').querySelector('.bg-task-close'))?.focus();}
+}
+function openBackgroundTasks(){
+  let dialog=$('bgTaskDialog');
+  if(!dialog){
+    dialog=document.createElement('dialog');dialog.id='bgTaskDialog';dialog.className='bg-task-dialog';dialog.setAttribute('aria-labelledby','bgTaskTitle');
+    const title=document.createElement('h2');title.id='bgTaskTitle';dialog.append(title);
+    const list=document.createElement('ul');list.id='bgTaskList';dialog.append(list);
+    const close=document.createElement('button');close.type='button';close.className='bg-task-close';close.onclick=()=>dialog.close();dialog.append(close);
+    dialog.addEventListener('close',()=>{const badge=$('bgBadge');(badge&&badge.style.display!=='none'?badge:$('msg'))?.focus();});
+    document.body.append(dialog);
+  }
+  $('bgTaskTitle').textContent=t('bg_tasks_title');
+  dialog.querySelector('.bg-task-close').textContent=t('help_tour_close');
+  _renderBackgroundTasks();if(!dialog.open)dialog.showModal();
+}
+function showBackgroundBadge(taskId){_bgActiveTasks.add(taskId);_syncBackgroundBadge();}
+function hideBackgroundBadge(taskId){_bgActiveTasks.delete(taskId);_syncBackgroundBadge();}
+function stopBackgroundPolling(parentSid){
+  const state=_bgPollTimers.get(parentSid);if(!state)return;
+  _bgPollTimers.delete(parentSid);clearTimeout(state.timer);
+  for(const id of state.tasks.keys())hideBackgroundBadge(id);
+  state.pending=[];state.tasks.clear();
 }
 function startBackgroundPolling(parentSid, taskId, prompt){
-  if(_bgPollTimers[taskId]) return;
-  async function _poll(){
-    try{
-      const r=await api('/api/background/status?session_id='+encodeURIComponent(parentSid));
-      if(r&&r.results){
-        for(const res of r.results){
-          if(res.task_id===taskId){
-            hideBackgroundBadge(taskId);
-            delete _bgPollTimers[taskId];
-            const msg={role:'assistant',content:`**${t('bg_label')}** ${prompt.slice(0,80)}\n\n${res.answer||t('bg_no_answer')}`,'_background':true,_ts:Date.now()/1000};
-            S.messages.push(msg);
-            renderMessages({preserveScroll:true});
-            showToast(t('bg_complete'));
-            return;
-          }
+  let state=_bgPollTimers.get(parentSid);
+  if(state){state.tasks.set(taskId,prompt);_syncBackgroundBadge();return;}
+  state={tasks:new Map([[taskId,prompt]]),pending:[],timer:null};
+  _bgPollTimers.set(parentSid,state);
+  _syncBackgroundBadge();
+  const isActive=()=>S.session&&S.session.session_id===parentSid
+    &&(typeof _loadingSessionId==='undefined'||!_loadingSessionId);
+  function deliver(){
+    if(!isActive()||!state.pending.length)return;
+    for(const res of state.pending){
+      const taskPrompt=state.tasks.get(res.task_id)||res.prompt||'';
+      S.messages.push({role:'assistant',content:`**${t('bg_label')}** ${taskPrompt.slice(0,80)}\n\n${res.answer||t('bg_no_answer')}`,_background:true,_ts:res.completed_at||Date.now()/1000});
+      state.tasks.delete(res.task_id);
+      hideBackgroundBadge(res.task_id);
+    }
+    state.pending=[];
+    if(typeof _invalidateSessionSceneCache==='function')_invalidateSessionSceneCache(parentSid);
+    renderMessages({preserveScroll:true});
+    showToast(t('bg_complete'));
+  }
+  async function poll(){
+    if(_bgPollTimers.get(parentSid)!==state)return;
+    state.timer=null;
+    deliver();
+    // The endpoint consumes completed results. Retain every result under its
+    // parent chat, and stop network polling once all registered tasks are ready.
+    const readyIds=new Set(state.pending.map(result=>result.task_id));
+    const hasRunning=[...state.tasks.keys()].some(id=>!readyIds.has(id));
+    if(hasRunning&&(typeof _loadingSessionId==='undefined'||_loadingSessionId!==parentSid)){
+      try{
+        const r=await api('/api/background/status?session_id='+encodeURIComponent(parentSid));
+        if(_bgPollTimers.get(parentSid)!==state)return;
+        if(r&&Array.isArray(r.results)){
+          state.pending.push(...r.results);
+          if(r.results.length&&!isActive())showToast(t('bg_result_ready'));
+        }
+        _syncBackgroundBadge();
+        // A navigation during fetch retains the results until this chat returns.
+        deliver();
+      }catch(error){
+        if(error&&[401,403,404].includes(error.status)){
+          stopBackgroundPolling(parentSid);showToast(t('bg_tracking_unavailable'));
         }
       }
-    }catch(_){}
-    _bgPollTimers[taskId]=setTimeout(_poll,3000);
+    }
+    if(_bgPollTimers.get(parentSid)!==state)return;
+    if(state.tasks.size||state.pending.length)state.timer=setTimeout(poll,3000);
+    else _bgPollTimers.delete(parentSid);
   }
-  _poll();
+  poll();
 }
 
 // ── Panel navigation (Chat / Tasks / Skills / Memory) ──

@@ -35,9 +35,7 @@ const SHELL_ASSETS = [
   './static/help-tour.js' + VQ,
   './static/help-tour.css' + VQ,
   './static/help-guide.css' + VQ,
-  './static/help-features.js' + VQ,
-  './static/help-msp-features.js' + VQ,
-  './static/help-guide.js' + VQ,
+  './static/help-guide-loader.js' + VQ,
   './static/vendor/guida/0.2.0/guida.umd.js' + VQ,
   './static/memory_dashboard.js' + VQ,
   './static/memory_dashboard.css' + VQ,
@@ -86,6 +84,9 @@ const SHELL_ASSETS = [
   './static/favicon-32.png',
   './manifest.json',
 ];
+
+// Optional catalogs are cached only after use, never during installation.
+const LAZY_ASSETS=['help-features.js','help-msp-features.js','help-feature-targets.js','help-guide.js'].map(name=>'./static/'+name+VQ);
 
 function deleteOldShellCaches() {
   return caches.keys().then((keys) =>
@@ -194,7 +195,7 @@ self.addEventListener('fetch', (event) => {
     ? url.pathname.slice(scopePath.length)
     : url.pathname.replace(/^\/+/, '');
   const shellPath = './' + relPath.replace(/^\/+/, '') + url.search;
-  if (!SHELL_ASSETS.includes(shellPath)) return;
+  if (!SHELL_ASSETS.includes(shellPath) && !LAZY_ASSETS.includes(shellPath)) return;
 
   // Shell assets: network-first with cache fallback. This keeps offline support
   // but avoids executing stale JS/CSS after a local hotfix when WEBUI_VERSION
