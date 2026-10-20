@@ -6834,6 +6834,9 @@ def _run_agent_streaming(
             'skill_modules', 'cron_wrapper', 'env_lock_wait', 'env_lock_hold',
             'mcp_discovery', 'agent_run', 'checkpoint_join',
             'agent_constructor', 'cache_eviction_close',
+            'prompt_context', 'bot_directory', 'cron_context', 'history_prepare',
+            'checkpoint_save', 'attachment_prepare', 'persistent_state_before',
+            'history_sanitize',
         } or outcome not in {'completed', 'skipped', 'unavailable', 'raised'}:
             return
         if run_journal is not None:
@@ -8797,60 +8800,64 @@ def _run_agent_streaming(
             # (agent's own mechanism). This preserves any selected personality
             # while making long tool runs emit real user-visible interim text
             # through interim_assistant_callback instead of frontend guesses.
-            agent.ephemeral_system_prompt = _webui_ephemeral_system_prompt(
-                '\n\n'.join(p for p in (_personality_prompt, _personal_overlay) if p),
-                surface_context={
-                    'source': 'webui',
-                    'session_id': session_id,
-                    'profile': execution_profile or getattr(s, 'profile', None),
-                    'workspace': s.workspace,
-                },
-                config_data=_cfg,
-                actor_email=_turn_principal,
-                conversation_owner_email=getattr(s, 'owner_email', None),
-            )
+            with _run_timing_stage('prompt_context'):
+                agent.ephemeral_system_prompt = _webui_ephemeral_system_prompt(
+                    '\n\n'.join(p for p in (_personality_prompt, _personal_overlay) if p),
+                    surface_context={
+                        'source': 'webui',
+                        'session_id': session_id,
+                        'profile': execution_profile or getattr(s, 'profile', None),
+                        'workspace': s.workspace,
+                    },
+                    config_data=_cfg,
+                    actor_email=_turn_principal,
+                    conversation_owner_email=getattr(s, 'owner_email', None),
+                )
             # Refreshed even for a cached agent; never persist the roster into
             # SOUL.md, memory, or the shared conversation transcript.
-            _bot_awareness = bot_delegation.awareness_prompt(
-                s, _turn_identity, execution_profile or getattr(s, 'profile', None) or 'default')
-            if _bot_awareness:
-                agent.ephemeral_system_prompt += '\n\n' + _bot_awareness
+            with _run_timing_stage('bot_directory'):
+                _bot_awareness = bot_delegation.awareness_prompt(
+                    s, _turn_identity, execution_profile or getattr(s, 'profile', None) or 'default')
+                if _bot_awareness:
+                    agent.ephemeral_system_prompt += '\n\n' + _bot_awareness
             # A chat about scheduled jobs (its job chat, or the chat a job
             # posts its results into) gets that job's live context, so a
             # follow-up like "why did this fail" works (api/cron_bots.py).
-            try:
-                from api.cron_bots import context_prompt as _cron_job_context_prompt
-                _cron_job_context = _cron_job_context_prompt(s, _turn_identity)
-            except Exception:
-                logger.debug("scheduled job context unavailable", exc_info=True)
-                _cron_job_context = ''
-            if _cron_job_context:
-                agent.ephemeral_system_prompt += '\n\n' + _cron_job_context
+            with _run_timing_stage('cron_context'):
+                try:
+                    from api.cron_bots import context_prompt as _cron_job_context_prompt
+                    _cron_job_context = _cron_job_context_prompt(s, _turn_identity)
+                except Exception:
+                    logger.debug("scheduled job context unavailable", exc_info=True)
+                    _cron_job_context = ''
+                if _cron_job_context:
+                    agent.ephemeral_system_prompt += '\n\n' + _cron_job_context
             _pending_started_at = getattr(s, 'pending_started_at', None)
             # Normal chat-start sets pending_started_at before spawning this thread;
             # fallback to now only for recovered/legacy flows where that marker is absent
             # or has been zeroed out (e.g. via a buggy migration / manual file edit).
             # Truthy-check covers None, missing-attr, and 0 uniformly.
             _turn_started_at = _pending_started_at if _pending_started_at else time.time()
-            _external_state_messages = get_state_db_session_messages(getattr(s, 'session_id', None))
-            _previous_messages = list(
-                reconciled_state_db_messages_for_session(
-                    s,
-                    state_messages=_external_state_messages,
-                ) or []
-            )
-            _previous_context_messages = _new_turn_context_from_messages(
-                reconciled_state_db_messages_for_session(
-                    s,
-                    prefer_context=True,
-                    state_messages=_external_state_messages,
-                ),
-                msg_text,
-            )
-            # Dedup before feeding to agent — merge_session_messages_append_only
-            # can produce duplicates when context_messages and state.db share
-            # messages with different timestamps.
-            _previous_context_messages = _deduplicate_context_messages(_previous_context_messages)
+            with _run_timing_stage('history_prepare'):
+                _external_state_messages = get_state_db_session_messages(getattr(s, 'session_id', None))
+                _previous_messages = list(
+                    reconciled_state_db_messages_for_session(
+                        s,
+                        state_messages=_external_state_messages,
+                    ) or []
+                )
+                _previous_context_messages = _new_turn_context_from_messages(
+                    reconciled_state_db_messages_for_session(
+                        s,
+                        prefer_context=True,
+                        state_messages=_external_state_messages,
+                    ),
+                    msg_text,
+                )
+                # Dedup before feeding to agent — merge_session_messages_append_only
+                # can produce duplicates when context_messages and state.db share
+                # messages with different timestamps.
+                _previous_context_messages = _deduplicate_context_messages(_previous_context_messages)
             _pre_compression_count = getattr(
                 getattr(agent, 'context_compressor', None),
                 'compression_count', 0,
@@ -8886,9 +8893,10 @@ def _run_agent_streaming(
             _checkpoint_stop = threading.Event()
             # Persist the user message BEFORE streaming starts so it's durable even if
             # the server crashes before the first checkpoint fires (every 15s).
-            with _agent_lock:
-                _stamp_group_bot_author(s, msg_text, execution_profile)
-                s.save(touch_updated_at=True, skip_index=False)
+            with _run_timing_stage('checkpoint_save'):
+                with _agent_lock:
+                    _stamp_group_bot_author(s, msg_text, execution_profile)
+                    s.save(touch_updated_at=True, skip_index=False)
 
             _ckpt_thread = threading.Thread(
                 target=_periodic_checkpoint, daemon=True,
@@ -8904,21 +8912,24 @@ def _run_agent_streaming(
             # this person's raw words rather than injected workspace context.
             if getattr(agent, '_memory_manager', None) is not None:
                 agent._memory_manager.raw_user_content = msg_text
-            user_message = _build_native_multimodal_message(workspace_ctx, _agent_msg_text, attachments, workspace, cfg=_cfg)
-            _persistent_state_before = _persistent_state_snapshot(_profile_home, str(_personal_root))
-            _run_conversation_kwargs = dict(
-                user_message=user_message,
-                system_message=workspace_system_msg,
-                conversation_history=_sanitize_messages_for_api(
-                    _previous_context_messages,
-                    cfg=_cfg,
-                    effective_model=resolved_model,
-                    effective_provider=resolved_provider,
-                    effective_base_url=resolved_base_url,
-                ),
-                task_id=session_id,
-                persist_user_message=msg_text,
-            )
+            with _run_timing_stage('attachment_prepare'):
+                user_message = _build_native_multimodal_message(workspace_ctx, _agent_msg_text, attachments, workspace, cfg=_cfg)
+            with _run_timing_stage('persistent_state_before'):
+                _persistent_state_before = _persistent_state_snapshot(_profile_home, str(_personal_root))
+            with _run_timing_stage('history_sanitize'):
+                _run_conversation_kwargs = dict(
+                    user_message=user_message,
+                    system_message=workspace_system_msg,
+                    conversation_history=_sanitize_messages_for_api(
+                        _previous_context_messages,
+                        cfg=_cfg,
+                        effective_model=resolved_model,
+                        effective_provider=resolved_provider,
+                        effective_base_url=resolved_base_url,
+                    ),
+                    task_id=session_id,
+                    persist_user_message=msg_text,
+                )
             # Only pass moa_config when a /moa override is actually active, so a
             # normal send never trips a TypeError on an older hermes-agent whose
             # run_conversation() predates the moa_config kwarg.

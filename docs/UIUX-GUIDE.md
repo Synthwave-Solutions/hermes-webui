@@ -228,3 +228,21 @@ The service worker caches these assets after use without downloading them during
 installation. Basic text help remains available if a catalog cannot be loaded.
 
 Background process updates show a plain-language status explanation when expanded. Command, exit code, and verbatim logs live behind a separate keyboard-accessible disclosure. An exit code only describes process completion, not whether a business goal succeeded. Both disclosure states survive message rerenders.
+
+### Streaming latency
+
+New-session sends wait for session creation, not a second sidebar network refresh:
+`newSession` already schedules that refresh. Streaming parse results belong to the
+attached stream and are reused only while both text and reasoning are unchanged.
+Repeated thinking updates preserve the existing text node when its content matches.
+
+Prose animation is presentation, not simulated generation. Small arrivals retain
+word pacing; backlogs over 12 words catch up in batches of at most 128 words per
+frame, without punctuation pauses. Fade duration is 140–220 ms. Reduced-motion
+behavior and the user's fade preference still apply. Finalization retains its
+bounded drain and full final transcript render.
+
+Private `run_timing` journal records distinguish prompt context, bot directory,
+cron context, history preparation, checkpoint save, attachment preparation,
+persistent-state scan, and history sanitization. They contain fixed stage names,
+durations and outcomes only; never prompt text, model credentials or identity.

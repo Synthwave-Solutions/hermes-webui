@@ -1412,7 +1412,7 @@ async function send(){
   // If busy or a manual compression is still running, handle based on default_message_mode
   if((S.busy||compressionRunning)&&!queueDrainOwnsSend){
     if(text||S.pendingFiles.length){
-      if(!S.session){await newSession();await renderSessionList();}
+      if(!S.session){await newSession();}
       // Busy-control slash commands must be intercepted HERE, before the
       // defaultMessageMode routing block, so the user can always type /steer, /interrupt,
       // /queue, /terminal, /goal, or /yolo while the agent is running and have
@@ -1488,7 +1488,7 @@ async function send(){
     if(_cmd){
       let _pushedUser=false;
       if(!_cmd.noEcho){
-        if(!S.session){await newSession();await renderSessionList();}
+        if(!S.session){await newSession();}
         S.messages.push({role:'user',content:text,_ts:Date.now()/1000});
         _pushedUser=true;
         renderMessages();
@@ -1506,7 +1506,7 @@ async function send(){
     }
     if(_parsedCmd&&!_cmd){
       if(_parsedCmd.name==='pet'){
-        if(!S.session){await newSession();await renderSessionList();}
+        if(!S.session){await newSession();}
         S.messages.push({role:'user',content:text,_ts:Date.now()/1000});
         let _petOutput=null;
         try{
@@ -1535,7 +1535,7 @@ async function send(){
         ? await getAgentCommandMetadata(_parsedCmd.name)
         : null;
       if(_agentCmd&&_agentCmd.cli_only){
-        if(!S.session){await newSession();await renderSessionList();}
+        if(!S.session){await newSession();}
         S.messages.push({role:'user',content:text,_ts:Date.now()/1000});
         S.messages.push({role:'assistant',content:cliOnlyCommandResponse(_parsedCmd.name,_agentCmd),_ts:Date.now()/1000});
         renderMessages();
@@ -1543,7 +1543,7 @@ async function send(){
       }
       const _agentCmdName=String(_agentCmd&&_agentCmd.name||_parsedCmd&&_parsedCmd.name||'').trim().toLowerCase();
       if(_AGENT_COMMANDS_RUN_ON_WEBUI.has(_agentCmdName)){
-        if(!S.session){await newSession();await renderSessionList();}
+        if(!S.session){await newSession();}
         S.messages.push({role:'user',content:text,_ts:Date.now()/1000});
         let _agentOutput='(no output)';
         try{
@@ -1558,7 +1558,7 @@ async function send(){
         $('msg').value='';autoResize();hideCmdDropdown();return;
       }
       if(_agentCmd&&_agentCmd.category==='Plugin'){
-        if(!S.session){await newSession();await renderSessionList();}
+        if(!S.session){await newSession();}
         S.messages.push({role:'user',content:text,_ts:Date.now()/1000});
         let _pluginOutput='(no output)';
         try{
@@ -1574,7 +1574,7 @@ async function send(){
       }
       if(_agentCmdName==='moa'){
         const _moaArgs=(text.split(/\s+/).slice(1).join(' ')||'').trim();
-        if(!S.session){await newSession();await renderSessionList();}
+        if(!S.session){await newSession();}
         if(!_moaArgs){
           let _moaUsage='/moa <prompt>';
           try{const _moaCfgU=await api('/api/commands/moa/resolve');_moaUsage=_moaCfgU.usage||_moaUsage;}catch(_eu){}
@@ -1606,7 +1606,7 @@ async function send(){
           _slashDisplayTextOverride=text;
           text=_bundleMessage;
         }catch(e){
-          if(!S.session){await newSession();await renderSessionList();}
+          if(!S.session){await newSession();}
           S.messages.push({role:'user',content:text,_ts:Date.now()/1000});
           S.messages.push({role:'assistant',content:`Bundle command error: ${e&&e.message||e}`,_ts:Date.now()/1000});
           renderMessages();
@@ -1615,7 +1615,9 @@ async function send(){
       }
     }
   }
-  if(!S.session){await newSession();await renderSessionList();}
+  // newSession already refreshes the sidebar asynchronously. Its network
+  // response must not delay dispatch of the first message.
+  if(!S.session){await newSession();}
 
   const activeSid=S.session.session_id;
   _sendInProgressSid=activeSid;
@@ -2740,10 +2742,10 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
   let _lastRunJournalEventId=reconnecting
     ? String((INFLIGHT[activeSid]&&INFLIGHT[activeSid].lastRunJournalEventId)||'')
     : '';
-  const _STREAM_FADE_MS=620;
-  const _STREAM_FADE_MAX_MS=900;
-  const _STREAM_FADE_DONE_MAX_MS=1000;
-  const _STREAM_FADE_DONE_DRAIN_MAX_MS=1400;
+  const _STREAM_FADE_MS=140;
+  const _STREAM_FADE_MAX_MS=220;
+  const _STREAM_FADE_DONE_MAX_MS=220;
+  const _STREAM_FADE_DONE_DRAIN_MAX_MS=350;
   const _anchorApi=(typeof window!=='undefined'&&window.HermesAssistantTurnAnchors)
     ? window.HermesAssistantTurnAnchors
     : null;
@@ -5071,7 +5073,7 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
       _streamFadeArrivalWps=0;
     }
 
-    if(now<_streamFadeHoldUntilMs){
+    if(now<_streamFadeHoldUntilMs&&backlogWords<=12){
       return {text:_streamFadeVisibleText,caughtUp:false,changed:false};
     }
 
@@ -5086,9 +5088,12 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
     _streamFadeWordCarry+=elapsedMs*wordsPerSecond/1000;
     if(!_streamFadeVisibleText) _streamFadeWordCarry=Math.max(_streamFadeWordCarry,1);
     let wordsToReveal=Math.floor(_streamFadeWordCarry);
-    // At very high throughput, cap each frame to a small readable wave. Sustained
-    // playback still catches up, but whole paragraphs no longer pop in at once.
-    const waveCap=backlogWords>=160?3:2;
+    // Never let animation manufacture a large backlog behind received output.
+    // Keep small arrivals smooth, but catch bursts up in bounded batches so
+    // rendering still yields between large Markdown updates.
+    const catchingUp=backlogWords>12;
+    if(catchingUp) wordsToReveal=Math.max(wordsToReveal,backlogWords-8);
+    const waveCap=catchingUp?128:2;
     wordsToReveal=Math.min(wordsToReveal,waveCap,backlogWords);
     if(wordsToReveal<1) return {text:_streamFadeVisibleText,caughtUp:false,changed:false};
     _streamFadeWordCarry=Math.max(0,_streamFadeWordCarry-wordsToReveal);
@@ -5104,11 +5109,11 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
     const chunk=remaining.slice(0,cut);
     const paragraphMatch=chunk.match(/\n\s*\n/);
     const paragraphBreak=paragraphMatch ? paragraphMatch.index : -1;
-    if(paragraphMatch) cut=paragraphBreak+paragraphMatch[0].length;
+    if(paragraphMatch&&!catchingUp) cut=paragraphBreak+paragraphMatch[0].length;
     const revealed=remaining.slice(0,cut);
     _streamFadeVisibleText+=revealed;
     _streamFadeVisibleWords+=_streamFadeWordCountOf(revealed);
-    const pauseMs=_streamFadePauseAfter(revealed,paragraphBreak);
+    const pauseMs=catchingUp?0:_streamFadePauseAfter(revealed,paragraphBreak);
     if(pauseMs) _streamFadeHoldUntilMs=now+pauseMs;
     if(_streamFadeVisibleText.length>targetText.length) _streamFadeVisibleText=targetText;
     return {text:_streamFadeVisibleText,caughtUp:_streamFadeVisibleText===targetText,changed:true};
@@ -5539,7 +5544,11 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
       if(typeof window._fixMobileScrollJank==='function') window._fixMobileScrollJank();
       _lastRenderMs=performance.now();
       const parsed=_cachedParsed&&_cachedParsedText===assistantText&&_cachedParsedReasoning===liveReasoningText ? _cachedParsed : _parseStreamState();
-      _cachedParsed=null;
+      // Fade frames can advance without a new token. Retain one parse for
+      // this stream; either accumulator changing invalidates it above.
+      _cachedParsed=parsed;
+      _cachedParsedText=assistantText;
+      _cachedParsedReasoning=liveReasoningText;
       _renderLiveThinking(parsed);
       const displayText = segmentStart===0
         ? parsed.displayText                          // first segment: uses think-tag stripping

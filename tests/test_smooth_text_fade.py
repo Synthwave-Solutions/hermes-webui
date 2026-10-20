@@ -9,7 +9,7 @@ PANELS_JS = (REPO / "static" / "panels.js").read_text(encoding="utf-8")
 MESSAGES_JS = (REPO / "static" / "messages.js").read_text(encoding="utf-8")
 BOOT_JS = (REPO / "static" / "boot.js").read_text(encoding="utf-8")
 STYLE_CSS = (REPO / "static" / "style.css").read_text(encoding="utf-8")
-I18N_JS = (REPO / "static" / "i18n.js").read_text(encoding="utf-8")
+I18N_JS = (REPO / "static" / "i18n" / "en.js").read_text(encoding="utf-8")
 
 FADE_SETTING = "fade_text_effect"
 FADE_CHECKBOX_ID = "settingsFadeTextEffect"
@@ -84,12 +84,12 @@ let _streamFadeArrivalWps=0;
 let _streamFadeLatestAnimationEndAt=0;
 let _streamFadeVisibleWords=0;
 let _streamFadeHoldUntilMs=0;
-let _streamFadeCurrentMs=620;
+let _streamFadeCurrentMs=140;
 let _streamFadeDomText='';
-const _STREAM_FADE_MS=620;
-const _STREAM_FADE_MAX_MS=900;
-const _STREAM_FADE_DONE_MAX_MS=1000;
-const _STREAM_FADE_DONE_DRAIN_MAX_MS=1400;
+const _STREAM_FADE_MS=140;
+const _STREAM_FADE_MAX_MS=220;
+const _STREAM_FADE_DONE_MAX_MS=220;
+const _STREAM_FADE_DONE_DRAIN_MAX_MS=350;
 const performance={performance_stub};
 {helpers}
 """
@@ -215,9 +215,9 @@ def test_stream_fade_appends_new_spans_without_replacing_existing_nodes():
     script = (
         function_block(MESSAGES_JS, "_streamFadeAppendText")
         + r"""
-const _STREAM_FADE_MS=620;
+const _STREAM_FADE_MS=140;
 let _streamFadeLatestAnimationEndAt=0;
-let _streamFadeCurrentMs=620;
+let _streamFadeCurrentMs=140;
 const performance={_t:0,now(){return this._t;}};
 function _streamFadeReduceMotionEnabled(){ return false; }
 class FakeNode{
@@ -394,7 +394,7 @@ def test_transparent_anchor_prose_receives_revealed_fade_text():
 
 def test_stream_fade_done_drain_has_hard_cap_for_large_buffered_responses():
     drain_block = function_block(MESSAGES_JS, "_drainStreamFadeBeforeDone")
-    assert "const _STREAM_FADE_DONE_DRAIN_MAX_MS=1400" in MESSAGES_JS
+    assert "const _STREAM_FADE_DONE_DRAIN_MAX_MS=350" in MESSAGES_JS
     assert_contains_all(
         drain_block,
         [
@@ -455,7 +455,7 @@ def test_stream_fade_css_is_opacity_only_and_hides_live_cursor():
         [
             "@keyframes stream-fade-word-in",
             ".stream-fade-word.is-new",
-            "var(--stream-fade-ms,620ms) cubic-bezier(.16,.84,.32,1)",
+            "var(--stream-fade-ms,140ms) cubic-bezier(.16,.84,.32,1)",
             "35%{opacity:.18;}",
             "70%{opacity:.72;}",
             "prefers-reduced-motion: reduce",
@@ -483,18 +483,18 @@ const words=Array.from({length:260},(_,i)=>'w'+i).join(' ');
 performance._t += 33;
 let out=_streamFadeNextText('slow start');
 if(!out.changed) throw new Error('expected initial reveal');
-if(_streamFadeCurrentMs !== 620) throw new Error(`expected base fade 620ms, got ${_streamFadeCurrentMs}`);
-for(let frame=0;frame<20&&_streamFadeCurrentMs<900;frame++){
+if(_streamFadeCurrentMs !== 140) throw new Error(`expected base fade 140ms, got ${_streamFadeCurrentMs}`);
+for(let frame=0;frame<20&&_streamFadeCurrentMs<220;frame++){
   performance._t += 120;
   out=_streamFadeNextText(words);
 }
-if(_streamFadeCurrentMs !== 900) throw new Error(`expected max fade 900ms, got ${_streamFadeCurrentMs}`);
+if(_streamFadeCurrentMs !== 220) throw new Error(`expected max fade 220ms, got ${_streamFadeCurrentMs}`);
 """
     )
     run_node(script)
 
 
-def test_stream_fade_playout_handles_fast_models_without_paragraph_pops():
+def test_stream_fade_playout_handles_fast_models_with_bounded_catchup():
     script = (
         fade_helper_script()
         + r"""
@@ -519,7 +519,7 @@ for(let frame=0;frame<40;frame++){
   const shown=(out.text.match(/\S+/g)||[]).length;
   const revealed=shown-previous;
   previous=shown;
-  if(revealed>3) throw new Error(`revealed too much in one frame: ${revealed}`);
+  if(revealed>128) throw new Error(`revealed too much in one frame: ${revealed}`);
 }
 if(previous<50) throw new Error(`too slow under large backlog: ${previous}`);
 """
@@ -557,3 +557,15 @@ if(afterBreak.changed) throw new Error('expected paragraph pause to hold next re
 """
     )
     run_node(script)
+
+
+def test_large_received_burst_is_visible_within_half_a_second():
+    run_node(fade_helper_script() + r'''
+const target=Array.from({length:500},(_,i)=>'word'+i).join(' ');
+let out;
+for(let frame=0;frame<15;frame++){
+  performance._t+=33;
+  out=_streamFadeNextText(target);
+}
+if(out.text!==target) throw new Error(`UI still hides ${target.length-out.text.length} received characters after 495ms`);
+''')
