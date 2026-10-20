@@ -16858,7 +16858,8 @@ function _processWakeupCardHtml(info, rawText, extras){
   // wrapping value in the expanded detail so touch/keyboard users can read it
   // without relying on a hover tooltip (#6350 review finding 4).
   const patternRow=(isWatch&&info.pattern)?`<div class="process-wakeup-pattern-row"><span class="process-wakeup-detail-key">${esc(t('process_wakeup_matched'))}</span><code>${esc(String(info.pattern))}</code></div>`:'';
-  return `<details class="process-wakeup-card"><summary class="process-wakeup-summary"><span class="process-wakeup-toggle">${li('chevron-right',12)}</span><span class="process-wakeup-label">${li('terminal',13)}<span>${esc(t('process_wakeup_label'))}</span></span>${chip}${extras.timeHtml||''}</summary><div class="process-wakeup-detail">${extras.filesHtml||''}${patternRow}${exitRow}${cmdRow}<div class="msg-body process-wakeup-body">${outHtml}</div>${extras.footHtml||''}</div></details>`;
+  const explanation=t(isWatch?'process_wakeup_watch_help':(exitOk?'process_wakeup_success_help':(exitKnown?'process_wakeup_failed_help':'process_wakeup_unknown_help')));
+  return `<details class="process-wakeup-card"><summary class="process-wakeup-summary"><span class="process-wakeup-toggle">${li('chevron-right',12)}</span><span class="process-wakeup-label">${li('terminal',13)}<span>${esc(t('process_wakeup_label'))}</span></span>${chip}${extras.timeHtml||''}</summary><div class="process-wakeup-detail"><p class="process-wakeup-explanation">${esc(explanation)}</p>${extras.filesHtml||''}${patternRow}<details class="process-wakeup-technical"><summary>${esc(t('process_wakeup_technical'))}</summary>${exitRow}${cmdRow}<div class="msg-body process-wakeup-body">${outHtml}</div></details>${extras.footHtml||''}</div></details>`;
 }
 
 // Group conversations: name the writer above their message. Only rendered when
@@ -17493,9 +17494,12 @@ function renderMessages(options){
         if(row.dataset.rawText!==processText||row._wakeupRenderedHtml!==nextRowHtml){
           const _priorCard=row.querySelector&&row.querySelector('details.process-wakeup-card');
           const _wasOpen=!!(_priorCard&&_priorCard.open);
+          const _technicalOpen=!!row.querySelector('details.process-wakeup-technical[open]');
           row.dataset.rawText=processText;
           row._wakeupRenderedHtml=nextRowHtml;
           row.innerHTML=nextRowHtml;
+          const _technical=row.querySelector('details.process-wakeup-technical');
+          if(_technical) _technical.open=_technicalOpen;
           if(_wasOpen){
             const _card=row.querySelector('details.process-wakeup-card');
             if(_card) _card.open=true;

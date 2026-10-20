@@ -142,11 +142,16 @@ def test_completion_details_are_keyboard_accessible_without_command_in_summary(w
               document.querySelector('main').innerHTML=_processWakeupCardHtml(
                 {type:'completion',command,output,exitCode:code}, '', {});
             }''', {'command': command, 'output': output, 'code': code})
-            summary = page.locator('summary')
+            summary = page.locator('.process-wakeup-summary')
             assert command not in summary.inner_text()
             assert f'process_wakeup_{status}' in summary.inner_text()
             assert not page.locator('.process-wakeup-text').is_visible()
             summary.focus()
+            page.keyboard.press('Enter')
+            assert page.locator('.process-wakeup-explanation').is_visible()
+            assert not page.locator('.process-wakeup-text').is_visible()
+            technical = page.locator('.process-wakeup-technical > summary')
+            technical.focus()
             page.keyboard.press('Enter')
             page.locator('.process-wakeup-text').wait_for(state='visible')
             assert page.locator('.process-wakeup-text').text_content() == output
