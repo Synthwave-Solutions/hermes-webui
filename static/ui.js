@@ -9,7 +9,7 @@ const S={_bootReady:false,session:null,messages:[],entries:[],busy:false,pending
 
 function defaultAssistantDisplayName(value){
   const name=value||'SynthPulse';
-  return /^(?:Hermes|SynPulse|SynthPulse)(?: Control)?$/.test(name)?'SynthPulse':name;
+  return /^(?:Hermes(?: Agent| WebUI)?|SynPulse|SynthPulse)(?: Control)?$/.test(name)?'SynthPulse':name;
 }
 function assistantDisplayName(){
   if(S.activeProfile&&S.activeProfile!=='default') return S.activeProfile.charAt(0).toUpperCase()+S.activeProfile.slice(1);
@@ -16843,20 +16843,22 @@ function _processWakeupCardHtml(info, rawText, extras){
   }else{
     const cls=exitOk?'ok':(exitKnown?'fail':'neutral');
     const icon=exitOk?li('check',11):(exitKnown?li('x',11):'');
-    chip=`<span class="process-wakeup-chip ${cls}">${icon}<span>exit ${esc(exitStr||'?')}</span></span>`;
+    const status=t(exitOk?'process_wakeup_success':(exitKnown?'process_wakeup_failed':'process_wakeup_unknown'));
+    chip=`<span class="process-wakeup-chip ${cls}" title="exit ${esc(exitStr||'?')}">${icon}<span>${esc(status)}</span></span>`;
   }
-  const cmdHtml=info.command?`<code class="process-wakeup-cmd" title="${esc(info.command)}">${esc(info.command)}</code>`:'';
+  // Shell commands belong in the disclosure, never in the conversation summary.
   // Preserve output byte-for-byte for the <pre>; trim ONLY for the
   // empty/non-empty decision so leading indentation and trailing blank lines
   // survive (#6350 review finding 1).
   const outRaw=info.output!=null?String(info.output):String(rawText||'');
   const outHtml=outRaw.trim()?`<pre class="process-wakeup-text">${esc(outRaw)}</pre>`:'';
+  const exitRow=isWatch?'':`<div class="process-wakeup-pattern-row"><code>exit ${esc(exitStr||'?')}</code></div>`;
   const cmdRow=info.command?`<div class="process-wakeup-cmd-row"><code>${esc(info.command)}</code></div>`:'';
   // The collapsed watch chip truncates the pattern; surface the full,
   // wrapping value in the expanded detail so touch/keyboard users can read it
   // without relying on a hover tooltip (#6350 review finding 4).
   const patternRow=(isWatch&&info.pattern)?`<div class="process-wakeup-pattern-row"><span class="process-wakeup-detail-key">${esc(t('process_wakeup_matched'))}</span><code>${esc(String(info.pattern))}</code></div>`:'';
-  return `<details class="process-wakeup-card"><summary class="process-wakeup-summary"><span class="process-wakeup-toggle">${li('chevron-right',12)}</span><span class="process-wakeup-label">${li('terminal',13)}<span>${esc(t('process_wakeup_label'))}</span></span>${cmdHtml}${chip}${extras.timeHtml||''}</summary><div class="process-wakeup-detail">${extras.filesHtml||''}${patternRow}${cmdRow}<div class="msg-body process-wakeup-body">${outHtml}</div>${extras.footHtml||''}</div></details>`;
+  return `<details class="process-wakeup-card"><summary class="process-wakeup-summary"><span class="process-wakeup-toggle">${li('chevron-right',12)}</span><span class="process-wakeup-label">${li('terminal',13)}<span>${esc(t('process_wakeup_label'))}</span></span>${chip}${extras.timeHtml||''}</summary><div class="process-wakeup-detail">${extras.filesHtml||''}${patternRow}${exitRow}${cmdRow}<div class="msg-body process-wakeup-body">${outHtml}</div>${extras.footHtml||''}</div></details>`;
 }
 
 // Group conversations: name the writer above their message. Only rendered when
@@ -17399,7 +17401,9 @@ function renderMessages(options){
         return _renderAttachmentHtml(fname,fileUrl);
       }).join('')}</div>`;
     }
-    let bodyHtml = _getCachedRender(displayContent, isUser);
+    // Process notices have their own escaped plain-text renderer below.
+    // Avoid parsing/caching potentially huge logs as Markdown just to discard it.
+    let bodyHtml = isProcessWakeup ? '' : _getCachedRender(displayContent, isUser);
     if(!isUser&&m.provider_details){
       const summary=m.provider_details_label||'Provider details';
       bodyHtml += `<details class="provider-error-details"><summary>${esc(String(summary))}</summary><pre><code>${esc(String(m.provider_details))}</code></pre></details>`;
