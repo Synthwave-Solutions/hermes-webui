@@ -2518,8 +2518,11 @@ def _extract_inline_thinking_from_content(raw_content, existing_reasoning='', *,
     # thinking block from re-walking the whole growing answer tail every token
     # (#3633 Codex perf catch: the per-token full walk was O(n^2) over a stream).
     next_opener = _next_inline_thinking_opener(text, 0)
+    # Input is immutable during this parse: a missing opener stays missing.
+    # Re-scanning every suffix of a partial-tag reply makes this quadratic.
+    has_partial_tail = streaming and _text_tail_is_partial_opener(text)
     while index < length:
-        if next_opener == -1 or index > next_opener:
+        if next_opener != -1 and index > next_opener:
             next_opener = _next_inline_thinking_opener(text, index)
         if next_opener == -1:
             # No further COMPLETE opener ahead. The remaining tail is plain
@@ -2532,7 +2535,7 @@ def _extract_inline_thinking_from_content(raw_content, existing_reasoning='', *,
             # normal loop (bounded — a partial tail is a transient single token)
             # rather than bulk-skipping. Otherwise stop (avoids re-walking the
             # growing answer tail every token — #3633 perf catch).
-            if streaming and _text_tail_is_partial_opener(text):
+            if has_partial_tail:
                 pass  # fall through to the code-aware char walk for the tail
             else:
                 break
@@ -2589,8 +2592,9 @@ def _extract_inline_thinking_from_content(raw_content, existing_reasoning='', *,
             if streaming:
                 matched_partial = False
                 for open_tag, _close_tag in _INLINE_THINKING_TAG_PAIRS:
-                    rest = text[index:]
-                    if len(rest) < len(open_tag) and open_tag.startswith(rest):
+                    # Only a short tail can be a partial tag; do not copy
+                    # the growing suffix at every character of a large reply.
+                    if length - index < len(open_tag) and open_tag.startswith(text[index:]):
                         if not seen_nonspace:
                             leading_removed = True
                         visible.append(text[cursor:index])

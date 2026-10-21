@@ -302,8 +302,11 @@ function _extractInlineThinkingFromContent(rawContent, existingReasoning, option
   // plain trailing content instead of walking it char-by-char every streamed token
   // (#3633 Codex per-token perf catch).
   let nextOpener=_nextThinkingOpener(text,0);
+  // The input is immutable during this parse. A missing opener stays missing;
+  // rescanning each suffix makes a long reply ending in <thi quadratic.
+  const hasPartialTail=streaming&&_textTailIsPartialOpener(text);
   while(index<text.length){
-    if(nextOpener===-1||index>nextOpener) nextOpener=_nextThinkingOpener(text,index);
+    if(nextOpener!==-1&&index>nextOpener) nextOpener=_nextThinkingOpener(text,index);
     if(nextOpener===-1){
       // No further COMPLETE opener ahead — remaining tail is plain and is
       // appended in one slice, EXCEPT during streaming when the tail is a prefix
@@ -312,7 +315,7 @@ function _extractInlineThinkingFromContent(rawContent, existingReasoning, option
       // inline-backtick / fenced / indented code stays visible — master parity).
       // Code state needs the char walk, so fall through in that case (bounded —
       // a partial tail is a transient single token) instead of bulk-skipping.
-      if(streaming&&_textTailIsPartialOpener(text)){
+      if(hasPartialTail){
         // fall through to the code-aware char walk for the tail
       } else {
         break;
