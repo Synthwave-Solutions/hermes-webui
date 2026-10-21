@@ -14308,11 +14308,12 @@ function _refreshTransparentLiveRow(existing, node, opts){
 function _renderLiveAnchorActivitySceneForStream(streamId, sessionId, opts){
   const requestedMode=opts&&opts.mode;
   const activeMode=chatActivityMode();
-  const mode=activeMode==='hide_all_activity'
-    ? 'hide_all_activity'
-    : (requestedMode==='compact_worklog'||requestedMode==='transparent_stream'||requestedMode==='hide_all_activity'
+  // Hidden activity has no DOM work. Avoid projecting/sanitizing the entire
+  // growing registry each frame; keep its events for a later mode switch.
+  if(activeMode==='hide_all_activity') return false;
+  const mode=requestedMode==='compact_worklog'||requestedMode==='transparent_stream'||requestedMode==='hide_all_activity'
     ? requestedMode
-    : activeMode);
+    : activeMode;
   const scene=_projectLiveAnchorActivitySceneForStream(streamId,mode);
   if(!scene) return false;
   return renderLiveAnchorActivityScene(streamId,scene,{...(opts||{}),sessionId});
