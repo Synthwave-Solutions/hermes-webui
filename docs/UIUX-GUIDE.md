@@ -259,3 +259,11 @@ first use. Expired/missing manifests fall back to eager discovery. This depends 
 the agent's SDK cache-hint presence fix; refresh old manifests from their servers
 instead of stripping their recorded zero TTL. Other profiles and model/effort
 settings are unchanged.
+
+Streaming partial thinking tags: the browser and server parsers retain a negative
+opener search within each immutable input, and evaluate the partial-tail predicate
+once. This avoids repeated full-suffix searches while preserving code-aware
+handling of incomplete tags. Python also checks the remaining length before copying
+a suffix. No state survives the parser call; reasoning, literal code, replay and
+settled content retain the same semantics. Regression coverage executes the actual
+JavaScript parser and its Python mirror on long partial-tag replies.
