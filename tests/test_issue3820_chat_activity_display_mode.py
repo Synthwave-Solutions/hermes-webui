@@ -216,7 +216,7 @@ process.stdout.write(JSON.stringify({{helperResult, snapshotResult, compactOverr
     assert result["captured"] == [
         {"streamId": "stream-1", "sceneMode": "hide_all_activity", "optMode": "hide_all_activity", "sessionId": "sid-1"},
         {"streamId": "stream-2", "optMode": "transparent_stream", "sessionId": "sid-2"},
-        {"streamId": "stream-3", "sceneMode": "hide_all_activity", "optMode": "compact_worklog", "sessionId": "sid-3"},
+        # Authoritative hidden mode skips projection and the renderer entirely.
     ]
 
 

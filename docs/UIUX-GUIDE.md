@@ -267,3 +267,9 @@ handling of incomplete tags. Python also checks the remaining length before copy
 a suffix. No state survives the parser call; reasoning, literal code, replay and
 settled content retain the same semantics. Regression coverage executes the actual
 JavaScript parser and its Python mirror on long partial-tag replies.
+
+When the user's activity mode is “Final answer only”, the live scene entry point
+skips activity projection as well as DOM rendering. Incoming activity still
+updates its registry; switching back to Compact Worklog or Transparent Stream
+projects the complete current registry. This removes hidden per-frame work
+without changing event collection, final answers, or visible-mode rendering.
