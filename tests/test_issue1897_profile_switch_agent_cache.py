@@ -94,12 +94,14 @@ def test_same_session_profile_switch_rebuilds_agent_under_new_soul_home(tmp_path
             }
 
     constructed_agents = []
+    opened_databases = []
     prompts_used_for_runs = []
     homes_seen_during_runs = []
 
     class SoulCachingAgent:
         def __init__(self, **kwargs):
             self.session_id = kwargs.get("session_id")
+            self._session_db = kwargs.get("session_db")
             self.model = kwargs.get("model")
             self.provider = kwargs.get("provider")
             self.base_url = kwargs.get("base_url")
@@ -133,6 +135,12 @@ def test_same_session_profile_switch_rebuilds_agent_under_new_soul_home(tmp_path
                 ]
             }
 
+        def clear_interrupt(self):
+            return True
+
+        def commit_memory_session(self):
+            return None
+
         def interrupt(self, _message):
             return None
 
@@ -146,7 +154,12 @@ def test_same_session_profile_switch_rebuilds_agent_under_new_soul_home(tmp_path
     fake_hermes_cli = types.ModuleType("hermes_cli")
     fake_hermes_cli.runtime_provider = fake_runtime_module
     fake_hermes_state = types.ModuleType("hermes_state")
-    fake_hermes_state.SessionDB = lambda: None
+    from tests.test_streaming_session_db_reuse import Database
+    def open_database(db_path):
+        db = Database(Path(db_path))
+        opened_databases.append(db)
+        return db
+    fake_hermes_state.SessionDB = open_database
 
     def home_for_profile(profile_name):
         return {"alpha": profile_a_home, "beta": profile_b_home}[profile_name]
@@ -164,7 +177,7 @@ def test_same_session_profile_switch_rebuilds_agent_under_new_soul_home(tmp_path
     monkeypatch.setattr(
         oauth,
         "resolve_runtime_provider_with_anthropic_env_lock",
-        lambda _resolver, requested=None: {
+        lambda _resolver, requested=None, **kwargs: {
             "provider": requested or "test-provider",
             "api_key": "synthetic-key",
             "base_url": None,
@@ -202,9 +215,15 @@ def test_same_session_profile_switch_rebuilds_agent_under_new_soul_home(tmp_path
     run_turn("alpha", "issue1897-stream-1", "first turn")
     run_turn("alpha", "issue1897-stream-2", "same profile second turn")
     assert len(constructed_agents) == 1, "same-profile turns should reuse the cached agent"
+    assert len(opened_databases) == 1, "cached turns must not reopen the session database"
+    assert constructed_agents[0]._session_db is opened_databases[0]
 
     run_turn("beta", "issue1897-stream-3", "profile switched turn")
 
+    assert len(opened_databases) == 2
+    opened_databases[0].close()
+    assert opened_databases[1].db_path == profile_b_home / 'state.db'
+    opened_databases[1].close()
     assert prompts_used_for_runs == [
         "PROFILE_ALPHA_SYNTHETIC_SOUL",
         "PROFILE_ALPHA_SYNTHETIC_SOUL",

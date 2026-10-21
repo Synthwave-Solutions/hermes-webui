@@ -6395,12 +6395,27 @@ def _last_resort_sync_from_core(session, stream_id, agent_lock):
         )
 
 
-def _build_session_db_for_stream(state_db_path):
-    """Build a per-request SessionDB handle for WebUI session search.
+def _build_session_db_for_stream(state_db_path, *, cached_agent=None):
+    """Reuse the matching cached agent database, or open a new session-search handle.
 
     Returns ``None`` if the helper module or constructor fails so callers can
     continue without session_search rather than propagating a hard failure.
     """
+    existing = getattr(cached_agent, '_session_db', None)
+    guard = getattr(existing, '_halt_if_db_generation_changed', None)
+    if (
+        existing is not None and state_db_path is not None
+        and getattr(existing, '_conn', None) is not None
+        and getattr(existing, '_read_conns_closed', True) is False
+        and not getattr(existing, 'read_only', False)
+        and callable(guard)
+        and Path(existing.db_path).absolute() == Path(state_db_path).absolute()
+    ):
+        # Core generation failures must propagate, never turn into an unchecked
+        # reopen. The agent owns this handle through eviction/self-heal; normal
+        # database reads and writes retain their own generation guards too.
+        guard()
+        return existing
     try:
         from hermes_state import SessionDB
         return SessionDB(db_path=state_db_path)
@@ -8281,7 +8296,7 @@ def _run_agent_streaming(
 
             # Initialize SessionDB so session_search works in WebUI sessions
             _state_db_path = (Path(_profile_home) / "state.db") if _profile_home else None
-            _session_db = _build_session_db_for_stream(_state_db_path)
+            _session_db = None  # Open only after resolving cached-agent ownership.
             resolved_model, resolved_provider, resolved_base_url = resolve_model_provider(
                 model_with_provider_context(model, provider_context)
             )
@@ -8566,6 +8581,8 @@ def _run_agent_streaming(
             # Mirrors gateway _agent_cache.  Keeps _user_turn_count alive so
             # injectionFrequency: "first-turn" actually suppresses after turn 1.
             if ephemeral:
+                _session_db = _build_session_db_for_stream(_state_db_path)
+                _agent_kwargs['session_db'] = _session_db
                 with _run_timing_stage('agent_constructor'):
                     agent = _AIAgent(**_agent_kwargs)
                     from api.personal_mnemosyne import attach as _attach_personal_memory
@@ -8680,7 +8697,9 @@ def _run_agent_streaming(
                         agent.clarify_callback = _agent_kwargs.get('clarify_callback')
                     if 'prefill_messages' in _agent_kwargs and hasattr(agent, 'prefill_messages'):
                         agent.prefill_messages = list(_agent_kwargs.get('prefill_messages') or [])
-                    if _session_db is not None:
+                    _session_db = _build_session_db_for_stream(_state_db_path, cached_agent=agent)
+                    _agent_kwargs['session_db'] = _session_db
+                    if _session_db is not None and _session_db is not getattr(agent, '_session_db', None):
                         # Close any previously held SessionDB connection before
                         # replacing it. Without this, each streaming request creates
                         # a new SessionDB whose WAL handles leak indefinitely,
@@ -8694,6 +8713,8 @@ def _run_agent_streaming(
                     if hasattr(agent, '_api_call_count'):
                         agent._api_call_count = 0
                 else:
+                    _session_db = _build_session_db_for_stream(_state_db_path)
+                    _agent_kwargs['session_db'] = _session_db
                     with _run_timing_stage('agent_constructor'):
                         agent = _AIAgent(**_agent_kwargs)
                         from api.personal_mnemosyne import attach as _attach_personal_memory

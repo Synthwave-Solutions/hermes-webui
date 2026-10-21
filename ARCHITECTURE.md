@@ -1724,3 +1724,14 @@ rows using one read-only state.db connection and bounded SQL chunks. The lookup
 is request-local, not cached: stale index sources are still corrected to
 read-only subagent rows, while mutation endpoints retain their independent
 single-session guards. No transcript or authorization state is changed.
+
+### Session database reuse during chat startup
+
+A healthy cached agent retains its session database across turns. The worker opens
+that database only after resolving agent ownership, and reuses it only for the
+same explicit profile database path, an open writable handle, and an available
+core generation guard. The guard runs before reuse; replaced database or WAL
+generation errors propagate rather than being hidden by reopening. Older cores
+without the guard, closed handles, and different profile paths retain the fresh
+open path. Existing agent eviction and credential self-heal own handle cleanup.
+No transcript, tool schemas, model selection, or prompt context is cached here.
