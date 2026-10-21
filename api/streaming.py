@@ -332,7 +332,10 @@ def _persistent_state_snapshot(profile_home: str | None, memory_home: str | None
         budget = _PERSISTENT_SKILL_SCAN_CAP
         for current, dirs, files in os.walk(skills_dir, followlinks=True):
             try:
-                real = os.path.realpath(current)
+                # Follow directory symlinks once, rather than resolving every
+                # ancestor on every visit. Device + inode also closes link cycles.
+                st = os.stat(current)
+                real = (st.st_dev, st.st_ino) if st.st_ino else os.path.realpath(current)
             except OSError:
                 dirs[:] = []
                 continue
@@ -348,7 +351,7 @@ def _persistent_state_snapshot(profile_home: str | None, memory_home: str | None
                 continue
             skill_md = Path(current) / "SKILL.md"
             try:
-                rel = str(skill_md.relative_to(skills_dir)).replace("\\", "/")
+                rel = os.path.relpath(skill_md, skills_dir).replace("\\", "/")
             except ValueError:
                 rel = str(skill_md)
             sig = _file_signature(skill_md)
