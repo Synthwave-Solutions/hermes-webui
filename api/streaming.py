@@ -362,6 +362,44 @@ def _persistent_state_snapshot(profile_home: str | None, memory_home: str | None
     return {"memory": memory, "skills": skills}
 
 
+class _PersistentStateSnapshotTask:
+    """One turn-owned, explicit-path scan; join before model work and on every exit."""
+
+    def __init__(self, profile_home, memory_home, session_id):
+        self.started = self.finished = None
+        self.error = None
+        self.snapshot = None
+
+        def capture():
+            self.started = time.perf_counter()
+            try:
+                self.snapshot = _persistent_state_snapshot(profile_home, memory_home)
+            except BaseException as exc:
+                self.error = exc
+            finally:
+                self.finished = time.perf_counter()
+
+        self.thread = threading.Thread(
+            target=capture, name=f"persistent-snapshot-{session_id[:8]}", daemon=True,
+        )
+        try:
+            self.thread.start()
+        except RuntimeError:
+            # Resource-limited hosts retain the previous synchronous behavior.
+            self.thread = None
+            capture()
+
+    def join(self):
+        if self.thread is not None:
+            self.thread.join()
+
+    def result(self):
+        self.join()
+        if self.error is not None:
+            raise self.error
+        return self.snapshot
+
+
 def _persistent_state_changes(before: dict | None, after: dict | None) -> dict:
     before = before or {"memory": {}, "skills": {}}
     after = after or {"memory": {}, "skills": {}}
@@ -6864,7 +6902,7 @@ def _run_agent_streaming(
             'mcp_discovery', 'agent_run', 'checkpoint_join',
             'agent_constructor', 'cache_eviction_close',
             'prompt_context', 'bot_directory', 'cron_context', 'history_prepare',
-            'checkpoint_save', 'attachment_prepare', 'persistent_state_before',
+            'checkpoint_save', 'attachment_prepare', 'persistent_state_before', 'persistent_state_wait',
             'history_sanitize',
         } or outcome not in {'completed', 'skipped', 'unavailable', 'raised'}:
             return
@@ -7319,6 +7357,7 @@ def _run_agent_streaming(
     # leave the turn narrower than the user asked for. Declared above the
     # Issue #765 group so `_checkpoint_stop = None` keeps its adjacency to `try:`.
     _chat_mode = 'super'
+    _persistent_state_scan = None
     # Initialised here (before any code that may raise) so the outer `finally`
     # block can safely check `if _checkpoint_stop is not None` even when an
     # exception fires before the checkpoint thread is created (Issue #765).
@@ -8813,6 +8852,11 @@ def _run_agent_streaming(
                 "Never fall back to a hardcoded path when this tag is present."
             )
             _preparation_phase('agent_ready')
+            # These explicit-path reads overlap prompt/history/checkpoint prep.
+            # Constructor memory initialization has finished; no model/tool runs
+            # until result() below has joined this turn-owned scan.
+            _persistent_state_scan = _PersistentStateSnapshotTask(
+                _profile_home, str(_personal_root), session_id)
             # Resolve personality prompt from config.yaml agent.personalities
             # (matches hermes-agent CLI behavior — passes via ephemeral_system_prompt)
             _personality_prompt = None
@@ -8949,8 +8993,15 @@ def _run_agent_streaming(
                 agent._memory_manager.raw_user_content = msg_text
             with _run_timing_stage('attachment_prepare'):
                 user_message = _build_native_multimodal_message(workspace_ctx, _agent_msg_text, attachments, workspace, cfg=_cfg)
-            with _run_timing_stage('persistent_state_before'):
-                _persistent_state_before = _persistent_state_snapshot(_profile_home, str(_personal_root))
+            try:
+                with _run_timing_stage('persistent_state_wait'):
+                    _persistent_state_before = _persistent_state_scan.result()
+            finally:
+                _record_run_timing(
+                    'persistent_state_before', _persistent_state_scan.started,
+                    _persistent_state_scan.finished,
+                    outcome='raised' if _persistent_state_scan.error else 'completed',
+                )
             with _run_timing_stage('history_sanitize'):
                 _run_conversation_kwargs = dict(
                     user_message=user_message,
@@ -10330,6 +10381,10 @@ def _run_agent_streaming(
                 # per-session channel because the chat stream is closed by then.
                 _maybe_schedule_title_refresh(s, _session_channel_put(s.session_id), agent)
         finally:
+            # Join even when preparation fails/cancels before the normal barrier.
+            # This finally runs before credential-recovery model calls too.
+            if _persistent_state_scan is not None:
+                _persistent_state_scan.join()
             # #4729: guaranteed-exit flush of any reasoning tail still buffered. On the
             # normal path the on_token/on_tool/post-run flushes already emptied it (no-op
             # here); on an exception or retry path that bypassed those, this emits the tail

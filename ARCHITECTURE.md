@@ -1735,3 +1735,19 @@ generation errors propagate rather than being hidden by reopening. Older cores
 without the guard, closed handles, and different profile paths retain the fresh
 open path. Existing agent eviction and credential self-heal own handle cleanup.
 No transcript, tool schemas, model selection, or prompt context is cached here.
+
+### Fresh persistent-state snapshot preparation
+
+Each chat turn starts its memory/skill signature scan after agent construction and
+before independent prompt, roster, history and checkpoint preparation. The scan
+receives explicit profile and personal-memory paths, without copying runtime
+credentials or context into its thread. The worker joins the scan before the
+first model/tool run; its inner cleanup also joins on preparation errors and
+cancellation before credential-recovery paths can run. The scan remains fresh
+per turn, with unchanged skill traversal and notification comparisons. A host
+that cannot start another thread falls back to synchronous scanning.
+
+`persistent_state_before` timing measures actual scan duration;
+`persistent_state_wait` measures only the remaining blocking wait at the model
+barrier. These intervals overlap other preparation stages and must not be summed
+as serial wall-clock costs.
