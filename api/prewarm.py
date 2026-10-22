@@ -116,3 +116,51 @@ def start_prewarm_thread() -> bool:
     t = threading.Thread(target=_run, name="webui-prewarm", daemon=True)
     t.start()
     return True
+
+
+_chat_warm_lock = threading.Lock()
+_chat_warm_state = 'cold'
+_chat_warm_retry_at = 0.0
+
+
+def _warm_chat_runtime() -> None:
+    # Only process-global Python imports. No agent construction, profile config,
+    # session reads, draft text, tool execution, or provider requests.
+    from api.streaming import _get_ai_agent, _prewarm_skill_tool_modules
+    if _get_ai_agent() is None:
+        raise RuntimeError('agent runtime unavailable')
+    _prewarm_skill_tool_modules()
+
+
+def start_chat_prewarm() -> str:
+    """Schedule at most one import worker; never block the composer request."""
+    global _chat_warm_state, _chat_warm_retry_at
+    if not _prewarm_enabled():
+        return 'disabled'
+    with _chat_warm_lock:
+        if _chat_warm_state in ('warming', 'ready'):
+            return _chat_warm_state
+        if time.monotonic() < _chat_warm_retry_at:
+            return 'deferred'
+        _chat_warm_state = 'warming'
+
+        def run():
+            global _chat_warm_state, _chat_warm_retry_at
+            started = time.perf_counter()
+            state = 'ready'
+            try:
+                _warm_chat_runtime()
+            except Exception:
+                state = 'cold'
+            finally:
+                with _chat_warm_lock:
+                    _chat_warm_state = state
+                    _chat_warm_retry_at = time.monotonic() + 30
+                print(f'[prewarm] chat runtime {state} ({(time.perf_counter()-started)*1000:.1f}ms)', flush=True)
+        try:
+            threading.Thread(target=run, name='webui-prewarm-chat', daemon=True).start()
+        except Exception:
+            _chat_warm_state = 'cold'
+            _chat_warm_retry_at = time.monotonic() + 30
+            return 'deferred'
+        return 'warming'

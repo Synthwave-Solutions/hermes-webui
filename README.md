@@ -887,3 +887,11 @@ the delegation changes, and restart the WebUI; retain the queue for diagnosis.
 MSP administrators can record implementation hours and agreed hourly rates on each scheduled task. My MSP totals these hours and shows annual support at 15% of job value; recording costs does not create an invoice. App-support levels are included in the infrastructure base retainer.
 
 See [annual MSP support hours](docs/msp-annual-support.md) for annual support budgets and monthly invoicing.
+
+Composer focus/typing now schedules a best-effort runtime import warmup through
+`POST /api/chat/prewarm`, behind the normal authentication, CSRF and governance
+guards. The browser sends an empty object, debounces focus/input and retries at
+most once every 30 seconds. The process runs one import worker and keeps the
+successful result until restart. It does not construct an agent, run tools,
+read a chat, or send a provider request. `HERMES_WEBUI_PREWARM=0` disables it.
+Only process-global import state changes; chat history and drafts are unchanged.

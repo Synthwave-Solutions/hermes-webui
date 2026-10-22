@@ -2315,6 +2315,26 @@ $('modelSelect').onchange=async()=>{
     if(warn&&typeof showToast==='function') showToast(warn,4000);
   }
 };
+// Composer runtime warmup: no draft/session data leaves the browser here.
+(function installComposerRuntimeWarmup(){
+  const composer=$('msg');
+  let timer=null, pending=false, lastAttempt=-Infinity;
+  function schedule(){
+    if(document.hidden || pending || timer!==null || Date.now()-lastAttempt<30000) return;
+    timer=setTimeout(()=>{
+      timer=null;
+      if(document.hidden || document.activeElement!==composer) return;
+      pending=true;
+      lastAttempt=Date.now();
+      Promise.resolve().then(()=>api('/api/chat/prewarm',{method:'POST',body:'{}'}))
+        .catch(()=>{}).finally(()=>{pending=false;});
+    },100);
+  }
+  composer.addEventListener('focus',schedule);
+  composer.addEventListener('input',schedule);
+})();
+// End composer runtime warmup.
+
 $('msg').addEventListener('input',()=>{
   if(typeof _composerDraftInputGeneration==='number') ++_composerDraftInputGeneration;
   updateSendBtn();
