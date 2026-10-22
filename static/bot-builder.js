@@ -6,7 +6,7 @@
     steps:['Identity & photo','Instructions & skills','Connections & tools','Access & review'],
     next:'Continue',back:'Back',save:'Create bot',saving:'Saving…'
   };
-  const tr=(key,fallback)=>typeof t==='function'?t(key):fallback;
+  const tr=(key,fallback)=>{const value=typeof t==='function'?t(key):null;return value&&value!==key?value:fallback;};
   function input(id){return document.getElementById(id);}
   async function readAvatar(file){
     if(!file || !['image/png','image/jpeg','image/webp'].includes(file.type))
@@ -111,7 +111,7 @@
     if(state.edit){
       input('builderBack').hidden=true;
       body.querySelectorAll('[data-builder-tab]').forEach(tab=>{
-        tab.onclick=()=>{if(!state||state.saving)return;if(window.BotKnowledge&&window.BotKnowledge.isBusy&&window.BotKnowledge.isBusy(state.config.name)){error(tr('bot_editor_knowledge_busy',"Wait for the knowledge file operation to finish."));return;}collect();state.step=Number(tab.dataset.builderTab);render();input('builderTab'+state.step).focus();};
+        tab.onclick=()=>{if(!state||state.saving)return;if(window.BotKnowledge&&window.BotKnowledge.isBusy&&window.BotKnowledge.isBusy(state.config.name)){error(tr('bot_editor_knowledge_busy',"Wait for the knowledge file operation to finish."));return;}collect();state.step=Number(tab.dataset.builderTab);render();input('builderTab'+state.step).focus();input('builderTab'+state.step).scrollIntoView({block:'nearest',inline:'nearest'});};
         tab.onkeydown=event=>{
           if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
           event.preventDefault();const tabs=[...body.querySelectorAll('[data-builder-tab]')];let index=tabs.indexOf(tab);
@@ -179,7 +179,7 @@
         _paintBotScoutTopics();
 
       }else{
-        box.innerHTML='<div class="bot-editor-actions"><button type="button" class="sm-btn" id="builderAssignTask">'+esc(tr('bot_editor_assign_task','Assign existing task'))+'</button><button type="button" class="sm-btn" id="builderCreateTask">'+esc(tr('bot_editor_new_task','New scheduled task'))+'</button></div><section id="profileBotJobs"></section>';
+        box.innerHTML='<div class="bot-task-toolbar"><button type="button" class="sm-btn" id="builderAssignTask">'+esc(tr('bot_editor_assign_task','Assign existing task'))+'</button><button type="button" class="sm-btn primary" id="builderCreateTask">'+esc(tr('bot_editor_new_task','New scheduled task'))+'</button></div><section id="profileBotJobs"></section>';
         input('builderAssignTask').onclick=()=>assignScheduledTaskToBot(p);
         input('builderCreateTask').onclick=()=>{collect();openCronCreate(p.name);};
         await _loadProfileBotJobs(p);
@@ -191,8 +191,8 @@
     try{
       const jobs=(await _botJobsAll()).filter(job=>job.managed_by!=='scout'&&_cronCanChangeBot(job)&&_cronJobBotName(job)!==p.name);
       if(state!==current)return;
-      const dialog=document.createElement('dialog');dialog.className='detail-card';
-      dialog.innerHTML='<form method="dialog"><h3>'+esc(tr('bot_editor_assign_title','Assign scheduled task'))+'</h3><p>'+esc(p.bot?.title||p.name)+' · '+esc(tr('bot_editor_assign_hint','Select a task. Its owner and schedule stay unchanged.'))+'</p><label>Task<select id="builderTaskChoice">'+jobs.map((job,i)=>'<option value="'+i+'">'+esc(job.name||job.id)+' · '+esc(job.owner_email||_cronOwnerProfileName(job))+'</option>').join('')+'</select></label><p role="alert" class="builder-task-error"></p><button type="submit" value="cancel" class="sm-btn">Cancel</button> <button type="button" class="sm-btn primary builder-task-assign" '+(!jobs.length?'disabled':'')+'>'+esc(tr('bot_editor_assign_save','Assign task'))+'</button></form>';
+      const dialog=document.createElement('dialog');dialog.className='bot-task-dialog';
+      dialog.innerHTML='<form method="dialog"><h3 id="builderTaskDialogTitle">'+esc(tr('bot_editor_assign_title','Assign scheduled task'))+'</h3><p>'+esc(p.bot?.title||p.name)+' · '+esc(tr('bot_editor_assign_hint','Select a task. Its owner and schedule stay unchanged.'))+'</p><label>'+esc(tr('task','Task'))+'<select id="builderTaskChoice">'+jobs.map((job,i)=>'<option value="'+i+'">'+esc(job.name||job.id)+' · '+esc(job.owner_email||_cronOwnerProfileName(job))+'</option>').join('')+'</select></label><p role="alert" class="builder-task-error"></p><div class="bot-task-dialog-actions"><button type="submit" value="cancel" class="sm-btn">'+esc(tr('cancel','Cancel'))+'</button> <button type="button" class="sm-btn primary builder-task-assign" '+(!jobs.length?'disabled':'')+'>'+esc(tr('bot_editor_assign_save','Assign task'))+'</button></div></form>';
       if(!jobs.length)dialog.querySelector('.builder-task-error').textContent=tr('bot_editor_no_tasks','No other editable scheduled tasks are available.');
       dialog.querySelector('.builder-task-assign').onclick=async event=>{
         const job=jobs[Number(dialog.querySelector('select').value)];if(!job)return;
@@ -204,6 +204,7 @@
           if(state===current)await mountAutomation();
         }catch(err){dialog.querySelector('.builder-task-error').textContent=err.message;event.target.disabled=false;}
       };
+      dialog.setAttribute('aria-labelledby','builderTaskDialogTitle');
       dialog.addEventListener('close',()=>dialog.remove(),{once:true});document.body.appendChild(dialog);dialog.showModal();
     }catch(err){error(err.message);}
   }
