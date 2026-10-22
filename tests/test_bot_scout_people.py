@@ -197,18 +197,17 @@ def test_response_carries_the_callers_own_state(scout_env):
 
 # -- Toolsets ---------------------------------------------------------------------
 
-def test_toolsets_name_only_read_only_mcp_servers_or_no_mcp(tmp_path):
-    assert bot_scout.toolsets_for([], tmp_path) == ["kanban", "skills", "web", "no_mcp"]
-    (tmp_path / "config.yaml").write_text(yaml.safe_dump({"mcp_servers": {
-        "notion": {"command": "x"}, "attio_api": {"command": "y"}}}))
-    assert bot_scout.toolsets_for(["AI"], tmp_path) == ["kanban", "skills", "web", "no_mcp"]
-    (tmp_path / "config.yaml").write_text(yaml.safe_dump({"mcp_servers": {
-        "notion": {"command": "x"}, "fireflies": {"command": "z"}}}))
-    assert bot_scout.toolsets_for([], tmp_path) == ["kanban", "skills", "web", "fireflies"]
-    (tmp_path / "config.yaml").write_text(yaml.safe_dump({"mcp_servers": {"fireflies": {"enabled": False}}}))
-    assert bot_scout.toolsets_for([], tmp_path) == ["kanban", "skills", "web", "no_mcp"]
-    for forbidden in ("terminal", "messaging", "send_message", "code_execution"):
-        assert forbidden not in bot_scout.toolsets_for(["x"], tmp_path)
+def test_toolsets_follow_bot_config_including_terminal_and_all_enabled_mcps(tmp_path):
+    cfg = {"platform_toolsets": {"cli": ["terminal", "skills", "web"]},
+           "mcp_servers": {"notion": {"command": "x"}, "attio_api": {"command": "y"},
+                           "off": {"command": "z", "enabled": False}}}
+    (tmp_path / "config.yaml").write_text(yaml.safe_dump(cfg))
+    tools = bot_scout.toolsets_for([], tmp_path)
+    assert {"terminal", "skills", "web", "notion", "attio_api"} <= set(tools)
+    assert "off" not in tools
+    cfg["platform_toolsets"]["cli"] = ["web"]
+    (tmp_path / "config.yaml").write_text(yaml.safe_dump(cfg))
+    assert "terminal" not in bot_scout.toolsets_for([], tmp_path)
 
 
 # -- The collector ----------------------------------------------------------------
