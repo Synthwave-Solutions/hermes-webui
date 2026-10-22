@@ -66,7 +66,7 @@ MCP connections and CLI tools are selected from capabilities available to the ed
 
 Use the conversation's participant picker to add people and up to six bots. Available bots are constrained by access, and bot access is checked again when a turn starts. Human membership and bot selection do not grant additional tool or data permissions.
 
-Choose **Talk to [bot name]** to target a bot using its stable ID. A message beginning with `@bot-id` does the same. With one bot, it can be selected automatically; with multiple bots, choose one explicitly. One selected bot responds per turn. This does not start an automatic multi-bot discussion or chain of handoffs.
+Choose **Talk to [bot name]** to target a bot using its stable ID. A message beginning with `@bot-id` does the same. With one bot, it can be selected automatically; with multiple bots, choose one explicitly. One selected bot responds per turn. Adding a bot does not itself start a turn. Explicit tool delegation can schedule a specialist or handoff as described below.
 
 Responses show the selected bot's identity. The authenticated person who sent the message remains the authorization principal, even when another person owns the conversation. The selected bot supplies its runtime configuration and knowledge reference list; the conversation retains its workspace and shared history.
 
@@ -182,3 +182,31 @@ the organization never shares a chat or changes a bot's permissions. Concurrent
 edits use revisions and ask the losing editor to retry rather than overwrite
 another tab's changes. There is no fixed nesting-depth limit; total stored
 sections and assignments are bounded to protect service resources.
+
+## Background specialists and group requests
+
+Every authenticated bot turn can discover the user's accessible bots through
+`delegate_to_bot(action="list")`. The default `action="delegate"` runs a bounded
+task in the target's own profile, private sub-conversation and configured model.
+Include necessary task context explicitly; the entire source history is not copied.
+The coordinating bot is resumed with the specialist's result and synthesizes the
+answer. The result notice links to the specialist conversation. Bots do not need
+to be members of the same chat. Child conversations are view-only and owned by the
+initiating human, including when that person is a guest in the originating group.
+
+`mode="handoff"` retains direct replies by bots already in the conversation.
+`action="request_join"` takes a reason in `task` and asks for human action using
+the existing participant controls; it never changes membership. Prefer background
+work unless ongoing shared participation is necessary.
+
+Both source and target access are rechecked before dispatch and return. Target
+restrictions and the originating permission ceiling remain enforced. One task can
+be queued per turn and chains are bounded to four handoffs. Cancellation of the
+originating turn cancels its pending task. An explicit busy response is retried;
+ambiguous starts and work interrupted by restart are reported, never silently
+replayed. Nested specialists must finish before an outer result is returned.
+
+Bot Screens now shows the relevant primary action (start, take over or hand back).
+Connection and administrator actions are in a separate disclosure, with a mode
+badge indicating viewing, private control or an inactive screen. Privacy leases,
+confirmation dialogs and access checks remain authoritative.

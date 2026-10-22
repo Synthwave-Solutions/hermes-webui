@@ -28,7 +28,7 @@ def chat(world, monkeypatch):
 
 
 def request(bot='reviewer', task='Review the plan'):
-    return json.loads(handoff.handle({'action': 'delegate', 'bot': bot, 'task': task}))
+    return json.loads(handoff.handle({'action': 'delegate', 'mode': 'handoff', 'bot': bot, 'task': task}))
 
 
 def job():
