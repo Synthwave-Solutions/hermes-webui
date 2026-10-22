@@ -32,4 +32,5 @@ export default [
       "no-import-assign": "error",
     },
   },
+  { files: ["static/bot-screens.js"], languageOptions: { sourceType: "module" } },
 ];

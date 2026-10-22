@@ -16843,7 +16843,7 @@ function _processWakeupCardHtml(info, rawText, extras){
     const uncertain=/^--- ERROR ---\r?$/m.test(String(rawText||''));
     const status=t(uncertain?'process_wakeup_unknown':'process_wakeup_delegation_received');
     const help=t(uncertain?'process_wakeup_unknown_help':'process_wakeup_delegation_help');
-    return `<details class="process-wakeup-card"><summary class="process-wakeup-summary"><span class="process-wakeup-toggle">${li('chevron-right',12)}</span><span class="process-wakeup-label">${li('terminal',13)}<span>${esc(t('process_wakeup_label'))}</span></span><span class="process-wakeup-chip neutral">${esc(status)}</span>${extras.timeHtml||''}</summary><div class="process-wakeup-detail"><p class="process-wakeup-explanation">${esc(help)}</p></div></details>`;
+    return `<details class="process-wakeup-card"><summary class="process-wakeup-summary"><span class="process-wakeup-toggle">${li('chevron-right',12)}</span><span class="process-wakeup-label">${li('terminal',13)}<span>${esc(t('process_wakeup_label'))}</span></span><span class="process-wakeup-chip neutral">${esc(status)}</span>${extras.timeHtml||''}</summary><div class="process-wakeup-detail"><p class="process-wakeup-explanation">${esc(help)}</p>${extras.contextHtml||''}</div></details>`;
   }
   const isWatch=info.type==='watch_match';
   const exitStr=info.exitCode==null?'':String(info.exitCode);
@@ -16883,7 +16883,9 @@ function _groupAuthorLineHtml(message){
     if(typeof S==='undefined'||!S||!S.session) return '';
     if(message&&message.role==='user'&&message.bot_delegation){
       const handoff=message.bot_delegation;
-      return `<div class="msg-author"><span class="msg-author-name">${esc(String(handoff.from||''))} → ${esc(String(handoff.to||''))}</span></div>`;
+      const childLink=handoff.mode==='background'&&handoff.result&&/^[a-f0-9]{12}$/.test(handoff.session_id||'')
+        ?` <button type="button" class="sp-subagent-open" data-sp-specialist-open="${esc(handoff.session_id)}" data-sp-specialist-profile="${esc(String(handoff.from||''))}">${esc(document.documentElement.lang==='nl'?'Open subgesprek':'Open sub-conversation')} ↗</button>`:'';
+      return `<div class="msg-author"><span class="msg-author-name">${esc(String(handoff.from||''))} → ${esc(String(handoff.to||''))}</span>${childLink}</div>`;
     }
     const people=S.session.participants;
     if(!Array.isArray(people)||!people.length) return '';
@@ -17333,7 +17335,7 @@ function renderMessages(options){
       _prevSepKey=_key;
     }
     let content=m.content||'';
-    if(m.role==='user'&&m.bot_delegation&&typeof m.bot_delegation.task==='string'){
+    if(m.role==='user'&&m.bot_delegation&&!m.bot_delegation.result&&typeof m.bot_delegation.task==='string'){
       content=m.bot_delegation.task;
     }
     let thinkingText='';
@@ -17483,7 +17485,7 @@ function renderMessages(options){
         noticeClass+=' process-wakeup-notice-card';
         const exitStr=wakeupInfo.exitCode==null?'':String(wakeupInfo.exitCode);
         if(wakeupInfo.type==='completion'&&/^-?\d+$/.test(exitStr)&&exitStr!=='0') noticeClass+=' process-wakeup-fail';
-        noticeInnerHtml=_processWakeupCardHtml(wakeupInfo, processText, {timeHtml, filesHtml, footHtml:`<div class="msg-foot"><span class="msg-actions">${copyBtn}</span></div>`});
+        noticeInnerHtml=_processWakeupCardHtml(wakeupInfo, processText, {timeHtml, filesHtml, contextHtml:_groupAuthorLineHtml(m), footHtml:`<div class="msg-foot"><span class="msg-actions">${copyBtn}</span></div>`});
       }else{
         const processTextHtml=processText?`<pre class="process-wakeup-text">${esc(processText)}</pre>`:'';
         noticeInnerHtml=`<div class="process-wakeup-label">${li('terminal',13)}<span>${esc(t('process_wakeup_label'))}</span></div>${filesHtml}<div class="msg-body process-wakeup-body">${processTextHtml}</div>${processFootHtml}`;

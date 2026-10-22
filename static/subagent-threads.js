@@ -128,11 +128,11 @@
   // Open the worker's own conversation (state.db child session, view-only) the
   // same way the sidebar opens nested subagent chats, so the same server-side
   // visibility checks apply.
-  async function openThread(childSid){
+  async function openThread(childSid,profile){
     if(!childSid) return;
     let row=null;
     try{ if(typeof _allSessions!=='undefined'&&Array.isArray(_allSessions)) row=_allSessions.find(s=>s&&s.session_id===childSid)||null; }catch(_){}
-    const session=row||{session_id:childSid,source_tag:'subagent',raw_source:'subagent',parent_session_id:currentSid,relationship_type:'child_session'};
+    const session=row||{session_id:childSid,...(profile?{profile}:{}),source_tag:'subagent',raw_source:'subagent',parent_session_id:currentSid,relationship_type:'child_session'};
     try{
       if(typeof _openSidebarSession==='function') await _openSidebarSession(session,{skipLineageResolve:true});
       else if(typeof loadSession==='function') await loadSession(childSid);
@@ -219,6 +219,12 @@
   }
 
   function start(){
+    root.document.addEventListener('click',event=>{
+      const button=event.target?.closest?.('[data-sp-specialist-open]');
+      if(!button)return;
+      event.preventDefault();
+      openThread(button.getAttribute('data-sp-specialist-open'),button.getAttribute('data-sp-specialist-profile'));
+    });
     const el=dock();
     if(el&&!el._spBound){ el.addEventListener('click',onClick); el._spBound=true; }
     setInterval(()=>{
