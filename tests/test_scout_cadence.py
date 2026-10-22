@@ -89,3 +89,27 @@ const personal=_botScoutCardHtml({bot_kind:'bot',bot_editable:false,scout_me:{en
 if(personal.includes('id="botScoutDefaultFrequency"') || !personal.includes('value="" selected'))throw Error('inheritance/editor');
 """
     subprocess.run(['node','-e',code],check=True,capture_output=True,text=True)
+
+def test_email_reads_owned_mail_without_writes(collector,monkeypatch):
+    import time,json
+    from types import SimpleNamespace
+    calls=[]
+    monkeypatch.setattr(collector.shutil,'which',lambda _: '/bin/gmail')
+    def run(args,**kwargs):
+        calls.append(args)
+        data={'messages':[{'id':'a123','subject':'Meeting','unread':True}]} if args[3]=='list' else {'body':'Prepare proposal'}
+        return SimpleNamespace(returncode=0,stdout=json.dumps(data))
+    monkeypatch.setattr(collector.subprocess,'run',run)
+    text,notes=collector.collect_email({'person':'alice@synthwave.solutions','person_explicit':True},time.monotonic()+20)
+    assert 'Prepare proposal' in text and notes
+    assert [a[3] for a in calls]==['list','read']
+    assert all(a[1:3]==['--as','alice@synthwave.solutions'] for a in calls)
+    collector.collect_email({'person':'bob@synthwave.solutions'},time.monotonic()+20)
+    assert len(calls)==2
+
+def test_scout_remains_an_agent_with_skills(scout_env):
+    result=bot_scout.apply('radar',{'enabled':True,'revision':_revision('radar')},ALICE)
+    job=_jobs(scout_env.homes['radar'])[0]
+    assert job['no_agent'] is False
+    assert 'skills' in job['enabled_toolsets']
+    assert 'skills_list' in job['prompt'] and 'skill_view' in job['prompt']

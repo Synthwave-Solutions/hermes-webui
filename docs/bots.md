@@ -111,3 +111,13 @@ Scout chats are upgraded on delivery; ownership and messages are preserved.
 The tracked runner source lives in `scripts/scout/`; deploy it into the root
 agent home's `scripts/scout/`, then synchronize enabled Scout profiles with
 `scripts/scout_per_person_migrate.py --apply --sync`. Preserve custom prompt files.
+
+Scout is an agent-backed Hermes background job (`no_agent: false`), with the
+collector providing starting context. The skills toolset lets the agent discover
+and read relevant available skills before research/preparation. Skill instructions
+do not expand the owner's permissions or authorize outbound actions.
+The collector also uses `gmail --as <owner> list/read` to include up to eight
+recent inbox messages and three bodies, prioritizing unread messages. This bounded
+selection excludes promotions/social mail, preserves unread state and reports
+partial/unavailable reads. Email content is untrusted source data. Replies are
+prepared as text in the conversation; nothing is sent or changed in Gmail.
