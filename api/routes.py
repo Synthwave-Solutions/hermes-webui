@@ -8068,6 +8068,28 @@ def _is_subagent_child_session_id(sid: str) -> bool:
     return _state_db_session_source(sid) == "subagent"
 
 
+def _subagent_parent_visible_to_request(sid: str, handler) -> bool:
+    """A read-only child inherits read access from its persisted WebUI parent.
+
+    Never trust a parent ID from the browser or grant access to ordinary foreign
+    sessions. Missing parents and database errors remain inaccessible.
+    """
+    if not handler or not is_safe_session_id(sid):
+        return False
+    try:
+        from api.models import _active_state_db_path
+        import sqlite3
+        path = Path(_active_state_db_path())
+        with closing(sqlite3.connect(path.as_uri() + "?mode=ro", uri=True, timeout=0.2)) as conn:
+            row = conn.execute("SELECT parent_session_id FROM sessions WHERE id=? AND source='subagent'", (sid,)).fetchone()
+        parent_id = row[0] if row else None
+        if not parent_id or parent_id == sid or not is_safe_session_id(parent_id):
+            return False
+        return _session_visible_to_request(get_session(parent_id), handler)
+    except Exception:
+        return False
+
+
 def _session_is_subagent_view_only(sid: str) -> bool:
     """Return True when ``sid`` is a delegated subagent child by ANY signal —
     state.db source OR a persisted WebUI sidecar tagged subagent.
@@ -13381,7 +13403,8 @@ def handle_get(handler, parsed) -> bool:
                 return bad(handler, "Session not found", 404)
             # Foreign-store sessions have no interactive creator, so they are
             # admin-only under user isolation (owner_email is None).
-            if not _session_owner_visible_to_request((cli_meta or {}).get("owner_email"), handler):
+            if not (_session_owner_visible_to_request((cli_meta or {}).get("owner_email"), handler)
+                    or _subagent_parent_visible_to_request(sid, handler)):
                 return bad(handler, "Session not found", 404)
             synth, reason = _claim_or_synthesize_cli_session(sid, cli_meta=cli_meta or {})
             if reason == "was_webui":
