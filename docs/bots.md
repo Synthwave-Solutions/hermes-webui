@@ -121,3 +121,12 @@ recent inbox messages and three bodies, prioritizing unread messages. This bound
 selection excludes promotions/social mail, preserves unread state and reports
 partial/unavailable reads. Email content is untrusted source data. Replies are
 prepared as text in the conversation; nothing is sent or changed in Gmail.
+
+Scout now inherits the bot's full configured CLI/WebUI tool surface, including
+terminal/CLIs, skills, files, browser, delegation and enabled MCP servers; there
+is no Scout-specific allowlist. Hermes resolves this selection on each Scout run,
+so newly enabled or disabled bot tools take effect without recreating the job.
+The stored list is a compatibility snapshot. Normal cron exclusions (interactive
+clarification/messaging and recursive scheduling by default), disabled toolsets,
+profile scope and the job owner's governance still apply. Tool access is distinct
+from permission to send messages or perform irreversible external actions.
