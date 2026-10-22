@@ -1751,3 +1751,13 @@ that cannot start another thread falls back to synchronous scanning.
 `persistent_state_wait` measures only the remaining blocking wait at the model
 barrier. These intervals overlap other preparation stages and must not be summed
 as serial wall-clock costs.
+
+### Profile enumeration on the sidebar hot path
+
+Profile visibility reads share the stat-validated YAML parse cache; only an
+explicit boolean `visible: false` hides a profile, and edits invalidate the
+cached parse on the next read. During an active streaming turn, all-profile
+CLI enumeration skips SQLite fingerprints that the existing streaming cache
+key would discard. The per-profile contexts remain complete; normal database
+fingerprinting resumes when streaming ends. Neither optimization changes
+session ownership, transcript contents, or the available tools.

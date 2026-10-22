@@ -5792,6 +5792,9 @@ def _all_profiles_cli_contexts() -> tuple[list[tuple[Path, Path, str | None]], t
     contexts: list[tuple[Path, Path, str | None]] = []
     cache_entries: list[tuple[str, str, object]] = []
     seen_homes: set[str] = set()
+    # get_cli_sessions freezes this key during streaming. Do not open every
+    # profile database just to compute fingerprints that are discarded.
+    streaming_frozen = _cli_sessions_streaming_freeze_marker() is not None
 
     def _add_context(profile_name) -> None:
         try:
@@ -5805,7 +5808,8 @@ def _all_profiles_cli_contexts() -> tuple[list[tuple[Path, Path, str | None]], t
         db_path = hermes_home / 'state.db'
         profile_value = str(profile_name or 'default').strip() or 'default'
         contexts.append((hermes_home, db_path, profile_value))
-        cache_entries.append((home_key, profile_value, _sqlite_file_stat_cache_key(db_path)))
+        cache_entries.append((home_key, profile_value,
+                              None if streaming_frozen else _sqlite_file_stat_cache_key(db_path)))
 
     try:
         _add_context(get_active_profile_name())
