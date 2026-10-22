@@ -159,3 +159,26 @@ conversation context. Bot editors retain their existing management rights. The
 picker loads on demand rather than slowing ordinary profile/sidebar requests.
 The save revalidates the target person's current chat access to the bot; the job
 continues to run and deliver as that person, never as the administrator.
+
+### Personal conversation sections and task groups
+
+The sidebar's **Conversations** view offers **New section**. Sections can contain
+subsections without a fixed nesting depth. Use a section's `+` to add a child,
+or its `…` to rename it or change its parent. The conversation `…` menu offers
+**Move to section**, including the option to return to the top level. Removing
+a section promotes its chats and subsections one level; it never deletes chats.
+Pinned chats stay within their assigned section. Unassigned chats retain date groups.
+
+**Tasks** groups scheduled-job chats by category and bot by default, with
+category-only and bot-only options. Categories are suggested from job metadata
+and titles; **Set task category** in a task chat's menu overrides the suggestion
+for the current user. Clear the override to use the suggestion again. Search
+reveals matching groups even when their sections were collapsed. Proactive
+Scout conversations retain their existing Conversations classification.
+
+Organization is stored per signed-in user on the server, separately from
+projects, conversation content, task configuration, and access grants. Changing
+the organization never shares a chat or changes a bot's permissions. Concurrent
+edits use revisions and ask the losing editor to retry rather than overwrite
+another tab's changes. There is no fixed nesting-depth limit; total stored
+sections and assignments are bounded to protect service resources.

@@ -5122,6 +5122,10 @@ function _openSessionActionMenu(session, anchorEl){
   menu.setAttribute('role','menu');
   menu.setAttribute('aria-label', 'Conversation actions');
   _appendSessionCopyLinkAction(menu, session);
+  if(window.SynthPulseSidebarOrg) menu.appendChild(_buildSessionAction(
+    t(_isJobChatSession(session)?'sidebar_org_change_category':'sidebar_org_move'), '', ICONS.folder,
+    ()=>{closeSessionActionMenu();window.SynthPulseSidebarOrg.moveChat(session);}
+  ));
   if(isReadOnly){
     _appendSessionExportHtmlAction(menu, session);
     _mountSessionActionMenu(menu, session, anchorEl);
@@ -8184,6 +8188,7 @@ function renderSessionListFromCache(){
   // Separate pinned from unpinned
   const pinned=orderedSessions.filter(s=>s.pinned);
   const unpinned=orderedSessions.filter(s=>!s.pinned);
+  if(window.SynthPulseSidebarOrg) window.SynthPulseSidebarOrg.controls(list,_sessionKindFilter);
   // Date grouping: Pinned / Today / Yesterday / This week / Last week / Older
   const now=_serverNowMs();
   // Collapse state persisted in localStorage
@@ -8203,9 +8208,13 @@ function renderSessionListFromCache(){
     } else { curItems.push(s); }
   }
   if(curItems.length) groups.push({label:curLabel,items:curItems});
+  if(window.SynthPulseSidebarOrg){
+    const organized=window.SynthPulseSidebarOrg.groups(groups,orderedSessions,_sessionKindFilter,q,_groupCollapsed);
+    groups.splice(0,groups.length,...organized);
+  }
   const flatSessionRows=[];
   for(const g of groups){
-    if(_groupCollapsed[g.label]) continue;
+    if(!g.forceExpanded&&_groupCollapsed[g.key||g.label]) continue;
     for(const s of g.items){ flatSessionRows.push({group:g,session:s}); }
   }
   _sessionVisibleSidebarIds=flatSessionRows.map(row=>row.session&&row.session.session_id).filter(Boolean);
@@ -8276,16 +8285,19 @@ function renderSessionListFromCache(){
     hdr.appendChild(caret);hdr.appendChild(label);
     const body=document.createElement('div');
     body.className='session-date-body';
-    const isGroupCollapsed=Boolean(_groupCollapsed[g.label]);
+    if(window.SynthPulseSidebarOrg) window.SynthPulseSidebarOrg.decorate(hdr,g);
+    const isGroupCollapsed=!g.forceExpanded&&Boolean(_groupCollapsed[g.key||g.label]);
     if(isGroupCollapsed){body.style.display='none';caret.classList.add('collapsed');}
     hdr.onclick=()=>{
       const isCollapsed=body.style.display==='none';
       body.style.display=isCollapsed?'':'none';
       caret.classList.toggle('collapsed',!isCollapsed);
-      _groupCollapsed[g.label]=!isCollapsed;
+      _groupCollapsed[g.key||g.label]=!isCollapsed;
       _saveCollapsed();
       renderSessionListFromCache();
     };
+    hdr.tabIndex=0;hdr.setAttribute('role','button');hdr.setAttribute('aria-expanded',String(!isGroupCollapsed));
+    hdr.onkeydown=e=>{if(e.target===hdr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();hdr.click();}};
     wrapper.appendChild(hdr);
     let groupTopPad=0;
     let groupBottomPad=0;

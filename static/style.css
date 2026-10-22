@@ -8687,3 +8687,19 @@ button.bg-badge{border:0;cursor:pointer;min-width:28px;min-height:28px;}
 .process-wakeup-technical{min-width:0;border-top:1px solid var(--border)}
 .process-wakeup-technical>summary{min-height:44px;display:list-item;align-content:center;cursor:pointer;color:var(--muted);overflow-wrap:anywhere}
 .process-wakeup-technical>summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* Personal sidebar sections: cap visual indentation, never logical nesting. */
+.sidebar-org-controls{display:flex;flex-wrap:wrap;gap:8px;padding:8px;color:var(--muted);font-size:12px}
+.sidebar-org-controls label{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+.sidebar-org-controls button,.sidebar-org-controls select,.sidebar-org-section-action{font:inherit;color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px;cursor:pointer;max-width:100%}
+.sidebar-org-section-action{padding:3px 8px;flex-shrink:0;margin-inline-start:4px;min-height:28px}
+.session-date-header>span:nth-child(2){min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.sidebar-org-dialog{color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;width:min(440px,calc(100vw - 32px));max-height:85vh;overflow:auto;box-sizing:border-box}
+.sidebar-org-dialog::backdrop{background:#0008}
+.sidebar-org-dialog label{display:flex;flex-direction:column;gap:6px;margin:12px 0}
+.sidebar-org-dialog input,.sidebar-org-dialog select{font:inherit;box-sizing:border-box;width:100%;min-width:0;padding:10px;color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:6px}
+.sidebar-org-dialog p{font-size:13px;line-height:1.5}
+.sidebar-org-dialog-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
+.sidebar-org-dialog-actions button{font:inherit;color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:9px 12px;cursor:pointer}
+.sidebar-org-error{color:var(--error,#f87171)}
+@media(max-width:600px){.sidebar-org-section-action{min-width:36px;min-height:36px}}
