@@ -206,6 +206,13 @@ def responsibilities_prompt(name):
 SCOUT_MAX_TOPICS = 12
 SCOUT_TOPIC_MAX = 80
 SCOUT_DEFAULT_TIME = '07:30'
+SCOUT_FREQUENCIES = ('hourly', '3h', '6h', '12h', 'daily', 'weekdays')
+
+def _scout_frequency(value):
+    if value is None: return 'daily'
+    if value not in SCOUT_FREQUENCIES: raise ValueError('Invalid Scout frequency')
+    return value
+
 SCOUT_MAX_PEOPLE = 50
 SCOUT_PROMPT_MAX = 2000
 SCOUT_MAX_SPACES = 6
@@ -265,9 +272,10 @@ def _scout_prompt(value):
 
 def validate_scout_person(entry):
     """One person's entry: ``{enabled, digest_time?, prompt?, spaces?}``."""
-    if not isinstance(entry,dict) or set(entry)-{'enabled','digest_time','prompt','spaces'}:raise ValueError('Unknown Scout person field')
+    if not isinstance(entry,dict) or set(entry)-{'enabled','digest_time','prompt','spaces','frequency'}:raise ValueError('Unknown Scout person field')
     if not isinstance(entry.get('enabled'),bool):raise ValueError('Scout enabled must be true or false')
     row={'enabled':entry['enabled']}
+    if entry.get('frequency') not in (None,''):row['frequency']=_scout_frequency(entry['frequency'])
     if entry.get('digest_time') not in (None,''):row['digest_time']=_scout_time(entry['digest_time'])
     prompt=_scout_prompt(entry.get('prompt'))
     if prompt:row['prompt']=prompt
@@ -275,7 +283,7 @@ def validate_scout_person(entry):
     if spaces:row['spaces']=spaces
     return row
 
-def validate_scout(enabled, topics=None, digest_time=None, people=None, spaces=None):
+def validate_scout(enabled, topics=None, digest_time=None, people=None, spaces=None, frequency=None):
     """Strict check of what a caller sends; returns the normalized settings.
 
     Without ``people`` the result is the bot-wide record of before (``enabled``
@@ -292,6 +300,7 @@ def validate_scout(enabled, topics=None, digest_time=None, people=None, spaces=N
         if len(topic)>SCOUT_TOPIC_MAX:raise ValueError('A Scout topic is at most %d characters'%SCOUT_TOPIC_MAX)
         if topic.casefold() not in (t.casefold() for t in clean):clean.append(topic)
     out={'enabled':enabled,'topics':clean,'digest_time':_scout_time(digest_time)}
+    if frequency is not None:out['frequency']=_scout_frequency(frequency)
     space_list=_scout_spaces(spaces)
     if space_list:out['spaces']=space_list
     if people is None:
@@ -334,7 +343,7 @@ def _stored_scout(value, home=None):
             people={}
             if value.get('enabled') is True:
                 people={_legacy_scout_owner(home) if home is not None else SCOUT_LEGACY_OWNER:{'enabled':True}}
-        return validate_scout(bool(value.get('enabled',False)),value.get('topics'),value.get('digest_time'),people,value.get('spaces'))
+        return validate_scout(bool(value.get('enabled',False)),value.get('topics'),value.get('digest_time'),people,value.get('spaces'),value.get('frequency'))
     except ValueError:return None
 
 def scout_person_view(scout, email):
@@ -345,6 +354,8 @@ def scout_person_view(scout, email):
             'known':bool(entry),
             'digest_time':entry.get('digest_time') or scout.get('digest_time') or SCOUT_DEFAULT_TIME,
             'own_time':bool(entry.get('digest_time')),
+            'frequency':entry.get('frequency') or scout.get('frequency') or 'daily',
+            'own_frequency':bool(entry.get('frequency')),
             'prompt':entry.get('prompt',''),
             'spaces':list(entry.get('spaces') or [])}
 
@@ -371,7 +382,7 @@ def scout_public_view(row, email, editor):
 def save_scout(name, scout, revision):
     """Write the Scout settings under the same revision as the appearance."""
     if not isinstance(scout,dict):raise ValueError('Scout settings must be an object')
-    scout=validate_scout(scout.get('enabled'),scout.get('topics'),scout.get('digest_time'),scout.get('people'),scout.get('spaces'))
+    scout=validate_scout(scout.get('enabled'),scout.get('topics'),scout.get('digest_time'),scout.get('people'),scout.get('spaces'),scout.get('frequency'))
     if not isinstance(revision,int) or isinstance(revision,bool) or revision<0: raise ValueError('Revision required')
     with _LOCK:
         path=_path(name);data=_load(path)

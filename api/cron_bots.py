@@ -89,7 +89,7 @@ def normalize_job_link(value) -> Optional[dict]:
     if not job_id or len(job_id) > 128:
         return None
     profile = str(value.get("profile") or "").strip() or ROOT_PROFILE
-    return {"job_id": job_id, "profile": profile}
+    return {"job_id": job_id, "profile": profile, **({"kind": "scout"} if value.get("kind") == "scout" else {})}
 
 
 def profile_for_home(home) -> str:
@@ -273,7 +273,7 @@ def _chat_key(job_id, profile) -> str:
 
 def job_chat_title(job: dict) -> str:
     name = str((job or {}).get("name") or (job or {}).get("id") or "Geplande taak").strip()
-    return f"{JOB_CHAT_EMOJI} {name}"[:120]
+    return (name if job.get("managed_by") == "scout" else f"{JOB_CHAT_EMOJI} {name}")[:120]
 
 
 _NL_DAYS = ("zondag", "maandag", "dinsdag", "woensdag", "donderdag", "vrijdag", "zaterdag")
@@ -346,6 +346,10 @@ def _excerpt(text, limit) -> str:
 
 def job_chat_intro(job: dict, profile) -> str:
     """The first message of a job chat: what this chat is and the job at a glance."""
+    if job.get("managed_by") == "scout":
+        return ("Hier deelt Scout voorbereidingen, onderzoek en voorstellen van " + bot_label(profile)
+                + ". Vraag gerust door of geef aan wat je wilt laten oppakken. "
+                "Je bepaalt hoe vaak Scout kijkt bij de Scout-instellingen van deze bot.")
     name = str(job.get("name") or job.get("id") or "Geplande taak")
     lines = [
         f"{JOB_CHAT_EMOJI} Deze chat hoort bij de geplande taak **{name}**.",
@@ -412,6 +416,13 @@ def ensure_job_chat(job: dict, profile, person: str) -> tuple[Optional[str], boo
         return None, False
     existing = find_job_chat(job_id, profile, person)
     if existing:
+        if job.get("managed_by") == "scout":
+            from api.models import get_session
+            session = get_session(existing)
+            if session and session.cron_job.get("kind") != "scout":
+                session.cron_job = {**session.cron_job, "kind": "scout"}
+                if session.title.startswith(JOB_CHAT_EMOJI): session.title = job_chat_title(job)
+                session.save()
         return existing, False
     owner = normalize_profile(profile)
     from api.models import new_session
@@ -424,7 +435,7 @@ def ensure_job_chat(job: dict, profile, person: str) -> tuple[Optional[str], boo
     session.title = job_chat_title(job)
     session.manual_title = True
     session.llm_title_generated = True
-    session.cron_job = {"job_id": job_id, "profile": owner}
+    session.cron_job = {"job_id": job_id, "profile": owner, **({"kind": "scout"} if job.get("managed_by") == "scout" else {})}
     session.messages.append({
         "role": "assistant",
         "content": job_chat_intro(job, owner),

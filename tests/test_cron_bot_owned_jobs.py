@@ -656,3 +656,20 @@ def test_job_detail_labels_and_output_card_are_translated():
     nl = (ROOT / "static" / "i18n" / "nl.js").read_text(encoding="utf-8")
     for key in ("cron_words_weekly", "cron_output_in_chat", "cron_output_other_bot"):
         assert f"  {key}: " in nl, key
+
+
+def test_scout_delivery_is_a_conversation_and_existing_chat_is_upgraded(bots_env):
+    job = _job('proactive')
+    sid,created = cron_bots.ensure_job_chat(job, 'scout', ALICE)
+    assert created
+    before = _read_session(bots_env,sid)
+    assert 'kind' not in before['cron_job']
+    scout = dict(job, managed_by='scout', scout_person=ALICE, name='Scout · Alice')
+    same,created = cron_bots.ensure_job_chat(scout, 'scout', ALICE)
+    assert same==sid and not created
+    after = _read_session(bots_env,sid)
+    assert after['cron_job']['kind']=='scout'
+    assert after['title']=='Scout · Alice'
+    assert after['owner_email']==ALICE and after['messages']==before['messages']
+    fresh,created = cron_bots.ensure_job_chat(dict(scout,id='fresh-scout'), 'scout', ALICE)
+    assert created and _read_session(bots_env,fresh)['cron_job']['kind']=='scout'

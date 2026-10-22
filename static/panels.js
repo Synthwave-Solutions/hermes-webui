@@ -8170,6 +8170,9 @@ async function saveBotAppearance(){
 // and sees how many people have Scout on.
 let _botScoutTopics=[];
 const _BOT_SCOUT_MAX=12,_BOT_SCOUT_TOPIC_MAX=80,_BOT_SCOUT_PROMPT_MAX=2000,_BOT_SCOUT_SPACES_MAX=6;
+function _scoutFrequencyOptions(value, inherit=false){
+  return [...(inherit?['']:[]),'hourly','3h','6h','12h','daily','weekdays'].map(v=>`<option value="${v}" ${v===value?'selected':''}>${esc(t('bot_scout_frequency_'+(v||'inherit')))}</option>`).join('');
+}
 function _botScoutCardHtml(p){
   // An unreadable profile.yaml reads as kind "unknown": no Scout until fixed.
   if(_botKind(p)!=='bot'||p.bot_kind==='unknown'||!p.scout_me)return '';
@@ -8184,6 +8187,7 @@ function _botScoutCardHtml(p){
         <label class="bot-scout-switch"><input type="checkbox" role="switch" id="botScoutEnabled" ${on?'checked':''} onchange="saveBotScout(this.checked)"><span>${esc(t(on?'bot_scout_saved_on':'bot_scout_saved_off'))}</span></label></div>
       <p class="bot-field-hint">${esc(t('bot_scout_intro'))}</p>
       <fieldset>
+        <label for="botScoutFrequency">${esc(t('bot_scout_frequency'))}<select id="botScoutFrequency">${_scoutFrequencyOptions(me.own_frequency?me.frequency:'',true)}</select></label>
         <label for="botScoutTime">${esc(t('bot_scout_my_time'))}<input type="time" id="botScoutTime" step="60" value="${esc(ownTime)}"></label>
         <p class="bot-field-hint">${esc(t('bot_scout_my_time_hint').replace('{time}',botTime))}</p>
         <label for="botScoutPrompt">${esc(t('bot_scout_my_prompt'))}</label>
@@ -8195,6 +8199,7 @@ function _botScoutCardHtml(p){
         <p class="bot-field-hint">${esc(count===1?t('bot_scout_people_one'):t('bot_scout_people_count').replace('{n}',String(count)))}</p>
         <label for="botScoutTopicInput">${esc(t('bot_scout_topics'))}</label>
         <div class="bot-scout-chips" id="botScoutChips"><input id="botScoutTopicInput" maxlength="${_BOT_SCOUT_TOPIC_MAX}" placeholder="${esc(t('bot_scout_topics_placeholder'))}" onkeydown="_botScoutTopicKey(event)" onblur="_botScoutAddTopic(this)"></div>
+        <label for="botScoutDefaultFrequency">${esc(t('bot_scout_default_frequency'))}<select id="botScoutDefaultFrequency">${_scoutFrequencyOptions(scout.frequency||'daily')}</select></label>
         <label for="botScoutDefaultTime">${esc(t('bot_scout_default_time'))}<input type="time" id="botScoutDefaultTime" step="60" value="${esc(botTime)}"></label>
         ${spaces?`<div class="bot-scout-spaces" role="group" aria-labelledby="botScoutSpacesLabel"><span id="botScoutSpacesLabel">${esc(t('bot_scout_spaces'))}</span>${spaces}</div><p class="bot-field-hint">${esc(t('bot_scout_spaces_hint'))}</p>`:''}
         <div class="bot-editor-actions"><button type="button" class="sm-btn" onclick="saveBotScoutBot()">${esc(t('bot_scout_save'))}</button></div>
@@ -8237,7 +8242,7 @@ async function saveBotScout(enabled){
   const time=$('botScoutTime')?String($('botScoutTime').value||'').slice(0,5):'';
   const prompt=$('botScoutPrompt')?String($('botScoutPrompt').value||'').slice(0,_BOT_SCOUT_PROMPT_MAX):'';
   try{
-    await _postBotScout(p,{enabled:on,digest_time:time,prompt},t(on?'bot_scout_saved_on':'bot_scout_saved_off'));
+    await _postBotScout(p,{enabled:on,digest_time:time,prompt,frequency:$('botScoutFrequency')?.value||''},t(on?'bot_scout_saved_on':'bot_scout_saved_off'));
   }catch(e){
     if($('botScoutEnabled')&&typeof enabled==='boolean')$('botScoutEnabled').checked=!enabled;
     showToast(e.message);
@@ -8251,7 +8256,7 @@ async function saveBotScoutBot(){
   const spaces=[...document.querySelectorAll('input[name="botScoutSpace"]:checked')].map(x=>x.value);
   if(spaces.length>_BOT_SCOUT_SPACES_MAX){showToast(t('bot_scout_spaces_max').replace('{n}',String(_BOT_SCOUT_SPACES_MAX)));return;}
   try{
-    await _postBotScout(p,{topics:_botScoutTopics,spaces,...(time?{default_time:time}:{})},t('bot_scout_saved_settings'));
+    await _postBotScout(p,{topics:_botScoutTopics,spaces,default_frequency:$('botScoutDefaultFrequency')?.value||'daily',...(time?{default_time:time}:{})},t('bot_scout_saved_settings'));
   }catch(e){showToast(e.message);}
 }
 // Responsibilities card (ui_meta.hermes-bots.responsibilities): what the bot
