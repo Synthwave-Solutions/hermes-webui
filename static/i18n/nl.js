@@ -1,6 +1,14 @@
 // Locale bundle; loaded on demand by static/i18n.js.
 // Dutch (nl): plain B1-level Dutch for SynthPulse. Missing keys fall back to English.
 window.__registerHermesLocale('nl', {
+  "bot_editor_tasks": "Geplande taken",
+  "bot_editor_assign_task": "Bestaande taak toewijzen",
+  "bot_editor_new_task": "Nieuwe geplande taak",
+  "bot_editor_assign_title": "Geplande taak toewijzen",
+  "bot_editor_assign_hint": "Selecteer een taak. De eigenaar en planning blijven hetzelfde.",
+  "bot_editor_no_tasks": "Er zijn geen andere bewerkbare geplande taken beschikbaar.",
+  "bot_editor_assign_save": "Taak toewijzen",
+
   _lang: 'nl',
   _label: 'Nederlands',
   _speech: 'nl-NL',

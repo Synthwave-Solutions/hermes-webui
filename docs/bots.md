@@ -210,3 +210,16 @@ Bot Screens now shows the relevant primary action (start, take over or hand back
 Connection and administrator actions are in a separate disclosure, with a mode
 badge indicating viewing, private control or an inactive screen. Privacy leases,
 confirmation dialogs and access checks remain authoritative.
+
+## Scheduled tasks and Scout in the bot editor
+
+Existing bots have **Scout** and **Scheduled tasks** tabs in **Edit bot**.
+Administrators and bot editors see the eligible-user selector automatically in
+Scout. Select a person to configure that person's schedule, instructions and
+cross-bot context; saving stays inside the editor and retains the selected person.
+Scout settings save separately from the bot configuration draft.
+
+Scheduled tasks can be assigned from the existing editable task list. Assignment
+uses the existing server access checks and preserves the task owner and schedule.
+Managed Scout jobs are configured through Scout rather than reassigned here.
+New scheduled tasks open the standard task form with the edited bot selected.

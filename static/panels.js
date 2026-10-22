@@ -2621,17 +2621,18 @@ let _cronProfilesCache=null;
 let _cronDeliveryOptionsCache=null;
 let _cronSkillPickerCleanup=null;
 
-function openCronCreate(){
+function openCronCreate(botProfile=''){
+  botProfile=typeof botProfile==='string'?botProfile:'';
   if (typeof switchPanel === 'function' && _currentPanel !== 'tasks') switchPanel('tasks');
   _cronPreFormDetail = _currentCronDetail ? { ..._currentCronDetail } : null;
   _editingCronId = null;
   _cronMode = 'create';
   _cronIsDuplicate = false;
   _cronSelectedSkills = [];
-  _renderCronForm({ name:'', schedule:'0 9 * * *', prompt:'', deliver:'local', profile:'', toast_notifications:true, notify:_cronDefaultNotify(''), model:'', provider:'', isEdit:false });
+  _renderCronForm({ name:'', schedule:'0 9 * * *', prompt:'', deliver:'local', profile:botProfile, toast_notifications:true, notify:_cronDefaultNotify(''), model:'', provider:'', isEdit:false });
   _cronSkillsCache = null;
   api('/api/skills').then(d=>{_cronSkillsCache=d.skills||[]; _bindCronSkillPicker();}).catch(()=>{});
-  loadCronProfiles().then(()=>_refreshCronProfileSelect('')).catch(()=>{});
+  loadCronProfiles().then(()=>_refreshCronProfileSelect(botProfile)).catch(()=>{});
 }
 
 function openCronEdit(job){
@@ -8196,7 +8197,7 @@ function _botScoutCardHtml(p){
         <label><input type="checkbox" id="botScoutCrossBot" ${me.cross_bot_context?'checked':''}> ${esc(t('bot_scout_cross_bot'))}</label>
         <label for="botScoutPrompt">${esc(t('bot_scout_my_prompt'))}</label>
         <textarea id="botScoutPrompt" rows="3" maxlength="${_BOT_SCOUT_PROMPT_MAX}" placeholder="${esc(t('bot_scout_my_prompt_placeholder'))}">${esc(me.prompt||'')}</textarea>
-        <div class="bot-editor-actions"><button type="button" class="sm-btn primary" onclick="saveBotScout()">${esc(t('bot_scout_save_me'))}</button></div>
+        <div class="bot-editor-actions"><button type="button" class="sm-btn primary" onclick="saveBotScout()">${esc(t(selected?'bot_scout_save':'bot_scout_save_me'))}</button></div>
       </fieldset>
       ${editable?`<fieldset class="bot-scout-bot">
         <h4>${esc(t('bot_scout_bot_settings'))}</h4>
@@ -8253,8 +8254,10 @@ async function _postBotScout(p,body,toast){
   await api('/api/bots/scout',{method:'POST',body:JSON.stringify({name:p.name,revision:p.bot_revision||0,...body})});
   _profileDropdownClearStoredCache();
   window.dispatchEvent(new CustomEvent('synpulse:bot-updated',{detail:{name:p.name}}));
-  _botScoutSelected={bot:'',person:''};
-  await loadProfilesPanel();showToast(toast);
+  if(window.BotBuilder?.isEditing(p.name)){await window.BotBuilder.refreshAutomation();showToast(toast);return;}
+  await loadProfilesPanel();
+  if(_currentProfileDetail?.name===p.name&&(_currentProfileDetail.scout_manageable||_currentProfileDetail.bot_editable))await loadBotScoutPeople();
+  showToast(toast);
 }
 // The caller's own Scout: the switch saves at once, time and wishes on Save.
 async function saveBotScout(enabled){
@@ -8651,6 +8654,7 @@ function _renderProfileDetail(p, activeName){
       <details class="bot-technical-details"><summary>${esc(t('bot_configuration_details'))}</summary>${rows.join('')}</details>
     </div>`;
   _botScoutTopics=(((p.bot||{}).scout||{}).topics||[]).slice();_paintBotScoutTopics();
+  if(p.scout_manageable||p.bot_editable)loadBotScoutPeople();
   _botDuties=(((p.bot||{}).responsibilities)||[]).map(d=>({...d}));_botDutyEditing=-1;_paintBotDuties();
   _loadBotWork(p);
   if (window.SpPicker) SpPicker.mountAll(body);
