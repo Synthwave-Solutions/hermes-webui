@@ -7769,7 +7769,7 @@ const SESSION_KIND_STORAGE_KEY='hermes-webui-session-kind';
 let _sessionKindFilter=(()=>{try{const v=localStorage.getItem(SESSION_KIND_STORAGE_KEY);return v==='all'||v==='jobs'||v==='chats'?v:'chats';}catch(_e){return 'chats';}})();
 let _sessionKindCounts={chats:0,jobs:0,jobsUnread:0};
 function _isJobChatSession(s){
-  return !!(s&&s.cron_job&&typeof s.cron_job==='object'&&s.cron_job.job_id);
+  return !!(s&&s.cron_job&&typeof s.cron_job==='object'&&s.cron_job.job_id&&s.cron_job.kind!=='scout');
 }
 function _sessionKindMatches(s, activeSid){
   if(_sessionKindFilter==='all') return true;

@@ -18,7 +18,7 @@ def test_job_chat_survives_sidebar_serialization_and_filter(monkeypatch):
     ordinary = Session(session_id='human_chat', title=job.title,
                        messages=[{'role': 'user', 'content': 'Explain this job'}])
     rows = [routes._sidebar_session_response_item(s.compact(), redact_enabled=False)
-            for s in [job, ordinary]]
+            for s in [job, ordinary, Session(session_id="scout_chat", cron_job={"job_id":"s1","profile":"cfo","kind":"scout"})]]
     assert rows[0].get('cron_job') == {'job_id': '05bdbadc5bf0', 'profile': 'default'}
     assert 'cron_job' not in rows[1]
     js = (ROOT / 'static/sessions.js').read_text()
@@ -33,8 +33,8 @@ _sessionKindFilter='all';
 const all=rows.filter(s=>_sessionKindMatches(s,null)).map(s=>s.session_id);
 console.log(JSON.stringify({chats,jobs,all}));
 ''', json.dumps(rows)], capture_output=True, text=True, check=True)
-    assert json.loads(result.stdout) == {'chats': ['human_chat'], 'jobs': ['job_chat'],
-                                        'all': ['job_chat', 'human_chat']}
+    assert json.loads(result.stdout) == {'chats': ['human_chat', 'scout_chat'], 'jobs': ['job_chat'],
+                                        'all': ['job_chat', 'human_chat', 'scout_chat']}
 
 
 def test_sidebar_job_link_is_bounded_and_invalid_link_is_omitted(monkeypatch):

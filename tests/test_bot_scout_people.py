@@ -94,7 +94,7 @@ def test_public_view_hides_other_people_from_non_editors(scout_env):
     assert "people" not in mine["bot"]["scout"] and "scout_people_count" not in mine
     assert ALICE not in json.dumps(mine) and "Mijn wens" not in json.dumps(mine)
     assert mine["scout_me"] == {"enabled": True, "known": True, "digest_time": "07:30", "own_time": False,
-                                "prompt": "", "spaces": []}
+                                "prompt": "", "spaces": [], "frequency": "daily", "own_frequency": False}
     admin = bot_metadata.scout_public_view(row, CAROL, editor=True)
     assert admin["scout_people_count"] == 2 and set(admin["bot"]["scout"]["people"]) == {ALICE, BOB}
     assert admin["scout_me"]["enabled"] is False and admin["scout_me"]["known"] is False
@@ -198,22 +198,22 @@ def test_response_carries_the_callers_own_state(scout_env):
 # -- Toolsets ---------------------------------------------------------------------
 
 def test_toolsets_name_only_read_only_mcp_servers_or_no_mcp(tmp_path):
-    assert bot_scout.toolsets_for([], tmp_path) == ["kanban", "no_mcp"]
+    assert bot_scout.toolsets_for([], tmp_path) == ["kanban", "web", "no_mcp"]
     (tmp_path / "config.yaml").write_text(yaml.safe_dump({"mcp_servers": {
         "notion": {"command": "x"}, "attio_api": {"command": "y"}}}))
     assert bot_scout.toolsets_for(["AI"], tmp_path) == ["kanban", "web", "no_mcp"]
     (tmp_path / "config.yaml").write_text(yaml.safe_dump({"mcp_servers": {
         "notion": {"command": "x"}, "fireflies": {"command": "z"}}}))
-    assert bot_scout.toolsets_for([], tmp_path) == ["kanban", "fireflies"]
+    assert bot_scout.toolsets_for([], tmp_path) == ["kanban", "web", "fireflies"]
     (tmp_path / "config.yaml").write_text(yaml.safe_dump({"mcp_servers": {"fireflies": {"enabled": False}}}))
-    assert bot_scout.toolsets_for([], tmp_path) == ["kanban", "no_mcp"]
+    assert bot_scout.toolsets_for([], tmp_path) == ["kanban", "web", "no_mcp"]
     for forbidden in ("terminal", "messaging", "send_message", "code_execution"):
         assert forbidden not in bot_scout.toolsets_for(["x"], tmp_path)
 
 
 # -- The collector ----------------------------------------------------------------
 
-SOURCE = Path(os.environ.get("SCOUT_SOURCE_DIR") or Path.home() / ".hermes" / "scripts" / "scout")
+SOURCE = Path(os.environ.get("SCOUT_SOURCE_DIR") or Path(__file__).resolve().parents[1] / "scripts" / "scout")
 
 
 @pytest.fixture

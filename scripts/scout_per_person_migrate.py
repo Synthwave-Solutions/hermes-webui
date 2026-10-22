@@ -104,6 +104,10 @@ def migrate(name: str, apply: bool, sync: bool) -> list:
         if current.get("enabled"):
             bot_scout.install_runner(home)
         for person, job in bot_scout.sync_all(home, current).items():
+            if job:
+                from api.cron_bots import find_job_chat, ensure_job_chat
+                if find_job_chat(job["id"], name, person):
+                    ensure_job_chat(job, name, person)
             state = "aan" if job and bot_scout._is_on(job) else "uit"
             lines.append(f"{name}: job van {person} bijgewerkt ({state})")
     return lines

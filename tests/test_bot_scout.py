@@ -125,7 +125,7 @@ def test_on_again_is_idempotent_and_off_pauses_without_deleting(scout_env):
     _set("radar", enabled=True, digest_time="08:00")
     [job] = _jobs(scout_env.homes["radar"])
     assert job["id"] == first and job["schedule"]["expr"] == "0 8 * * *"
-    assert job["enabled_toolsets"] == ["kanban", "no_mcp"]
+    assert job["enabled_toolsets"] == ["kanban", "web", "no_mcp"]
     assert "geen onderwerpen" in job["prompt"]
     off = _set("radar", enabled=False)
     assert off["bot"]["scout"]["enabled"] is False and off["bot"]["scout"]["digest_time"] == "08:00"
@@ -304,7 +304,7 @@ def test_an_older_scout_job_loses_terminal_on_the_next_sync(scout_env):
         cj.update_job(first, {"enabled_toolsets": ["terminal", "kanban", "web"]})
     _set("radar", enabled=True)
     [job] = _jobs(scout_env.homes["radar"])
-    assert job["enabled_toolsets"] == ["kanban", "no_mcp"]
+    assert job["enabled_toolsets"] == ["kanban", "web", "no_mcp"]
 
 
 def test_unreadable_bot_metadata_is_unknown_and_gets_no_scout(scout_env):

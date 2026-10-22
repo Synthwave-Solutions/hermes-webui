@@ -22,9 +22,12 @@ The editor's **Kind** select starts with **Automatic**, which stores no explicit
 
 ## Scout
 
-Scout reviews open work, progress, opportunities and blockers once a day. Its update includes grounded advice and up to three concrete proposals, each with a source, intended result and approval question. Fresh assigned triage, todo and ready tasks can trigger proposals as well as blocked, review and stale tasks. Existing tasks are referenced rather than duplicated; new proposals remain in triage until approved. Web news is supporting context, not the main purpose. Turn it on with the radar button next to the bot in the sidebar or on the bot's **Scout** card, where you also set up to 12 topics (at most 80 characters each) and the digest time (default 07:30). Settings live in `ui_meta['hermes-bots'].scout` as `{enabled, topics, digest_time}` and are saved through `POST /api/bots/scout`, which needs the same rights as editing the bot.
-
-Turning Scout on copies the Scout runner files from the root profile's `scripts/scout/` into the bot's own `scripts/scout/` (the scheduler only runs scripts inside the job's own Hermes home) and creates or resumes one scheduled job in the bot's own task store, marked `managed_by: scout`. The job runs `scout/scout_collect.py` first and only wakes the agent when there is something new; the agent works read-only, files actionable items as triage tasks and writes at most one digest in the bot's task chat. In-app notifications for the job are off. Turning Scout off pauses the job; it is never deleted.
+Scout proactively reviews the person's open work and upcoming calendar, researches
+preparation opportunities and posts useful briefings and proposals in Conversations.
+Enable it with the sidebar radar button or the bot's Scout card. Each person chooses
+their frequency, time and wishes; bot editors manage defaults, topics and followed
+spaces. See **Proactive Scout schedules and conversations** below for the scheduling,
+authorization and delivery contract.
 
 ## Responsibilities
 
@@ -76,3 +79,35 @@ Historical requests without this context are explicitly labelled as unavailable.
 ## Large capability selections
 
 All catalog-backed options can be selected, up to the existing 10,000-entry request bound per capability list. Each entry must still be available under the editor's current grants. The former 100-entry sublimit blocked unchanged legacy bots with 154 CLI tools; it has been removed for existing and new bots. Narrowing a selection and later restoring permitted options works without a shrinking legacy quota.
+
+### Proactive Scout schedules and conversations
+
+Scout settings belong to a `(bot, person)` pair. Each person can override the
+bot's `frequency` and `digest_time`, or inherit them. Supported frequencies are
+`hourly`, `3h`, `6h`, `12h`, `daily` (the existing default), and `weekdays`.
+Hourly schedules use the selected minute; multi-hour schedules use the selected
+hour as their phase. Times use the cron scheduler's configured timezone.
+Only bot editors can set `default_frequency` / `default_time` or another person's
+settings. Changing a bot default reschedules existing subscribers; it does not
+subscribe anyone new. Turning Scout off pauses only that person's job.
+
+A scheduled round can now wake Scout without new news or task events. The
+collector reads the job owner's primary calendar for the next seven days using
+`gws-hermes --as <owner> calendar events list`, under the existing identity policy.
+It never falls back to a shared account. Calendar reads are bounded (18 seconds,
+40 events); missing access and truncation are reported as source limitations.
+Personal memory, previous bot conversations, followed spaces and open work remain
+scoped to the person. Immediate retries are debounced for 50 minutes.
+
+Web research is available even without configured news topics. Scout prioritizes
+preparation for the next 48 hours, connects available context, and provides up to
+three researched briefings, drafts or proposals with sources. Private details
+must not enter public searches. No email sending, calendar changes or external
+execution is authorized. A round with nothing useful remains silent.
+
+Scout result chats retain their `cron_job` provenance with `kind: scout` but appear
+in **Conversations**. Other scheduled job chats stay under **Tasks**. Existing
+Scout chats are upgraded on delivery; ownership and messages are preserved.
+The tracked runner source lives in `scripts/scout/`; deploy it into the root
+agent home's `scripts/scout/`, then synchronize enabled Scout profiles with
+`scripts/scout_per_person_migrate.py --apply --sync`. Preserve custom prompt files.
