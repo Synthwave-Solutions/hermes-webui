@@ -42,11 +42,9 @@ JOB_NAME = "Scout"
 PERSON_FIELD = "scout_person"
 ADOPTED_FIELD = "scout_adopted"
 JOB_CATEGORY = "Scout"
-# kanban files triage tasks; web only searches the bot's topics, so it is
-# left out while there are none. No terminal: the agent reports what it did
-# with each item in one SCOUT-LEDGER line at the end of its digest and the
-# next collector run records it (scout_collect.py), so it never runs code.
-BASE_TOOLSETS = ("kanban",)
+# Agent tools for triage, skill discovery and research. Workspace reads are
+# supplied by the governed collector; outbound actions remain unavailable.
+BASE_TOOLSETS = ("kanban", "skills")
 # MCP: a per-job toolset list that names no MCP server gets EVERY enabled MCP
 # server of the bot merged in by the engine (cron/scheduler.py
 # _merge_mcp_into_per_job_toolsets), write-capable ones included. Naming at
@@ -211,6 +209,13 @@ def job_prompt(home, topics, person: str | None = None, wishes: str = "", spaces
     text += """
 
 Proactieve werkwijze (ook zonder nieuws of nieuwe taken):
+Je bent een echte Hermes-agent in een achtergrondtaak; het verzamelscript levert alleen startcontext.
+Gebruik skills_list en skill_view om de relevante beschikbare skills te kiezen en te lezen voordat je werkt:
+gws-gmail voor mailcontext, gws-calendar voor afspraken, client-meeting-prep voor klantafspraken,
+en rol- of domeinspecifieke researchskills wanneer passend. Respecteer toegang en beschikbaarheid;
+installeer of wijzig geen skills. Een skill geeft nooit extra rechten of toestemming om berichten te versturen.
+Combineer e-mails (inhoud, afzender, open vragen en deadlines), agenda, gesprekken, geheugen en open werk.
+Werk concrete antwoordconcepten en voorbereidingen uit in het gesprek, zonder mail te versturen of als gelezen te markeren.
 Bekijk de agenda voor de komende zeven dagen, met prioriteit voor de komende 48 uur.
 Verbind afspraken en deadlines met de persoonlijke context, eerdere gesprekken, open werk en beschikbare bronnen.
 Kies maximaal drie kansrijke voorbereidingen binnen de rol van deze bot. Doe daarvoor verdiepend webonderzoek:
@@ -353,6 +358,7 @@ def sync_job(home, scout: dict, person: str):
             "prompt": job_prompt(home, scout["topics"], person, entry.get("prompt") or "", spaces),
             "schedule": schedule_for(entry.get("digest_time") or scout["digest_time"], entry.get("frequency") or scout.get("frequency") or "daily"),
             "script": SCRIPT,
+            "no_agent": False,
             "enabled_toolsets": toolsets_for(scout["topics"], home),
         }
         if mine:

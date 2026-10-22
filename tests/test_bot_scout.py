@@ -110,7 +110,7 @@ def test_turning_scout_on_creates_one_job_in_the_bots_own_store(scout_env):
     assert job["managed_by"] == "scout" and job["name"] == "Scout \u00b7 Alice" and job["scout_person"] == ALICE
     assert job["script"] == "scout/scout_collect.py" and job["no_agent"] is False
     assert job["schedule"]["kind"] == "cron" and job["schedule"]["expr"] == "45 6 * * *"
-    assert job["enabled_toolsets"] == ["kanban", "web", "no_mcp"]
+    assert job["enabled_toolsets"] == ["kanban", "skills", "web", "no_mcp"]
     assert job["prompt"].startswith("Eigen Scout prompt.") and "AI act; MKB automatisering" in job["prompt"]
     assert job["deliver"] == "local" and job["notify"] == {"in_app": "off", "delivery": "all"}
     assert job["owner_email"] == ALICE and job["origin"] == {"platform": "webui", "chat_id": None, "user_id": ALICE}
@@ -125,7 +125,7 @@ def test_on_again_is_idempotent_and_off_pauses_without_deleting(scout_env):
     _set("radar", enabled=True, digest_time="08:00")
     [job] = _jobs(scout_env.homes["radar"])
     assert job["id"] == first and job["schedule"]["expr"] == "0 8 * * *"
-    assert job["enabled_toolsets"] == ["kanban", "web", "no_mcp"]
+    assert job["enabled_toolsets"] == ["kanban", "skills", "web", "no_mcp"]
     assert "geen onderwerpen" in job["prompt"]
     off = _set("radar", enabled=False)
     assert off["bot"]["scout"]["enabled"] is False and off["bot"]["scout"]["digest_time"] == "08:00"
@@ -304,7 +304,7 @@ def test_an_older_scout_job_loses_terminal_on_the_next_sync(scout_env):
         cj.update_job(first, {"enabled_toolsets": ["terminal", "kanban", "web"]})
     _set("radar", enabled=True)
     [job] = _jobs(scout_env.homes["radar"])
-    assert job["enabled_toolsets"] == ["kanban", "web", "no_mcp"]
+    assert job["enabled_toolsets"] == ["kanban", "skills", "web", "no_mcp"]
 
 
 def test_unreadable_bot_metadata_is_unknown_and_gets_no_scout(scout_env):
