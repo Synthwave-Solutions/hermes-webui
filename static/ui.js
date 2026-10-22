@@ -16802,6 +16802,9 @@ function _maybeRecoverVirtualizedBlankViewport(options, preserveScroll, virtualW
 // null and keep the raw-notice fallback.
 function _parseProcessWakeupBody(text){
   const s=String(text||'');
+  if(/^\[ASYNC DELEGATION (?:BATCH )?COMPLETE [—–-] [^\]\n]+\]\r?\n/.test(s)){
+    return {type:'delegation',output:s,exitCode:null,command:'',pattern:null};
+  }
   // Header groups are single-line by grammar; the output group captures the
   // rest verbatim (leading indentation / trailing blank lines preserved). The
   // watch suppression note is intentionally NOT split out of the output — real
@@ -16834,6 +16837,14 @@ function _processWakeupInfo(m, text){
   };
 }
 function _processWakeupCardHtml(info, rawText, extras){
+  if(info.type==='delegation'||info.type==='async_delegation'){
+    // Agent instructions and subagent transcripts stay in model history, not
+    // the chat DOM. A COMPLETE envelope does not prove successful execution.
+    const uncertain=/^--- ERROR ---\r?$/m.test(String(rawText||''));
+    const status=t(uncertain?'process_wakeup_unknown':'process_wakeup_delegation_received');
+    const help=t(uncertain?'process_wakeup_unknown_help':'process_wakeup_delegation_help');
+    return `<details class="process-wakeup-card"><summary class="process-wakeup-summary"><span class="process-wakeup-toggle">${li('chevron-right',12)}</span><span class="process-wakeup-label">${li('terminal',13)}<span>${esc(t('process_wakeup_label'))}</span></span><span class="process-wakeup-chip neutral">${esc(status)}</span>${extras.timeHtml||''}</summary><div class="process-wakeup-detail"><p class="process-wakeup-explanation">${esc(help)}</p></div></details>`;
+  }
   const isWatch=info.type==='watch_match';
   const exitStr=info.exitCode==null?'':String(info.exitCode);
   // Signal-killed processes report negative exit codes (subprocess returncode).

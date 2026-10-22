@@ -651,6 +651,8 @@ window.__registerHermesLocale('en', {
   process_wakeup_success_help: 'The background command has finished. Its output is available in the technical details.',
   process_wakeup_failed_help: 'The background command stopped with an error. Open the technical details to inspect the error and output.',
   process_wakeup_watch_help: 'An expected pattern was found in the output. The task may still be running.',
+  process_wakeup_delegation_received: 'Background update received',
+  process_wakeup_delegation_help: 'The assistant received a background update and can use it in its reply.',
   process_wakeup_unknown_help: 'The task reported an update, but its completion status is unknown.',
   process_wakeup_technical: 'View command and logs',
   process_wakeup_unknown: 'Status unknown',
