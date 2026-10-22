@@ -113,3 +113,27 @@ def test_scout_remains_an_agent_with_skills(scout_env):
     assert job['no_agent'] is False
     assert 'skills' in job['enabled_toolsets']
     assert 'skills_list' in job['prompt'] and 'skill_view' in job['prompt']
+
+def test_rolling_chats_include_answers_without_advancing_event_cursor(collector,monkeypatch,tmp_path):
+    import json
+    from types import SimpleNamespace
+    state=tmp_path/'webui';sessions=state/'sessions';sessions.mkdir(parents=True)
+    now=1000000;person='alice@example.com'
+    row={'session_id':'own','profile':'radar','owner_email':person,'updated_at':now-100,'title':'Client prep'}
+    data={**row,'messages':[{'role':'user','content':'Prepare the meeting','timestamp':now-200},
+                           {'role':'assistant','content':'Draft ready; budget still unresolved','timestamp':now-100},
+                           {'role':'tool','content':'SECRET TOOL OUTPUT'}]}
+    (sessions/'_index.json').write_text(json.dumps([row]))
+    (sessions/'own.json').write_text(json.dumps(data))
+    monkeypatch.setattr(collector,'webui_state_dir',lambda ctx:state)
+    writes=[];led=SimpleNamespace(get_meta=lambda _:str(now),set_meta=lambda *args:writes.append(args))
+    ctx={'person':person,'person_explicit':True,'profile':'radar'}
+    assert collector.collect_chats(ctx,led,now)==[]
+    result=collector.collect_chats(ctx,led,now,context=True)
+    assert len(result)==1 and 'budget still unresolved' in result[0]['summary']
+    assert 'Prepare the meeting' in result[0]['summary'] and 'SECRET TOOL' not in str(result)
+    assert writes==[]
+    # Stale index must never override changed ownership or sharing.
+    for changed in ({'owner_email':'bob@example.com'},{'share_token':'shared'}, {'profile':'other'}, {'project_shared':True}):
+        (sessions/'own.json').write_text(json.dumps({**data,**changed}))
+        assert collector.collect_chats(ctx,led,now,context=True)==[]
