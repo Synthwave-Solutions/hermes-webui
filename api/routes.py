@@ -13637,6 +13637,10 @@ def handle_get(handler, parsed) -> bool:
         from api.user_avatars import handle_people_avatar
         return handle_people_avatar(handler, parse_qs(parsed.query))
 
+    if parsed.path == "/api/me/sidebar-organization":
+        from api.sidebar_organization import handle
+        return handle(handler)
+
     if parsed.path == "/api/me/avatar":
         from api.user_avatars import handle_me_avatar
         return handle_me_avatar(handler, "GET", None)
@@ -15329,6 +15333,10 @@ def handle_post(handler, parsed) -> bool:
             s.personality = name if name else None
             s.save()
         return j(handler, {"ok": True, "personality": s.personality, "prompt": prompt})
+
+    if parsed.path == "/api/me/sidebar-organization":
+        from api.sidebar_organization import handle
+        return handle(handler, body)
 
     if parsed.path == "/api/me/avatar":
         from api.user_avatars import handle_me_avatar
