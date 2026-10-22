@@ -347,7 +347,7 @@
     dot.setAttribute('aria-label', dot.title + ' (' + botDisplayName(p) + ')');
     return dot;
   }
-  // Scout (api/bot_scout.py): a daily read-only look-out per person per bot.
+  // Scout (api/bot_scout.py): a proactive look-out per person per bot.
   // Everyone who may chat with a bot switches their own Scout for it here;
   // people's own profiles get none.
   function scoutIcon() {
@@ -372,10 +372,10 @@
       // The first time someone turns Scout on for a bot, say what that means;
       // turning it off needs no confirmation.
       if (!on && !me.known && typeof window.showConfirmDialog === 'function') {
-        const time = /^\d\d:\d\d$/.test(me.digest_time || '') ? me.digest_time : '07:30';
+        const frequency = tx('bot_scout_frequency_'+(me.frequency||'daily'), me.frequency||'daily');
         const ok = await window.showConfirmDialog({
           title: tx('bot_scout_confirm_title', 'Turn Scout on?'),
-          message: tx('bot_scout_confirm_on', 'You get a daily Scout from this bot at {time}. Read only, notifications off.').replace('{time}', time),
+          message: tx('bot_scout_confirm_on', 'Scout checks {frequency} and shares useful preparations in your conversations. Change the schedule in this bot’s Scout settings.').replace('{frequency}', frequency),
           confirmLabel: tx('bot_scout_confirm_ok', 'Turn Scout on'),
         });
         if (!ok) return;
