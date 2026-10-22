@@ -2869,7 +2869,8 @@ def _profile_visible_from_meta(profile_path: Path) -> bool:
         meta_path = Path(profile_path) / 'profile.yaml'
         if not meta_path.exists():
             return True
-        data = yaml.safe_load(meta_path.read_text(encoding='utf-8'))
+        from api.config import load_profile_yaml_cached
+        data = load_profile_yaml_cached(meta_path)
     except Exception:
         return True
     if not isinstance(data, dict):
