@@ -603,6 +603,8 @@ window.__registerHermesLocale('nl', {
   process_wakeup_success_help: 'De opdracht op de achtergrond is afgerond. De uitvoer staat bij de technische details.',
   process_wakeup_failed_help: 'De opdracht op de achtergrond is gestopt met een fout. Bekijk de technische details voor de foutmelding en uitvoer.',
   process_wakeup_watch_help: 'Een verwacht patroon is gevonden in de uitvoer. De taak kan nog actief zijn.',
+  process_wakeup_delegation_received: 'Achtergrondupdate ontvangen',
+  process_wakeup_delegation_help: 'De assistent heeft een achtergrondupdate ontvangen en kan die verwerken in het antwoord.',
   process_wakeup_unknown_help: 'De taak heeft een update gemeld, maar de eindstatus is onbekend.',
   process_wakeup_technical: 'Commando en logs bekijken',
   process_wakeup_unknown: 'Status onbekend',
