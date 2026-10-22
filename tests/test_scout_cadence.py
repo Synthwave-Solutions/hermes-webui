@@ -81,12 +81,18 @@ def test_scout_form_renders_inheritance_and_personal_override():
     code="""
 const esc=x=>String(x),t=x=>x,_botKind=p=>'bot';
 const _BOT_SCOUT_PROMPT_MAX=2000,_BOT_SCOUT_TOPIC_MAX=80;
+let _botScoutSelected={bot:'',person:''};
 """+helpers+"""
 const html=_botScoutCardHtml({bot_kind:'bot',bot_editable:true,bot:{scout:{frequency:'6h'}},scout_me:{enabled:true,own_frequency:true,frequency:'hourly'}});
+if(html.includes('botScoutSpace') || html.includes('Google Chat'))throw Error('provider-specific UI');
 if(!html.includes('id="botScoutFrequency"') || !html.includes('id="botScoutDefaultFrequency"'))throw Error('missing selectors');
 if(!html.includes('value="hourly" selected') || !html.includes('value="6h" selected'))throw Error('wrong values');
 const personal=_botScoutCardHtml({bot_kind:'bot',bot_editable:false,scout_me:{enabled:false}});
 if(personal.includes('id="botScoutDefaultFrequency"') || !personal.includes('value="" selected'))throw Error('inheritance/editor');
+_botScoutSelected={bot:'radar',person:'bob@example.com'};
+const admin=_botScoutCardHtml({name:'radar',bot_kind:'bot',scout_manageable:true,bot_editable:false,scout_me:{enabled:false},scout_people_options:[{email:'bob@example.com',enabled:true,prompt:'Prepare quotes'}]});
+if(!admin.includes('value="bob@example.com" selected') || !admin.includes('Prepare quotes') || !admin.includes('loadBotScoutPeople()'))throw Error('admin selected person');
+
 """
     subprocess.run(['node','-e',code],check=True,capture_output=True,text=True)
 
@@ -137,3 +143,44 @@ def test_rolling_chats_include_answers_without_advancing_event_cursor(collector,
     for changed in ({'owner_email':'bob@example.com'},{'share_token':'shared'}, {'profile':'other'}, {'project_shared':True}):
         (sessions/'own.json').write_text(json.dumps({**data,**changed}))
         assert collector.collect_chats(ctx,led,now,context=True)==[]
+
+def test_cross_bot_context_requires_opt_in_and_source_access(collector,tmp_path):
+    import yaml
+    root=tmp_path/'hermes';home=root/'profiles'/'radar';home.mkdir(parents=True)
+    person='alice@example.com';ctx={'home':home,'root':root,'profile':'radar','person':person}
+    rows=[{'profile':n,'owner_email':person} for n in ('other','denied','managed','default')]
+    (root/'dashboard-governance.yaml').write_text(yaml.safe_dump({'mode':'enforce','default_effect':'deny',
+        'users':{person:{'grants':{'profiles':['other']}}}}))
+    def consent(value):
+        (home/'profile.yaml').write_text(yaml.safe_dump({'ui_meta':{'hermes-bots':{'scout':{
+            'people':{person:{'enabled':True,'cross_bot_context':value}}}}}}))
+    consent(False)
+    assert collector.cross_bot_profiles(ctx,rows)==set()
+    consent(True)
+    assert collector.cross_bot_profiles(ctx,rows)=={'other','default'}
+    managed=root/'profiles'/'managed';managed.mkdir()
+    (managed/'profile.yaml').write_text(yaml.safe_dump({'synpulse_builder':{'owner_email':person}}))
+    assert 'managed' in collector.cross_bot_profiles(ctx,rows)
+    (managed/'profile.yaml').write_text(yaml.safe_dump({'synpulse_builder':{'owner_email':'bob@example.com'}}))
+    assert 'managed' not in collector.cross_bot_profiles(ctx,rows)
+    (root/'dashboard-governance.yaml').write_text('broken: [')
+    assert collector.cross_bot_profiles(ctx,rows)==set()
+
+def test_other_bot_context_stays_owned_and_attributed(collector,monkeypatch,tmp_path):
+    import json
+    from types import SimpleNamespace
+    state=tmp_path/'webui';sessions=state/'sessions';sessions.mkdir(parents=True)
+    now=1000000;person='alice@example.com'
+    rows=[]
+    for sid,profile,owner in [('mine','other',person),('someone','other','bob@example.com'),('blocked','denied',person)]:
+        row={'session_id':sid,'profile':profile,'owner_email':owner,'updated_at':now-10,'title':sid}
+        rows.append(row)
+        (sessions/(sid+'.json')).write_text(json.dumps({**row,'messages':[{'role':'user','content':sid,'timestamp':now-10}]}))
+    (sessions/'_index.json').write_text(json.dumps(rows))
+    monkeypatch.setattr(collector,'webui_state_dir',lambda ctx:state)
+    monkeypatch.setattr(collector,'cross_bot_profiles',lambda ctx,rows:{'other'})
+    ctx={'person':person,'person_explicit':True,'profile':'radar'}
+    led=SimpleNamespace(get_meta=lambda _:None,set_meta=lambda *args:None)
+    result=collector.collect_chats(ctx,led,now,context=True)
+    assert len(result)==1 and result[0]['profile']=='other' and 'Chat met other' in result[0]['title']
+    assert collector.collect_chats(ctx,led,now)==[]

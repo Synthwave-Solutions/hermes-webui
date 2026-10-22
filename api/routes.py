@@ -3627,7 +3627,15 @@ def _handle_bot_scout(handler, body):
         managed = bot_metadata.read_profile(name).get("bot_managed")
     except Exception:
         managed = False
-    editor = bool(_bot_editable_check(handler)(name, bool(managed)))
+    from api.ownership import identity_is_admin, _request_identity
+    editor = bool(_bot_editable_check(handler)(name, bool(managed))) or identity_is_admin(_request_identity(handler))
+    if body.get("action") == "people":
+        if not editor:
+            return bad(handler, "Only administrators or bot editors can manage other people's Scouts", 403)
+        try:
+            return j(handler, {"people": bot_scout.people_options(name, caller)})
+        except Exception:
+            return bad(handler, "Could not resolve users with access to this bot", 503)
     # Without an email (auth off) a bot editor still names the person.
     if not caller and not (editor and person):
         return bad(handler, "Scout needs a signed in person with an email address.", 403)
@@ -14248,13 +14256,14 @@ def handle_get(handler, parsed) -> bool:
             viewer = str(request_owner_email(handler) or "").strip().lower()
         except Exception:
             viewer = ""
+        from api.ownership import identity_is_admin, _request_identity
+        scout_admin = identity_is_admin(_request_identity(handler))
         for index, row in enumerate(rows):
             row["bot_editable"] = editable(row["name"], bool(row.get("bot_managed")))
             # Scout per person: the viewer's own state (scout_me); other
             # people's addresses only for who may edit the bot.
-            rows[index] = bot_metadata.scout_public_view(row, viewer, row["bot_editable"])
-            if row["bot_editable"] and rows[index].get("bot_kind") == "bot":
-                rows[index]["scout_space_options"] = [{"id": s, "name": n} for s, n in bot_metadata.SCOUT_SPACES]
+            row["scout_manageable"] = row["bot_editable"] or scout_admin
+            rows[index] = bot_metadata.scout_public_view(row, viewer, row["scout_manageable"])
         return j(
             handler,
             {

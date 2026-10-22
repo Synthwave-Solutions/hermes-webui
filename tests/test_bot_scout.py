@@ -23,6 +23,7 @@ BOB = "bob.de.vries@example.com"
 @pytest.fixture
 def scout_env(monkeypatch, tmp_path):
     import api.profiles as profiles
+    monkeypatch.setattr(bot_scout, "person_has_bot_access", lambda name, person: True)
 
     root = tmp_path / "hermes"
     homes = {"default": root, "radar": root / "profiles" / "radar", "odis": root / "profiles" / "odis"}
@@ -232,6 +233,8 @@ class _RouteHandler:
 
 
 def _route_env(monkeypatch, editor, caller=ALICE, chat=True):
+    from api import ownership
+    monkeypatch.setattr(ownership, "identity_is_admin", lambda identity: False)
     from api import routes
     import api.ownership as ownership
     monkeypatch.setattr(ownership, "request_owner_email", lambda handler: caller)
@@ -358,3 +361,27 @@ def test_the_bots_own_prompt_is_copied_once_and_then_kept(scout_env):
     _set("radar", enabled=True)
     [job] = _jobs(scout_env.homes["radar"])
     assert job["prompt"].startswith("Prompt van deze bot.")
+
+def test_admin_can_manage_other_person_scout_without_bot_ownership(scout_env,monkeypatch):
+    from api import ownership
+    routes=_route_env(monkeypatch,editor=False,caller=ALICE)
+    monkeypatch.setattr(ownership,'identity_is_admin',lambda identity:True)
+    status,body=_post(routes,{'name':'radar','person':BOB,'enabled':True,'frequency':'3h','revision':0})
+    assert status==200
+    job=_jobs(scout_env.homes['radar'])[0]
+    assert job['owner_email']==BOB and job['scout_person']==BOB
+    monkeypatch.setattr(bot_scout,'person_has_bot_access',lambda name,person:False)
+    status,_=_post(routes,{'name':'radar','person':'outsider@example.com','enabled':True,'revision':_revision('radar')})
+    assert status==403 and len(_jobs(scout_env.homes['radar']))==1
+
+def test_people_picker_requires_admin_or_editor(scout_env,monkeypatch):
+    from api import ownership
+    routes=_route_env(monkeypatch,editor=False,caller=ALICE)
+    monkeypatch.setattr(ownership,'identity_is_admin',lambda identity:False)
+    status,_=_post(routes,{'name':'radar','action':'people'})
+    assert status==403
+    monkeypatch.setattr(ownership,'identity_is_admin',lambda identity:True)
+    monkeypatch.setattr(bot_scout,'people_options',lambda name,caller:[{'email':BOB,'enabled':False}])
+    status,body=_post(routes,{'name':'radar','action':'people'})
+    assert status==200 and body['people'][0]['email']==BOB
+    assert _jobs(scout_env.homes['radar'])==[]

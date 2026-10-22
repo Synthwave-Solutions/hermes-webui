@@ -373,8 +373,39 @@ def find_job(home, person: str):
     return None
 
 
+def person_has_bot_access(name: str, person: str) -> bool:
+    """Validate a target against current bot access, never an admin's own grants."""
+    try:
+        from api.governance.loader import get_policy
+        from api.governance.enforce import subject_from_identity, is_profile_allowed_for
+        from api.governance.resolver import resolve_effective_access
+        policy = get_policy()
+        if not policy.enabled: return False
+        identity = {"email": person}
+        access = resolve_effective_access(policy, subject_from_identity(identity, policy))
+        return access.has_permission("chat:use") and is_profile_allowed_for(identity, name)
+    except Exception:
+        return False
+
+
+def people_options(name: str, caller: str) -> list:
+    """Known eligible users; called only by the authorized admin/editor route."""
+    from api import bot_builder
+    from api.governance.loader import get_policy
+    policy = get_policy()
+    row = bot_metadata.read_profile(name)
+    scout = (row.get("bot") or {}).get("scout") or {}
+    managed = bot_builder.managed(name) or {}
+    candidates = set(policy.users) | set(policy.bootstrap_admins) | set(scout.get("people") or {})
+    candidates.update(managed.get("allowed_users") or [])
+    candidates.update([caller, managed.get("owner_email")])
+    return [{"email": email, **bot_metadata.scout_person_view(scout, email)}
+            for email in sorted({_email(e) for e in candidates if e})
+            if person_has_bot_access(name, email)]
+
+
 BOT_FIELDS = ("topics", "default_time", "spaces", "default_frequency")
-PERSON_FIELDS = ("enabled", "digest_time", "prompt", "person_spaces", "frequency")
+PERSON_FIELDS = ("enabled", "digest_time", "prompt", "person_spaces", "frequency", "cross_bot_context")
 
 
 def apply(name: str, body: dict, caller_email: str | None, editor: bool = False) -> dict:
@@ -404,6 +435,8 @@ def apply(name: str, body: dict, caller_email: str | None, editor: bool = False)
         raise ScoutError(403, "Scout needs a signed in person")
     if person != caller and not editor:
         raise ScoutError(403, "Only a bot editor can change Scout for someone else")
+    if person != caller and not person_has_bot_access(name, person):
+        raise ScoutError(403, "This person does not have access to this bot")
     bot_change = [k for k in BOT_FIELDS if k in body]
     if bot_change and not editor:
         raise ScoutError(403, "Only a bot editor can change the topics, spaces or default time of Scout")
@@ -424,6 +457,8 @@ def apply(name: str, body: dict, caller_email: str | None, editor: bool = False)
                 entry["enabled"] = body["enabled"]
             if "digest_time" in body:
                 entry["digest_time"] = body["digest_time"]
+            if "cross_bot_context" in body:
+                entry["cross_bot_context"] = body["cross_bot_context"]
             if "frequency" in body:
                 entry["frequency"] = body["frequency"]
             if "prompt" in body:

@@ -139,3 +139,23 @@ prior answers to help identify decisions, unresolved questions and existing work
 an assistant's claim is not treated as proof of completion. Tool output, task chats,
 shared chats and other people's conversations are excluded. Ownership, profile and
 sharing are rechecked on the session file, not trusted solely from the cached index.
+
+A person can additionally opt into `cross_bot_context` on each bot's Scout card.
+This shares only that person's recent private conversations with other bots they
+currently have access to, with the source bot attached to each excerpt. Explicit
+managed-bot ACLs and the current governance policy are checked on every collection;
+missing or invalid policy disables additional profiles. Other users are never
+included, and source ownership/sharing/profile are rechecked on the session file.
+The setting defaults to off and does not grant tools or access to another profile.
+
+Scout's interface is integration-neutral: source selection belongs in the person's
+instructions, using the skills and connections available to the bot. The Google
+Chat space picker is no longer part of the UI; old stored source settings remain
+readable for compatibility. Saving unrelated settings does not erase them.
+
+Administrators can choose **Configure Scouts for users**, select an eligible user,
+and configure that person's enablement, cadence, time, instructions and personal
+conversation context. Bot editors retain their existing management rights. The
+picker loads on demand rather than slowing ordinary profile/sidebar requests.
+The save revalidates the target person's current chat access to the bot; the job
+continues to run and deliver as that person, never as the administrator.

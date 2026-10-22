@@ -272,9 +272,12 @@ def _scout_prompt(value):
 
 def validate_scout_person(entry):
     """One person's entry: ``{enabled, digest_time?, prompt?, spaces?}``."""
-    if not isinstance(entry,dict) or set(entry)-{'enabled','digest_time','prompt','spaces','frequency'}:raise ValueError('Unknown Scout person field')
+    if not isinstance(entry,dict) or set(entry)-{'enabled','digest_time','prompt','spaces','frequency','cross_bot_context'}:raise ValueError('Unknown Scout person field')
     if not isinstance(entry.get('enabled'),bool):raise ValueError('Scout enabled must be true or false')
     row={'enabled':entry['enabled']}
+    if 'cross_bot_context' in entry:
+        if not isinstance(entry['cross_bot_context'],bool):raise ValueError('Scout cross-bot context must be true or false')
+        row['cross_bot_context']=entry['cross_bot_context']
     if entry.get('frequency') not in (None,''):row['frequency']=_scout_frequency(entry['frequency'])
     if entry.get('digest_time') not in (None,''):row['digest_time']=_scout_time(entry['digest_time'])
     prompt=_scout_prompt(entry.get('prompt'))
@@ -356,6 +359,7 @@ def scout_person_view(scout, email):
             'own_time':bool(entry.get('digest_time')),
             'frequency':entry.get('frequency') or scout.get('frequency') or 'daily',
             'own_frequency':bool(entry.get('frequency')),
+            'cross_bot_context':bool(entry.get('cross_bot_context')),
             'prompt':entry.get('prompt',''),
             'spaces':list(entry.get('spaces') or [])}
 

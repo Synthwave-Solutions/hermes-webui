@@ -94,7 +94,7 @@ def test_public_view_hides_other_people_from_non_editors(scout_env):
     assert "people" not in mine["bot"]["scout"] and "scout_people_count" not in mine
     assert ALICE not in json.dumps(mine) and "Mijn wens" not in json.dumps(mine)
     assert mine["scout_me"] == {"enabled": True, "known": True, "digest_time": "07:30", "own_time": False,
-                                "prompt": "", "spaces": [], "frequency": "daily", "own_frequency": False}
+                                "prompt": "", "spaces": [], "frequency": "daily", "own_frequency": False, "cross_bot_context": False}
     admin = bot_metadata.scout_public_view(row, CAROL, editor=True)
     assert admin["scout_people_count"] == 2 and set(admin["bot"]["scout"]["people"]) == {ALICE, BOB}
     assert admin["scout_me"]["enabled"] is False and admin["scout_me"]["known"] is False
