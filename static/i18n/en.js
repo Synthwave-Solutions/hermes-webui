@@ -1,5 +1,13 @@
 // Locale bundle; loaded on demand by static/i18n.js.
 window.__registerHermesLocale('en', {
+  "bot_editor_tasks": "Scheduled tasks",
+  "bot_editor_assign_task": "Assign existing task",
+  "bot_editor_new_task": "New scheduled task",
+  "bot_editor_assign_title": "Assign scheduled task",
+  "bot_editor_assign_hint": "Select a task. Its owner and schedule stay unchanged.",
+  "bot_editor_no_tasks": "No other editable scheduled tasks are available.",
+  "bot_editor_assign_save": "Assign task",
+
   chat_session_loading: 'Your conversation is still loading. Your draft is kept; send it when loading finishes.',
   integrations_connect_not_configured: 'Connecting apps is not set up on this platform yet. Ask your administrator.',
   channels_hook_on_save_neutral: 'On save the webhook is published on your platform\'s public address and the URL appears on the card. Enter that URL at the provider.',

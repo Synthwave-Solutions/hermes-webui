@@ -93,6 +93,8 @@
       content=field(tr('bot_editor_memory',"Bot memory"),'builderMemory',c.bot_memory||'',true)+
         '<p>'+esc(tr('bot_editor_memory_hint',"Shared with the users of this bot. Separate from My Notes and your personal user profile."))+'</p>'+
         '<p>'+esc(tr('bot_editor_knowledge_hint',"File selections are saved separately using Save knowledge below."))+'</p><div id="builderKnowledge"></div>';
+    }else if(state.edit&&(step===6||step===7)){
+      content='<div id="builderAutomation" aria-live="polite">Loading…</div>';
     }else if(step===5){
       content=choices('Skills','skills',cat.skills);
     }else{
@@ -102,7 +104,7 @@
         [['Bot',c.title+' (@'+c.name+')'],['Instructions',c.system_prompt],['Skills',(c.skills||[]).join(', ')||'None selected'],['MCP connections',(c.mcp_servers||[]).join(', ')||'None selected'],['CLI tools',(c.cli_tools||[]).join(', ')||'None selected']].map(([a,b])=>'<dt>'+esc(a)+'</dt><dd>'+esc(b)+'</dd>').join('')+'</dl>'+
         '<p>The bot becomes available only after all configuration and access checks succeed.</p>';
     }
-    const sections=[[0,tr('bot_editor_identity',"Identity & photo")],[1,tr('bot_editor_instructions',"Instructions")],[4,tr('bot_editor_memory_tab',"Memory & knowledge")],[5,tr('bot_editor_skills',"Skills")],[2,tr('bot_editor_connections',"Connections & tools")],[3,tr('bot_editor_access',"Access")]];
+    const sections=[[0,tr('bot_editor_identity',"Identity & photo")],[1,tr('bot_editor_instructions',"Instructions")],[4,tr('bot_editor_memory_tab',"Memory & knowledge")],[5,tr('bot_editor_skills',"Skills")],[2,tr('bot_editor_connections',"Connections & tools")],[3,tr('bot_editor_access',"Access")],[6,tr('bot_scout',"Scout")],[7,tr('bot_editor_tasks','Scheduled tasks')]];
     const navigation=state.edit?'<div class="bot-builder-tabs" role="tablist" aria-label="'+esc(tr('bot_editor_tabs','Bot configuration'))+'">'+sections.map(([i,label])=>'<button type="button" role="tab" id="builderTab'+i+'" aria-controls="builderTabPanel" aria-selected="'+(i===step)+'" tabindex="'+(i===step?0:-1)+'" data-builder-tab="'+i+'">'+esc(label)+'</button>').join('')+'</div>':'<ol class="bot-builder-steps">'+copy.steps.map((s,i)=>'<li '+(i===step?'aria-current="step"':'')+'>'+esc(s)+'</li>').join('')+'</ol>';
     body.innerHTML='<div class="main-view-content bot-builder">'+navigation+'<section id="builderTabPanel" '+(state.edit?'role="tabpanel" aria-labelledby="builderTab'+step+'"':'')+'>'+content+'</section>'+
       '<p id="builderError" role="alert" hidden></p><div class="bot-builder-actions"><button type="button" class="sm-btn" id="builderBack" '+(step===0||state.edit?'disabled':'')+'>Back</button><button type="button" class="sm-btn primary" id="builderNext">'+(state.edit?'Save bot':step===3?'Create bot':'Continue')+'</button></div></div>';
@@ -122,6 +124,7 @@
         else input('builderKnowledge').textContent=tr('bot_editor_knowledge_unavailable',"Knowledge files are unavailable. Reload the page.");
       }
     }
+    if(state.edit&&(step===6||step===7)){input('builderNext').hidden=true;mountAutomation();}
     if(state.edit&&input('builderName'))input('builderName').readOnly=true;
     body.querySelectorAll('[data-filter]').forEach(el=>el.oninput=()=>{
       body.querySelectorAll('[data-choice="'+el.dataset.filter+'"]').forEach(row=>row.hidden=!row.textContent.toLowerCase().includes(el.value.toLowerCase()));
@@ -151,10 +154,58 @@
     });
     if(epoch!==intent||!data)return;
     if(!data.can_edit){body.textContent='You do not have permission to configure this bot.';return;}
-    const steps={identity:0,soul:1,memory:4,knowledge:4,skills:5,settings:2,access:3};
+    const steps={identity:0,soul:1,memory:4,knowledge:4,skills:5,settings:2,access:3,scout:6,tasks:7};
     state={step:name?(steps[section]??0):0,edit:!!name,catalog:data.catalog||{},config:{name:'',title:'',description:'',system_prompt:'',skills:[],mcp_servers:[],cli_tools:[],allowed_users:[],allowed_groups:[],...data.config}};
     if(!name)delete state.config.revision;
     render();
+  }
+  async function mountAutomation(){
+    const current=state,box=input('builderAutomation');if(!current||!box)return;
+    try{
+      const data=await api('/api/profiles?fast=1&counts=0',{timeoutToast:false});
+      if(state!==current||input('builderAutomation')!==box)return;
+      const p=(data.profiles||[]).find(row=>row.name===current.config.name);
+      if(!p)throw new Error('This bot is no longer available.');
+      _currentProfileDetail=p;
+      if(current.step===6){
+        _botScoutTopics=[...((p.bot&&p.bot.scout&&p.bot.scout.topics)||[])];
+        if(p.scout_manageable||p.bot_editable){
+          const people=await api('/api/bots/scout',{method:'POST',body:JSON.stringify({name:p.name,action:'people'})});
+          if(state!==current||input('builderAutomation')!==box)return;
+          p.scout_people_options=people.people||[];
+        }
+        box.innerHTML=_botScoutCardHtml(p);
+        if(!box.innerHTML){box.textContent='Scout is available for bot profiles only.';return;}
+        _paintBotScoutTopics();
+
+      }else{
+        box.innerHTML='<div class="bot-editor-actions"><button type="button" class="sm-btn" id="builderAssignTask">'+esc(tr('bot_editor_assign_task','Assign existing task'))+'</button><button type="button" class="sm-btn" id="builderCreateTask">'+esc(tr('bot_editor_new_task','New scheduled task'))+'</button></div><section id="profileBotJobs"></section>';
+        input('builderAssignTask').onclick=()=>assignScheduledTaskToBot(p);
+        input('builderCreateTask').onclick=()=>{collect();openCronCreate(p.name);};
+        await _loadProfileBotJobs(p);
+      }
+    }catch(err){if(state===current&&input('builderAutomation')===box)box.textContent=err.message;}
+  }
+  async function assignScheduledTaskToBot(p){
+    const current=state;
+    try{
+      const jobs=(await _botJobsAll()).filter(job=>job.managed_by!=='scout'&&_cronCanChangeBot(job)&&_cronJobBotName(job)!==p.name);
+      if(state!==current)return;
+      const dialog=document.createElement('dialog');dialog.className='detail-card';
+      dialog.innerHTML='<form method="dialog"><h3>'+esc(tr('bot_editor_assign_title','Assign scheduled task'))+'</h3><p>'+esc(p.bot?.title||p.name)+' · '+esc(tr('bot_editor_assign_hint','Select a task. Its owner and schedule stay unchanged.'))+'</p><label>Task<select id="builderTaskChoice">'+jobs.map((job,i)=>'<option value="'+i+'">'+esc(job.name||job.id)+' · '+esc(job.owner_email||_cronOwnerProfileName(job))+'</option>').join('')+'</select></label><p role="alert" class="builder-task-error"></p><button type="submit" value="cancel" class="sm-btn">Cancel</button> <button type="button" class="sm-btn primary builder-task-assign" '+(!jobs.length?'disabled':'')+'>'+esc(tr('bot_editor_assign_save','Assign task'))+'</button></form>';
+      if(!jobs.length)dialog.querySelector('.builder-task-error').textContent=tr('bot_editor_no_tasks','No other editable scheduled tasks are available.');
+      dialog.querySelector('.builder-task-assign').onclick=async event=>{
+        const job=jobs[Number(dialog.querySelector('select').value)];if(!job)return;
+        event.target.disabled=true;
+        try{
+          const store=_cronOwnerProfileName(job)||'default';
+          await api('/api/crons/assign',{method:'POST',body:JSON.stringify({job_id:job.id,owner_profile:store,bot:p.name===store?'':p.name})});
+          _botJobsCache=null;dialog.close();
+          if(state===current)await mountAutomation();
+        }catch(err){dialog.querySelector('.builder-task-error').textContent=err.message;event.target.disabled=false;}
+      };
+      dialog.addEventListener('close',()=>dialog.remove(),{once:true});document.body.appendChild(dialog);dialog.showModal();
+    }catch(err){error(err.message);}
   }
   async function save(){
     if(!state||(!state.edit&&state.step!==3)||state.saving)return;
@@ -183,6 +234,6 @@
     }catch(err){if(state===current){current.saving=false;input('profileDetailBody').querySelectorAll('[data-builder-tab]').forEach(tab=>tab.disabled=false);error(err.message);button.disabled=false;input('builderBack').disabled=false;button.textContent=current.edit?'Save bot':'Create bot';}}
   }
   function invalidate(){epoch++;state=null;if(window.BotKnowledge&&window.BotKnowledge.forget)window.BotKnowledge.forget();}
-  window.BotBuilder={readAvatar,open,save,invalidate};
+  window.BotBuilder={readAvatar,open,save,invalidate,isEditing:name=>!!state?.edit&&state.config.name===name,refreshAutomation:mountAutomation};
 
 })();
