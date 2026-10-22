@@ -130,3 +130,12 @@ The stored list is a compatibility snapshot. Normal cron exclusions (interactive
 clarification/messaging and recursive scheduling by default), disabled toolsets,
 profile scope and the job owner's governance still apply. Tool access is distinct
 from permission to send messages or perform irreversible external actions.
+
+Scout also receives a rolling seven-day snapshot of the person's recent private
+conversations with the same bot: up to eight chats, eight user/assistant messages
+per chat, and 12,000 characters overall. This context is independent of the new-item
+cursor, so an active topic remains visible after an earlier Scout round. It includes
+prior answers to help identify decisions, unresolved questions and existing work;
+an assistant's claim is not treated as proof of completion. Tool output, task chats,
+shared chats and other people's conversations are excluded. Ownership, profile and
+sharing are rechecked on the session file, not trusted solely from the cached index.
