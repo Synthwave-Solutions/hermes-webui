@@ -14672,6 +14672,10 @@ def handle_post(handler, parsed) -> bool:
         from api.share_routes import handle_mutation as handle_share_mutation
         return handle_share_mutation(handler, body, revoke=parsed.path == "/api/share/revoke")
 
+    if parsed.path == "/api/chat/prewarm":
+        from api.prewarm import start_chat_prewarm
+        return j(handler, {"state": start_chat_prewarm()})
+
     if parsed.path == "/api/chat/mentions/prepare":
         from api.chat_mentions import prepare
         try:
