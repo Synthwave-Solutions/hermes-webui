@@ -41,3 +41,11 @@ test('Scout save refreshes inside editor without losing selected user',async()=>
  await context._postBotScout({name:'reviewer',bot_revision:4},{person:selected.person,enabled:true},'Saved');
  assert.equal(calls[0].person,selected.person);assert.equal(calls[1],'refresh');assert.equal(context._botScoutSelected,selected);
 });
+
+
+test('editor labels remain readable when an older locale returns missing keys',()=>{
+ const start=builder.indexOf('  const tr=');const end=builder.indexOf('\n',start);
+ const context={t:key=>key};vm.createContext(context);
+ vm.runInContext(builder.slice(start,end)+"\nresult=tr('bot_editor_assign_title','Assign scheduled task');",context);
+ assert.equal(context.result,'Assign scheduled task');
+});
