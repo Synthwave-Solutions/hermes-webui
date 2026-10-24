@@ -22,6 +22,7 @@ def _db():
             state TEXT NOT NULL, child_id TEXT NOT NULL, target_authority TEXT,
             target_stream TEXT, result_authority TEXT, result_stream TEXT,
             detail TEXT, created REAL NOT NULL, updated REAL NOT NULL)''')
+        db.execute("CREATE INDEX IF NOT EXISTS specialists_parent_created ON specialists(session_id,created)")
         yield db
 
 
@@ -220,3 +221,34 @@ def dispatch():
 def recover():
     with _db() as db:
         db.execute("UPDATE specialists SET state='failed',detail='Server restarted; work was not replayed',updated=? WHERE state IN ('pending','starting','started','delivering','reporting')", (time.time(),))
+
+
+def snapshot(session_id):
+    """Display records only; caller must authorize access to the parent chat."""
+    from api.bot_metadata import read_profile
+    with _db() as db:
+        rows = db.execute(
+            "SELECT id,target_bot,task,state,child_id,created,updated FROM specialists "
+            "WHERE session_id=? ORDER BY created DESC LIMIT 100", (session_id,)).fetchall()
+    result = []
+    titles = {}
+    for row in reversed(rows):
+        bot = row['target_bot']
+        if bot not in titles:
+            try:
+                titles[bot] = read_profile(bot).get('bot', {}).get('title') or bot
+            except (OSError, ValueError, KeyError):
+                titles[bot] = bot
+        state = row['state']
+        status = ('queued' if state in ('pending', 'ready') else
+                  'running' if state in ('starting', 'started', 'completed', 'delivering', 'reporting') else
+                  'completed' if state == 'delivered' else
+                  'cancelled' if state == 'cancelled' else 'failed')
+        result.append(dict(id='bot:'+row['id'], bot_profile=bot, bot_title=titles[bot],
+                           task=row['task'], status=status, child_session_id=row['child_id']
+                           if state not in ('pending', 'ready') else '',
+                           started_at=row['created'], updated_at=row['updated'],
+                           queue_authoritative=True, steps=[], tool_count=0,
+                           **({'duration_seconds': max(0, row['updated']-row['created'])}
+                              if status in ('completed', 'failed', 'cancelled') else {})))
+    return result

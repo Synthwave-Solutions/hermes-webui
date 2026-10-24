@@ -273,3 +273,25 @@ def test_group_guest_keeps_own_identity_and_private_child(team, monkeypatch):
         assert team.session.owner_email == 'other-owner@example.test'
     finally:
         bots.reset_turn(token)
+
+
+def test_snapshot_names_bots_and_scopes_parent_without_authority(team, monkeypatch):
+    from api import bot_metadata
+    monkeypatch.setattr(bot_metadata, 'read_profile', lambda bot: {'bot': {'title': 'Proposal Bot'}})
+    result = enqueue()
+    rows = specialists.snapshot(team.session.session_id)
+    assert len(rows) == 1
+    assert rows[0]['bot_title'] == 'Proposal Bot'
+    assert rows[0]['bot_profile'] == 'reviewer'
+    assert rows[0]['status'] == 'queued'
+    assert rows[0]['child_session_id'] == ''
+    assert specialists.snapshot('another-parent') == []
+    assert not {'authority', 'ceiling', 'target_authority'} & rows[0].keys()
+    for state, status in [('started', 'running'), ('reporting', 'running'),
+                          ('delivered', 'completed'), ('failed', 'failed'),
+                          ('cancelled', 'cancelled')]:
+        with specialists._db() as db:
+            db.execute('UPDATE specialists SET state=? WHERE id=?', (state, result['delegation_id']))
+        row = specialists.snapshot(team.session.session_id)[0]
+        assert row['status'] == status
+        assert row['child_session_id'] == result['session_id']
