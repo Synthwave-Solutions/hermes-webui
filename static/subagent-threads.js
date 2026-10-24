@@ -23,6 +23,7 @@
   let lastSignature='';
   let pollTimer=null;
   let inflight=false;
+  let lastRefresh=0;
   let open=new Set();
   let collapsed=false;
   let generation=0;
@@ -39,6 +40,7 @@
   function isLive(w){
     if(!w||w.restored) return false;
     if(w.status!=='running'&&w.status!=='queued') return false;
+    if(w.queue_authoritative) return true;
     const seen=Number(w.updated_at)||0;
     return !seen||nowSec()-seen<STALE_SECONDS;
   }
@@ -71,7 +73,7 @@
     const dur=durationOf(w);
     const chip=ft?ft.statusChipHtml({state:st,duration:dur}):'';
     const idx=Number(w.task_index)||0, cnt=Number(w.task_count)||0;
-    const who=cnt>1?`${tx('subagent')} ${idx+1}/${cnt}`:tx('subagent');
+    const who=w.bot_title||w.bot_profile||(cnt>1?`${tx('subagent')} ${idx+1}/${cnt}`:tx('subagent'));
     const n=Number(w.tool_count)||0;
     const stepsLabel=n===1?tx('tools_one'):tx('tools_many',{n});
     const steps=Array.isArray(w.steps)?w.steps:[];
@@ -81,7 +83,7 @@
       ?`<ol class="sp-subagent-steps">${steps.map(stepHtml).join('')}</ol>${hidden&&w.steps_truncated?`<div class="sp-subagent-note">${esc(tx('step_more',{n:hidden}))}</div>`:''}`
       :`<div class="sp-subagent-note">${esc(n?stepsLabel:tx('subagents_empty'))}</div>`;
     const openLink=w.child_session_id
-      ?`<button type="button" class="sp-subagent-open" data-sp-subagent-open="${esc(w.child_session_id)}">💬 ${esc(tx('open_thread'))} <span aria-hidden="true">↗</span></button>`
+      ?`<button type="button" class="sp-subagent-open" data-sp-subagent-open="${esc(w.child_session_id)}" data-sp-subagent-profile="${esc(w.bot_profile||'')}">💬 ${esc(tx('open_thread'))} <span aria-hidden="true">↗</span></button>`
       :'';
     return `<article class="sp-subagent-card" data-state="${esc(st)}" data-worker-id="${esc(w.id)}">
       <button type="button" class="sp-subagent-head" aria-expanded="${isOpen?'true':'false'}" data-sp-subagent-toggle="${esc(w.id)}">
@@ -107,7 +109,7 @@
     const done=states.filter(s=>s==='done').length;
     const failed=states.filter(s=>s==='failed').length;
     const tick=live?Math.floor(nowSec()/5):0; // refresh running durations every 5 s
-    const signature=JSON.stringify([currentSid,collapsed,[...open],tick,workers.map(w=>[w.id,w.status,w.tool_count,(w.steps||[]).length,w.duration_seconds,w.task,w.child_session_id||''])]);
+    const signature=JSON.stringify([currentSid,collapsed,[...open],tick,workers.map(w=>[w.id,w.status,w.tool_count,(w.steps||[]).length,w.duration_seconds,w.task,w.child_session_id||'',w.bot_title||'',w.bot_profile||''])]);
     if(signature===lastSignature) return;
     lastSignature=signature;
     const parts=[];
@@ -144,7 +146,7 @@
 
   function onClick(ev){
     const o=ev.target&&ev.target.closest?ev.target.closest('[data-sp-subagent-open]'):null;
-    if(o){ ev.preventDefault(); openThread(o.getAttribute('data-sp-subagent-open')); return; }
+    if(o){ ev.preventDefault(); openThread(o.getAttribute('data-sp-subagent-open'),o.getAttribute('data-sp-subagent-profile')); return; }
     const t=ev.target&&ev.target.closest?ev.target.closest('[data-sp-subagent-toggle],[data-sp-subagent-dock-toggle]'):null;
     if(!t) return;
     const id=t.getAttribute('data-sp-subagent-toggle');
@@ -165,6 +167,7 @@
     if(!sid||inflight) return;
     if(root.document&&root.document.hidden){ schedule(); return; }
     inflight=true;
+    lastRefresh=Date.now();
     const gen=generation;
     try{
       const fetcher=typeof root.api==='function'?root.api:null;
@@ -231,6 +234,8 @@
       const sid=activeSid();
       if(sid!==currentSid) switchTo(sid);
       else if(workers.some(isLive)) render(); // keeps running durations fresh
+      // Discover queued bot jobs even when their parent stream has already ended.
+      if(sid&&!inflight&&!pollTimer&&Date.now()-lastRefresh>15000) refresh();
     }, WATCH_MS);
     switchTo(activeSid());
   }

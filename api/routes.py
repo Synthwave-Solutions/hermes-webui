@@ -13514,6 +13514,8 @@ def handle_get(handler, parsed) -> bool:
             except Exception:
                 logger.debug("subagent thread restore failed for %s", sid, exc_info=True)
                 workers = []
+        from api.bot_specialists import snapshot as specialist_snapshot
+        workers = workers + specialist_snapshot(sid)
         active = any(w.get("status") in {"queued", "running"} and not w.get("restored") for w in workers)
         return j(handler, {"session_id": sid, "subagents": workers, "active": active, "server_time": time.time()})
 

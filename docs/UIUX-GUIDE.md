@@ -273,3 +273,10 @@ skips activity projection as well as DOM rendering. Incoming activity still
 updates its registry; switching back to Compact Worklog or Transparent Stream
 projects the complete current registry. This removes hidden per-frame work
 without changing event collection, final answers, or visible-mode rendering.
+
+The subagent dock includes background bot delegations alongside ordinary workers.
+Bot cards show the configured bot title, delegated task and durable queue status;
+opening a child conversation preserves its bot profile. Queued work appears before
+its child conversation exists. Result delivery remains in progress until the
+coordinating bot's report finishes. The authenticated parent-session check also
+protects the delegation listing; authority records are never included in it.
