@@ -58,3 +58,27 @@ def test_invoice_proxy_keeps_customer_scope_and_hides_provider_choices(write_pol
     for extra in [{'org_id':'other'},{'invoice_id':'invoice_other'},{'url':'https://other.test'},{'paid':True}]:
         h=_Handler();msp_service.handle_post(h,'/api/msp/invoice',{'request_id':'br_example',**extra});assert h.status==422
     assert len(calls)==1
+
+
+def test_request_only_apps_reject_direct_toggle_but_keep_explicit_requests(write_policy,caller,monkeypatch):
+    from api import msp_service
+    caller.email=PLATFORM[0]; calls=[]
+    monkeypatch.setenv('SP_MSP_REQUEST_ONLY_APPS','1')
+    monkeypatch.setattr(control_plane_client,'call',lambda *a,**k:(calls.append((a,k)) or (200,{'status':'requested'})))
+    h=_Handler();msp_service.handle_post(h,'/api/msp/app-state',{'app_id':'opendesign','enabled':True})
+    assert h.status==403 and h.body['error']=='msp_approval_required'
+    assert calls==[]
+    h=_Handler();msp_service.handle_post(h,'/api/msp/app-request',{'app_id':'opendesign','note':'Please review this app.'})
+    assert h.status==200
+    assert calls[0][0]==('POST','/v1/customer/apps/opendesign/request')
+    assert calls[0][1]['acting']['user']==PLATFORM[0]
+
+
+def test_unmanaged_app_toggle_behavior_is_unchanged(write_policy,caller,monkeypatch):
+    from api import msp_service
+    caller.email=PLATFORM[0]; calls=[]
+    monkeypatch.delenv('SP_MSP_REQUEST_ONLY_APPS',raising=False)
+    monkeypatch.setattr(control_plane_client,'call',lambda *a,**k:(calls.append((a,k)) or (200,{'enabled':True})))
+    h=_Handler();msp_service.handle_post(h,'/api/msp/app-state',{'app_id':'opendesign','enabled':True})
+    assert h.status==200
+    assert calls[0][0]==('POST','/v1/customer/apps/opendesign/state')

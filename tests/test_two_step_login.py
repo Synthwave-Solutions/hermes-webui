@@ -556,3 +556,18 @@ def test_hd_claim_ignored_when_issuer_missing():
     }
     identity = auth_oidc._identity_from_claims(claims)
     assert not any(g.startswith("hd:") for g in identity["groups"])
+
+
+@pytest.mark.parametrize('subtitle,expected', [
+    ('Iuvenis operations', 'Iuvenis operations'),
+    (' <script>alert(1)</script> ', '&lt;script&gt;alert(1)&lt;/script&gt;'),
+    ('   ', 'Secure access for Synthwave Solutions operations'),
+])
+def test_deployment_subtitle_is_escaped_and_blank_keeps_locale(monkeypatch,subtitle,expected):
+    monkeypatch.setenv('SP_WEBUI_LOGIN_SUBTITLE',subtitle)
+    monkeypatch.setattr(routes,'load_settings',lambda:{'language':'en','bot_name':'SynthPulse'})
+    captured={}
+    monkeypatch.setattr(routes,'t',lambda _h,body,**_kw:captured.update(body=body) or True)
+    routes.handle_get(RouteFakeHandler(),SimpleNamespace(path='/login',query=''))
+    assert '<p class="sub">'+expected+'</p>' in captured['body']
+    assert '<script>alert(1)</script>' not in captured['body']
