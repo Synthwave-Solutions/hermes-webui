@@ -323,10 +323,41 @@ class HubBackend:
         return data
 
 
+class LocalPersonalBackend(InterimSqliteBackend):
+    """Read-only explorer restricted to this authenticated person's local banks."""
+    name = "local_personal"
+    _shared = None
+    _shared_lock = threading.Lock()
+
+    def data_version(self, store: registry.Store) -> str:
+        # The shared reader remains read-only. Use sub-second DB/WAL revisions
+        # so a consolidation immediately invalidates the 30-second view cache.
+        revisions = []
+        for suffix in ("", "-wal"):
+            try:
+                stat = os.stat(store.backend_ref + suffix)
+                revisions.append((stat.st_mtime_ns, stat.st_size, stat.st_ino))
+            except OSError:
+                revisions.append(None)
+        return repr(revisions)
+
+    def list_stores(self, viewer: Viewer, identity: dict | None = None) -> list[registry.Store]:
+        if not viewer.email or not viewer.email_hash:
+            raise BackendRefused("Authenticated person required")
+        try:
+            return [store for store in registry.personal_stores(viewer) if store.is_own(viewer)]
+        except registry.RegistryUnavailable as exc:
+            raise BackendUnavailable(str(exc)) from exc
+
+
 def select_backend(*, is_hq: bool):
     """The configured backend, or ``BackendUnavailable`` (addendum 6.6.7)."""
     mode = os.environ.get("HERMES_WEBUI_MEMDASH_BACKEND", "").strip()
     hub_url = os.environ.get("HERMES_WEBUI_MNEMO_URL", "").strip()
+    if mode == "local_personal":
+        if hub_url:
+            raise BackendUnavailable("Choose either the local personal explorer or the hub")
+        return LocalPersonalBackend.shared()
     if mode == "sqlite_interim":
         if hub_url:
             raise BackendUnavailable("the interim reader is off while a hub URL is set")

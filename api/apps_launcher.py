@@ -114,6 +114,6 @@ def handle_get(handler, parsed):
                 row['url'] = None
     result = {'apps': apps}
     if managed:
-        result['msp'] = {'connected': True, 'manage_apps': customer.get('permissions', {}).get('manage_apps', False)}
+        result['msp'] = {'connected': True, 'manage_apps': customer.get('permissions', {}).get('manage_apps', False), 'request_only': os.getenv('SP_MSP_REQUEST_ONLY_APPS') == '1'}
     j(handler, result)
     return True

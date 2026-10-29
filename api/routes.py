@@ -12280,7 +12280,7 @@ def handle_get(handler, parsed) -> bool:
             .replace("{{WEBUI_VERSION}}", version_token)
             .replace("{{LANG}}", _html.escape(_login_strings["lang"]))
             .replace("{{LOGIN_TITLE}}", _html.escape(_login_strings["title"]))
-            .replace("{{LOGIN_SUBTITLE}}", _html.escape(_login_strings["subtitle"]))
+            .replace("{{LOGIN_SUBTITLE}}", _html.escape(os.getenv("SP_WEBUI_LOGIN_SUBTITLE", "").strip() or _login_strings["subtitle"]))
             .replace("{{LOGIN_INVALID_PW}}", _html.escape(_login_strings["invalid_pw"]))
             .replace(
                 "{{LOGIN_CONN_FAILED}}", _html.escape(_login_strings["conn_failed"])

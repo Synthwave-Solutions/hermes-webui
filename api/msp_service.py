@@ -1,6 +1,7 @@
 """Self-service proxy. Only server-resolved identities reach the signed MSP API."""
 from urllib.parse import parse_qs, quote, urlencode
 import re
+import os
 from api import control_plane_client as control
 from api.org_modules import context
 from api.governance import delegation
@@ -60,6 +61,8 @@ def handle_post(handler,path,body):
     # Validate even self-service payloads before forwarding. Organisation and
     # acting headers can never be supplied by the browser.
     if not isinstance(body,dict):return respond(handler,(422,{'error':'Invalid request'}))
+    if path=='/api/msp/app-state' and os.getenv('SP_MSP_REQUEST_ONLY_APPS') == '1':
+        return respond(handler,(403,{'error':'msp_approval_required','message':'Ask your MSP to provision or change app availability.'}))
     if path=='/api/msp/invoice':
         allowed={'request_id'};ident=body.get('request_id','')
         if not isinstance(ident,str) or not re.fullmatch(r'br_[A-Za-z0-9_-]{1,80}',ident):return respond(handler,(422,{'error':'Invalid invoice request'}))

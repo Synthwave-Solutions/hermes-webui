@@ -34,16 +34,21 @@
         card.append(heading,el('p',localized(r.description)||c.intro,'app-description'));
         const actions=el('div',null,'app-actions'),url=validUrl(r.url);
         if(url){const action=c.open;const link=el('a',action+' ↗','app-button app-open');link.href=url;link.target='_blank';link.rel='noopener noreferrer';link.setAttribute('aria-label',action+': '+name);actions.append(link);}
-        else card.append(el('p',r.available&&r.enabled===false?(lang()==='nl'?'Uitgeschakeld in SynthPulse':'Disabled in SynthPulse'):c.unconfigured,'app-unconfigured'));
+        else card.append(el('p',r.enabled===false?(lang()==='nl'?'Uitgeschakeld in SynthPulse':'Disabled in SynthPulse'):c.unconfigured,'app-unconfigured'));
         if(r.id){const help=btn(c.help,()=>guide(id,help));help.setAttribute('aria-label',c.help+': '+name);actions.append(help);}
         card.append(actions);
         if(msp.connected && r.support_levels){
           const nl=lang()==='nl';
           const change=(path,payload)=>mutate(path,{app_id:id,...payload});
-          if(msp.manage_apps && r.available){
+          if(msp.manage_apps && r.available && !msp.request_only){
             const toggle=btn((r.enabled?(nl?'Aan':'On'):(nl?'Uit':'Off'))+' · SynthPulse',()=>change('/api/msp/app-state',{enabled:!r.enabled}));
             toggle.classList.add('app-state-toggle');toggle.setAttribute('role','switch');toggle.setAttribute('aria-checked',String(r.enabled));toggle.setAttribute('aria-label',(nl?'App beschikbaar: ':'App available: ')+name);toggle.disabled=mutation;card.append(toggle);
 
+          }
+          if(msp.request_only && (!r.available || !r.enabled)){
+            const request=btn(nl?'Aanvragen bij MSP':'Request from MSP',()=>mutate('/api/msp/app-request',{
+              app_id:id,note:(nl?'Graag deze app beoordelen en beschikbaar maken voor onze installatie: ':'Please review and provision this app for our installation: ')+name}));
+            request.disabled=mutation;actions.append(request);
           }
           const support=el('div',null,'app-support'),sub=r.support;
           support.append(el('strong',nl?'Support & uitbreidingen':'Support & upgrades'));
