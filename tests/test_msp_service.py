@@ -60,7 +60,7 @@ def test_invoice_proxy_keeps_customer_scope_and_hides_provider_choices(write_pol
     assert len(calls)==1
 
 
-def test_request_only_apps_reject_direct_toggle_but_keep_explicit_requests(write_policy,caller,monkeypatch):
+def test_request_only_apps_reject_direct_toggle_but_keep_explicit_requests(write_policy,caller,monkeypatch):  # noqa: F811 — pytest injects the imported fixtures by name.
     from api import msp_service
     caller.email=PLATFORM[0]; calls=[]
     monkeypatch.setenv('SP_MSP_REQUEST_ONLY_APPS','1')
@@ -74,7 +74,7 @@ def test_request_only_apps_reject_direct_toggle_but_keep_explicit_requests(write
     assert calls[0][1]['acting']['user']==PLATFORM[0]
 
 
-def test_unmanaged_app_toggle_behavior_is_unchanged(write_policy,caller,monkeypatch):
+def test_unmanaged_app_toggle_behavior_is_unchanged(write_policy,caller,monkeypatch):  # noqa: F811 — pytest injects the imported fixtures by name.
     from api import msp_service
     caller.email=PLATFORM[0]; calls=[]
     monkeypatch.delenv('SP_MSP_REQUEST_ONLY_APPS',raising=False)

@@ -45,7 +45,6 @@ def test_customer_explorer_returns_owner_consolidations_graph_and_episodic_data(
  assert fresh.status==200 and any('New consolidation visible' in str(item) for item in fresh.body['items'])
 
 def test_foreign_bank_hidden_even_for_admin_and_reader_is_readonly(env):
- from api import personal_context
  from api.memdash_scope import email_hash
  foreign_ref=env.registry.ref_for('person:'+email_hash(H.BOB)+':private')
  assert env.view(foreign_ref,'stats').status==404
