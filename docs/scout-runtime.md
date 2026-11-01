@@ -5,6 +5,10 @@ one job in that bot's native cron store. Its result belongs to that person's
 private Scout conversation. A quiet run may deliberately return `[SILENT]`;
 a failed run is not evidence that there is nothing useful to report.
 
+Private conversations show the Scout's advice and prepared material. Its internal
+`SCOUT-LEDGER` and `SCOUT-WEB` lines stay in the native run output for the next
+collector round; the delivery bridge removes those lines from chat messages.
+
 Deployments that keep background profiles on a separate multiplex gateway can
 set `webui.background_gateway_home` to its absolute home in the **root**
 `config.yaml`. Leave it unset for ordinary native gateway discovery. This is an
