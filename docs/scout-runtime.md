@@ -52,6 +52,18 @@ server-owned cron trigger supplies this distinction; prompt text cannot change i
 The Scout must attempt necessary source checks before choosing `[SILENT]`, and
 report a material source failure when it prevents reliable preparation.
 
+For native agent runs whose execution profile is also their owning cron store,
+**Run now** creates one native execution record before spawning its worker. The
+child adopts that record and uses the native output, delivery queue and terminal
+bookkeeping with the same execution ID. Receipt reconciliation leaves a live
+owner alone and recovers an interrupted child; the WebUI parent accepts an
+explicit, verified native completion instead of saving and delivering again.
+A lost child reply cannot overwrite a completed run. Older engines and script
+jobs retain their existing manual path. The separate execution-profile/store
+compatibility path also stays unchanged: native receipt recovery currently
+assumes those homes coincide, so this lifecycle guarantee does not cover that
+split. Scout jobs use one bot home for both roles.
+
 CLI credentials must resolve in the background process's actual environment.
 When a deployment uses the governed Workspace wrappers with central credentials,
 configure their existing `GWS_DWD_SA_KEY` and `GMAIL_DWD_SA_KEY` references in the
@@ -69,6 +81,11 @@ Preserve the enforce markers, rules and profile-specific restrictions. A missing
 policy under a home that was previously enforced correctly refuses every tool;
 removing the marker or changing the mode is not a deployment repair.
 
+Policy source changes also need to be installed for the intended profiles with
+`deploy/synthwave-policy/install.sh`, followed by a gateway reload or restart.
+Verify that the installed plugin matches the reviewed source; updating only the
+engine checkout leaves already-installed policy copies unchanged.
+
 Keep approved CLI directories in that gateway HOME's login-shell initialization
 (for example its `.profile`, or configured `terminal.shell_init_files`). The
 service's `PATH` alone is insufficient: a login-shell snapshot can replace it.
@@ -85,3 +102,5 @@ configuration save alone does not prove an agent ran or a result was delivered.
 
 Regression coverage: `tests/test_bot_scout.py` checks idempotent enrollment and
 that a host which does not serve the bot cannot leave an enabled job behind.
+`tests/test_cron_manual_native_lifecycle.py` exercises native receipt recovery,
+one completion and one delivery, including a crashed child and a lost reply.

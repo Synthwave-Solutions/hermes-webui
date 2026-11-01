@@ -2124,7 +2124,8 @@ def _cron_run_job_kwargs(run_job, run_kwargs) -> dict:
     return {key: value for key, value in run_kwargs.items() if _callable_accepts_kwarg(run_job, key)}
 
 
-def _cron_job_subprocess_main(job, execution_profile_home, result_queue, run_plan=None, run_kwargs=None):
+def _cron_job_subprocess_main(job, execution_profile_home, result_queue, run_plan=None, run_kwargs=None,
+                              native_execution=None):
     """Run one cron job inside a child process pinned to a profile home.
 
     The run is governed (W0). An engine with ``cron.scheduler.run_job_governed``
@@ -2138,7 +2139,8 @@ def _cron_job_subprocess_main(job, execution_profile_home, result_queue, run_pla
     """
     try:
         plan = run_plan if isinstance(run_plan, dict) else None
-        with _cron_policy_file_pin((plan or {}).get("governance_policy")):
+
+        def _run_governed():
             result = _cron_run_governed_entry(
                 job, execution_profile_home, (plan or {}).get("store_home"), run_kwargs=run_kwargs)
             if result is None:
@@ -2161,6 +2163,17 @@ def _cron_job_subprocess_main(job, execution_profile_home, result_queue, run_pla
                             result = _run()
                 finally:
                     _reset_cron_run_governance(token)
+            return result
+
+        with _cron_policy_file_pin((plan or {}).get("governance_policy")):
+            if native_execution is None:
+                result = _run_governed()
+            else:
+                from api import cron_manual_execution
+
+                result = cron_manual_execution.complete_in_child(
+                    job, native_execution, _run_governed,
+                    refusal_type=_CronRunRefused, profile_home=execution_profile_home)
         result_queue.put(("ok", result))
     except _CronRunRefused as refused:
         result_queue.put(("refused", refused.refusal, refused.recorded))
@@ -2190,7 +2203,8 @@ def _cron_subprocess_result_timeout_seconds(job):
     return 6 * 60 * 60.0
 
 
-def _run_cron_job_in_profile_subprocess(job, execution_profile_home, run_plan=None, run_kwargs=None):
+def _run_cron_job_in_profile_subprocess(job, execution_profile_home, run_plan=None, run_kwargs=None,
+                                       native_execution=None):
     """Execute cron.scheduler.run_job without holding the parent cron env lock.
 
     cron.scheduler/cron.jobs still rely on process-global HERMES_HOME and module
@@ -2209,7 +2223,9 @@ def _run_cron_job_in_profile_subprocess(job, execution_profile_home, run_plan=No
     ctx = multiprocessing.get_context("spawn")
     result_queue = ctx.Queue(maxsize=1)
     args = (job, execution_profile_home, result_queue, run_plan)
-    if run_kwargs:
+    if native_execution is not None:
+        args += (dict(run_kwargs or {}), native_execution)
+    elif run_kwargs:
         args += (dict(run_kwargs),)
     process = ctx.Process(target=_cron_job_subprocess_main, args=args)
     process.start()
@@ -2290,7 +2306,7 @@ def _run_cron_tracked(
     """
     import importlib
 
-    from api import cron_notifications
+    from api import cron_manual_execution, cron_notifications
     from cron.jobs import mark_job_run, save_job_output
 
     _cron_scheduler = importlib.import_module("cron.scheduler")
@@ -2300,6 +2316,7 @@ def _run_cron_tracked(
 
     job_id = job.get("id", "")
     execution_profile_home = execution_profile_home or profile_home
+    native_execution = None
 
     def _with_cron_home(home, fn):
         if home is None:
@@ -2316,11 +2333,29 @@ def _run_cron_tracked(
         if run_plan is not None:
             subprocess_kwargs["run_plan"] = run_plan
         run_kwargs = cron_notifications.manual_run_kwargs(job, actor=actor)
+        # Native receipts, execution records and their recovery tail share one
+        # home. Keep the older split-store/profile path until the engine exposes
+        # an explicit cross-profile completion contract.
+        if _cron_same_home(profile_home, execution_profile_home):
+            native_execution = _with_cron_home(
+                profile_home, lambda: cron_manual_execution.prepare(job, _cron_scheduler))
+        if native_execution is not None:
+            job = dict(job, execution_id=native_execution)
+            run_kwargs = dict(run_kwargs, execution_id=native_execution)
+            subprocess_kwargs["native_execution"] = native_execution
         if run_kwargs:
             subprocess_kwargs["run_kwargs"] = run_kwargs
-        success, output, final_response, error = _run_cron_job_in_profile_subprocess(
+        result = _run_cron_job_in_profile_subprocess(
             job, execution_profile_home, **subprocess_kwargs
         )
+        if isinstance(result, cron_manual_execution.NativeCompletion):
+            if result.execution_id != native_execution:
+                raise RuntimeError("Manual cron completion identity mismatch")
+            _with_cron_home(profile_home, lambda: cron_manual_execution.require_completed(job_id, native_execution))
+            return
+        if native_execution is not None:
+            raise RuntimeError("Native manual cron worker returned no completion receipt")
+        success, output, final_response, error = result
 
         # Persist output, deliver the same content the scheduled cron path would
         # send, and write run metadata back to the job's owning cron store even
@@ -2375,8 +2410,12 @@ def _run_cron_tracked(
                 logger.warning("Failed to record the refused manual cron run of %s", job_id, exc_info=True)
     except Exception as e:
         logger.exception("Manual cron run failed for job %s", job_id)
+        error_text = str(e)
         try:
-            _with_cron_home(profile_home, lambda: mark_job_run(job_id, False, str(e)))  # noqa: F821  e is bound by the enclosing `except ... as e` and the lambda runs synchronously here
+            if native_execution is not None:
+                _with_cron_home(profile_home, lambda: cron_manual_execution.settle_error(job, native_execution, error_text))
+            else:
+                _with_cron_home(profile_home, lambda: mark_job_run(job_id, False, error_text))
         except Exception:
             logger.debug("Failed to mark manual cron run failure for %s", job_id)
     finally:
