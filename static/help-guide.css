@@ -14,7 +14,7 @@
 .sp-feature-guide button{font:inherit;cursor:pointer;color:inherit;border:1px solid var(--border);background:var(--surface);border-radius:var(--sp-radius-sm,8px);min-height:40px;padding:8px 12px;white-space:normal;text-align:left}
 .sp-feature-guide button:hover{background:var(--hover-bg)}
 .sp-feature-guide :is(button,input,select,summary):focus-visible{outline:2px solid var(--accent);outline-offset:3px}
-.sp-feature-guide .sp-guide-primary{background:var(--accent);border-color:var(--accent);color:var(--accent-contrast,#fff);font-weight:600;margin-top:16px}.sp-feature-guide .sp-guide-primary:hover{filter:brightness(.95)}
+.sp-feature-guide .sp-guide-primary{background:var(--sp-action-bg);border-color:var(--sp-action-bg);color:var(--sp-on-action);font-weight:600;margin-top:16px}.sp-feature-guide .sp-guide-primary:hover{background:var(--sp-action-bg);filter:brightness(.95)}
 .sp-guide-meta{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;padding:0 28px 12px;color:var(--muted);font-size:12px;flex-shrink:0}.sp-guide-meta>span{margin-right:auto}.sp-guide-meta button{border:0;background:transparent;padding:6px;min-height:32px;font-size:12px}
 /* Short windows scroll the dialog once its controls leave too little reading space. */
 .sp-guide-body{display:grid;grid-template-columns:minmax(230px,33%) minmax(0,1fr);flex:1;min-height:min(280px,60dvh);border-block:1px solid var(--border)}

@@ -49,8 +49,8 @@ button.help-card-link:focus-visible{outline:2px solid var(--accent);outline-offs
 .sp-help-tooltip .guida-close:hover{background:var(--hover-bg);color:var(--text);border-color:transparent;}
 .sp-help-tooltip .guida-btn-secondary{background:var(--input-bg);color:var(--text);border:1px solid var(--border2);}
 .sp-help-tooltip .guida-btn-secondary:hover{background:var(--hover-bg);border-color:var(--border2);}
-.sp-help-tooltip .guida-next{background:var(--accent);color:var(--sp-on-accent,#fff);border:1px solid var(--accent);}
-.sp-help-tooltip .guida-next:hover{background:var(--accent);filter:brightness(1.06);}
+.sp-help-tooltip .guida-next{background:var(--sp-action-bg);color:var(--sp-on-action);border:1px solid var(--sp-action-bg);}
+.sp-help-tooltip .guida-next:hover{background:var(--sp-action-bg);filter:brightness(.95);}
 .sp-help-tooltip .guida-arrow-top{border-top-color:var(--surface);}
 .sp-help-tooltip .guida-arrow-bottom{border-bottom-color:var(--surface);}
 .sp-help-tooltip .guida-arrow-left{border-left-color:var(--surface);}
@@ -101,8 +101,8 @@ ol.sp-help-popover-sections{list-style:decimal;padding-left:18px;}
 .sp-help-btn{font:inherit;font-size:12.5px;font-weight:600;height:32px;padding:0 12px;border-radius:var(--sp-radius-sm,8px);border:1px solid var(--border2);background:var(--input-bg);color:var(--text);cursor:pointer;}
 .sp-help-btn:hover{background:var(--hover-bg);}
 .sp-help-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
-.sp-help-btn-primary{background:var(--accent);border-color:var(--accent);color:var(--sp-on-accent,#fff);}
-.sp-help-btn-primary:hover{background:var(--accent);filter:brightness(1.06);}
+.sp-help-btn-primary{background:var(--sp-action-bg);border-color:var(--sp-action-bg);color:var(--sp-on-action);}
+.sp-help-btn-primary:hover{background:var(--sp-action-bg);filter:brightness(.95);}
 @media (max-width:640px){
   .sp-help-card{left:8px;right:8px;top:calc(56px + env(safe-area-inset-top,0px));bottom:auto;width:auto;}
   .sp-help-tooltip .guida-btn,.sp-help-btn{height:40px;}
