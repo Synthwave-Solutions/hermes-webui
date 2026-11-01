@@ -8726,12 +8726,28 @@ button.bg-badge{border:0;cursor:pointer;min-width:28px;min-height:28px;}
 .vault-items-header { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-top:28px; }
 .vault-login { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px 0; border-bottom:1px solid var(--border); }
 .vault-login p { margin:4px 0; overflow-wrap:anywhere; }
-.vault-dialog { box-sizing:border-box; width:min(520px, calc(100vw - 32px)); max-height:calc(100dvh - 48px); overflow:auto; border:1px solid var(--border); border-radius:16px; padding:24px; background:var(--bg-secondary, #142033); color:var(--text, #e5edf7); box-shadow:0 20px 80px #0008; }
+.vault-dialog { box-sizing:border-box; margin:auto; width:min(520px, calc(100vw - 32px)); max-height:calc(100dvh - 32px); overflow:auto; border:1px solid var(--border2); border-radius:16px; padding:24px; background:var(--surface); color:var(--text); box-shadow:0 20px 80px #0004; }
 .vault-dialog::backdrop { background:#030914bb; }
-.vault-dialog h2 { margin-top:0; }
-.vault-field { display:flex; flex-direction:column; gap:6px; margin:16px 0; font-size:14px; }
-.vault-field input, .vault-field select { box-sizing:border-box; width:100%; min-height:40px; padding:9px 12px; border:1px solid var(--border); border-radius:8px; background:var(--bg, #0b1220); color:inherit; font:inherit; }
-.vault-field input:focus-visible, .vault-field select:focus-visible { outline:2px solid var(--accent, #7ac7ff); outline-offset:2px; }
+.vault-dialog h2 { margin:0; font-size:20px; line-height:1.3; color:var(--strong); }
+.vault-dialog > .intg-muted { margin:8px 0 24px; font-size:14px; line-height:1.6; }
+.vault-dialog form { display:grid; gap:16px; min-width:0; }
+.vault-field { display:flex; flex-direction:column; gap:8px; min-width:0; font-size:14px; font-weight:600; line-height:1.5; }
+.vault-field input, .vault-field select { box-sizing:border-box; width:100%; min-width:0; min-height:44px; padding:10px 12px; border:1px solid var(--border2); border-radius:8px; background:var(--bg); color:var(--text); font:inherit; font-weight:400; }
+.vault-field input::placeholder { color:var(--muted); opacity:1; }
+.vault-dialog :is(input, select, button):focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.vault-dialog [role="status"] { margin:0; font-size:14px; line-height:1.6; overflow-wrap:anywhere; }
+.vault-dialog [role="status"]:empty { display:none; }
+.vault-dialog .intg-hub-actions { display:flex; justify-content:flex-end; flex-wrap:wrap; gap:10px; padding-top:16px; border-top:1px solid var(--border); }
+.vault-dialog .sm-btn { flex:0 1 auto; min-width:88px; min-height:44px; padding:10px 18px; border:1px solid var(--border2); border-radius:8px; background:var(--surface); color:var(--text); font:inherit; font-size:14px; font-weight:600; line-height:1.5; letter-spacing:0; cursor:pointer; touch-action:manipulation; transition:background .15s; }
+.vault-dialog .sm-btn:hover { background:var(--surface-subtle); }
+.vault-dialog .sm-btn.primary { background:var(--text); border-color:var(--text); color:var(--surface); }
+.vault-dialog .sm-btn.primary:hover { background:var(--strong); border-color:var(--strong); }
+.vault-dialog .sm-btn:disabled { opacity:.6; cursor:wait; }
+@media(max-width:600px) {
+  .vault-dialog { padding:20px; }
+  .vault-field input, .vault-field select { font-size:16px; }
+  .vault-dialog .sm-btn { flex:1; }
+}
 
 /* Person-specific Scout setup, shared by the bot page and the bot editor. */
 .bot-scout-card{min-width:0;overflow-wrap:anywhere;}
