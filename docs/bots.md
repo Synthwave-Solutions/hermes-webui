@@ -153,9 +153,9 @@ instructions, using the skills and connections available to the bot. The Google
 Chat space picker is no longer part of the UI; old stored source settings remain
 readable for compatibility. Saving unrelated settings does not erase them.
 
-Administrators can choose **Configure Scouts for users**, select an eligible user,
-and configure that person's enablement, cadence, time, instructions and personal
-conversation context. Bot editors retain their existing management rights. The
+Administrators open **Change person** in the Scout card to search eligible users,
+see their saved on/off state and schedule, and select the person to configure.
+The selected person's address stays visible above their instructions and schedule. Bot editors retain their existing management rights. The
 picker loads on demand rather than slowing ordinary profile/sidebar requests.
 The save revalidates the target person's current chat access to the bot; the job
 continues to run and deliver as that person, never as the administrator.
@@ -214,10 +214,41 @@ confirmation dialogs and access checks remain authoritative.
 ## Scheduled tasks and Scout in the bot editor
 
 Existing bots have **Scout** and **Scheduled tasks** tabs in **Edit bot**.
-Administrators and bot editors see the eligible-user selector automatically in
-Scout. Select a person to configure that person's schedule, instructions and
-cross-bot context; saving stays inside the editor and retains the selected person.
-Scout settings save separately from the bot configuration draft.
+Administrators and bot editors can open **Change person** to search the eligible
+people list. Each row shows the saved enablement and schedule. Regular users see
+only their own settings. If the directory is unavailable, own settings remain
+usable and the directory offers a retry; missing users are never invented.
+
+Start with **Prepare the day**, **Follow up on tasks**, or **Research opportunities**,
+or write personal instructions. Suggestions append to existing text, never change
+the schedule, and never enable extra conversation context. Use **Frequency** and
+**Time** to set a personal schedule; **Follow bot time** makes inheritance explicit.
+The preview uses the scheduler's configured timezone, not the browser's timezone.
+
+**Save & activate Scout** starts the schedule; it does not immediately dispatch a
+round. An existing active Scout offers **Save changes** and **Pause Scout**.
+**Save without activating** saves an inactive setup. The delivery note explains
+that useful results appear privately under this bot in **Conversations**. A round
+with nothing useful can stay silent.
+
+Personal drafts survive switching people and editor tabs in the current view.
+They are held in memory on that view's profile object, not in browser storage;
+leaving the bot editor or reloading releases them. Saving updates that person's
+server state and revision in place, preserves other people's drafts and the bot
+configuration draft, and never reloads the whole profiles screen. Failed saves
+keep the draft with an inline error. Duplicate submissions are disabled, and a
+late response cannot replace a different screen. A revision conflict still needs
+a reload/review; the client never retries with a newer revision automatically.
+
+**Shared bot defaults** is a separate disclosure and save action. It changes
+shared topics and inherited timing, not personal enablement or explicit overrides.
+Scout settings still save separately from the bot configuration draft.
+
+Browser regression: `node tests/scout_person_setup_browser.cjs` (using the existing
+Playwright installation via `PLAYWRIGHT_MODULE` and optionally `CHROMIUM_PATH`).
+The fixture uses synthetic people and intercepted API responses; backend access,
+revision and per-person isolation tests remain in `test_bot_scout_people.py`.
+Desktop, laptop and phone evidence: [Scout setup comparison](scout-person-setup.md).
 
 Scheduled tasks can be assigned from the existing editable task list. Assignment
 uses the existing server access checks and preserves the task owner and schedule.

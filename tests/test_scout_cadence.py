@@ -77,11 +77,10 @@ def test_scout_form_renders_inheritance_and_personal_override():
     import subprocess
     from pathlib import Path
     js=(Path(__file__).resolve().parents[1]/'static/panels.js').read_text()
-    helpers=js[js.index('function _scoutFrequencyOptions'):js.index('function _paintBotScoutTopics')]
+    helpers=js[js.index('// Scout card (api/bot_scout.py)'):js.index('function _paintBotScoutTopics')]
     code="""
 const esc=x=>String(x),t=x=>x,_botKind=p=>'bot';
-const _BOT_SCOUT_PROMPT_MAX=2000,_BOT_SCOUT_TOPIC_MAX=80;
-let _botScoutSelected={bot:'',person:''};
+const window={};
 """+helpers+"""
 const html=_botScoutCardHtml({bot_kind:'bot',bot_editable:true,bot:{scout:{frequency:'6h'}},scout_me:{enabled:true,own_frequency:true,frequency:'hourly'}});
 if(html.includes('botScoutSpace') || html.includes('Google Chat'))throw Error('provider-specific UI');
@@ -91,7 +90,7 @@ const personal=_botScoutCardHtml({bot_kind:'bot',bot_editable:false,scout_me:{en
 if(personal.includes('id="botScoutDefaultFrequency"') || !personal.includes('value="" selected'))throw Error('inheritance/editor');
 _botScoutSelected={bot:'radar',person:'bob@example.com'};
 const admin=_botScoutCardHtml({name:'radar',bot_kind:'bot',scout_manageable:true,bot_editable:false,scout_me:{enabled:false},scout_people_options:[{email:'bob@example.com',enabled:true,prompt:'Prepare quotes'}]});
-if(!admin.includes('value="bob@example.com" selected') || !admin.includes('Prepare quotes') || !admin.includes('loadBotScoutPeople()'))throw Error('admin selected person');
+if(!admin.includes('value="bob@example.com" aria-pressed="true"') || !admin.includes('Prepare quotes'))throw Error('admin selected person');
 
 """
     subprocess.run(['node','-e',code],check=True,capture_output=True,text=True)

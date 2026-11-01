@@ -79,3 +79,5 @@ dialog.bot-task-dialog::backdrop{background:rgb(3 9 18 / .72);backdrop-filter:bl
 .bot-task-dialog-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:26px;padding-top:18px;border-top:1px solid var(--border)}
 .bot-task-dialog-actions .sm-btn{min-height:40px;min-width:100px;padding:9px 16px}
 @media(max-width:640px){dialog.bot-task-dialog{padding:20px}.bot-task-toolbar{justify-content:stretch}.bot-task-toolbar button{flex:1}.bot-builder-tabs [role=tab]{padding:9px 10px}}
+#builderAutomation .bot-scout-head h3{margin:0;padding:0;border:0;font-size:16px;}
+#builderAutomation .bot-scout-card .bot-field-hint{margin:4px 0 0;}
