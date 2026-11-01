@@ -706,3 +706,31 @@ def test_server_side_turn_rejects_stale_runtime_before_session_acceptance(monkey
         "retryable": True,
         "_status": 409,
     }
+
+@pytest.mark.parametrize('layout', ['loose', 'packed', 'detached', 'worktree'])
+def test_verified_runtime_revision_needs_no_git_processes(monkeypatch, tmp_path, layout):
+    from api import agent_runtime
+    repo = tmp_path / 'engine'
+    repo.mkdir()
+    (repo / 'run_agent.py').write_text('class AIAgent: pass\n')
+    _git(repo, 'init', '-q')
+    _git(repo, 'add', 'run_agent.py')
+    _git(repo, 'commit', '-qm', 'initial')
+    if layout == 'packed':
+        _git(repo, 'pack-refs', '--all')
+    elif layout == 'detached':
+        _git(repo, 'checkout', '--detach')
+    elif layout == 'worktree':
+        worktree = tmp_path / 'worktree'
+        _git(repo, 'worktree', 'add', '-b', 'worker', str(worktree))
+        repo = worktree
+    module = repo / 'run_agent.py'
+    revision = agent_runtime._read_agent_revision(repo, module_path=module)
+    assert revision == _git(repo, 'rev-parse', 'HEAD')
+    with monkeypatch.context() as ctx:
+        ctx.setattr(agent_runtime.subprocess, 'run', lambda *a, **kw: pytest.fail('git spawned after identity verification'))
+        assert agent_runtime._read_agent_revision(repo, module_path=module) == revision
+    module.write_text('class AIAgent: changed = True\n')
+    _git(repo, 'add', 'run_agent.py')
+    _git(repo, 'commit', '-qm', 'changed')
+    assert agent_runtime._read_agent_revision(repo, module_path=module) != revision

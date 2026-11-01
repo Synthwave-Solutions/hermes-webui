@@ -14164,11 +14164,11 @@ window.SynthPulseFeatureCatalog = {
       ],
       "locales": {
         "nl": {
-          "title": "Nango openen",
+          "title": "App-connectors openen",
           "purpose": "Beheer integraties en verbindingen met externe diensten.",
           "when": "Gebruik deze ingang voor de inrichting van een externe koppeling bekijken.",
           "steps": [
-            "Kies Apps in de navigatie en zoek Nango.",
+            "Kies Apps in de navigatie en open App-connectors.",
             "Bekijk de status en de beschrijving van de kaart.",
             "Sluit de gids en kies Openen als een adres is ingesteld. Rond indien nodig de eigen aanmelding van de app af.",
             "Werk verder in de doelapp en gebruik het oorspronkelijke tabblad om terug te keren naar SynthPulse."
@@ -14178,11 +14178,11 @@ window.SynthPulseFeatureCatalog = {
           "example": "Bijvoorbeeld: de inrichting van een externe koppeling bekijken."
         },
         "en": {
-          "title": "Open Nango",
+          "title": "Open app connectors",
           "purpose": "Manage integrations and connections to external services.",
           "when": "Use this entry point for reviewing an external integration setup.",
           "steps": [
-            "Choose Apps in navigation and find Nango.",
+            "Choose Apps in navigation and open App connectors.",
             "Review the card’s status and description.",
             "Close the guide and choose Open when an address is configured. Complete the app’s own sign-in if required.",
             "Continue in the destination app and use the original tab to return to SynthPulse."

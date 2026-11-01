@@ -8703,3 +8703,32 @@ button.bg-badge{border:0;cursor:pointer;min-width:28px;min-height:28px;}
 .sidebar-org-dialog-actions button{font:inherit;color:var(--text);background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:9px 12px;cursor:pointer}
 .sidebar-org-error{color:var(--error,#f87171)}
 @media(max-width:600px){.sidebar-org-section-action{min-width:36px;min-height:36px}}
+
+/* Integration hub: source catalogs are loaded only when their tab is opened. */
+.intg-hub-tabs { display:flex; gap:6px; flex-wrap:wrap; border-bottom:1px solid var(--border); padding-bottom:12px; margin-bottom:20px; }
+.intg-hub-tabs button { min-height:40px; padding:8px 14px; border:1px solid transparent; border-radius:8px; background:transparent; color:var(--muted); cursor:pointer; font:inherit; }
+.intg-hub-tabs button[aria-selected="true"] { color:var(--text); border-color:var(--border2); background:var(--code-bg); }
+.intg-hub-tabs button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.intg-hub-intro { margin-bottom:20px; }
+.intg-hub-intro h2 { margin:0 0 8px; }
+.intg-hub-intro p { margin:0; line-height:1.6; color:var(--muted); }
+.intg-hub-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap:16px; }
+.intg-hub-card { display:flex; flex-direction:column; align-items:flex-start; gap:8px; padding:16px; border:1px solid var(--border); border-radius:8px; min-width:0; }
+.intg-hub-card h3 { font-size:14px; margin:0; overflow-wrap:anywhere; }
+.intg-hub-card p { font-size:13px; line-height:1.5; margin:0 0 8px; color:var(--muted); overflow-wrap:anywhere; }
+.intg-hub-card .sm-btn { margin-top:auto; min-height:36px; }
+.intg-hub-account { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 0; border-bottom:1px solid var(--border); }
+.intg-hub-account span { min-width:0; overflow-wrap:anywhere; }
+.intg-action-status { margin-top:16px; font-size:13px; overflow-wrap:anywhere; }
+.intg-toolbar select { max-width:100%; min-height:40px; padding:8px; background:var(--code-bg); color:var(--text); border:1px solid var(--border2); border-radius:6px; }
+.intg-content [role="tabpanel"][hidden] { display:none; }
+@media(max-width:600px) { .intg-hub-tabs button { flex:1 1 42%; } .intg-hub-account { flex-wrap:wrap; } }
+.vault-items-header { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-top:28px; }
+.vault-login { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px 0; border-bottom:1px solid var(--border); }
+.vault-login p { margin:4px 0; overflow-wrap:anywhere; }
+.vault-dialog { box-sizing:border-box; width:min(520px, calc(100vw - 32px)); max-height:calc(100dvh - 48px); overflow:auto; border:1px solid var(--border); border-radius:16px; padding:24px; background:var(--bg-secondary, #142033); color:var(--text, #e5edf7); box-shadow:0 20px 80px #0008; }
+.vault-dialog::backdrop { background:#030914bb; }
+.vault-dialog h2 { margin-top:0; }
+.vault-field { display:flex; flex-direction:column; gap:6px; margin:16px 0; font-size:14px; }
+.vault-field input, .vault-field select { box-sizing:border-box; width:100%; min-height:40px; padding:9px 12px; border:1px solid var(--border); border-radius:8px; background:var(--bg, #0b1220); color:inherit; font:inherit; }
+.vault-field input:focus-visible, .vault-field select:focus-visible { outline:2px solid var(--accent, #7ac7ff); outline-offset:2px; }

@@ -116,7 +116,8 @@ async function loadIntegrations() {
       ? _intgT('integrations_all_connections', 'All connections')
       : _intgT('integrations_my_connections', 'My connections');
   }
-  await Promise.all([_intgLoadCatalog(), _intgRefreshConnections(), _intgRefreshRequests(), chLoadChannels(), chLoadMine()]);
+  if (typeof loadIntegrationTab === "function") await loadIntegrationTab();
+  else await Promise.all([_intgLoadCatalog(), _intgRefreshConnections(), _intgRefreshRequests(), chLoadChannels(), chLoadMine()]);
   return true;
 }
 
@@ -178,7 +179,7 @@ function _intgRenderNotice() {
   if (nango.available === false) {
     el.style.display = '';
     el.innerHTML = '<div class="intg-banner">'
-      + _intgEsc(_intgT('integrations_nango_down', 'Nango is unreachable; showing the catalog without connect state.'))
+      + _intgEsc(_intgT('integrations_nango_down', 'The connection service is temporarily unavailable; the catalog remains available.'))
       + (nango.error ? ' <span class="intg-muted">(' + _intgEsc(nango.error) + ')</span>' : '')
       + '</div>';
   } else {
@@ -275,7 +276,7 @@ function _intgOwnerOf(c) {
 }
 
 function _intgProviderName(key) {
-  const providers = (_intgCatalog && _intgCatalog.providers) || [];
+  const providers = typeof _intgAllProviders === 'function' ? _intgAllProviders() : ((_intgCatalog && _intgCatalog.providers) || []);
   for (const p of providers) {
     if (p.unique_key === key || p.key === key) return p.display_name || key;
   }
@@ -285,7 +286,8 @@ function _intgProviderName(key) {
 function _intgRenderConnections() {
   const el = $('intgConnections');
   if (!el) return;
-  const rows = _intgConnections || [];
+  const personal = typeof _hostedAccounts === 'undefined' ? [] : _hostedAccounts;
+  const rows = (_intgConnections || []).concat(personal.map(row => ({_hosted:true, connection_id:row.connectionId, provider_config_key:row.connector, end_user:{id:_intgMyEndUserId()}, status:row.status})));
   const isAdmin = _intgIsAdmin(_intgMe);
   if (!rows.length) {
     el.innerHTML = '<div class="intg-muted">' + _intgEsc(_intgT('integrations_no_connections', 'No connections yet. Connect a service from the catalog below.')) + '</div>';
@@ -296,7 +298,7 @@ function _intgRenderConnections() {
     const cid = String(c.connection_id || '');
     const key = String(c.provider_config_key || '');
     const errors = Array.isArray(c.errors) ? c.errors : [];
-    const status = errors.length
+    const status = c._hosted ? '<span class="intg-badge">' + _intgEsc(c.status || '') + '</span>' : errors.length
       ? '<span class="intg-badge intg-badge-error">' + errors.length + ' ' + _intgEsc(_intgT('integrations_errors', 'error(s)')) + '</span>'
       : '<span class="intg-badge intg-badge-ok">' + _intgEsc(_intgT('integrations_healthy', 'Healthy')) + '</span>';
     let ownerTd = '';
@@ -306,7 +308,7 @@ function _intgRenderConnections() {
       ownerTd = '<td class="intg-nowrap">' + _intgEsc(label) + '</td>';
     }
     const canDelete = isAdmin || _intgIsOwnConnection(c);
-    const action = canDelete
+    const action = c._hosted ? '<button type="button" class="intg-btn danger" data-hosted-disconnect="' + _intgEsc(cid) + '">' + _intgEsc(_intgT('integrations_disconnect', 'Disconnect')) + '</button>' : canDelete
       ? '<button type="button" class="intg-btn danger" data-intg-action="disconnect" data-cid="' + _intgEsc(cid) + '" data-key="' + _intgEsc(key) + '">' + _intgEsc(_intgT('integrations_disconnect', 'Disconnect')) + '</button>'
       : '';
     return '<tr>'
@@ -329,7 +331,7 @@ function _intgRenderConnections() {
 }
 
 function _intgCategories() {
-  const providers = (_intgCatalog && _intgCatalog.providers) || [];
+  const providers = typeof _intgAllProviders === 'function' ? _intgAllProviders() : ((_intgCatalog && _intgCatalog.providers) || []);
   const set = new Set();
   providers.forEach(p => (p.categories || []).forEach(c => set.add(String(c))));
   return Array.from(set).sort((a, b) => a.localeCompare(b));
@@ -356,7 +358,7 @@ function _intgAuthModeLabel(mode) {
 }
 
 function _intgFilteredProviders() {
-  const providers = (_intgCatalog && _intgCatalog.providers) || [];
+  const providers = typeof _intgAllProviders === 'function' ? _intgAllProviders() : ((_intgCatalog && _intgCatalog.providers) || []);
   const q = _intgSearch.trim().toLowerCase();
   const cat = _intgCategory;
   const out = providers.filter(p => {
@@ -364,6 +366,7 @@ function _intgFilteredProviders() {
     if (!q) return true;
     if (String(p.display_name || '').toLowerCase().includes(q)) return true;
     if (String(p.key || '').toLowerCase().includes(q)) return true;
+    if (String(p.description || '').toLowerCase().includes(q)) return true;
     return (p.categories || []).some(c => String(c).toLowerCase().includes(q));
   });
   // Configured providers first; within each group keep the backend's
@@ -373,17 +376,19 @@ function _intgFilteredProviders() {
 
 function _intgRenderGrid() {
   const grid = $('intgGrid');
-  if (!grid || !_intgCatalog) return;
+  if (!grid || (!_intgCatalog && typeof _intgAllProviders !== 'function')) return;
   const providers = _intgFilteredProviders();
   const connectedKeys = _intgConnectedKeys();
   const pendingKeys = _intgPendingRequestKeys();
   const isAdminUser = _intgIsAdmin(_intgMe);
-  const nangoUp = !((_intgCatalog.nango || {}).available === false);
+  const nangoUp = !(((_intgCatalog || {}).nango || {}).available === false);
+  const visible = typeof _intgVisibleProviders === 'function' ? _intgVisibleProviders(providers) : providers;
   if (!providers.length) {
     grid.innerHTML = '<div class="intg-muted">' + _intgEsc(_intgT('integrations_no_results', 'No providers match your search.')) + '</div>';
     return;
   }
-  grid.innerHTML = providers.map(p => {
+  grid.innerHTML = visible.map(p => {
+    if (p._hosted) return _hostedCardHtml(p);
     const authLabel = _intgAuthModeLabel(p.auth_mode);
     const cats = (p.categories || []).slice(0, 3);
     const connected = p.configured && p.unique_key && connectedKeys.has(p.unique_key);
@@ -456,7 +461,7 @@ function _intgRenderGrid() {
       + (p.unique_key && p.unique_key !== p.key ? ' · ' + _intgEsc(p.unique_key) : '') + '</div></div>'
       + '<div class="intg-card-key">' + _intgEsc(p.key) + '</div>'
       + '<div class="intg-card-badges">' + badges + '</div>'
-      + (isAdminUser && p.setup_required ? '<div class="intg-muted intg-setup-message">' + _intgEsc(p.setup_message || 'Finish OAuth setup in Nango, then refresh SynthPulse.') + '</div>' : '')
+      + (isAdminUser && p.setup_required ? '<div class="intg-muted intg-setup-message">' + _intgEsc(p.setup_message || 'Finish the app connection setup, then refresh SynthPulse.') + '</div>' : '')
       + '<div class="intg-card-actions">' + action + docs + '</div>'
       + '</div>';
   }).join('');
@@ -493,7 +498,7 @@ function _intgApiUrlFor(connectUrl) {
 // before the requests refresh (and even if that call fails).
 function _intgMarkPending(providerConfigKey) {
   const key = String(providerConfigKey || '');
-  const providers = (_intgCatalog && _intgCatalog.providers) || [];
+  const providers = typeof _intgAllProviders === 'function' ? _intgAllProviders() : ((_intgCatalog && _intgCatalog.providers) || []);
   providers.forEach(p => {
     if (p && (p.unique_key === key || p.key === key)) p.approval = 'pending';
   });
@@ -508,7 +513,7 @@ async function _intgEnablePayload(providerKey) {
   if (!provider) throw new Error('Provider is no longer available. Refresh the catalog.');
   // Shared by the Connections and Governance Enable actions. Keep the
   // provider-managed MCP setup explanation visible before any POST or dialog.
-  if (provider.setup_required) throw new Error(provider.setup_message || 'Finish OAuth setup in Nango, then refresh SynthPulse.');
+  if (provider.setup_required) throw new Error(provider.setup_message || 'Finish the app connection setup, then refresh SynthPulse.');
   const payload = { provider_config_key: providerKey };
   const fields = provider.configured && provider.unique_key === providerKey ? [] : (provider.credential_fields || []);
   if (!fields.length) return payload;
@@ -626,7 +631,7 @@ async function _intgEnable(providerKey) {
   if (typeof showToast === 'function') {
     if (data && data.needs_credentials) {
       showToast(_intgT('integrations_enabled_needs_credentials',
-        'Enabled. Add the OAuth client credentials in the Nango dashboard before connecting.'), 8000);
+        'Enabled. Add the app credentials before connecting.'), 8000);
     } else {
       showToast(_intgT('integrations_enabled', 'Enabled. It can be connected now.'), 4000);
     }

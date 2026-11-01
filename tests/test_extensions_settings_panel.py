@@ -27,22 +27,18 @@ def _between(start_marker: str, end_marker: str) -> str:
 
 
 def _locale_count() -> int:
-    return len(re.findall(r"^  (?:[A-Za-z_][A-Za-z0-9_]*|'[^']+'):\s*\{", I18N_JS, re.MULTILINE))
+    from tests.i18n_catalogs import locale_catalogs
+    return len(locale_catalogs())
 
 
 def _locale_blocks() -> dict[str, str]:
-    matches = list(re.finditer(r"^  ((?:[A-Za-z_][A-Za-z0-9_]*|'[^']+')):\s*\{", I18N_JS, re.MULTILINE))
-    blocks = {}
-    for idx, match in enumerate(matches):
-        end = matches[idx + 1].start() if idx + 1 < len(matches) else len(I18N_JS)
-        blocks[match.group(1)] = I18N_JS[match.start():end]
-    return blocks
+    from tests.i18n_catalogs import locale_catalogs
+    return locale_catalogs()
 
 
-def _locale_string(block: str, key: str) -> str:
-    match = re.search(rf"\b{re.escape(key)}:\s*([\"'])(.*?)\1", block, re.DOTALL)
-    assert match, f"{key} not found in locale block"
-    return match.group(2)
+def _locale_string(block: dict, key: str) -> str:
+    assert key in block, f"{key} not found in locale"
+    return block[key]
 
 
 def _contains_post_method(block: str) -> bool:

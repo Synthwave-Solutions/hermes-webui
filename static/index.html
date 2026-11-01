@@ -1093,8 +1093,13 @@
       </div>
       <div class="main-view-body intg-main-body">
         <div class="main-view-content intg-content">
-          <div id="intgNotice" style="display:none"></div>
-          <div id="intgRequests" style="display:none"></div>
+          <div class="intg-hub-tabs" role="tablist" aria-label="Integration types">
+            <button type="button" id="intgTabConnectors" role="tab" aria-selected="true" aria-controls="intgPaneConnectors" onclick="switchIntegrationTab('connectors')" data-i18n="integrations_hosted_tab">App-connectors</button>
+            <button type="button" id="intgTabPlugins" role="tab" aria-selected="false" aria-controls="intgPanePlugins" onclick="switchIntegrationTab('plugins')">Plugins</button>
+            <button type="button" id="intgTabVault" role="tab" aria-selected="false" aria-controls="intgPaneVault" onclick="switchIntegrationTab('vault')" data-i18n="vault_title">Password vaults</button>
+            <button type="button" id="intgTabChannels" role="tab" aria-selected="false" aria-controls="intgPaneChannels" onclick="switchIntegrationTab('channels')" data-i18n="channels_title">Messaging channels</button>
+          </div>
+          <div id="intgPaneChannels" role="tabpanel" aria-labelledby="intgTabChannels" hidden>
           <section id="intgMine" class="intg-channels intg-mine" style="display:none">
             <div class="intg-section-title" data-i18n="mychannels_title">Your bot</div>
             <div id="intgMineBody"><div class="intg-muted" data-i18n="loading">Loading...</div></div>
@@ -1112,6 +1117,10 @@
             <div class="intg-section-title" data-i18n="channels_people_title">People on channels</div>
             <div id="intgChannelPeople"></div>
           </section>
+          </div>
+          <div id="intgPaneConnectors" role="tabpanel" aria-labelledby="intgTabConnectors">
+          <div id="intgNotice" style="display:none"></div>
+          <div id="intgRequests" style="display:none"></div>
           <div class="intg-section-title" id="intgConnectionsTitle" data-i18n="integrations_my_connections">My connections</div>
           <div id="intgConnections"><div class="intg-muted" data-i18n="loading">Loading...</div></div>
           <div class="intg-section-title" data-i18n="integrations_catalog">Available services</div>
@@ -1119,7 +1128,28 @@
             <input id="intgSearch" type="search" placeholder="Search providers..." data-i18n-placeholder="integrations_search_placeholder" autocomplete="off" data-1p-ignore data-lpignore="true" data-bwignore="true" data-form-type="other">
             <div id="intgCategoryChips" class="intg-chip-row"></div>
           </div>
+          <p id="intgCount" class="intg-muted" aria-live="polite"></p>
           <div id="intgGrid" class="intg-grid"><div class="intg-muted" data-i18n="loading">Loading...</div></div>
+          <button id="intgMore" type="button" class="sm-btn" onclick="showMoreHosted()" hidden data-i18n="integrations_more">Show more</button>
+          <div id="hostedActionStatus" class="intg-action-status" role="status"></div>
+          </div>
+          <section id="intgPaneVault" role="tabpanel" aria-labelledby="intgTabVault" hidden>
+            <div class="intg-hub-intro"><h2 data-i18n="vault_title">Password vaults</h2>
+              <p data-i18n="vault_intro">Your logins, available to the bots you use. Passwords are encrypted and filled directly into the matching website, without entering the conversation.</p></div>
+            <div id="vaultSources" class="intg-hub-grid" aria-live="polite"></div>
+            <div class="vault-items-header"><h3 data-i18n="vault_saved_logins">Saved logins</h3>
+              <button type="button" class="sm-btn" onclick="openVaultLogin()" data-i18n="vault_add">Add login</button></div>
+            <p class="intg-muted" data-i18n="vault_items_hint">Only the website and account name are shown. Manage logins from an external vault in its own app.</p>
+            <div id="vaultItems"></div><p id="vaultStatus" role="status" aria-live="polite"></p>
+          </section>
+          <section id="intgPanePlugins" role="tabpanel" aria-labelledby="intgTabPlugins" hidden>
+            <p class="intg-muted" data-i18n="integrations_plugins_intro">Extend your bots with tools, memory and integrations. Administrators manage installation and activation.</p>
+            <div id="pluginScope" class="intg-muted"></div>
+            <div class="intg-toolbar"><input id="pluginCatalogSearch" type="search" aria-label="Search plugins" data-i18n-placeholder="integrations_plugins_search" placeholder="Search plugins…" oninput="renderIntegrationPlugins()"><select id="pluginCatalogFilter" aria-label="Plugin list" onchange="renderIntegrationPlugins()"><option value="installed" data-i18n="settings_extensions_installed_tab">Installed</option><option value="catalog" data-i18n="settings_extensions_gallery_tab">Catalog</option></select></div>
+            <div id="pluginCatalogEmpty" class="intg-muted" hidden data-i18n="integrations_plugin_empty">No plugins found.</div>
+            <div id="pluginCatalogList" class="intg-grid" aria-live="polite"></div>
+            <div id="pluginActionStatus" class="intg-action-status" role="status"></div>
+          </section>
         </div>
       </div>
     </div>
@@ -1721,6 +1751,7 @@
             </div>
           </div>
           <div class="settings-pane" id="settingsPanePlugins">
+            <button type="button" class="sm-btn" onclick="openIntegrationPlugins()" data-i18n="integrations_manage_plugins">Manage plugins</button>
             <div class="settings-section-head">
               <div>
                 <div class="settings-section-title" data-i18n="settings_plugins_title">Plugins</div>
@@ -2098,6 +2129,8 @@
 <script src="static/bot-builder.js?v=__WEBUI_VERSION__-bot-editor2" defer></script>
 <script src="static/governance.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/integrations.js?v=__WEBUI_VERSION__" defer></script>
+<script src="static/integration-hub.js?v=__WEBUI_VERSION__" defer></script>
+<script src="static/vault.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/projects.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/onboarding.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/split.js?v=__WEBUI_VERSION__" defer></script>

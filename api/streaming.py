@@ -645,9 +645,11 @@ def _prewarm_skill_tool_modules():
             pass
 
 
+from api.agent_runtime import ensure_agent_runtime_current, require_ai_agent_class
+
 # Lazy import to avoid circular deps -- hermes-agent is on sys.path via api/config.py
 try:
-    from run_agent import AIAgent
+    AIAgent = require_ai_agent_class()
 except ImportError:
     AIAgent = None
 
@@ -660,9 +662,10 @@ def _get_ai_agent():
     requiring a server restart.
     """
     global AIAgent
+    ensure_agent_runtime_current()
     if AIAgent is None:
         try:
-            from run_agent import AIAgent as _cls  # noqa: PLC0415
+            _cls = require_ai_agent_class()
             AIAgent = _cls
         except ImportError:
             pass
@@ -7341,6 +7344,7 @@ def _run_agent_streaming(
     _bot_delegation_token = None
     _streaming_cron_profile_home_token = None
     _personal_memory_token = None
+    _personal_credentials_token = None
     _profile_home_context = None
     _skill_learning_context = None
     _worker_ownership_token = None
@@ -7417,6 +7421,8 @@ def _run_agent_streaming(
             if not _personal_auth.is_auth_enabled():
                 _turn_identity = {"method": "auth_disabled", "email": ""}
         _personal_root = personal_context.ensure_home(_turn_identity)
+        from api.personal_credentials import bind as bind_credentials, reset as reset_credentials
+        _personal_credentials_token = bind_credentials(_turn_identity)
         _personal_shared = personal_context.shared_conversation(s)
         from tools.memory_tool import bind_personal_memory_dir, reset_personal_memory_dir
         _personal_memory_token = bind_personal_memory_dir(_personal_root / "memories", enabled=not _personal_shared)
@@ -10689,6 +10695,8 @@ def _run_agent_streaming(
         put('apperror', _error_payload)
     finally:
         try:
+            if _personal_credentials_token is not None:
+                reset_credentials(_personal_credentials_token)
             if _personal_memory_token is not None:
                 reset_personal_memory_dir(_personal_memory_token)
             # Stop the periodic checkpoint thread before the final recovery path.

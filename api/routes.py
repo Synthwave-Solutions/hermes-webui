@@ -30,6 +30,7 @@ import http.client
 import socket as _socket
 from collections import defaultdict
 from pathlib import Path
+from api.agent_runtime import AgentRuntimeChangedError, ensure_agent_runtime_current, require_ai_agent_class
 from contextlib import closing
 from urllib.parse import parse_qs, quote, unquote, urljoin, urlsplit
 from urllib.error import HTTPError, URLError
@@ -13823,6 +13824,16 @@ def handle_get(handler, parsed) -> bool:
         }
         return j(handler, {"git": info})
 
+    if parsed.path in {"/api/integrations/hosted/catalog", "/api/integrations/hosted/accounts"}:
+        from api.hosted_connectors import handle
+        return handle(handler, parsed.path.rsplit("/", 1)[-1])
+    if parsed.path == "/api/plugins/catalog":
+        from api.plugin_catalog_ui import handle
+        return handle(handler, "catalog")
+    if parsed.path == "/api/vault/status":
+        from api.vault import handle
+        return handle(handler, "status")
+
     if parsed.path == "/api/integrations/catalog":
         from api.integrations import get_catalog
         from api.ownership import request_is_admin, request_owner_email
@@ -16285,6 +16296,17 @@ def handle_post(handler, parsed) -> bool:
         except RuntimeError as e:
             return bad(handler, _sanitize_error(e), 500)
 
+    if parsed.path in {"/api/integrations/hosted/connect", "/api/integrations/hosted/disconnect"}:
+        from api.hosted_connectors import handle
+        return handle(handler, parsed.path.rsplit("/", 1)[-1], body)
+    if parsed.path in {"/api/plugins/install", "/api/plugins/toggle"}:
+        from api.plugin_catalog_ui import handle
+        return handle(handler, parsed.path.rsplit("/", 1)[-1], body)
+    if parsed.path in {"/api/vault/add", "/api/vault/remove", "/api/vault/configure",
+                       "/api/vault/disconnect", "/api/vault/unlock", "/api/vault/lock", "/api/vault/items"}:
+        from api.vault import handle
+        return handle(handler, parsed.path.rsplit("/", 1)[-1], body)
+
     if parsed.path == "/api/integrations/connect":
         from api.integrations import CONNECT_STATUS_PENDING, create_connect_session
         from api.ownership import request_is_admin, request_owner_email
@@ -17421,7 +17443,7 @@ def handle_post(handler, parsed) -> bool:
                 except Exception as _e:
                     logger.debug("update summary auxiliary model failed; falling back to main model: %s", _e)
 
-                from run_agent import AIAgent
+                AIAgent = require_ai_agent_class()
 
                 agent = AIAgent(
                     model=_main_model,
@@ -21653,6 +21675,9 @@ def _handle_btw(handler, body):
         return bad(handler, str(e))
     if _session_is_subagent_view_only(str(body.get("session_id") or "")):
         return bad(handler, "Subagent sessions are view-only and cannot be used for /btw from WebUI", 400)
+    stale_response = _agent_runtime_barrier_response()
+    if stale_response is not None:
+        return j(handler, stale_response, status=409)
     try:
         s = get_session(body["session_id"])
     except KeyError:
@@ -21715,6 +21740,9 @@ def _handle_background(handler, body):
         require(body, "prompt")
     except ValueError as e:
         return bad(handler, str(e))
+    stale_response = _agent_runtime_barrier_response()
+    if stale_response is not None:
+        return j(handler, stale_response, status=409)
     try:
         s = get_session(body["session_id"])
     except KeyError:
@@ -22014,6 +22042,31 @@ class _ChatStartResponse(dict):
     execution_profile = None
 
 
+def _agent_runtime_barrier_response(
+    *,
+    runner_local_owned: bool = False,
+    external_runtime_owned: bool | None = None,
+) -> dict | None:
+    """Return the typed stale-runtime response for local in-process turns."""
+    if external_runtime_owned is True:
+        return None
+    if runner_local_owned and webui_gateway_chat_enabled(get_config()):
+        return None
+    from api.runtime_adapter import runtime_adapter_runner_enabled
+
+    if runner_local_owned and runtime_adapter_runner_enabled():
+        return None
+    try:
+        ensure_agent_runtime_current()
+    except AgentRuntimeChangedError as exc:
+        return {
+            "error": str(exc),
+            "type": "agent_runtime_stale",
+            "retryable": True,
+        }
+    return None
+
+
 def _start_chat_stream_for_session(
     s,
     *,
@@ -22030,6 +22083,7 @@ def _start_chat_stream_for_session(
     sender_email=None,
     sender_identity=None,
     continuation_ref=None,
+    external_runtime_owned: bool | None = None,
 ):
     """Persist pending state, register an SSE channel, and start an agent turn.
 
@@ -22038,6 +22092,8 @@ def _start_chat_stream_for_session(
     participant who wrote, and the turn runs under THEIR governance: being in
     somebody else's conversation must never lend you their rights.
     """
+    if external_runtime_owned is None:
+        external_runtime_owned = webui_gateway_chat_enabled(get_config())
     attachments = attachments or []
     # Groups always use the local worker below, where each turn is bound to
     # its human sender. Personal gateway chats keep their configured backend.
@@ -22070,6 +22126,19 @@ def _start_chat_stream_for_session(
             # borrow that route for an incompletely configured selected bot.
             return {'error': f'Bot {execution_profile} has no configured default model. Configure its model before starting a group turn.', '_status': 400}
         model, model_provider, normalized_model = bot_model, bot_provider, bot_model
+    # Auth-disabled gateway installations carry a sentinel identity, not a
+    # signed user. Preserve that legacy route; managed bots, projects and
+    # authenticated/private-memory turns require the governed local worker.
+    backend_is_gateway = (
+        not continuation_ref
+        and _managed_bot_access is None
+        and (not sender_identity or sender_identity.get("method") == "auth_disabled")
+        and external_runtime_owned
+        and not bool(getattr(s, 'participants', None) or getattr(s, 'bot_participants', None) or getattr(s, 'project_id', None))
+    )
+    stale_response = _agent_runtime_barrier_response(external_runtime_owned=backend_is_gateway)
+    if stale_response is not None:
+        return {**stale_response, "_status": 409}
     # Prevent duplicate runs in the same session while a stream is still active.
     # This commonly happens after page refresh/reconnect races and can produce
     # duplicated clarify cards for what appears to be a single user request.
@@ -22188,16 +22257,6 @@ def _start_chat_stream_for_session(
         STREAM_GOAL_RELATED[stream_id] = True
     _group_chat.remember_route_reason(stream_id, execution_profile, route_reason)
     diag.stage("worker_thread_start") if diag else None
-    # Auth-disabled gateway installations carry a sentinel identity, not a
-    # signed user. Preserve that legacy route; managed bots, projects and
-    # authenticated/private-memory turns require the governed local worker.
-    backend_is_gateway = (
-        not continuation_ref
-        and _managed_bot_access is None
-        and (not sender_identity or sender_identity.get("method") == "auth_disabled")
-        and webui_gateway_chat_enabled(get_config())
-        and not bool(getattr(s, 'participants', None) or getattr(s, 'bot_participants', None) or getattr(s, 'project_id', None))
-    )
     worker_target = _run_gateway_chat_streaming if backend_is_gateway else _run_agent_streaming
     worker_kwargs = {"model_provider": model_provider, "goal_related": goal_related}
     if sender_identity and not backend_is_gateway:
@@ -22301,6 +22360,7 @@ def _start_run(
     sender_email=None,
     sender_identity=None,
     continuation_ref=None,
+    gateway_chat_enabled: bool | None = None,
 ):
     """Shared start-run helper for /api/chat/start and start_session_turn.
 
@@ -22343,6 +22403,7 @@ def _start_run(
                 moa_config=moa_config,
                 sender_email=sender_email,
                 sender_identity=sender_identity,
+                external_runtime_owned=gateway_chat_enabled,
             )
 
         def _legacy_adapter_factory():
@@ -22385,6 +22446,7 @@ def _start_run(
         moa_config=moa_config,
         sender_email=sender_email,
         sender_identity=sender_identity,
+        external_runtime_owned=gateway_chat_enabled,
         **({'continuation_ref': continuation_ref} if continuation_ref else {}),
     )
 
@@ -22431,6 +22493,9 @@ def start_session_turn(
     msg = str(message or "").strip()
     if not msg:
         return {"error": "message is required", "_status": 400}
+    stale_response = _agent_runtime_barrier_response(runner_local_owned=True)
+    if stale_response is not None:
+        return {**stale_response, "_status": 409}
     try:
         s = get_session(session_id)
     except KeyError:
@@ -22790,6 +22855,9 @@ def _handle_chat_start(handler, body, diag=None):
             require(body, "session_id")
         except ValueError as e:
             return bad(handler, str(e))
+        stale_response = _agent_runtime_barrier_response(runner_local_owned=True)
+        if stale_response is not None:
+            return j(handler, stale_response, status=409)
         diag.stage("get_session") if diag else None
         claimed_new_session = False
         try:
@@ -23053,6 +23121,9 @@ def _handle_chat_sync(handler, body):
     """Fallback synchronous chat endpoint (POST /api/chat). Not used by frontend."""
     if _session_is_subagent_view_only(str(body.get("session_id") or "")):
         return bad(handler, "Subagent sessions are view-only and cannot be written from WebUI", 400)
+    stale_response = _agent_runtime_barrier_response()
+    if stale_response is not None:
+        return j(handler, stale_response, status=409)
     s = get_session(body["session_id"])
     msg = str(body.get("message", "")).strip()
     if not msg:
@@ -23095,13 +23166,15 @@ def _handle_chat_sync(handler, body):
         os.environ["HERMES_EXEC_ASK"] = "1"
         os.environ["HERMES_SESSION_KEY"] = s.session_id
     try:
-        from run_agent import AIAgent
+        AIAgent = require_ai_agent_class()
 
         # The bind must precede AIAgent construction (the agent-side
         # init_agent model policy fires at construction) and span
         # run_conversation; this sync fallback runs on the handler thread, so
         # binding here scopes the whole turn correctly.
-        with governed_agent_turn(
+        from api.personal_credentials import scope as personal_credentials_scope
+        from api.ownership import _request_identity
+        with personal_credentials_scope(_request_identity(handler)), governed_agent_turn(
             _governed_identity,
             active_profile=str(getattr(s, "profile", None) or "default"),
             session_id=s.session_id,
@@ -24471,6 +24544,7 @@ def _llm_git_commit_message(system_prompt: str, user_prompt: str, session=None) 
     from api import profiles as profiles_api
 
     active_profile = profiles_api.get_active_profile_name() or "default"
+    ensure_agent_runtime_current()
     with profiles_api.profile_env_for_background_worker(
         active_profile,
         "git commit message",
@@ -24540,7 +24614,7 @@ def _llm_git_commit_message(system_prompt: str, user_prompt: str, session=None) 
         except Exception as _e:
             logger.debug("git commit message auxiliary model failed; falling back to main model: %s", _e)
 
-        from run_agent import AIAgent
+        AIAgent = require_ai_agent_class()
 
         agent = AIAgent(
             model=_main_model,
@@ -24586,6 +24660,8 @@ def _handle_git_commit_message(handler, body):
         return bad(handler, str(e))
     except GitWorkspaceError as e:
         return _git_bad(handler, e)
+    except AgentRuntimeChangedError as e:
+        return j(handler, {"error": str(e), "type": "agent_runtime_stale", "retryable": True}, status=409)
     except Exception as e:
         logger.exception("git commit message generation failed")
         return bad(handler, _sanitize_error(e), 500)
@@ -24617,6 +24693,8 @@ def _handle_git_commit_message_selected(handler, body):
         return bad(handler, str(e))
     except GitWorkspaceError as e:
         return _git_bad(handler, e)
+    except AgentRuntimeChangedError as e:
+        return j(handler, {"error": str(e), "type": "agent_runtime_stale", "retryable": True}, status=409)
     except Exception as e:
         logger.exception("selected git commit message generation failed")
         return bad(handler, _sanitize_error(e), 500)
@@ -26865,6 +26943,7 @@ def _handle_handoff_summary(handler, body):
 
         # Call LLM for summary.
     try:
+        ensure_agent_runtime_current()
         import api.config as _cfg
         from api.oauth import resolve_runtime_provider_with_anthropic_env_lock
         import hermes_cli.runtime_provider as _runtime_provider
@@ -27004,6 +27083,8 @@ def _handle_handoff_summary(handler, body):
             "rounds": rounds,
             "fallback": fallback,
         })
+    except AgentRuntimeChangedError as e:
+        return j(handler, {"error": str(e), "type": "agent_runtime_stale", "retryable": True}, status=409)
     except Exception as e:
         logger.warning("Handoff summary generation failed: %s", e)
         summary_text = _fallback_handoff_summary(msgs)
