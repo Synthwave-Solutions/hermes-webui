@@ -301,6 +301,12 @@ def sync_job(home, scout: dict, person: str):
     if not person:
         raise ScoutError(400, "Scout needs a person")
     entry = (scout.get("people") or {}).get(person) or {}
+    if entry.get("enabled"):
+        from api.background_runtime import BackgroundRuntimeError, ensure_background_profile
+        try:
+            ensure_background_profile(home)
+        except BackgroundRuntimeError as exc:
+            raise ScoutError(503, str(exc)) from exc
     with cron_profile_context_for_home(Path(home)):
         import cron.jobs as cj
 
