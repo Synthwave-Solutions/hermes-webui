@@ -59,7 +59,73 @@ def _set(name, **body):
     return bot_scout.apply(name, body, ALICE, editor=True)
 
 
+@pytest.mark.parametrize("ready", [True, False])
+def test_scout_enable_requires_configured_background_host(scout_env, monkeypatch, tmp_path, ready):
+    import hermes_cli.gateway_runtime_discovery as discovery
+    import gateway.control_socket as control
+
+    host = tmp_path / "host"
+    host.mkdir(mode=0o700)
+    (host / "profiles").mkdir(mode=0o700)
+    (scout_env.root / "config.yaml").write_text(yaml.safe_dump({
+        "webui": {"background_gateway_home": str(host)},
+    }))
+    served = [{"home": str(host), "profile_id": str(host)}]
+    calls = []
+
+    def identify(home, **kwargs):
+        assert Path(home) == host
+        return {"runtime_protocol": 1, "state": "ready", "instance_id": "owner",
+                "authority_epoch": 1, "supervisor": "none", "api_origin": "http://127.0.0.1:8765",
+                "capabilities": ["session-authority-v1"], "served_profiles": list(served)}
+
+    def rescan(home, **kwargs):
+        calls.append(home)
+        link = host / "profiles" / "radar"
+        assert link.is_symlink() and link.resolve() == scout_env.homes["radar"]
+        if ready:
+            served.append({"home": str(link.resolve()), "profile_id": str(link.resolve())})
+        return {"served_profiles": ["default", "radar"] if ready else ["default"]}
+
+    monkeypatch.setattr(discovery, "query_identify", identify)
+    monkeypatch.setattr(control, "rescan_gateway_profiles", rescan)
+    if ready:
+        _set("radar", enabled=True)
+        assert len(_jobs(scout_env.homes["radar"])) == 1
+        _set("radar", enabled=True)
+        assert len(_jobs(scout_env.homes["radar"])) == 1
+        assert len(calls) == 1
+    else:
+        with pytest.raises(bot_scout.ScoutError, match="background runner"):
+            _set("radar", enabled=True)
+        assert not _jobs(scout_env.homes["radar"])
+        assert not (bot_metadata.read_profile("radar")["bot"].get("scout") or {}).get("enabled")
+
+
 # -- Runner copies -------------------------------------------------------------
+
+def test_background_registration_never_replaces_another_profile(scout_env, monkeypatch, tmp_path):
+    import hermes_cli.gateway_runtime_discovery as discovery
+    from api.background_runtime import BackgroundRuntimeError, ensure_background_profile
+
+    host = tmp_path / "host"
+    (host / "profiles").mkdir(parents=True, mode=0o700)
+    link = host / "profiles" / "radar"
+    link.symlink_to(scout_env.homes["odis"])
+    (scout_env.root / "config.yaml").write_text(yaml.safe_dump({
+        "webui": {"background_gateway_home": str(host)},
+    }))
+    monkeypatch.setattr(discovery, "query_identify", lambda *a, **k: {
+        "runtime_protocol": 1, "state": "ready", "instance_id": "owner",
+        "authority_epoch": 1, "supervisor": "none", "api_origin": "http://127.0.0.1:8765",
+        "capabilities": ["session-authority-v1"],
+        "served_profiles": [{"home": str(host), "profile_id": str(host)}],
+    })
+    with pytest.raises(BackgroundRuntimeError, match="different profile"):
+        ensure_background_profile(scout_env.homes["radar"])
+    assert link.resolve() == scout_env.homes["odis"]
+    assert not _jobs(scout_env.homes["radar"])
+
 
 def test_runner_files_are_copied_as_real_files_and_only_when_changed(scout_env):
     dest = bot_scout.install_runner(scout_env.homes["radar"])
