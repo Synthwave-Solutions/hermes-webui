@@ -125,3 +125,25 @@ integration script and stylesheet, exercises admin/member states at 1440px and
 and checks that both Enable entry points avoid a write and credential dialog.
 The API is a fixture and external requests are blocked; this test establishes
 frontend behavior, not live OAuth success.
+
+### Password vault dialogs
+
+The Add login, Bitwarden connection/unlock and 1Password connection dialogs
+follow the selected light or dark theme. Each opens centered, with readable
+field labels, a distinct Save action and separate Close action. On small screens
+the dialog scrolls within the viewport; Close and Save remain reachable.
+The explanatory text is also associated with the dialog for screen readers.
+
+Verification uses the actual renderer and styles with synthetic inputs and all
+network requests blocked:
+
+```sh
+node tests/frontend/vault-dialog.cjs
+```
+
+`PLAYWRIGHT_MODULE_PATH` can point to an existing Playwright installation and
+`CHROMIUM_PATH` can select an installed Chromium binary. `SYNTHPULSE_QA_OUTPUT`
+optionally saves screenshots. Coverage includes both themes, desktop/laptop/mobile
+and a reduced-height viewport, text contrast, keyboard focus, cancellation,
+required-field validation and clearing secrets during a mocked save. It does
+not establish a real password-manager connection or store live credentials.

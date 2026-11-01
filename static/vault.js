@@ -100,9 +100,11 @@ function _vaultDialog(title, description, fields, submit) {
   document.getElementById('vaultDialog')?.close();
   const dialog = _hubNode('dialog', 'vault-dialog'); dialog.id = 'vaultDialog';
   dialog.setAttribute('aria-labelledby', 'vaultDialogTitle');
+  dialog.setAttribute('aria-describedby', 'vaultDialogHint');
   const heading = _hubNode('h2', '', title); heading.id = 'vaultDialogTitle';
+  const hint = _hubNode('p', 'intg-muted', description); hint.id = 'vaultDialogHint';
   const form = _hubNode('form', ''); form.autocomplete = 'off';
-  dialog.append(heading, _hubNode('p', 'intg-muted', description), form);
+  dialog.append(heading, hint, form);
   for (const field of fields) {
     const label = _hubNode('label', 'vault-field', field.label);
     const input = _hubNode(field.options ? 'select' : 'input', '');
@@ -118,7 +120,7 @@ function _vaultDialog(title, description, fields, submit) {
   }
   const message = _hubNode('p', '', ''); message.setAttribute('role', 'status');
   const actions = _hubNode('div', 'intg-hub-actions');
-  const save = _hubNode('button', 'sm-btn', _vaultT('save', 'Save')); save.type = 'submit';
+  const save = _hubNode('button', 'sm-btn primary', _vaultT('save', 'Save')); save.type = 'submit';
   actions.append(_hubButton(_vaultT('close', 'Close'), () => dialog.close()), save);
   form.append(message, actions);
   form.addEventListener('submit', async event => {
