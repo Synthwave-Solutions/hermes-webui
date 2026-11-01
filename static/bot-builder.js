@@ -114,7 +114,7 @@
       orientTabs();
       input('builderBack').hidden=true;
       body.querySelectorAll('[data-builder-tab]').forEach(tab=>{
-        tab.onclick=()=>{if(!state||state.saving)return;if(window.BotKnowledge&&window.BotKnowledge.isBusy&&window.BotKnowledge.isBusy(state.config.name)){error(tr('bot_editor_knowledge_busy',"Wait for the knowledge file operation to finish."));return;}collect();state.step=Number(tab.dataset.builderTab);render();input('builderTab'+state.step).focus();input('builderTab'+state.step).scrollIntoView({block:'nearest',inline:'nearest'});};
+        tab.onclick=()=>{if(!state||state.saving)return;if(typeof _botScoutIsBusy==='function'&&_botScoutIsBusy()){error(tr('bot_setup_saving','Saving…'));return;}if(typeof _botScoutCapture==='function')_botScoutCapture();if(window.BotKnowledge&&window.BotKnowledge.isBusy&&window.BotKnowledge.isBusy(state.config.name)){error(tr('bot_editor_knowledge_busy',"Wait for the knowledge file operation to finish."));return;}collect();state.step=Number(tab.dataset.builderTab);render();input('builderTab'+state.step).focus();input('builderTab'+state.step).scrollIntoView({block:'nearest',inline:'nearest'});};
         tab.onkeydown=event=>{
           if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'].includes(event.key))return;
           event.preventDefault();const tabs=[...body.querySelectorAll('[data-builder-tab]')];let index=tabs.indexOf(tab);
@@ -165,18 +165,24 @@
   async function mountAutomation(){
     const current=state,box=input('builderAutomation');if(!current||!box)return;
     try{
-      const data=await api('/api/profiles?fast=1&counts=0',{timeoutToast:false});
+      const data=current.step===6&&current.scoutProfile?{profiles:[current.scoutProfile]}:await api('/api/profiles?fast=1&counts=0',{timeoutToast:false});
       if(state!==current||input('builderAutomation')!==box)return;
       const p=(data.profiles||[]).find(row=>row.name===current.config.name);
       if(!p)throw new Error('This bot is no longer available.');
       _currentProfileDetail=p;
       if(current.step===6){
         _botScoutTopics=[...((p.bot&&p.bot.scout&&p.bot.scout.topics)||[])];
-        if(p.scout_manageable||p.bot_editable){
-          const people=await api('/api/bots/scout',{method:'POST',body:JSON.stringify({name:p.name,action:'people'})});
-          if(state!==current||input('builderAutomation')!==box)return;
-          p.scout_people_options=people.people||[];
+        if((p.scout_manageable||p.bot_editable)&&!p.scout_people_options){
+          try{
+            const people=await api('/api/bots/scout',{method:'POST',body:JSON.stringify({name:p.name,action:'people'})});
+            if(state!==current||input('builderAutomation')!==box)return;
+            p.scout_people_options=people.people||[];
+          }catch(err){
+            if(state!==current||input('builderAutomation')!==box)return;
+            p.scout_people_error=true;
+          }
         }
+        current.scoutProfile=p;
         box.innerHTML=_botScoutCardHtml(p);
         if(!box.innerHTML){box.textContent='Scout is available for bot profiles only.';return;}
         _paintBotScoutTopics();

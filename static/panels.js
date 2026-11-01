@@ -8165,67 +8165,129 @@ async function saveBotAppearance(){
     await loadProfilesPanel();showToast(t('bot_saved'));
   }catch(e){showToast(e.message);}
 }
-// Scout card (api/bot_scout.py), per person per bot. Everyone who may chat
-// with the bot switches their own Scout here, with their own time and wishes.
-// Administrators and bot editors manage users, topics and default timing
-// and sees how many people have Scout on.
+// Scout card (api/bot_scout.py), per person per bot. Drafts belong to the
+// mounted profile object, never localStorage; leaving that view releases them.
 let _botScoutTopics=[];
 let _botScoutSelected={bot:'',person:''};
+const _botScoutViews=new WeakMap();
 const _BOT_SCOUT_MAX=12,_BOT_SCOUT_TOPIC_MAX=80,_BOT_SCOUT_PROMPT_MAX=2000,_BOT_SCOUT_SPACES_MAX=6;
 function _scoutFrequencyOptions(value, inherit=false){
   return [...(inherit?['']:[]),'hourly','3h','6h','12h','daily','weekdays'].map(v=>`<option value="${v}" ${v===value?'selected':''}>${esc(t('bot_scout_frequency_'+(v||'inherit')))}</option>`).join('');
 }
+function _botScoutActor(){return String(window.__GOV_ME__?.email||'').trim().toLowerCase();}
+function _botScoutPerson(p,person){
+  if(!person)return p.scout_me||{};
+  const scout=p.bot?.scout||{};
+  if(!Object.hasOwn(scout,'people'))return (p.scout_people_options||[]).find(x=>x.email===person)||{};
+  const entry=scout.people?.[person]||{};
+  return {...entry,known:!!scout.people?.[person],own_time:!!entry.digest_time,own_frequency:!!entry.frequency,
+    digest_time:entry.digest_time||scout.digest_time||'07:30',frequency:entry.frequency||scout.frequency||'daily'};
+}
+function _botScoutState(p){
+  if(!_botScoutViews.has(p)){
+    const scout=p.bot?.scout||{};
+    const selected=_botScoutSelected.bot===p.name?_botScoutSelected.person:'';
+    _botScoutViews.set(p,{person:selected!==_botScoutActor()&&(p.scout_people_options||[]).some(x=>x.email===selected)?selected:'',drafts:new Map(),busy:false,query:'',error:'',status:'',peopleError:p.scout_people_error?t('bot_scout_people_error'):'',
+      defaults:{topics:[...(scout.topics||[])],frequency:scout.frequency||'daily',time:scout.digest_time||'07:30',open:false}});
+  }
+  return _botScoutViews.get(p);
+}
+function _botScoutDraft(p,person){
+  const view=_botScoutState(p),me=_botScoutPerson(p,person);
+  return view.drafts.get(person)||{prompt:me.prompt||'',frequency:me.own_frequency?me.frequency:'',inherit_time:!me.own_time,digest_time:me.digest_time||p.bot?.scout?.digest_time||'07:30',cross_bot_context:!!me.cross_bot_context};
+}
+function _botScoutCapture(){
+  const p=_currentProfileDetail,card=document.querySelector('.bot-scout-card');
+  if(!p||!card||card.dataset.profile!==p.name||!$('botScoutPrompt'))return;
+  const view=_botScoutState(p);
+  // An empty custom time is an invalid draft, not a choice to inherit.
+  view.drafts.set(view.person,{prompt:$('botScoutPrompt').value,frequency:$('botScoutFrequency').value,
+    inherit_time:$('botScoutInheritTime').checked,digest_time:$('botScoutTime').value,cross_bot_context:$('botScoutCrossBot').checked});
+  if($('botScoutDefaultTime'))view.defaults={topics:[..._botScoutTopics],time:$('botScoutDefaultTime').value,frequency:$('botScoutDefaultFrequency').value,open:!!$('botScoutDefaults')?.open};
+}
+function _botScoutIsBusy(){return !!(_currentProfileDetail&&_botScoutViews.get(_currentProfileDetail)?.busy);}
+function _botScoutSchedule(frequency,time){
+  // Hourly cron uses only the minute; do not imply a once-daily start time.
+  return frequency==='hourly'?t('bot_scout_hourly_summary').replace('{minute}',time.slice(3)):
+    t('bot_scout_schedule_summary').replace('{frequency}',t('bot_scout_frequency_'+frequency)).replace('{time}',time);
+}
 function _botScoutCardHtml(p){
-  // An unreadable profile.yaml reads as kind "unknown": no Scout until fixed.
   if(_botKind(p)!=='bot'||p.bot_kind==='unknown'||!p.scout_me)return '';
-  const scout=(p.bot&&p.bot.scout)||{},editable=p.scout_manageable===true||p.bot_editable===true;
-  const selected=editable&&_botScoutSelected.bot===p.name?_botScoutSelected.person:'';
-  const me=(p.scout_people_options||[]).find(x=>x.email===selected)||p.scout_me,on=!!me.enabled;
-  const people=(p.scout_people_options||[]).map(x=>`<option value="${esc(x.email)}" ${selected===x.email?'selected':''}>${esc(x.email)} · ${esc(t(x.enabled?'bot_scout_saved_on':'bot_scout_saved_off'))}</option>`).join('');
-  const botTime=/^\d\d:\d\d$/.test(scout.digest_time||'')?scout.digest_time:'07:30';
-  const ownTime=me.own_time&&/^\d\d:\d\d$/.test(me.digest_time||'')?me.digest_time:'';
-  const count=Number(p.scout_people_count||0);
-  return `<section class="detail-card bot-scout-card" aria-labelledby="botScoutTitle">
-      <div class="bot-scout-head"><h3 id="botScoutTitle">${esc(t(selected?'bot_scout':'bot_scout_me'))}</h3>
-        <label class="bot-scout-switch"><input type="checkbox" role="switch" id="botScoutEnabled" ${on?'checked':''} onchange="saveBotScout(this.checked)"><span>${esc(t(on?'bot_scout_saved_on':'bot_scout_saved_off'))}</span></label></div>
-      <p class="bot-field-hint">${esc(t('bot_scout_intro'))}</p>
-      ${editable?`<div class="bot-editor-actions"><button type="button" class="sm-btn" onclick="loadBotScoutPeople()">${esc(t('bot_scout_manage_people'))}</button></div>${p.scout_people_options?`<label for="botScoutPerson">${esc(t('bot_scout_person'))}<select id="botScoutPerson" onchange="selectBotScoutPerson(this.value)"><option value="">${esc(t('bot_scout_me'))}</option>${people}</select></label>`:''}`:''}
-      <fieldset>
-        <label for="botScoutFrequency">${esc(t('bot_scout_frequency'))}<select id="botScoutFrequency">${_scoutFrequencyOptions(me.own_frequency?me.frequency:'',true)}</select></label>
-        <label for="botScoutTime">${esc(t('bot_scout_my_time'))}<input type="time" id="botScoutTime" step="60" value="${esc(ownTime)}"></label>
-        <p class="bot-field-hint">${esc(t('bot_scout_my_time_hint').replace('{time}',botTime))}</p>
-        <label><input type="checkbox" id="botScoutCrossBot" ${me.cross_bot_context?'checked':''}> ${esc(t('bot_scout_cross_bot'))}</label>
-        <label for="botScoutPrompt">${esc(t('bot_scout_my_prompt'))}</label>
-        <textarea id="botScoutPrompt" rows="3" maxlength="${_BOT_SCOUT_PROMPT_MAX}" placeholder="${esc(t('bot_scout_my_prompt_placeholder'))}">${esc(me.prompt||'')}</textarea>
-        <div class="bot-editor-actions"><button type="button" class="sm-btn primary" onclick="saveBotScout()">${esc(t(selected?'bot_scout_save':'bot_scout_save_me'))}</button></div>
-      </fieldset>
-      ${editable?`<fieldset class="bot-scout-bot">
-        <h4>${esc(t('bot_scout_bot_settings'))}</h4>
-        <p class="bot-field-hint">${esc(count===1?t('bot_scout_people_one'):t('bot_scout_people_count').replace('{n}',String(count)))}</p>
-        <label for="botScoutTopicInput">${esc(t('bot_scout_topics'))}</label>
-        <div class="bot-scout-chips" id="botScoutChips"><input id="botScoutTopicInput" maxlength="${_BOT_SCOUT_TOPIC_MAX}" placeholder="${esc(t('bot_scout_topics_placeholder'))}" onkeydown="_botScoutTopicKey(event)" onblur="_botScoutAddTopic(this)"></div>
-        <label for="botScoutDefaultFrequency">${esc(t('bot_scout_default_frequency'))}<select id="botScoutDefaultFrequency">${_scoutFrequencyOptions(scout.frequency||'daily')}</select></label>
-        <label for="botScoutDefaultTime">${esc(t('bot_scout_default_time'))}<input type="time" id="botScoutDefaultTime" step="60" value="${esc(botTime)}"></label>
-
-        <div class="bot-editor-actions"><button type="button" class="sm-btn" onclick="saveBotScoutBot()">${esc(t('bot_scout_save'))}</button></div>
-      </fieldset>`:''}
-    </section>`;
+  const scout=p.bot?.scout||{},editable=p.scout_manageable===true||p.bot_editable===true;
+  const view=_botScoutState(p),person=view.person,me=_botScoutPerson(p,person),draft=_botScoutDraft(p,person);
+  const botTime=scout.digest_time||'07:30',botFrequency=scout.frequency||'daily';
+  const target=person||_botScoutActor()||t('bot_scout_yourself');
+  const label=person?target:t('bot_scout_yourself');
+  const people=[{email:'',...p.scout_me},...(p.scout_people_options||[]).filter(x=>x.email!==_botScoutActor()).map(x=>({email:x.email,..._botScoutPerson(p,x.email)}))];
+  _botScoutTopics=[...view.defaults.topics];
+  const rows=people.map(x=>`<button type="button" class="bot-scout-person" value="${esc(x.email)}" aria-pressed="${x.email===person}" onclick="selectBotScoutPerson(this.value)"><span><strong>${esc(x.email||t('bot_scout_yourself'))}</strong><small>${esc(x.enabled?_botScoutSchedule(x.frequency||botFrequency,x.digest_time||botTime):t('bot_scout_not_active'))}</small></span><span class="bot-scout-state ${x.enabled?'is-on':''}">${esc(t(x.enabled?'bot_scout_saved_on':'bot_scout_saved_off'))}</span></button>`).join('');
+  return `<section class="detail-card bot-scout-card" data-profile="${esc(p.name)}" aria-labelledby="botScoutTitle" aria-busy="${view.busy}">
+    <fieldset id="botScoutControls" ${view.busy?'disabled':''}>
+      ${editable?`<details class="bot-scout-people" id="botScoutPeople"><summary><span><small>${esc(t('bot_scout_person'))}</small><strong>${esc(label)}</strong></span><span>${esc(t('bot_scout_choose_person'))}</span></summary><div class="bot-scout-directory"><label for="botScoutSearch">${esc(t('bot_scout_search_people'))}</label><input type="search" id="botScoutSearch" value="${esc(view.query)}" oninput="filterBotScoutPeople(this.value)"><p class="bot-field-hint">${esc(t('bot_scout_people_access'))}</p><div class="bot-scout-person-list" role="group" aria-label="${esc(t('bot_scout_person'))}">${rows}</div><p id="botScoutNoPeople" class="bot-field-hint" hidden>${esc(t('bot_scout_no_people'))}</p>${!p.scout_people_options?`<button type="button" class="sm-btn" onclick="loadBotScoutPeople()">${esc(t('bot_scout_load_people'))}</button>`:''}<p class="bot-scout-error" role="alert">${esc(view.peopleError||'')}</p></div></details>`:''}
+      <div class="bot-scout-head"><div><h3 id="botScoutTitle">${esc(person?t('bot_scout_for_person').replace('{person}',label):t('bot_scout_me'))}</h3><p class="bot-field-hint">${esc(p.bot?.title||p.name)}${editable?' · '+esc(p.scout_people_count===1?t('bot_scout_people_one'):t('bot_scout_people_count').replace('{n}',String(p.scout_people_count||0))):''}</p></div><span class="bot-scout-state ${me.enabled?'is-on':''}">${esc(t(me.enabled?'bot_scout_saved_on':'bot_scout_saved_off'))}</span></div>
+      <div class="bot-scout-field"><label for="botScoutPrompt">${esc(t('bot_scout_prepare'))}</label><p class="bot-field-hint">${esc(t('bot_scout_prepare_hint'))}</p>
+        <div class="bot-scout-presets" role="group" aria-label="${esc(t('bot_scout_starters'))}">${['agenda','tasks','research'].map(key=>`<button type="button" class="sm-btn" data-scout-template="${key}" onclick="applyBotScoutTemplate(this.dataset.scoutTemplate)">${esc(t('bot_scout_template_'+key))}</button>`).join('')}</div>
+        <textarea id="botScoutPrompt" rows="4" maxlength="${_BOT_SCOUT_PROMPT_MAX}" placeholder="${esc(t('bot_scout_my_prompt_placeholder'))}" oninput="updateBotScoutPreview()">${esc(draft.prompt)}</textarea>
+      </div>
+      <div class="bot-scout-schedule"><label for="botScoutFrequency">${esc(t('bot_scout_frequency'))}<select id="botScoutFrequency" onchange="updateBotScoutPreview()">${_scoutFrequencyOptions(draft.frequency,true)}</select></label><label for="botScoutTime">${esc(t('bot_scout_run_time'))}<input type="time" id="botScoutTime" step="60" required value="${esc(draft.inherit_time?botTime:draft.digest_time)}" ${draft.inherit_time?'disabled':''} oninput="updateBotScoutPreview()"></label></div>
+      <label class="bot-scout-check"><input type="checkbox" id="botScoutInheritTime" ${draft.inherit_time?'checked':''} onchange="updateBotScoutPreview()"><span>${esc(t('bot_scout_inherit_time').replace('{time}',botTime))}</span></label>
+      <p id="botScoutPreview" class="bot-field-hint" aria-live="polite">${esc(_botScoutSchedule(draft.frequency||botFrequency,draft.inherit_time?botTime:draft.digest_time))} · ${esc(t('bot_scout_timezone_hint'))}</p>
+      <details class="bot-scout-context"><summary>${esc(t('bot_scout_context'))}</summary><p class="bot-field-hint">${esc(t('bot_scout_context_hint'))}</p><label class="bot-scout-check"><input type="checkbox" id="botScoutCrossBot" ${draft.cross_bot_context?'checked':''} onchange="updateBotScoutPreview()"><span>${esc(t(person?'bot_scout_cross_bot_person':'bot_scout_cross_bot'))}</span></label></details>
+      <div class="bot-scout-delivery"><strong>${esc(t('bot_scout_delivery_title'))}</strong><p class="bot-field-hint">${esc(t('bot_scout_delivery_hint').replace('{person}',target))}</p></div>
+      <p id="botScoutError" class="bot-scout-error" role="alert" ${view.error?'':'hidden'}>${esc(view.error)}</p><p id="botScoutStatus" role="status">${esc(view.status)}</p>
+      <div class="bot-scout-actions"><button type="button" id="botScoutSave" class="sm-btn primary" onclick="saveBotScout(true)">${esc(t(view.busy?'bot_setup_saving':me.enabled?'bot_scout_save_changes':'bot_scout_activate'))}</button><button type="button" id="botScoutPause" class="sm-btn" onclick="saveBotScout(false)">${esc(t(me.enabled?'bot_scout_pause':'bot_scout_save_paused'))}</button></div>
+      ${editable?`<details class="bot-scout-bot" id="botScoutDefaults" ${view.defaults.open?'open':''}><summary>${esc(t('bot_scout_defaults_title'))}</summary><p class="bot-field-hint">${esc(t('bot_scout_defaults_hint'))}</p><label for="botScoutTopicInput">${esc(t('bot_scout_topics'))}</label><div class="bot-scout-chips" id="botScoutChips"><input id="botScoutTopicInput" maxlength="${_BOT_SCOUT_TOPIC_MAX}" placeholder="${esc(t('bot_scout_topics_placeholder'))}" onkeydown="_botScoutTopicKey(event)" onblur="_botScoutAddTopic(this)"></div><div class="bot-scout-schedule"><label for="botScoutDefaultFrequency">${esc(t('bot_scout_default_frequency'))}<select id="botScoutDefaultFrequency">${_scoutFrequencyOptions(view.defaults.frequency)}</select></label><label for="botScoutDefaultTime">${esc(t('bot_scout_default_time'))}<input type="time" required id="botScoutDefaultTime" step="60" value="${esc(view.defaults.time)}"></label></div><button type="button" class="sm-btn" onclick="saveBotScoutBot()">${esc(t('bot_scout_save_defaults'))}</button></details>`:''}
+    </fieldset></section>`;
 }
 function _refreshBotScoutCard(){
   const card=document.querySelector('.bot-scout-card');
-  if(card&&_currentProfileDetail){card.outerHTML=_botScoutCardHtml(_currentProfileDetail);_paintBotScoutTopics();}
+  if(card&&_currentProfileDetail){card.outerHTML=_botScoutCardHtml(_currentProfileDetail);_paintBotScoutTopics();filterBotScoutPeople(_botScoutState(_currentProfileDetail).query);}
+}
+function filterBotScoutPeople(query){
+  const p=_currentProfileDetail;if(!p)return;
+  _botScoutState(p).query=query;
+  const value=query.trim().toLowerCase();let count=0;
+  document.querySelectorAll('.bot-scout-person').forEach(row=>{row.hidden=!row.textContent.toLowerCase().includes(value);if(!row.hidden)count++;});
+  if($('botScoutNoPeople'))$('botScoutNoPeople').hidden=count>0;
 }
 async function loadBotScoutPeople(){
-  const p=_currentProfileDetail;if(!p)return;
+  const p=_currentProfileDetail;if(!p||!(p.scout_manageable||p.bot_editable))return;
+  const view=_botScoutState(p);if(view.loadingPeople||view.busy)return;
+  view.loadingPeople=true;
   try{
     const data=await api('/api/bots/scout',{method:'POST',body:JSON.stringify({name:p.name,action:'people'})});
     if(_currentProfileDetail!==p)return;
-    p.scout_people_options=data.people||[];_refreshBotScoutCard();
-  }catch(e){showToast(e.message);}
+    if(!view.busy)_botScoutCapture();
+    p.scout_people_options=data.people||[];view.peopleError='';
+    if(view.person&&!p.scout_people_options.some(x=>x.email===view.person)){view.person='';view.error=t('bot_scout_person_unavailable');}
+    if(!view.busy)_refreshBotScoutCard();
+  }catch(e){if(_currentProfileDetail===p){view.peopleError=t('bot_scout_people_error');if(!view.busy){_botScoutCapture();_refreshBotScoutCard();}}}
+  finally{view.loadingPeople=false;}
 }
 function selectBotScoutPerson(person){
-  if(!_currentProfileDetail)return;
-  _botScoutSelected={bot:_currentProfileDetail.name,person};_refreshBotScoutCard();
+  const p=_currentProfileDetail;if(!p||_botScoutIsBusy())return;
+  if(person&&(!(p.scout_manageable||p.bot_editable)||!(p.scout_people_options||[]).some(x=>x.email===person)))return;
+  _botScoutCapture();const view=_botScoutState(p);
+  view.person=person===_botScoutActor()?'':person;view.error='';view.status='';view.query='';
+  _botScoutSelected={bot:p.name,person:view.person};_refreshBotScoutCard();
+  $('botScoutPrompt')?.focus({preventScroll:true});
+}
+function updateBotScoutPreview(){
+  const p=_currentProfileDetail;if(!p||_botScoutIsBusy())return;
+  const scout=p.bot?.scout||{},inherit=$('botScoutInheritTime').checked;
+  $('botScoutTime').disabled=inherit;
+  if(inherit)$('botScoutTime').value=scout.digest_time||'07:30';
+  _botScoutCapture();const draft=_botScoutDraft(p,_botScoutState(p).person);
+  $('botScoutPreview').textContent=_botScoutSchedule(draft.frequency||scout.frequency||'daily',draft.inherit_time?(scout.digest_time||'07:30'):draft.digest_time)+' · '+t('bot_scout_timezone_hint');
+}
+function applyBotScoutTemplate(key){
+  if(!['agenda','tasks','research'].includes(key)||_botScoutIsBusy())return;
+  const input=$('botScoutPrompt');if(!input)return;
+  const addition=t('bot_scout_template_'+key+'_prompt'),current=input.value.trim();
+  if(current.includes(addition))return;
+  const next=current?current+'\n\n'+addition:addition;
+  if(next.length>_BOT_SCOUT_PROMPT_MAX){$('botScoutError').textContent=t('bot_scout_prompt_full');$('botScoutError').hidden=false;return;}
+  input.value=next;updateBotScoutPreview();input.focus();
 }
 function _paintBotScoutTopics(){
   const box=$('botScoutChips'),input=$('botScoutTopicInput');if(!box||!input)return;
@@ -8236,51 +8298,54 @@ function _paintBotScoutTopics(){
     const remove=document.createElement('button');remove.type='button';remove.textContent='\u00d7';
     remove.setAttribute('aria-label',t('bot_scout_remove_topic')+': '+topic);
     remove.disabled=input.disabled||!!input.closest('fieldset:disabled');
-    remove.onclick=()=>{_botScoutTopics=_botScoutTopics.filter(x=>x!==topic);_paintBotScoutTopics();input.focus();};
+    remove.onclick=()=>{_botScoutTopics=_botScoutTopics.filter(x=>x!==topic);_paintBotScoutTopics();_botScoutCapture();input.focus();};
     chip.append(label,remove);box.insertBefore(chip,input);
   }
   input.hidden=_botScoutTopics.length>=_BOT_SCOUT_MAX;
 }
 function _botScoutAddTopic(input){
+  if(_botScoutIsBusy())return;
   const topic=String(input.value||'').replace(/\s+/g,' ').trim().slice(0,_BOT_SCOUT_TOPIC_MAX);input.value='';
   if(!topic||_botScoutTopics.length>=_BOT_SCOUT_MAX||_botScoutTopics.some(x=>x.toLowerCase()===topic.toLowerCase()))return;
-  _botScoutTopics.push(topic);_paintBotScoutTopics();
+  _botScoutTopics.push(topic);_paintBotScoutTopics();_botScoutCapture();
 }
 function _botScoutTopicKey(e){
   if(e.key==='Enter'||e.key===','){e.preventDefault();_botScoutAddTopic(e.target);e.target.focus();}
-  else if(e.key==='Backspace'&&!e.target.value&&_botScoutTopics.length){_botScoutTopics.pop();_paintBotScoutTopics();}
+  else if(e.key==='Backspace'&&!e.target.value&&_botScoutTopics.length){_botScoutTopics.pop();_paintBotScoutTopics();_botScoutCapture();}
 }
 async function _postBotScout(p,body,toast){
-  await api('/api/bots/scout',{method:'POST',body:JSON.stringify({name:p.name,revision:p.bot_revision||0,...body})});
-  _profileDropdownClearStoredCache();
-  window.dispatchEvent(new CustomEvent('synpulse:bot-updated',{detail:{name:p.name}}));
-  if(window.BotBuilder?.isEditing(p.name)){await window.BotBuilder.refreshAutomation();showToast(toast);return;}
-  await loadProfilesPanel();
-  if(_currentProfileDetail?.name===p.name&&(_currentProfileDetail.scout_manageable||_currentProfileDetail.bot_editable))await loadBotScoutPeople();
-  showToast(toast);
-}
-// The caller's own Scout: the switch saves at once, time and wishes on Save.
-async function saveBotScout(enabled){
-  const p=_currentProfileDetail;if(!p)return;
-  const on=typeof enabled==='boolean'?enabled:!!($('botScoutEnabled')&&$('botScoutEnabled').checked);
-  const person=$('botScoutPerson')?.value||'';
-  const time=$('botScoutTime')?String($('botScoutTime').value||'').slice(0,5):'';
-  const prompt=$('botScoutPrompt')?String($('botScoutPrompt').value||'').slice(0,_BOT_SCOUT_PROMPT_MAX):'';
+  const view=_botScoutState(p),card=document.querySelector('.bot-scout-card');if(view.busy||!card)return;
+  view.busy=true;view.error='';view.status='';
+  $('botScoutControls').disabled=true;card.setAttribute('aria-busy','true');
+  $('botScoutError').hidden=true;$('botScoutStatus').textContent=t('bot_setup_saving');
   try{
-    await _postBotScout(p,{...(person?{person}:{}),enabled:on,digest_time:time,prompt,frequency:$('botScoutFrequency')?.value||'',cross_bot_context:!!$('botScoutCrossBot')?.checked},t(on?'bot_scout_saved_on':'bot_scout_saved_off'));
-  }catch(e){
-    if($('botScoutEnabled')&&typeof enabled==='boolean')$('botScoutEnabled').checked=!enabled;
-    showToast(e.message);
+    const data=await api('/api/bots/scout',{method:'POST',body:JSON.stringify({name:p.name,revision:p.bot_revision||0,...body})});
+    // Keep the current editor and other people's drafts. Server values own the
+    // saved state and revision; bot configuration has a separate draft owner.
+    for(const key of ['bot','bot_revision','scout_me','scout_people_count'])if(Object.hasOwn(data,key))p[key]=data[key];
+    if(Object.hasOwn(body,'topics'))view.defaults={topics:[...(p.bot?.scout?.topics||[])],frequency:p.bot?.scout?.frequency||'daily',time:p.bot?.scout?.digest_time||'07:30',open:true};
+    else view.drafts.delete(body.person||'');
+    view.status=toast;
+    _profileDropdownClearStoredCache();window.dispatchEvent(new CustomEvent('synpulse:bot-updated',{detail:{name:p.name}}));
+  }catch(e){view.error=e.message;}
+  finally{
+    view.busy=false;
+    if(_currentProfileDetail===p&&card.isConnected){_refreshBotScoutCard();$('botScoutSave')?.focus({preventScroll:true});}
   }
 }
-// The bot's own Scout settings (bot editors): topics, default time, spaces.
+// Explicit save/activate/pause: choosing a person or a template never starts work.
+async function saveBotScout(enabled=true){
+  const p=_currentProfileDetail;if(!p||_botScoutIsBusy())return;
+  if(!$('botScoutTime').reportValidity())return;
+  _botScoutCapture();const view=_botScoutState(p),person=view.person,{inherit_time,...draft}=view.drafts.get(person);
+  await _postBotScout(p,{...(person?{person}:{}),enabled,...draft,digest_time:inherit_time?'':draft.digest_time},t(enabled?'bot_scout_person_saved':'bot_scout_person_paused').replace('{person}',person||t('bot_scout_yourself')));
+}
 async function saveBotScoutBot(){
-  const p=_currentProfileDetail;if(!p)return;
+  const p=_currentProfileDetail;if(!p||_botScoutIsBusy())return;
   const input=$('botScoutTopicInput');if(input&&input.value)_botScoutAddTopic(input);
-  const time=$('botScoutDefaultTime')?String($('botScoutDefaultTime').value||'').slice(0,5):'';
-  try{
-    await _postBotScout(p,{topics:_botScoutTopics,default_frequency:$('botScoutDefaultFrequency')?.value||'daily',...(time?{default_time:time}:{})},t('bot_scout_saved_settings'));
-  }catch(e){showToast(e.message);}
+  if(!$('botScoutDefaultTime').reportValidity())return;
+  _botScoutCapture();const defaults=_botScoutState(p).defaults;
+  await _postBotScout(p,{topics:defaults.topics,default_frequency:defaults.frequency,default_time:defaults.time},t('bot_scout_saved_settings'));
 }
 // Responsibilities card (ui_meta.hermes-bots.responsibilities): what the bot
 // answers for. Everyone who sees the bot reads the list; an editor adds, edits
