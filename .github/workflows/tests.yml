@@ -206,7 +206,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Synthwave-Solutions/hermes-agent
-          ref: 1a5122982281e7f8bfce6bb63e4d95e4018d85a9
+          ref: 9d1f85a96d2df4c3bc09897c7c1d5f79e051bc5a
           path: engine
 
       - name: Set up Python ${{ matrix.python-version }}
