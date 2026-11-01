@@ -91,6 +91,11 @@ that slice.
 
 ## UI, UX, and theme contracts
 
+- [`docs/feature-guide.md`](feature-guide.md): short page orientation, optional full
+  catalog, mobile reading views and draft-preserving interactive explanations.
+- [`docs/workspace-clarity.md`](workspace-clarity.md): shared workspace layout,
+  local bot search and the section-based bot editor.
+
 - [`DESIGN.md`](../DESIGN.md): design tokens and the current calm-console
   direction: conversation first, quiet metadata, restrained accents, and
   progressive disclosure for debugging detail.

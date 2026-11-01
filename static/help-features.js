@@ -273,13 +273,13 @@ window.SynthPulseFeatureCatalog = {
       "locales": {
         "en": {
           "title": "Explain this page",
-          "purpose": "Walk through interactive explanations of every documented feature associated with the current page.",
+          "purpose": "Get a short introduction to the current page, then open the complete feature guide when you need more detail.",
           "when": "When you want to understand a control before changing application state.",
           "steps": [
-            "Choose the question-mark help button.",
-            "Use Next feature or choose a topic directly. Switch between Dutch and English and read the complete explanation.",
-            "Visible controls are highlighted. For a missing control, the guide explains the context or prerequisites that may be needed.",
-            "Composer shortcut: /explain. Review any required arguments in the command suggestions."
+            "Choose Page guide beside the question mark, or type /explain.",
+            "Follow the introduction and up to five key controls. Only controls available to you are highlighted.",
+            "Choose Browse all features for searchable instructions, permissions and examples. Each topic also offers its own interactive guide.",
+            "Close the explanation to return to your work. Your draft stays untouched."
           ],
           "permissions": "Reading this static guide needs no extra permission. Described features retain their own access checks.",
           "limits": "This guide describes capabilities, not your current permissions or live service health. Search stays in this browser.",
@@ -287,13 +287,13 @@ window.SynthPulseFeatureCatalog = {
         },
         "nl": {
           "title": "Leg deze pagina uit",
-          "purpose": "Doorloop interactieve uitleg van alle gedocumenteerde functies die bij de huidige pagina horen.",
+          "purpose": "Krijg een korte introductie van de huidige pagina en open de volledige functiegids als je meer uitleg nodig hebt.",
           "when": "Wanneer je een bediening wilt begrijpen voordat je de toepassing wijzigt.",
           "steps": [
-            "Kies de hulpknop met het vraagteken.",
-            "Doorloop de functies met Volgende functie of kies direct een onderwerp. Wissel tussen Nederlands en Engels en lees de volledige uitleg.",
-            "Zichtbare bedieningen worden aangewezen. Bij een ontbrekende bediening lees je welke context of voorwaarden nodig kunnen zijn.",
-            "Snelopdracht in het berichtveld: /explain. Controleer eventuele argumenten in de opdrachtsuggesties."
+            "Kies Uitleg naast het vraagteken of typ /explain.",
+            "Volg de introductie en maximaal vijf belangrijke bedieningen. Alleen beschikbare bedieningen worden aangewezen.",
+            "Kies Alle functies bekijken voor doorzoekbare stappen, rechten en voorbeelden. Elk onderwerp heeft ook een eigen interactieve uitleg.",
+            "Sluit de uitleg om verder te werken. Je concept blijft behouden."
           ],
           "permissions": "Deze statische gids lezen vereist geen extra rechten. Beschreven functies behouden hun eigen toegangscontrole.",
           "limits": "Deze gids beschrijft mogelijkheden, niet je huidige rechten of actuele servicestatus. Zoeken blijft in deze browser.",
@@ -5119,17 +5119,21 @@ window.SynthPulseFeatureCatalog = {
     {
       "id": "webui.bots.scout",
       "area": "bots",
-      "status": "available",
-      "conditions": [],
+      "status": "conditional",
+      "conditions": [
+        "bot-access",
+        "scout-permissions"
+      ],
       "anchors": [
         "?help_feature=webui.bots.scout",
         "#botScoutEnabled",
-        "#botScoutTopicInput",
-        "#botScoutTime"
+        "#botScoutPerson",
+        "#botScoutFrequency",
+        "#botScoutPrompt"
       ],
       "source_refs": [
-        "static/panels.js:8080",
-        "static/chat-bots.js",
+        "static/bot-builder.js",
+        "static/panels.js",
         "api/bot_scout.py"
       ],
       "related": [
@@ -5138,30 +5142,32 @@ window.SynthPulseFeatureCatalog = {
       ],
       "locales": {
         "en": {
-          "title": "Scout for a bot",
-          "purpose": "Let a bot look around once a day for news on its topics and bring you one short digest.",
-          "when": "When a bot should keep an eye on a subject, a market or its own tasks without you asking every day.",
+          "title": "Proactive Scout per person and bot",
+          "purpose": "Let a bot look ahead, research and prepare useful work using the context and tools available to it.",
+          "when": "When you want useful preparation or suggestions without having to start every request yourself.",
           "steps": [
-            "Open a bot and find the Scout card, or use the radar button next to the bot in the sidebar.",
-            "Add topics: type one and press Enter. Pick the time of the digest.",
-            "Turn Scout on and save. The scheduled task Scout appears with the bot's tasks."
+            "Open a bot, choose Edit and then Scout.",
+            "Choose the user if you have administration access, then set a frequency and time. Otherwise configure your own Scout.",
+            "Describe what to watch for and prepare. Choose whether recent conversations with your other accessible bots may provide context.",
+            "Enable Scout and save its settings. Its personal updates appear among conversations."
           ],
-          "permissions": "Turning Scout on or off and changing its topics requires the right to edit that bot. Others see a small mark when Scout is on.",
-          "limits": "Scout only reads. It files actionable items as tasks in triage and writes at most one digest per day in the bot's task chat; it never sends messages. People's own profiles have no Scout. Turning it off pauses the task, it is not deleted.",
-          "example": "Give the CFO bot the topics invoices and cash flow, with the digest at 07:30."
+          "permissions": "Each run keeps the selected person's access and the bot's tools and skills. Administrators can configure only eligible users with access to the bot.",
+          "limits": "A schedule does not grant new permissions or automatically approve external actions. Available context depends on connected accounts and access. Switching Scout off pauses future runs.",
+          "example": "Ask Scout to check upcoming meetings, review relevant email and recent chats, and propose preparation that it can take on."
         },
         "nl": {
-          "title": "Scout voor een bot",
-          "purpose": "Laat een bot elke dag rondkijken naar nieuws over zijn onderwerpen en je een korte digest geven.",
-          "when": "Als een bot een onderwerp, markt of zijn eigen taken in de gaten moet houden zonder dat je er elke dag om vraagt.",
+          "title": "Proactieve Scout per gebruiker en bot",
+          "purpose": "Laat een bot vooruitkijken, onderzoek doen en nuttig werk voorbereiden met de beschikbare context en hulpmiddelen.",
+          "when": "Als je bruikbare voorbereiding of voorstellen wilt zonder iedere vraag zelf te starten.",
           "steps": [
-            "Open een bot en zoek de kaart Scout, of gebruik de radarknop naast de bot in de zijbalk.",
-            "Voeg onderwerpen toe: typ er een en druk op Enter. Kies de tijd van de digest.",
-            "Zet Scout aan en sla op. De geplande taak Scout verschijnt bij de taken van de bot."
+            "Open een bot, kies Bewerken en daarna Scout.",
+            "Kies de gebruiker als je beheerrechten hebt en stel frequentie en tijd in. Anders stel je je eigen Scout in.",
+            "Beschrijf waarop Scout moet letten en wat hij kan voorbereiden. Kies of recente gesprekken met je andere toegankelijke bots context mogen geven.",
+            "Zet Scout aan en sla de eigen instellingen op. Persoonlijke updates verschijnen tussen de gesprekken."
           ],
-          "permissions": "Scout aan of uit zetten en de onderwerpen wijzigen kan alleen wie de bot mag bewerken. Anderen zien een klein teken als Scout aan staat.",
-          "limits": "Scout leest alleen. Actiepunten worden taken in triage en Scout schrijft hooguit een digest per dag in de taakchat van de bot; Scout verstuurt nooit berichten. Persoonlijke profielen van mensen hebben geen Scout. Uitzetten pauzeert de taak, die wordt niet verwijderd.",
-          "example": "Geef de CFO-bot de onderwerpen facturen en cashflow, met de digest om 07:30."
+          "permissions": "Iedere uitvoering behoudt de toegang van de gekozen gebruiker en de tools en skills van de bot. Beheerders kunnen alleen gebruikers instellen die toegang tot de bot hebben.",
+          "limits": "Een planning geeft geen nieuwe rechten of automatische toestemming voor externe acties. Beschikbare context hangt af van gekoppelde accounts en toegang. Scout uitzetten pauzeert toekomstige uitvoeringen.",
+          "example": "Laat Scout komende afspraken, relevante e-mails en recente chats bekijken en voorstellen welk voorbereidend werk hij kan oppakken."
         }
       }
     },
@@ -14178,7 +14184,7 @@ window.SynthPulseFeatureCatalog = {
           "example": "Bijvoorbeeld: de inrichting van een externe koppeling bekijken."
         },
         "en": {
-          "title": "Open app connectors",
+          "title": "Open App-connectors",
           "purpose": "Manage integrations and connections to external services.",
           "when": "Use this entry point for reviewing an external integration setup.",
           "steps": [
@@ -15252,6 +15258,214 @@ window.SynthPulseFeatureCatalog = {
           "permissions": "Screen permissions are assigned separately per bot: view, control and administer.",
           "limits": "Other viewers receive no new frames during takeover. Connection loss keeps the bot blocked until control is handed back. A screen is not an additional OS isolation boundary.",
           "example": "Sign in on the bot computer on the right, hand back and ask it to continue in the chat on the left."
+        }
+      }
+    },
+    {
+      "id": "webui.connections.app_connectors",
+      "area": "connections",
+      "status": "conditional",
+      "conditions": [
+        "connection-configuration",
+        "integration-permissions"
+      ],
+      "anchors": [
+        "?help_feature=webui.connections.app_connectors",
+        "#intgTabConnectors",
+        "#intgSearch"
+      ],
+      "source_refs": [
+        "static/integrations.js",
+        "static/integration-hub.js",
+        "static/index.html"
+      ],
+      "related": [
+        "webui.connections.vault",
+        "webui.connections.channel"
+      ],
+      "locales": {
+        "en": {
+          "title": "Connect an app",
+          "purpose": "Find app connectors and manage your connected accounts in one place.",
+          "when": "When a bot needs access to an app you use.",
+          "steps": [
+            "Open Connections and choose App connectors.",
+            "Search by app name or filter by category.",
+            "Choose Connect and follow the account sign-in steps.",
+            "Check the connected account status before asking your bot to use it."
+          ],
+          "permissions": "Account connections are scoped to the signed-in person; some services need administrator setup or approval.",
+          "limits": "A catalog entry is not proof that the service is configured. An unavailable connection service shows a retry message, not an empty account list.",
+          "example": "Connect your calendar so a bot can help prepare for meetings."
+        },
+        "nl": {
+          "title": "Een app verbinden",
+          "purpose": "Vind app-connectors en beheer je gekoppelde accounts op één plek.",
+          "when": "Als een bot toegang nodig heeft tot een app die je gebruikt.",
+          "steps": [
+            "Open Koppelingen en kies App-connectors.",
+            "Zoek op appnaam of filter op categorie.",
+            "Kies Verbinden en volg de aanmeldstappen voor je account.",
+            "Controleer de status van het account voordat je de bot ermee laat werken."
+          ],
+          "permissions": "Accounts horen bij de aangemelde gebruiker; sommige diensten vragen inrichting of goedkeuring door een beheerder.",
+          "limits": "Een vermelding in de catalogus betekent niet dat de dienst is ingesteld. Een onbereikbare verbindingsdienst toont een melding om opnieuw te proberen, geen lege accountlijst.",
+          "example": "Verbind je agenda zodat een bot kan helpen om afspraken voor te bereiden."
+        }
+      }
+    },
+    {
+      "id": "webui.connections.plugins",
+      "area": "connections",
+      "status": "conditional",
+      "conditions": [
+        "plugin-administration"
+      ],
+      "anchors": [
+        "?help_feature=webui.connections.plugins",
+        "#intgTabPlugins",
+        "#pluginCatalogSearch"
+      ],
+      "source_refs": [
+        "static/integration-hub.js",
+        "api/plugins.py"
+      ],
+      "related": [
+        "webui.connections.app_connectors",
+        "webui.bots.instructions"
+      ],
+      "locales": {
+        "en": {
+          "title": "Manage bot plugins",
+          "purpose": "Extend a bot with available plugins from the catalog.",
+          "when": "When a task needs capabilities that are not yet installed.",
+          "steps": [
+            "Open Connections and choose Plugins.",
+            "Select the intended bot profile and search or filter the catalog.",
+            "Read the plugin details, source and requested capabilities.",
+            "If permitted, install or manage the plugin. Follow any restart notice before using it."
+          ],
+          "permissions": "Installation and changes require plugin administration access for the selected bot.",
+          "limits": "Installed plugins can add executable capabilities. Catalog availability does not mean a plugin is installed or ready, and some need configuration or a restart.",
+          "example": "Find a plugin for a new service and review it before adding it to the intended bot."
+        },
+        "nl": {
+          "title": "Plugins voor bots beheren",
+          "purpose": "Breid een bot uit met beschikbare plugins uit de catalogus.",
+          "when": "Als een taak mogelijkheden vraagt die nog niet zijn geïnstalleerd.",
+          "steps": [
+            "Open Koppelingen en kies Plugins.",
+            "Kies het bedoelde botprofiel en zoek of filter in de catalogus.",
+            "Lees de informatie, bron en gevraagde mogelijkheden van de plugin.",
+            "Installeer of beheer de plugin als je daar rechten voor hebt. Volg een eventuele herstartmelding voordat je hem gebruikt."
+          ],
+          "permissions": "Installatie en wijzigingen vragen beheerrechten voor plugins van het gekozen botprofiel.",
+          "limits": "Plugins kunnen uitvoerbare mogelijkheden toevoegen. Een catalogusvermelding betekent niet dat een plugin is geïnstalleerd of klaar voor gebruik; soms zijn instellingen of een herstart nodig.",
+          "example": "Vind een plugin voor een nieuwe dienst en bekijk de details voordat je hem aan de bedoelde bot toevoegt."
+        }
+      }
+    },
+    {
+      "id": "webui.connections.vault",
+      "area": "connections",
+      "status": "conditional",
+      "conditions": [
+        "vault-configuration",
+        "personal-account"
+      ],
+      "anchors": [
+        "?help_feature=webui.connections.vault",
+        "#intgTabVault",
+        "#vaultSources"
+      ],
+      "source_refs": [
+        "static/vault.js",
+        "api/vault.py"
+      ],
+      "related": [
+        "webui.connections.app_connectors",
+        "webui.bots.access"
+      ],
+      "locales": {
+        "en": {
+          "title": "Set up password vaults",
+          "purpose": "Use encrypted logins for matching websites without putting passwords in the conversation.",
+          "when": "When your bot needs to sign in to a website.",
+          "steps": [
+            "Open Connections and choose Password vaults.",
+            "Use the built-in vault or configure an available Bitwarden or 1Password source.",
+            "Add a login or finish the external vault sign-in, then check its status.",
+            "Manage external vault items in that password manager; manage built-in logins here."
+          ],
+          "permissions": "Vault connections belong to the signed-in user and remain subject to existing bot and tool access.",
+          "limits": "An external vault needs its own account, configuration and supported CLI. The interface shows account and website metadata, not saved passwords.",
+          "example": "Configure a password manager once so the bot can sign in to an allowed website when needed."
+        },
+        "nl": {
+          "title": "Wachtwoordkluizen instellen",
+          "purpose": "Gebruik versleutelde inloggegevens op bijbehorende websites zonder wachtwoorden in het gesprek te zetten.",
+          "when": "Als je bot moet inloggen op een website.",
+          "steps": [
+            "Open Koppelingen en kies Wachtwoordkluizen.",
+            "Gebruik de ingebouwde kluis of stel een beschikbare Bitwarden- of 1Password-bron in.",
+            "Voeg een login toe of rond de aanmelding bij de externe kluis af en controleer de status.",
+            "Beheer gegevens uit externe kluizen in die wachtwoordmanager; beheer ingebouwde logins hier."
+          ],
+          "permissions": "Kluisverbindingen horen bij de aangemelde gebruiker en blijven onder de bestaande toegangsregels voor bots en tools vallen.",
+          "limits": "Een externe kluis vraagt een eigen account, inrichting en ondersteunde CLI. De interface toont account- en websitegegevens, geen opgeslagen wachtwoorden.",
+          "example": "Stel een wachtwoordmanager in zodat de bot zo nodig op een toegestane website kan inloggen."
+        }
+      }
+    },
+    {
+      "id": "webui.bots.scheduled_tasks",
+      "area": "bots",
+      "status": "conditional",
+      "conditions": [
+        "bot-edit-access",
+        "scheduled-task-access"
+      ],
+      "anchors": [
+        "?help_feature=webui.bots.scheduled_tasks",
+        "#builderAssignTask",
+        "#builderCreateTask"
+      ],
+      "source_refs": [
+        "static/bot-builder.js",
+        "static/panels.js"
+      ],
+      "related": [
+        "webui.tasks.create",
+        "webui.bots.scout"
+      ],
+      "locales": {
+        "en": {
+          "title": "Assign scheduled work to a bot",
+          "purpose": "See and manage the scheduled tasks assigned to a bot from its editor.",
+          "when": "When recurring work should run with a specific bot.",
+          "steps": [
+            "Open the bot, choose Edit and then Scheduled tasks.",
+            "Assign an eligible existing task, or create a new one.",
+            "Check the owner, schedule, instructions and delivery in the task editor.",
+            "Save the task and inspect its status and earlier runs."
+          ],
+          "permissions": "Only tasks visible and assignable under your existing bot, task and owner permissions are offered.",
+          "limits": "Assigning a task does not grant new access or run it immediately. Tasks and Scout have their own save controls.",
+          "example": "Assign a weekly summary to the bot with the relevant skills and context."
+        },
+        "nl": {
+          "title": "Geplande taken aan een bot toewijzen",
+          "purpose": "Bekijk en beheer geplande taken van een bot vanuit de bot-editor.",
+          "when": "Als terugkerend werk door een specifieke bot moet worden uitgevoerd.",
+          "steps": [
+            "Open de bot, kies Bewerken en daarna Geplande taken.",
+            "Wijs een beschikbare bestaande taak toe of maak een nieuwe.",
+            "Controleer eigenaar, planning, instructies en bezorging in de taak-editor.",
+            "Sla de taak op en bekijk de status en eerdere uitvoeringen."
+          ],
+          "permissions": "Alleen taken die je met je bestaande rechten voor bots, taken en eigenaren mag zien en toewijzen worden aangeboden.",
+          "limits": "Een toewijzing geeft geen nieuwe rechten en start de taak niet meteen. Taken en Scout hebben hun eigen opslagknoppen.",
+          "example": "Wijs een wekelijks overzicht toe aan de bot met de juiste skills en context."
         }
       }
     }

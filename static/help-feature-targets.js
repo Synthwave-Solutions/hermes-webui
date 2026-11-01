@@ -5,9 +5,46 @@
 (function () {
   'use strict';
   const entries = {
-  "webui.chat.bot_screens": {"panel": "chat", "targets": ["#workspaceScreensTab"], "entryTargets": ["#btnWorkspacePanelToggle", "#btnWorkspacePanelEdgeToggle"], "entryHint": {"nl": "Open het rechterzijpaneel en kies Bot Screens. Het tabblad verschijnt als je schermrechten hebt.", "en": "Open the right panel and choose Bot Screens. The tab appears when you have screen access."}},
-  "webui.bots.org_chart": {"panel":"profiles", "targets":["#btnBotOrgChart"], "entryTargets":[".rail [data-panel=\"profiles\"]"], "entryHint":{"nl":"Open Bots en kies bovenaan de lijst Organigram. Rapporteert aan stel je per bot in bij Bewerken.","en":"Open Bots and choose Org chart at the top of the list. Set Reports to per bot under Edit."}},
-  "webui.bots.screens": {"panel":"profiles", "targets":["#btnBotScreens"], "entryTargets":[".rail [data-panel=\"profiles\"]"], "entryHint":{"nl":"Open Bots. Met expliciete schermrechten verschijnt daar Bot Screens; zonder die rechten kan je beheerder toegang instellen.","en":"Open Bots. Bot Screens appears with explicit screen grants; otherwise your administrator can configure access."}},
+  "webui.chat.bot_screens": {
+    "panel": "chat",
+    "targets": [
+      "#workspaceScreensTab"
+    ],
+    "entryTargets": [
+      "#btnWorkspacePanelToggle",
+      "#btnWorkspacePanelEdgeToggle"
+    ],
+    "entryHint": {
+      "nl": "Open het rechterzijpaneel en kies Bot Screens. Het tabblad verschijnt als je schermrechten hebt.",
+      "en": "Open the right panel and choose Bot Screens. The tab appears when you have screen access."
+    }
+  },
+  "webui.bots.org_chart": {
+    "panel": "profiles",
+    "targets": [
+      "#btnBotOrgChart"
+    ],
+    "entryTargets": [
+      ".rail [data-panel=\"profiles\"]"
+    ],
+    "entryHint": {
+      "nl": "Open Bots en kies bovenaan de lijst Organigram. Rapporteert aan stel je per bot in bij Bewerken.",
+      "en": "Open Bots and choose Org chart at the top of the list. Set Reports to per bot under Edit."
+    }
+  },
+  "webui.bots.screens": {
+    "panel": "profiles",
+    "targets": [
+      "#btnBotScreens"
+    ],
+    "entryTargets": [
+      ".rail [data-panel=\"profiles\"]"
+    ],
+    "entryHint": {
+      "nl": "Open Bots. Met expliciete schermrechten verschijnt daar Bot Screens; zonder die rechten kan je beheerder toegang instellen.",
+      "en": "Open Bots. Bot Screens appears with explicit screen grants; otherwise your administrator can configure access."
+    }
+  },
   "webui.help.navigation": {
     "panel": "chat",
     "targets": [
@@ -1107,8 +1144,9 @@
     "panel": "profiles",
     "targets": [
       "#botScoutEnabled",
-      "#botScoutTopicInput",
-      "#botScoutTime"
+      "#botScoutPerson",
+      "#botScoutFrequency",
+      "#botScoutPrompt"
     ],
     "entryTargets": [
       ".profile-card[data-name]"
@@ -2638,6 +2676,41 @@
     "entryHint": {
       "nl": "Kies Overzicht.",
       "en": "Choose Overview."
+    }
+  },
+  "webui.connections.app_connectors": {
+    "panel": "integrations",
+    "targets": [
+      "#intgTabConnectors",
+      "#intgSearch"
+    ]
+  },
+  "webui.connections.plugins": {
+    "panel": "integrations",
+    "targets": [
+      "#intgTabPlugins",
+      "#pluginCatalogSearch"
+    ]
+  },
+  "webui.connections.vault": {
+    "panel": "integrations",
+    "targets": [
+      "#intgTabVault",
+      "#vaultSources"
+    ]
+  },
+  "webui.bots.scheduled_tasks": {
+    "panel": "profiles",
+    "targets": [
+      "#builderAssignTask",
+      "#builderCreateTask"
+    ],
+    "entryTargets": [
+      ".profile-card[data-name]"
+    ],
+    "entryHint": {
+      "en": "Open the relevant section after closing the guide. The guide does not activate controls or save changes.",
+      "nl": "Open het bijbehorende onderdeel na het sluiten van de gids. De gids bedient geen knoppen en slaat geen wijzigingen op."
     }
   }
 };

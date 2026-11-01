@@ -39,26 +39,14 @@ window.SynthPulseHelpContent = {
             {
               "id": "list",
               "title": "Your conversations",
-              "body": "Your chats are listed here, newest first. Click one to continue where you left off.",
+              "body": "Continue a conversation, find it with search, or organise it in nested sections. Scheduled runs live under Tasks; personal Scout conversations stay with your chats.",
               "target": "[data-tour='chat-list']"
-            },
-            {
-              "id": "search",
-              "title": "Find a chat",
-              "body": "Search by title or by words from the conversation.",
-              "target": "[data-tour='chat-search']"
             },
             {
               "id": "composer",
               "title": "Write a message",
-              "body": "Type your question or task and press Enter to send it. Shift and Enter start a new line.",
+              "body": "Describe what you need and press Enter to send. Shift and Enter start a new line. Add files or choose a model beside the message field when needed.",
               "target": "[data-tour='chat-composer']"
-            },
-            {
-              "id": "attach",
-              "title": "Add files",
-              "body": "Attach documents or images so the assistant can read them.",
-              "target": "[data-tour='chat-attach']"
             },
             {
               "id": "bot",
@@ -67,16 +55,28 @@ window.SynthPulseHelpContent = {
               "target": "[data-tour='chat-bot']"
             },
             {
-              "id": "model",
-              "title": "Model",
-              "body": "Shows the AI model of this chat. Pick another one when a task needs a faster or a stronger model.",
-              "target": "[data-tour='chat-model']"
-            },
-            {
               "id": "workspace",
               "title": "Files of this space",
               "body": "Open the files of the current space next to the chat.",
               "target": "[data-tour='chat-workspace']"
+            },
+            {
+              "id": "search",
+              "title": "Find a chat",
+              "body": "Search by title or by words from the conversation.",
+              "target": "[data-tour='chat-search']"
+            },
+            {
+              "id": "attach",
+              "title": "Add files",
+              "body": "Attach documents or images so the assistant can read them.",
+              "target": "[data-tour='chat-attach']"
+            },
+            {
+              "id": "model",
+              "title": "Model",
+              "body": "Shows the AI model of this chat. Pick another one when a task needs a faster or a stronger model.",
+              "target": "[data-tour='chat-model']"
             }
           ],
           "related": [
@@ -164,8 +164,14 @@ window.SynthPulseHelpContent = {
         },
         "profiles": {
           "title": "Bots",
-          "summary": "Bots are assistants with their own instructions, skills and access. Pick one for a chat or set up a new one.",
+          "summary": "Find the right bot for your work. Each bot has its own instructions, knowledge, skills and access.",
           "sections": [
+            {
+              "id": "search",
+              "title": "Find the right bot",
+              "body": "Search by name, description or category. Search stays on this page and keeps any changes in the open editor. Clear it to see all your bots again.",
+              "target": "#profileSearch"
+            },
             {
               "id": "new",
               "title": "Create a bot",
@@ -175,7 +181,7 @@ window.SynthPulseHelpContent = {
             {
               "id": "list",
               "title": "Your bots",
-              "body": "Open a bot to see what it does, who may use it and which skills it has.",
+              "body": "Select a bot to inspect it. If you can edit it, its settings have separate sections for instructions, knowledge, tools, access, Scout and scheduled tasks. Scout prepares useful work proactively; scheduled tasks run at set times.",
               "target": "[data-tour='bots-list']"
             }
           ],
@@ -187,23 +193,28 @@ window.SynthPulseHelpContent = {
         },
         "bot_builder": {
           "title": "Guided bot builder",
-          "summary": "Set up a bot step by step. You can go back to any step before you save.",
+          "summary": "Create a bot in four steps, then review and save. Editing an existing bot uses separate sections so you can go straight to the setting you need.",
           "parent": "profiles",
           "sections": [
             {
               "id": "identity",
               "title": "Identity",
-              "body": "Give the bot a name, a title and a short description, so colleagues know when to use it."
+              "body": "Choose a recognisable name, photo and short description. Explain when someone should use this bot."
             },
             {
               "id": "instructions",
               "title": "Instructions",
-              "body": "Describe how the bot should work: its role, its tone and what it must never do."
+              "body": "Describe the role, tone and boundaries, then choose the skills it needs. Keep instructions specific to this bot."
             },
             {
               "id": "access",
               "title": "Access",
-              "body": "Choose which people and groups may use the bot. Others do not see it."
+              "body": "Choose who may use the bot. Access to the bot does not automatically grant access to everyone else's app accounts. Review your choices before saving."
+            },
+            {
+              "id": "autonomy",
+              "title": "Set up proactive work",
+              "body": "After creating the bot, use Scout to prepare useful work proactively, and Scheduled tasks for work at a fixed time. Administrators can select an eligible user when managing their Scout or tasks."
             }
           ],
           "related": [
@@ -305,7 +316,8 @@ window.SynthPulseHelpContent = {
           "related": [
             "chat",
             "kanban"
-          ]
+          ],
+          "parent": "chat"
         },
         "skills": {
           "title": "Skills library",
@@ -422,7 +434,8 @@ window.SynthPulseHelpContent = {
           "related": [
             "workspace_files",
             "workspaces"
-          ]
+          ],
+          "parent": "workspaces"
         },
         "memory": {
           "title": "Personal memory",
@@ -442,13 +455,31 @@ window.SynthPulseHelpContent = {
         },
         "integrations": {
           "title": "Connections",
-          "summary": "Connect the services you use, such as mail, calendar or files, so your bots can work with them for you.",
+          "summary": "Connect your apps, add capabilities and manage sign-in details here. The tabs separate what a bot can use from where it can communicate.",
           "sections": [
             {
-              "id": "connect",
-              "title": "Connect a service",
-              "body": "Pick a service and sign in. Only your own chats and tasks use your connection, and you can disconnect at any time.",
-              "target": "[data-tour='connections-intro']"
+              "id": "connectors",
+              "title": "App connections",
+              "body": "Search for a service and choose Connect. Your connected accounts appear together, with their status and disconnect option. Some services require an administrator to finish setup.",
+              "target": "#intgTabConnectors"
+            },
+            {
+              "id": "plugins",
+              "title": "Add capabilities",
+              "body": "Plugins can add tools and skills to a bot. Review the source and permissions before installation. Managing them requires the appropriate access.",
+              "target": "#intgTabPlugins"
+            },
+            {
+              "id": "vault",
+              "title": "Manage saved logins",
+              "body": "Use the built-in vault or connect an available password manager. Saved logins are filled into matching websites without putting passwords in the chat. External vaults need their own account and setup.",
+              "target": "#intgTabVault"
+            },
+            {
+              "id": "channels",
+              "title": "Choose messaging channels",
+              "body": "Channels let a bot receive and send messages outside this web app. Use app connections for working with an app; use channels for conversations through that app.",
+              "target": "#intgTabChannels"
             }
           ],
           "related": [
@@ -518,7 +549,8 @@ window.SynthPulseHelpContent = {
           "related": [
             "insights",
             "settings"
-          ]
+          ],
+          "parent": "settings"
         },
         "settings": {
           "title": "Settings",
@@ -741,26 +773,14 @@ window.SynthPulseHelpContent = {
             {
               "id": "list",
               "title": "Je gesprekken",
-              "body": "Hier staan je chats, de nieuwste bovenaan. Klik op een chat om verder te gaan waar je gebleven was.",
+              "body": "Ga verder met een gesprek, zoek het terug of orden chats in secties met subsecties. Geplande uitvoeringen staan onder Taken; persoonlijke Scout-gesprekken blijven tussen je chats.",
               "target": "[data-tour='chat-list']"
-            },
-            {
-              "id": "search",
-              "title": "Een chat zoeken",
-              "body": "Zoek op titel of op woorden uit het gesprek.",
-              "target": "[data-tour='chat-search']"
             },
             {
               "id": "composer",
               "title": "Een bericht schrijven",
-              "body": "Typ je vraag of opdracht en druk op Enter om te versturen. Met Shift en Enter begin je een nieuwe regel.",
+              "body": "Beschrijf wat je nodig hebt en druk op Enter. Met Shift en Enter begin je een nieuwe regel. Voeg zo nodig bestanden toe of kies een model naast het berichtveld.",
               "target": "[data-tour='chat-composer']"
-            },
-            {
-              "id": "attach",
-              "title": "Bestanden toevoegen",
-              "body": "Voeg documenten of afbeeldingen toe, zodat de assistent ze kan lezen.",
-              "target": "[data-tour='chat-attach']"
             },
             {
               "id": "bot",
@@ -769,16 +789,28 @@ window.SynthPulseHelpContent = {
               "target": "[data-tour='chat-bot']"
             },
             {
-              "id": "model",
-              "title": "Model",
-              "body": "Het AI-model van deze chat. Kies een ander model als een taak sneller of sterker moet.",
-              "target": "[data-tour='chat-model']"
-            },
-            {
               "id": "workspace",
               "title": "Bestanden van deze ruimte",
               "body": "Open de bestanden van de huidige ruimte naast de chat.",
               "target": "[data-tour='chat-workspace']"
+            },
+            {
+              "id": "search",
+              "title": "Een chat zoeken",
+              "body": "Zoek op titel of op woorden uit het gesprek.",
+              "target": "[data-tour='chat-search']"
+            },
+            {
+              "id": "attach",
+              "title": "Bestanden toevoegen",
+              "body": "Voeg documenten of afbeeldingen toe, zodat de assistent ze kan lezen.",
+              "target": "[data-tour='chat-attach']"
+            },
+            {
+              "id": "model",
+              "title": "Model",
+              "body": "Het AI-model van deze chat. Kies een ander model als een taak sneller of sterker moet.",
+              "target": "[data-tour='chat-model']"
             }
           ],
           "related": [
@@ -866,8 +898,14 @@ window.SynthPulseHelpContent = {
         },
         "profiles": {
           "title": "Bots",
-          "summary": "Bots zijn assistenten met eigen instructies, vaardigheden en toegang. Kies er een voor een chat of maak een nieuwe.",
+          "summary": "Vind de juiste bot voor je werk. Elke bot heeft eigen instructies, kennis, vaardigheden en toegang.",
           "sections": [
+            {
+              "id": "search",
+              "title": "Vind de juiste bot",
+              "body": "Zoek op naam, beschrijving of categorie. Zoeken gebeurt op deze pagina en behoudt je wijzigingen in de geopende editor. Wis de zoekopdracht om alle bots weer te zien.",
+              "target": "#profileSearch"
+            },
             {
               "id": "new",
               "title": "Een bot maken",
@@ -877,7 +915,7 @@ window.SynthPulseHelpContent = {
             {
               "id": "list",
               "title": "Je bots",
-              "body": "Open een bot om te zien wat hij doet, wie hem mag gebruiken en welke vaardigheden hij heeft.",
+              "body": "Selecteer een bot om hem te bekijken. Als je hem mag bewerken, hebben instructies, kennis, hulpmiddelen, toegang, Scout en geplande taken elk een eigen onderdeel. Scout bereidt proactief nuttig werk voor; geplande taken draaien op vaste tijden.",
               "target": "[data-tour='bots-list']"
             }
           ],
@@ -889,23 +927,28 @@ window.SynthPulseHelpContent = {
         },
         "bot_builder": {
           "title": "Bouwhulp voor bots",
-          "summary": "Stel een bot stap voor stap in. Je kunt naar elke stap terug voordat je opslaat.",
+          "summary": "Maak een bot in vier stappen en controleer je keuzes voor het opslaan. Een bestaande bot heeft aparte onderdelen, zodat je meteen naar de juiste instelling kunt.",
           "parent": "profiles",
           "sections": [
             {
               "id": "identity",
               "title": "Identiteit",
-              "body": "Geef de bot een naam, een titel en een korte omschrijving, zodat collega's weten wanneer ze hem gebruiken."
+              "body": "Kies een herkenbare naam, foto en korte beschrijving. Leg uit wanneer iemand deze bot gebruikt."
             },
             {
               "id": "instructions",
               "title": "Instructies",
-              "body": "Beschrijf hoe de bot moet werken: zijn rol, zijn toon en wat hij nooit mag doen."
+              "body": "Beschrijf de rol, toon en grenzen en kies de benodigde vaardigheden. Houd instructies specifiek voor deze bot."
             },
             {
               "id": "access",
               "title": "Toegang",
-              "body": "Kies welke mensen en groepen de bot mogen gebruiken. Anderen zien hem niet."
+              "body": "Kies wie de bot mag gebruiken. Toegang tot de bot geeft niet automatisch toegang tot de app-accounts van anderen. Controleer je keuzes voordat je opslaat."
+            },
+            {
+              "id": "autonomy",
+              "title": "Proactief werk instellen",
+              "body": "Na het aanmaken kun je Scout gebruiken om proactief nuttig werk voor te bereiden, en Geplande taken voor werk op vaste tijden. Beheerders kunnen een gebruiker met toegang kiezen bij het beheren van diens Scout of taken."
             }
           ],
           "related": [
@@ -1007,7 +1050,8 @@ window.SynthPulseHelpContent = {
           "related": [
             "chat",
             "kanban"
-          ]
+          ],
+          "parent": "chat"
         },
         "skills": {
           "title": "Vaardighedenbibliotheek",
@@ -1124,7 +1168,8 @@ window.SynthPulseHelpContent = {
           "related": [
             "workspace_files",
             "workspaces"
-          ]
+          ],
+          "parent": "workspaces"
         },
         "memory": {
           "title": "Persoonlijk geheugen",
@@ -1144,13 +1189,31 @@ window.SynthPulseHelpContent = {
         },
         "integrations": {
           "title": "Koppelingen",
-          "summary": "Koppel de diensten die je gebruikt, zoals mail, agenda of bestanden, zodat je bots er voor jou mee kunnen werken.",
+          "summary": "Verbind je apps, voeg mogelijkheden toe en beheer inloggegevens. De tabbladen maken onderscheid tussen wat een bot kan gebruiken en waar hij kan communiceren.",
           "sections": [
             {
-              "id": "connect",
-              "title": "Een dienst koppelen",
-              "body": "Kies een dienst en log in. Alleen je eigen chats en taken gebruiken je koppeling, en je kunt hem altijd weer loskoppelen.",
-              "target": "[data-tour='connections-intro']"
+              "id": "connectors",
+              "title": "Apps verbinden",
+              "body": "Zoek een dienst en kies Verbinden. Je gekoppelde accounts staan bij elkaar, met hun status en de optie om te ontkoppelen. Sommige diensten hebben eerst instellingen van een beheerder nodig.",
+              "target": "#intgTabConnectors"
+            },
+            {
+              "id": "plugins",
+              "title": "Mogelijkheden toevoegen",
+              "body": "Plugins kunnen hulpmiddelen en vaardigheden aan een bot toevoegen. Bekijk de bron en rechten voor installatie. Je hebt de juiste toegang nodig om ze te beheren.",
+              "target": "#intgTabPlugins"
+            },
+            {
+              "id": "vault",
+              "title": "Inloggegevens beheren",
+              "body": "Gebruik de ingebouwde kluis of verbind een beschikbare wachtwoordmanager. Inloggegevens worden op de bijbehorende website ingevuld, zonder wachtwoorden in de chat te plaatsen. Een externe kluis vraagt een eigen account en inrichting.",
+              "target": "#intgTabVault"
+            },
+            {
+              "id": "channels",
+              "title": "Berichtkanalen kiezen",
+              "body": "Via kanalen kan een bot buiten deze webapp berichten ontvangen en versturen. Gebruik app-koppelingen om met een app te werken; gebruik kanalen voor gesprekken via die app.",
+              "target": "#intgTabChannels"
             }
           ],
           "related": [
@@ -1220,7 +1283,8 @@ window.SynthPulseHelpContent = {
           "related": [
             "insights",
             "settings"
-          ]
+          ],
+          "parent": "settings"
         },
         "settings": {
           "title": "Instellingen",

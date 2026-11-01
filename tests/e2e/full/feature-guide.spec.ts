@@ -1,7 +1,7 @@
 import {test,expect,open} from './fixtures';
 test.use({user:'admin'});
 async function ready(page:any){await page.waitForFunction(()=>typeof S!=='undefined'&&S._bootReady&&_loadingSessionId===null);}
-async function guide(page:any,feature?:string){await page.evaluate((f:any)=>window.SynthPulseFeatureGuide.open({feature:f,locale:'en'}),feature);await expect(page.locator('#spFeatureGuide')).toBeVisible();}
+async function guide(page:any,feature?:string){await page.evaluate(async(f:any)=>{await window.loadSynthPulseFeatureGuide();window.SynthPulseFeatureGuide.open({feature:f,locale:'en'});},feature);await expect(page.locator('#spFeatureGuide')).toBeVisible();}
 
 test('complete catalogs search locally, translate with parity, filter and export',async({page})=>{
  await open(page);await ready(page);await page.locator('#msg').fill('QA draft must survive the feature guide');
@@ -24,9 +24,7 @@ test('complete catalogs search locally, translate with parity, filter and export
 
 test('context link, escape and hidden-control action preserve permissions and focus',async({page})=>{
  await open(page);await ready(page);await page.locator('#btnPageHelp').click();
- const topic=await page.evaluate(()=>window.SynthPulseFeatureGuide.featuresForPage('chat').findIndex(f=>f.id==='webui.chat.model'));
- await page.locator('.sp-feature-tour-picker').selectOption(String(topic));
- const context=page.getByRole('button',{name:/Back to feature guide|Terug naar functiegids/});await expect(context).toBeVisible();await context.click();
+ const context=page.locator('.sp-help-tooltip [data-guide-link]');await expect(context).toBeVisible();await context.click();
  await expect(page.locator('#spGuideArea')).toHaveValue('chat');await page.keyboard.press('Escape');await expect(page.locator('#btnPageHelp')).toBeFocused();
  await guide(page,'webui.settings.shutdown');const posts:string[]=[];page.on('request',r=>{if(r.method()==='POST')posts.push(r.url());});
  await page.getByRole('button',{name:'Show control',exact:true}).click();await expect(page.locator('.sp-guide-notice')).toContainText('not visible');expect(posts).toEqual([]);

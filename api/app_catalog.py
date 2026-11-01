@@ -48,7 +48,7 @@ _ROWS = (
             'Build and manage automated workflows.', 'workflows', 'automation', 'platform'),
     AppSpec('omniroute', 'OmniRoute', 'Beheer modelroutes en verbindingen met AI-aanbieders.',
             'Manage model routing and AI provider connections.', 'workspace', 'platform', 'platform'),
-    AppSpec('nango', 'Nango', 'Beheer integraties en verbindingen met externe diensten.',
+    AppSpec('nango', 'App-connectors', 'Beheer integraties en verbindingen met externe diensten.',
             'Manage integrations and connections to external services.', 'workspace', 'platform', 'platform'),
     AppSpec('docuseal', 'DocuSeal', 'Bereid documenten voor en volg digitale ondertekening.',
             'Prepare documents and follow digital signing.', 'e_signing', 'productivity'),

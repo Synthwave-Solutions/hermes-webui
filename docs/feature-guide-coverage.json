@@ -1077,10 +1077,10 @@
     {
       "id": "webui.bots.scout",
       "area": "bots",
-      "status": "available",
+      "status": "conditional",
       "source_refs": [
-        "static/panels.js:8080",
-        "static/chat-bots.js",
+        "static/bot-builder.js",
+        "static/panels.js",
         "api/bot_scout.py"
       ]
     },
@@ -3085,6 +3085,43 @@
         "static/workspace.js",
         "static/bot-screens-link.js",
         "static/bot-screens.js"
+      ]
+    },
+    {
+      "id": "webui.connections.app_connectors",
+      "area": "connections",
+      "status": "conditional",
+      "source_refs": [
+        "static/integrations.js",
+        "static/integration-hub.js",
+        "static/index.html"
+      ]
+    },
+    {
+      "id": "webui.connections.plugins",
+      "area": "connections",
+      "status": "conditional",
+      "source_refs": [
+        "static/integration-hub.js",
+        "api/plugins.py"
+      ]
+    },
+    {
+      "id": "webui.connections.vault",
+      "area": "connections",
+      "status": "conditional",
+      "source_refs": [
+        "static/vault.js",
+        "api/vault.py"
+      ]
+    },
+    {
+      "id": "webui.bots.scheduled_tasks",
+      "area": "bots",
+      "status": "conditional",
+      "source_refs": [
+        "static/bot-builder.js",
+        "static/panels.js"
       ]
     }
   ],
@@ -8027,6 +8064,231 @@
         "static/panels.js:15396"
       ],
       "feature_id": "webui.governance.waiting"
+    },
+    {
+      "control": "profileSearch",
+      "tag": "input",
+      "label": "Search bots by name, description or category",
+      "source_refs": [
+        "static/index.html"
+      ],
+      "feature_id": "webui.bots.select"
+    },
+    {
+      "control": "action:clearProfileSearch",
+      "tag": "button",
+      "label": "Clear bot search",
+      "source_refs": [
+        "static/panels.js"
+      ],
+      "feature_id": "webui.bots.select"
+    },
+    {
+      "control": "intgTabConnectors",
+      "tag": "control",
+      "label": "intgTabConnectors",
+      "source_refs": [
+        "static/index.html"
+      ],
+      "feature_id": "webui.connections.app_connectors"
+    },
+    {
+      "control": "intgMore",
+      "tag": "control",
+      "label": "intgMore",
+      "source_refs": [
+        "static/index.html"
+      ],
+      "feature_id": "webui.connections.app_connectors"
+    },
+    {
+      "control": "intgTabPlugins",
+      "tag": "control",
+      "label": "intgTabPlugins",
+      "source_refs": [
+        "static/index.html"
+      ],
+      "feature_id": "webui.connections.plugins"
+    },
+    {
+      "control": "pluginCatalogSearch",
+      "tag": "control",
+      "label": "pluginCatalogSearch",
+      "source_refs": [
+        "static/index.html"
+      ],
+      "feature_id": "webui.connections.plugins"
+    },
+    {
+      "control": "pluginCatalogFilter",
+      "tag": "control",
+      "label": "pluginCatalogFilter",
+      "source_refs": [
+        "static/index.html"
+      ],
+      "feature_id": "webui.connections.plugins"
+    },
+    {
+      "control": "action:openIntegrationPlugins",
+      "tag": "button",
+      "label": "openIntegrationPlugins",
+      "source_refs": [
+        "static/index.html"
+      ],
+      "feature_id": "webui.connections.plugins"
+    },
+    {
+      "control": "intgTabVault",
+      "tag": "control",
+      "label": "intgTabVault",
+      "source_refs": [
+        "static/index.html"
+      ],
+      "feature_id": "webui.connections.vault"
+    },
+    {
+      "control": "action:openVaultLogin",
+      "tag": "button",
+      "label": "openVaultLogin",
+      "source_refs": [
+        "static/index.html"
+      ],
+      "feature_id": "webui.connections.vault"
+    },
+    {
+      "control": "intgTabChannels",
+      "tag": "control",
+      "label": "intgTabChannels",
+      "source_refs": [
+        "static/index.html"
+      ],
+      "feature_id": "webui.connections.channel"
+    },
+    {
+      "control": "builderAssignTask",
+      "tag": "control",
+      "label": "builderAssignTask",
+      "source_refs": [
+        "static/bot-builder.js"
+      ],
+      "feature_id": "webui.bots.scheduled_tasks"
+    },
+    {
+      "control": "builderCreateTask",
+      "tag": "control",
+      "label": "builderCreateTask",
+      "source_refs": [
+        "static/bot-builder.js"
+      ],
+      "feature_id": "webui.bots.scheduled_tasks"
+    },
+    {
+      "control": "builderTaskChoice",
+      "tag": "control",
+      "label": "builderTaskChoice",
+      "source_refs": [
+        "static/bot-builder.js"
+      ],
+      "feature_id": "webui.bots.scheduled_tasks"
+    },
+    {
+      "control": "cronCategoryFilterSelect",
+      "tag": "control",
+      "label": "cronCategoryFilterSelect",
+      "source_refs": [
+        "static/panels.js"
+      ],
+      "feature_id": "webui.tasks.labels"
+    },
+    {
+      "control": "action:clearCronFilters",
+      "tag": "button",
+      "label": "clearCronFilters",
+      "source_refs": [
+        "static/panels.js"
+      ],
+      "feature_id": "webui.tasks.labels"
+    },
+    {
+      "control": "action:loadBotScoutPeople",
+      "tag": "button",
+      "label": "loadBotScoutPeople",
+      "source_refs": [
+        "static/panels.js"
+      ],
+      "feature_id": "webui.bots.scout"
+    },
+    {
+      "control": "botScoutPerson",
+      "tag": "control",
+      "label": "botScoutPerson",
+      "source_refs": [
+        "static/panels.js"
+      ],
+      "feature_id": "webui.bots.scout"
+    },
+    {
+      "control": "botScoutFrequency",
+      "tag": "control",
+      "label": "botScoutFrequency",
+      "source_refs": [
+        "static/panels.js"
+      ],
+      "feature_id": "webui.bots.scout"
+    },
+    {
+      "control": "botScoutCrossBot",
+      "tag": "control",
+      "label": "botScoutCrossBot",
+      "source_refs": [
+        "static/panels.js"
+      ],
+      "feature_id": "webui.bots.scout"
+    },
+    {
+      "control": "botScoutPrompt",
+      "tag": "control",
+      "label": "botScoutPrompt",
+      "source_refs": [
+        "static/panels.js"
+      ],
+      "feature_id": "webui.bots.scout"
+    },
+    {
+      "control": "botScoutDefaultFrequency",
+      "tag": "control",
+      "label": "botScoutDefaultFrequency",
+      "source_refs": [
+        "static/panels.js"
+      ],
+      "feature_id": "webui.bots.scout"
+    },
+    {
+      "control": "botScoutDefaultTime",
+      "tag": "control",
+      "label": "botScoutDefaultTime",
+      "source_refs": [
+        "static/panels.js"
+      ],
+      "feature_id": "webui.bots.scout"
+    },
+    {
+      "control": "action:saveBotScoutBot",
+      "tag": "button",
+      "label": "saveBotScoutBot",
+      "source_refs": [
+        "static/panels.js"
+      ],
+      "feature_id": "webui.bots.scout"
+    },
+    {
+      "control": "action:setSessionKindFilter",
+      "tag": "button",
+      "label": "setSessionKindFilter",
+      "source_refs": [
+        "static/sessions.js"
+      ],
+      "feature_id": "webui.sessions.organize"
     }
   ],
   "method": "Inventory of concrete HTML controls and inline handlers, supplemented by manual review of generated conversation menus, bot builder and knowledge controls, composer customization and the embedded read-only memory dashboard. Save/cancel and equivalent responsive controls share a feature. Hidden vendor login, server settings and inactive legacy visualizers are excluded from user workflows.",

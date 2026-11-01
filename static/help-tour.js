@@ -992,14 +992,10 @@
     recordEvent('explain_clicked',{page:pageId});
     const panel=parentOf(entry)||pageId;
     if(asked&&panel!==currentPanel()&&panelView(panel))await goToPanel(panel);
-    if(typeof window.loadSynthPulseFeatureGuide==='function'){
-      try{await window.loadSynthPulseFeatureGuide();}catch(_){} // Text help remains available offline.
-    }
-    const catalog=window.SynthPulseFeatureGuide;
-    const allFeatures=catalog?.featuresForPage(pageId)||[];
-    if(allFeatures.length&&startFeatureTour(allFeatures.map(f=>f.id),{trigger,locale:catalog.language()}))return true;
+    // Page help is an orientation, not the complete reference catalog. Keep the
+    // catalog lazy; guideButton opens all topics when someone asks for depth.
     const sections=(Array.isArray(entry.sections)?entry.sections:[]).filter(section=>allowed(section,ctx));
-    const visible=sections.filter(section=>typeof section.target==='string'&&isVisible(query(section.target)));
+    const visible=sections.filter(section=>typeof section.target==='string'&&isVisible(query(section.target))).slice(0,5);
     if(visible.length&&guidaClass()){
       const anchor=document.getElementById('btnPageHelp');
       const first=isVisible(anchor)?anchor:query(visible[0].target);

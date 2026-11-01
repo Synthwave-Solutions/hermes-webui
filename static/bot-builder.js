@@ -2,12 +2,14 @@
 (function(){
   'use strict';
   let state=null, epoch=0;
-  const copy = {
-    steps:['Identity & photo','Instructions & skills','Connections & tools','Access & review'],
-    next:'Continue',back:'Back',save:'Create bot',saving:'Saving…'
-  };
   const tr=(key,fallback)=>{const value=typeof t==='function'?t(key):null;return value&&value!==key?value:fallback;};
   function input(id){return document.getElementById(id);}
+  const tabLayout=window.matchMedia?.('(min-width:1100px)');
+  function orientTabs(){
+    const tabs=document.querySelector('.bot-builder-tabs');
+    if(tabs)tabs.setAttribute('aria-orientation',tabLayout?.matches?'vertical':'horizontal');
+  }
+  tabLayout?.addEventListener('change',orientTabs);
   async function readAvatar(file){
     if(!file || !['image/png','image/jpeg','image/webp'].includes(file.type))
       throw new Error('Choose a PNG, JPEG or WebP image.');
@@ -70,52 +72,53 @@
   function render(){
     const body=input('profileDetailBody');if(!body||!state)return;
     const {config:c,catalog:cat,step}=state;
-    input('profileDetailTitle').textContent=state.edit?'Edit bot':'Create a bot';
+    input('profileDetailTitle').textContent=state.edit?(c.title||c.name)+' · '+tr('bot_setup_edit','Edit bot'):tr('bot_setup_create','Create a bot');
     input('profileDetailEmpty').style.display='none';body.style.display='';
     _profileMode='create';_setProfileHeaderButtons('create');
     const headerSave=input('btnSaveProfileDetail');if(headerSave)headerSave.style.display='none';
     let content='';
     if(step===0){
-      content=field('Bot ID','builderName',c.name)+field('Display name','builderTitle',c.title)+
-        field('What does this bot help with?','builderDescription',c.description,true)+
-        '<label class="bot-builder-field">Profile photo<input id="builderPhoto" type="file" accept="image/png,image/jpeg,image/webp"></label>'+
-        '<p>PNG, JPEG or WebP up to 10 MB. Resized before saving.</p>'+
-        ((state.avatar||c.avatar_url)?'<img class="bot-builder-photo" src="'+esc(state.avatar||c.avatar_url)+'" alt="Bot photo preview">':'');
+      content=field(tr('bot_setup_id','Bot ID'),'builderName',c.name)+field(tr('bot_setup_name','Display name'),'builderTitle',c.title)+
+        field(tr('bot_setup_description','What does this bot help with?'),'builderDescription',c.description,true)+
+        '<label class="bot-builder-field">'+esc(tr('bot_setup_photo','Profile photo'))+'<input id="builderPhoto" type="file" accept="image/png,image/jpeg,image/webp"></label>'+
+        '<p>'+esc(tr('bot_setup_photo_hint','PNG, JPEG or WebP up to 10 MB. Resized before saving.'))+'</p>'+
+        ((state.avatar||c.avatar_url)?'<img class="bot-builder-photo" src="'+esc(state.avatar||c.avatar_url)+'" alt="'+esc(tr('bot_setup_photo_preview','Bot photo preview'))+'">':'');
     }else if(step===1){
-      content=field('System instructions','builderPrompt',c.system_prompt,true)+
-        '<p>Define the role, expected outputs and boundaries. These are the bot’s instructions, not your personal memory.</p>'+
+      content=field(tr('bot_editor_instructions','Instructions'),'builderPrompt',c.system_prompt,true)+
         (state.edit?'':choices('Skills','skills',cat.skills));
     }else if(step===2){
-      content='<p>Only connections and tools already available to your account can be selected. Credentials stay on the server.</p>'+
-        choices('MCP connections','mcp_servers',cat.mcp_servers)+choices('CLI tools','cli_tools',cat.cli_tools)+
-        '<p>Model: <strong>'+esc(c.default_model||'Configured default')+'</strong> '+esc(c.model_provider||'')+'</p>';
+      content=choices(tr('bot_setup_connections','Tool connections'),'mcp_servers',cat.mcp_servers)+choices(tr('bot_setup_cli','Command-line tools'),'cli_tools',cat.cli_tools)+
+        '<p>Model: <strong>'+esc(c.default_model||tr('bot_setup_default','Configured default'))+'</strong> '+esc(c.model_provider||'')+'</p>';
     }else if(step===4){
       content=field(tr('bot_editor_memory',"Bot memory"),'builderMemory',c.bot_memory||'',true)+
         '<p>'+esc(tr('bot_editor_memory_hint',"Shared with the users of this bot. Separate from My Notes and your personal user profile."))+'</p>'+
         '<p>'+esc(tr('bot_editor_knowledge_hint',"File selections are saved separately using Save knowledge below."))+'</p><div id="builderKnowledge"></div>';
     }else if(state.edit&&(step===6||step===7)){
-      content='<div id="builderAutomation" aria-live="polite">Loading…</div>';
+      content='<div id="builderAutomation" aria-live="polite">'+esc(tr('loading','Loading…'))+'</div>';
     }else if(step===5){
       content=choices('Skills','skills',cat.skills);
     }else{
-      content='<p>Private to you by default. Add only the people or groups who should be able to use this bot.</p>'+
-        choices('Allowed users','allowed_users',cat.users)+choices('Allowed groups','allowed_groups',cat.groups)+
-        '<h3>Review before saving</h3><dl class="bot-builder-review">'+
-        [['Bot',c.title+' (@'+c.name+')'],['Instructions',c.system_prompt],['Skills',(c.skills||[]).join(', ')||'None selected'],['MCP connections',(c.mcp_servers||[]).join(', ')||'None selected'],['CLI tools',(c.cli_tools||[]).join(', ')||'None selected']].map(([a,b])=>'<dt>'+esc(a)+'</dt><dd>'+esc(b)+'</dd>').join('')+'</dl>'+
-        '<p>The bot becomes available only after all configuration and access checks succeed.</p>';
+      content=choices(tr('bot_setup_users','Allowed users'),'allowed_users',cat.users)+choices(tr('bot_setup_groups','Allowed groups'),'allowed_groups',cat.groups)+
+        '<h3>'+esc(tr('bot_setup_review','Review before saving'))+'</h3><dl class="bot-builder-review">'+
+        [['Bot',c.title+' (@'+c.name+')'],[tr('bot_editor_instructions','Instructions'),c.system_prompt],['Skills',(c.skills||[]).join(', ')||tr('bot_setup_none','None selected')],[tr('bot_setup_connections','Tool connections'),(c.mcp_servers||[]).join(', ')||tr('bot_setup_none','None selected')],[tr('bot_setup_cli','Command-line tools'),(c.cli_tools||[]).join(', ')||tr('bot_setup_none','None selected')]].map(([a,b])=>'<dt>'+esc(a)+'</dt><dd>'+esc(b)+'</dd>').join('')+'</dl>'+
+        '<p>'+esc(tr('bot_setup_review_hint','The bot becomes available after its configuration and access have been checked.'))+'</p>';
     }
     const sections=[[0,tr('bot_editor_identity',"Identity & photo")],[1,tr('bot_editor_instructions',"Instructions")],[4,tr('bot_editor_memory_tab',"Memory & knowledge")],[5,tr('bot_editor_skills',"Skills")],[2,tr('bot_editor_connections',"Connections & tools")],[3,tr('bot_editor_access',"Access")],[6,tr('bot_scout',"Scout")],[7,tr('bot_editor_tasks','Scheduled tasks')]];
-    const navigation=state.edit?'<div class="bot-builder-tabs" role="tablist" aria-label="'+esc(tr('bot_editor_tabs','Bot configuration'))+'">'+sections.map(([i,label])=>'<button type="button" role="tab" id="builderTab'+i+'" aria-controls="builderTabPanel" aria-selected="'+(i===step)+'" tabindex="'+(i===step?0:-1)+'" data-builder-tab="'+i+'">'+esc(label)+'</button>').join('')+'</div>':'<ol class="bot-builder-steps">'+copy.steps.map((s,i)=>'<li '+(i===step?'aria-current="step"':'')+'>'+esc(s)+'</li>').join('')+'</ol>';
-    body.innerHTML='<div class="main-view-content bot-builder">'+navigation+'<section id="builderTabPanel" '+(state.edit?'role="tabpanel" aria-labelledby="builderTab'+step+'"':'')+'>'+content+'</section>'+
-      '<p id="builderError" role="alert" hidden></p><div class="bot-builder-actions"><button type="button" class="sm-btn" id="builderBack" '+(step===0||state.edit?'disabled':'')+'>Back</button><button type="button" class="sm-btn primary" id="builderNext">'+(state.edit?'Save bot':step===3?'Create bot':'Continue')+'</button></div></div>';
+    const createSteps=[sections[0][1],tr('bot_setup_instructions_skills','Instructions & skills'),sections[4][1],tr('bot_setup_access_review','Access & review')];
+    const navigation=state.edit?'<div class="bot-builder-tabs" role="tablist" aria-label="'+esc(tr('bot_editor_tabs','Bot configuration'))+'">'+sections.map(([i,label])=>'<button type="button" role="tab" id="builderTab'+i+'" aria-controls="builderTabPanel" aria-selected="'+(i===step)+'" tabindex="'+(i===step?0:-1)+'" data-builder-tab="'+i+'">'+esc(label)+'</button>').join('')+'</div>':'<ol class="bot-builder-steps">'+createSteps.map((s,i)=>'<li '+(i===step?'aria-current="step"':'')+'><span aria-hidden="true">'+(i+1)+'</span>'+esc(s)+'</li>').join('')+'</ol>';
+    const title=state.edit?sections.find(([i])=>i===step)?.[1]:createSteps[step];
+    const introduction='<header class="bot-builder-section-head"><h2>'+esc(title||'')+'</h2><p>'+esc(tr('bot_setup_hint_'+step,''))+'</p></header>';
+    body.innerHTML='<div class="main-view-content bot-builder">'+navigation+'<section id="builderTabPanel" '+(state.edit?'role="tabpanel" aria-labelledby="builderTab'+step+'"':'')+'>'+introduction+content+'</section>'+
+      '<p id="builderError" role="alert" hidden></p><div class="bot-builder-actions"><button type="button" class="sm-btn" id="builderBack" '+(step===0||state.edit?'disabled':'')+'>'+esc(tr('bot_setup_back','Back'))+'</button><button type="button" class="sm-btn primary" id="builderNext">'+esc(state.edit?tr('bot_setup_save','Save bot'):step===3?tr('bot_setup_create','Create a bot'):tr('bot_setup_next','Continue'))+'</button></div></div>';
     if(state.edit){
+      orientTabs();
       input('builderBack').hidden=true;
       body.querySelectorAll('[data-builder-tab]').forEach(tab=>{
         tab.onclick=()=>{if(!state||state.saving)return;if(window.BotKnowledge&&window.BotKnowledge.isBusy&&window.BotKnowledge.isBusy(state.config.name)){error(tr('bot_editor_knowledge_busy',"Wait for the knowledge file operation to finish."));return;}collect();state.step=Number(tab.dataset.builderTab);render();input('builderTab'+state.step).focus();input('builderTab'+state.step).scrollIntoView({block:'nearest',inline:'nearest'});};
         tab.onkeydown=event=>{
-          if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
+          if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'].includes(event.key))return;
           event.preventDefault();const tabs=[...body.querySelectorAll('[data-builder-tab]')];let index=tabs.indexOf(tab);
-          index=event.key==='Home'?0:event.key==='End'?tabs.length-1:(index+(event.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length;
+          index=event.key==='Home'?0:event.key==='End'?tabs.length-1:(index+(['ArrowRight','ArrowDown'].includes(event.key)?1:-1)+tabs.length)%tabs.length;
           tabs[index].click();
         };
       });
@@ -217,7 +220,7 @@
       error(tr('bot_editor_knowledge_unsaved',"Save your knowledge file selection first, then save the bot."));return;
     }
     validate();const current=state,button=input('builderNext');
-    state.saving=true;button.disabled=true;button.textContent='Saving…';
+    state.saving=true;button.disabled=true;button.textContent=tr('bot_setup_saving','Saving…');
     input('builderBack').disabled=true;
     input('profileDetailBody').querySelectorAll('[data-builder-tab]').forEach(tab=>tab.disabled=true);
     const payload={...state.config};
@@ -232,7 +235,7 @@
       window.dispatchEvent(new CustomEvent('synpulse:bot-updated',{detail:{name:payload.name}}));
       await loadProfilesPanel();openProfileDetail(payload.name);
       showToast('Bot saved');
-    }catch(err){if(state===current){current.saving=false;input('profileDetailBody').querySelectorAll('[data-builder-tab]').forEach(tab=>tab.disabled=false);error(err.message);button.disabled=false;input('builderBack').disabled=false;button.textContent=current.edit?'Save bot':'Create bot';}}
+    }catch(err){if(state===current){current.saving=false;input('profileDetailBody').querySelectorAll('[data-builder-tab]').forEach(tab=>tab.disabled=false);error(err.message);button.disabled=false;input('builderBack').disabled=false;button.textContent=current.edit?tr('bot_setup_save','Save bot'):tr('bot_setup_create','Create a bot');}}
   }
   function invalidate(){epoch++;state=null;if(window.BotKnowledge&&window.BotKnowledge.forget)window.BotKnowledge.forget();}
   window.BotBuilder={readAvatar,open,save,invalidate,isEditing:name=>!!state?.edit&&state.config.name===name,refreshAutomation:mountAutomation};
