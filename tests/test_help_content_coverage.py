@@ -33,7 +33,7 @@ ASSIGN = "window.SynthPulseHelpContent = "
 # Plan 6.1: pages that are not a data-panel of their own.
 VIRTUAL_PAGES = {
     "group_chat", "voice_mode", "realtime_voice", "bot_builder", "profile_switching",
-    "workspace_files", "plugins",
+    "workspace_files", "plugins", "todos", "files", "logs",
 }
 # Structural keys: identical in every locale, never shown to a person.
 PAGE_KEYS = {"title", "summary", "sections", "related", "parent", "audience", "module", "modules", "enabled_if"}

@@ -28,7 +28,7 @@ def _locale_blocks():
 
 
 def _render_profiles_panel_body():
-    start = PANELS_JS.index("async function loadProfilesPanel(")
+    start = PANELS_JS.index("function _renderProfilesList(")
     end = PANELS_JS.index("\nfunction ", start + 1)
     return PANELS_JS[start:end]
 
@@ -39,21 +39,16 @@ def _render_profile_concept_help_body():
     return PANELS_JS[start:end]
 
 
-def test_i18n_keys_are_english_fallback_owned():
-    """Profile concept keys live in English and fall back from every other locale."""
+def test_i18n_keys_keep_english_fallback_and_dutch_sidebar_copy():
+    """Translations may override copy; English remains the fallback."""
     locale_blocks = _locale_blocks()
     en_block = locale_blocks["en"]
     for key in PROFILE_CONCEPT_KEYS:
         assert re.search(rf"\b{re.escape(key)}:\s*'", en_block), (
             f"missing key {key!r} in en locale block"
         )
-    for locale, block in locale_blocks.items():
-        if locale == "en":
-            continue
-        for key in PROFILE_CONCEPT_KEYS:
-            assert not re.search(rf"\b{re.escape(key)}:\s*'", block), (
-                f"key {key!r} must be absent from non-English locale {locale!r}"
-            )
+    for key in ("profile_concept_title", "profile_concept_subtitle"):
+        assert f'"{key}":' in locale_blocks['nl']
     assert re.search(r"_locale\[key\]\s*\?\?\s*LOCALES\.en\[key\]", I18N_JS)
 
 

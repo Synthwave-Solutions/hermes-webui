@@ -1,14 +1,17 @@
 import {test,expect,open} from './fixtures';
 
+// Composer prewarm imports modules only; it neither sends a model request nor writes a chat.
 async function ready(page:any){
  await open(page);
  await page.waitForFunction(()=>typeof S!=='undefined'&&S._bootReady&&_loadingSessionId===null);
+ await page.evaluate(()=>window.loadSynthPulseFeatureGuide());
 }
 
-test('page explanation covers the complete chat and composer context without writing',async({page},info)=>{
+test('optional full guide covers the complete chat and composer context without writing',async({page},info)=>{
  await ready(page);await page.locator('#msg').fill('Keep this unsent draft exactly.');
- const writes:string[]=[];page.on('request',r=>{if(['POST','PUT','PATCH','DELETE'].includes(r.method())&&!r.url().endsWith('/api/help/events'))writes.push(r.url());});
- await page.locator('#btnPageHelp').click();
+ const writes:string[]=[];page.on('request',r=>{if(['POST','PUT','PATCH','DELETE'].includes(r.method())&&!r.url().endsWith('/api/help/events')&&!r.url().endsWith('/api/chat/prewarm'))writes.push(r.url());});
+ await page.locator('#btnPageHelp').focus();
+ await page.evaluate(()=>window.SynthPulseHelp.startFeatureTour(window.SynthPulseFeatureGuide.featuresForPage('chat').map(f=>f.id),{trigger:document.getElementById('btnPageHelp')}));
  const tip=page.locator('.sp-feature-tour');await expect(tip).toBeVisible();
  const ids=await page.evaluate(()=>window.SynthPulseFeatureGuide.featuresForPage('chat').map(f=>f.id));
  expect(ids.length).toBeGreaterThan(32);
@@ -51,7 +54,7 @@ test('every catalogue feature has complete interactive NL/EN content, including 
   }
   return {count:ids.length,failures,clean:!document.querySelector('.guida-tooltip,#spFeatureTourAnchor,[data-sp-help-step]')};
  });
- expect(report.count).toBe(483);expect(report.failures).toEqual([]);expect(report.clean).toBe(true);
+ expect(report.count).toBe(510);expect(report.failures).toEqual([]);expect(report.clean).toBe(true);
 });
 
 test('catalogue opens an individual or filtered tour and preserves language and selection',async({page})=>{
@@ -83,7 +86,7 @@ test('missing spotlight library keeps the complete catalogue explanation availab
 
 test('background controls stay inactive while the guide navigates to the real control',async({page})=>{
  await ready(page);await page.locator('#msg').fill('Do not send this draft.');
- const writes:string[]=[];page.on('request',r=>{if(['POST','PUT','PATCH','DELETE'].includes(r.method())&&!r.url().endsWith('/api/help/events')&&!(r.url().endsWith('/api/auth/passkeys')&&r.postData()==='{}'))writes.push(r.url());});
+ const writes:string[]=[];page.on('request',r=>{if(['POST','PUT','PATCH','DELETE'].includes(r.method())&&!r.url().endsWith('/api/help/events')&&!r.url().endsWith('/api/chat/prewarm')&&!(r.url().endsWith('/api/auth/passkeys')&&r.postData()==='{}'))writes.push(r.url());});
  await page.evaluate(()=>window.SynthPulseHelp.startFeatureTour(['webui.chat.send'],{locale:'en'}));
  await page.locator('#btnSend').dispatchEvent('click');await expect(page.locator('#msg')).toHaveValue('Do not send this draft.');expect(writes).toEqual([]);
  await page.keyboard.press('Escape');

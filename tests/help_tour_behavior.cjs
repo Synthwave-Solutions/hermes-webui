@@ -434,7 +434,8 @@ test('the popover is the fallback without Guida or without a visible target',asy
   await page.evaluate(()=>window.SynthPulseHelp.explainPage('bot_builder'));
   await page.locator('.sp-help-popover').waitFor();
   assert.equal(await page.locator('.sp-help-popover-title').innerText(),'Guided bot builder');
-  assert.equal(await page.locator('.sp-help-popover-section').count(),3);
+  assert.equal(await page.locator('.sp-help-popover-section').count(),4);
+  assert.match(await page.locator('.sp-help-popover').innerText(),/proactive work/);
   assert.equal(await page.locator('.guida-overlay').count(),0);
   await context.close();
 });

@@ -1743,12 +1743,12 @@ function spRenderGrouped(container, entries, opts){
     const storeKey = (opts.storagePrefix || 'sp-group') + ':' + (key || '__none__');
     let collapsed = false;
     try { collapsed = localStorage.getItem(storeKey) === '1'; } catch (_e) {}
-    if (!collapsed) details.open = true;
+    if (opts.forceOpen || !collapsed) details.open = true;
     const summary = document.createElement('summary');
     summary.className = 'cron-group-summary';
     summary.innerHTML = `<span class="cron-group-name">${esc(key || (t('cron_category_none') || 'No category'))}</span><span class="cron-group-count">${items.length}</span>`;
     details.appendChild(summary);
-    details.addEventListener('toggle', () => { try { localStorage.setItem(storeKey, details.open ? '0' : '1'); } catch (_e) {} });
+    if (!opts.forceOpen) details.addEventListener('toggle', () => { try { localStorage.setItem(storeKey, details.open ? '0' : '1'); } catch (_e) {} });
     const inner = document.createElement('div');
     inner.className = 'cron-group-inner';
     for (const entry of items) inner.appendChild(entry.node);
@@ -8480,6 +8480,32 @@ async function loadProfilesPanel() {
     const data = await api('/api/profiles?fast=1');
     _profilesCache = data;
     _profileDropdownWriteStoredCache(data);
+    _renderProfilesList(data, true);
+  } catch (e) {
+    panel.innerHTML = `<div style="color:var(--accent);font-size:12px;padding:12px">${esc(t('error_prefix'))}${esc(e.message)}</div>`;
+  }
+}
+
+function filterProfilesPanel() {
+  if (_profilesCache) _renderProfilesList(_profilesCache, false);
+}
+
+function clearProfileSearch() {
+  const search = $('profileSearch');
+  if (search) { search.value = ''; search.focus(); }
+  filterProfilesPanel();
+}
+
+function _renderProfilesList(data, refreshDetail) {
+  const panel = $('profilesPanel');
+  if (!panel) return;
+  const words = String($('profileSearch')?.value || '').trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+  const profiles = (data.profiles || []).filter(p => {
+    const text = [botDisplayName(p), p.name, p.bot?.description, p.bot?.category].join(' ').toLocaleLowerCase();
+    return words.every(word => text.includes(word));
+  });
+  const status = $('profileSearchStatus');
+  if (status) status.textContent = t('profiles_search_count', profiles.length, (data.profiles || []).length);
     panel.innerHTML = '';
 
     // Hide "New profile" button in single profile mode
@@ -8489,7 +8515,7 @@ async function loadProfilesPanel() {
     }
 
     // In single profile mode, don't show the explanatory card
-    if (!data.single_profile_mode) {
+    if (!data.single_profile_mode && !words.length) {
       const explainer = document.createElement('div');
       explainer.className = 'profile-card profile-help-card';
       explainer.innerHTML = `
@@ -8519,7 +8545,7 @@ async function loadProfilesPanel() {
       ? S.activeProfile
       : (data.active || 'default');
     const _profileCardEntries = [];
-    for (const p of data.profiles) {
+    for (const p of profiles) {
       const card = document.createElement('div');
       card.className = 'profile-card';
       card.dataset.name = p.name;
@@ -8529,19 +8555,19 @@ async function loadProfilesPanel() {
       const meta = [];
       if (typeof p.model === 'string' && p.model) meta.push(p.model.split('/').pop());
       if (p.provider&&window._navAudience==='admin') meta.push(p.provider);
-      if(p.bot&&p.bot.description)meta.unshift(p.bot.description);
       if (!p.skill_counts_pending && p.total_skills && p.total_skills > 0) meta.push(t('profile_skill_count', p.total_skills).replace(String(p.total_skills), `${p.enabled_skills} / ${p.total_skills}`));
       const gwDot = window._navAudience==='member'?'':p.gateway_running
         ? `<span class="profile-opt-badge running" title="${esc(t('profile_gateway_running'))}"></span>`
         : `<span class="profile-opt-badge stopped" title="${esc(t('profile_gateway_stopped'))}"></span>`;
       const isActive = p.name === activeName;
       const activeBadge = isActive ? `<span style="color:var(--link);font-size:10px;font-weight:600;margin-left:6px">${esc(t('profile_active'))}</span>` : '';
-      const defaultBadge = p.is_default ? ` <span style="opacity:.5">${esc(t('profile_default_label'))}</span>` : '';
+      const description = p.bot && p.bot.description;
       const hiddenBadge = p.visible === false ? ' <span class="detail-badge" title="Hidden from chat">Hidden from chat</span>' : '';
       card.innerHTML = `
         <div class="profile-card-header">
           <div style="min-width:0;flex:1">
-            <div class="profile-card-name${isActive ? ' is-active' : ''}">${botAvatarHtml(p)}${gwDot}${esc(botDisplayName(p))}${defaultBadge}${activeBadge}${hiddenBadge}</div>
+            <div class="profile-card-name${isActive ? ' is-active' : ''}">${botAvatarHtml(p)}${gwDot}<span class="profile-card-title">${esc(botDisplayName(p))}</span>${activeBadge}${hiddenBadge}</div>
+            ${description ? `<p class="profile-card-description" title="${esc(description)}">${esc(description)}</p>` : ''}
             ${meta.length ? `<div class="profile-card-meta">${esc(meta.join(' \u00b7 '))}</div>` : `<div class="profile-card-meta">${esc(t('profile_no_configuration'))}</div>`}
           </div>
         </div>`;
@@ -8549,17 +8575,15 @@ async function loadProfilesPanel() {
       if (_currentProfileDetail && _currentProfileDetail.name === p.name) card.classList.add('active');
       _profileCardEntries.push({ category: p.bot && p.bot.category, node: card });
     }
-    spRenderGrouped(panel, _profileCardEntries, { storagePrefix: 'bots-group' });
-    _decorateBotCardsWithJobs(data.profiles);
+    spRenderGrouped(panel, _profileCardEntries, { storagePrefix: 'bots-group', forceOpen: words.length > 0 });
+    if (!profiles.length) panel.innerHTML = `<div class="sp-search-empty"><p>${esc(t('profiles_search_empty'))}</p><button type="button" class="sm-btn" data-clear-profile-search onclick="clearProfileSearch()">${esc(t('profiles_search_clear'))}</button></div>`;
+    _decorateBotCardsWithJobs(data.profiles, !refreshDetail);
     // Re-render detail with fresh data if we have one and we're not in a form
-    if (_currentProfileDetail && _profileMode !== 'create') {
+    if (refreshDetail && _currentProfileDetail && _profileMode !== 'create') {
       const refreshed = data.profiles.find(p => p.name === _currentProfileDetail.name);
       if (refreshed) _renderProfileDetail(refreshed, data.active);
       else _clearProfileDetail();
     }
-  } catch (e) {
-    panel.innerHTML = `<div style="color:var(--accent);font-size:12px;padding:12px">${esc(t('error_prefix'))}${esc(e.message)}</div>`;
-  }
 }
 
 function _renderProfileConceptHelp(activeName){
@@ -8768,9 +8792,9 @@ async function _loadProfileBotJobs(p){
   box.style.display = '';
 }
 // A small "n tasks" chip on every bot card, red dot when one needs attention.
-async function _decorateBotCardsWithJobs(profiles){
+async function _decorateBotCardsWithJobs(profiles, cachedOnly){
   if (typeof _canUseFeature === 'function' && !_canUseFeature('cron:read')) return;
-  let jobs; try { jobs = await _botJobsAll(); } catch (_e) { return; }
+  let jobs; try { jobs = cachedOnly ? (_botJobsCache?.jobs || []) : await _botJobsAll(); } catch (_e) { return; }
   for (const p of profiles || []) {
     const card = document.querySelector(`.profile-card[data-name="${CSS.escape(p.name)}"] .profile-card-header > div`);
     if (!card || card.querySelector('.bot-card-jobs')) continue;

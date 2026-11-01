@@ -100,7 +100,7 @@ async function _loadHostedAccounts(epoch = _hubEpoch) {
     _hostedAccounts = data.accounts || [];
     _intgRenderConnections();
     _intgRenderGrid();
-  } catch (error) { if (epoch === _hubEpoch) _hubStatus('hostedActionStatus', error.message); }
+  } catch (error) { if (epoch === _hubEpoch) _hubStatus('hostedActionStatus', _hubText('integrations_load_retry', 'Connections could not be loaded. Refresh to try again.')); }
 }
 
 async function _connectHosted(row, button) {

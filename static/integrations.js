@@ -35,6 +35,8 @@ let _intgCatalog = null;      // last /api/integrations/catalog payload
 let _intgConnections = null;  // last connections array
 let _intgRequests = null;     // caller's own approval requests (any status)
 let _intgMe = null;           // /api/governance/me payload (for email/admin)
+let _intgConnectionsFailed = false;
+let _intgCatalogFailed = false;
 let _intgSearch = '';
 let _intgCategory = '';
 let _intgSearchTimer = null;
@@ -125,9 +127,11 @@ async function _intgLoadCatalog() {
   const grid = $('intgGrid');
   try {
     _intgCatalog = await api('/api/integrations/catalog', { redirect401: false });
+    _intgCatalogFailed = false;
   } catch (e) {
     _intgCatalog = null;
-    if (grid) grid.innerHTML = '<div class="intg-error">' + _intgEsc((e && e.message) || 'request failed') + '</div>';
+    _intgCatalogFailed = true;
+    if (grid) grid.innerHTML = '<div class="intg-error">' + _intgEsc(_intgT('integrations_load_retry', 'Connections could not be loaded. Refresh to try again.')) + '</div>';
     return;
   }
   _intgRenderNotice();
@@ -136,16 +140,15 @@ async function _intgLoadCatalog() {
 }
 
 async function _intgRefreshConnections() {
-  const el = $('intgConnections');
   let data;
   try {
     data = await api('/api/integrations/connections', { redirect401: false, timeoutToast: false });
   } catch (e) {
-    if (el && _intgConnections === null) {
-      el.innerHTML = '<div class="intg-error">' + _intgEsc((e && e.message) || 'request failed') + '</div>';
-    }
+    _intgConnectionsFailed = true;
+    _intgRenderConnections();
     return;
   }
+  _intgConnectionsFailed = false;
   _intgConnections = (data && Array.isArray(data.connections)) ? data.connections : [];
   _intgRenderConnections();
   _intgRenderGrid(); // "Connected" chips depend on the connection list
@@ -180,7 +183,6 @@ function _intgRenderNotice() {
     el.style.display = '';
     el.innerHTML = '<div class="intg-banner">'
       + _intgEsc(_intgT('integrations_nango_down', 'The connection service is temporarily unavailable; the catalog remains available.'))
-      + (nango.error ? ' <span class="intg-muted">(' + _intgEsc(nango.error) + ')</span>' : '')
       + '</div>';
   } else {
     el.style.display = 'none';
@@ -289,8 +291,9 @@ function _intgRenderConnections() {
   const personal = typeof _hostedAccounts === 'undefined' ? [] : _hostedAccounts;
   const rows = (_intgConnections || []).concat(personal.map(row => ({_hosted:true, connection_id:row.connectionId, provider_config_key:row.connector, end_user:{id:_intgMyEndUserId()}, status:row.status})));
   const isAdmin = _intgIsAdmin(_intgMe);
+  const failure = _intgConnectionsFailed ? '<div class="intg-error" role="status">' + _intgEsc(_intgT('integrations_load_retry', 'Connections could not be loaded. Refresh to try again.')) + '</div>' : '';
   if (!rows.length) {
-    el.innerHTML = '<div class="intg-muted">' + _intgEsc(_intgT('integrations_no_connections', 'No connections yet. Connect a service from the catalog below.')) + '</div>';
+    el.innerHTML = failure || '<div class="intg-muted">' + _intgEsc(_intgT('integrations_no_connections', 'No connections yet. Connect a service from the catalog below.')) + '</div>';
     return;
   }
   const ownerTh = isAdmin ? '<th>' + _intgEsc(_intgT('integrations_col_owner', 'Owner')) + '</th>' : '';
@@ -320,7 +323,7 @@ function _intgRenderConnections() {
       + '<td class="intg-row-actions">' + action + '</td>'
       + '</tr>';
   }).join('');
-  el.innerHTML = '<div class="intg-table-wrap"><table class="intg-table"><thead><tr>'
+  el.innerHTML = failure + '<div class="intg-table-wrap"><table class="intg-table"><thead><tr>'
     + '<th>' + _intgEsc(_intgT('integrations_col_provider', 'Provider')) + '</th>'
     + '<th>' + _intgEsc(_intgT('integrations_col_connection', 'Connection')) + '</th>'
     + ownerTh
@@ -384,7 +387,9 @@ function _intgRenderGrid() {
   const nangoUp = !(((_intgCatalog || {}).nango || {}).available === false);
   const visible = typeof _intgVisibleProviders === 'function' ? _intgVisibleProviders(providers) : providers;
   if (!providers.length) {
-    grid.innerHTML = '<div class="intg-muted">' + _intgEsc(_intgT('integrations_no_results', 'No providers match your search.')) + '</div>';
+    grid.innerHTML = _intgCatalogFailed
+      ? '<div class="intg-error">' + _intgEsc(_intgT('integrations_load_retry', 'Connections could not be loaded. Refresh to try again.')) + '</div>'
+      : '<div class="intg-muted">' + _intgEsc(_intgT('integrations_no_results', 'No providers match your search.')) + '</div>';
     return;
   }
   grid.innerHTML = visible.map(p => {
