@@ -932,3 +932,32 @@ class TestApiWireFormat:
         assert mod.WEBUI_HOST == "127.0.0.1"
         assert mod.WEBUI_PORT == "8787"
         assert mod.WEBUI_URL == "http://127.0.0.1:8787"
+
+
+async def test_stdio_catalog_and_tool_dispatch_with_installed_sdk(tmp_path):
+    """Exercise the actual SDK registration, handshake and dispatch over stdio."""
+    from mcp import ClientSession, StdioServerParameters
+    from mcp.client.stdio import stdio_client
+
+    child_env = {
+        "HERMES_HOME": str(tmp_path / "agent"),
+        "HERMES_WEBUI_STATE_DIR": str(tmp_path / "webui"),
+    }
+    for key in ("HERMES_WEBUI_AGENT_DIR", "HERMES_WEBUI_PYTHON"):
+        if os.environ.get(key):
+            child_env[key] = os.environ[key]
+    params = StdioServerParameters(
+        command=sys.executable,
+        args=[str(_REPO / "mcp_server.py")],
+        env=child_env,
+    )
+    async with stdio_client(params) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            catalog = await session.list_tools()
+            names = {tool.name for tool in catalog.tools}
+            assert {"list_projects", "create_project", "move_session"} <= names
+            result = await session.call_tool("list_projects", {})
+            assert not result.model_dump(by_alias=True).get("isError")
+            payload = json.loads(result.content[0].text)
+            assert payload == []

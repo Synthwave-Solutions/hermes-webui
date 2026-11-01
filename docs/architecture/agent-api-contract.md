@@ -57,6 +57,9 @@ The integration follows the engine's moved interfaces:
 - Scheduled-task destinations include the engine's installed platform
   registry as well as legacy built-in destinations. Authorization and
   recipient validation still run against the complete destination.
+- The optional WebUI MCP server supports both the MCP 1.x decorator API
+  and MCP 2.x typed callback registration used by the new engine environment.
+  Project/session handlers and profile authorization are shared by both.
 
 These changes do not migrate session storage, bot access, Scout settings, or
 scheduled-task ownership. The focused compatibility tests exercise provider

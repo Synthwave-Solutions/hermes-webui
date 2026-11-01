@@ -7,7 +7,7 @@ Option A rewrite (2026-05-08): imports api.models and api.profiles
 directly from the webui codebase, using canonical helpers for
 locking, profile scoping, index consistency, and validation.
 
-    pip install "mcp<2"   # one-time setup
+    pip install "mcp>=1,<3"  # one-time setup
     python3 mcp_server.py # start via stdio
 
 MCP config for Hermes Agent (add to config.yaml):
@@ -36,7 +36,7 @@ from pathlib import Path
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.types import Tool, TextContent
+from mcp.types import CallToolResult, ListToolsResult, Tool, TextContent
 
 # ── Ensure the repo root is on sys.path so api.* imports work ─────────────
 _REPO_ROOT = Path(__file__).parent.resolve()
@@ -72,9 +72,6 @@ WEBUI_PORT = os.environ.get("HERMES_WEBUI_PORT", "8787")
 WEBUI_URL = f"http://{WEBUI_HOST}:{WEBUI_PORT}"
 _auth_cookie: str | None = None
 _auth_expires: float = 0  # unix timestamp after which we re-auth
-
-server = Server("hermes-webui")
-
 
 # ═══════════════════════════════════════════════════════════════════════════
 #  Helpers — filesystem (project CRUD via canonical api.models)
@@ -543,18 +540,38 @@ HANDLERS = {
 }
 
 
-@server.list_tools()
 async def list_tools() -> list[Tool]:
     return TOOLS
 
 
-@server.call_tool()
 async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     handler = HANDLERS.get(name)
     if not handler:
         return [TextContent(type="text", text=json.dumps(
             {"error": f"Unknown tool: {name}"}, ensure_ascii=False))]
     return await handler(arguments)
+
+
+if hasattr(Server, "list_tools"):
+    # MCP 1.x registers handlers with decorators.
+    server = Server("hermes-webui")
+    server.list_tools()(list_tools)
+    server.call_tool()(call_tool)
+else:
+    # MCP 2.x takes typed callbacks at construction instead.
+    async def _on_list_tools(_context, _params):
+        return ListToolsResult(tools=await list_tools())
+
+    async def _on_call_tool(_context, params):
+        return CallToolResult(content=await call_tool(params.name, params.arguments or {}))
+
+    _tool_schemas = {tool.name: tool.input_schema for tool in TOOLS}
+    server = Server(
+        "hermes-webui",
+        on_list_tools=_on_list_tools,
+        on_call_tool=_on_call_tool,
+        get_tool_input_schema=_tool_schemas.get,
+    )
 
 
 async def main():
