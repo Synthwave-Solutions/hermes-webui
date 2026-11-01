@@ -231,7 +231,8 @@ ROUTE_CATALOG: tuple[RouteRule, ...] = (
     RouteRule("/api/skills/learning-activity", "chat:use", "skills:write", match="exact"),
     RouteRule("/api/skills",              "skills:read", "skills:write"),
     RouteRule("/api/mcp",                 "mcp:read", "mcp:write"),
-    RouteRule("/api/plugins",             "plugins:read", match="exact"),
+    RouteRule("/api/plugins",             "plugins:read", "plugins:write"),
+    RouteRule("/api/vault",               "integrations:read", "integrations:connect"),
     RouteRule("/api/extensions",          "plugins:read", "plugins:write"),  # incl. sidecar proxy wildcard
 
     # cron (route_permission special-cases POST .../run -> cron:run, as reference)

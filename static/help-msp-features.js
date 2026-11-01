@@ -4399,13 +4399,13 @@ window.SynthPulseMspFeatureCatalog = {
           "when": "When configuring or checking this setting for a client installation.",
           "steps": [
             "Open the client wizard and choose Hosting and installation.",
-            "Review public oauth callback against the client’s approved requirements. Example: Nango callback, port 10000.",
+            "Review public oauth callback against the client’s approved requirements. Example: Connector OAuth callback, port 10000.",
             "Enter or select the value, then choose Next or Save draft and check the save confirmation.",
             "Review the effective configuration and remaining prerequisites before making live changes."
           ],
           "permissions": "Operators and admins can configure and run actions. Partners can only inspect their owned clients.",
           "limits": "Availability depends on the selected infrastructure root, account rights, image architecture and reviewed cloud plan. A saved option creates no resource and includes no agreed price. This concerns the connection callback, never the private staff cockpit. Public routes require a separate access review.",
-          "example": "Nango callback, port 10000"
+          "example": "Connector OAuth callback, port 10000"
         },
         "nl": {
           "title": "Publieke OAuth-callback",
@@ -4413,13 +4413,13 @@ window.SynthPulseMspFeatureCatalog = {
           "when": "Wanneer je deze instelling voor een klantinstallatie configureert of controleert.",
           "steps": [
             "Open de klantwizard en kies Hosting en installatie.",
-            "Beoordeel publieke oauth-callback aan de hand van de goedgekeurde klanteisen. Voorbeeld: Nango callback, port 10000.",
+            "Beoordeel publieke oauth-callback aan de hand van de goedgekeurde klanteisen. Voorbeeld: Connector OAuth callback, port 10000.",
             "Vul de waarde in of selecteer deze, kies Volgende of Concept opslaan en controleer de bevestiging.",
             "Beoordeel de effectieve configuratie en resterende voorwaarden voordat je live wijzigingen uitvoert."
           ],
           "permissions": "Operators en admins kunnen configureren en acties uitvoeren. Partners bekijken alleen hun eigen klanten.",
           "limits": "Beschikbaarheid hangt af van de infrastructuurvariant, accountrechten, imagearchitectuur en het beoordeelde cloudplan. Een opgeslagen optie maakt geen middel aan en bevat geen afgesproken prijs. Dit betreft de verbindingscallback, nooit het privébeheercockpit. Publieke routes vereisen een aparte toegangsbeoordeling.",
-          "example": "Nango callback, port 10000"
+          "example": "Connector OAuth callback, port 10000"
         }
       }
     },

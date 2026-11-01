@@ -696,6 +696,8 @@ def provider_approval(
 
 def _provider_label(key: str) -> str:
     """Human-readable provider name for an approval row (falls back to the key)."""
+    if key.startswith("hosted-"):
+        return key[len("hosted-"):].replace("-", " ").title()
     try:
         entry = load_provider_entries().get(key)
     except RuntimeError:

@@ -12,6 +12,7 @@ from pathlib import Path
 import sys
 import subprocess
 import threading
+import re
 
 # Retain the discovered path as a diagnostic/test-visible compatibility value;
 # runtime identity is deliberately captured from the loaded module below.
@@ -21,6 +22,38 @@ _RESTART_MESSAGE = (
     "Hermes Agent was updated while Hermes WebUI was running. "
     "Restart Hermes WebUI before retrying this action."
 )
+
+# Cache only the verified source identity, never the revision. Every admission
+# reads HEAD again, without spawning git on the latency-sensitive chat path.
+_TRACKED_ROOTS: dict[tuple[Path, Path], Path] = {}
+
+
+def _head_revision(root: Path) -> str | None:
+    try:
+        git_dir = root / ".git"
+        if git_dir.is_file():
+            pointer = git_dir.read_text().strip()
+            if not pointer.startswith("gitdir: "):
+                return None
+            git_dir = (root / pointer[8:]).resolve()
+        common = git_dir
+        if (git_dir / "commondir").exists():
+            common = (git_dir / (git_dir / "commondir").read_text().strip()).resolve()
+        head = (git_dir / "HEAD").read_text().strip()
+        if head.startswith("ref: "):
+            ref = head[5:]
+            if not ref.startswith("refs/") or ".." in Path(ref).parts:
+                return None
+            for directory in (git_dir, common):
+                if (directory / ref).is_file():
+                    head = (directory / ref).read_text().strip()
+                    break
+            else:
+                head = next((line.split()[0] for line in (common / "packed-refs").read_text().splitlines()
+                             if len(line.split()) == 2 and line.split()[1] == ref), "")
+        return head if re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", head) else None
+    except (OSError, ValueError):
+        return None
 
 
 def _read_agent_revision(
@@ -41,6 +74,11 @@ def _read_agent_revision(
             module_path = Path(module_file).resolve()
         except (OSError, RuntimeError, TypeError):
             return None
+
+    identity = (agent_dir, module_path)
+    root = _TRACKED_ROOTS.get(identity)
+    if root is not None:
+        return _head_revision(root) if module_path.is_file() else None
 
     try:
         worktree_result = subprocess.run(
@@ -83,7 +121,10 @@ def _read_agent_revision(
         return None
 
     revision = revision_result.stdout.strip()
-    return revision if revision_result.returncode == 0 and revision else None
+    if revision_result.returncode == 0 and revision:
+        _TRACKED_ROOTS[identity] = worktree
+        return revision
+    return None
 
 
 _AGENT_SOURCE_DIR: Path | None = None

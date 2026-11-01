@@ -568,10 +568,11 @@ def test_handoff_summary_codex_output_cap_matches_provider_compatibility(
 
         def _run_codex_stream(self, kwargs):
             request_kwargs.append(kwargs)
-            return object()
-
-        def _normalize_codex_response(self, response):
-            return types.SimpleNamespace(content="- You should complete the remaining review."), "stop"
+            return types.SimpleNamespace(status="completed", output=[
+                types.SimpleNamespace(type="message", role="assistant", content=[
+                    types.SimpleNamespace(type="output_text", text="- You should complete the remaining review."),
+                ]),
+            ])
 
         def release_clients(self):
             return None

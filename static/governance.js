@@ -2007,7 +2007,7 @@ async function _govLoadIntegrations() {
   const nangoDown = ((catalog && catalog.nango) || {}).available === false;
   const banner = nangoDown
     ? '<div class="gov-muted" style="margin-bottom:10px">' + _govT('governance_intg_nango_down',
-        'Nango is unreachable; showing the last known state, actions may fail.') + '</div>'
+        'The connection service is unavailable; showing the last known state, actions may fail.') + '</div>'
     : '';
   const rows = governed.map(p => {
     const key = String(p.unique_key || p.key || '');
@@ -2063,7 +2063,7 @@ async function _govLoadIntegrations() {
       'No governed integrations yet. Enable providers from the Integrations panel.') + '</td></tr>') +
     '</tbody></table>' +
     '<div class="gov-muted">' + _govT('governance_intg_note',
-      'Approve/Enable makes a provider connectable for everyone; Disable removes it from Nango (blocked while connections exist); Revoke returns it to the request flow.') +
+      'Approve/Enable makes a provider connectable for everyone; Disable removes its connection configuration (blocked while connections exist); Revoke returns it to the request flow.') +
     ' <a href="#" onclick="switchPanel(\'integrations\');return false">' + _govT('governance_intg_open_panel', 'Open the Integrations panel') + '</a></div>';
 }
 

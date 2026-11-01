@@ -264,7 +264,9 @@ class TestPluginsSettingsUi:
 
         assert 'id="pluginsList"' in html
         assert 'id="pluginsEmpty"' in html
-        assert "No Hermes plugins are currently visible" in html
+        assert "No runtime plugins are currently visible" in html
+        assert html.count('id="pluginsList"') == 1
+        assert html.count('id="pluginCatalogList"') == 1
 
     def test_plugins_panel_fetches_api_and_renders_hook_badges_safely(self):
         js = read("static/panels.js")
@@ -571,10 +573,11 @@ class TestPluginCollisionDetection:
         assert "plugin.enabled===false" in segment
 
     def test_plugins_panel_i18n_strings_present(self):
-        i18n = read("static/i18n.js")
-
-        assert "plugins_active_provider:" in i18n
-        assert "plugins_provider_no_hooks:" in i18n
+        from tests.i18n_catalogs import locale_catalogs
+        catalogs = locale_catalogs()
+        for locale in ("en", "nl"):
+            assert catalogs[locale]["plugins_active_provider"]
+            assert catalogs[locale]["plugins_provider_no_hooks"]
 
 
 class TestAutoHidePluginsTab:

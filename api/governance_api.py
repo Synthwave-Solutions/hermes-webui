@@ -1370,7 +1370,7 @@ def _handle_approvals_decide_generic(handler, parsed, policy, subject, body, kin
         else:
             mcp_requests.uninstall_quietly(key, decided_by, path=parsed.path)
 
-    if kind == approvals.KIND_INTEGRATION and decision == "approve":
+    if kind == approvals.KIND_INTEGRATION and decision == "approve" and not key.startswith("hosted-"):
         # Same immediacy as MCP: approving a provider also creates the Nango
         # integration, so the requester's card flips straight to Connect
         # instead of parking on "an admin is setting it up". Best-effort:

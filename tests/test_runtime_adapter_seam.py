@@ -318,17 +318,18 @@ def test_goal_adapter_action_is_bounded_to_slice3c_actions():
     assert routes._runtime_adapter_goal_action("ship #1925") == "set"
 
 
-def test_approval_respond_does_not_fallback_to_oldest_when_explicit_id_is_stale():
+def test_approval_respond_does_not_fallback_to_oldest_when_explicit_id_is_stale(monkeypatch):
     routes = importlib.import_module("api.routes")
-    src = (routes.Path(__file__).parent.parent / "api" / "routes.py").read_text(encoding="utf-8")
-    helper_idx = src.index("def _resolve_approval_legacy")
-    helper_body = src[helper_idx:src.index("def _handle_approval_respond", helper_idx)]
-
-    assert "A stale explicit id must not accidentally approve" in helper_body
-    assert "if not pending and not approval_id:" in helper_body
-    stale_branch = helper_body[helper_body.index("else:", helper_body.index("for i, entry")):helper_body.index("else:\n                pending = queue.pop(0)")]
-    assert "pending = None" in stale_branch
-    assert "queue.pop(0)" not in stale_branch
+    approval = importlib.import_module("tools.approval")
+    sid = "stale-response-test"
+    entry = {"approval_id": "live", "pattern_key": "unrelated-command", "command": "test"}
+    gateway_entry = approval._ApprovalEntry(dict(entry))
+    monkeypatch.setattr(routes, "_pending", {sid: [entry]})
+    monkeypatch.setattr(routes, "_gateway_queues", {sid: [gateway_entry]})
+    assert routes._resolve_approval_legacy(sid, "stale-id", "session") is False
+    assert routes._pending[sid] == [entry]
+    assert routes._gateway_queues[sid] == [gateway_entry]
+    assert not approval.is_approved(sid, "unrelated-command")
 
 
 def test_approval_respond_peeks_gateway_queues_when_pending_empty() -> None:
@@ -430,37 +431,22 @@ def test_chat_start_route_selects_adapter_only_when_flag_enabled():
     assert "HERMES_WEBUI_RUNTIME_ADAPTER" not in helper_body, "helper should use runtime_adapter_enabled(), not inline env checks"
 
 
-def test_runner_local_chat_start_selection_does_not_fallback_to_legacy():
+def test_runner_local_chat_start_selection_does_not_fallback_to_legacy(monkeypatch):
+    from types import SimpleNamespace
     routes = importlib.import_module("api.routes")
-    src = (routes.Path(__file__).parent.parent / "api" / "routes.py").read_text(encoding="utf-8")
-    # See note in test_chat_start_route_selects_adapter_only_when_flag_enabled
-    # — adapter selection moved into the shared `_start_run` helper.
-    helper_idx = src.index("def _start_run(")
-    helper_body = src[helper_idx:src.index("def start_session_turn(", helper_idx)]
-    start_idx = src.index("def _handle_chat_start")
-    start_body = src[start_idx:src.index("def _resolve_chat_workspace_with_recovery", start_idx)]
-
-    flag_branch = "if runtime_adapter_enabled() or runtime_adapter_runner_enabled():"
-    assert flag_branch in helper_body
-    assert "except NotImplementedError as exc:" in helper_body
-    # The helper returns {"error": str(exc), "_status": 501}; the route then
-    # maps that onto the legacy j(handler, {...}, status=501) response shape
-    # to keep the public contract identical to pre-refactor behavior.
-    assert 'return {"error": str(exc), "_status": 501}' in helper_body
-    assert 'return j(handler, {"error": response["error"]}, status=501)' in start_body
-    assert "runner-local chat backend is not configured" in src
-    # The adapter branch inside the helper still calls _start_chat_stream_for_session
-    # through the _legacy_start_run delegate before the trailing legacy-direct
-    # fallthrough (the function returns the legacy direct call when the flag
-    # is off — no `else:` keyword anymore since each branch returns).
-    adapter_branch_start = helper_body.index(flag_branch)
-    # Slice up to the final (post-flag) return _start_chat_stream_for_session
-    # — there are two occurrences: one inside _legacy_start_run, one at the
-    # fallthrough; we want both inside the branch slice.
-    fallthrough = helper_body.rindex("return _start_chat_stream_for_session(")
-    adapter_branch = helper_body[adapter_branch_start:fallthrough]
-    assert "_start_chat_stream_for_session(" in adapter_branch, "legacy-journal delegate should still call the legacy path"
-    assert "runtime_adapter_runner_enabled()" in adapter_branch or "runtime_adapter_runner_enabled()" in helper_body
+    runtime = importlib.import_module("api.runtime_adapter")
+    monkeypatch.setattr(runtime, "runtime_adapter_enabled", lambda: False)
+    monkeypatch.setattr(runtime, "runtime_adapter_runner_enabled", lambda: True)
+    def unavailable(**kwargs):
+        raise NotImplementedError("runner unavailable")
+    def legacy(*args, **kwargs):
+        raise AssertionError("runner request must not fall back to legacy")
+    monkeypatch.setattr(runtime, "build_runtime_adapter", unavailable)
+    monkeypatch.setattr(routes, "_start_chat_stream_for_session", legacy)
+    result = routes._start_run(SimpleNamespace(session_id="runner-test", profile="default"),
+        msg="hello", attachments=[], workspace="/tmp", model="test", model_provider="test",
+        normalized_model="test", source="webui", route="/api/chat/start")
+    assert result == {"error": "runner unavailable", "_status": 501}
 
 
 def test_chat_start_adapter_path_preserves_legacy_response_shape():

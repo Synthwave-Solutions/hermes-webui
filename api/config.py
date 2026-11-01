@@ -3516,9 +3516,14 @@ def _lmstudio_model_reasoning_options(
         )
 
     try:
-        from hermes_cli.models import (
-            lmstudio_model_reasoning_options as _cli_lmstudio_model_reasoning_options,
-        )
+        try:
+            from hermes_cli.models_local import (
+                lmstudio_model_reasoning_options as _cli_lmstudio_model_reasoning_options,
+            )
+        except ImportError:
+            from hermes_cli.models import (
+                lmstudio_model_reasoning_options as _cli_lmstudio_model_reasoning_options,
+            )
     except Exception:
         return _lmstudio_reasoning_probe_options_fallback(
             model,
