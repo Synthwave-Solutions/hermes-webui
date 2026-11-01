@@ -42,6 +42,21 @@ display limit. Old pending attempts release only cooldowns stamped by that exact
 attempt. Deploy collector and ledger scripts together; saving a Scout installs
 the current pair in its bot profile.
 
+An explicit **Run now** always performs a preparation round, including during the
+automatic retry cooldown. Automatic scheduled fires continue to debounce. The
+server-owned cron trigger supplies this distinction; prompt text cannot change it.
+The Scout must attempt necessary source checks before choosing `[SILENT]`, and
+report a material source failure when it prevents reliable preparation.
+
+CLI credentials must resolve in the background process's actual environment.
+When a deployment uses the governed Workspace wrappers with central credentials,
+configure their existing `GWS_DWD_SA_KEY` and `GMAIL_DWD_SA_KEY` references in the
+authorized bot's secret scope and `terminal.env_passthrough`. Do not copy a
+private key or replace the sandbox HOME with the administrator's HOME. Verify
+read access as the job owner and denial for a mismatched bound identity. This
+is an operator configuration choice for deployments using those wrappers, not
+a requirement to connect Google accounts or grant other bots access.
+
 To verify a deployment, enable a Scout, check its next scheduled run, trigger a
 run and inspect the execution result and its private conversation. A successful
 configuration save alone does not prove an agent ran or a result was delivered.

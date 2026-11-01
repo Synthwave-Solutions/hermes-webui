@@ -1328,7 +1328,10 @@ def run() -> int:
         last_notes_wake = float(led.get_meta("last_notes_wake") or 0)
         notes_due = bool(notes) and (now - last_notes_wake) >= NOTES_WAKE_HOURS * 3600
 
-        preparation_due = proactive_due(led, now)
+        # "Run now" is an explicit request for fresh preparation. Only automatic
+        # fires debounce; the trigger is server-owned cron metadata, not prompt text.
+        preparation_due = (os.environ.get("HERMES_CRON_TRIGGER") == "manual"
+                           or proactive_due(led, now))
         if not fresh and not topics_due and not notes_due and not preparation_due:
             if jobs_ok:
                 led.set_meta("jobs_watermark", str(now))
