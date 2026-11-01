@@ -198,16 +198,19 @@ def test_response_carries_the_callers_own_state(scout_env):
 # -- Toolsets ---------------------------------------------------------------------
 
 def test_toolsets_follow_bot_config_including_terminal_and_all_enabled_mcps(tmp_path):
+    from cron.scheduler import _resolve_cron_enabled_toolsets
     cfg = {"platform_toolsets": {"cli": ["terminal", "skills", "web"]},
            "mcp_servers": {"notion": {"command": "x"}, "attio_api": {"command": "y"},
                            "off": {"command": "z", "enabled": False}}}
     (tmp_path / "config.yaml").write_text(yaml.safe_dump(cfg))
-    tools = bot_scout.toolsets_for([], tmp_path)
+    job = {"managed_by": "scout", "enabled_toolsets": bot_scout.toolsets_for([], tmp_path)}
+    assert job["enabled_toolsets"] is None
+    tools = _resolve_cron_enabled_toolsets(job, cfg)
     assert {"terminal", "skills", "web", "notion", "attio_api"} <= set(tools)
     assert "off" not in tools
     cfg["platform_toolsets"]["cli"] = ["web"]
     (tmp_path / "config.yaml").write_text(yaml.safe_dump(cfg))
-    assert "terminal" not in bot_scout.toolsets_for([], tmp_path)
+    assert "terminal" not in _resolve_cron_enabled_toolsets(job, cfg)
 
 
 # -- The collector ----------------------------------------------------------------

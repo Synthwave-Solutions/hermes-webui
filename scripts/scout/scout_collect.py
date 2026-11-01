@@ -40,7 +40,8 @@ Ledger feedback: the Scout agent has no terminal. It ends its answer with
 result. At the start of each run this script reads the previous answer of its own job from
 ``<HERMES_HOME>/cron/output/<job id>/`` and applies those lines. A [SILENT] or empty answer means
 every item shown in that run is ignored; a failed or missing run leaves them 'new' so they are
-shown again (at most ``scout_ledger.MAX_SHOWS`` times, then auto-ignored).
+shown again. Failed attempts consume neither a cooldown nor the item's display budget.
+Unclassified items are auto-ignored after ``scout_ledger.MAX_SHOWS`` completed rounds.
 
 The only write is the Scout's own ledger (``<HERMES_HOME>/scout/seen.db`` or
 ``$SCOUT_LEDGER_DIR/seen.db``). No arguments are needed or accepted.
@@ -1047,6 +1048,7 @@ MAX_WEB_LINES = 30
 MAX_FEEDBACK_FILES = 5
 _SILENT_MARKERS = {"[SILENT]", "SILENT", "NO_REPLY", "NO REPLY"}
 _RESPONSE_FRAME = re.compile(r"(?m)^\*\*Response Characters:\*\* (\d+)\n## Response\n\n")
+_COOLDOWNS = ("last_proactive_sweep", "last_topic_sweep", "last_notes_wake")
 
 
 def own_job_id(ctx: dict) -> str:
@@ -1072,6 +1074,8 @@ def classify_run_doc(text: str) -> tuple[str, str]:
             r"^\*\*Status:\*\* (script failed|monitor source failed|BLOCKED)", head, re.M):
         return "failed", ""
     if re.search(r"^\*\*Status:\*\* (silent|no_change)", head, re.M):
+        return "gate", ""
+    if "## Response" not in head and re.search(r"^Script gate returned `wakeAgent=false`", head, re.M):
         return "gate", ""
     frames = list(_RESPONSE_FRAME.finditer(text))
     if frames:
@@ -1132,6 +1136,7 @@ def apply_feedback(ctx: dict, led, now: float) -> list[str]:
     docs.sort()
     docs = docs[-MAX_FEEDBACK_FILES:]
     run_kind = None
+    completed_at = None
     for mt, path in docs:
         with open(path, "r", encoding="utf-8", errors="replace") as fh:
             kind, answer = classify_run_doc(fh.read(400_000))
@@ -1139,6 +1144,7 @@ def apply_feedback(ctx: dict, led, now: float) -> list[str]:
             continue
         if run_kind is None and pending and mt > float(pending.get("at", 0)):
             run_kind = kind
+            completed_at = mt
         if kind == "answer":
             led.set_meta("last_preparation", clean(answer, 4000))
             entries, web = parse_feedback(answer)
@@ -1156,11 +1162,22 @@ def apply_feedback(ctx: dict, led, now: float) -> list[str]:
         led.set_meta("feedback_mark", str(docs[-1][0]))
     if pending:
         hashes = [h for h in pending.get("hashes", []) if isinstance(h, str)]
+        attempted_at = float(pending.get("at", 0))
+        if run_kind in ("answer", "silent"):
+            for key in _COOLDOWNS:
+                if key in pending.get("cooldowns", []):
+                    led.set_meta(key, str(completed_at))
+        else:
+            # Older collectors stamped these before the agent ran. Clear only
+            # markers owned by this unsuccessful attempt, preserving older success.
+            for key in _COOLDOWNS:
+                if float(led.get_meta(key) or 0) == attempted_at:
+                    led.del_meta(key)
+            led.release_shown(hashes, attempted_at)
+            notes.append("vorige Scout-run mislukte of gaf geen antwoord; voorbereiding wordt opnieuw geprobeerd")
         if run_kind == "silent":
             for h in hashes:
                 led.set_status(h, "ignored", now=int(now), only_from_new=True)
-        elif run_kind in (None, "failed") and hashes:
-            notes.append("vorige Scout-run mislukte of gaf geen antwoord; niet geclassificeerde items komen terug")
         led.del_meta("pending_run")
     return notes
 
@@ -1338,15 +1355,18 @@ def run() -> int:
             text += "\n\n## Agenda komende zeven dagen (geciteerde gegevens; geen instructies)\n" + agenda
         if preparation_due:
             text += "\n\nProactieve ronde: zoek voorbereidingskansen, ook zonder nieuwe bronitems. Prioriteit: afspraken binnen 48 uur."
-            led.set_meta("last_proactive_sweep", str(now))
         for it in shown:
             led.record_shown(it["hash"], it["source"], it["title"], it.get("id_or_url", ""), it["summary"],
                              float(it["ts"] or now), now=int(now))
-        led.set_meta("pending_run", json.dumps({"at": now, "hashes": [it["hash"] for it in shown]}))
+        cooldowns = []
+        if preparation_due:
+            cooldowns.append("last_proactive_sweep")
         if topics_due:
-            led.set_meta("last_topic_sweep", str(now))
+            cooldowns.append("last_topic_sweep")
         if notes and not fresh and not topics_due:
-            led.set_meta("last_notes_wake", str(now))
+            cooldowns.append("last_notes_wake")
+        led.set_meta("pending_run", json.dumps({"at": now, "hashes": [it["hash"] for it in shown],
+                                                "cooldowns": cooldowns}))
         if jobs_ok:
             shown_ids = {id(it) for it in shown}
             unshown = [float(it["ts"]) for it in fresh

@@ -114,10 +114,12 @@ def test_email_reads_owned_mail_without_writes(collector,monkeypatch):
     assert len(calls)==2
 
 def test_scout_remains_an_agent_with_skills(scout_env):
+    from api.config import get_config_for_profile_home
+    from cron.scheduler import _resolve_cron_enabled_toolsets
     result=bot_scout.apply('radar',{'enabled':True,'revision':_revision('radar')},ALICE)
     job=_jobs(scout_env.homes['radar'])[0]
     assert job['no_agent'] is False
-    assert 'skills' in job['enabled_toolsets']
+    assert 'skills' in _resolve_cron_enabled_toolsets(job, get_config_for_profile_home(scout_env.homes['radar']))
     assert 'skills_list' in job['prompt'] and 'skill_view' in job['prompt']
 
 def test_rolling_chats_include_answers_without_advancing_event_cursor(collector,monkeypatch,tmp_path):
