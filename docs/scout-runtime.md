@@ -96,6 +96,21 @@ direct subprocess: resolve the CLI names, read a source as the owner, and check
 that an unrelated bound identity remains denied. Confirm that legitimate reads
 pass the existing policy and policy-tampering attempts remain blocked.
 
+Verify MCP launchers in the gateway's selected Python environment and bound bot
+profile. A maintenance interpreter can report Node/npm installed while the live
+profile resolves a different tool store. Provision the missing locked toolchain
+through an explicit `hermes pm install npm` in that runtime; do not enable
+unrestricted lazy installation to hide the missing dependency. Check the
+configured servers with native `hermes mcp test` and confirm an actual authorized
+source read as well as tool discovery. Reload their connections after repair.
+
+External CLI wrappers must resolve their installed program and credential-file
+paths independently of a sandbox `HOME`. Keep the existing authorized credential
+reference and isolated HOME; do not copy keys or broaden bot grants. Missing
+provider permissions remain a separate issue: for example, Workspace Tasks
+reads need an authorized Tasks scope. A rejected scope requires the Workspace
+administrator's authorization, not a governance bypass or a silent Scout run.
+
 To verify a deployment, enable a Scout, check its next scheduled run, trigger a
 run and inspect the execution result and its private conversation. A successful
 configuration save alone does not prove an agent ran or a result was delivered.
