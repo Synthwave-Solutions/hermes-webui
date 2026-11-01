@@ -42,16 +42,20 @@ class TitleAgent:
         self.release.wait()  # Every test releases this gate in finally.
         if self.error:
             raise RuntimeError("synthetic title failure")
-        return {"choices": [{"message": {"content": "Synthetic title"}, "finish_reason": "stop"}]}
+        return {
+            "choices": [{"message": {"content": "Synthetic title"}, "finish_reason": "stop"}],
+            "status": "completed",
+            "output": [SimpleNamespace(type="message", role="assistant", content=[
+                SimpleNamespace(type="output_text", text="Synthetic title"),
+            ])],
+        }
 
     def _ensure_primary_openai_client(self, **_kwargs):
         return SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=lambda **kw: self._request(kw))))
 
     def _run_codex_stream(self, kwargs):
-        return self._request(kwargs)
-
-    def _normalize_codex_response(self, response):
-        return SimpleNamespace(content=response["choices"][0]["message"]["content"]), "stop"
+        response = self._request(kwargs)
+        return SimpleNamespace(status=response["status"], output=response["output"])
 
 
 @pytest.fixture(autouse=True)

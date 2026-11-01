@@ -36,6 +36,33 @@ helpers are genuinely shared code.
 
 ## Dependency classes
 
+### SynthPulse engine v0.22.5 compatibility
+
+The SynthPulse fork still imports the engine in process. The v0.22.5
+integration supports the engine's Python 3.14 runtime and keeps the existing
+WebUI Python 3.11–3.13 test matrix. Deploy the WebUI and engine as a compatible
+pair and restart both processes after changing the engine checkout; replacing
+source beneath a running interpreter can mix old and new modules.
+
+The integration follows the engine's moved interfaces:
+
+- Native Codex and Anthropic response conversion uses
+  `agent.transports.get_transport(...).normalize_response(...)`.
+- Anthropic credential discovery uses `agent.anthropic_credentials`, with the
+  previous adapter import retained for older engines.
+- Local LM Studio discovery uses `hermes_cli.models_local`, with the previous
+  `hermes_cli.models` import retained for older engines.
+- Skill listing uses the public `sort_skills` helper and falls back to the
+  older private helper when needed.
+- Scheduled-task destinations include the engine's installed platform
+  registry as well as legacy built-in destinations. Authorization and
+  recipient validation still run against the complete destination.
+
+These changes do not migrate session storage, bot access, Scout settings, or
+scheduled-task ownership. The focused compatibility tests exercise provider
+normalization, authenticated local discovery, and plugin-backed task delivery.
+The exact engine commit used by CI is pinned in `.github/workflows/tests.yml`.
+
 | Audit class | Current surface | Replacement classification |
 | --- | --- | --- |
 | `docker_agent_source_volume` | Compose files and Docker docs expose `hermes-agent-src` and `/opt/hermes` to make the agent checkout visible to WebUI. | Remove the WebUI source mount only after startup install and runtime imports have migrated. This needs Docker/compose follow-up work, not a runtime behavior change in this audit PR. |

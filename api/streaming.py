@@ -3407,7 +3407,8 @@ def generate_title_raw_via_agent(agent, user_text: str, assistant_text: str) -> 
                         if 'max_output_tokens' in codex_kwargs:
                             codex_kwargs['max_output_tokens'] = max_tokens
                         resp = agent._run_codex_stream(codex_kwargs)
-                        assistant_message, _ = agent._normalize_codex_response(resp)
+                        from agent.transports import get_transport
+                        assistant_message = get_transport('codex_responses').normalize_response(resp)
                         raw = (assistant_message.content or '') if assistant_message else ''
                         if not raw:
                             empty_status = 'llm_empty'

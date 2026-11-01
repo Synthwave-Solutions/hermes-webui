@@ -27,9 +27,9 @@ import urllib.request
 import urllib.error
 import pytest
 
-if not (3, 11) <= sys.version_info[:2] <= (3, 13):
+if not (3, 11) <= sys.version_info[:2] <= (3, 14):
     pytest.exit(
-        "Hermes WebUI tests require Python 3.11, 3.12, or 3.13. "
+        "Hermes WebUI tests require Python 3.11, 3.12, 3.13, or 3.14. "
         "Run ./scripts/test.sh so the repo-local supported .venv is used "
         "instead of an unsupported system python.",
         returncode=3,
@@ -1244,6 +1244,10 @@ _REAL_HERMES_STATE = sys.modules.get("hermes_state")
 _AGENT_PATH_ENV_KEYS = ("HERMES_WEBUI_AGENT_DIR", "PYTHONPATH", "HERMES_WEBUI_PYTHON")
 _REAL_AGENT_ENV = {k: os.environ.get(k) for k in _AGENT_PATH_ENV_KEYS}
 _REAL_SYS_PATH = list(sys.path)
+if HERMES_AGENT is not None and str(HERMES_AGENT) not in _REAL_SYS_PATH:
+    # api.config may add the engine only during test collection, after this
+    # snapshot. Preserve that path when restoring a non-editable PM install.
+    _REAL_SYS_PATH.append(str(HERMES_AGENT))
 
 
 def _hermes_cli_is_healthy() -> bool:

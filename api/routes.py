@@ -959,9 +959,12 @@ def _skills_list_from_dir(
         MAX_DESCRIPTION_LENGTH,
         _EXCLUDED_SKILL_DIRS,
         _parse_frontmatter,
-        _sort_skills,
         skill_matches_platform,
     )
+    try:
+        from tools.skills_tool import sort_skills
+    except ImportError:
+        from tools.skills_tool import _sort_skills as sort_skills
 
     if not skills_dir.exists():
         skills_dir.mkdir(parents=True, exist_ok=True)
@@ -1042,7 +1045,7 @@ def _skills_list_from_dir(
 
     if category:
         all_skills = [s for s in all_skills if s.get("category") == category]
-    all_skills = _sort_skills(all_skills)
+    all_skills = sort_skills(all_skills)
     categories = sorted(set(s.get("category") for s in all_skills if s.get("category")))
     result = {
         "success": True,
@@ -23520,11 +23523,20 @@ def _cron_delivery_platforms():
         from cron.scheduler import _KNOWN_DELIVERY_PLATFORMS
     except Exception:
         _KNOWN_DELIVERY_PLATFORMS = frozenset()
+    names = set(_KNOWN_DELIVERY_PLATFORMS)
+    try:
+        # Newer engines register messaging platforms as plugins. Their static
+        # set contains only exceptional transports, not Telegram/Slack/etc.
+        from cron.scheduler_delivery import _iter_home_target_platforms
+    except ImportError:
+        pass  # Older engines keep the complete list in the scheduler constant.
+    else:
+        names.update(_iter_home_target_platforms())
     platforms = [
         {"value": "local", "label": "Local (save output only)"},
         {"value": "origin", "label": "Origin (reply to creator)"}
     ]
-    for name in sorted(_KNOWN_DELIVERY_PLATFORMS):
+    for name in sorted(names - {"local", "origin"}):
         platforms.append({"value": name, "label": name.capitalize()})
     return platforms
 
@@ -26791,15 +26803,25 @@ def _handle_handoff_summary(handler, body):
             if getattr(agent, "api_mode", "") == "codex_responses":
                 codex_kwargs = agent._build_api_kwargs(api_messages)
                 codex_kwargs.pop("tools", None)
-                codex_kwargs["max_output_tokens"] = max_tokens
+                base_url = str(getattr(agent, "base_url", "") or "").strip()
+                native_codex = (
+                    getattr(agent, "provider", "") == "openai-codex"
+                    or urlsplit(base_url).hostname == "chatgpt.com"
+                )
+                if native_codex:
+                    codex_kwargs.pop("max_output_tokens", None)
+                else:
+                    codex_kwargs["max_output_tokens"] = max_tokens
                 resp = agent._run_codex_stream(codex_kwargs)
-                assistant_message, _ = agent._normalize_codex_response(resp)
+                from agent.transports import get_transport
+                assistant_message = get_transport("codex_responses").normalize_response(resp)
                 result["text"] = str((assistant_message.content or "") if assistant_message else "").strip()
                 result["incomplete"] = _summary_output_incomplete(result["text"])
                 return result
 
             if getattr(agent, "api_mode", "") == "anthropic_messages":
-                from agent.anthropic_adapter import build_anthropic_kwargs, normalize_anthropic_response
+                from agent.anthropic_adapter import build_anthropic_kwargs
+                from agent.transports import get_transport
 
                 ant_kwargs = build_anthropic_kwargs(
                     model=agent.model,
@@ -26812,7 +26834,7 @@ def _handle_handoff_summary(handler, body):
                     base_url=getattr(agent, "_anthropic_base_url", None),
                 )
                 resp = agent._anthropic_messages_create(ant_kwargs)
-                assistant_message, _ = normalize_anthropic_response(
+                assistant_message = get_transport("anthropic_messages").normalize_response(
                     resp,
                     strip_tool_prefix=getattr(agent, "_is_anthropic_oauth", False),
                 )

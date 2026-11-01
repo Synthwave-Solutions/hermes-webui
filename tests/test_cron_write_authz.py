@@ -319,6 +319,9 @@ def env(monkeypatch, inject_policy):
         monkeypatch.setitem(sys.modules, "cron", cron_pkg)
         monkeypatch.setitem(sys.modules, "cron.jobs", store.module())
         monkeypatch.setitem(sys.modules, "cron.scheduler", scheduler)
+        # The older-engine fixture has no plugin delivery registry. Do not
+        # inherit a real scheduler_delivery module imported by another test.
+        monkeypatch.setitem(sys.modules, "cron.scheduler_delivery", None)
         state.store = store
 
     _install(state.store)
@@ -1328,6 +1331,19 @@ def test_delivery_options_route_and_write_check_share_one_list(env):
     offered = {p["value"] for p in handler.body["platforms"]}
     assert offered == {"local", "origin", "telegram", "slack"}
     assert offered == {p["value"] for p in routes._cron_delivery_platforms()}
+
+
+def test_plugin_delivery_platforms_are_offered_without_granting_arbitrary_targets(env, monkeypatch):
+    import api.routes as routes
+
+    delivery = types.ModuleType("cron.scheduler_delivery")
+    delivery._iter_home_target_platforms = lambda: iter(("matrix", "telegram"))
+    monkeypatch.setitem(sys.modules, "cron.scheduler_delivery", delivery)
+    options = routes._cron_delivery_platforms()
+    assert sum(p["value"] == "telegram" for p in options) == 1
+    assert "matrix" in {p["value"] for p in options}
+    assert env.create(OWNER, _form_create_payload(deliver="matrix")).status == 200
+    assert env.create(OWNER, _form_create_payload(deliver="matrix:someone-else")).status == 403
 
 
 def test_unchanged_custom_deliver_can_be_saved_back(env):
