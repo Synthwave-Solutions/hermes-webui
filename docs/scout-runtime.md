@@ -25,6 +25,23 @@ credentials, cron store and user governance; the shared host only supplies the
 execution process. Root-owned messaging credentials remain subject to the
 existing adapter ownership checks.
 
+Scout jobs leave `enabled_toolsets` unset. The engine's managed-Scout resolver
+uses the bot's current CLI tool configuration on each run, including its enabled
+MCP connections. A stored list would instead make every listed MCP a mandatory
+dependency, so an unrelated unavailable connector could block all preparation.
+Unavailable sources still need to be reported honestly; ordinary jobs with
+explicit tool requirements retain their existing preflight checks. Saving an
+existing Scout upgrades its stored tool selection to this inherited mode.
+
+The collector records a pending attempt in the person's Scout ledger. Preparation,
+topic and source-warning cooldowns advance only after its saved output confirms
+an agent response (including a deliberate `[SILENT]`). A blocked, failed, missing
+or script-gated run consumes no cooldown or item display budget. Items remain
+available for retry, and only successful unclassified rounds count toward their
+display limit. Old pending attempts release only cooldowns stamped by that exact
+attempt. Deploy collector and ledger scripts together; saving a Scout installs
+the current pair in its bot profile.
+
 To verify a deployment, enable a Scout, check its next scheduled run, trigger a
 run and inspect the execution result and its private conversation. A successful
 configuration save alone does not prove an agent ran or a result was delivered.

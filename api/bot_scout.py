@@ -236,18 +236,21 @@ def schedule_for(digest_time: str, frequency: str = "daily") -> str:
     return "%d %d * * %s" % (int(minute), int(hour), "1-5" if frequency == "weekdays" else "*")
 
 
-def toolsets_for(topics, home=None) -> list:
+def toolsets_for(topics, home=None) -> None:
     """Use the bot's own CLI/WebUI tool selection, never a Scout allowlist.
 
-    Persist a compatible snapshot; current Hermes resolves Scout's bot tools
-    again for each run, so later profile changes take effect automatically.
+    Validate the bot selection, then leave the per-job override unset. Hermes
+    resolves managed Scout tools from this bot's CLI configuration on every run.
+    A snapshot would turn every optional MCP into an explicit job requirement,
+    making an unrelated unavailable connection block the whole Scout.
     """
     if home is None:
         raise ScoutError(400, "Scout needs an explicit bot home")
     from api.config import get_config_for_profile_home
     from hermes_cli.tools_config import _get_platform_tools
     cfg = get_config_for_profile_home(home)
-    return sorted(_get_platform_tools(cfg, "cli")) + ["no_mcp"]
+    _get_platform_tools(cfg, "cli")
+    return None
 
 
 def scout_jobs(jobs) -> list:

@@ -198,9 +198,21 @@ class Ledger:
         """Rows shown before that nobody classified yet (status 'new'), oldest first."""
         rows = self.conn.execute(
             "SELECT hash, source, title, ref, summary, item_ts, shown_count FROM seen "
-            "WHERE status = 'new' AND shown_count > 0 ORDER BY first_seen LIMIT ?", (int(limit),)).fetchall()
+            "WHERE status = 'new' ORDER BY first_seen LIMIT ?", (int(limit),)).fetchall()
         return [{"hash": h, "source": src, "title": t or "", "id_or_url": ref or "", "summary": summ or "",
                  "ts": ts or 0, "shown_count": n} for h, src, t, ref, summ, ts, n in rows]
+
+    def release_shown(self, hashes: list[str], attempted_at: float) -> None:
+        """A failed attempt did not show its items to an agent. Keep them retryable.
+
+        Clearing last_shown makes repeated failure reconciliation idempotent;
+        matching it prevents an older attempt from undoing a newer display.
+        """
+        self.conn.executemany(
+            "UPDATE seen SET shown_count = MAX(0, shown_count - 1), last_shown = NULL "
+            "WHERE hash = ? AND status = 'new' AND last_shown = ?",
+            [(h, int(attempted_at)) for h in hashes])
+        self.conn.commit()
 
     def auto_ignore(self, max_shows: int = MAX_SHOWS, now: int | None = None) -> int:
         cur = self.conn.execute(

@@ -376,6 +376,24 @@ def test_pausing_preserves_tools_and_resume_inherits_bot_tools(scout_env):
     assert job["enabled_toolsets"] == bot_scout.toolsets_for([], scout_env.homes["radar"])
 
 
+def test_scout_inherits_current_tools_without_requiring_every_mcp(scout_env):
+    from cron.scheduler import _resolve_cron_enabled_toolsets
+    from cron.scheduler_preflight import _empty_requested_mcp_toolsets
+    from hermes_cli.tools_config import _get_platform_tools
+
+    home = scout_env.homes["radar"]
+    cfg = {"platform_toolsets": {"cli": ["terminal", "web"]},
+           "mcp_servers": {"unavailable_research": {"url": "https://mcp.invalid"}}}
+    (home / "config.yaml").write_text(yaml.safe_dump(cfg))
+    _set("radar", enabled=True)
+    [job] = _jobs(home)
+    assert job["enabled_toolsets"] is None
+    assert _empty_requested_mcp_toolsets(job, cfg) is None
+    assert _resolve_cron_enabled_toolsets(job, cfg) == sorted(_get_platform_tools(cfg, "cli"))
+    changed = {**cfg, "platform_toolsets": {"cli": ["terminal", "web", "file"]}}
+    assert _resolve_cron_enabled_toolsets(job, changed) == sorted(_get_platform_tools(changed, "cli"))
+
+
 def test_unreadable_bot_metadata_is_unknown_and_gets_no_scout(scout_env):
     (scout_env.homes["radar"] / "profile.yaml").write_text("ui_meta: [unclosed\n")
     assert bot_metadata.read_profile("radar")["bot_kind"] == "unknown"
