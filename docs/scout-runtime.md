@@ -57,6 +57,24 @@ read access as the job owner and denial for a mismatched bound identity. This
 is an operator configuration choice for deployments using those wrappers, not
 a requirement to connect Google accounts or grant other bots access.
 
+An isolated gateway `HOME` also changes governance and login-shell resolution.
+For installations using the Synthwave policy plugin, point its existing
+`SYNTHWAVE_POLICY_ROOT` setting at the authoritative installation root, or link
+the gateway's `policy` directory to that existing central policy directory.
+Preserve the enforce markers, rules and profile-specific restrictions. A missing
+policy under a home that was previously enforced correctly refuses every tool;
+removing the marker or changing the mode is not a deployment repair.
+
+Keep approved CLI directories in that gateway HOME's login-shell initialization
+(for example its `.profile`, or configured `terminal.shell_init_files`). The
+service's `PATH` alone is insufficient: a login-shell snapshot can replace it.
+Use absolute installed CLI directories and preserve the isolated HOME. Do not
+source an administrator's whole shell configuration or copy credentials to fix
+command discovery. Verify this with a fresh native terminal backend, not just a
+direct subprocess: resolve the CLI names, read a source as the owner, and check
+that an unrelated bound identity remains denied. Confirm that legitimate reads
+pass the existing policy and policy-tampering attempts remain blocked.
+
 To verify a deployment, enable a Scout, check its next scheduled run, trigger a
 run and inspect the execution result and its private conversation. A successful
 configuration save alone does not prove an agent ran or a result was delivered.
