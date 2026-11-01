@@ -162,6 +162,32 @@ def test_completed_run_delivers_update_into_originating_conversation(bridge_env)
 
 # -- Successful run whose delivery failed ------------------------------------
 
+
+@pytest.mark.parametrize("managed_scout", [True, False])
+def test_scout_delivery_hides_control_lines_but_preserves_raw_ledger_output(bridge_env, managed_scout):
+    sid = "cwdscout001"
+    _write_session(bridge_env, sid)
+    body = (
+        "I prepared the meeting questions.\n\n"
+        "**SCOUT-LEDGER: a1b2c3d4=notified**\n"
+        "> SCOUT-WEB: https://example.com/research | Research | saved\n"
+        "The remaining decision belongs to you."
+    )
+    _write_output(bridge_env, "scout1", body)
+    output_file = bridge_env.home / "cron/output/scout1/run.md"
+    raw = output_file.read_bytes()
+    job = _job("scout1", sid, _now_iso(), **({"managed_by": "scout"} if managed_scout else {}))
+
+    actions = cwd.process_jobs_once([job], home=bridge_env.home)
+
+    assert [a["outcome"] for a in actions] == [cwd.OUTCOME_DELIVERED]
+    content = _read_session(bridge_env, sid)["messages"][-1]["content"]
+    assert "I prepared the meeting questions." in content
+    assert "The remaining decision belongs to you." in content
+    for internal in ("SCOUT-LEDGER", "a1b2c3d4", "SCOUT-WEB", "example.com/research"):
+        assert (internal in content) is not managed_scout
+    assert output_file.read_bytes() == raw
+
 def test_successful_run_with_failed_delivery_is_visible_not_ok(bridge_env, monkeypatch):
     sid = "cwdmissing1"  # session sidecar intentionally absent
     _write_output(bridge_env, "job2", "output that has nowhere to go")

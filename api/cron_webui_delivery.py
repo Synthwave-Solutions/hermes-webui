@@ -393,6 +393,9 @@ def latest_output_text(
 
 # -- Message building --------------------------------------------------------
 
+_SCOUT_CONTROL_LINE = re.compile(r"^[ \t>*`_-]{0,6}SCOUT-(?:LEDGER|WEB):[^\r\n]*(?:\r?\n|$)", re.MULTILINE)
+
+
 def _truncate_body(body: str) -> str:
     if len(body) <= MAX_DELIVERY_CHARS:
         return body
@@ -486,6 +489,9 @@ def build_update_text(job: dict, *, body: str | None, run_ok: bool, run_error: s
             f"\U0001f5d3\ufe0f {name} is mislukt bij de run{stamp}: {detail}\n"
             f"De details staan in Geplande taken (taak {job.get('id', '?')})."
         )
+    if body and job.get("managed_by") == "scout":
+        # The collector reads the unchanged native output, never this chat projection.
+        body = _SCOUT_CONTROL_LINE.sub("", body).strip()
     if body:
         return f"\U0001f5d3\ufe0f Uitkomst van {name}{stamp}\n\n{_truncate_body(body)}"
     return (
