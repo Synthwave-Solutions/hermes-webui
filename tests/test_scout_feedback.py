@@ -51,6 +51,13 @@ def test_failed_preflight_can_retry_then_success_debounces(collector, monkeypatc
         assert ledger.get_meta("last_preparation") == "Meeting preparation ready."
         assert float(ledger.get_meta("last_proactive_sweep")) == 10011
 
+    # Explicit Run now requests must actually prepare work, even during the
+    # automatic retry cooldown (for example after repairing source access).
+    monkeypatch.setenv("HERMES_CRON_TRIGGER", "manual")
+    monkeypatch.setattr(collector.time, "time", lambda: 10030)
+    assert collector.run() == 0
+    assert "Proactieve ronde" in capsys.readouterr().out
+
 
 @pytest.mark.parametrize("answer", ["Useful preparation", "[SILENT]"])
 def test_completed_agent_run_acknowledges_only_pending_cooldowns(collector, tmp_path, answer):
