@@ -15506,7 +15506,7 @@ async function _loadCheckpoints(workspace){
 }
 
 async function _viewCheckpointDiff(workspace,checkpoint){
-  const modal=document.getElementById('checkpointDiffModal');
+  let modal=document.getElementById('checkpointDiffModal');
   if(!modal){
     const m=document.createElement('div');
     m.id='checkpointDiffModal';
@@ -15515,7 +15515,7 @@ async function _viewCheckpointDiff(workspace,checkpoint){
       <div style="background:var(--bg,${getComputedStyle(document.documentElement).getPropertyValue('--bg')||'#1a1a2e'});border:1px solid var(--border,rgba(255,255,255,0.12));border-radius:12px;width:90vw;max-width:800px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,0.4)">
         <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border,rgba(255,255,255,0.08))">
           <div id="checkpointDiffModalTitle" style="font-weight:600;font-size:14px"></div>
-          <button onclick="document.getElementById('checkpointDiffModal').style.display='none'" style="background:none;border:none;color:var(--fg);cursor:pointer;font-size:18px;padding:0 4px">&times;</button>
+          <button aria-label="${esc(t('help_tour_close'))}" onclick="document.getElementById('checkpointDiffModal').style.display='none'" style="background:none;border:none;color:var(--text);cursor:pointer;font-size:18px;min-width:44px;min-height:44px;padding:0 4px">&times;</button>
         </div>
         <div id="checkpointDiffModalBody" style="flex:1;overflow:auto;padding:12px 16px">
           <div style="color:var(--muted);font-size:12px">${esc(t('checkpoint_loading'))}</div>
@@ -15523,6 +15523,7 @@ async function _viewCheckpointDiff(workspace,checkpoint){
       </div>`;
     m.onclick=(e)=>{if(e.target===m) m.style.display='none';};
     document.body.appendChild(m);
+    modal=m;
   }
   modal.style.display='flex';
   $('checkpointDiffModalTitle').textContent=t('checkpoint_diff_title');
@@ -15545,7 +15546,7 @@ async function _viewCheckpointDiff(workspace,checkpoint){
       html+='</div>';
     }
     if(data.diff){
-      html+=`<pre style="background:var(--bg-secondary,rgba(0,0,0,0.3));border:1px solid var(--border,rgba(255,255,255,0.08));border-radius:8px;padding:12px;font-size:11px;line-height:1.4;overflow-x:auto;white-space:pre-wrap;word-break:break-all;max-height:50vh;overflow-y:auto;color:var(--fg)">${esc(data.diff)}</pre>`;
+      html+=`<pre style="background:var(--code-bg);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:12px;line-height:1.5;overflow-x:auto;white-space:pre-wrap;word-break:break-all;max-height:50vh;overflow-y:auto;color:var(--text)">${esc(data.diff)}</pre>`;
     }
     body.innerHTML=html;
   }catch(e){
