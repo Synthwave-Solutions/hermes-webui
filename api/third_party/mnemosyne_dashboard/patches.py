@@ -178,6 +178,8 @@ def apply(module) -> None:
     store._pattern_origin_label = staticmethod(_origin_label)
     from api.memdash_graph import install as install_graph
     install_graph(store)
+    from api.memdash_consolidation import install
+    install(store)
     module.default_db_path = _refuse("default_db_path")
     module.plugin_data_dir = _refuse("plugin_data_dir")
     module._memdash_patched = True

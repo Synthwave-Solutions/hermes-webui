@@ -2758,7 +2758,7 @@ window.__registerHermesLocale('en', {
     memory_section_shared_project: 'Shared project instructions',
     memory_section_shared_project_empty: 'No shared instructions.',
     mem_intro_company: 'All bots can use this company knowledge. Only admins can change it. Your edits are kept when topics are merged automatically, and deleted topics stay deleted.',
-    mem_intro_personal: 'Only you can see and edit these memories. Your private chats share one personal memory. Memories from a shared chat are only used in that chat.',
+    mem_intro_personal: 'Only you can see and edit these memories. Each bot has its own memory for you. Private chats with the same bot share memory; shared-chat memories stay within that chat and bot.',
     mem_search_placeholder: 'Search memories',
     mem_search: 'Search',
     mem_previous: 'Previous',

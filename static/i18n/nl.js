@@ -2653,7 +2653,7 @@ window.__registerHermesLocale('nl', {
   memory_section_shared_project: 'Gedeelde projectinstructies',
   memory_section_shared_project_empty: 'Geen gedeelde instructies.',
   mem_intro_company: 'Alle bots kunnen deze bedrijfskennis gebruiken. Alleen beheerders kunnen die aanpassen. Je aanpassingen blijven bewaard als onderwerpen automatisch worden samengevoegd, en verwijderde onderwerpen komen niet terug.',
-  mem_intro_personal: 'Alleen jij kunt deze herinneringen zien en aanpassen. Je privégesprekken delen één persoonlijk geheugen. Herinneringen uit een gedeeld gesprek worden alleen in dat gesprek gebruikt.',
+  mem_intro_personal: 'Alleen jij kunt deze herinneringen zien en aanpassen. Elke bot heeft een eigen geheugen voor jou. Privégesprekken met dezelfde bot delen geheugen; herinneringen uit gedeelde gesprekken blijven binnen dat gesprek en die bot.',
   mem_search_placeholder: 'Zoek in herinneringen',
   mem_search: 'Zoeken',
   mem_previous: 'Vorige',

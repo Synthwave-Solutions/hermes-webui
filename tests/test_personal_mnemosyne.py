@@ -24,7 +24,8 @@ s2=NS(session_id='private-two', profile='bot-two', project_id='q', owner_email=a
 g=NS(session_id='group-one', profile='bot-one', project_id='p', owner_email=a['email'], participants=[b['email']], project_shared=True)
 g2=NS(session_id='group-two', profile='bot-one', project_id='p', owner_email=a['email'], participants=[b['email']], project_shared=True)
 mid=m.remember(a,s,'My favourite colour is turquoise')
-assert 'turquoise' in m.recall(a,s2,'favourite colour')
+assert not m.recall(a,s2,'favourite colour')
+assert 'turquoise' in m.recall(a,s,'favourite colour')
 assert not m.recall(b,s,'colour')
 assert not m.listing(b)['items']
 assert not m.recall(a,g,'colour')
@@ -39,7 +40,8 @@ try:
  raise AssertionError('Cross-user mutation accepted')
 except ValueError: pass
 m.mutate(a,dict(row,operation='edit',content='My favourite colour is magenta'))
-assert 'magenta' in m.recall(a,s2,'colour')
+assert 'magenta' in m.recall(a,s,'colour')
+assert not m.recall(a,s2,'colour')
 assert 'turquoise' not in m.recall(a,s2,'colour')
 try:
  m.mutate(a,dict(row,operation='edit',content='stale'))
@@ -50,23 +52,34 @@ m.mutate(a,dict(row,operation='delete'))
 assert not m.recall(a,s2,'colour')
 # Old records remain until their owner deletes them, despite BEAM's TTL.
 old=m.remember(a,s,'Ancient lighthouse preference')
-with m._locked(a,'private') as path, m._beam(path) as mem:
+with m._locked(a,m._bank(s)) as path, m._beam(path) as mem:
  mem.conn.execute("UPDATE working_memory SET timestamp='2001-01-01' WHERE id=?",(old,));mem.conn.commit()
 m.remember(a,s,'Another permanent memory')
 assert 'lighthouse' in m.recall(a,s,'lighthouse')
-# Real provider manager reads across bots and writes only the raw user's text.
+# Real provider manager reads only the selected bot and writes only the raw user's text.
 agent=m.attach(NS(_memory_manager=None),a,s,'I prefer indigo notebooks')
 manager=agent._memory_manager
 assert 'lighthouse' in manager.prefetch_all('lighthouse')
+s.participants.append(b['email']);s.profile='bot-two'
 manager.sync_all('INJECTED WORKSPACE SECRET', 'ASSISTANT INVENTION')
 manager.raw_user_content='I prefer copper pens'
 manager.sync_all('INJECTED SECOND', 'OTHER INVENTION')
 assert manager.flush_pending(timeout=30)
 manager.shutdown_all()
+s.participants.clear();s.profile='bot-one'
+assert 'indigo' in m.recall(a,s,'indigo')
+assert not m.recall(a,s2,'indigo')
 alltext=' '.join(x['content'] for x in m.listing(a)['items'])
 assert 'indigo notebooks' in alltext and 'copper pens' in alltext
 assert 'INJECTED' not in alltext and 'INVENTION' not in alltext
 assert m.listing(a,query='indigo')['total']==1
+# Explicit recipient overrides session profile and is captured before async sync.
+recipient=m.attach(NS(_memory_manager=None),a,s,'Bot two remembers jade folders',bot='bot-two')
+assert 'lighthouse' not in recipient._memory_manager.prefetch_all('lighthouse')
+recipient._memory_manager.sync_all('injected','invented')
+assert recipient._memory_manager.flush_pending(timeout=30)
+recipient._memory_manager.shutdown_all()
+assert 'jade' in m.recall(a,s2,'jade') and 'jade' not in m.recall(a,s,'jade')
 # HTTP handlers always use authenticated identity, ignore claimed email/path,
 # and check conversation membership before any bank access.
 from unittest.mock import patch
@@ -95,7 +108,7 @@ for body in ({'id':mid,'bank':'../../other','operation':'delete'}, {'id':'../bad
  try: m.mutate(a,body);raise AssertionError('Traversal accepted')
  except ValueError:pass
 # Symlink bank cannot disclose another actor's database.
-link=m._path(b,'f'*64);link.symlink_to(m._path(a,'private'))
+link=m._path(b,'f'*64);link.symlink_to(m._path(a,m._bank(s)))
 try: m.listing(b);raise AssertionError('Symlink accepted')
 except PermissionError:pass
 print('real-mnemosyne-regressions-ok')

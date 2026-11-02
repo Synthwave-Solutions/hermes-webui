@@ -18,6 +18,8 @@ from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from api import personal_mnemosyne as memory
+from api import memory_banks
+from api.memory_statements import clean_statement, SKILL_PREFIX
 
 
 def email(value):
@@ -41,7 +43,7 @@ def records(data, sid, skipped):
     authors = {email(m.get('author_email')) for m in messages if isinstance(m, dict)
                and m.get('role') == 'user' and m.get('author_email')}
     shared = bool(data.get('project_shared') or data.get('participants') or (authors - {'', owner}))
-    session = SimpleNamespace(session_id=sid, owner_email=owner, participants=data.get('participants') or [],
+    base_session = SimpleNamespace(session_id=sid, owner_email=owner, participants=data.get('participants') or [],
                               project_shared=shared, profile=data.get('profile') or 'default',
                               project_id=data.get('project_id') or '')
     for index, message in enumerate(messages):
@@ -57,13 +59,29 @@ def records(data, sid, skipped):
             skipped['unknown_author'] += 1
             continue
         content = text_content(message.get('content'))
+        if content.lstrip().startswith(SKILL_PREFIX):
+            skipped["reference_material"] += 1
+            continue
         if not content:
             skipped['empty_or_nontext'] += 1
             continue
+        reply_bots = set()
+        for reply in messages[index+1:]:
+            if not isinstance(reply,dict):
+                continue
+            if reply.get('role') == 'user':
+                break
+            if reply.get('role') == 'assistant' and reply.get('bot_profile'):
+                reply_bots.add(memory_banks.bot_name(reply['bot_profile']))
+        if len(reply_bots) > 1:
+            skipped['ambiguous_bot'] += 1
+            continue
+        session = SimpleNamespace(**dict(vars(base_session), profile=next(iter(reply_bots),base_session.profile)))
         # No API-content sidecars, binaries, tool output or model summaries.
         # Chunk instead of silently dropping the end of a long user message.
         for part, start in enumerate(range(0, len(content), memory.MAX_CONTENT)):
-            chunk = content[start:start + memory.MAX_CONTENT]
+            original_chunk = content[start:start + memory.MAX_CONTENT]
+            chunk = clean_statement(original_chunk)
             if not chunk.strip():
                 continue
             source = {'chat': sid, 'bot': session.profile, 'project': session.project_id,
@@ -71,7 +89,7 @@ def records(data, sid, skipped):
                       'part': part, 'import_version': 1, 'kind': 'historical_user_statement'}
             # Content identity survives editing/deleting the imported memory.
             # The receipt is retained even if the owner later deletes it.
-            receipt = hashlib.sha256(json.dumps([author, sid, index, part, chunk], ensure_ascii=False).encode()).hexdigest()
+            receipt = hashlib.sha256(json.dumps([author, sid, index, part, original_chunk], ensure_ascii=False).encode()).hexdigest()
             yield author, session, chunk, source, receipt
 
 
@@ -94,12 +112,22 @@ def import_batch(author, session, entries, backup_dir):
     identity = {'email': author}
     with memory._locked(identity, memory._bank(session)) as path:
         backup(path, backup_dir)
+        archived_receipts = set()
+        legacy = path.with_name(memory_banks.describe(path.stem)['conversation']+'.db')
+        if legacy.exists():
+            memory.pc._safe(legacy)
+            conn=memory._read(legacy)
+            try:
+                if memory_banks.archived(conn) and conn.execute("SELECT 1 FROM sqlite_master WHERE name='webui_history_imports'").fetchone():
+                    archived_receipts={r[0] for r in conn.execute('SELECT receipt FROM webui_history_imports')}
+            finally:
+                conn.close()
         with memory._beam(path) as mem:
             mem.conn.execute('''CREATE TABLE IF NOT EXISTS webui_history_imports
                 (receipt TEXT PRIMARY KEY, memory_id TEXT NOT NULL, imported_at TEXT NOT NULL)''')
             mem.conn.commit()
             for content, source, receipt in entries:
-                if mem.conn.execute('SELECT 1 FROM webui_history_imports WHERE receipt=?', (receipt,)).fetchone():
+                if receipt in archived_receipts or mem.conn.execute('SELECT 1 FROM webui_history_imports WHERE receipt=?', (receipt,)).fetchone():
                     result['already_processed'] += 1
                     continue
                 content = memory._content(content)
@@ -155,7 +183,7 @@ def run(session_dir, report_dir, apply=False):
                 author, bank = key
                 counts[author]['chats'] += 1
                 counts[author]['candidate_memories'] += len(entries)
-                counts[author]['shared_chat_memories' if bank != 'private' else 'private_memories'] += len(entries)
+                counts[author]['shared_chat_memories' if memory_banks.describe(bank)['conversation'] != 'private' else 'private_memories'] += len(entries)
                 if apply:
                     # Short lock windows let live chat memory writes continue.
                     for start in range(0, len(entries), 20):
@@ -172,7 +200,7 @@ def run(session_dir, report_dir, apply=False):
 
 
 if __name__ == '__main__':
-    from api.config import SESSION_DIR, STATE_DIR
+    from api.config import SESSION_DIR
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--apply', action='store_true')
     parser.add_argument('--report-dir', type=Path, required=True)

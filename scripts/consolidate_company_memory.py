@@ -23,16 +23,18 @@ Use existing topic keys for semantically equivalent knowledge; consolidate new e
 
 
 def discover():
-    from api.config import STATE_DIR
     groups=defaultdict(list)
-    for path in sorted((Path(STATE_DIR)/'personal_context').glob('*/mnemosyne/*.db')):
+    from api.memory_banks import active_paths
+    for path in active_paths():
         personal.pc._safe(path)
         conn=personal._read(path)
         try:
-            rows=conn.execute("SELECT id,content,timestamp,metadata_json FROM working_memory WHERE session_id='personal' ORDER BY timestamp DESC,id").fetchall()
-            for row in rows:
-                content=personal._content(row['content'])
-                source_id=hashlib.sha256((str(path.relative_to(STATE_DIR))+':'+row['id']).encode()).hexdigest()
+            rows=conn.execute("SELECT id,content,timestamp,metadata_json FROM working_memory WHERE session_id='personal' AND COALESCE(json_extract(metadata_json,'$.kind'),'') != 'consolidated' ORDER BY timestamp DESC,id").fetchall()
+            from api.memory_statements import statement_rows
+            for row, statement in statement_rows(rows):
+                content=personal._content(statement)
+                from api.memory_banks import source_reference
+                source_id=source_reference(path,row['id'],json.loads(row['metadata_json'] or '{}'))
                 groups[path.parent.parent.name].append({'source_id':source_id,'content':content,
                     'fingerprint':hashlib.sha256(('company-v2:'+content).encode()).hexdigest(),'timestamp':row['timestamp'],
                     'origin_actor':path.parent.parent.name,'chat':json.loads(row['metadata_json'] or '{}').get('chat','')})
@@ -58,26 +60,10 @@ def prune(mem, sources):
 
 
 def extract(batch, catalog):
-    from api.config import get_config,resolve_custom_provider_connection
-    from openai import OpenAI
-    cfg=get_config();model_cfg=cfg.get('model',{})
-    provider=os.environ.get('COMPANY_MEMORY_PROVIDER') or model_cfg.get('provider','')
-    if not provider.startswith('custom:'):
-        raise ValueError('Company consolidation requires an explicitly configured custom provider')
-    key,url=resolve_custom_provider_connection(provider)
-    if not url:raise ValueError('Company consolidation provider is unavailable')
-    model=os.environ.get('COMPANY_MEMORY_MODEL') or model_cfg.get('default')
-    with OpenAI(api_key=key or 'no-key-required',base_url=url,timeout=180,max_retries=0) as client:
-        result=client.chat.completions.create(model=model,messages=[{'role':'system','content':SYSTEM},
-            {'role':'user','content':json.dumps({'existing_topics':catalog,'source_messages':batch},ensure_ascii=False)}],
-            max_tokens=5000,temperature=0)
-    raw=result.choices[0].message.content or ''
-    if result.choices[0].finish_reason not in ('stop',None):raise ValueError('Consolidation response was incomplete')
-    raw=raw.strip()
-    if raw.startswith('```'):raw=raw.split('\n',1)[1].rsplit('```',1)[0].strip()
-    value=json.loads(raw)
-    if not isinstance(value,dict) or 'facts' not in value:raise ValueError('Invalid consolidation JSON')
-    return value['facts']
+    from api.memory_extraction import extract as extract_facts
+    return extract_facts(SYSTEM, batch, catalog,
+                         provider=os.environ.get('COMPANY_MEMORY_PROVIDER'),
+                         model=os.environ.get('COMPANY_MEMORY_MODEL'))
 
 
 def run(max_batches=6,extractor=extract):
@@ -86,6 +72,11 @@ def run(max_batches=6,extractor=extract):
         prune(mem,sources)
         seen=dict(mem.conn.execute('SELECT source_id,fingerprint FROM company_sources'))
     pending=[s for s in sources if seen.get(s['source_id'])!=s['fingerprint']]
+    with company.database() as mem:
+        for k,v in {'last_scan':company.now(),'pending':str(len(pending)),
+                    'sources_total':str(len(sources)),'last_error':''}.items():
+            mem.conn.execute('INSERT OR REPLACE INTO company_state VALUES (?,?)',(k,v))
+        mem.conn.commit()
     processed=0;updated=0
     for _ in range(max_batches):
         if not pending:break
@@ -126,14 +117,27 @@ if __name__=='__main__':
     import fcntl
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--max-batches',type=int,default=6)
+    parser.add_argument('--drain',action='store_true')
     args=parser.parse_args()
     target=company.path().parent;target.mkdir(mode=0o700,parents=True,exist_ok=True)
     fd=os.open(personal.pc._safe(target/'worker.lock'),os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
     try:
-        fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
-        run(max(1,min(args.max_batches,50)))
+        fcntl.flock(fd,fcntl.LOCK_EX | (0 if args.drain else fcntl.LOCK_NB))
+        while True:
+            result=run(max(1,min(args.max_batches,50)))
+            if not args.drain or not result['pending']:
+                break
+            if not result['processed']:
+                raise RuntimeError('Company consolidation cannot progress')
     except BlockingIOError:
         print('Consolidation already running')
-    except Exception:
+    except Exception as exc:
+        import sqlite3
+        try:
+            with sqlite3.connect(company.path(),timeout=3) as db:
+                db.execute("INSERT OR REPLACE INTO company_state VALUES ('last_error',?)",(type(exc).__name__,))
+        except sqlite3.Error:
+            pass
+        print(json.dumps({'status':'failed','error_type':type(exc).__name__}),flush=True)
         raise SystemExit(1)
     finally:os.close(fd)

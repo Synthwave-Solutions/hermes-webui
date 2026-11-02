@@ -9,7 +9,7 @@ Environment=HERMES_HOME=%h/.hermes
 Environment=HERMES_WEBUI_AGENT_DIR=%h/.hermes/hermes-agent
 Environment=MNEMOSYNE_NO_EMBEDDINGS=1
 EnvironmentFile=-%h/hermes-webui/.env
-ExecStart=%h/.hermes/hermes-agent/venv/bin/python %h/hermes-webui/scripts/consolidate_company_memory.py --max-batches 10
+ExecStart=%h/.hermes/hermes-agent/venv/bin/python %h/hermes-webui/scripts/with_agent_runtime.py %h/hermes-webui/scripts/consolidate_company_memory.py --max-batches 10
 TimeoutStartSec=35min
 Nice=10
 CPUWeight=20

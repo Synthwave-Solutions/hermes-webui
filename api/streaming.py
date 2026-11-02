@@ -8632,7 +8632,7 @@ def _run_agent_streaming(
                 with _run_timing_stage('agent_constructor'):
                     agent = _AIAgent(**_agent_kwargs)
                     from api.personal_mnemosyne import attach as _attach_personal_memory
-                    agent = _attach_personal_memory(agent, _turn_identity, s, msg_text)
+                    agent = _attach_personal_memory(agent, _turn_identity, s, msg_text, bot=execution_profile or _resolved_profile_name or 'default')
                 logger.debug('[webui] Created ephemeral agent for session %s', session_id)
             else:
                 import hashlib as _hashlib
@@ -8665,6 +8665,7 @@ def _run_agent_streaming(
                     # profile's SOUL.md (and any other profile-scoped context).
                     _profile_home or '',
                     str(_personal_root),
+                    str(execution_profile or _resolved_profile_name or 'default'),
                     _personal_shared,
                     [_file_signature(path) for key, path in personal_context.paths(_turn_identity, s).items()
                      if key in ("memory", "user")],
@@ -8764,7 +8765,7 @@ def _run_agent_streaming(
                     with _run_timing_stage('agent_constructor'):
                         agent = _AIAgent(**_agent_kwargs)
                         from api.personal_mnemosyne import attach as _attach_personal_memory
-                        agent = _attach_personal_memory(agent, _turn_identity, s, msg_text)
+                        agent = _attach_personal_memory(agent, _turn_identity, s, msg_text, bot=execution_profile or _resolved_profile_name or 'default')
                     # Register the new agent with the memory lifecycle so
                     # its commit_memory_session() can be found later.
                     try:
@@ -9430,7 +9431,7 @@ def _run_agent_streaming(
                                 _agent_kwargs['credential_pool'] = _heal_rt.get('credential_pool')
                             agent = _AIAgent(**_agent_kwargs)
                             from api.personal_mnemosyne import attach as _attach_personal_memory
-                            agent = _attach_personal_memory(agent, _turn_identity, s, msg_text)
+                            agent = _attach_personal_memory(agent, _turn_identity, s, msg_text, bot=execution_profile or _resolved_profile_name or 'default')
                             with STREAMS_LOCK:
                                 AGENT_INSTANCES[stream_id] = agent
                             from api.config import SESSION_AGENT_CACHE as _SAC, SESSION_AGENT_CACHE_LOCK as _SAC_L
@@ -10546,7 +10547,7 @@ def _run_agent_streaming(
                         _heal_kwargs['credential_pool'] = _heal_rt.get('credential_pool')
                     _heal_agent = _AIAgent(**_heal_kwargs)
                     from api.personal_mnemosyne import attach as _attach_personal_memory
-                    _heal_agent = _attach_personal_memory(_heal_agent, _turn_identity, s, msg_text)
+                    _heal_agent = _attach_personal_memory(_heal_agent, _turn_identity, s, msg_text, bot=execution_profile or _resolved_profile_name or 'default')
                     with STREAMS_LOCK:
                         AGENT_INSTANCES[stream_id] = _heal_agent
                     from api.config import SESSION_AGENT_CACHE as _SAC2, SESSION_AGENT_CACHE_LOCK as _SAC2_L

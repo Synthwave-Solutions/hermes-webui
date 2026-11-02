@@ -18,7 +18,7 @@ window.PersonalMemories = (() => {
       parent.appendChild(element);
       return element;
     };
-    make('p', company ? _pmT('mem_intro_company','All bots can use this company knowledge. Only admins can change it. Your edits are kept when topics are merged automatically, and deleted topics stay deleted.') : _pmT('mem_intro_personal','Only you can see and edit these memories. Your private chats share one personal memory. Memories from a shared chat are only used in that chat.'));
+    make('p', company ? _pmT('mem_intro_company','All bots can use this company knowledge. Only admins can change it. Your edits are kept when topics are merged automatically, and deleted topics stay deleted.') : _pmT('mem_intro_personal','Only you can see and edit these memories. Each bot has its own memory for you. Private chats with the same bot share memory; shared-chat memories stay within that chat and bot.'));
     const form = make('form');
     form.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px';
     const search = make('input', '', form);
@@ -56,7 +56,7 @@ window.PersonalMemories = (() => {
     function card(item) {
       const article = make('article', '', list); article.className = 'notes-source-card';
       const meta = make('p', '', article); meta.className = 'memory-detail-mtime';
-      meta.textContent = company ? `${item.category} · ${_pmT('mem_sources','{0} sources',item.sources)} · ${item.manual ? _pmT('mem_admin_protected','Protected by an admin') : _pmT('mem_auto','Merged automatically')}` : `${item.scope === 'private' ? _pmT('mem_private','Private chats') : _pmT('mem_shared_only','Only in a shared chat')} · ${new Date(item.timestamp).toLocaleString()}`;
+      meta.textContent = company ? `${item.category} · ${_pmT('mem_sources','{0} sources',item.sources)} · ${item.manual ? _pmT('mem_admin_protected','Protected by an admin') : _pmT('mem_auto','Merged automatically')}` : `${item.bot ? 'Bot '+item.bot+' · ' : ''}${item.scope === 'private' ? _pmT('mem_private','Private chats') : _pmT('mem_shared_only','Only in a shared chat')} · ${new Date(item.timestamp).toLocaleString()}`;
       const content = make('p', item.content, article); content.style.cssText = 'white-space:pre-wrap;overflow-wrap:anywhere';
       const controls = make('div', '', article); controls.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap';
       const edit = make('button', _pmT('mem_edit','Edit'), controls), del = make('button', _pmT('mem_delete','Delete'), controls);

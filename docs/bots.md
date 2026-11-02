@@ -254,3 +254,16 @@ Scheduled tasks can be assigned from the existing editable task list. Assignment
 uses the existing server access checks and preserves the task owner and schedule.
 Managed Scout jobs are configured through Scout rather than reassigned here.
 New scheduled tasks open the standard task form with the edited bot selected.
+
+## Personal memory per bot
+
+Each person has a separate Mnemosyne memory for each bot. Private conversations
+with that bot can recall its earlier facts and episodes. A different bot does not
+automatically receive those memories. Shared conversations keep an additional
+conversation boundary. The selected responding bot, rather than just the chat's
+default profile, determines where a turn is remembered.
+
+The Memory explorer names these banks by bot; saved-memory cards also show the
+bot. They stay private to their owner. The nightly 03:00 Europe/Amsterdam pipeline
+processes all these banks for facts, episodes, graph relations and aging. Company
+knowledge and explicitly configured shared bot notes remain separate layers.

@@ -507,10 +507,9 @@ def personal_stores(viewer: Viewer) -> list[Store]:
         if not directory.is_dir():
             return []
         stores = []
-        for candidate in sorted(directory.glob("*.db")):
+        from api.memory_banks import active_paths, describe
+        for candidate in active_paths(directory):
             bank = candidate.stem
-            if bank != "private" and not re.fullmatch(r"[0-9a-f]{64}", bank):
-                continue
             personal_context._safe(candidate)
             path = checked_store_path(candidate, [directory])
             if path is None:
@@ -518,9 +517,9 @@ def personal_stores(viewer: Viewer) -> list[Store]:
             store_id = "person:" + viewer.email_hash + ":" + bank
             stores.append(Store(
                 store_id=store_id, ref=ref_for(store_id), kind="personal",
-                label="Personal memories" if bank == "private" else "Conversation memories " + bank[:8],
+                label=describe(bank)["label"],
                 owner_hash=viewer.email_hash, owner_display=viewer.display_name,
-                private_owner_hash=viewer.email_hash, primary=bank == "private",
+                private_owner_hash=viewer.email_hash, primary=bank in ("private", "bot-default--private"),
                 backend_ref=str(path), last_write=_last_write(path),
             ))
         return stores

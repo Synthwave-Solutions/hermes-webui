@@ -1,0 +1,12 @@
+[Unit]
+Description=Refresh SynthPulse personal knowledge automatically
+
+[Timer]
+OnBootSec=3min
+OnUnitInactiveSec=2min
+AccuracySec=15s
+Persistent=true
+Unit=personal-memory.service
+
+[Install]
+WantedBy=timers.target

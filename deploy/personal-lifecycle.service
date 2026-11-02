@@ -1,0 +1,17 @@
+[Unit]
+Description=Maintain SynthPulse memory lifecycle and knowledge graph
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/hermes-webui
+Environment=HERMES_HOME=%h/.hermes
+Environment=HERMES_WEBUI_AGENT_DIR=%h/.hermes/hermes-agent
+Environment=MNEMOSYNE_NO_EMBEDDINGS=1
+EnvironmentFile=-%h/hermes-webui/.env
+ExecStart=%h/.hermes/hermes-agent/venv/bin/python %h/hermes-webui/scripts/with_agent_runtime.py %h/hermes-webui/scripts/maintain_personal_memory.py
+TimeoutStartSec=20min
+Nice=10
+CPUWeight=20
+MemoryMax=1G
+UMask=0077

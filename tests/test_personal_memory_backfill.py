@@ -24,6 +24,17 @@ def test_private_owner_and_preserved_long_text():
     assert not rows[0][1].project_shared
 
 
+def test_import_uses_recorded_responding_bot_per_turn():
+    data={'owner_email':'alice@example.test','profile':'default','messages':[
+        {'role':'user','content':'Project Kobalt gebruikt PostgreSQL.'},
+        {'role':'assistant','content':'Recorded','bot_profile':'alpha'},
+        {'role':'user','content':'Project Amber gebruikt SQLite.'},
+        {'role':'assistant','content':'Recorded','bot_profile':'beta'}]}
+    result=list(records(data,'multi-bot',Counter()))
+    assert [r[1].profile for r in result]==['alpha','beta']
+    assert [r[3]['bot'] for r in result]==['alpha','beta']
+
+
 def test_past_different_author_keeps_history_shared():
     data={'owner_email':'alice@example.test','messages':[{'role':'user','content':'unknown'},
         {'role':'user','author_email':'bob@example.test','content':'mine'}]}
@@ -48,7 +59,7 @@ backups=Path(sys.argv[1])/'backup';backups.mkdir()
 a='alice@example.test';s=NS(session_id='one',owner_email=a,participants=[],project_shared=False,profile='bot',project_id='')
 source={'message_time':1700000000}
 entry=[('I prefer violet',source,'a'*64)]
-with m._locked({'email':a},'private') as path, m._beam(path): pass
+with m._locked({'email':a},m._bank(s)) as path, m._beam(path): pass
 assert import_batch(a,s,entry,backups)['created']==1
 row=m.listing({'email':a})['items'][0]
 assert row['timestamp'].startswith('2023-')

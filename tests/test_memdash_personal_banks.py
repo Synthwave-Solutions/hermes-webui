@@ -40,3 +40,21 @@ def test_personal_registry_refuses_symlinked_banks(monkeypatch, tmp_path):
         assert not env.banks()["available"]
     finally:
         env.close()
+
+
+def test_bot_banks_are_named_and_still_owner_only(monkeypatch, tmp_path):
+    env = H.Env(monkeypatch, tmp_path)
+    monkeypatch.setattr(config, "STATE_DIR", env.state)
+    try:
+        root = personal_context.home({'email': H.MICHAEL}) / 'mnemosyne'
+        for bot in ('default', 'analyst'):
+            H.make_bank(root / ('bot-'+bot+'--private.db'), owner='michael', memories=2)
+        env.as_user(H.MICHAEL)
+        stores = env.banks()['stores']
+        bot = next(s for s in stores if s['label']=='Bot analyst · private')
+        assert env.view(bot['ref'],'stats').body['counts']['working_memory']==2
+        assert next(s for s in stores if s['ref']==env.banks()['me'])['label']=='Bot default · private'
+        env.as_user(H.YASER)
+        assert env.view(bot['ref'],'stats').status==404
+    finally:
+        env.close()

@@ -1,0 +1,11 @@
+[Unit]
+Description=Nightly SynthPulse complete memory processing for every user
+
+[Timer]
+OnCalendar=*-*-* 03:00:00 Europe/Amsterdam
+AccuracySec=1min
+Persistent=true
+Unit=personal-memory-nightly.service
+
+[Install]
+WantedBy=timers.target
