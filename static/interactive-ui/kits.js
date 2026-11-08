@@ -147,6 +147,21 @@
   }, true);
   document.addEventListener('keydown', function(e){ if(e.key === 'Escape') post({type:'key', key:'Escape'}); }, true);
 
+  // Kinds in their own files (static/interactive-ui/kinds/*.js) register a
+  // renderer here: render(box, spec, restore, ctx) -> {onTheme?}. They build the
+  // DOM with ctx.h (textContent only), never with HTML from the spec.
+  var RENDERERS = {};
+  window.SWKitRender = {
+    register: function(kind, fn){ if(/^[a-z][a-z-]{1,20}$/.test(kind) && typeof fn === 'function' && !RENDERERS[kind]) RENDERERS[kind] = fn; },
+    h: function(tag, cls, text){ return h(tag, cls, text); },
+    fmt: function(v, type, decimals){ return fmt(v, type, decimals); },
+    lang: function(){ return LANG; },
+    theme: function(){ return api.theme; },
+    save: function(values){ saveState(values); },
+    resize: function(){ scheduleHeight(true); },
+    copy: function(text){ api.copy(text); }
+  };
+
   var stateTimer = 0;
   function saveState(values){
     clearTimeout(stateTimer);
@@ -920,7 +935,7 @@
   // ── Render ──────────────────────────────────────────────────────────────
   function render(msg){
     var kit = msg.kit, spec = msg.spec;
-    if(!spec || typeof spec !== 'object' || ['table', 'chart', 'map', 'kpi', 'timeline'].indexOf(kit) < 0) return;
+    if(!spec || typeof spec !== 'object' || (['table', 'chart', 'map', 'kpi', 'timeline'].indexOf(kit) < 0 && !RENDERERS[kit])) return;
     LANG = msg.lang === 'en' ? 'en' : 'nl';
     document.documentElement.lang = LANG;
     lastMsg = msg;
@@ -946,6 +961,8 @@
         current = renderKpi(box, spec);
       } else if(kit === 'timeline'){
         current = renderTimeline(box, spec, {a:typeof restore.a === 'number' ? restore.a : -1});
+      } else if(RENDERERS[kit]){
+        current = RENDERERS[kit](box, spec, restore, window.SWKitRender) || {};
       } else {
         current = renderMap(box, spec, {a:typeof restore.a === 'number' ? restore.a : -1}, api.data);
       }
@@ -959,7 +976,9 @@
 
   if(standalone){
     if(DOC.theme) applyTheme(null, DOC.theme);
-    render(DOC);
+    // Kind files come after this script: draw once the page is parsed.
+    if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function(){ render(DOC); });
+    else render(DOC);
     return;
   }
   window.addEventListener('message', function(e){

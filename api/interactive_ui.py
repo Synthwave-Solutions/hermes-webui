@@ -412,16 +412,20 @@ FRAME_BYTES = FRAME_HTML.encode("utf-8")
 # ── Data blocks: the kit frame ──────────────────────────────────────────────
 KIT_FRAME_PATH = "/static/interactive-ui/kit.html"
 _STATIC_DIR = Path(__file__).resolve().parents[1] / "static"
+# Extra kinds live in static/interactive-ui/kinds/<kind>.js (+ optional .css):
+# each registers its checks with SWKit and its renderer with SWKitRender.
+_KIND_DIR = Path(__file__).resolve().parents[1] / "static" / "interactive-ui" / "kinds"
+KIND_FILES = tuple(sorted(p.stem for p in _KIND_DIR.glob("*.js"))) if _KIND_DIR.is_dir() else ()
 KIT_STYLE_FILES = (
     "vendor/leaflet/1.9.4/leaflet.css",
     "interactive-ui/kits.css",
-)
+) + tuple(f"interactive-ui/kinds/{k}.css" for k in KIND_FILES if (_KIND_DIR / f"{k}.css").is_file())
 KIT_SCRIPT_FILES = (
     "vendor/chartjs/4.4.7/chart.umd.js",
     "vendor/leaflet/1.9.4/leaflet.js",
     "interactive-ui/kit-core.js",
     "interactive-ui/kits.js",
-)
+) + tuple(f"interactive-ui/kinds/{k}.js" for k in KIND_FILES)
 # Tiles come from this server by default (api/map_tiles.py): PDOK for the
 # Netherlands, OpenStreetMap elsewhere, cached and fetched with a proper
 # User-Agent, so no browser gets a "blocked" tile.

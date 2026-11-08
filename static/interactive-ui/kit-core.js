@@ -844,9 +844,35 @@ function base(spec,lang,kind,m,warnings,limits){
     return {min,max,ticks,todayX,lines:bounds.slice(1,-1).map(b=>(b-min)/span)};
   }
 
+  // ── Extra kinds ──────────────────────────────────────────────────────────
+  // A kind in its own file (static/interactive-ui/kinds/*.js) registers here:
+  // register(kind, {fences:[...], name:{nl,en}, noun:{nl,en}, icon, streamHeight,
+  //   validate(raw, lang, helpers) -> {errors, warnings, spec}, estHeight(spec), table(spec)}).
+  // The same file registers its renderer with SWKitRender inside the kit frame.
+  const EXTRA={};
+  function register(kind,def){
+    if(!/^[a-z][a-z-]{1,20}$/.test(kind)||!def||typeof def.validate!=='function'||EXTRA[kind]||KIT_LANGS[kind]) return false;
+    EXTRA[kind]=def;
+    [kind].concat(Array.isArray(def.fences)?def.fences:[]).forEach(f=>{f=String(f).toLowerCase();if(/^[a-z][a-z-]{1,20}$/.test(f)&&!KIT_LANGS[f]||KIT_LANGS[f]===kind)KIT_LANGS[f]=kind;});
+    ['nl','en'].forEach(l=>{
+      if(def.noun&&def.noun[l]) NOUN[l][kind]=String(def.noun[l]);
+      if(def.name&&def.name[l]) NAME[l][kind]=String(def.name[l]);
+    });
+    return true;
+  }
+  function extra(kind){return Object.prototype.hasOwnProperty.call(EXTRA,kind)?EXTRA[kind]:null;}
+  // What a kind file may use to validate.
+  function helpers(lang){
+    const m=messenger(lang);
+    return {m,str,isObj,clampInt,parseNumber,kpiNumber,base:(spec,kind,warnings)=>base(spec,lang,kind,m,warnings,LIMITS),
+      fieldName:(nl,en)=>fieldName(lang,nl,en),pickLang,LIMITS,formatValue};
+  }
+
   // ── Entry point ──────────────────────────────────────────────────────────
   function estHeight(kind,spec){
     if(!spec) return 120;
+    const x=extra(kind);
+    if(x){try{return Math.max(80,Math.min(2000,Math.round(Number(x.estHeight?x.estHeight(spec):300))||300));}catch(_){return 300;}}
     if(kind==='table'){
       const shown=Math.min(spec.rows.length,50);
       return Math.round(28+(spec.subtitle?24:0)+(spec.filter?48:0)+Math.min(440,42+Math.max(1,shown)*37+(spec.total?37:0))+(spec.rows.length>50?48:0)+(spec.source?28:0));
@@ -883,9 +909,12 @@ function base(spec,lang,kind,m,warnings,limits){
     // The block may name the conversation language; it sets labels and number format.
     const own=String(raw&&raw.lang||'').toLowerCase();
     if(own==='nl'||own==='en'){lang=own;m=messenger(lang);}
-    const fn={table:validateTable,chart:validateChart,map:validateMap,kpi:validateKpi,timeline:validateTimeline}[kind]||null;
+    const x=extra(kind);
+    const fn=x?((raw,l)=>x.validate(raw,l,helpers(l))):({table:validateTable,chart:validateChart,map:validateMap,kpi:validateKpi,timeline:validateTimeline}[kind]||null);
     if(!fn){res.errors.push(m('notObject'));return res;}
-    const r=fn(raw,lang);
+    let r;
+    try{r=fn(raw,lang)||{errors:[m('notObject')],warnings:[]};}catch(err){r={errors:[m('notObject')],warnings:[]};}
+    r.errors=Array.isArray(r.errors)?r.errors:[];r.warnings=Array.isArray(r.warnings)?r.warnings:[];
     res.errors=r.errors;res.warnings=r.warnings;
     if(r.spec&&!r.errors.length){r.spec.lang=lang;res.spec=r.spec;res.title=r.spec.title;res.estHeight=estHeight(kind,r.spec);}
     else res.title=str(raw&&raw.title,LIMITS.title);
@@ -1005,6 +1034,8 @@ function base(spec,lang,kind,m,warnings,limits){
         rows:spec.items.map(i=>[i.label,i.value,i.delta,i.target]),
         types:['text','number','number','number']};
     }
+    const x=extra(kind);
+    if(x){try{const t=x.table?x.table(spec,view,data):null;if(t&&Array.isArray(t.header)&&Array.isArray(t.rows))return t;}catch(_){}return {header:[],rows:[]};}
     if(kind==='timeline'){
       const en=spec.lang==='en', lang=en?'en':'nl', pos=spec.mode==='date'?'date':'number';
       return {header:en?['Item','Start','End','Owner','Status','Milestone','Note']:['Onderdeel','Start','Einde','Eigenaar','Status','Mijlpaal','Notitie'],
@@ -1065,7 +1096,7 @@ function base(spec,lang,kind,m,warnings,limits){
       +(mid.length?'&waypoints='+encodeURIComponent(mid.join('|')):'')+'&travelmode=driving';
   }
 
-  const api={KIT_LANGS,kitKind,LIMITS,NOUN,NAME,pickLang,cleanJson,parseKit,parseCsv,detectDelimiter,parseNumber,
+  const api={register,extra,KIT_LANGS,kitKind,LIMITS,NOUN,NAME,pickLang,cleanJson,parseKit,parseCsv,detectDelimiter,parseNumber,
     validateTable,validateChart,validateMap,validateKpi,validateTimeline,build,estHeight,streamingTitle,compareCells,formatValue,viewIndices,
     initialView,totals,kitTable,toCsv,toTsv,mapRequest,mapLocalData,tileUrlOk,googleMapsUrl,OSM_TILES,
     kpiValueText,kpiDeltaText,timelineAxis,timelinePeriod,statusWord,dayOf,isoOf,STATUS_WORDS};

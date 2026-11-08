@@ -35,6 +35,10 @@ const _iui=(function(){
   const KIT_URL='static/interactive-ui/kit.html';
   const KIT_STREAM_H={table:300,chart:380,map:460,kpi:150,timeline:340};
   const KIT_ICON={table:'table',chart:'chart',map:'pin',kpi:'gauge',timeline:'gantt'};
+  // Kinds registered from static/interactive-ui/kinds/*.js bring their own height, icon and names.
+  function kitExtra(kind){const K=kits();return K&&typeof K.extra==='function'?K.extra(kind):null;}
+  function kitStreamH(kind){const x=kitExtra(kind);return KIT_STREAM_H[kind]||(x&&Number(x.streamHeight))||300;}
+  function kitIcon(kind){const x=kitExtra(kind);return KIT_ICON[kind]||(x&&typeof x.icon==="string"&&ICON[x.icon]?x.icon:"spark");}
   const KIT_DATA_MAX=200*1024;
   function kits(){return typeof SWKit!=='undefined'&&SWKit&&typeof SWKit.build==='function'?SWKit:null;}
   function kitKindOf(lang){const K=kits();return K?K.kitKind(lang):'';}
@@ -117,10 +121,20 @@ const _iui=(function(){
     return l.startsWith('nl')?'nl':'en';
   }
   function tx(key,...args){const v=(TEXT[lang()]||TEXT.en)[key];return typeof v==='function'?v(...args):(v||key);}
-  function kitWord(field,kind){const m=(TEXT[lang()]||TEXT.en)[field];return (m&&m[kind])||kind;}
+  function kitWord(field,kind){
+    const m=(TEXT[lang()]||TEXT.en)[field];
+    if(m&&m[kind]) return m[kind];
+    const K=kits(), table=K&&(field==='kitNoun'?K.NOUN:field==='kitName'?K.NAME:null);
+    const l=lang()==='nl'?'nl':'en';
+    return (table&&table[l]&&table[l][kind])||kind;
+  }
   function toast(msg){try{if(typeof showToast==='function')showToast(msg,2600);}catch(_){}}
 
   const ICON={
+    flow:'<rect x="3" y="3" width="7" height="5" rx="1"/><rect x="14" y="16" width="7" height="5" rx="1"/><path d="M6.5 8v4.5h11V16"/>',
+    compare:'<rect x="3" y="4" width="7.5" height="16" rx="1.5"/><rect x="13.5" y="4" width="7.5" height="16" rx="1.5"/><path d="M6 9h2M16.5 9h2M6 13h2M16.5 13h2"/>',
+    funnel:'<path d="M3 4h18l-7 8v6l-4 2v-8z"/>',
+    form:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
     spark:'<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
     reload:'<path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/>',
     code:'<path d="M16 18l6-6-6-6"/><path d="M8 6l-6 6 6 6"/>',
@@ -556,7 +570,7 @@ const _iui=(function(){
     card.dataset.iuiCard=String(++seq);
     card.setAttribute('role','group');
     const head=document.createElement('div');head.className='iui-head';
-    const badge=document.createElement('span');badge.className='iui-badge';badge.innerHTML=icon(KIT_ICON[kit]||'spark');
+    const badge=document.createElement('span');badge.className='iui-badge';badge.innerHTML=icon(kitIcon(kit));
     const titleEl=document.createElement('span');titleEl.className='iui-title';
     const pill=document.createElement('span');pill.className='iui-pill';pill.textContent=tx('example');pill.hidden=true;
     const status=document.createElement('span');status.className='iui-status';
@@ -668,7 +682,7 @@ const _iui=(function(){
   }
   function kitParse(ctrl){
     const K=kits(), kind=ctrl.kit;
-    const base={kit:kind,css:'',html:'',scripts:[],warnings:[],errors:[],spec:null,tooBig:false,title:'',height:KIT_STREAM_H[kind]||300};
+    const base={kit:kind,css:'',html:'',scripts:[],warnings:[],errors:[],spec:null,tooBig:false,title:'',height:kitStreamH(kind)};
     if(!K) return Object.assign(base,{errors:['kit unavailable']});
     if(!ctrl.final) return Object.assign(base,{title:K.streamingTitle(ctrl.source)});
     const r=K.build(kind,ctrl.source,{lang:lang(),fence:ctrl.fence});
