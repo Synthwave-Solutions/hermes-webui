@@ -412,9 +412,46 @@ def _ask_json(system: str, user: str) -> dict:
     raise RuntimeError("The model did not answer usefully (" + last + "). Your input is kept; try again.")
 
 
+_WORD = re.compile(r"[a-zà-ÿ0-9]{4,}")
+
+
+_FILLER = {"agent", "maak", "maakt", "maken", "voor", "naar", "door", "wordt", "worden", "elke", "alle", "deze",
+           "super", "skill", "taak", "with", "from", "that", "this", "synthwave", "synthpulse", "hermes"}
+
+
+def _stems(text: str) -> set:
+    """Lower-case words of four letters or more, with a plain Dutch or English plural cut off."""
+    out = set()
+    for w in _WORD.findall(str(text or "").lower()):
+        if w in _FILLER:
+            continue
+        for suffix in ("en", "s"):
+            if len(w) > 5 and w.endswith(suffix):
+                w = w[: -len(suffix)]
+                break
+        out.add(w)
+    return out
+
+
+def _reuse_score(words: set, name: str) -> float:
+    """How well an existing name fits: two shared words, or most of a short name.
+
+    One shared word in a long name ("klant huisstijl document" for a quote
+    about house style) is a coincidence, not something to reuse.
+    """
+    own = _stems(name)
+    shared = len(words & own)
+    if not shared:
+        return 0
+    coverage = shared / len(own)
+    if shared >= 2 or coverage >= 0.5:
+        return shared + coverage
+    return 0
+
+
 def _reuse_candidates(text: str, limit: int = 3) -> list[str]:
-    """Existing tasks and skills whose names share words with ``text``."""
-    words = {w for w in re.findall(r"[a-zà-ÿ0-9]{4,}", text.lower())}
+    """Existing tasks and skills whose names fit ``text`` well."""
+    words = _stems(text)
     if not words:
         return []
     scored = []
@@ -423,7 +460,7 @@ def _reuse_candidates(text: str, limit: int = 3) -> list[str]:
 
         for _profile, job in value_tracking.iter_store_jobs():
             name = str(job.get("name") or "")
-            score = len(words & set(re.findall(r"[a-zà-ÿ0-9]{4,}", name.lower())))
+            score = _reuse_score(words, name)
             if score:
                 scored.append((score, "Taak: " + name))
     except Exception:
@@ -433,8 +470,7 @@ def _reuse_candidates(text: str, limit: int = 3) -> list[str]:
 
         skills_root = Path(get_hermes_home_for_profile("default")) / "skills"
         for skill in skills_root.glob("*/*/SKILL.md"):
-            name = skill.parent.name.replace("-", " ")
-            score = len(words & set(re.findall(r"[a-zà-ÿ0-9]{4,}", name.lower())))
+            score = _reuse_score(words, skill.parent.name.replace("-", " "))
             if score:
                 scored.append((score, "Skill: " + skill.parent.name))
     except Exception:
