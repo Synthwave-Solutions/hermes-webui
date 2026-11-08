@@ -74,7 +74,10 @@ def test_ae3_pre_stash_keeps_the_old_literal_and_the_allowlist_is_unchanged():
 
 def test_ae4_post_processing_calls_the_hooks_last_and_guarded():
     body = _function(UI, "postProcessRenderedMessages")
-    lines = [line.strip() for line in body.splitlines()[1:-1] if line.strip() and not line.strip().startswith("//")]
+    # The interactive answers hook (static/interactive_ui.js) sits between the
+    # tree views and the SVG hooks; it has its own pin in test_interactive_ui.py.
+    lines = [line.strip() for line in body.splitlines()[1:-1] if line.strip() and not line.strip().startswith("//")
+             and "renderInteractiveUiBlocks" not in line]
     assert lines[-3] == "initTreeViews(container);"
     assert lines[-2] == ("if(typeof renderSvgVisualBlocks==='function'){try{renderSvgVisualBlocks(container);}"
                          "catch(e){console.warn('[svg] render failed',e);}}")

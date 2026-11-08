@@ -12441,6 +12441,11 @@ def handle_get(handler, parsed) -> bool:
 
     if parsed.path.startswith(("/static/vendor/mnemosyne-dashboard/", "/session/static/vendor/mnemosyne-dashboard/")):
         return _serve_memdash_vendor(handler, parsed)
+    if parsed.path in ("/static/interactive-ui/frame.html", "/session/static/interactive-ui/frame.html"):
+        from api import interactive_ui
+        if not interactive_ui.serve(handler, parsed):
+            j(handler, {"error": "not found"}, status=404)
+        return True
 
     if parsed.path.startswith("/session/static/"):
         # Strip the leading "/session" so _serve_static() sees a path that

@@ -8152,6 +8152,7 @@ function renderMd(raw){
     const firstMermaidLine=codeLines.map(line=>line.trim()).find(line=>line&&!line.startsWith('%%'))||'';
     const looksLikeLineNumberedToolOutput=/^\s*\d+\|/.test(firstCodeLine);
     const looksLikeMermaidStart=firstMermaidLine==='---'||/^(graph|flowchart|sequenceDiagram|classDiagram|classDiagram-v2|stateDiagram|stateDiagram-v2|erDiagram|journey|gantt|pie|gitGraph|mindmap|timeline|quadrantChart|requirementDiagram|C4Context|C4Container|C4Component|C4Dynamic|c4Context|c4Container|c4Component|c4Dynamic|sankey-beta|block-beta|packet-beta|xychart-beta|kanban|architecture-beta)\b/.test(firstMermaidLine);
+    if(_interactiveUiFenceAccepts(lang,code)) return lead+_interactiveUiPlaceholder(code);
     if(_svgVisualFenceAccepts(lang,code)) return lead+_svgVisualPlaceholder(code);
     if(lang==='mermaid'&&!looksLikeLineNumberedToolOutput&&looksLikeMermaidStart){
       const id='mermaid-'+Math.random().toString(36).slice(2,10);
@@ -8622,7 +8623,9 @@ function renderMd(raw){
   // in depth.
   // The svg-visual-block alternation (plan addendum AE-3) only ever matches
   // placeholders built above: _tag strips that class from raw HTML.
-  s=s.replace(/(<div class="pre-header">[\s\S]*?<\/div>)?<pre[^>]*>[\s\S]*?<\/pre>|<div class="(mermaid-block|katex-block)"[\s\S]*?<\/div>|<div class="svg-visual-block"[\s\S]*?<\/div>/g,m=>{
+  // iui-block (interactive answers) is protected the same way: its escaped
+  // source keeps blank lines that must not become paragraphs.
+  s=s.replace(/(<div class="pre-header">[\s\S]*?<\/div>)?<pre[^>]*>[\s\S]*?<\/pre>|<div class="(mermaid-block|katex-block)"[\s\S]*?<\/div>|<div class="iui-block"[\s\S]*?<\/div>|<div class="svg-visual-block"[\s\S]*?<\/div>/g,m=>{
     _pre_stash.push(m);
     return '\x00E'+(_pre_stash.length-1)+'\x00';
   });
@@ -8639,6 +8642,19 @@ function renderMd(raw){
   s=s.replace(/\x00Q(\d+)\x00/g,(_,i)=>_bq_stash[+i]);
   return s;
 
+  // ── Interactive answers seam ──────────────────────────────────────────
+  // static/interactive_ui.js may define interactiveUiFenceAccepts(lang,code).
+  // The renderer builds the placeholder itself with the source escaped; the
+  // card and its sandboxed frame are mounted later in postProcess.
+  function _interactiveUiFenceAccepts(lang,code){
+    if(typeof interactiveUiFenceAccepts!=='function') return false;
+    try{return interactiveUiFenceAccepts(lang,code)===true;}catch(_){return false;}
+  }
+  function _interactiveUiPlaceholder(code){
+    const id='iui-'+Math.random().toString(36).slice(2,10);
+    _preBlock_stash.push(`<div class="iui-block" data-iui-id="${id}">${esc(code.trim())}</div>`);
+    return '\x00P'+(_preBlock_stash.length-1)+'\x00';
+  }
   // ── Inline SVG visuals seams (plan addendum AE-1, AE-2) ──────────────────
   // Declared below the return (function declarations are hoisted), so the
   // passes above only gain one call each. static/svg_visuals.js may define the hooks
@@ -19925,6 +19941,8 @@ function postProcessRenderedMessages(container) {
   renderMermaidBlocks(container);
   renderKatexBlocks(container);
   initTreeViews(container);
+  // Interactive answers: mount sandboxed cards for interactive-ui fences.
+  if(typeof renderInteractiveUiBlocks==='function'){try{renderInteractiveUiBlocks(container);}catch(e){console.warn('[interactive-ui] render failed',e);}}
   // Inline SVG visuals (plan addendum AE-4): hooks from static/svg_visuals.js.
   if(typeof renderSvgVisualBlocks==='function'){try{renderSvgVisualBlocks(container);}catch(e){console.warn('[svg] render failed',e);}}
   if(typeof enhanceSvgMediaCards==='function'){try{enhanceSvgMediaCards(container);}catch(e){console.warn('[svg] render failed',e);}}

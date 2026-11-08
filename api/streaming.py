@@ -818,6 +818,14 @@ def _webui_ephemeral_system_prompt(
         visuals_prompt = ""
     if visuals_prompt:
         parts.append(visuals_prompt)
+    try:
+        from api import interactive_ui
+        interactive_prompt = interactive_ui.prompt_block(config_data)
+    except Exception:
+        logger.debug("WebUI interactive answers prompt unavailable", exc_info=True)
+        interactive_prompt = ""
+    if interactive_prompt:
+        parts.append(interactive_prompt)
     delivery_prompt = _webui_delivery_context_prompt(config_data)
     if delivery_prompt:
         parts.append(delivery_prompt)

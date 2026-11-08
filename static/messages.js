@@ -4091,6 +4091,7 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
       if(delta){
         window.smd.parser_write(st.parser,delta);
         st.writtenText=value;
+        if(typeof interactiveUiStreamTick==='function'){try{interactiveUiStreamTick(st.node);}catch(_){}}
       }
       if(finalize){
         _finalizeAnchorProseIncrementalNode(st);
@@ -4530,6 +4531,7 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
     // (_safeSmdRenderer or _streamFadeRenderer), applied inline as smd
     // creates each DOM node — no post-hoc full-DOM scan needed.
     _scheduleStreamingKatex();
+    if(assistantBody&&typeof interactiveUiStreamTick==='function'){try{interactiveUiStreamTick(assistantBody);}catch(_){}}
   }
   // Allowed URL schemes for anchors and images rendered from agent-streamed markdown.
   // Raw file:// anchors are rewritten to /api/media before the user can click them.
