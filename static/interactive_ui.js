@@ -90,13 +90,13 @@ const _iui=(function(){
       errorLead:'Deze weergave werkt niet helemaal.',tooBig:'Deze weergave is te groot om te tonen.',
       removed:'Overgeslagen bron',ask:'Vraag uit deze weergave',send:'Versturen',cancel:'Annuleren',
       draftBusy:'Je concept staat nog in het invoerveld. Verstuur of wis dat eerst.',
-      repairPrompt:(title,msg)=>`Kun je de weergave "${title}" herstellen? Die werkt niet helemaal (${msg}). Stuur het volledige interactive-ui-blok opnieuw.`,
+      repairPrompt:title=>`Kun je "${title}" herstellen? Die werkt nog niet goed.`,
       sandboxNote:'Draait los van je account en de chat',chipsLabel:'Voorgestelde antwoorden',chipsBusy:'Even wachten tot het huidige antwoord klaar is.',
-      kitNoun:{table:'tabel',chart:'grafiek',map:'kaart',kpi:'KPI-rij',timeline:'planning'},
+      kitNoun:{table:'tabel',chart:'grafiek',map:'kaart',kpi:'kerncijfers',timeline:'planning'},
       kitName:{table:'Tabel',chart:'Grafiek',map:'Kaart',kpi:'Kerncijfers',timeline:'Planning'},
-      kitFail:noun=>`Deze ${noun} kon niet worden gemaakt.`,downloadCsv:'Download als CSV',copyTable:'Kopieer als tabel',
+      kitFail:noun=>noun==='kerncijfers'?'Deze kerncijfers konden niet worden gemaakt.':`Deze ${noun} kon niet worden gemaakt.`,downloadCsv:'Download als CSV',copyTable:'Kopieer als tabel',
       viewData:'Gegevens bekijken',hideData:'Gegevens verbergen',copyData:'Gegevens kopiëren',example:'Voorbeeld',
-      kitRepairPrompt:(noun,title,msg,fence)=>`Kun je de ${noun} "${title}" herstellen? ${msg} Stuur het volledige ${fence}-blok opnieuw.`},
+      kitRepairPrompt:(noun,title)=>noun==='kerncijfers'?`Kun je de kerncijfers "${title}" herstellen? Die kloppen nog niet.`:`Kun je de ${noun} "${title}" herstellen? Die klopt nog niet.`},
     en:{title:'Interactive view',building:'Building',
       restart:'Restart',viewCode:'View code',hideCode:'Hide code',copyCode:'Copy code',download:'Download',
       devGroup:'For developers',full:'Full screen',exitFull:'Close',more:'More options',repair:'Fix it',
@@ -104,13 +104,13 @@ const _iui=(function(){
       errorLead:'This view is not fully working.',tooBig:'This view is too large to show.',
       removed:'Skipped source',ask:'Question from this view',send:'Send',cancel:'Cancel',
       draftBusy:'Your draft is still in the message box. Send or clear it first.',
-      repairPrompt:(title,msg)=>`Can you fix the view "${title}"? It is not fully working (${msg}). Send the complete interactive-ui block again.`,
+      repairPrompt:title=>`Can you fix "${title}"? It is not working yet.`,
       sandboxNote:'Runs separately from your account and the chat',chipsLabel:'Suggested replies',chipsBusy:'Wait until the current reply is finished.',
-      kitNoun:{table:'table',chart:'chart',map:'map',kpi:'KPI row',timeline:'timeline'},
+      kitNoun:{table:'table',chart:'chart',map:'map',kpi:'key figures',timeline:'timeline'},
       kitName:{table:'Table',chart:'Chart',map:'Map',kpi:'Key figures',timeline:'Timeline'},
       kitFail:noun=>`This ${noun} could not be made.`,downloadCsv:'Download as CSV',copyTable:'Copy as table',
       viewData:'View data',hideData:'Hide data',copyData:'Copy data',example:'Example',
-      kitRepairPrompt:(noun,title,msg,fence)=>`Can you fix the ${noun} "${title}"? ${msg} Send the complete ${fence} block again.`},
+      kitRepairPrompt:(noun,title)=>`Can you fix the ${noun} "${title}"? It is not right yet.`},
   };
   function lang(){
     const l=String((typeof _currentLang!=='undefined'&&_currentLang)||document.documentElement.lang||navigator.language||'en').toLowerCase();
@@ -601,13 +601,16 @@ const _iui=(function(){
 
     const repair=button('wrench',tx('repair'),(b,ev)=>{
       if(!ev||!ev.isTrusted) return;
-      const first=ctrl.errors[0]?friendly(ctrl.errors[0].message).slice(0,160):'';
+      const first=ctrl.errors[0]?friendly(ctrl.errors[0].message).slice(0,240):'';
+      // The user sees one plain sentence; the error and the block type go to the
+      // agent in a report the chat hides from the bubble.
+      const report=(fence,msg)=>`\n\n[View report]\nBlock: ${fence}\nProblem: ${String(msg||'unknown').replace(/\[\/?View report\]/g,'')}\nFix the cause and send the complete ${fence} block again.\n[/View report]`;
       if(ctrl.kit){
         const msg=first||((ctrl.parsed&&ctrl.parsed.warnings||[])[0]||'');
-        sendPrompt(tx('kitRepairPrompt',kitWord('kitNoun',ctrl.kit),ctrl.parsed&&ctrl.parsed.title||kitWord('kitName',ctrl.kit),msg,ctrl.fence||ctrl.kit));
+        sendPrompt(tx('kitRepairPrompt',kitWord('kitNoun',ctrl.kit),ctrl.parsed&&ctrl.parsed.title||kitWord('kitName',ctrl.kit))+report(ctrl.fence||ctrl.kit,msg));
         return;
       }
-      sendPrompt(tx('repairPrompt',ctrl.parsed&&ctrl.parsed.title||tx('title'),first));
+      sendPrompt(tx('repairPrompt',ctrl.parsed&&ctrl.parsed.title||tx('title'))+report('interactive-ui',first));
     },'iui-btn--text');
     const detailsBtn=button('code',tx('details'),b=>{
       errorDetails.hidden=!errorDetails.hidden;

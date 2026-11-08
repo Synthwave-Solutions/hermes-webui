@@ -15,7 +15,13 @@
   }
   function preferenceKey() { return actor() ? 'synpulse:bot-roster-collapsed:' + actor() : null; }
   function collapsed() {
-    try { return preferenceKey() && localStorage.getItem(preferenceKey()) === '1'; } catch (_) { return false; }
+    try {
+      const stored = preferenceKey() ? localStorage.getItem(preferenceKey()) : null;
+      if (stored === '1') return true;
+      if (stored === '0') return false;
+      // On a phone the row starts folded: the titlebar already switches bots.
+      return !!(window.matchMedia && window.matchMedia('(max-width:640px)').matches);
+    } catch (_) { return false; }
   }
   function available(rows, session) {
     const bots = session && Array.isArray(session.bot_participants) ? session.bot_participants : [];

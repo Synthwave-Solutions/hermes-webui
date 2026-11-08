@@ -7372,6 +7372,15 @@ function _clearActivityElapsedTimer(){
 }
 
 const _MOBILE_CONFIG_BASE_LABEL='Workspace, model, quota, reasoning, and context settings';
+// Members hear "Instellingen"; engine numbers stay for admins.
+function _mobileConfigLabel(state){
+  const admin=document.documentElement.getAttribute('data-nav-audience')==='admin';
+  const tr=(k,f)=>(typeof t==='function'&&t(k)!==k)?t(k):f;
+  const base=tr('settings_title','Settings');
+  if(!state) return admin?_MOBILE_CONFIG_BASE_LABEL:base;
+  if(admin) return `${_MOBILE_CONFIG_BASE_LABEL} \u00b7 ${state.label}`;
+  return state.pct>75?`${base} \u00b7 ${tr('chat_getting_long','conversation is getting long')}`:base;
+}
 
 function _setCtxCompressButton(btn,text){
   if(!btn)return;
@@ -7402,8 +7411,8 @@ function _syncMobileCtxDisplay(state){
   if(!state||!state.visible){
     if(row)row.style.display='none';
     if(mobileConfigBtn){
-      mobileConfigBtn.setAttribute('aria-label',_MOBILE_CONFIG_BASE_LABEL);
-      mobileConfigBtn.setAttribute('title',_MOBILE_CONFIG_BASE_LABEL);
+      mobileConfigBtn.setAttribute('aria-label',_mobileConfigLabel(null));
+      mobileConfigBtn.setAttribute('title',_mobileConfigLabel(null));
     }
     _setCtxCompressButton(compressBtn,'');
     // Reset context ring to 0% to clear any stale values from previous sessions
@@ -7429,8 +7438,8 @@ function _syncMobileCtxDisplay(state){
     );
   })(state.pct);
   if(mobileConfigBtn){
-    mobileConfigBtn.setAttribute('aria-label',`${_MOBILE_CONFIG_BASE_LABEL}; ${state.label}`);
-    mobileConfigBtn.setAttribute('title',`${_MOBILE_CONFIG_BASE_LABEL} \u00b7 ${state.label}`);
+    mobileConfigBtn.setAttribute('aria-label',_mobileConfigLabel(state));
+    mobileConfigBtn.setAttribute('title',_mobileConfigLabel(state));
   }
   if(row){
     row.style.display='';
@@ -8706,7 +8715,8 @@ function renderMd(raw){
 }
 
 function _stripAttachedFilesMarkerForDisplay(text){
-  return String(text||'').replace(/\n\n\[Attached files: [^\]]+\]$/,'').trim();
+  // A repair request carries the view's error for the agent only.
+  return String(text||'').replace(/\n\n\[View report\][\s\S]*?\[\/View report\]\s*$/,'').replace(/\n\n\[Attached files: [^\]]+\]$/,'').trim();
 }
 
 function setStatus(t){

@@ -64,7 +64,8 @@ WIKI_HOSTS = {lang: f"{lang}.wikipedia.org" for lang in ("nl", "en", "de", "fr")
 COMMONS_API_URL = "https://commons.wikimedia.org/w/api.php"
 ALLOWED_HOSTS = frozenset({"api.pdok.nl", "nominatim.openstreetmap.org", "commons.wikimedia.org", *WIKI_HOSTS.values()})
 PHOTO_PREFIX = "https://upload.wikimedia.org/wikipedia/commons/"
-DEFAULT_TILES = {"url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png", "attribution": "© OpenStreetMap", "maxZoom": 19}
+# "local": the kit loads tiles from this server (api/map_tiles.py).
+DEFAULT_TILES = {"url": "local", "attribution": "", "maxZoom": 19}
 USER_AGENT = "SynthwaveSuperAgent/1.0 (+https://synthwave.solutions)"
 
 MAX_BODY = 16 * 1024
