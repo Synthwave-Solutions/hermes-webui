@@ -262,6 +262,13 @@ def test_parser_in_node():
     assert "all parser checks passed" in result.stdout
 
 
+@pytest.mark.skipif(NODE is None, reason="node is not installed")
+def test_form_block_in_node():
+    result = subprocess.run([NODE, str(REPO / "tests" / "form_block.cjs")], capture_output=True, text=True, timeout=60)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "all form checks passed" in result.stdout
+
+
 # ── Data blocks: the kit frame ──────────────────────────────────────────────
 
 class _Request(_Handler):
@@ -398,8 +405,9 @@ def test_data_prompt_appears_once_before_the_interactive_block(isolated_prompt):
 def test_data_prompt_names_the_rules_within_its_budget():
     text = interactive_ui.PROMPT_DATA
     assert not re.search(LONG_DASHES, text)
-    assert len(text.split()) <= 600  # grows with each data block kind
-    for phrase in ("```table", "```chart", "```map", "```csv", "```kpi", "```timeline", "JSON numbers", "lat and lng only when a tool or the user supplied them",
+    assert len(text.split()) <= 600
+    for phrase in ("```table", "```chart", "```map", "```csv", "```kpi", "```timeline", "```form", "```flow", "```compare", "```funnel", "radar", "only when you need structured answers",
+                   "at most 8 questions, 12 options each", "JSON numbers", "lat and lng only when a tool or the user supplied them",
                    "Never put travel times, distances or opening hours", "photos:true only for landmarks",
                    "At most one data block per reply", "takeaway"):
         assert phrase in text, phrase

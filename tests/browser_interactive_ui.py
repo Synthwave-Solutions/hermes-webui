@@ -20,6 +20,11 @@ that streams replies with ```interactive-ui blocks, then drives Chromium:
     milestones, the today line, click and keyboard details, and the stacked
     list at 390 px. Map tiles and Wikimedia are stubbed with page.route and the
     geocoder is off: no network.
+11. a questions form (```form): a quiet line while it streams, required
+    fields checked, a draft in the message box kept, a Dutch date box, arrow
+    keys and Enter, synthetic clicks ignored, Versturen sends a plain answer
+    with its own toast, the card locks with the answers and stays answered
+    after a reload; a /btw row does not close an open form.
 
 Screenshots land in IUI_ARTIFACT_DIR (default: a temp dir, printed at the end).
 
@@ -108,12 +113,24 @@ TIMELINE_SPEC = {"title": "Uitrol Junior AI", "lang": "nl", "unit": "week", "sta
     {"label": "Training", "start": 7, "end": 7, "status": "todo"},
     {"label": "Live", "start": 8, "milestone": True, "status": "todo"},
 ]}
+FORM_SPEC = {"title": "Uitrol Junior AI: een paar keuzes", "lang": "nl", "intro": "Dan maak ik de planning en de begroting op maat.", "fields": [
+    {"id": "budget", "label": "Budget", "type": "number", "unit": "€ per maand", "min": 500, "max": 50000, "required": True, "placeholder": "Bijvoorbeeld 5.000"},
+    {"id": "start", "label": "Start", "type": "date", "min": "2026-01-01"},
+    {"id": "teams", "label": "Welke teams doen mee?", "type": "multi", "options": ["Sales", "Finance", "Operations", "HR"], "required": True},
+    {"id": "tempo", "label": "Tempo", "type": "choice", "options": ["Rustig", "Normaal", "Snel"], "default": "Normaal"},
+    {"id": "uren", "label": "Uren per week voor training", "type": "slider", "min": 0, "max": 20, "unit": "uur"},
+    {"id": "pilot", "label": "Eerst een pilot?", "type": "yesno"},
+    {"id": "wensen", "label": "Nog iets dat ik moet weten?", "type": "text", "placeholder": "Optioneel"},
+]}
+_FORM_JSON = json.dumps(FORM_SPEC, ensure_ascii=False, indent=1)
+FORM_LEAD = "Ik heb nog een paar dingen van je nodig."
 DATA_TURNS = {
     "[tabel]": ["Hier zijn de klanten.\n\n```table\n", json.dumps(TABLE_SPEC, ensure_ascii=False, indent=1), "\n```\n\nBos 08 groeit het hardst."],
     "[csv]": ["Als CSV:\n\n```csv\n", CSV_BLOCK, "```\n\nEn als code:\n\n```chart\nnew Chart(ctx, {type: 'bar'});\n```\n"],
     "[grafiek]": ["De omzet per maand:\n\n```chart\n", json.dumps(CHART_SPEC, ensure_ascii=False), "\n```\n\nMaart sprong eruit."],
     "[kaart]": ["Je route:\n\n```map\n", json.dumps(MAP_SPEC, ensure_ascii=False), "\n```\n\nDrie stops liggen dicht bij elkaar."],
     "[kpi]": ["De cijfers van oktober:\n\n```kpi\n", json.dumps(KPI_SPEC, ensure_ascii=False), "\n```\n\nDe MRR groeit, de churn loopt op."],
+    "[formulier]": [FORM_LEAD + "\n\n```form\n"] + [_FORM_JSON[i:i + 60] for i in range(0, len(_FORM_JSON), 60)] + ["\n```\n"],
     "[planning]": ["De planning:\n\n```timeline\n", json.dumps(TIMELINE_SPEC, ensure_ascii=False, indent=1), "\n```\n\nDe acceptatietest is het risico."],
 }
 
@@ -648,6 +665,145 @@ def data_blocks(page, ctx, gateway, art, base_runs):
     return runs
 
 
+def form_block(page, gateway, art, base_runs):
+    """Step 11: a questions form drawn by the chat itself; the answer is the user's next message."""
+    page.set_viewport_size({"width": 1280, "height": 900})
+    page.evaluate("""() => { window.__formRaw = false; window.__formWait = false;
+        window.__formWatch = setInterval(() => {
+            const live = document.getElementById('liveAssistantTurn');
+            if (!live) return;
+            if ([...live.querySelectorAll('pre code')].some(c => /(^| )(language-)?form( |$)/.test(c.className) && c.offsetParent !== null)) window.__formRaw = true;
+            if ([...live.querySelectorAll('.iui-form-wait')].some(w => w.offsetParent !== null)) window.__formWait = true;
+            if ([...live.querySelectorAll('*')].some(n => n.offsetParent !== null && n.children.length === 0 && /"fields"/.test(n.textContent || ''))) window.__formRaw = true;
+        }, 25); }""")
+    runs = base_runs + 1
+    send_turn(page, gateway, "Stel me een paar vragen [formulier]", runs, FORM_LEAD)
+    seen = page.evaluate("() => { clearInterval(window.__formWatch); return {raw: window.__formRaw, wait: window.__formWait}; }")
+    assert seen["raw"] is False, "the form's JSON was visible while the reply streamed"
+    assert seen["wait"] is True, "no quiet placeholder while the form streamed"
+    form = page.locator(".iui-form:visible").last
+    form.wait_for(timeout=20000)
+    assert form.locator(".iui-form-title").inner_text() == FORM_SPEC["title"]
+    assert form.locator(".iui-field").count() == len(FORM_SPEC["fields"])
+    assert page.locator("pre code.language-form:visible").count() == 0
+    assert "fields" not in page.inner_text("#messages"), "raw JSON in the chat"
+    form.scroll_into_view_if_needed()
+    form.screenshot(path=str(art / "40-form.png"))
+    # Required fields are checked; nothing is sent.
+    form.locator(".iui-form-submit").click()
+    time.sleep(0.4)
+    assert form.locator(".iui-field.is-invalid").count() == 2, form.locator(".iui-field.is-invalid").count()
+    assert "Nog 2 vragen" in form.locator(".iui-form-hint").inner_text()
+    assert len(gateway.runs) == runs, "an incomplete form must not be sent"
+    form.screenshot(path=str(art / "41-form-required.png"))
+    # Fill it in with the real controls.
+    form.locator("[data-field=budget] input").fill("5.000")
+    # The date box takes Dutch dates whatever the browser language, and says the day in words.
+    start = form.locator("[data-field=start] input.iui-input")
+    assert start.get_attribute("type") == "text" and start.get_attribute("placeholder") == "dd-mm-jjjj"
+    start.fill("1-12-2026")
+    assert form.locator("[data-field=start] .iui-date-echo").inner_text() == "dinsdag 1 december 2026"
+    assert form.locator("[data-field=start] .iui-date-pick").get_attribute("aria-label") == "Kies in de kalender"
+    form.locator("[data-field=teams] .iui-opt", has_text="Sales").click()
+    form.locator("[data-field=teams] .iui-opt", has_text="Operations").click()
+    # Keyboard: arrows move the choice inside a radio group (Normaal is the default).
+    form.locator("[data-field=tempo] .iui-opt[aria-checked=true]").focus()
+    page.keyboard.press("ArrowRight")
+    assert form.locator("[data-field=tempo] .iui-opt[aria-checked=true]").inner_text() == "Snel"
+    assert page.evaluate("() => document.activeElement.textContent") == "Snel", "focus follows the choice"
+    form.locator("[data-field=uren] input[type=range]").fill("7")
+    assert form.locator("[data-field=uren] .iui-slider-val").inner_text() == "7 uur"
+    form.locator("[data-field=pilot] .iui-opt", has_text="Ja").click()
+    form.locator("[data-field=wensen] input").fill("Vooral de training van het team.")
+    assert form.locator(".iui-field.is-invalid").count() == 0
+    form.screenshot(path=str(art / "42-form-filled.png"))
+    # A draft in the message box is never overwritten.
+    page.locator("#msg").fill("mijn eigen concept")
+    form.locator(".iui-form-submit").click()
+    time.sleep(0.8)
+    assert len(gateway.runs) == runs and page.input_value("#msg") == "mijn eigen concept", "the draft must be kept"
+    assert "is-locked" not in (form.get_attribute("class") or "")
+    page.locator("#msg").fill("")
+    # A click from a script is not the user: nothing is sent.
+    page.evaluate("() => [...document.querySelectorAll('.iui-form-submit')].pop().click()")
+    time.sleep(0.6)
+    assert len(gateway.runs) == runs and "is-locked" not in (form.get_attribute("class") or ""), "a synthetic click must not send"
+    page.evaluate("""() => { window.__toasts = []; const o = window.showToast;
+        window.showToast = function (m, d, k) { window.__toasts.push(String(m)); return typeof o === 'function' ? o.apply(this, arguments) : undefined; }; }""")
+    # Enter in the number box sends, like Versturen.
+    form.locator("[data-field=budget] input").focus()
+    page.keyboard.press("Enter")
+    body = wait_runs(gateway, runs + 1)
+    for line in ("Mijn antwoorden:", "- Budget: € 5.000 per maand", "- Start: 1 december", "- Welke teams doen mee? Sales en Operations",
+                 "- Tempo: Snel", "- Uren per week voor training: 7 uur", "- Eerst een pilot? Ja", "- Nog iets dat ik moet weten? Vooral de training van het team."):
+        assert line in body, (line, body)
+    assert "{" not in body and "budget" not in body and "multi" not in body, body
+    wait_idle(page)
+    page.wait_for_function(f"() => document.getElementById('messages').innerText.includes('Antwoord op vervolgvraag {runs}')", timeout=20000)
+    time.sleep(1.5)
+    bubble = page.locator(".msg-row[data-role='user']:visible").last.inner_text()
+    assert "Budget: € 5.000 per maand" in bubble and "fields" not in bubble, bubble
+    toasts = page.evaluate("() => window.__toasts || []")
+    assert "Antwoorden verstuurd" in toasts and "Vraag verstuurd" not in toasts, toasts
+    focus = page.evaluate("() => { const a = document.activeElement; return a === document.body ? 'body' : a.classList.contains('iui-form') ? 'form' : (a.id || a.className || a.tagName); }")
+    assert focus in ("form", "msg"), f"focus fell back to the page after sending: {focus}"
+    done = page.locator(".iui-form:visible").last
+    assert "is-locked" in (done.get_attribute("class") or ""), "the answered form must lock"
+    assert done.locator(".iui-form-submit").count() == 0 and done.locator(".iui-opt").count() == 0
+    summary = done.locator(".iui-form-summary").inner_text()
+    assert "€ 5.000 per maand" in summary and "Sales en Operations" in summary, summary
+    done.scroll_into_view_if_needed()
+    done.screenshot(path=str(art / "43-form-answered.png"))
+    ok("questions form: quiet while streaming, required fields checked, draft kept, plain answer sent, card locked with the answers")
+    # After a reload in a fresh tab state the form reads its answers back from the message.
+    page.evaluate("() => sessionStorage.clear()")
+    page.reload(wait_until="domcontentloaded")
+    page.wait_for_function(f"() => document.getElementById('messages') && document.getElementById('messages').innerText.includes('Antwoord op vervolgvraag {runs}')", timeout=45000)
+    time.sleep(2.0)
+    again = page.locator(".iui-form").last
+    again.scroll_into_view_if_needed()
+    page.wait_for_function("() => { const f=[...document.querySelectorAll('.iui-form')].pop(); return !!f && f.classList.contains('is-locked'); }", timeout=20000)
+    assert "Sales en Operations" in again.locator(".iui-form-summary").inner_text()
+    ok("after a reload the form stays answered and shows the answers from the sent message")
+    # Screenshots: open and answered, light and dark, desktop and 390 px.
+    send_turn(page, gateway, "Nog een keer [formulier]", runs + 2, FORM_LEAD)
+    fresh = page.locator(".iui-form:not(.is-locked):visible").last
+    # A /btw side question below the reply does not close the form.
+    page.evaluate("""() => { const t = [...document.querySelectorAll('.assistant-turn')].pop();
+        const r = document.createElement('div'); r.className = 'msg-row msg-row-btw'; r.dataset.role = 'assistant'; r.dataset.btw = '1';
+        r.id = 'iuiBtwProbe'; r.textContent = 'Terzijde'; t.parentNode.insertBefore(r, t.nextSibling); }""")
+    assert fresh.locator(".iui-form-submit").is_visible(), "a /btw row hid Versturen"
+    assert page.evaluate("() => _iui.formTurnState([...document.querySelectorAll('.iui-form-host')].pop()).locked") is False
+    page.evaluate("() => document.getElementById('iuiBtwProbe').remove()")
+    # Clicking the untouched slider thumb without moving it is an answer too.
+    slider = fresh.locator("[data-field=uren] input[type=range]")
+    assert fresh.locator("[data-field=uren] .iui-slider-val").inner_text() == "Schuif om te kiezen"
+    assert slider.get_attribute("aria-valuetext") == "Schuif om te kiezen"
+    slider.click()
+    assert fresh.locator("[data-field=uren] .iui-slider-val").inner_text().endswith(" uur")
+    assert slider.get_attribute("aria-valuetext").endswith(" uur")
+    ok("questions form: Dutch date box, arrow keys, Enter sends, synthetic clicks ignored, own toast, /btw ignored, slider thumb click counts")
+    shots = []
+    for theme in ("light", "dark"):
+        page.evaluate(f"() => _applyTheme('{theme}')")
+        for width, tag in ((1280, "desktop"), (390, "mobile")):
+            page.set_viewport_size({"width": width, "height": 900 if width > 400 else 844})
+            time.sleep(0.6)
+            for which, sel in (("open", ".iui-form:not(.is-locked):visible"), ("answered", ".iui-form.is-locked:visible")):
+                c = page.locator(sel).last
+                c.scroll_into_view_if_needed()
+                name = f"44-form-{which}-{theme}-{tag}.png"
+                c.screenshot(path=str(art / name))
+                shots.append(name)
+            if width == 390:
+                overflow = page.evaluate("() => { const f=[...document.querySelectorAll('.iui-form')].pop(); return f.scrollWidth - f.clientWidth; }")
+                assert overflow <= 1, f"the form overflows by {overflow}px at 390 px"
+    page.evaluate("() => _applyTheme('dark')")
+    page.set_viewport_size({"width": 1280, "height": 900})
+    ok(f"form screenshots: {', '.join(shots)}")
+    return runs + 2
+
+
 def main() -> int:
     from playwright.sync_api import sync_playwright
 
@@ -946,6 +1102,9 @@ def main() -> int:
 
             # 10. data blocks
             data_blocks(page, ctx, gateway, art, len(gateway.runs))
+
+            # 11. questions form
+            form_block(page, gateway, art, len(gateway.runs))
 
             unexpected = [e for e in console_errors if not any(s in e for s in (
                 "nietBestaandeFunctie", "evil.example", "favicon", "manifest", "sw.js", "serviceworker", "Content Security Policy",
