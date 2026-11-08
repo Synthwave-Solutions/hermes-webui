@@ -2501,6 +2501,12 @@
       "#mainApps [data-app-id=\"openseo\"]"
     ]
   },
+  "webui.apps.twenty": {
+    "panel": "apps",
+    "targets": [
+      "#mainApps [data-app-id=\"twenty\"]"
+    ]
+  },
   "webui.apps.n8n": {
     "panel": "apps",
     "targets": [

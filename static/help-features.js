@@ -14050,6 +14050,56 @@ window.SynthPulseFeatureCatalog = {
       }
     },
     {
+      "id": "webui.apps.twenty",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured app directory and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.twenty",
+        "#mainApps [data-app-id=\"twenty\"]"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "Twenty CRM openen",
+          "purpose": "Beheer contacten, bedrijven, deals, notities en taken in het CRM.",
+          "when": "Gebruik deze ingang voor een deal opzoeken en een vervolgtaak aanmaken.",
+          "steps": [
+            "Kies Apps in de navigatie en zoek Twenty CRM.",
+            "Bekijk de status en de beschrijving van de kaart.",
+            "Sluit de gids en kies Openen als een adres is ingesteld. Rond indien nodig de eigen aanmelding van de app af.",
+            "Werk verder in de doelapp en gebruik het oorspronkelijke tabblad om terug te keren naar SynthPulse."
+          ],
+          "permissions": "Toegang tot Apps en de bijbehorende actieve module; platformbeheerders kunnen ingestelde appadressen ook zonder die module bekijken. De doelapp controleert zelf je toegang.",
+          "limits": "Openen navigeert alleen naar het ingestelde adres. De app kan een eigen aanmelding vereisen. Niet ingesteld betekent dat er geen bruikbare link is; een ingestelde link garandeert niet dat de dienst bereikbaar is.",
+          "example": "Bijvoorbeeld: een deal opzoeken en een vervolgtaak aanmaken."
+        },
+        "en": {
+          "title": "Open Twenty CRM",
+          "purpose": "Manage contacts, companies, deals, notes and tasks in the CRM.",
+          "when": "Use this entry point for looking up a deal and creating a follow-up task.",
+          "steps": [
+            "Choose Apps in navigation and find Twenty CRM.",
+            "Review the card’s status and description.",
+            "Close the guide and choose Open when an address is configured. Complete the app’s own sign-in if required.",
+            "Continue in the destination app and use the original tab to return to SynthPulse."
+          ],
+          "permissions": "Access to Apps and the associated active module; platform administrators can discover configured app addresses even without that module. The destination app checks its own access.",
+          "limits": "Open only navigates to the configured address. The app may require its own sign-in. Not configured means there is no usable link; a configured link does not guarantee the service is reachable.",
+          "example": "For example: looking up a deal and creating a follow-up task."
+        }
+      }
+    },
+    {
       "id": "webui.apps.n8n",
       "area": "apps",
       "status": "conditional",

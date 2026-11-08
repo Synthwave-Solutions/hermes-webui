@@ -44,6 +44,8 @@ _ROWS = (
             'Create 3D models, scenes and renders in Blender in your browser.'),
     AppSpec('openseo', 'OpenSEO', 'Doe zoekwoordonderzoek, volg posities en audit websites voor SEO en AI-zichtbaarheid.',
             'Research keywords, track rankings and audit websites for SEO and AI visibility.', 'workspace', 'marketing', 'platform'),
+    AppSpec('twenty', 'Twenty CRM', 'Beheer contacten, bedrijven, deals, notities en taken in het CRM.',
+            'Manage contacts, companies, deals, notes and tasks in the CRM.', 'workspace', 'sales', 'platform'),
     AppSpec('n8n', 'n8n', 'Bouw en beheer geautomatiseerde workflows.',
             'Build and manage automated workflows.', 'workflows', 'automation', 'platform'),
     AppSpec('omniroute', 'OmniRoute', 'Beheer modelroutes en verbindingen met AI-aanbieders.',
