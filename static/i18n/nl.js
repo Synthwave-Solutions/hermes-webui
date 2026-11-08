@@ -2801,4 +2801,13 @@ window.__registerHermesLocale('nl', {
   composer_project_title: 'Kies het project waarin je werkt',
   shared_change_hint_space: 'Dit verandert het voor iedereen die deze ruimte gebruikt.',
   shared_change_hint_project: 'Dit verandert het voor iedereen in dit project.',
+  // Bot teamwork: handoffs, specialist results, helper credit.
+  bot_team_task_from_to: 'Opdracht van {0} aan {1}',
+  bot_team_answer_from_to: 'Antwoord van {0} aan {1}',
+  bot_team_view_task: 'Bekijk de opdracht',
+  bot_team_result_done: '{0} is klaar',
+  bot_team_result_partial: '{0} meldde zich terug, maar niet alles is gelukt',
+  bot_team_result_to: 'Antwoord gaat naar {0}',
+  bot_team_result_open: 'Bekijk het werk van {0}',
+  bot_team_assisted_by: 'met hulp van {0}',
 });

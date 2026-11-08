@@ -199,6 +199,18 @@ initiating human, including when that person is a guest in the originating group
 the existing participant controls; it never changes membership. Prefer background
 work unless ongoing shared participation is necessary.
 
+In the chat this shows as teamwork, without profile IDs. The asking bot's turn
+ends with one line such as "Sanne heeft Linus gevraagd: ..." with both bot
+photos; the task itself sits behind "Bekijk de opdracht". A specialist's report
+is a "Linus is klaar" card with a link to its sub-conversation, and the reply
+that follows carries a "met hulp van Linus" chip. That chip is derived only
+from the structured `bot_delegation.result` records directly before the reply,
+never from message text. A handoff task row reads "Opdracht van Sanne aan
+Grace" with the bot-written task folded. The "Teamwerk" strip under the chat
+lists specialists and handoff jobs of the conversation (`GET
+/api/session/subagents`, read-only) with plain statuses and folds once all work
+is done.
+
 Both source and target access are rechecked before dispatch and return. Target
 restrictions and the originating permission ceiling remain enforced. One task can
 be queued per turn and chains are bounded to four handoffs. Cancellation of the

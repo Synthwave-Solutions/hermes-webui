@@ -60,6 +60,14 @@
   function botHandle(id, title) { return handleFromText(title) || handleFromText(id) || 'bot'; }
   function handleFor(p) { return botHandle(p && p.name, p && p.bot && p.bot.title); }
   function profileFor(id) { return profiles.find(p => p && p.name === id) || null; }
+  // Display identity for teamwork lines and cards (static/tool-friendly.js):
+  // the viewer's own catalog only, never another person's bot list.
+  function botInfo(id) {
+    const p = profileFor(id);
+    if (!p) return null;
+    const title = p.bot && typeof p.bot.title === 'string' ? p.bot.title.trim() : '';
+    return {known:true, title, avatar_url:typeof p.bot_avatar_url === 'string' ? p.bot_avatar_url : ''};
+  }
   function handleForBot(id, title) { const p = profileFor(id); return p ? handleFor(p) : botHandle(id, title); }
   // The text that addresses a bot: its handle when no other bot here shares it.
   function addressName(p, rows) {
@@ -565,6 +573,7 @@
     }).catch(() => { if (fresh()) catalogRetry = true; }).finally(() => {
       if (!fresh()) return;
       loading = false; paint(); paintMenu(); scheduleDecorate();
+      try { window.dispatchEvent(new CustomEvent('synpulse:bot-catalog')); } catch (_) {}
     });
     if (!actor()) { people = []; peopleLoading = false; return; }
     Promise.resolve(api('/api/bot-screen/status', {timeoutToast:false, redirect401:false})).then(result => {
@@ -650,7 +659,7 @@
   // Live bot identity of group turns (plan 5.2). static/messages.js hands each
   // `turn_bot` stream event to onTurnBot; workingState(sessionId) is the
   // Working state per session, also announced as `synpulse:group-working`.
-  window.groupRouting = {onTurnBot, workingState, reasonText, handleFor, setDefaultBot, predictRoute:currentRoute};
+  window.groupRouting = {onTurnBot, workingState, reasonText, handleFor, setDefaultBot, predictRoute:currentRoute, botInfo, catalogReady};
   window.chatBotRecipientRules = {available, address, mentions, fold, normalizeBotAddress,
     HANDLE_DENYLIST, handleFromText, botHandle, resolveMention, predictRoute, reasonText, lastBot};
 })();

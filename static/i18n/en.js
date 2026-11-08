@@ -2906,4 +2906,13 @@ window.__registerHermesLocale('en', {
     composer_project_title: 'Choose the project you work in',
     shared_change_hint_space: 'This changes it for everyone who uses this space.',
     shared_change_hint_project: 'This changes it for everyone in this project.',
+    // Bot teamwork: handoffs, specialist results, helper credit.
+    bot_team_task_from_to: 'Task from {0} to {1}',
+    bot_team_answer_from_to: 'Answer from {0} to {1}',
+    bot_team_view_task: 'View the task',
+    bot_team_result_done: '{0} is done',
+    bot_team_result_partial: '{0} reported back, but not everything worked',
+    bot_team_result_to: 'The answer goes to {0}',
+    bot_team_result_open: 'See the work of {0}',
+    bot_team_assisted_by: 'with help from {0}',
 });

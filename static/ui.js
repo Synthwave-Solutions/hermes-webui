@@ -16855,6 +16855,19 @@ function _processWakeupInfo(m, text){
   };
 }
 function _processWakeupCardHtml(info, rawText, extras){
+  const _delegation=extras&&extras.botDelegation;
+  const _bt=typeof window!=='undefined'&&window.SynPulseFriendlyTools&&window.SynPulseFriendlyTools.bots;
+  if(_delegation&&_delegation.result===true&&_bt&&(info.type==='delegation'||info.type==='async_delegation')){
+    // A bot answered another bot: say who did the work and where it goes.
+    // The envelope itself (agent instructions, raw result) stays out of the DOM.
+    const raw=String(rawText||'');
+    const uncertain=/^--- ERROR ---\r?$/m.test(raw)||/\nUnresolved delegated work:\n/.test(raw);
+    const helper=String(_delegation.from||''), lead=String(_delegation.to||'');
+    const helperName=_bt.name(helper), leadName=_bt.name(lead);
+    const open=/^[a-f0-9]{12}$/.test(_delegation.session_id||'')
+      ?`<button type="button" class="sp-bot-result-open" data-sp-specialist-open="${esc(_delegation.session_id)}" data-sp-specialist-profile="${esc(helper)}">${esc(t('bot_team_result_open',helperName))} <span aria-hidden="true">↗</span></button>`:'';
+    return `<div class="sp-bot-result" data-state="${uncertain?'partial':'done'}" title="${esc('@'+helper)}">${_bt.avatarHtml(helper,helperName,'sp-bot-result-avatar')}<div class="sp-bot-result-main"><div class="sp-bot-result-title">${esc(t(uncertain?'bot_team_result_partial':'bot_team_result_done',helperName))}</div><div class="sp-bot-result-sub">${esc(t('bot_team_result_to',leadName))}${extras.timeHtml||''}</div></div>${open}</div>`;
+  }
   if(info.type==='delegation'||info.type==='async_delegation'){
     // Agent instructions and subagent transcripts stay in model history, not
     // the chat DOM. A COMPLETE envelope does not prove successful execution.
@@ -16903,6 +16916,13 @@ function _groupAuthorLineHtml(message){
       const handoff=message.bot_delegation;
       const childLink=handoff.mode==='background'&&handoff.result&&/^[a-f0-9]{12}$/.test(handoff.session_id||'')
         ?` <button type="button" class="sp-subagent-open" data-sp-specialist-open="${esc(handoff.session_id)}" data-sp-specialist-profile="${esc(String(handoff.from||''))}">${esc(document.documentElement.lang==='nl'?'Open subgesprek':'Open sub-conversation')} ↗</button>`:'';
+      const bt=typeof window!=='undefined'&&window.SynPulseFriendlyTools&&window.SynPulseFriendlyTools.bots;
+      if(bt&&typeof bt.name==='function'){
+        const from=String(handoff.from||''), to=String(handoff.to||'');
+        const fromName=bt.name(from), toName=bt.name(to);
+        const label=t(handoff.result?'bot_team_answer_from_to':'bot_team_task_from_to', fromName, toName);
+        return `<div class="msg-author sp-handoff-author" title="${esc('@'+from+' ↪ @'+to)}">${bt.avatarHtml(from,fromName,'sp-bot-avatar-from')}${bt.avatarHtml(to,toName,'sp-bot-avatar-to')}<span class="msg-author-name">${esc(label)}</span>${childLink}</div>`;
+      }
       return `<div class="msg-author"><span class="msg-author-name">${esc(String(handoff.from||''))} → ${esc(String(handoff.to||''))}</span>${childLink}</div>`;
     }
     const people=S.session.participants;
@@ -17503,7 +17523,7 @@ function renderMessages(options){
         noticeClass+=' process-wakeup-notice-card';
         const exitStr=wakeupInfo.exitCode==null?'':String(wakeupInfo.exitCode);
         if(wakeupInfo.type==='completion'&&/^-?\d+$/.test(exitStr)&&exitStr!=='0') noticeClass+=' process-wakeup-fail';
-        noticeInnerHtml=_processWakeupCardHtml(wakeupInfo, processText, {timeHtml, filesHtml, contextHtml:_groupAuthorLineHtml(m), footHtml:`<div class="msg-foot"><span class="msg-actions">${copyBtn}</span></div>`});
+        noticeInnerHtml=_processWakeupCardHtml(wakeupInfo, processText, {timeHtml, filesHtml, contextHtml:_groupAuthorLineHtml(m), footHtml:`<div class="msg-foot"><span class="msg-actions">${copyBtn}</span></div>`, botDelegation:m.bot_delegation});
       }else{
         const processTextHtml=processText?`<pre class="process-wakeup-text">${esc(processText)}</pre>`:'';
         noticeInnerHtml=`<div class="process-wakeup-label">${li('terminal',13)}<span>${esc(t('process_wakeup_label'))}</span></div>${filesHtml}<div class="msg-body process-wakeup-body">${processTextHtml}</div>${processFootHtml}`;
@@ -17560,7 +17580,11 @@ function renderMessages(options){
       let row=(_msgNodeRecycleEnabled||_msgNodeRecycleSameSession)?_recycleStash.get(rawIdx):null;
       if(row&&(!row.classList.contains('msg-row')||row.classList.contains('assistant-turn'))) row=null;
       const newRawText=String(displayContent).trim();
-      const nextRowHtml=`${_groupAuthorLineHtml(m)}${filesHtml}<div class="msg-body">${bodyHtml}</div>${footHtml}`;
+      const botTask=!!(m.bot_delegation&&!m.bot_delegation.result&&typeof m.bot_delegation.task==='string');
+      const bodyBlock=botTask
+        ?`<details class="sp-handoff-task"><summary>${esc(t('bot_team_view_task'))}</summary><div class="msg-body">${bodyHtml}</div></details>`
+        :`<div class="msg-body">${bodyHtml}</div>`;
+      const nextRowHtml=`${_groupAuthorLineHtml(m)}${filesHtml}${bodyBlock}${footHtml}`;
       if(row){
         row.className='msg-row';
         row.id=_userMessageDomId(rawIdx);
@@ -17570,8 +17594,10 @@ function renderMessages(options){
         row.dataset.role='user';
         delete row.dataset.editing;
         if(row.dataset.rawText!==newRawText||row.innerHTML!==nextRowHtml){
+          const taskOpen=!!(botTask&&row.querySelector('details.sp-handoff-task[open]'));
           row.dataset.rawText=newRawText;
           row.innerHTML=nextRowHtml;
+          if(taskOpen){ const d=row.querySelector('details.sp-handoff-task'); if(d) d.open=true; }
         }
       }else{
         row=document.createElement('div');
@@ -17632,6 +17658,18 @@ function renderMessages(options){
           icon.appendChild(avatar);
         }
         role.title='@'+String(m.bot_profile);
+      }
+    }
+    {
+      const _bt=typeof window!=='undefined'&&window.SynPulseFriendlyTools&&window.SynPulseFriendlyTools.bots;
+      const helpers=_bt&&typeof _bt.assistedBy==='function'?_bt.assistedBy(S.messages,rawIdx):[];
+      const role=helpers.length?currentAssistantTurn.querySelector('.msg-role.assistant'):null;
+      if(role&&!role.querySelector('.sp-assisted-chip')){
+        const chip=document.createElement('span');
+        chip.className='sp-assisted-chip';
+        chip.textContent=t('bot_team_assisted_by',_bt.joinNames(helpers.map(id=>_bt.name(id))));
+        chip.title=helpers.map(id=>'@'+id).join(', ');
+        role.appendChild(chip);
       }
     }
     _setLatestAssistantTurnLandmark(currentAssistantTurn, !m._live&&rawIdx===latestRenderedAssistantRawIdx);
@@ -19247,11 +19285,14 @@ function buildToolCard(tc){
   const disclosureKey=typeof _toolDisclosureIdentity==='function'?_toolDisclosureIdentity(tc):'';
   if(disclosureKey) row.setAttribute('data-tool-disclosure-key', disclosureKey);
   const friendly=typeof _friendlyToolInfo==='function'?_friendlyToolInfo(tc):null;
-  const icon=friendly?`<span class="sp-tool-emoji" aria-hidden="true">${friendly.emoji}</span>`:toolIcon(tc.name);
+  // Bot handoffs (delegate_to_bot) show both avatars and only the task as detail.
+  const handoffTask=friendly&&friendly.family==='handoff'?String(friendly.task||''):null;
+  const icon=friendly?(friendly.iconHtml||`<span class="sp-tool-emoji" aria-hidden="true">${friendly.emoji}</span>`):toolIcon(tc.name);
   const hasRawDetail=!!(tc.snippet)||(tc.args&&Object.keys(tc.args).length>0);
   const allowsDetail=typeof _toolCardAllowsDetail==='function'?_toolCardAllowsDetail(toolKind,tc):true;
   // Friendly rows keep every raw detail behind "Details", also for reads/searches.
-  const hasDetail=hasRawDetail&&(allowsDetail||!!friendly);
+  // A handoff row has a detail only when it has a task to show.
+  const hasDetail=hasRawDetail&&(allowsDetail||!!friendly)&&handoffTask===null||!!handoffTask;
   let displaySnippet='';
   if(tc.snippet){
     const s=tc.snippet;
@@ -19288,12 +19329,13 @@ function buildToolCard(tc){
   }
   const statusChip=friendly&&window.SynPulseFriendlyTools?window.SynPulseFriendlyTools.statusChipHtml(friendly):'';
   const toggleHtml=friendly
-    ?`<span class="tool-card-toggle sp-details-toggle"><span class="sp-details-label">${esc(window.SynPulseFriendlyTools.text('details'))}</span>${li('chevron-right',12)}</span>`
+    ?`<span class="tool-card-toggle sp-details-toggle"><span class="sp-details-label">${esc(friendly.detailsLabel||window.SynPulseFriendlyTools.text('details'))}</span>${li('chevron-right',12)}</span>`
     :`<span class="tool-card-toggle">${li('chevron-right',12)}</span>`;
-  const detailLeadText=hasDetail&&typeof _toolDetailLeadText==='function'?_toolDetailLeadText(toolKind,tc):'';
+  const detailLeadText=handoffTask===null&&hasDetail&&typeof _toolDetailLeadText==='function'?_toolDetailLeadText(toolKind,tc):'';
   const detailLeadLabel=typeof _toolDetailLeadLabel==='function'?_toolDetailLeadLabel(toolKind):(toolKind==='shell'?'Shell':'Input');
-  const detailLead=detailLeadText?`<div class="tool-card-detail-lead"><div class="tool-card-detail-lead-label">${esc(detailLeadLabel)}</div><pre>${esc(detailLeadText)}</pre></div>`:'';
-  const argsEntries=tc.args&&Object.keys(tc.args).length?Object.entries(tc.args):[];
+  const detailLead=handoffTask?`<div class="sp-handoff-brief">${esc(handoffTask)}</div>`
+    :detailLeadText?`<div class="tool-card-detail-lead"><div class="tool-card-detail-lead-label">${esc(detailLeadLabel)}</div><pre>${esc(detailLeadText)}</pre></div>`:'';
+  const argsEntries=handoffTask===null&&tc.args&&Object.keys(tc.args).length?Object.entries(tc.args):[];
   const visibleArgs=(detailLeadText&&toolKind==='shell')?[]:argsEntries;
   row.innerHTML=`
     <div class="${cardClass}">
@@ -19314,7 +19356,7 @@ function buildToolCard(tc){
             return `<div class="tool-arg-pair"><span class="tool-arg-key">${esc(k)}</span><span class="tool-arg-val">${esc(sv)}</span></div>`;
           }).join('')
         }</div>`:''}
-        ${displaySnippet?`<div class="tool-card-result">
+        ${displaySnippet&&handoffTask===null?`<div class="tool-card-result">
           <pre>${tc.is_diff||_snippetLooksLikeDiff(displaySnippet)?`<code class="diff-block" data-highlighted="1">${_colorDiffLines(displaySnippet)}</code>`:esc(displaySnippet)}</pre>
           ${hasMore?`<button class="tool-card-more" data-full="${esc(tc.snippet||'').replace(/"/g,'&quot;')}" data-short="${esc(displaySnippet||'').replace(/"/g,'&quot;')}" data-is-diff="${tc.is_diff||_snippetLooksLikeDiff(displaySnippet)?1:0}" data-more-label="${esc(moreLabel)}" data-less-label="${esc(lessLabel)}" onclick="event.stopPropagation();_toggleToolDiff(this)">${esc(moreLabel)}</button>`:''}
         </div>`:''}
