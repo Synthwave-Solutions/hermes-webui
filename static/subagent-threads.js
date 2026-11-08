@@ -284,7 +284,19 @@
       if(m.role!=='assistant') continue;
       for(const c of (Array.isArray(m.tool_calls)?m.tool_calls:[])){
         const fn=c&&c.function||{};
-        if((fn.name||c.name)==='delegate_to_bot') calls.push({id:String(c.id||''),args:parseArgs(fn.arguments!==undefined?fn.arguments:c.args),idx:i});
+        const name=fn.name||c.name;
+        const raw=fn.arguments!==undefined?fn.arguments:c.args;
+        if(name==='delegate_to_bot') calls.push({id:String(c.id||''),args:parseArgs(raw),idx:i});
+        else if(name==='tool_call'){
+          // Deferred tools arrive wrapped: tool_call {calls:[{name,arguments}]}.
+          const inner=parseArgs(raw).calls;
+          (Array.isArray(inner)?inner:[]).forEach((ic,j)=>{
+            if(ic&&ic.name==='delegate_to_bot'){
+              const a=typeof ic.arguments==='string'?parseArgs(ic.arguments):(ic.arguments&&typeof ic.arguments==='object'?ic.arguments:{});
+              calls.push({id:String(c.id||''),args:a,idx:i,sub:j,many:inner.length>1});
+            }
+          });
+        }
       }
       if(Array.isArray(m.content)){
         for(const part of m.content){
@@ -294,7 +306,10 @@
       }
     }
     return calls.map(c=>({name:'delegate_to_bot',args:c.args,assistant_msg_idx:c.idx,done:true,
-      result:Object.prototype.hasOwnProperty.call(results,c.id)?results[c.id]:'',key:c.id||('i'+c.idx)}));
+      // A wrapped call with several inner calls has one combined result: only
+      // its error text is not attributable, so treat it as unknown.
+      result:!c.many&&Object.prototype.hasOwnProperty.call(results,c.id)?results[c.id]:'',
+      key:(c.id||('i'+c.idx))+(c.sub!==undefined?':'+c.sub:'')}));
   }
   function decorate(container){
     const ft=FT();
@@ -307,7 +322,15 @@
     const scope=container&&container.querySelectorAll?container:doc.getElementById('msgInner');
     if(!scope||!messages.length) return;
     // Cheap exit for ordinary chats: no delegate_to_bot anywhere.
-    if(!messages.some(m=>m&&m.role==='assistant'&&((Array.isArray(m.tool_calls)&&m.tool_calls.some(c=>c&&((c.function&&c.function.name)||c.name)==='delegate_to_bot'))
+    const isHandoffCall=c=>{
+      if(!c) return false;
+      const n=(c.function&&c.function.name)||c.name;
+      if(n==='delegate_to_bot') return true;
+      if(n!=='tool_call') return false;
+      const raw=c.function&&c.function.arguments!==undefined?c.function.arguments:c.args;
+      return /delegate_to_bot/.test(typeof raw==='string'?raw:JSON.stringify(raw||''));
+    };
+    if(!messages.some(m=>m&&m.role==='assistant'&&((Array.isArray(m.tool_calls)&&m.tool_calls.some(isHandoffCall))
       ||(Array.isArray(m.content)&&m.content.some(p=>p&&p.type==='tool_use'&&p.name==='delegate_to_bot'))))){
       return;
     }

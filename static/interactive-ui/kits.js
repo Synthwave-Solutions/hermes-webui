@@ -363,7 +363,8 @@
         if(horizontal){ ctx.moveTo(p, area.top); ctx.lineTo(p, area.bottom); } else { ctx.moveTo(area.left, p); ctx.lineTo(area.right, p); }
         ctx.stroke();
         ctx.setLineDash([]); ctx.globalAlpha = 1; ctx.fillStyle = t.fg; ctx.font = '600 11px ' + (getComputedStyle(document.body).fontFamily || 'sans-serif');
-        var label = (target.label ? target.label + ': ' : '') + f(target.value);
+        // A label that already names the amount is shown as it is.
+        var label = target.label && /\d/.test(target.label) ? target.label : (target.label ? target.label + ': ' : '') + f(target.value);
         var w = ctx.measureText(label).width + 10, x, y;
         if(horizontal){ x = Math.min(p + 4, area.right - w); y = area.top + 2; }
         else { x = area.right - w; y = p - 20; }

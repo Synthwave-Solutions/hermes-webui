@@ -667,6 +667,7 @@ const _iui=(function(){
     const p=ctrl.parsed;
     const title=p.title||(ctrl.kit?kitWord('kitName',ctrl.kit):tx('title'));
     ctrl.pill.hidden=!(p.spec&&p.spec.example);
+    if(ctrl.kit) ctrl.pill.textContent=(TEXT[kitLang(ctrl)]||TEXT.en).example;
     if(ctrl.titleEl.textContent!==title) ctrl.titleEl.textContent=title;
     ctrl.card.setAttribute('aria-label',title);
     ctrl.moreBtn.hidden=!ctrl.final;
