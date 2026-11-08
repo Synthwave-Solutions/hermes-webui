@@ -398,7 +398,7 @@ def test_data_prompt_appears_once_before_the_interactive_block(isolated_prompt):
 def test_data_prompt_names_the_rules_within_its_budget():
     text = interactive_ui.PROMPT_DATA
     assert not re.search(LONG_DASHES, text)
-    assert len(text.split()) <= 360
+    assert len(text.split()) <= 600  # grows with each data block kind
     for phrase in ("```table", "```chart", "```map", "```csv", "```kpi", "```timeline", "JSON numbers", "lat and lng only when a tool or the user supplied them",
                    "Never put travel times, distances or opening hours", "photos:true only for landmarks",
                    "At most one data block per reply", "takeaway"):

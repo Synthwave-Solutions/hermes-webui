@@ -20,7 +20,7 @@
     placeName:80,address:200,time:20,note:240,category:30,categories:6,tones:20,specBytes:200*1024,
     kpiItems:8,kpiLabel:40,kpiNote:80,tlItems:20,tlLabel:60,tlOwner:40,tlNote:160,tlMaxUnit:1000,tlTicks:12};
   const COLUMN_TYPES=new Set(['text','number','currency','percent','date','status','link']);
-  const CHART_TYPES=new Set(['bar','hbar','stacked','line','area','pie','donut']);
+  const CHART_TYPES=new Set(['bar','hbar','stacked','line','area','pie','donut','radar']);
   const TONES=new Set(['good','warn','bad','info']);
   const WIKI_LANGS=new Set(['nl','en','de','fr']);
   const NOUN={nl:{table:'tabel',chart:'grafiek',map:'kaart',kpi:'KPI-rij',timeline:'planning'},
@@ -461,6 +461,7 @@ function base(spec,lang,kind,m,warnings,limits){
     let type=typeof spec.type==='string'?spec.type.trim().toLowerCase():'bar';
     if(type==='doughnut') type='donut';
     if(type==='horizontal'||type==='horizontalbar'||type==='barh') type='hbar';
+    if(type==='spider'||type==='web'||type==='spin'||type==='spinneweb') type='radar';
     if(!CHART_TYPES.has(type)){warn('chartType',type);type='bar';}
     const round=type==='pie'||type==='donut';
     let labels=Array.isArray(spec.labels)?spec.labels.map(l=>str(l,LIMITS.label)):null;
@@ -516,7 +517,10 @@ function base(spec,lang,kind,m,warnings,limits){
       if(Number.isFinite(p.n)&&!round) target={value:p.n,label:str(t.label,40)};
       else if(!round) warn('target');
     }
-    const height=spec.height==null?(type==='hbar'?Math.max(220,Math.min(480,60+labels.length*28*Math.max(1,series.length*0.6))):300):clampInt(spec.height,180,480,300);
+    // A radar needs at least three axes to be a shape; with fewer it is a bar chart.
+    if(type==='radar'&&labels.length<3) type='bar';
+    if(type==='radar'&&target) target=null;
+    const height=spec.height==null?(type==='hbar'?Math.max(220,Math.min(480,60+labels.length*28*Math.max(1,series.length*0.6))):type==='radar'?340:300):clampInt(spec.height,180,480,300);
     return {errors,warnings,spec:Object.assign(out,{
       type,labels,series,format,
       decimals:spec.decimals==null?null:clampInt(spec.decimals,0,2,null),

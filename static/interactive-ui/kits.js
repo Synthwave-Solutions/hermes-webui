@@ -369,12 +369,16 @@
     function config(){
       var c = colors(), t = c.t, hl = spec.highlight, hlSeries = hl && spec.series.some(function(s){ return s.name === hl; });
       var kind = spec.type === 'hbar' || spec.type === 'stacked' ? 'bar' : spec.type === 'area' ? 'line' : spec.type === 'donut' ? 'doughnut' : spec.type;
+      var radar = kind === 'radar';
       var datasets = spec.series.map(function(s, i){
         var color = hl ? (hlSeries ? (s.name === hl ? c.accent : c.muted) : c.pal[i % 8]) : c.pal[i % 8];
         var ds = {label:s.name, data:s.data.slice()};
         if(round){
           ds.backgroundColor = spec.labels.map(function(l, j){ return hl ? (l === hl ? c.accent : alpha(c.pal[j % 8], 0.35)) : c.pal[j % 8]; });
           ds.borderColor = t.surface || t.bg || '#171a23'; ds.borderWidth = 2; ds.hoverOffset = 6;
+        } else if(radar){
+          ds.borderColor = color; ds.backgroundColor = alpha(color, 0.16); ds.borderWidth = 2;
+          ds.pointRadius = 3; ds.pointHoverRadius = 5; ds.pointBackgroundColor = color;
         } else if(kind === 'bar'){
           ds.backgroundColor = hl && !hlSeries && spec.series.length === 1 ? spec.labels.map(function(l){ return l === hl ? c.accent : c.muted; }) : color;
           ds.borderRadius = 4; ds.maxBarThickness = 48; ds.borderSkipped = false;
@@ -435,23 +439,48 @@
           plugins:{legend:{display:!round && spec.series.length > 1, position:'bottom', labels:{color:t.fg, boxWidth:10, boxHeight:10, usePointStyle:true, padding:14}},
             tooltip:{backgroundColor:t.surface2 || t.surface, titleColor:t.strong || t.fg, bodyColor:t.fg, borderColor:t.border, borderWidth:1, padding:10,
               callbacks:{label:function(ctx){
-                var v = ctx.parsed && (round ? ctx.parsed : (horizontal ? ctx.parsed.x : ctx.parsed.y));
+                var v = ctx.parsed && (round ? ctx.parsed : radar ? ctx.parsed.r : (horizontal ? ctx.parsed.x : ctx.parsed.y));
                 var name = round ? ctx.label : ctx.dataset.label;
                 return ' ' + name + ': ' + f(typeof v === 'number' ? v : ctx.raw);
               }}}}}};
-      if(round){ if(kind === 'doughnut') cfg.options.cutout = '62%'; }
+      if(round){ if(kind === 'doughnut'){ cfg.options.cutout = '62%'; cfg.plugins.push(centerPlugin(t)); } }
+      else if(radar){
+        cfg.options.interaction = {mode:'nearest', intersect:false};
+        cfg.options.scales = {r:{beginAtZero:true, angleLines:{color:alpha(t.border || '#2a2f3d', 0.9)}, grid:{color:alpha(t.border || '#2a2f3d', 0.9)},
+          pointLabels:{color:t.fg, font:{size:12}}, ticks:{display:false, maxTicksLimit:5}}};
+      }
       else cfg.options.scales = horizontal ? {x:valueAxis, y:catAxis} : {x:catAxis, y:valueAxis};
       return cfg;
+    }
+    // The middle of a donut names the total, so the slices read as parts of it.
+    function centerPlugin(t){
+      return {id:'swCenter', afterDraw:function(ch){
+        if(spec.format === 'percent') return;
+        var s = spec.series[0], sum = s.data.reduce(function(a, v){ return a + (v || 0); }, 0), area = ch.chartArea;
+        if(!area || !(sum > 0)) return;
+        var ctx = ch.ctx, cx = (area.left + area.right) / 2, cy = (area.top + area.bottom) / 2;
+        var font = getComputedStyle(document.body).fontFamily || 'sans-serif';
+        var r = Math.min(area.right - area.left, area.bottom - area.top) / 2 * 0.62;
+        var big = Math.max(12, Math.min(22, r / 3.2));
+        ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = t.strong || t.fg; ctx.font = '700 ' + big + 'px ' + font;
+        ctx.fillText(f(sum), cx, cy - big * 0.35);
+        ctx.fillStyle = t.muted || t.fg; ctx.font = '500 ' + Math.max(10, big * 0.55) + 'px ' + font;
+        ctx.fillText(T('total'), cx, cy + big * 0.75);
+        ctx.restore();
+      }};
     }
     function drawLegend(){
       if(!legend) return;
       legend.textContent = '';
       var c = colors(), s = spec.series[0], sum = s.data.reduce(function(a, v){ return a + (v || 0); }, 0);
+      // Percentages that already add up to 100 need no share next to them.
+      var whole = spec.format === 'percent' && Math.abs(sum - 100) < 0.6;
       spec.labels.forEach(function(l, j){
         var li = h('li'), sw = h('span', 'k-swatch');
         sw.style.background = spec.highlight ? (l === spec.highlight ? c.accent : alpha(c.pal[j % 8], 0.35)) : c.pal[j % 8];
         var v = s.data[j];
-        li.append(sw, h('span', 'k-legend-label', l), h('span', 'k-legend-value', v == null ? '' : f(v) + (sum > 0 ? ' (' + fmt(Math.round(v / sum * 1000) / 10, 'percent', 1) + ')' : '')));
+        li.append(sw, h('span', 'k-legend-label', l), h('span', 'k-legend-value', v == null ? '' : f(v) + (sum > 0 && !whole ? ' (' + fmt(Math.round(v / sum * 100), 'percent', 0) + ')' : '')));
         legend.appendChild(li);
       });
     }
