@@ -242,29 +242,30 @@ def main() -> int:
 
             # 3. chart and placing unassigned work
             hub(page, "chart")
-            page.wait_for_selector('.om-team[data-team-key="finance/debiteuren"]', timeout=10000)
+            page.wait_for_selector('.oc-team[data-team-key="finance/debiteuren"]', timeout=10000)
             # j1/j2/j3 belong to MEMBER, who is now in the team: they follow the owner's team.
-            card_text = page.locator('.om-team[data-team-key="finance/debiteuren"] > summary').inner_text()
+            card_text = page.locator('.oc-team[data-team-key="finance/debiteuren"] > .oc-node').inner_text()
             assert "3" in card_text, card_text
             sel = page.locator('.om-unassigned [data-bot="finbot"] select[data-om-assign-bot]')
             sel.select_option("finance/debiteuren")
             page.wait_for_function("() => !document.querySelector('.om-unassigned [data-bot=\"finbot\"]')", timeout=10000)
-            team = page.locator('.om-team[data-team-key="finance/debiteuren"]')
-            if not team.evaluate("d => d.open"):
-                team.locator("> summary .om-team-title").click()
-            page.wait_for_selector('.om-team[data-team-key="finance/debiteuren"] [data-om-bot-node="finbot"]', timeout=10000)
-            tree = team.locator(".om-team-body").inner_text()
+            team = page.locator('.oc-team[data-team-key="finance/debiteuren"]')
+            if not team.evaluate("e => !e.classList.contains('closed')"):
+                team.locator("> .oc-node .oc-toggle").click()
+            page.wait_for_selector('.oc-team[data-team-key="finance/debiteuren"] [data-om-bot-node="finbot"]', timeout=10000)
+            tree = team.locator("> ul").inner_text()
             assert "lisa" in tree and "tom" in tree and "Finance Bot" in tree, tree
             strip = page.locator("#mainOrganisation .om-strip").inner_text()
             assert "Mensen" in strip and "Koppelingen" in strip and "Skills" in strip and "Tijd bespaard" in strip, strip
-            assert page.locator('.om-dept2[data-om-open="dept:finance"] > summary .om-mini-stat').count() == 5
+            assert page.locator('.oc-dept[data-dept-key="finance"] > .oc-node .om-mini-stat').count() == 5
+            assert page.locator('.oc .oc-org .oc-dept').count() >= 1, "departments hang under the organisation node"
             page.screenshot(path=str(art / "03-org-chart.png"))
             ok("org chart: totals on top, a collapsible department and team with its numbers, the lead with people and bots beneath; the bot is placed from the chart")
 
             # every number opens what is behind it
-            team.locator('> summary .om-mini-stat[data-om-detail="tasks"]').click()
+            team.locator('> .oc-node .om-mini-stat[data-om-detail="tasks"]').click()
             page.wait_for_selector('#mainOrganisation .om-detail [data-om-detail-list] .om-row', timeout=10000)
-            assert team.evaluate("d => d.open"), "clicking a number must not fold the team"
+            assert page.locator('.oc-team[data-team-key="finance/debiteuren"]').evaluate("e => !e.classList.contains('closed')"), "clicking a number must not fold the team"
             listed = page.locator("#mainOrganisation .om-detail").inner_text()
             assert "Debiteurenlijst" in listed and "Geplande taken" in listed, listed
             page.locator('#mainOrganisation [data-om-detail-q]').fill("bankmut")
@@ -272,7 +273,7 @@ def main() -> int:
             page.wait_for_function("() => /Bankmutaties/.test(document.querySelector('#mainOrganisation [data-om-detail-list]').innerText) && !/Debiteurenlijst/.test(document.querySelector('#mainOrganisation [data-om-detail-list]').innerText)", timeout=5000)
             page.locator('#mainOrganisation .om-strip [data-om-detail="people"]').click()
             page.wait_for_function("() => /lisa@example.com/.test(document.querySelector('#mainOrganisation .om-detail')?.innerText || '')", timeout=10000)
-            page.locator('.om-dept2[data-om-open="dept:finance"] > summary .om-mini-stat[data-om-detail="bots"]').click()
+            page.locator('.oc-dept[data-dept-key="finance"] > .oc-node .om-mini-stat[data-om-detail="bots"]').click()
             page.wait_for_function("() => /Finance Bot/.test(document.querySelector('#mainOrganisation .om-detail')?.innerText || '')", timeout=10000)
             for kind in ("connections", "skills"):
                 d = ctx.request.get(f"/api/org/chart?detail={kind}&level=team&key=finance/debiteuren").json()
@@ -292,16 +293,19 @@ def main() -> int:
                                                                 "name": "Debiteuren", "parent": "finance/incasso"})
             assert bad.status == 400, bad.status
             hub(page, "chart")
-            page.wait_for_selector('.om-team[data-team-key="finance/debiteuren"] .om-subteams .om-team[data-team-key="finance/incasso"]', timeout=10000)
+            page.wait_for_selector('.oc-team[data-team-key="finance/debiteuren"] > ul .oc-team[data-team-key="finance/incasso"]', timeout=10000)
             page.locator('[data-om-expand="0"]').click()
-            assert not page.locator('.om-team[data-team-key="finance/debiteuren"]').evaluate("d => d.open")
+            assert not page.locator('.oc-team[data-team-key="finance/debiteuren"]').evaluate("e => !e.classList.contains('closed')")
             page.reload(); page.wait_for_selector("#msg", state="visible", timeout=20000)
             hub(page, "chart")
-            page.wait_for_selector('.om-team[data-team-key="finance/debiteuren"]', state="attached", timeout=10000)
-            assert not page.locator('.om-dept2[data-om-open="dept:finance"]').evaluate("d => d.open")
-            assert not page.locator('.om-team[data-team-key="finance/debiteuren"]').evaluate("d => d.open")
+            page.wait_for_selector('.oc-team[data-team-key="finance/debiteuren"]', state="attached", timeout=10000)
+            assert not page.locator('.oc-dept[data-dept-key="finance"]').evaluate("e => !e.classList.contains('closed')")
+            assert not page.locator('.oc-team[data-team-key="finance/debiteuren"]').evaluate("e => !e.classList.contains('closed')")
             page.locator('[data-om-expand="1"]').click()
-            assert page.locator('.om-team[data-team-key="finance/incasso"]').is_visible()
+            assert page.locator('.oc-team[data-team-key="finance/incasso"]').is_visible()
+            page.locator('[data-oc-zoom="-1"]').click()
+            assert page.locator('.oc').evaluate("e => e.style.zoom") == "0.9"
+            page.locator('[data-oc-zoom="1"]').click()
             page.screenshot(path=str(art / "03b-org-subteam.png"), full_page=True)
             ok("sub-teams sit under their team, a loop is refused, and collapsed state is remembered")
 

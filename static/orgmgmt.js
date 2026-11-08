@@ -24,7 +24,7 @@
       person: 'Persoon',
       other: 'Overig', fails: 'faalt', no_value: 'zonder waarde', suggested: 'voorstel',
       suggest_intro: '{n} voorstellen op basis van de bestaande categorie.', apply_suggestions: 'Neem alle voorstellen over', applied_n: '{n} ingedeeld',
-      org: 'Organisatie', mgmt: 'Management', chart: 'Organigram', manage: 'Teams beheren', parent: 'Onder team', parent_none: 'Geen, hoofdteam', subteams: 'Subteams', expand_all: 'Alles uitklappen', collapse_all: 'Alles inklappen', s_people: 'Mensen', s_bots: 'Bots', s_tasks: 'Geplande taken', s_conn: 'Koppelingen', s_skills: 'Skills', s_saved: 'Tijd bespaard', s_saved_sub: 'laatste 4 weken', s_conn_hint: 'MCP-servers van de bots plus persoonlijke koppelingen van de mensen', details: 'Details', show_which: 'klik om te zien welke', whole_org: 'Hele organisatie', search_in: 'Zoek in {what}', no_match: 'Niets gevonden.', nothing_here: 'Niets om te tonen.', conn_mcp: 'MCP-servers van bots', conn_app: 'Persoonlijke koppelingen', via_bots: 'via {n} bot(s)', via_people: 'van {n} persoon/personen', hierarchy: 'Hiërarchie', h_note: 'Bots zonder bot-manager staan onder de teamlead.', no_lead: 'Geen teamlead', reports: 'rapporteert aan',
+      org: 'Organisatie', mgmt: 'Management', chart: 'Organigram', manage: 'Teams beheren', parent: 'Onder team', parent_none: 'Geen, hoofdteam', subteams: 'Subteams', expand_all: 'Alles uitklappen', collapse_all: 'Alles inklappen', s_people: 'Mensen', s_bots: 'Bots', s_tasks: 'Geplande taken', s_conn: 'Koppelingen', s_skills: 'Skills', s_saved: 'Tijd bespaard', s_saved_sub: 'laatste 4 weken', s_conn_hint: 'MCP-servers van de bots plus persoonlijke koppelingen van de mensen', details: 'Details', collapse: 'Inklappen', expand: 'Uitklappen', departments: 'Afdelingen', department_one: 'Afdeling', zoom_in: 'Inzoomen', zoom_out: 'Uitzoomen', zoom_fit: 'Passend maken', show_which: 'klik om te zien welke', whole_org: 'Hele organisatie', search_in: 'Zoek in {what}', no_match: 'Niets gevonden.', nothing_here: 'Niets om te tonen.', conn_mcp: 'MCP-servers van bots', conn_app: 'Persoonlijke koppelingen', via_bots: 'via {n} bot(s)', via_people: 'van {n} persoon/personen', hierarchy: 'Hiërarchie', h_note: 'Bots zonder bot-manager staan onder de teamlead.', no_lead: 'Geen teamlead', reports: 'rapporteert aan',
       people: 'Mensen', bots: 'Bots', both: 'Samen', tasks: 'Taken', team: 'Team', teams: 'Teams',
       department: 'Afdeling', departments: 'Afdelingen', lead: 'Lead', members: 'Leden', rate: 'Uurtarief',
       org_intro: 'Wie in welk team zit, welke bots en geplande taken voor dat team werken, en hoeveel tijd dat bespaart.',
@@ -95,7 +95,7 @@
       person: 'Person',
       other: 'Other', fails: 'failing', no_value: 'without value', suggested: 'suggested',
       suggest_intro: '{n} suggestions based on the existing category.', apply_suggestions: 'Apply all suggestions', applied_n: '{n} placed',
-      org: 'Organisation', mgmt: 'Management', chart: 'Org chart', manage: 'Manage teams', parent: 'Under team', parent_none: 'None, top-level team', subteams: 'Sub-teams', expand_all: 'Expand all', collapse_all: 'Collapse all', s_people: 'People', s_bots: 'Bots', s_tasks: 'Scheduled tasks', s_conn: 'Connections', s_skills: 'Skills', s_saved: 'Time saved', s_saved_sub: 'last 4 weeks', s_conn_hint: 'MCP servers of the bots plus personal connections of the people', details: 'Details', show_which: 'click to see which', whole_org: 'Whole organisation', search_in: 'Search {what}', no_match: 'Nothing found.', nothing_here: 'Nothing to show.', conn_mcp: 'MCP servers of bots', conn_app: 'Personal connections', via_bots: 'through {n} bot(s)', via_people: 'from {n} person(s)', hierarchy: 'Hierarchy', h_note: 'Bots without a bot manager sit under the team lead.', no_lead: 'No team lead', reports: 'reports to',
+      org: 'Organisation', mgmt: 'Management', chart: 'Org chart', manage: 'Manage teams', parent: 'Under team', parent_none: 'None, top-level team', subteams: 'Sub-teams', expand_all: 'Expand all', collapse_all: 'Collapse all', s_people: 'People', s_bots: 'Bots', s_tasks: 'Scheduled tasks', s_conn: 'Connections', s_skills: 'Skills', s_saved: 'Time saved', s_saved_sub: 'last 4 weeks', s_conn_hint: 'MCP servers of the bots plus personal connections of the people', details: 'Details', collapse: 'Collapse', expand: 'Expand', departments: 'Departments', department_one: 'Department', zoom_in: 'Zoom in', zoom_out: 'Zoom out', zoom_fit: 'Fit to width', show_which: 'click to see which', whole_org: 'Whole organisation', search_in: 'Search {what}', no_match: 'Nothing found.', nothing_here: 'Nothing to show.', conn_mcp: 'MCP servers of bots', conn_app: 'Personal connections', via_bots: 'through {n} bot(s)', via_people: 'from {n} person(s)', hierarchy: 'Hierarchy', h_note: 'Bots without a bot manager sit under the team lead.', no_lead: 'No team lead', reports: 'reports to',
       people: 'People', bots: 'Bots', both: 'Both', tasks: 'Tasks', team: 'Team', teams: 'Teams',
       department: 'Department', departments: 'Departments', lead: 'Lead', members: 'Members', rate: 'Hourly rate',
       org_intro: 'Who is in which team, which bots and scheduled tasks work for that team, and how much time that saves.',
@@ -195,7 +195,8 @@
   }
 
   // ── Organisation screen ───────────────────────────────────────────────────
-  const O = { view: 'chart', layer: 'both', chart: null, structure: null, selected: '', busy: false, error: '', detail: null };
+  const O = { view: 'chart', layer: 'both', chart: null, structure: null, selected: '', busy: false, error: '', detail: null,
+    zoom: (() => { try { return Number(localStorage.getItem('sp-org-zoom')) || 1; } catch (_e) { return 1; } })() };
 
   function shell(id, title, actions){
     const root = $id(id);
@@ -337,7 +338,21 @@
   function botAv(b){
     return `<span class="om-face bot" style="${b.color ? '--bot:' + H(b.color) : ''}">${b.avatar_url ? `<img src="${H(b.avatar_url)}" alt="" loading="lazy">` : H(initials(b.title))}</span>`;
   }
-  function hierarchyHtml(team){
+  // ── Top-down org chart with connector lines (same card language as the bots' org chart) ──
+  function ocToggle(id, count, open){
+    return count ? `<button type="button" class="oc-toggle" data-oc-toggle="${H(id)}" aria-expanded="${open}" title="${H(open ? w('collapse') : w('expand'))}">${open ? '−' : '+'}<span>${count}</span></button>` : '';
+  }
+  function ocLi(id, cls, node, children, dflt, extra){
+    const open = isOpen(id, dflt);
+    const n = children.length;
+    return `<li class="oc-li ${cls || ''} ${n && !open ? 'closed' : ''}" data-oc-id="${H(id)}" ${extra || ''}>${node.replace('<!--toggle-->', ocToggle(id, n, open))}${n ? `<ul>${children.join('')}</ul>` : ''}</li>`;
+  }
+  function botNodeLi(team, b, bkids, depth){
+    const ch = depth < 6 ? (bkids[b.name] || []) : [];
+    const node = `<div class="oc-node bot" data-om-bot-node="${H(b.name)}" data-bot="${H(b.name)}">${botAv(b)}<span class="oc-text"><strong>${H(b.title)}</strong><span>${H(b.role || b.category || '')}</span></span><button type="button" class="oc-open" data-om-open-bot aria-label="${H(w('open'))}">↗</button><!--toggle--></div>`;
+    return ocLi('bot:' + team.key + ':' + b.name, 'oc-bot', node, ch.map(c => botNodeLi(team, c, bkids, depth + 1)), false);
+  }
+  function teamChildren(team, all, depth){
     const people = (O.chart && O.chart.people) || {};
     const lead = team.lead || '';
     const members = (team.people || []).map(p => p.email).filter(e => e !== lead);
@@ -352,53 +367,44 @@
     const names = new Set(bots.map(b => b.name));
     const bkids = {};
     for (const b of bots) { const boss = names.has(b.reports_to) && b.reports_to !== b.name ? b.reports_to : ''; (bkids[boss] = bkids[boss] || []).push(b); }
-    const branch = (id, row, children) => children ? `<li><details data-om-open="${H(id)}" ${isOpen(id, true) ? 'open' : ''}><summary>${row}</summary><ul class="om-h">${children}</ul></details></li>` : `<li>${row}</li>`;
-    const botNode = (b, depth) => {
-      const ch = depth < 6 ? (bkids[b.name] || []) : [];
-      const row = `<div class="om-node bot" data-om-bot-node="${H(b.name)}">${botAv(b)}<span class="om-node-text"><strong>${H(b.title)}</strong><span>${H(b.role || b.category || w('bots').replace(/s$/, ''))}</span></span>${ch.length ? `<span class="om-node-count" title="${H(w('bots'))}">${ch.length}</span>` : ''}</div>`;
-      return branch('bot:' + team.key + ':' + b.name, row, ch.length ? ch.map(c => botNode(c, depth + 1)).join('') : '');
-    };
-    const personNode = (e, depth) => {
+    const personLi = (e, d) => {
       const p = people[e] || {};
-      const ch = depth < 6 ? (kids[e] || []) : [];
-      const topBots = e === lead ? (bkids[''] || []) : [];
-      const row = `<div class="om-node person ${e === lead ? 'is-lead' : ''}">${personAv(e, e === lead)}<span class="om-node-text"><strong>${H(e.replace(/@.*/, ''))}</strong><span>${H(p.title || (e === lead ? w('lead') : e))}</span></span>${ch.length + topBots.length ? `<span class="om-node-count">${ch.length + topBots.length}</span>` : ''}</div>`;
-      const children = ch.map(c => personNode(c, depth + 1)).join('') + topBots.map(b => botNode(b, depth + 1)).join('');
-      return branch('person:' + team.key + ':' + e, row, children);
+      const ch = (d < 6 ? (kids[e] || []) : []).map(c => personLi(c, d + 1));
+      const topBots = e === lead ? (bkids[''] || []).map(b => botNodeLi(team, b, bkids, d + 1)) : [];
+      const node = `<div class="oc-node person ${e === lead ? 'lead' : ''}">${personAv(e, e === lead)}<span class="oc-text"><strong>${H(e.replace(/@.*/, ''))}</strong><span>${H(p.title || (e === lead ? w('lead') : e))}</span></span><!--toggle--></div>`;
+      return ocLi('person:' + team.key + ':' + e, 'oc-person', node, ch.concat(topBots), true);
     };
-    let roots = '';
-    if (lead && (O.layer !== 'bots' || (bkids[''] || []).length)) roots = personNode(lead, 0);
-    else roots = (kids[lead] || kids[''] || []).map(e => personNode(e, 0)).join('') + (bkids[''] || []).map(b => botNode(b, 0)).join('');
-    if (!roots) return `<p class="om-muted om-small">${H(w('nothing_runs'))}</p>`;
-    return `<ul class="om-h om-h-root">${roots}</ul>${!lead && (bkids[''] || []).length ? '' : (bots.length ? `<p class="om-h-note">${H(w('h_note'))}</p>` : '')}`;
-  }
-  function teamHtml(team, all, depth){
-    const id = 'team:' + team.key;
+    let out = [];
+    if (lead && (O.layer !== 'bots' || (bkids[''] || []).length)) out.push(personLi(lead, 0));
+    else out = (kids[lead] || kids[''] || []).map(e => personLi(e, 0)).concat((bkids[''] || []).map(b => botNodeLi(team, b, bkids, 0)));
     const subs = depth < 5 ? all.filter(t => t.parent === team.key) : [];
+    return out.concat(subs.map(t => teamLi(t, all, depth + 1)));
+  }
+  function teamLi(team, all, depth){
     const st = team.stats || {};
     const flag = (st.failing || 0) + (st.missing_value || 0) > 0;
-    return `<details class="om-team ${O.selected === team.key ? 'sel' : ''}" data-om-open="${H(id)}" data-team-key="${H(team.key)}" ${isOpen(id, false) ? 'open' : ''}>
-      <summary class="om-team-sum">
-        <span class="om-chev" aria-hidden="true"></span>
-        ${team.lead ? personAv(team.lead, true) : `<span class="om-face empty">${icon('people')}</span>`}
-        <span class="om-team-title"><strong>${H(team.name)}</strong><span>${H(team.lead ? team.lead.replace(/@.*/, '') : w('no_lead'))}${subs.length ? ' · ' + subs.length + ' ' + H(w('subteams').toLowerCase()) : ''}</span></span>
-        ${flag ? `<span class="om-flag-dot" title="${H(w('waiting'))}"></span>` : ''}
-        ${statsRow(team.summary, 'team', team.key)}${savedHtml(team.summary, 'team', team.key)}
-        <button type="button" class="sm-btn om-team-open" data-om-team="${H(team.key)}" aria-pressed="${O.selected === team.key}">${H(w('details'))}</button>
-      </summary>
-      <div class="om-team-body">${hierarchyHtml(team)}
-        ${subs.length ? `<div class="om-subteams"><div class="om-sub-label">${H(w('subteams'))}</div>${subs.map(t => teamHtml(t, all, depth + 1)).join('')}</div>` : ''}
-      </div></details>`;
+    const subs = all.filter(t => t.parent === team.key).length;
+    const node = `<div class="oc-node team ${O.selected === team.key ? 'sel' : ''}">
+        <div class="oc-head">${team.lead ? personAv(team.lead, true) : `<span class="om-face empty">${icon('people')}</span>`}
+          <span class="oc-text"><strong>${H(team.name)}</strong><span>${H(team.lead ? team.lead.replace(/@.*/, '') : w('no_lead'))}${subs ? ' · ' + subs + ' ' + H(w('subteams').toLowerCase()) : ''}</span></span>
+          ${savedHtml(team.summary, 'team', team.key)}${flag ? `<span class="om-flag-dot" title="${H(w('waiting'))}"></span>` : ''}</div>
+        ${statsRow(team.summary, 'team', team.key)}
+        <button type="button" class="sm-btn om-team-open" data-om-team="${H(team.key)}" aria-pressed="${O.selected === team.key}">${H(w('details'))}</button><!--toggle--></div>`;
+    return ocLi('team:' + team.key, 'oc-team', node, teamChildren(team, all, depth), false, `data-team-key="${H(team.key)}"`);
   }
-  function deptHtml(d){
-    const id = 'dept:' + d.key;
+  function deptLi(d){
     const teams = d.teams || [];
-    const tops = teams.filter(t => !t.parent);
-    return `<details class="om-dept2" data-om-open="${H(id)}" ${isOpen(id, true) ? 'open' : ''}>
-      <summary class="om-dept-sum"><span class="om-chev" aria-hidden="true"></span>
-        <span class="om-dept-title"><strong>${H(d.name)}</strong><span>${teams.length} ${H((teams.length === 1 ? w('team') : w('teams')).toLowerCase())}</span></span>
-        ${statsRow(d.summary, 'dept', d.key)}${savedHtml(d.summary, 'dept', d.key)}</summary>
-      <div class="om-dept-body">${tops.map(t => teamHtml(t, teams, 0)).join('') || `<p class="om-muted om-small">${H(w('nothing_yet'))}</p>`}</div></details>`;
+    const node = `<div class="oc-node dept"><div class="oc-head"><span class="om-face dept">${icon('people', 16)}</span><span class="oc-text"><strong>${H(d.name)}</strong><span>${teams.length} ${H((teams.length === 1 ? w('team') : w('teams')).toLowerCase())}</span></span>${savedHtml(d.summary, 'dept', d.key)}</div>
+        ${statsRow(d.summary, 'dept', d.key)}<!--toggle--></div>`;
+    return ocLi('dept:' + d.key, 'oc-dept', node, teams.filter(t => !t.parent).map(t => teamLi(t, teams, 0)), true, `data-dept-key="${H(d.key)}"`);
+  }
+  function chartHtml(depts){
+    const sum = O.chart.summary || {};
+    const root = `<div class="oc-node org"><div class="oc-head"><span class="om-face org">${icon('skills', 16)}</span><span class="oc-text"><strong>${H(lang() === 'en' ? 'Organisation' : 'Organisatie')}</strong><span>${depts.length} ${H((depts.length === 1 ? w('department_one') : w('departments')).toLowerCase())}</span></span>${savedHtml(sum, 'org', '')}</div><!--toggle--></div>`;
+    const z = O.zoom || 1;
+    return `<div class="oc-wrap" data-tour="org-chart">
+      <div class="oc-tools" role="group" aria-label="Zoom"><button type="button" class="sm-btn" data-oc-zoom="-1" aria-label="${H(w('zoom_out'))}">−</button><span class="oc-zoom-val">${Math.round(z * 100)}%</span><button type="button" class="sm-btn" data-oc-zoom="1" aria-label="${H(w('zoom_in'))}">+</button><button type="button" class="sm-btn" data-oc-zoom="fit">${H(w('zoom_fit'))}</button></div>
+      <div class="oc-scroll"><div class="oc" style="zoom:${z}"><ul>${ocLi('org', 'oc-org', root, depts.map(deptLi), true)}</ul></div></div></div>`;
   }
 
   function teamOptions(selected){
@@ -484,7 +490,7 @@
     body.innerHTML = `<p class="om-intro">${H(w('org_intro'))}</p>
       ${orgStripHtml(O.chart.summary)}
       <div class="om-layout ${selected || O.detail ? 'has-drawer' : ''}">
-        <div class="om-tree2" data-tour="org-chart">${depts.map(deptHtml).join('')}${unassignedHtml()}</div>
+        <div class="om-tree2">${chartHtml(depts)}${unassignedHtml()}</div>
         ${O.detail ? detailDrawerHtml() : drawerHtml(selected)}
       </div>`;
     if (O.detail) paintDetail();
@@ -571,7 +577,13 @@
       if (t.dataset.omDetail) { ev.preventDefault(); const same = O.detail && O.detail.kind === t.dataset.omDetail && O.detail.level === t.dataset.omLevel && O.detail.key === t.dataset.omKey; if (same) { O.detail = null; renderOrg(); } else await openDetail(t.dataset.omDetail, t.dataset.omLevel, t.dataset.omKey); return; }
       if (t.hasAttribute('data-om-detail-close')) { O.detail = null; renderOrg(); return; }
       if (t.dataset.omTeam) { O.detail = null; ev.preventDefault(); O.selected = O.selected === t.dataset.omTeam ? '' : t.dataset.omTeam; renderOrg(); return; }
-      if (t.dataset.omExpand) { const open = t.dataset.omExpand === '1'; root.querySelectorAll('details[data-om-open]').forEach(d => { d.open = open; setOpen(d.dataset.omOpen, open); }); return; }
+      if (t.dataset.omExpand) { const open = t.dataset.omExpand === '1'; root.querySelectorAll('[data-oc-id]').forEach(li => { if (li.querySelector(':scope > ul')) setOpen(li.dataset.ocId, open); }); renderOrg(); return; }
+      if (t.dataset.ocToggle) { const li = t.closest('[data-oc-id]'); const open = li.classList.contains('closed'); setOpen(t.dataset.ocToggle, open); li.classList.toggle('closed', !open); t.setAttribute('aria-expanded', String(open)); t.firstChild.textContent = open ? '−' : '+'; return; }
+      if (t.dataset.ocZoom) { const sc = root.querySelector('.oc-scroll'), oc = root.querySelector('.oc'); let z = O.zoom || 1;
+        if (t.dataset.ocZoom === 'fit' && sc && oc) { oc.style.zoom = 1; z = Math.max(0.4, Math.min(1, (sc.clientWidth - 8) / Math.max(1, oc.scrollWidth))); }
+        else z = Math.max(0.4, Math.min(1.5, Math.round((z + Number(t.dataset.ocZoom) * 0.1) * 10) / 10));
+        O.zoom = z; try { localStorage.setItem('sp-org-zoom', String(z)); } catch (_e) {}
+        if (oc) oc.style.zoom = z; const v = root.querySelector('.oc-zoom-val'); if (v) v.textContent = Math.round(z * 100) + '%'; return; }
       if (t.hasAttribute('data-om-close')) { O.selected = ''; renderOrg(); return; }
       if (t.hasAttribute('data-om-template')) { await applyTemplate(); return; }
       if (t.dataset.omNewAutomation) { if (window.SPStudio) { await window.SPStudio.newForTeam(t.dataset.omNewAutomation); return; } const team = findTeam(t.dataset.omNewAutomation); await startChat(w('chat_prompt_team', { team: team ? team.name : t.dataset.omNewAutomation })); return; }
