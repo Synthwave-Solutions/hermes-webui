@@ -11,7 +11,12 @@ that streams replies with ```interactive-ui blocks, then drives Chromium:
 6. the frame is isolated: no cookie, no same-origin fetch, no parent DOM;
 7. a broken widget shows the error bar; repair sends a prompt;
 8. after a hard reload the card renders again from the transcript;
-9. narrow (mobile) layout.
+9. narrow (mobile) layout;
+10. data blocks (```table, ```csv, ```chart, ```map) in the kit frame:
+    sorting, search, "Toon alle", CSV export, the chart/table switch kept
+    over a reload, map pins and route, the unresolved group, the status line
+    without moving the chat, and the note when tiles do not load. Map tiles and
+    Wikimedia are stubbed with page.route and the geocoder is off: no network.
 
 Screenshots land in IUI_ARTIFACT_DIR (default: a temp dir, printed at the end).
 
@@ -22,6 +27,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import tempfile
 import threading
@@ -64,6 +70,44 @@ PROMPTS = [
 ]
 E2E_PASSWORD = "iui-e2e-local-only"
 TAKEAWAY = "Bij deze aannames verdient de agent zichzelf binnen twee maanden terug."
+
+# ── Data block fixtures (step 10) ───────────────────────────────────────────
+_NAMES = ["Jansen", "De Vries", "Bakker", "Visser", "Smit", "Meijer", "Mulder", "Bos", "Vos", "Peters",
+          "Hendriks", "Dekker", "Brouwer", "Dijkstra", "Kok", "Jacobs"]
+TABLE_ROWS = [[f"{_NAMES[i % len(_NAMES)]} {i + 1:02d} Bouw",
+               1000 + (i * 7919) % 9000, round(((i * 37) % 41) - 12 + 0.5, 1),
+               ["Actief", "Pauze", "Nieuw"][i % 3]] for i in range(60)]
+TABLE_SPEC = {"title": "Omzet per klant", "subtitle": "Laatste twaalf maanden", "source": "Uit het CRM",
+              "columns": ["Klant", {"label": "Omzet", "type": "currency"}, {"label": "Groei", "type": "percent"},
+                          {"label": "Status", "type": "status"}],
+              "rows": TABLE_ROWS, "total": True, "tones": {"Actief": "good", "Pauze": "warn", "Nieuw": "info"}}
+CSV_BLOCK = 'Naam;Plaats;Bedrag\n"Jansen; Zonen";Utrecht;"1.234,50"\n"De ""Gouden"" Leeuw";Amsterdam;980\nVan Dijk;Den Haag;2.100\n'
+CHART_SPEC = {"type": "bar", "title": "Omzet per maand", "labels": ["Jan", "Feb", "Mrt", "Apr", "Mei", "Jun"],
+              "series": [{"name": "Omzet", "data": [42000, 45500, 61000, 48000, 51000, 53500]}],
+              "format": "currency", "highlight": "Mrt", "target": {"value": 50000, "label": "Doel"}, "source": "Boekhouding"}
+MAP_SPEC = {"title": "Bezoekroute Amsterdam", "kind": "route", "subtitle": "Vrijdag", "places": [
+    {"name": "Rijksmuseum", "address": "Museumstraat 1, Amsterdam", "lat": 52.36, "lng": 4.8852, "time": "09:30", "note": "Start bij de ingang"},
+    {"name": "Anne Frank Huis", "lat": 52.3752, "lng": 4.884, "time": "11:30"},
+    {"name": "De Dam", "lat": 52.3731, "lng": 4.8926, "time": "13:00"},
+    {"name": "Kantoor Haarlem", "address": "Stationsplein 1, Haarlem", "time": "15:00"},
+]}
+DATA_TURNS = {
+    "[tabel]": ["Hier zijn de klanten.\n\n```table\n", json.dumps(TABLE_SPEC, ensure_ascii=False, indent=1), "\n```\n\nBos 08 groeit het hardst."],
+    "[csv]": ["Als CSV:\n\n```csv\n", CSV_BLOCK, "```\n\nEn als code:\n\n```chart\nnew Chart(ctx, {type: 'bar'});\n```\n"],
+    "[grafiek]": ["De omzet per maand:\n\n```chart\n", json.dumps(CHART_SPEC, ensure_ascii=False), "\n```\n\nMaart sprong eruit."],
+    "[kaart]": ["Je route:\n\n```map\n", json.dumps(MAP_SPEC, ensure_ascii=False), "\n```\n\nDrie stops liggen dicht bij elkaar."],
+}
+
+
+def _png(width=256, height=256, rgb=(226, 230, 236)):
+    """A plain PNG for stubbed map tiles and photos."""
+    import struct
+    import zlib
+    raw = b"".join(b"\x00" + bytes(rgb) * width for _ in range(height))
+    def chunk(tag, data):
+        return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", zlib.crc32(tag + data) & 0xffffffff)
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
+            + chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b""))
 
 
 class Gateway:
@@ -151,7 +195,10 @@ class Gateway:
                 if main:
                     owner.runs.append("\n".join(users[-3:]))
                     owner.system_prompts.append(system)
-                    chunks, gate = owner.script(len(owner.runs) - 1)
+                    # The newest marker in the user's own words (recalled memory is left out).
+                    last = re.sub(r"<memory-context>[\s\S]*?</memory-context>", "", users[-1] if users else "")
+                    marker = max((m for m in DATA_TURNS if m in last), key=last.rfind, default=None)
+                    chunks, gate = (list(DATA_TURNS[marker]), None) if marker else owner.script(len(owner.runs) - 1)
                 else:
                     chunks, gate = ["Titel"], None
                 if not body.get("stream"):
@@ -258,6 +305,239 @@ def wait_idle(page, timeout=30000):
     page.wait_for_function("() => !document.querySelector('#liveAssistantTurn')", timeout=timeout)
 
 
+# The newest card of a kind has drawn (older cards mount lazily when scrolled to).
+LAST_READY = "k => { const c=[...document.querySelectorAll('.iui-card.iui-kit--'+k)].pop(); return !!c && c.dataset.state === 'ready'; }"
+
+
+def bring_ready(page, kind, timeout=30, first=False):
+    """Scroll the newest (or first) card of a kind into view until it has
+    drawn (the chat may still be settling its scroll position after a reload)."""
+    deadline = time.time() + timeout
+    cards = page.locator(f".iui-card.iui-kit--{kind}")
+    card = cards.first if first else cards.last
+    check = ("k => { const c=document.querySelector('.iui-card.iui-kit--'+k); return !!c && c.dataset.state === 'ready'; }"
+             if first else LAST_READY)
+    while time.time() < deadline:
+        try:
+            card.scroll_into_view_if_needed(timeout=2000)
+            if page.evaluate(check, kind):
+                return card
+        except Exception:
+            pass
+        time.sleep(0.4)
+    raise AssertionError(f"the {kind} card did not draw")
+
+
+def kit_frames(page):
+    return [f for f in page.frames if f.url.split("?")[0].endswith("/static/interactive-ui/kit.html")]
+
+
+def kit_frame_for(page, card, timeout=15):
+    """The kit frame inside one card (matched through its iframe element)."""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        handle = card.locator("iframe.iui-frame").element_handle(timeout=2000)
+        frame = handle.content_frame() if handle else None
+        if frame and frame.url.split("?")[0].endswith("/static/interactive-ui/kit.html"):
+            return frame
+        time.sleep(0.1)
+    raise AssertionError("no kit frame in the card")
+
+
+def send_turn(page, gateway, text, n, done_text):
+    page.locator("#msg").fill(text)
+    page.locator("#btnSend").click()
+    wait_runs(gateway, n)
+    page.wait_for_function("t => { const m=document.getElementById('messages'); return !!m && m.innerText.includes(t) && !document.querySelector('#liveAssistantTurn'); }",
+                           arg=done_text, timeout=30000)
+    time.sleep(2.0)  # the chat re-renders the settled turn once more
+
+
+def data_blocks(page, ctx, gateway, art, base_runs):
+    """Step 10: data blocks drawn by the kit frame from JSON or CSV."""
+    tile = _png()
+    photo = _png(64, 64, (180, 190, 200))
+    state = {"tiles": "stub"}
+
+    def tiles(route):
+        if state["tiles"] == "block":
+            route.abort()
+        else:
+            route.fulfill(status=200, body=tile, headers={"Content-Type": "image/png", "Cache-Control": "no-store"})
+    ctx.route("https://tile.openstreetmap.org/**", tiles)
+    ctx.route("https://upload.wikimedia.org/**", lambda r: r.fulfill(status=200, body=photo, headers={"Content-Type": "image/png"}))
+    page.set_viewport_size({"width": 1280, "height": 900})
+    # Data blocks speak the chat's language; check the Dutch copy (saved, so it survives the reload).
+    page.evaluate("""async () => {
+        await api('/api/settings', {method: 'POST', body: JSON.stringify({language: 'nl'})});
+        if (typeof setLocale === 'function') await setLocale('nl');
+    }""")
+    page.wait_for_function("() => (document.documentElement.lang || '').toLowerCase().startsWith('nl')", timeout=10000)
+    runs = base_runs
+
+    # 10a. table: 60 rows, first 50 shown, sort, search, CSV export
+    runs += 1
+    send_turn(page, gateway, "Laat de klanten zien als tabel [tabel]", runs, "Bos 08 groeit het hardst.")
+    card = page.locator(".iui-card.iui-kit--table:visible").last
+    card.wait_for(timeout=20000)
+    page.wait_for_function(LAST_READY, arg="table", timeout=30000)
+    assert card.locator(".iui-title").inner_text() == TABLE_SPEC["title"]
+    frame = kit_frame_for(page, card)
+    frame.wait_for_selector(".k-grid tbody tr", timeout=10000)
+    assert frame.locator(".k-grid tbody tr").count() == 50
+    more = frame.locator(".k-more")
+    assert more.inner_text() == "Toon alle 60 rijen", more.inner_text()
+    by_revenue = sorted(TABLE_ROWS, key=lambda r: r[1])
+    frame.locator("th:nth-child(2) .k-sort").click()
+    assert frame.locator("th:nth-child(2)").get_attribute("aria-sort") == "ascending"
+    assert frame.locator(".k-grid tbody tr:first-child th").inner_text() == by_revenue[0][0]
+    frame.locator("th:nth-child(2) .k-sort").click()
+    assert frame.locator("th:nth-child(2)").get_attribute("aria-sort") == "descending"
+    assert frame.locator(".k-grid tbody tr:first-child th").inner_text() == by_revenue[-1][0]
+    first_num = frame.locator(".k-grid tbody tr:first-child td.num").first.inner_text()
+    assert first_num.startswith("€") and "." in first_num, first_num
+    more.click()
+    assert frame.locator(".k-grid tbody tr").count() == 60 and frame.locator(".k-more").is_hidden()
+    assert frame.locator(".k-grid tfoot th").inner_text() == "Totaal"
+    page.locator(".iui-card.iui-kit--table:visible").last.scroll_into_view_if_needed()
+    card.screenshot(path=str(art / "10-table-desktop-dark.png"))
+    frame.locator(".k-search").fill("jansen")
+    frame.wait_for_function("() => document.querySelectorAll('.k-grid tbody tr').length === 4", timeout=5000)
+    names = frame.locator(".k-grid tbody tr th").all_inner_texts()
+    assert all("Jansen" in n for n in names), names
+    assert frame.locator(".k-count").inner_text() == "4 van 60 rijen"
+    time.sleep(0.5)  # the view is saved after a short debounce
+    with page.expect_download() as dl:
+        menu_action(page, "Download als CSV", "Download as CSV", card=".iui-card.iui-kit--table")
+    raw = Path(dl.value.path()).read_bytes()
+    assert raw.startswith(b"\xef\xbb\xbf"), raw[:10]
+    lines = raw.decode("utf-8-sig").splitlines()
+    assert lines[0] == "Klant;Omzet;Groei;Status", lines[0]
+    assert len(lines) == 5 and all("Jansen" in line for line in lines[1:]), lines
+    assert dl.value.suggested_filename == "omzet-per-klant.csv", dl.value.suggested_filename
+    ok(f"table: 50 of 60 rows, sort up and down, 'Toon alle', search (4 van 60), CSV with BOM and ';' ({len(lines) - 1} rows as filtered)")
+
+    # 10b. csv with quotes; a ```chart holding code stays a code block
+    runs += 1
+    send_turn(page, gateway, "En als CSV [csv]", runs, "En als code:")
+    page.wait_for_function("() => document.querySelectorAll('.iui-card.iui-kit--table').length >= 2", timeout=20000)
+    card = page.locator(".iui-card.iui-kit--table:visible").last
+    card.scroll_into_view_if_needed()
+    page.wait_for_function(LAST_READY, arg="table", timeout=30000)
+    frame = kit_frame_for(page, card)
+    frame.wait_for_selector(".k-grid tbody tr", timeout=10000)
+    heads = [t.strip() for t in frame.locator(".k-grid thead th").all_inner_texts()]
+    assert heads == ["Naam", "Plaats", "Bedrag"], heads
+    first = frame.locator(".k-grid tbody tr").first.locator("th, td").all_inner_texts()
+    second = frame.locator(".k-grid tbody tr").nth(1).locator("th, td").all_inner_texts()
+    assert first[0] == "Jansen; Zonen" and first[2] == "1.234,5", first
+    assert second[0] == 'De "Gouden" Leeuw', second
+    code_block = page.locator(".msg-row pre code.language-chart:visible").last
+    assert "new Chart" in code_block.inner_text()
+    ok(f"csv: quoted ';' and doubled quotes parsed ({first[0]!r}, {second[0]!r}); a ```chart with code stays a code block")
+
+    # 10c. chart with highlight; the table view is kept over a reload
+    runs += 1
+    send_turn(page, gateway, "Maak er een grafiek van [grafiek]", runs, "Maart sprong eruit.")
+    page.wait_for_function(LAST_READY, arg="chart", timeout=30000)
+    card = page.locator(".iui-card.iui-kit--chart:visible").last
+    frame = kit_frame_for(page, card)
+    frame.wait_for_function("() => { const c=document.querySelector('.k-canvas canvas'); return c && c.width > 100 && !document.querySelector('.k-canvas').hidden; }", timeout=10000)
+    assert frame.locator(".k-seg button[aria-pressed=true]").inner_text() == "Grafiek"
+    assert frame.locator(".k-note").is_hidden(), "the chart must draw without the fallback note"
+    card.scroll_into_view_if_needed()
+    time.sleep(0.7)  # let the bars settle
+    card.screenshot(path=str(art / "11-chart-desktop-dark.png"))
+    frame.locator(".k-seg button", has_text="Tabel").click()
+    assert frame.locator(".k-chart-table").is_visible() and frame.locator(".k-canvas").is_hidden()
+    assert "61.000" in frame.locator(".k-chart-table").inner_text()
+    frame.locator(".k-seg button", has_text="Grafiek").click()
+    assert frame.locator(".k-canvas").is_visible()
+    frame.locator(".k-seg button", has_text="Tabel").click()
+    time.sleep(0.6)
+    ok("chart: drawn with highlight and target; 'Grafiek | Tabel' switches both ways")
+
+    # 10d. map: three pins and a route from given coordinates, one address unresolved (geocoder off)
+    runs += 1
+    send_turn(page, gateway, "Zet de bezoeken op de kaart [kaart]", runs, "Drie stops liggen dicht bij elkaar.")
+    page.wait_for_function(LAST_READY, arg="map", timeout=30000)
+    card = page.locator(".iui-card.iui-kit--map:visible").last
+    frame = kit_frame_for(page, card)
+    frame.wait_for_function("() => document.querySelectorAll('.sw-pin').length === 3", timeout=10000)
+    assert frame.locator("path.sw-route").count() == 1
+    frame.wait_for_selector(".k-map.is-played", timeout=5000)
+    missing = frame.locator(".k-missing").inner_text()
+    assert "Niet op de kaart gevonden" in missing and "Kantoor Haarlem" in missing, missing
+    assert frame.locator(".k-items li").count() == 3
+    assert "De lijn toont de volgorde" in frame.locator(".k-notes").inner_text()
+    chips = frame.locator(".k-chip").all_inner_texts()
+    assert chips == ["4 locaties", "Route"], chips
+    card.scroll_into_view_if_needed()
+    time.sleep(2.8)  # the drop-in and the route draw once, then stand still
+    card.screenshot(path=str(art / "12-map-desktop-dark.png"))
+    before = page.evaluate("() => document.getElementById('messages').scrollTop")
+    frame.locator(".k-items li").nth(1).locator("button").click()
+    frame.wait_for_function("() => document.querySelector('.k-status').textContent.includes('Locatie 2 van 4: Anne Frank Huis')", timeout=5000)
+    time.sleep(0.8)
+    after = page.evaluate("() => document.getElementById('messages').scrollTop")
+    assert abs(after - before) <= 1, (before, after)
+    assert frame.locator(".sw-pin.is-active").inner_text() == "2"
+    assert frame.locator(".leaflet-popup .k-pop-name").inner_text() == "Anne Frank Huis"
+    ok(f"map: 3 pins, route line, 'Niet op de kaart gevonden' lists the address, list click sets the status line, chat stays at {after}")
+    # Tiles that do not load leave the list and say so.
+    state["tiles"] = "block"
+    menu_action(page, "Opnieuw starten", "Restart", card=".iui-card.iui-kit--map")
+    frame = kit_frame_for(page, page.locator(".iui-card.iui-kit--map:visible").last)
+    frame.wait_for_selector(".k-tile-note:not([hidden])", timeout=12000)
+    assert "De kaart laadt nu niet" in frame.locator(".k-tile-note").inner_text()
+    time.sleep(1.0)
+    assert frame.locator(".k-items li").count() == 3
+    page.locator(".iui-card.iui-kit--map:visible").last.screenshot(path=str(art / "13-map-tiles-blocked.png"))
+    state["tiles"] = "stub"
+    ok("map without tiles: calm note, list still there")
+
+    # 10e. after a reload the chart comes back in the table view the user chose
+    page.reload(wait_until="domcontentloaded")
+    page.wait_for_function("t => document.getElementById('messages') && document.getElementById('messages').innerText.includes(t)",
+                           arg="Drie stops liggen dicht bij elkaar.", timeout=45000)
+    time.sleep(2.0)
+    chart_card = bring_ready(page, "chart")
+    frame = kit_frame_for(page, chart_card)
+    frame.wait_for_selector(".k-chart-table:not([hidden])", timeout=10000)
+    assert frame.locator(".k-seg button[aria-pressed=true]").inner_text() == "Tabel"
+    assert frame.locator(".k-canvas").is_hidden()
+    ok("after a reload the chart card opens in the table view the user chose")
+    frame.locator(".k-seg button:nth-child(1)").click()  # back to the chart for the screenshots
+
+    # 10f. screenshots: desktop and 390 px, dark and light
+    shots = []
+    for width, height in ((1280, 900), (390, 844)):
+        page.set_viewport_size({"width": width, "height": height})
+        for theme in ("dark", "light"):
+            page.evaluate(f"() => _applyTheme('{theme}')")
+            time.sleep(0.6)
+            for kind in ("table", "chart", "map"):
+                c = bring_ready(page, kind, first=kind == "table")
+                f = kit_frame_for(page, c)
+                f.wait_for_function(f"() => document.documentElement.getAttribute('data-theme') === '{theme}'", timeout=5000)
+                time.sleep(2.8 if kind == "map" else 0.8)
+                overflow = c.evaluate("c => c.scrollWidth - c.clientWidth")
+                assert overflow <= 1, f"{kind} card overflows by {overflow}px at {width}px"
+                name = f"14-{kind}-{'mobile' if width < 600 else 'desktop'}-{theme}.png"
+                if width < 600:
+                    # A phone shows the top of the card under the app bar.
+                    c.evaluate("c => c.scrollIntoView({block: 'start'})")
+                    time.sleep(0.4)
+                    page.screenshot(path=str(art / name))
+                else:
+                    c.screenshot(path=str(art / name))
+                shots.append(name)
+    page.evaluate("() => _applyTheme('dark')")
+    page.set_viewport_size({"width": 1280, "height": 900})
+    ok(f"screenshots: {', '.join(shots)}")
+    return runs
+
+
 def main() -> int:
     from playwright.sync_api import sync_playwright
 
@@ -283,6 +563,7 @@ def main() -> int:
         "  models:\n"
         "  - iui-fake\n"
         "toolsets: []\n"
+        "webui_map_geocoder: \"off\"\n"
         "mcp_servers: {}\n"
         "memory:\n"
         "  memory_enabled: false\n"
@@ -550,6 +831,9 @@ def main() -> int:
             assert overflow <= 1, f"card overflows horizontally by {overflow}px"
             page.screenshot(path=str(art / "07-mobile.png"))
             ok("narrow layout fits without horizontal overflow")
+
+            # 10. data blocks
+            data_blocks(page, ctx, gateway, art, len(gateway.runs))
 
             unexpected = [e for e in console_errors if not any(s in e for s in (
                 "nietBestaandeFunctie", "evil.example", "favicon", "manifest", "sw.js", "serviceworker", "Content Security Policy",
