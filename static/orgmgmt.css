@@ -410,3 +410,9 @@ button.om-mini-stat:focus-visible,button.om-saved:focus-visible,button.om-strip-
 .oc-node.oc-merged,.oc-merged>.oc-node{border-width:1.5px}
 .oc-node.org{min-width:280px}
 .oc-node.org .oc-text{flex:1 0 auto}
+/* Drag to pan */
+.oc-scroll{cursor:grab;touch-action:pan-x pan-y;scrollbar-width:thin}
+.oc-scroll.panning{cursor:grabbing;user-select:none}
+.oc-scroll.panning .oc-node{pointer-events:none}
+.oc-node{cursor:default}
+.oc-tools::after{content:attr(data-hint);font-size:11.5px;color:var(--muted);margin-right:auto;order:-1}
