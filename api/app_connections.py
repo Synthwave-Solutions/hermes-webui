@@ -127,6 +127,12 @@ class Resolver:
         self._email = str(self._identity.get("email") or "").strip().lower()
         self._admin: bool | None = None
 
+    @property
+    def email(self) -> str:
+        """The signed-in person this turn runs for (read by per-person tool plugins such as
+        SynthPulse Artifacts; never a credential)."""
+        return self._email
+
     # ── ownership ──────────────────────────────────────────────────────────
     def _is_admin(self) -> bool:
         if self._admin is None:
