@@ -191,9 +191,11 @@
     var t = function(key){ var v = TEXT[lang][key]; return typeof v === 'function' ? v.apply(null, Array.prototype.slice.call(arguments, 1)) : v; };
     var num = function(v){ return fmt(v, spec.format, null); };
     // An estimate stays an estimate: "ca. 900", and shares from it in whole percents.
-    var ROUGH = {nl:{ca:'ca.', gt:'meer dan', lt:'minder dan'}, en:{ca:'about', gt:'more than', lt:'less than'}}[lang];
+    var ROUGH = {nl:{ca:'ca.', gt:'meer dan', lt:'minder dan', lt1:'minder dan 1%'}, en:{ca:'about', gt:'more than', lt:'less than', lt1:'less than 1%'}}[lang];
     var numS = function(s){ return (s.rough ? ROUGH[s.rough] + ' ' : '') + num(s.value); };
     var anyRough = spec.stages.some(function(s){ return s.rough; });
+    // A share from an estimate is an estimate too: "ca. 4%", never "3,9%".
+    var pctR = function(p, rough){ if(p === null || p === undefined) return ''; if(!rough) return pct(p); return p > 0 && p < 1 ? ROUGH.lt1 : ROUGH.ca + ' ' + fmt(Math.round(p), 'percent', 0); };
     // 0% only for a real 0. From 10% whole numbers (38%), from 0,1% one decimal
     // (4,2%, 0,4%), below that two significant digits (0,015%), and never a
     // rounded 100% for a share that is not quite all.
@@ -210,17 +212,18 @@
     // Each part only when its number exists: no " van Oud" after a stage of 0.
     function shares(i){
       var s = stages[i], out = [];
-      if(i && s.conv !== null) out.push(t('fromPrev', pct(s.conv), stages[i - 1].label));
-      if(i && s.fromStart !== null) out.push(t('fromStart', pct(s.fromStart)));
+      var rp = !!(s.rough || (i && stages[i - 1].rough)), rs = !!(s.rough || stages[0].rough);
+      if(i && s.conv !== null) out.push(t('fromPrev', pctR(s.conv, rp), stages[i - 1].label));
+      if(i && s.fromStart !== null) out.push(t('fromStart', pctR(s.fromStart, rs)));
       return out;
     }
     return {
       t:t, num:num, numS:numS, pct:pct,
-      overall:function(){ return spec.overall === null ? '' : t('overall', stages[0].label, stages[stages.length - 1].label, anyRough ? ROUGH.ca + ' ' + fmt(Math.round(spec.overall * 10) / 10, 'percent', 1) : pct(spec.overall)); },
+      overall:function(){ return spec.overall === null ? '' : t('overall', stages[0].label, stages[stages.length - 1].label, pctR(spec.overall, anyRough)); },
       overallPrev:function(){ return spec.overallPrev === null ? '' : t('overallPrev', pct(spec.overallPrev)); },
-      drop:function(){ return spec.drop < 0 ? '' : t('drop', stages[spec.drop - 1].label, stages[spec.drop].label, pct(stages[spec.drop].conv)); },
-      chip:function(i){ var c = stages[i].conv; return c !== null && (stages[i].rough || stages[i - 1].rough) ? ROUGH.ca + ' ' + fmt(Math.round(c), 'percent', 0) : pct(c); },
-      aria:function(i){ var s = stages[i], p = [s.label, numS(s)]; if(i && s.conv !== null) p.push(t('fromPrev', pct(s.conv), stages[i - 1].label)); return p.join(', '); },
+      drop:function(){ return spec.drop < 0 ? '' : t('drop', stages[spec.drop - 1].label, stages[spec.drop].label, pctR(stages[spec.drop].conv, !!(stages[spec.drop].rough || stages[spec.drop - 1].rough))); },
+      chip:function(i){ return pctR(stages[i].conv, !!(stages[i].rough || stages[i - 1].rough)); },
+      aria:function(i){ var s = stages[i], p = [s.label, numS(s)]; if(i && s.conv !== null) p.push(t('fromPrev', pctR(s.conv, !!(s.rough || stages[i - 1].rough)), stages[i - 1].label)); return p.join(', '); },
       detail:function(i){
         var s = stages[i], parts = [s.label, numS(s)].concat(shares(i));
         if(spec.compare && s.prev !== null) parts.push(t('prev', num(s.prev)));
@@ -329,7 +332,7 @@
       buttons.forEach(function(x, j){ x.setAttribute('aria-pressed', String(j === i)); x.tabIndex = j === i ? 0 : -1; rows[j].classList.toggle('is-active', j === i); });
       detail.textContent = X.detail(i);
       detail.classList.add('is-set');
-      if(!isRestore) ctx.save({a:i});
+      if(!isRestore){ ctx.save({a:i}); if(ctx.reveal) ctx.reveal(detail); }
       ctx.resize();
     }
     if(seen && restore.a >= 0 && restore.a < n) select(restore.a, true);
