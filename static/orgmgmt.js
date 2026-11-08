@@ -196,7 +196,7 @@
 
   // ── Organisation screen ───────────────────────────────────────────────────
   const O = { view: 'chart', layer: 'both', chart: null, structure: null, selected: '', busy: false, error: '', detail: null,
-    zoom: (() => { try { return Number(localStorage.getItem('sp-org-zoom')) || 1; } catch (_e) { return 1; } })() };
+    zoom: (() => { try { return Number(localStorage.getItem('sp-org-zoom')) || 0; } catch (_e) { return 0; } })() };
 
   function shell(id, title, actions){
     const root = $id(id);
@@ -500,6 +500,13 @@
       </div>`;
     if (O.detail) paintDetail();
     else if (selected) loadTeamPlaybooks(selected.key);
+    if (!O.zoom) { // first visit: fit the chart to the width once; the person's own zoom is kept after that
+      const sc = body.querySelector('.oc-scroll'), oc = body.querySelector('.oc');
+      if (sc && oc && sc.clientWidth) {
+        O.zoom = Math.max(0.5, Math.min(1, Math.floor(((sc.clientWidth - 8) / Math.max(1, oc.scrollWidth)) * 20) / 20));
+        oc.style.zoom = O.zoom; const v = body.querySelector('.oc-zoom-val'); if (v) v.textContent = Math.round(O.zoom * 100) + '%';
+      }
+    }
     if (O.chart.summary && O.chart.summary.pending && !O.pendingTimer && (O.pendingTries || 0) < 12) {
       O.pendingTimer = setTimeout(async () => { O.pendingTimer = null; O.pendingTries = (O.pendingTries || 0) + 1; if (typeof _currentPanel !== 'undefined' && _currentPanel === 'organisation' && O.view === 'chart') await loadOrg(); }, 4000);
     } else if (O.chart.summary && !O.chart.summary.pending) O.pendingTries = 0;

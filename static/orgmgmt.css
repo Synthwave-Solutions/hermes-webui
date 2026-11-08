@@ -408,3 +408,5 @@ button.om-mini-stat:focus-visible,button.om-saved:focus-visible,button.om-strip-
 .oc-text strong{overflow-wrap:normal;word-break:normal;hyphens:auto}
 .oc-node.org .oc-text strong{white-space:nowrap}
 .oc-node.oc-merged,.oc-merged>.oc-node{border-width:1.5px}
+.oc-node.org{min-width:280px}
+.oc-node.org .oc-text{flex:1 0 auto}
