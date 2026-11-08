@@ -437,8 +437,8 @@
     const raw=String(id||'').trim();
     if(!raw) return text('another_bot');
     if(raw==='default'&&typeof root.spProfileLabel==='function'){ try{ return String(root.spProfileLabel(raw)); }catch(_){} }
-    const w=raw.replace(/[-_.]+/g,' ').replace(/\s+/g,' ').trim();
-    return w.charAt(0).toUpperCase()+w.slice(1);
+    // Never show a technical profile id: an unknown bot is just "another bot".
+    return text('another_bot');
   }
   // Set when a name was guessed before the catalog arrived, so the chat can
   // repaint once with the real names (static/subagent-threads.js).
@@ -515,6 +515,7 @@
   function handoffError(message, toName){
     const msg=String(message||'');
     if(/four handoffs|chain is too deep/i.test(msg)) return text('handoff_limit');
+    if(/delegating bot was revoked|originating authority changed/i.test(msg)) return text('handoff_failed',{to:toName});
     if(/authorized bot|not available|revoked|no longer in this conversation/i.test(msg)) return text('handoff_not_available',{to:toName});
     return text('handoff_failed',{to:toName});
   }

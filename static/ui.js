@@ -17655,6 +17655,8 @@ function renderMessages(options){
           avatar.src='/api/profile/avatar?profile='+encodeURIComponent(String(m.bot_profile));
           avatar.alt=''; avatar.style.cssText='width:100%;height:100%;object-fit:cover;border-radius:inherit';
           avatar.onerror=()=>avatar.remove();
+          // The initial stays as fallback text; hide it once the photo shows.
+          avatar.onload=()=>{icon.style.fontSize='0';icon.style.color='transparent';};
           icon.appendChild(avatar);
         }
         role.title='@'+String(m.bot_profile);

@@ -67,9 +67,9 @@ const hostile=ft.bots.handoffLineHtml(call({action:'delegate',bot:'linus-researc
 assert.ok(!hostile.includes('<img src=x'));
 assert.match(hostile,/&lt;img src=x onerror=alert\(1\)&gt;/);
 
-// Names: catalog title, then the stamped bot name, then a readable form.
+// Names: catalog title, then the stamped bot name; an unknown bot never shows its id.
 assert.equal(ft.bots.name('sanne-sales'),'Sanne');
-assert.equal(ft.bots.name('grace-ops'),'Grace ops');
+assert.equal(ft.bots.name('grace-ops'),'een andere bot');
 S.messages.push({role:'assistant',content:'hoi',bot_profile:'grace-ops',bot_name:'Grace'});
 assert.equal(ft.bots.name('grace-ops'),'Grace');
 assert.equal(ft.bots.name(''),'een andere bot');

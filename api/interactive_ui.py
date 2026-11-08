@@ -523,7 +523,10 @@ def serve(handler, parsed) -> bool:
         csp = kit_frame_csp(_config())
         body = KIT_FRAME_BYTES
         etag = '"' + hashlib.sha256(body + csp.encode("utf-8")).hexdigest()[:32] + '"'
-        header_list = headers(csp, "private, no-cache") + [("ETag", etag)]
+        # A versioned URL (the chat always adds ?v=<release>) may be reused for an
+        # hour without asking; otherwise revalidate with the ETag.
+        versioned = "v=" in str(getattr(parsed, "query", "") or "")
+        header_list = headers(csp, "private, max-age=3600" if versioned else "private, no-cache") + [("ETag", etag)]
     else:
         return False
     sent_tag = ""

@@ -310,7 +310,9 @@ const _iui=(function(){
     let first=true;
     Promise.resolve().then(()=>interactiveUiMapResolve(p.spec,ctrl.stateKey,{lang:lang(),onUpdate:data=>{if(!first)apply(data);}}))
       .then(data=>{first=false;ctrl.resolving=false;if(ctrl.state==='building')setState(ctrl,ctrl.rendered?'ready':'loading');apply(data);},
-        ()=>{first=false;ctrl.resolving=false;if(ctrl.state==='building')setState(ctrl,'loading');apply(K.mapLocalData(p.spec,'later'));});
+        ()=>{first=false;ctrl.resolving=false;if(ctrl.state==='building')setState(ctrl,'loading');apply(K.mapLocalData(p.spec,'later'));
+          // Busy or offline: try once more a little later.
+          if(!ctrl.mapRetried){ctrl.mapRetried=true;setTimeout(()=>{if(ctrl.card.isConnected){ctrl.kitData=null;ensureMapData(ctrl);}},8000);}});
   }
   function onMessage(e){
     const data=e&&e.data;
@@ -681,7 +683,7 @@ const _iui=(function(){
       if(cached) ctrl.skeleton.classList.add('is-quiet');
     }
     if(ctrl.state!=='error') setState(ctrl,ctrl.final?(ctrl.rendered?'ready':'loading'):'building');
-    if(ctrl.kit==='map') ensureMapData(ctrl);
+    if(ctrl.kit==='map'&&ctrl.mounted) ensureMapData(ctrl);
     if(ctrl.mounted) pushRender(ctrl);
     revealIfReady(ctrl);
   }

@@ -8511,7 +8511,9 @@ details.sp-handoff-line > .sp-handoff-summary{cursor:pointer;}
 /* The result card is the whole notice: no second frame around it. */
 .process-wakeup-notice:has(> .sp-bot-result){padding:0;border:0;background:none;}
 @media (max-width:640px){
-  .sp-handoff-more{display:none;}
+  .sp-handoff-more{font-size:0;padding:2px 6px;opacity:.8;}
+  .sp-handoff-more::after{content:"\203A";font-size:15px;line-height:1;}
+  .sp-handoff-line[open] .sp-handoff-more::after{content:"\2039";}
   .sp-handoff-brief{margin-left:0;}
   .msg-role.assistant .sp-assisted-chip{max-width:46vw;margin-left:6px;}
   .sp-subagent-status{display:none;}

@@ -796,6 +796,12 @@ def _send(handler, payload, status=200, headers=None):
 def handle(handler) -> bool:
     """``POST /api/map/resolve``. Never raises; never logs place names or addresses."""
     try:
+        from api import interactive_ui as _iui
+        if not _iui.enabled(_iui._config()):
+            return _send(handler, {"error": "disabled"}, 404)
+    except Exception:
+        pass
+    try:
         raw_length = handler.headers.get("Content-Length") if getattr(handler, "headers", None) is not None else None
         try:
             length = int(raw_length) if raw_length not in (None, "") else 0
