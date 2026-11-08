@@ -1694,6 +1694,12 @@ const _iui=(function(){
         else{const pre=document.createElement('pre');const c=document.createElement('code');c.textContent=block.textContent||'';pre.appendChild(c);block.replaceWith(pre);}
         return;
       }
+      if((block.getAttribute('data-iui-kind')||'')==='artifact'){
+        if(typeof synthpulseArtifactRender==='function'){
+          try{synthpulseArtifactRender(block);}catch(err){try{console.warn('[artifacts] card failed',err);}catch(_){}}
+        }else{const pre=document.createElement('pre');const c=document.createElement('code');c.textContent=block.textContent||'';pre.appendChild(c);block.replaceWith(pre);}
+        return;
+      }
       const source=block.textContent||'';
       const kindAttr=block.getAttribute('data-iui-kind')||'';
       const kit=kitKindOf(kindAttr);
@@ -1748,6 +1754,8 @@ const _iui=(function(){
     root.querySelectorAll('pre > code').forEach(code=>{
       const cls=' '+(code.className||'')+' ';
       if(/ (language-)?(suggestions|replies) /.test(cls)){code.parentElement.classList.add('iui-raw-hidden');return;}
+      // An artifact card appears once the reply is complete; never show its raw JSON.
+      if(/ (language-)?artifact /.test(cls)){code.parentElement.classList.add('iui-raw-hidden');return;}
       if(/ (language-)?(form|vraag|vragen|questions) /.test(cls)){streamForm(code);return;}
       const kit=streamKit(code,cls);
       if(!kit&&!/ (language-)?(interactive-ui|interactive|iui) /.test(cls)) return;
@@ -1818,6 +1826,8 @@ function interactiveUiFenceAccepts(lang,code){
   const l=String(lang||'').toLowerCase();
   const c=String(code||'');
   if(!c.trim()) return false;
+  // A SynthPulse artifact card (static/artifacts.js): JSON with the artifact id.
+  if(l==='artifact') return typeof synthpulseArtifactAccepts==='function'&&synthpulseArtifactAccepts(c);
   if(_iui.FENCE_LANGS.has(l)||_iui.CHIP_LANGS.has(l)) return true;
   // A questions form is JSON only (an object, or a list of questions).
   if(_iui.FORM_LANGS.has(l)) return /^\s*[\[{]/.test(c);

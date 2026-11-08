@@ -826,6 +826,14 @@ def _webui_ephemeral_system_prompt(
         interactive_prompt = ""
     if interactive_prompt:
         parts.append(interactive_prompt)
+    try:
+        from api import artifacts as _artifacts
+        artifacts_prompt = _artifacts.prompt_block()
+    except Exception:
+        logger.debug("SynthPulse Artifacts prompt unavailable", exc_info=True)
+        artifacts_prompt = ""
+    if artifacts_prompt:
+        parts.append(artifacts_prompt)
     delivery_prompt = _webui_delivery_context_prompt(config_data)
     if delivery_prompt:
         parts.append(delivery_prompt)

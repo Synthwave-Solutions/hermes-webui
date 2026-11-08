@@ -1,0 +1,28 @@
+/* SynthPulse Artifacts card (static/artifacts.js). Builds on the interactive-ui card classes. */
+.spa-head{gap:10px}
+.spa-titles{display:flex;flex-direction:column;min-width:0;line-height:1.25}
+.spa-sub{font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.spa-stage{background:var(--main-bg,var(--bg));border-top:1px solid var(--border-subtle,var(--border))}
+.spa-frame{display:block;width:100%;height:100%;border:0;background:transparent;border-radius:0 0 15px 15px}
+.spa-card:has(.spa-share:not([hidden])) .spa-frame,.spa-card:has(.spa-share:not([hidden])) .spa-stage{border-radius:0}
+.spa-stage--note{display:flex;align-items:center;justify-content:center;height:96px!important}
+.spa-note{margin:0;padding:0 16px;font-size:13px;color:var(--muted);text-align:center}
+.spa-share{padding:12px 14px 14px;border-top:1px solid var(--border-subtle,var(--border));border-radius:0 0 15px 15px}
+.spa-share[hidden],.spa-share-out[hidden],.spa-share-row[hidden]{display:none}
+.spa-share-lead,.spa-share-note{margin:0 0 10px;font-size:12.5px;color:var(--muted);line-height:1.45}
+.spa-share-note{margin:8px 0 0}
+.spa-share-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.spa-share-label{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
+.spa-share-select,.spa-share-url{height:32px;padding:0 10px;border:1px solid var(--border);border-radius:10px;background:var(--input-bg,var(--surface));color:var(--text);font:inherit;font-size:13px}
+.spa-share-url{flex:1 1 260px;min-width:0;font-family:ui-monospace,"SF Mono",Menlo,monospace;font-size:12px}
+.spa-share-make,.spa-share-copy{height:32px;padding:0 14px;border:0;border-radius:10px;background:var(--accent);color:var(--accent-text,#fff);font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.spa-share-make:disabled{opacity:.6;cursor:default}
+.spa-full{position:fixed;inset:0;z-index:9500;display:flex;flex-direction:column;background:var(--main-bg,var(--bg))}
+.spa-full-bar{display:flex;align-items:center;gap:10px;min-height:52px;padding:8px 10px 8px 16px;border-bottom:1px solid var(--border-subtle,var(--border))}
+.spa-full-stage{flex:1 1 auto;min-height:0}
+.spa-full-stage .spa-frame{border-radius:0}
+html.spa-full-open,html.spa-full-open body{overflow:hidden}
+@media (max-width:640px){
+  .spa-card .iui-btn--text .iui-btn-label{display:none}
+  .spa-stage{max-height:70vh}
+}
