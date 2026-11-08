@@ -67,3 +67,5 @@ main.main.showing-studio>#mainStudio{display:flex;flex-direction:column;overflow
 .st-include{margin-left:auto;display:inline-flex;gap:6px;align-items:center;font-size:12.5px}
 .st-confirm{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-top:14px;padding:12px 14px;border:1px solid var(--accent);border-radius:var(--sp-radius-lg);background:var(--accent-bg,rgba(0,157,255,.06));font-size:13px}
 @media (max-width:900px){.st-layout{grid-template-columns:1fr}.st-conv{position:static;max-height:none}}
+.st-live-note{margin:0;padding:8px 14px;border-top:1px solid var(--border);color:var(--accent-text,var(--accent))}
+.st-compose [data-st-live][aria-pressed=true]{border-color:var(--accent);color:var(--accent-text,var(--accent))}

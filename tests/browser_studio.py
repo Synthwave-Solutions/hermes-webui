@@ -49,9 +49,11 @@ ANSWERS = {
                                      {"step": "Medewerker kijkt na en verstuurt", "actor": "mens", "building_block": "human"}],
                            "metrics": [{"name": "DSO", "baseline": "41 dagen", "target": "30 dagen"}]},
     "uitvoerbaar Playbook": {"components": [
+        {"type": "bot", "name": "Debiteuren Bot", "description": "Maakt concept-aanmaningen",
+         "instructions": "Je helpt het team Debiteuren met aanmaningen. Je verstuurt nooit zelf iets."},
         {"type": "task", "name": "Concept-aanmaningen maandag", "schedule": "0 8 * * 1",
          "prompt": "Maak een lijst van facturen ouder dan 30 dagen en schrijf per klant een concept-aanmaning. Verstuur niets.",
-         "before_minutes": 60, "review_minutes": 10, "per": "run"},
+         "before_minutes": 60, "review_minutes": 10, "per": "run", "bot": "Debiteuren Bot"},
         {"type": "skill", "name": "Aanmaning opstellen", "description": "Aanmaning in drie niveaus in huisstijl",
          "content": "# Aanmaning opstellen\n\n1. Bepaal het niveau.\n2. Schrijf kort en vriendelijk."},
         {"type": "human", "name": "Concepten nakijken en versturen", "who": MEMBER, "what": "Elke maandag de concepten nakijken"},
@@ -146,7 +148,27 @@ def main() -> int:
             page.screenshot(path=str(art / "01-studio-start.png"))
             ok("Organisation chart opens a new Studio use case for the team, with the guide cards")
 
+            # 1b. live talking through the realtime voice agent (stubbed: no microphone in headless)
+            page.evaluate("""() => {
+              window.__voice = {sid: null, stopped: false};
+              window.synPulseVoice = {d: {transcript: e => { window.__voice.orig = (window.__voice.orig || 0) + 1; }},
+                async start(sid) { window.__voice.sid = sid; this.d.transcript([{role: 'user', text: 'Elke maandag bel ik facturen na'}, {role: 'assistant', text: 'Vertel meer'}]); },
+                stop() { window.__voice.stopped = true; }};
+            }""")
+            page.locator('[data-st-phase="discover"]').click()
+            page.wait_for_selector("[data-st-live]", timeout=10000)
+            page.locator("[data-st-live]").click()
+            page.wait_for_function("() => window.__voice.sid && /bel ik facturen/.test(document.querySelector('[data-st-send] textarea').value)", timeout=10000)
+            assert page.evaluate("() => window.__voice.orig") == 1
+            page.locator("[data-st-live]").click()
+            assert page.evaluate("() => window.__voice.stopped") is True
+            sid = page.evaluate("() => window.__voice.sid")
+            sess = ctx.request.get("/api/session?session_id=" + sid).json()
+            assert "Studio" in json.dumps(sess.get("session", sess))[:4000], str(sess)[:300]
+            ok("Live praten runs the realtime voice agent in a session of its own; what is said lands in the Studio")
+
             # 2. discover
+            page.locator("[data-st-send] textarea").fill("")
             page.locator("[data-st-topic]").first.click()
             page.locator("[data-st-send] textarea").fill("Elke maandag bel ik facturen na en schrijf ik aanmaningen, dat kost me twee uur.")
             page.locator("[data-st-send] button[type=submit]").click()
@@ -171,7 +193,7 @@ def main() -> int:
             # 4. playbook
             page.locator("[data-st-make-playbook]").first.click()
             page.wait_for_selector(".st-comp", timeout=20000)
-            assert page.locator(".st-comp").count() == 4
+            assert page.locator(".st-comp").count() == 5
             sched = page.locator('.st-comp [data-st-f="schedule"]').first
             sched.fill("0 9 * * 1")
             page.locator("[data-st-save-playbook]").click()
@@ -189,19 +211,23 @@ def main() -> int:
             page.locator("[data-st-build]").click()
             page.wait_for_selector('[data-st-nav="tasks"]', timeout=60000)
             canvas = page.locator(".st-canvas").inner_text()
-            assert canvas.count("Klaar") == 3 and "Overgeslagen" in canvas, canvas
+            assert canvas.count("Klaar") == 4 and "Overgeslagen" in canvas, canvas
             page.screenshot(path=str(art / "06-built.png"), full_page=True)
             jobs = ctx.request.get("/api/crons").json().get("jobs") or []
             job = next(j for j in jobs if j.get("name") == "Concept-aanmaningen maandag")
             assert job.get("enabled") is False, job.get("enabled")
             assert job["value"]["before_minutes"] == 60 and job["value"]["team"] == "finance/debiteuren", job.get("value")
             assert (job.get("schedule") or {}).get("expr", job.get("schedule_display")) in ("0 9 * * 1",) or "9" in str(job.get("schedule")), job.get("schedule")
+            assert job.get("assigned_bot") == "studio-debiteuren-bot", job.get("assigned_bot")
+            bots = ctx.request.get("/api/profiles?fast=1").json().get("profiles") or []
+            bot = next(b for b in bots if b["name"] == "studio-debiteuren-bot")
+            assert (bot.get("bot") or {}).get("serves") == ["finance/debiteuren"], bot.get("bot")
             skill = home / "skills" / "studio" / "aanmaning-opstellen" / "SKILL.md"
             assert skill.is_file() and "studio_use_case" in skill.read_text(), skill
             tasks = ctx.request.get("/api/kanban/board").json()
             titles = json.dumps(tasks)
             assert "Concepten nakijken en versturen" in titles, titles[:300]
-            ok("build creates a paused task with value and team, a skill and a Kanban task; the connection is left to the person")
+            ok("build creates a bot for the team, a paused task with value and team assigned to that bot, a skill and a Kanban task; the connection is handled")
 
             # 6. measure and Management
             page.locator('[data-st-goto="measure"]').click()
@@ -218,7 +244,7 @@ def main() -> int:
             page.locator("[data-st-back]").click()
             page.wait_for_selector(".st-card", timeout=10000)
             card = page.locator(".st-card").first.inner_text()
-            assert "Debiteurenopvolging" in card and "3 gebouwd" in card, card
+            assert "Debiteurenopvolging" in card and "4 gebouwd" in card, card
             page.screenshot(path=str(art / "07-list.png"))
             ok("use case list shows the use case with built parts")
 

@@ -12437,7 +12437,7 @@ def handle_get(handler, parsed) -> bool:
         return studio.handle_get(handler, parsed)
 
     if parsed.path in ("/api/org/chart", "/api/management/overview", "/api/management/job",
-                       "/api/management/pricing"):
+                       "/api/management/pricing", "/api/value/chat"):
         from api import management
         return management.handle_get(handler, parsed)
 

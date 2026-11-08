@@ -26,6 +26,7 @@
     goals: 'Doelen', opps: 'Kansen', impact: 'Impact', effort: 'Moeite', choose: 'Kies', chosen: 'Gekozen',
     quick_win: 'Snel resultaat', next_design: 'Verder naar inrichten', next_playbook: 'Maak het Playbook', next_build: 'Droogrun',
     as_is: 'Zoals het nu gaat', to_be: 'Zoals het wordt', metrics: 'Succesmetingen', reuse: 'Bestaat al',
+    a_bot: 'Nieuwe bot, alleen voor jou zichtbaar, werkt voor het team', instructions: 'Instructies', live: 'Live praten', live_stop: 'Stop live', live_on: 'Live gesprek met de Super Agent: wat je zegt komt hieronder in het tekstvak.', conn_ok: 'Al verbonden', conn_req: 'Aangevraagd bij beheer', conn_none: 'Niet in de catalogus; vraag het aan via Verbindingen',
     b_task: 'Geplande taak', b_skill: 'Skill', b_bot: 'Bot', b_human: 'Blijft mens', b_connection: 'Koppeling', b_custom: 'Maatwerk',
     include: 'Meenemen', name: 'Naam', schedule: 'Ritme (cron)', prompt: 'Opdracht', before: 'Min. eerst', now: 'Min. nu', per: 'Per',
     per_run: 'keer', per_day: 'dag', per_week: 'week', description: 'Beschrijving', content: 'Werkwijze', who: 'Wie', what: 'Wat',
@@ -56,6 +57,7 @@
     goals: 'Goals', opps: 'Opportunities', impact: 'Impact', effort: 'Effort', choose: 'Choose', chosen: 'Chosen',
     quick_win: 'Quick win', next_design: 'Continue to design', next_playbook: 'Make the Playbook', next_build: 'Dry run',
     as_is: 'As it is', to_be: 'As it will be', metrics: 'Success measures', reuse: 'Already exists',
+    a_bot: 'New bot, visible to you only, works for the team', instructions: 'Instructions', live: 'Talk live', live_stop: 'Stop live', live_on: 'Live conversation with the Super Agent: what you say lands in the text box below.', conn_ok: 'Already connected', conn_req: 'Requested from admins', conn_none: 'Not in the catalogue; request it in Connections',
     b_task: 'Scheduled task', b_skill: 'Skill', b_bot: 'Bot', b_human: 'Stays human', b_connection: 'Connection', b_custom: 'Custom',
     include: 'Include', name: 'Name', schedule: 'Rhythm (cron)', prompt: 'Instruction', before: 'Min. before', now: 'Min. now', per: 'Per',
     per_run: 'run', per_day: 'day', per_week: 'week', description: 'Description', content: 'Way of working', who: 'Who', what: 'What',
@@ -141,9 +143,11 @@
     const hasSpeech = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
     return `<section class="st-conv" aria-label="${H(w('conv'))}">
       <div class="st-notes" aria-live="polite">${notes.map(n => `<div class="st-note ${n.role}">${H(n.text)}</div>`).join('')}${St.busy ? `<div class="st-note agent st-thinking">${H(w('thinking'))}</div>` : ''}</div>
+      ${St.live ? `<p class="om-small st-live-note">${H(w('live_on'))}</p>` : ''}
       ${canSend ? `<form class="st-compose" data-st-send>
         <textarea name="input" rows="4" placeholder="${H(w(ph))}" aria-label="${H(w(ph))}">${H(St.draft)}</textarea>
         <div class="st-compose-actions">
+          ${window.synPulseVoice ? `<button type="button" class="sm-btn" data-st-live aria-pressed="${!!St.live}">🎧 ${H(St.live ? w('live_stop') : w('live'))}</button>` : ''}
           ${hasSpeech ? `<button type="button" class="sm-btn" data-st-mic aria-pressed="${St.listening}">🎙 ${H(St.listening ? w('listening') : w('speak'))}</button>` : ''}
           <button type="button" class="sm-btn" data-st-chat>${H(w('discuss'))}</button>
           <button type="submit" class="sm-btn primary" ${St.busy ? 'disabled' : ''}>${H(w('send'))}</button>
@@ -193,6 +197,7 @@
     if (c.type === 'task') fields = f('name', w('name')) + f('schedule', w('schedule')) + f('before_minutes', w('before'), 'number', 'min="0"') + f('review_minutes', w('now'), 'number', 'min="0"')
       + `<label class="om-field">${H(w('per'))}<select data-st-f="per" data-i="${i}">${['run', 'day', 'week'].map(p => `<option value="${p}" ${c.per === p ? 'selected' : ''}>${H(w('per_' + p))}</option>`).join('')}</select></label>`
       + `<label class="om-field wide">${H(w('prompt'))}<textarea data-st-f="prompt" data-i="${i}" rows="4">${H(c.prompt)}</textarea></label>`;
+    else if (c.type === 'bot') fields = f('name', w('name')) + f('description', w('description')) + `<label class="om-field wide">${H(w('instructions'))}<textarea data-st-f="instructions" data-i="${i}" rows="4">${H(c.instructions)}</textarea></label>`;
     else if (c.type === 'skill') fields = f('name', w('name')) + f('description', w('description')) + `<label class="om-field wide">${H(w('content'))}<textarea data-st-f="content" data-i="${i}" rows="5">${H(c.content)}</textarea></label>`;
     else if (c.type === 'human') fields = f('name', w('name')) + f('who', w('who')) + f('what', w('what'));
     else fields = f('name', w('name')) + f('provider', w('provider')) + f('why', w('what'));
@@ -260,14 +265,31 @@
   // ── Building ───────────────────────────────────────────────────────────────
   async function runBuild(){
     const doc = St.doc;
-    const comps = ((doc.playbook || {}).components || []).filter(c => c.include);
+    const order = { bot: 0, skill: 1, task: 2, human: 3, connection: 4 };
+    const comps = ((doc.playbook || {}).components || []).filter(c => c.include).sort((a, b) => (order[a.type] ?? 9) - (order[b.type] ?? 9));
     St.building = true; render();
     const log = [];
+    const botSlugs = {};
+    const slug = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    let catalog = null, connections = null;
     const teamName = (St.teams.find(t => t.key === doc.team) || {}).name || '';
     for (const c of comps) {
       const row = { key: c.key, type: c.type, status: 'ok', ref: c.name, at: Date.now() / 1000 };
       try {
-        if (c.type === 'task') {
+        if (c.type === 'bot') {
+          const name = ('studio-' + slug(c.name)).slice(0, 60);
+          await post('/api/bots/builder', { name, title: c.name, description: c.description || '', skills: [], mcp_servers: [], cli_tools: [], allowed_users: [], allowed_groups: [], default_model: '', model_provider: '',
+            system_prompt: `${c.instructions || c.description || c.name}\n\nJe bent gemaakt in Studio voor de use case "${doc.title}". Je verstuurt nooit zelf iets naar anderen; je maakt concepten en vraagt eerst.` });
+          botSlugs[slug(c.name)] = name;
+          if (doc.team) {
+            try {
+              const list = await call('/api/profiles?fast=1');
+              const prof = ((list && list.profiles) || []).find(p => p.name === name) || {};
+              await post('/api/profile/appearance', { name, revision: prof.bot_revision || 0, bot: { serves: [doc.team], kind: 'bot' } });
+            } catch (_e) {}
+          }
+          row.ref = 'bot ' + name;
+        } else if (c.type === 'task') {
           const value = c.before_minutes > 0
             ? { before_minutes: c.before_minutes, review_minutes: Math.min(c.review_minutes || 0, c.before_minutes), per: c.per || 'run', task: c.name, source: 'playbook', confidence: 'estimated' }
             : { unknown: true, unknown_reason: 'Nog in te vullen na de testrun', task: c.name, source: 'playbook' };
@@ -275,6 +297,11 @@
           const prompt = `${c.prompt}\n\nCATEGORY: ${teamName || 'Studio'}`;
           const res = await post('/api/crons/create', { name: c.name, prompt, schedule: c.schedule, deliver: 'local', enabled: false, value, category: teamName || 'Studio' });
           row.ref = (res.job && res.job.name) || c.name;
+          const bot = c.bot && botSlugs[slug(c.bot)];
+          if (bot && res.job) {
+            await post('/api/crons/assign', { job_id: res.job.id, owner_profile: res.job.owner_profile || 'default', bot });
+            row.ref += ' → ' + bot;
+          }
         } else if (c.type === 'skill') {
           const slug = String(c.name || c.key).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 48) || c.key;
           const content = `---\nname: ${slug}\ndescription: ${String(c.description || c.name).replace(/\n/g, ' ')}\nmetadata:\n  studio_use_case: ${doc.id}\n  studio_component: ${c.key}\n---\n\n${c.content || ''}\n`;
@@ -283,7 +310,14 @@
         } else if (c.type === 'human') {
           await post('/api/kanban/tasks', { title: c.name, body: `${c.what || ''}\n\nWie: ${c.who || ''}\nUit Studio: ${doc.title}`, created_by: 'studio', idempotency_key: doc.id + ':' + c.key });
         } else {
-          row.status = 'skipped'; row.error = w('a_connection');
+          if (catalog === null) { try { catalog = (await call('/api/integrations/catalog')).providers || []; } catch (_e) { catalog = []; } }
+          if (connections === null) { try { connections = (await call('/api/integrations/connections')).connections || []; } catch (_e) { connections = []; } }
+          const want = slug(c.provider || c.name);
+          const match = catalog.find(p => [p.key, p.unique_key, p.display_name].some(v => slug(v) === want));
+          const connected = match && connections.some(x => [match.key, match.unique_key].includes(x.provider_config_key));
+          if (connected) { row.ref = (match.display_name || c.name) + ': ' + w('conn_ok'); }
+          else if (match) { await post('/api/integrations/request', { provider_config_key: match.unique_key || match.key }); row.ref = (match.display_name || c.name) + ': ' + w('conn_req'); }
+          else { row.status = 'skipped'; row.error = w('conn_none'); }
         }
       } catch (e) { row.status = 'failed'; row.error = errMsg(e).slice(0, 280); }
       log.push(row);
@@ -306,6 +340,40 @@
     root().querySelectorAll('[data-st-include]').forEach(el => { const c = comps[Number(el.dataset.stInclude)]; if (c) c.include = el.checked; });
     return comps;
   }
+  // Live: the realtime voice agent (static/realtime_voice.js) in a chat
+  // session of its own for this use case. What the person says flows into the
+  // compose box; sending stays a click, so the model steps run on purpose.
+  async function toggleLive(){
+    const voice = window.synPulseVoice;
+    if (!voice) return;
+    if (St.live) { stopLive(); return; }
+    let sid = St.doc.voice_session;
+    if (!sid) {
+      const data = await post('/api/session/new', {});
+      sid = data && data.session && data.session.session_id;
+      if (!sid) { toast('Voice session could not start'); return; }
+      try { await post('/api/session/rename', { session_id: sid, title: 'Studio · ' + (St.doc.title || 'use case') }); } catch (_e) {}
+      await save({ voice_session: sid }, true);
+    }
+    const base = (root().querySelector('[data-st-send] textarea') || {}).value || '';
+    const original = voice.d.transcript;
+    St.live = { original, base };
+    voice.d.transcript = entries => {
+      try { if (original) original(entries); } catch (_e) {}
+      const said = (entries || []).filter(e => e.role === 'user').map(e => e.text).join(' ').trim();
+      St.draft = (base ? base + ' ' : '') + said;
+      const ta = root() && root().querySelector('[data-st-send] textarea');
+      if (ta) ta.value = St.draft;
+    };
+    render();
+    try { await voice.start(sid); } catch (e) { toast(errMsg(e)); stopLive(); }
+  }
+  function stopLive(){
+    const voice = window.synPulseVoice;
+    if (voice && St.live) { voice.d.transcript = St.live.original; try { voice.stop(); } catch (_e) {} }
+    St.live = null; render();
+  }
+
   function dictate(){
     const R = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!R) return;
@@ -343,7 +411,7 @@
         render(); return;
       }
       if (b.dataset.stOpen) { await open(b.dataset.stOpen); return; }
-      if (b.hasAttribute('data-st-back')) { St.doc = null; await loadList(); render(); return; }
+      if (b.hasAttribute('data-st-back')) { if (St.live) stopLive(); St.doc = null; await loadList(); render(); return; }
       if (b.hasAttribute('data-st-delete')) { if (confirm(w('confirm_delete'))) { try { await post('/api/studio/delete', { id: St.doc.id }); } catch (e) { toast(errMsg(e)); } St.doc = null; await loadList(); render(); } return; }
       if (b.dataset.stPhase) { await save({ phase: b.dataset.stPhase }, true); render(); return; }
       if (b.dataset.stGoto) {
@@ -356,6 +424,7 @@
       if (b.hasAttribute('data-st-save-playbook')) { await save({ components: collectComponents() }); render(); return; }
       if (b.hasAttribute('data-st-build')) { if (!St.building) await runBuild(); return; }
       if (b.hasAttribute('data-st-mic')) { dictate(); return; }
+      if (b.hasAttribute('data-st-live')) { await toggleLive(); return; }
       if (b.hasAttribute('data-st-chat')) {
         const summary = (St.doc.notes || []).filter(n => n.role === 'user').map(n => n.text).join(' ').slice(0, 600);
         if (typeof switchPanel === 'function') await switchPanel('chat');

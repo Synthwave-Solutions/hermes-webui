@@ -166,3 +166,9 @@ main.main.showing-organisation>#mainOrganisation,main.main.showing-management>#m
 .om-side button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .om-side .om-side-count{margin-left:auto;font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
 .om-side .om-side-flag{width:7px;height:7px;border-radius:50%;background:var(--error);flex:0 0 auto}
+
+/* Chip under a bot chat */
+.om-chat-value{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 auto 6px;max-width:var(--chat-max-width,860px);padding:6px 12px;border:1px solid var(--border);border-radius:999px;background:var(--surface);box-shadow:var(--sp-shadow-xs);font-size:12.5px;width:fit-content}
+.om-chat-value .sm-btn{min-height:28px;padding:0 10px;font-size:12px;border-radius:999px;border:1px solid var(--border2,var(--border));background:var(--surface);color:var(--text);cursor:pointer;font-weight:600}
+.om-chat-value .sm-btn.primary{background:var(--sp-action-bg);color:var(--sp-on-action);border-color:var(--sp-action-bg)}
+.om-chat-value .om-chip-text{color:var(--text)}

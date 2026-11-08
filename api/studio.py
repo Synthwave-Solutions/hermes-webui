@@ -37,7 +37,7 @@ _LOCK = threading.Lock()
 _ID_RE = re.compile(r"^uc_[a-f0-9]{12}$")
 PHASES = ("discover", "design", "playbook", "build", "measure")
 BLOCKS = ("task", "skill", "bot", "human", "connection", "custom")
-COMPONENT_TYPES = ("task", "skill", "human", "connection")
+COMPONENT_TYPES = ("bot", "task", "skill", "human", "connection")
 MAX_TEXT = 6000
 
 
@@ -168,9 +168,12 @@ def clean_components(items) -> list:
         if c["type"] == "task":
             per = c.get("per") if c.get("per") in ("run", "day", "week") else "run"
             row.update({"schedule": _txt(c.get("schedule"), 60) or "0 8 * * 1",
-                        "prompt": str(c.get("prompt") or "")[:4000], "bot": _txt(c.get("bot"), 64),
+                        "prompt": str(c.get("prompt") or "")[:4000], "bot": _txt(c.get("bot"), 64).lower(),
                         "before_minutes": _int(c.get("before_minutes"), 0, 6000),
                         "review_minutes": _int(c.get("review_minutes"), 0, 6000), "per": per})
+        elif c["type"] == "bot":
+            row.update({"description": _txt(c.get("description"), 300),
+                        "instructions": str(c.get("instructions") or "")[:4000]})
         elif c["type"] == "skill":
             row.update({"description": _txt(c.get("description"), 300), "content": str(c.get("content") or "")[:12000]})
         elif c["type"] == "human":
@@ -209,6 +212,11 @@ def update(view, body: dict) -> dict:
             doc["goals"] = clean_goals(body.get("goals"))
         if "opportunities" in body:
             doc["opportunities"] = clean_opportunities(body.get("opportunities"))
+        if "voice_session" in body:
+            sid = str(body.get("voice_session") or "")
+            if sid and not re.fullmatch(r"[A-Za-z0-9_-]{4,64}", sid):
+                raise ValueError("Invalid session")
+            doc["voice_session"] = sid
         if "selected" in body:
             doc["selected"] = _txt(body.get("selected"), 20)
         if "process" in body:
@@ -243,13 +251,16 @@ Houd menselijke beslissingen bij de mens. Geef 1 tot 3 metrics met nulmeting en 
  "building_block": "task", "note": "..."}], "metrics": [{"name": "...", "baseline": "...", "target": "..."}]}"""
 
 PLAYBOOK = """Maak van het nieuwe proces een uitvoerbaar Playbook voor SynthPulse. Componenten:
+- bot: alleen als het team een vaste AI-collega voor dit werk nodig heeft. Velden: name (bijv. "Debiteuren Bot"),
+  description, instructions (de rol in de jij-vorm, wat hij wel en niet doet, verstuurt nooit zelf iets).
+  Een task die door deze bot gedaan wordt, krijgt bot: <de name van de bot>.
 - task: een geplande taak. Velden: name, schedule (cron, Europe/Amsterdam, binnen kantoortijden),
   prompt (zelfstandige opdracht voor de agent, Nederlands, verstuurt NOOIT iets naar anderen maar maakt concepten
   en levert in dit gesprek af), before_minutes en review_minutes (handwerk eerst en controle nu), per (run/day/week).
 - skill: een werkwijze als Markdown. Velden: name (kort), description, content (SKILL-tekst met stappen).
 - human: een stap die bij een mens blijft. Velden: name, who, what.
 - connection: een benodigde koppeling. Velden: name, provider, why.
-Maximaal 6 componenten, alleen wat nodig is. Alleen JSON: {"components": [{"type": "task", "name": "...", ...}]}"""
+Maximaal 7 componenten, alleen wat nodig is. Alleen JSON: {"components": [{"type": "task", "name": "...", ...}]}"""
 
 
 def _ask_json(system: str, user: str) -> dict:

@@ -107,6 +107,8 @@ def seed(home: Path) -> None:
                       f"Debiteurenlijst · run {i}"))
     srows.append(("chat1", "webui", MEMBER, "synthwave-auto", now - 7200, None, now - 7000, 8, 60000, 6000, 0, 0, 0, None, "unknown",
                   "Aanmaning klant X"))
+    srows.append(("chat2", "webui", ADMIN, "synthwave-auto", now - 5400, None, now - 5000, 6, 40000, 4000, 0, 0, 0, None, "unknown",
+                  "Aanmaning klant Y"))
     conn.executemany("INSERT INTO sessions VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", srows)
     conn.commit()
     conn.close()
@@ -331,15 +333,37 @@ def main() -> int:
             page.locator("#botDutyTimes").fill("10")
             page.locator("#botDutyForm .sm-btn.primary").click()
             page.wait_for_selector("#botDutiesCard .bot-duty-value", timeout=10000)
+            page.wait_for_timeout(500)
+            page.wait_for_selector("#botDutiesCard .bot-duty-value", timeout=10000)
             chip = page.locator("#botDutiesCard .bot-duty-value").inner_text()
             assert "4,2" in chip, chip  # (30 - 5) x 10 = 250 min
             assert page.locator("#botServesSelect").input_value() == "finance/debiteuren"
-            page.locator("#botDutiesCard").screenshot(path=str(art / "08-bot-duty-value.png"))
+            page.wait_for_timeout(800)
+            page.screenshot(path=str(art / "08-bot-duty-value.png"))
             ok("bot responsibility with minutes shows the weekly saving; the bot's team is shown in its editor")
 
             overview = ctx.request.get("/api/management/overview?period=28").json()
             bot = next(b for b in overview["bots"] if b["name"] == "finbot")
-            assert bot["estimate_minutes_per_week"] == 250 and bot["chats"] == 1, bot
+            assert bot["estimate_minutes_per_week"] == 250 and bot["chats"] == 2, bot
+
+            # 7b. the chip under a bot chat: confirm, then correct
+            r = ctx.request.post("/api/value/chat", data={"session_id": "chat2", "duty": "Aanmaningen opstellen"})
+            assert r.ok, r.text()[:200]
+            # chat1 is Tom's chat: the admin cannot label it (not found for this person)
+            assert ctx.request.post("/api/value/chat", data={"session_id": "chat1", "duty": "Aanmaningen opstellen"}).status in (403, 404)
+            page.evaluate("async () => { await switchPanel('chat'); }")
+            page.wait_for_timeout(500)
+            page.evaluate("() => { window.S = window.S || {}; S.session = Object.assign({}, S.session || {}, {session_id: 'chat2'}); }")
+            page.wait_for_selector("#omChatValue:not([hidden]) .om-chip-text", timeout=10000)
+            chip = page.locator("#omChatValue").inner_text()
+            assert "Aanmaningen opstellen" in chip and "25 min" in chip, chip
+            page.locator("#omChatValue [data-om-chip-edit]").click()
+            page.locator("#omChatValue [data-om-chip-duty]").select_option("")
+            page.locator("#omChatValue [data-om-chip-save]").click()
+            page.wait_for_function("() => /Niet gekoppeld/.test(document.querySelector('#omChatValue')?.innerText || '')", timeout=10000)
+            label = ctx.request.get("/api/value/chat?session_id=chat2").json()
+            assert label["label_state"] == "removed" and not label["duty"], label
+            ok("the chip under a bot chat shows the saving; the person confirms or corrects it, nobody else can")
 
             # 8. narrow layout
             page.set_viewport_size({"width": 390, "height": 844})

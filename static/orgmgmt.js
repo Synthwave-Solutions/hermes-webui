@@ -19,6 +19,7 @@
       per_label: 'Eenheid', per_run_opt: 'per keer', per_day_opt: 'per dag', per_week_opt: 'per week', per_hint: 'Draait de taak vaker dan dagelijks? Kies per dag: de besparing telt dan één keer per dag met een geslaagde run.',
       of_which_confirmed: 'waarvan {h} bevestigd', all_estimated: 'nog geheel op basis van AI-schattingen',
       d_check_high: 'Schatting lijkt hoog', d_check_high_sub: 'meer dan 4 uur per dag voor één taak; controleer eenheid en minuten',
+      chip_logged: 'Gelogd als: {d} · bespaart ~{m} min', chip_no_duty: 'Niet gekoppeld aan een verantwoordelijkheid', chip_wrong: 'Klopt niet', chip_which: 'Welke verantwoordelijkheid deed dit gesprek?', chip_none: 'Geen',
       measuring_since: 'Meting loopt sinds {d}: eerdere runs waren al opgeschoond, dus deze periode is nog niet compleet.',
       person: 'Persoon',
       other: 'Overig', fails: 'faalt', no_value: 'zonder waarde', suggested: 'voorstel',
@@ -89,6 +90,7 @@
       per_label: 'Unit', per_run_opt: 'per run', per_day_opt: 'per day', per_week_opt: 'per week', per_hint: 'Runs more than daily? Choose per day: the saving then counts once per day with a completed run.',
       of_which_confirmed: 'of which {h} confirmed', all_estimated: 'still entirely based on AI estimates',
       d_check_high: 'Estimate looks high', d_check_high_sub: 'more than 4 hours a day for one task; check unit and minutes',
+      chip_logged: 'Logged as: {d} · saves ~{m} min', chip_no_duty: 'Not linked to a responsibility', chip_wrong: 'Not right', chip_which: 'Which responsibility did this chat cover?', chip_none: 'None',
       measuring_since: 'Measuring since {d}: earlier runs had already been pruned, so this period is not complete yet.',
       person: 'Person',
       other: 'Other', fails: 'failing', no_value: 'without value', suggested: 'suggested',
@@ -897,6 +899,50 @@
     if (!(before > 0)) return { error: w('need_minutes') };
     return { value: { before_minutes: before, review_minutes: Number(($id('cronFormValueNow') || {}).value || 0), per: String(($id('cronFormValuePer') || {}).value || 'run'), task, source: 'owner', confidence: 'confirmed' } };
   }
+
+  // ── Chip under a bot chat: which responsibility it covered ───────────────
+  // The collector labels finished chats (api/value_tracking.label_chats). The
+  // person who had the chat confirms or corrects it here; nobody else can.
+  const C = { sid: '', data: null, editing: false };
+  function chipBox(){
+    let box = $id('omChatValue');
+    const wrap = $id('composerWrap');
+    if (!box && wrap && wrap.parentNode) { box = document.createElement('div'); box.id = 'omChatValue'; box.className = 'om-chat-value'; box.hidden = true; wrap.parentNode.insertBefore(box, wrap); }
+    return box;
+  }
+  function paintChip(){
+    const box = chipBox();
+    if (!box) return;
+    const d = C.data;
+    if (!d || !d.duties || !d.duties.length || d.label_state === 'none' || d.label_state === 'skipped') { box.hidden = true; box.innerHTML = ''; return; }
+    box.hidden = false;
+    const final = d.label_state === 'confirmed' || d.label_state === 'removed';
+    if (C.editing) {
+      box.innerHTML = `<span>${H(w('chip_which'))}</span><select class="om-select" data-om-chip-duty><option value="">${H(w('chip_none'))}</option>${d.duties.map(x => `<option value="${H(x.title)}" ${x.title === d.duty ? 'selected' : ''}>${H(x.title)} · ${x.saves} ${H(w('min'))}</option>`).join('')}</select><button type="button" class="sm-btn primary" data-om-chip-save>${H(w('save'))}</button>`;
+      return;
+    }
+    const text = d.duty ? w('chip_logged', { d: d.duty, m: d.saved_minutes || 0 }) : w('chip_no_duty');
+    box.innerHTML = `<span class="om-chip-text">⏱ ${H(text)}</span>${final ? `<span class="om-badge confirmed">${H(w('label_confirmed'))}</span>` : `<button type="button" class="sm-btn" data-om-chip-yes>${H(w('yes'))}</button>`}<button type="button" class="sm-btn" data-om-chip-edit>${H(w('chip_wrong'))}</button>`;
+  }
+  async function refreshChip(){
+    const sid = (window.S && S.session && S.session.session_id) || '';
+    if (sid === C.sid) return;
+    C.sid = sid; C.data = null; C.editing = false; paintChip();
+    if (!sid) return;
+    try { const d = await call('/api/value/chat?session_id=' + encodeURIComponent(sid)); if (C.sid === sid) { C.data = d; paintChip(); } } catch (_e) {}
+  }
+  async function labelChip(duty){
+    try { const r = await post('/api/value/chat', { session_id: C.sid, duty }); C.data = Object.assign({}, C.data, { duty: r.duty || '', saved_minutes: r.saved_minutes || 0, label_state: duty ? 'confirmed' : 'removed' }); C.editing = false; paintChip(); toast(w('saved')); }
+    catch (e) { toast(errMsg(e)); }
+  }
+  document.addEventListener('click', ev => {
+    const b = ev.target.closest('#omChatValue button');
+    if (!b) return;
+    if (b.hasAttribute('data-om-chip-yes')) labelChip(C.data && C.data.duty || '');
+    else if (b.hasAttribute('data-om-chip-edit')) { C.editing = true; paintChip(); }
+    else if (b.hasAttribute('data-om-chip-save')) labelChip(($id('omChatValue').querySelector('[data-om-chip-duty]') || {}).value || '');
+  });
+  setInterval(() => { refreshChip().catch(() => {}); }, 2500);
 
   // ── Panel hooks ───────────────────────────────────────────────────────────
   window.SPOrg = { load: async () => { bindOrg(); await loadOrg(); }, refreshNav };

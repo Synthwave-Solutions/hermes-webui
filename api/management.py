@@ -516,7 +516,7 @@ def job_detail(view, store: str, job_id: str, days: int, start: float, end: floa
 
 # ── HTTP ─────────────────────────────────────────────────────────────────────
 
-_GET = ("/api/management/overview", "/api/management/job", "/api/management/pricing", "/api/org/chart")
+_GET = ("/api/management/overview", "/api/management/job", "/api/management/pricing", "/api/org/chart", "/api/value/chat")
 _POST = ("/api/management/pricing", "/api/value/job", "/api/value/chat", "/api/value/collect")
 
 
@@ -533,6 +533,10 @@ def handle_get(handler, parsed) -> bool:
                 return True
             _collect_safely()
             j(handler, chart(view))
+            return True
+        if path == "/api/value/chat":
+            sid = (qs.get("session_id") or [""])[0]
+            j(handler, value_tracking.chat_label_for(sid, view.email))
             return True
         if path == "/api/management/job":
             _collect_safely()
@@ -583,8 +587,10 @@ def handle_post(handler, parsed, body) -> bool:
             j(handler, value_tracking.collect(force=True))
             return True
         if path == "/api/value/chat":
-            row = value_tracking.label_chat(str(body.get("session_key") or ""), str(body.get("duty") or ""),
-                                            view.email, body.get("saved_minutes"))
+            key = str(body.get("session_key") or "")
+            if not key and body.get("session_id"):
+                key = (value_tracking.chat_label_for(str(body["session_id"]), view.email) or {}).get("session_key") or ""
+            row = value_tracking.label_chat(key, str(body.get("duty") or ""), view.email, body.get("saved_minutes"))
             j(handler, {"ok": True, "duty": row.get("duty"), "saved_minutes": row.get("saved_minutes")})
             return True
         return _post_job_value(handler, view, body)

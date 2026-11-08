@@ -42,6 +42,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import sqlite3
 import threading
 import time
@@ -503,6 +504,30 @@ def label_chat(session_key: str, duty: str, actor_email: str, saved_minutes: int
         return dict(conn.execute("SELECT * FROM chats WHERE session_key=?", (session_key,)).fetchone())
     finally:
         conn.close()
+
+
+def chat_label_for(session_id: str, email: str) -> dict:
+    """The label of one of the caller's own bot chats, with the bot's duties
+    to choose from. Empty when there is none or it is someone else's chat."""
+    from api import org_structure
+
+    email = org_structure.norm_email(email)
+    if not session_id or not email or not re.fullmatch(r"[A-Za-z0-9_-]{4,64}", session_id):
+        return {}
+    conn = _connect()
+    try:
+        row = conn.execute("SELECT * FROM chats WHERE session_id=? AND user_email=? ORDER BY last_at DESC LIMIT 1",
+                           (session_id, email)).fetchone()
+    finally:
+        conn.close()
+    if row is None:
+        return {}
+    duties = [{"title": d["title"], "saves": max(0, int(d.get("minutes_before") or 0) - int(d.get("minutes_now") or 0))}
+              for d in bot_duties(row["bot"]) if int(d.get("minutes_before") or 0) > 0]
+    if not duties:
+        return {}
+    return {"session_key": row["session_key"], "bot": row["bot"], "duty": row["duty"] or "",
+            "label_state": row["label_state"], "saved_minutes": row["saved_minutes"] or 0, "duties": duties}
 
 
 # ── Bots: duties with minutes ────────────────────────────────────────────────
