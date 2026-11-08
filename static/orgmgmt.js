@@ -380,20 +380,25 @@
     const subs = depth < 5 ? all.filter(t => t.parent === team.key) : [];
     return out.concat(subs.map(t => teamLi(t, all, depth + 1)));
   }
-  function teamLi(team, all, depth){
+  function teamLi(team, all, depth, dept){
     const st = team.stats || {};
     const flag = (st.failing || 0) + (st.missing_value || 0) > 0;
     const subs = all.filter(t => t.parent === team.key).length;
     const node = `<div class="oc-node team ${O.selected === team.key ? 'sel' : ''}">
         <div class="oc-head">${team.lead ? personAv(team.lead, true) : `<span class="om-face empty">${icon('people')}</span>`}
-          <span class="oc-text"><strong>${H(team.name)}</strong><span>${H(team.lead ? team.lead.replace(/@.*/, '') : w('no_lead'))}${subs ? ' · ' + subs + ' ' + H(w('subteams').toLowerCase()) : ''}</span></span>
+          <span class="oc-text"><strong>${H(team.name)}</strong><span>${dept ? H(w('department_one')) + ' · ' : ''}${H(team.lead ? team.lead.replace(/@.*/, '') : w('no_lead'))}${subs ? ' · ' + subs + ' ' + H(w('subteams').toLowerCase()) : ''}</span></span>
           ${savedHtml(team.summary, 'team', team.key)}${flag ? `<span class="om-flag-dot" title="${H(w('waiting'))}"></span>` : ''}</div>
         ${statsRow(team.summary, 'team', team.key)}
         <button type="button" class="sm-btn om-team-open" data-om-team="${H(team.key)}" aria-pressed="${O.selected === team.key}">${H(w('details'))}</button><!--toggle--></div>`;
-    return ocLi('team:' + team.key, 'oc-team', node, teamChildren(team, all, depth), false, `data-team-key="${H(team.key)}"`);
+    return ocLi('team:' + team.key, 'oc-team' + (dept ? ' oc-dept oc-merged' : ''), node, teamChildren(team, all, depth), false,
+      `data-team-key="${H(team.key)}"${dept ? ` data-dept-key="${H(dept.key)}"` : ''}`);
   }
   function deptLi(d){
     const teams = d.teams || [];
+    // A department with one team of the same name is one level, not two.
+    if (teams.length === 1 && !teams[0].parent && String(teams[0].name).trim().toLowerCase() === String(d.name).trim().toLowerCase()) {
+      return teamLi(teams[0], teams, 0, d);
+    }
     const node = `<div class="oc-node dept"><div class="oc-head"><span class="om-face dept">${icon('people', 16)}</span><span class="oc-text"><strong>${H(d.name)}</strong><span>${teams.length} ${H((teams.length === 1 ? w('team') : w('teams')).toLowerCase())}</span></span>${savedHtml(d.summary, 'dept', d.key)}</div>
         ${statsRow(d.summary, 'dept', d.key)}<!--toggle--></div>`;
     return ocLi('dept:' + d.key, 'oc-dept', node, teams.filter(t => !t.parent).map(t => teamLi(t, teams, 0)), true, `data-dept-key="${H(d.key)}"`);
