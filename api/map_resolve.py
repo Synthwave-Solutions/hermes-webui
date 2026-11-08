@@ -427,8 +427,14 @@ def parse_pdok(payload):
 
 
 def _pdok(query, deadline, agent):
-    url = PDOK_URL + "?" + urllib.parse.urlencode({"q": query, "rows": 1, "fl": "weergavenaam,centroide_ll,type,score"})
-    return parse_pdok(_fetch_json(url, deadline, agent))
+    params = {"q": query, "rows": 1, "fl": "weergavenaam,centroide_ll,type,score"}
+    if re.search(r"\d", query):
+        # With a house number, ask for the address itself first: the free
+        # search otherwise ranks the street above "Museumstraat 1".
+        found = parse_pdok(_fetch_json(PDOK_URL + "?" + urllib.parse.urlencode(dict(params, fq="type:adres")), deadline, agent))
+        if found:
+            return found
+    return parse_pdok(_fetch_json(PDOK_URL + "?" + urllib.parse.urlencode(params), deadline, agent))
 
 
 def parse_nominatim(payload):
@@ -469,14 +475,27 @@ def _nominatim(query, lang, region, deadline, agent, contact):
 _COMMONS_FILE_RE = re.compile(r"/wikipedia/commons/(?:thumb/)?[0-9a-f]/[0-9a-f]{2}/([^/]+)(?:/[^/]+)?")
 
 
-def commons_filename(url: str):
+_IMAGE_HOSTS = ("upload.wikimedia.org", "thumb.wikimedia.org")
+
+
+def commons_image(url: str):
+    """(url on upload.wikimedia.org without a query, Commons file name) or None.
+
+    Wikipedia now hands out thumbnails on thumb.wikimedia.org with tracking
+    parameters; the same path is served by upload.wikimedia.org, the only
+    photo host the kit frame allows."""
     parts = urllib.parse.urlsplit(str(url or ""))
-    if parts.scheme != "https" or parts.hostname != "upload.wikimedia.org":
+    if parts.scheme != "https" or parts.hostname not in _IMAGE_HOSTS or parts.port or parts.username:
         return None
     match = _COMMONS_FILE_RE.fullmatch(parts.path)
     if not match:
         return None
-    return urllib.parse.unquote(match.group(1)).replace(" ", "_")
+    return "https://upload.wikimedia.org" + parts.path, urllib.parse.unquote(match.group(1)).replace(" ", "_")
+
+
+def commons_filename(url: str):
+    image = commons_image(url)
+    return image[1] if image else None
 
 
 def _plain(value, limit):
@@ -518,12 +537,12 @@ def _wiki_summary(lang, title, deadline, agent, want_photo):
 def _commons_photo(summary, lang, canonical, deadline, agent):
     thumb = (summary.get("thumbnail") or {}) if isinstance(summary.get("thumbnail"), dict) else {}
     original = (summary.get("originalimage") or {}) if isinstance(summary.get("originalimage"), dict) else {}
-    image, full = str(thumb.get("source") or ""), str(original.get("source") or "")
-    if not image.startswith(PHOTO_PREFIX) or not full.startswith(PHOTO_PREFIX):
-        return None
-    filename = commons_filename(full)
-    if not filename or commons_filename(image) != filename:
+    image, full = commons_image(thumb.get("source")), commons_image(original.get("source"))
+    if not image or not full or image[1] != full[1]:
         return None  # thumbnail and original must be the same Commons file
+    image, filename = image
+    if not image.startswith(PHOTO_PREFIX) or re.search(r"[\s\"'<>\\]", image):
+        return None
     url = COMMONS_API_URL + "?" + urllib.parse.urlencode({
         "action": "query", "format": "json", "formatversion": 2, "prop": "imageinfo", "iiprop": "extmetadata",
         "iiextmetadatafilter": "Artist|LicenseShortName", "titles": "File:" + filename})

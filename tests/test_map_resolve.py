@@ -93,9 +93,19 @@ def test_pdok_answers_dutch_addresses_and_its_point_is_parsed(net):
                      "label": "Taurusavenue 1, 2132LS Hoofddorp"}
     assert net.hosts() == ["api.pdok.nl"]
     query = urllib.parse.parse_qs(urllib.parse.urlsplit(net.calls[0]["url"]).query)
-    assert query["q"] == ["Taurusavenue 1, Hoofddorp"] and query["rows"] == ["1"]
+    assert query["q"] == ["Taurusavenue 1, Hoofddorp"] and query["rows"] == ["1"] and query["fq"] == ["type:adres"]
     assert out["attribution"] == ["Kadaster / PDOK"]
     assert counts["looked_up"] == 1
+
+
+def test_pdok_falls_back_to_the_free_search_without_an_address_match(net):
+    def pdok(url):
+        if "fq=type" in url:
+            return {"response": {"docs": []}}
+        return {"response": {"docs": [{"centroide_ll": "POINT(4.638 52.387)", "type": "weg", "weergavenaam": "Stationsplein, Haarlem"}]}}
+    net.set("api.pdok.nl", pdok)
+    out, _ = mr.resolve(request({"name": "Station", "q": "Stationsplein 1, Haarlem"}), ON)
+    assert out["places"][0]["precision"] == "street" and len(net.calls) == 2
 
 
 @pytest.mark.parametrize("payload,expected", [
@@ -290,6 +300,17 @@ def test_no_photo_without_a_free_license_and_a_matching_commons_file(net, change
     assert out["places"][0]["status"] == "ok" and "photo" not in out["places"][0]
 
 
+def test_a_thumb_host_thumbnail_is_served_from_the_upload_host(net):
+    summary = json.loads(json.dumps(SUMMARY))
+    summary["thumbnail"]["source"] = THUMB.replace("upload.wikimedia.org", "thumb.wikimedia.org") + "?utm_source=nl.wikipedia.org&utm_content=thumbnail"
+    summary["originalimage"]["source"] = ORIGINAL + "?utm_source=nl.wikipedia.org"
+    net.set("nominatim.openstreetmap.org", NOMINATIM_HIT)
+    net.set("nl.wikipedia.org", summary)
+    net.set("commons.wikimedia.org", COMMONS)
+    out, _ = mr.resolve(request({"name": "Rijksmuseum", "q": "Rijksmuseum"}, photos=True), ON)
+    assert out["places"][0]["photo"]["url"] == THUMB, "same path, upload host, no tracking query"
+
+
 def test_photos_are_capped_per_map(net, monkeypatch):
     monkeypatch.setattr(mr, "NOMINATIM_SPACING", 0.0)
     net.set("nl.wikipedia.org", SUMMARY)
@@ -382,7 +403,7 @@ def test_the_request_deadline_stops_lookups(net, monkeypatch):
         return {"response": {"docs": []}}
     net.set("api.pdok.nl", slow)
     net.set("nominatim.openstreetmap.org", NOMINATIM_HIT)
-    out, _ = mr.resolve(request({"name": "A", "q": "Straat 1, A"}, {"name": "B", "q": "Straat 2, B"}), {"webui_map_geocoder": "pdok"})
+    out, _ = mr.resolve(request({"name": "A", "q": "Dorpsstraat, A"}, {"name": "B", "q": "Kerkstraat, B"}), {"webui_map_geocoder": "pdok"})
     assert [p["status"] for p in out["places"]] == ["not_found", "later"]
 
 
