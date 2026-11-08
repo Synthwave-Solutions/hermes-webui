@@ -24,7 +24,7 @@
       person: 'Persoon',
       other: 'Overig', fails: 'faalt', no_value: 'zonder waarde', suggested: 'voorstel',
       suggest_intro: '{n} voorstellen op basis van de bestaande categorie.', apply_suggestions: 'Neem alle voorstellen over', applied_n: '{n} ingedeeld',
-      org: 'Organisatie', mgmt: 'Management', chart: 'Organigram', manage: 'Teams beheren', parent: 'Onder team', parent_none: 'Geen, hoofdteam', subteams: 'Subteams', expand_all: 'Alles uitklappen', collapse_all: 'Alles inklappen', s_people: 'Mensen', s_bots: 'Bots', s_tasks: 'Geplande taken', s_conn: 'Koppelingen', s_skills: 'Skills', s_saved: 'Tijd bespaard', s_saved_sub: 'laatste 4 weken', s_conn_hint: 'MCP-servers van de bots plus persoonlijke koppelingen van de mensen', details: 'Details', hierarchy: 'Hiërarchie', h_note: 'Bots zonder bot-manager staan onder de teamlead.', no_lead: 'Geen teamlead', reports: 'rapporteert aan',
+      org: 'Organisatie', mgmt: 'Management', chart: 'Organigram', manage: 'Teams beheren', parent: 'Onder team', parent_none: 'Geen, hoofdteam', subteams: 'Subteams', expand_all: 'Alles uitklappen', collapse_all: 'Alles inklappen', s_people: 'Mensen', s_bots: 'Bots', s_tasks: 'Geplande taken', s_conn: 'Koppelingen', s_skills: 'Skills', s_saved: 'Tijd bespaard', s_saved_sub: 'laatste 4 weken', s_conn_hint: 'MCP-servers van de bots plus persoonlijke koppelingen van de mensen', details: 'Details', show_which: 'klik om te zien welke', whole_org: 'Hele organisatie', search_in: 'Zoek in {what}', no_match: 'Niets gevonden.', nothing_here: 'Niets om te tonen.', conn_mcp: 'MCP-servers van bots', conn_app: 'Persoonlijke koppelingen', via_bots: 'via {n} bot(s)', via_people: 'van {n} persoon/personen', hierarchy: 'Hiërarchie', h_note: 'Bots zonder bot-manager staan onder de teamlead.', no_lead: 'Geen teamlead', reports: 'rapporteert aan',
       people: 'Mensen', bots: 'Bots', both: 'Samen', tasks: 'Taken', team: 'Team', teams: 'Teams',
       department: 'Afdeling', departments: 'Afdelingen', lead: 'Lead', members: 'Leden', rate: 'Uurtarief',
       org_intro: 'Wie in welk team zit, welke bots en geplande taken voor dat team werken, en hoeveel tijd dat bespaart.',
@@ -95,7 +95,7 @@
       person: 'Person',
       other: 'Other', fails: 'failing', no_value: 'without value', suggested: 'suggested',
       suggest_intro: '{n} suggestions based on the existing category.', apply_suggestions: 'Apply all suggestions', applied_n: '{n} placed',
-      org: 'Organisation', mgmt: 'Management', chart: 'Org chart', manage: 'Manage teams', parent: 'Under team', parent_none: 'None, top-level team', subteams: 'Sub-teams', expand_all: 'Expand all', collapse_all: 'Collapse all', s_people: 'People', s_bots: 'Bots', s_tasks: 'Scheduled tasks', s_conn: 'Connections', s_skills: 'Skills', s_saved: 'Time saved', s_saved_sub: 'last 4 weeks', s_conn_hint: 'MCP servers of the bots plus personal connections of the people', details: 'Details', hierarchy: 'Hierarchy', h_note: 'Bots without a bot manager sit under the team lead.', no_lead: 'No team lead', reports: 'reports to',
+      org: 'Organisation', mgmt: 'Management', chart: 'Org chart', manage: 'Manage teams', parent: 'Under team', parent_none: 'None, top-level team', subteams: 'Sub-teams', expand_all: 'Expand all', collapse_all: 'Collapse all', s_people: 'People', s_bots: 'Bots', s_tasks: 'Scheduled tasks', s_conn: 'Connections', s_skills: 'Skills', s_saved: 'Time saved', s_saved_sub: 'last 4 weeks', s_conn_hint: 'MCP servers of the bots plus personal connections of the people', details: 'Details', show_which: 'click to see which', whole_org: 'Whole organisation', search_in: 'Search {what}', no_match: 'Nothing found.', nothing_here: 'Nothing to show.', conn_mcp: 'MCP servers of bots', conn_app: 'Personal connections', via_bots: 'through {n} bot(s)', via_people: 'from {n} person(s)', hierarchy: 'Hierarchy', h_note: 'Bots without a bot manager sit under the team lead.', no_lead: 'No team lead', reports: 'reports to',
       people: 'People', bots: 'Bots', both: 'Both', tasks: 'Tasks', team: 'Team', teams: 'Teams',
       department: 'Department', departments: 'Departments', lead: 'Lead', members: 'Members', rate: 'Hourly rate',
       org_intro: 'Who is in which team, which bots and scheduled tasks work for that team, and how much time that saves.',
@@ -195,7 +195,7 @@
   }
 
   // ── Organisation screen ───────────────────────────────────────────────────
-  const O = { view: 'chart', layer: 'both', chart: null, structure: null, selected: '', busy: false, error: '' };
+  const O = { view: 'chart', layer: 'both', chart: null, structure: null, selected: '', busy: false, error: '', detail: null };
 
   function shell(id, title, actions){
     const root = $id(id);
@@ -244,19 +244,92 @@
   function setOpen(id, v){ OPEN[id] = !!v; try { localStorage.setItem(OPEN_KEY, JSON.stringify(OPEN)); } catch (_e) {} }
   const hue = v => { let h = 0; for (const c of String(v || '')) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
 
-  function statsRow(sum){
+  function statsRow(sum, level, key){
     sum = sum || {};
-    return `<span class="om-mini">${STAT_KEYS.map(([k, l]) => `<span class="om-mini-stat" title="${H(w(l))}${k === 'connections' ? ' · ' + H(w('s_conn_hint')) + ((sum.connection_names || []).length ? ': ' + H(sum.connection_names.join(', ')) : '') : ''}">${icon(k, 17)}<b>${H(nf(0).format(sum[k] || 0))}</b></span>`).join('')}</span>`;
+    return `<span class="om-mini">${STAT_KEYS.map(([k, l]) => `<button type="button" class="om-mini-stat" data-om-detail="${k}" data-om-level="${H(level || 'org')}" data-om-key="${H(key || '')}" aria-pressed="${!!(O.detail && O.detail.kind === k && O.detail.level === (level || 'org') && O.detail.key === (key || ''))}" title="${H(w(l))}: ${H(w('show_which'))}">${icon(k, 17)}<b>${H(nf(0).format(sum[k] || 0))}</b></button>`).join('')}</span>`;
   }
-  function savedHtml(sum){
+  function savedHtml(sum, level, key){
     const m = (sum || {}).saved_minutes || 0;
-    return `<span class="om-saved ${m ? '' : 'none'}" title="${H(w('s_saved'))} · ${H(w('s_saved_sub'))}">${icon('saved', 17)}<b>${H(hrs(m))}</b></span>`;
+    return `<button type="button" class="om-saved ${m ? '' : 'none'}" data-om-detail="tasks" data-om-level="${H(level || 'org')}" data-om-key="${H(key || '')}" title="${H(w('s_saved'))} · ${H(w('s_saved_sub'))}">${icon('saved', 17)}<b>${H(hrs(m))}</b></button>`;
   }
   function orgStripHtml(sum){
     sum = sum || {};
-    return `<div class="om-strip">${STAT_KEYS.map(([k, l]) => `<div class="om-strip-tile" ${k === 'connections' ? `title="${H(w('s_conn_hint'))}"` : ''}><span class="om-strip-icon">${icon(k, 18)}</span><span class="om-strip-value">${H(nf(0).format(sum[k] || 0))}</span><span class="om-strip-label">${H(w(l))}</span></div>`).join('')}
-      <div class="om-strip-tile saved"><span class="om-strip-icon">${icon('saved', 18)}</span><span class="om-strip-value">${H(hrs(sum.saved_minutes || 0))}</span><span class="om-strip-label">${H(w('s_saved'))} <small>${H(w('s_saved_sub'))}</small></span></div></div>`;
+    return `<div class="om-strip">${STAT_KEYS.map(([k, l]) => `<button type="button" class="om-strip-tile" data-om-detail="${k}" data-om-level="org" data-om-key="" ${k === 'connections' ? `title="${H(w('s_conn_hint'))}"` : ''}><span class="om-strip-icon">${icon(k, 18)}</span><span class="om-strip-value">${H(nf(0).format(sum[k] || 0))}</span><span class="om-strip-label">${H(w(l))}</span></button>`).join('')}
+      <button type="button" class="om-strip-tile saved" data-om-detail="tasks" data-om-level="org" data-om-key=""><span class="om-strip-icon">${icon('saved', 18)}</span><span class="om-strip-value">${H(hrs(sum.saved_minutes || 0))}</span><span class="om-strip-label">${H(w('s_saved'))} <small>${H(w('s_saved_sub'))}</small></span></button></div>`;
   }
+
+  // ── What lies behind a number: a side panel with the list, grouped and searchable ──
+  async function openDetail(kind, level, key){
+    O.detail = { kind, level, key, data: null, q: '', error: '' };
+    renderOrg();
+    const q = document.querySelector('#mainOrganisation [data-om-detail-q]');
+    if (q) q.focus({ preventScroll: true });
+    try { O.detail.data = await call(`/api/org/chart?detail=${encodeURIComponent(kind)}&level=${encodeURIComponent(level)}&key=${encodeURIComponent(key)}`); }
+    catch (e) { if (O.detail) O.detail.error = errMsg(e); }
+    if (O.detail && O.detail.kind === kind && O.detail.key === key) paintDetail();
+  }
+  function viaChips(list, max){
+    const n = (list || []).length;
+    return `<span class="om-chips">${(list || []).slice(0, max || 4).map(v => `<span class="om-chip">${H(String(v).replace(/@.*/, ''))}</span>`).join('')}${n > (max || 4) ? `<span class="om-chip more" title="${H(list.slice(max || 4).join(', '))}">+${n - (max || 4)}</span>` : ''}</span>`;
+  }
+  function botTitle(name){
+    for (const d of (O.chart && O.chart.departments) || []) for (const t of d.teams || []) for (const b of t.bot_list || []) if (b.name === name) return b.title;
+    return name;
+  }
+  function detailGroups(d){
+    const q = (O.detail.q || '').toLowerCase();
+    const hit = txt => !q || String(txt || '').toLowerCase().includes(q);
+    const groups = new Map();
+    const add = (g, html) => { if (!groups.has(g)) groups.set(g, []); groups.get(g).push(html); };
+    for (const it of d.items || []) {
+      if (d.kind === 'skills') {
+        if (!hit(it.name + ' ' + it.description + ' ' + it.category + ' ' + it.bots.join(' '))) continue;
+        add(it.category || w('no_category'), `<div class="om-detail-item"><div class="om-detail-main"><strong>${H(it.name)}</strong>${it.description ? `<span>${H(it.description)}</span>` : ''}</div>${viaChips(it.bots, 3)}</div>`);
+      } else if (d.kind === 'connections') {
+        if (!hit(it.name + ' ' + it.via.join(' '))) continue;
+        add(it.kind === 'mcp' ? w('conn_mcp') : w('conn_app'), `<div class="om-detail-item"><span class="om-detail-icon">${icon('connections', 16)}</span><div class="om-detail-main"><strong>${H(it.name)}</strong><span>${H(it.kind === 'mcp' ? w('via_bots', { n: it.via.length }) : w('via_people', { n: it.via.length }))}</span></div>${viaChips(it.via, 4)}</div>`);
+      } else if (d.kind === 'bots') {
+        if (!hit(it.title + ' ' + (it.role || '') + ' ' + (it.category || ''))) continue;
+        add(it.category || w('no_category'), botRowHtml(it));
+      } else if (d.kind === 'tasks') {
+        if (!hit(it.name + ' ' + (it.bot || ''))) continue;
+        add((d.items.length > 12 && it.bot) ? botTitle(it.bot) : '', jobRowHtml(it));
+      } else if (d.kind === 'people') {
+        if (!hit(it.email + ' ' + it.title + ' ' + it.teams.join(' '))) continue;
+        add('', `<div class="om-row"><span class="om-face" style="--h:${hue(it.email)}">${it.avatar_url ? `<img src="${H(it.avatar_url)}" alt="">` : H(initials(it.email))}</span><div class="om-row-main"><div class="om-row-title">${H(it.email)}</div><div class="om-row-sub">${H(it.title || it.teams.join(', '))}</div></div></div>`);
+      }
+    }
+    return groups;
+  }
+  function paintDetail(){
+    const box = document.querySelector('#mainOrganisation [data-om-detail-list]');
+    if (!box || !O.detail) return;
+    const d = O.detail.data;
+    if (O.detail.error) { box.innerHTML = `<p class="om-muted">${H(O.detail.error)}</p>`; return; }
+    if (!d) { box.innerHTML = `<div class="om-skeleton"></div><div class="om-skeleton"></div><div class="om-skeleton"></div>`; return; }
+    const groups = detailGroups(d);
+    const shown = [...groups.values()].reduce((a, g) => a + g.length, 0);
+    const cnt = document.querySelector('#mainOrganisation [data-om-detail-count]');
+    if (cnt) cnt.textContent = O.detail.q ? `${shown} / ${d.count}` : String(d.count);
+    if (!shown) { box.innerHTML = `<p class="om-muted om-small">${H(w(d.count ? 'no_match' : 'nothing_here'))}</p>`; return; }
+    const many = groups.size > 1;
+    box.innerHTML = [...groups.entries()].sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0])).map(([g, rows]) => many || g
+      ? `<details class="om-detail-group" ${!many || groups.size <= 3 || O.detail.q ? 'open' : ''}><summary><span class="om-chev" aria-hidden="true"></span><strong>${H(g || w('other'))}</strong><span class="om-side-count">${rows.length}</span></summary><div class="om-list">${rows.join('')}</div></details>`
+      : `<div class="om-list">${rows.join('')}</div>`).join('');
+  }
+  function detailDrawerHtml(){
+    const dt = O.detail;
+    const label = { people: 's_people', bots: 's_bots', tasks: 's_tasks', connections: 's_conn', skills: 's_skills' }[dt.kind];
+    const where = dt.level === 'org' ? w('whole_org') : dt.level === 'dept' ? (((O.chart.departments || []).find(d => d.key === dt.key) || {}).name || dt.key) : ((findTeam(dt.key) || {}).name || dt.key);
+    return `<aside class="om-drawer om-detail" aria-label="${H(w(label))}">
+      <div class="om-drawer-head"><span class="om-strip-icon">${icon(dt.kind === 'tasks' ? 'tasks' : dt.kind, 18)}</span><div><h3>${H(w(label))} <span class="om-detail-count" data-om-detail-count>${dt.data ? H(dt.data.count) : ''}</span></h3><div class="om-muted om-small">${H(where)}</div></div>
+      <button type="button" class="om-drawer-close" data-om-detail-close aria-label="${H(w('cancel'))}">×</button></div>
+      ${dt.kind === 'connections' ? `<p class="om-small om-muted" style="margin:0 0 10px">${H(w('s_conn_hint'))}</p>` : ''}
+      <input type="search" class="om-select om-detail-q" data-om-detail-q value="${H(dt.q)}" placeholder="${H(w('search_in', { what: w(label).toLowerCase() }))}" aria-label="${H(w('search_in', { what: w(label).toLowerCase() }))}">
+      <div class="om-detail-list" data-om-detail-list></div>
+    </aside>`;
+  }
+
   function personAv(email, lead){
     const p = ((O.chart && O.chart.people) || {})[email] || {};
     return `<span class="om-face ${lead ? 'lead' : ''}" style="--h:${hue(email)}" title="${H(email)}">${p.avatar_url ? `<img src="${H(p.avatar_url)}" alt="" loading="lazy">` : H(initials(email))}</span>`;
@@ -310,7 +383,7 @@
         ${team.lead ? personAv(team.lead, true) : `<span class="om-face empty">${icon('people')}</span>`}
         <span class="om-team-title"><strong>${H(team.name)}</strong><span>${H(team.lead ? team.lead.replace(/@.*/, '') : w('no_lead'))}${subs.length ? ' · ' + subs.length + ' ' + H(w('subteams').toLowerCase()) : ''}</span></span>
         ${flag ? `<span class="om-flag-dot" title="${H(w('waiting'))}"></span>` : ''}
-        ${statsRow(team.summary)}${savedHtml(team.summary)}
+        ${statsRow(team.summary, 'team', team.key)}${savedHtml(team.summary, 'team', team.key)}
         <button type="button" class="sm-btn om-team-open" data-om-team="${H(team.key)}" aria-pressed="${O.selected === team.key}">${H(w('details'))}</button>
       </summary>
       <div class="om-team-body">${hierarchyHtml(team)}
@@ -324,7 +397,7 @@
     return `<details class="om-dept2" data-om-open="${H(id)}" ${isOpen(id, true) ? 'open' : ''}>
       <summary class="om-dept-sum"><span class="om-chev" aria-hidden="true"></span>
         <span class="om-dept-title"><strong>${H(d.name)}</strong><span>${teams.length} ${H((teams.length === 1 ? w('team') : w('teams')).toLowerCase())}</span></span>
-        ${statsRow(d.summary)}${savedHtml(d.summary)}</summary>
+        ${statsRow(d.summary, 'dept', d.key)}${savedHtml(d.summary, 'dept', d.key)}</summary>
       <div class="om-dept-body">${tops.map(t => teamHtml(t, teams, 0)).join('') || `<p class="om-muted om-small">${H(w('nothing_yet'))}</p>`}</div></details>`;
   }
 
@@ -410,11 +483,12 @@
     const selected = O.selected ? findTeam(O.selected) : null;
     body.innerHTML = `<p class="om-intro">${H(w('org_intro'))}</p>
       ${orgStripHtml(O.chart.summary)}
-      <div class="om-layout ${selected ? 'has-drawer' : ''}">
+      <div class="om-layout ${selected || O.detail ? 'has-drawer' : ''}">
         <div class="om-tree2">${depts.map(deptHtml).join('')}${unassignedHtml()}</div>
-        ${drawerHtml(selected)}
+        ${O.detail ? detailDrawerHtml() : drawerHtml(selected)}
       </div>`;
-    if (selected) loadTeamPlaybooks(selected.key);
+    if (O.detail) paintDetail();
+    else if (selected) loadTeamPlaybooks(selected.key);
   }
   async function loadTeamPlaybooks(key){
     let rows = [];
@@ -483,13 +557,17 @@
     if (!root || root.dataset.omBound) return;
     root.dataset.omBound = '1';
     root.addEventListener('toggle', ev => { const d = ev.target; if (d && d.dataset && d.dataset.omOpen) setOpen(d.dataset.omOpen, d.open); }, true);
+    root.addEventListener('input', ev => { if (ev.target.hasAttribute('data-om-detail-q') && O.detail) { O.detail.q = ev.target.value; paintDetail(); } });
+    document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && O.detail && typeof _currentPanel !== 'undefined' && _currentPanel === 'organisation') { O.detail = null; renderOrg(); } });
     root.addEventListener('click', async ev => {
       const t = ev.target.closest('button,[data-om-view]');
       if (!t) return;
       if (t.dataset.omView) { O.view = t.dataset.omView; renderOrg(); return; }
       if (t.dataset.omLayer) { O.layer = t.dataset.omLayer; renderOrg(); return; }
       if (t.hasAttribute('data-om-refresh')) { await loadOrg(); return; }
-      if (t.dataset.omTeam) { ev.preventDefault(); O.selected = O.selected === t.dataset.omTeam ? '' : t.dataset.omTeam; renderOrg(); return; }
+      if (t.dataset.omDetail) { ev.preventDefault(); const same = O.detail && O.detail.kind === t.dataset.omDetail && O.detail.level === t.dataset.omLevel && O.detail.key === t.dataset.omKey; if (same) { O.detail = null; renderOrg(); } else await openDetail(t.dataset.omDetail, t.dataset.omLevel, t.dataset.omKey); return; }
+      if (t.hasAttribute('data-om-detail-close')) { O.detail = null; renderOrg(); return; }
+      if (t.dataset.omTeam) { O.detail = null; ev.preventDefault(); O.selected = O.selected === t.dataset.omTeam ? '' : t.dataset.omTeam; renderOrg(); return; }
       if (t.dataset.omExpand) { const open = t.dataset.omExpand === '1'; root.querySelectorAll('details[data-om-open]').forEach(d => { d.open = open; setOpen(d.dataset.omOpen, open); }); return; }
       if (t.hasAttribute('data-om-close')) { O.selected = ''; renderOrg(); return; }
       if (t.hasAttribute('data-om-template')) { await applyTemplate(); return; }
