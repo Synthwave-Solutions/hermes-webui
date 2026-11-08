@@ -100,7 +100,7 @@ assert.deepStrictEqual(K.viewIndices(spec, {s: null, q: 'b'}, 'nl'), [1]);
 assert.deepStrictEqual(K.viewIndices(spec, {s: null, q: '1.200'}, 'nl'), [0], 'search also matches the shown number');
 assert.deepStrictEqual(plain(K.totals(spec, [0, 1, 2])), [null, 2000, null, null]);
 const exported = K.toCsv(K.kitTable('table', spec, {s: [1, 'asc'], q: ''}), {delimiter: ';', decimalComma: true});
-assert.ok(exported.startsWith('\uFEFFNaam;Omzet;Groei;Sinds\r\n'), exported);
+assert.ok(exported.startsWith('\uFEFFNaam;Omzet (€);Groei (%);Sinds\r\n'), exported);
 assert.ok(exported.includes('B;800;5;2025-01-15\r\n'));
 const injected = K.toCsv({header: ['a', 'b'], rows: [['=HYPERLINK("x")', 1.5], ['a;b', 'say "hi"'], [-2, '@x']]}, {delimiter: ';', decimalComma: true});
 assert.strictEqual(injected, '\uFEFFa;b\r\n"\'=HYPERLINK(""x"")";1,5\r\n"a;b";"say ""hi"""\r\n-2;\'@x\r\n', 'formulas never start a cell; numbers use a decimal comma');
@@ -139,7 +139,7 @@ assert.strictEqual(radar.spec.target, null);
 assert.deepStrictEqual(build('chart', {title: 'x', labels: [], series: [{data: [1]}]}).errors, ['De labels ontbreken.']);
 assert.deepStrictEqual(build('chart', {title: 'x', labels: ['a'], series: [{data: ['n/a']}]}).errors, ['Er zijn geen reeksen (series) met getallen.']);
 assert.ok(build('chart', {title: 'x', labels: ['a'], series: [{data: [1]}], highlight: 'zz'}).warnings.some(w => w.includes('"zz"')));
-assert.deepStrictEqual(plain(K.kitTable('chart', chart.spec)), {header: ['Categorie', 'Omzet', 'Kosten'],
+assert.deepStrictEqual(plain(K.kitTable('chart', chart.spec)), {header: ['Categorie', 'Omzet (€)', 'Kosten (€)'],
   rows: [['Jan', 100, 50], ['Feb', 1200, 60], ['Mrt', null, null]], types: ['text', 'currency', 'currency']});
 
 // ── map ──────────────────────────────────────────────────────────────────────
@@ -211,10 +211,10 @@ assert.deepStrictEqual(kpi.spec.items.map(i => K.kpiValueText(i, 'nl')), ['€ 
 assert.deepStrictEqual(kpi.spec.items.map(i => K.kpiDeltaText(i, 'nl')), ['+12,5%', '+0,4 procentpunt', '-3%', '€ -800', '0%']);
 assert.deepStrictEqual(kpi.spec.items.slice(0, 2).map(i => K.kpiDeltaText(i, 'en')), ['+12.5%', '+0.4 pts']);
 assert.ok(kpi.estHeight > 100 && kpi.estHeight < 400, kpi.estHeight);
-assert.deepStrictEqual(plain(K.kitTable('kpi', kpi.spec)).header, ['Cijfer', 'Waarde', 'Verandering', 'Doel']);
+assert.deepStrictEqual(plain(K.kitTable('kpi', kpi.spec)).header, ['Cijfer', 'Waarde', 'Verandering', 'Eenheid verandering', 'Doel']);
 assert.strictEqual(K.toCsv(K.kitTable('kpi', kpi.spec), {delimiter: ';', decimalComma: true}),
-  '﻿Cijfer;Waarde;Verandering;Doel\r\nMRR;18400;12,5;20000\r\nChurn;2,1;0,4;\r\nKlanten;1234;-3;\r\nKosten;9100;-800;10000\r\nPijplijn;1250000;0;\r\n');
-assert.deepStrictEqual(plain(K.kitTable('kpi', build('kpi', {title: 'x', lang: 'en', items: [{label: 'a', value: 1}]}).spec)).header, ['Figure', 'Value', 'Change', 'Target']);
+  '﻿Cijfer;Waarde;Verandering;Eenheid verandering;Doel\r\nMRR;18400;12,5;%;20000\r\nChurn;2,1;0,4;procentpunt;\r\nKlanten;1234;-3;%;\r\nKosten;9100;-800;€;10000\r\nPijplijn;1250000;0;%;\r\n');
+assert.deepStrictEqual(plain(K.kitTable('kpi', build('kpi', {title: 'x', lang: 'en', items: [{label: 'a', value: 1}]}).spec)).header, ['Figure', 'Value', 'Change', 'Change unit', 'Target']);
 // Fixable: bad fields are dropped with a warning that names the figure.
 const kpiFix = build('kpi', {items: [
   {label: 'Omzet', value: '€ 1.200', format: 'money', delta: 'veel', good: 'sideways', target: -5, deltaFormat: 'ratio', note: 'n'.repeat(100)},

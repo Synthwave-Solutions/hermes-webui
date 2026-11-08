@@ -459,7 +459,7 @@ def data_blocks(page, ctx, gateway, art, base_runs):
     raw = Path(dl.value.path()).read_bytes()
     assert raw.startswith(b"\xef\xbb\xbf"), raw[:10]
     lines = raw.decode("utf-8-sig").splitlines()
-    assert lines[0] == "Klant;Omzet;Groei;Status", lines[0]
+    assert lines[0] == "Klant;Omzet (€);Groei (%);Status", lines[0]
     assert len(lines) == 5 and all("Jansen" in line for line in lines[1:]), lines
     assert dl.value.suggested_filename == "omzet-per-klant.csv", dl.value.suggested_filename
     ok(f"table: 50 of 60 rows, sort up and down, 'Toon alle', search (4 van 60), CSV with BOM and ';' ({len(lines) - 1} rows as filtered)")

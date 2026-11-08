@@ -44,6 +44,7 @@
       google:'Open in Google Maps', copyAddr:'Kopieer adressen', photo:function(a,l){ return 'Foto: ' + a + ', ' + l; },
       more:'Meer info', approxPin:'bij benadering', mapLabel:'Kaart', listLabel:'Locaties',
       good:'gunstig', bad:'ongunstig', flat:'gelijk', target:function(p, t){ return p + ' van het doel van ' + t; }, limit:function(p, t){ return p + ' van het budget van ' + t; }, over:function(d, t){ return d + ' boven het budget van ' + t; },
+      limitMax:function(p, t){ return p + ' van het maximum van ' + t; }, overMax:function(d, t){ return d + ' boven het maximum van ' + t; },
       today:'Vandaag', milestone:'Mijlpaal', tlLabel:'Planning', pick:'Kies een balk voor de details.'},
     en:{search:'Search table', showAll:function(n){ return 'Show all ' + n + ' rows'; }, total:'Total',
       count:function(a,b){ return a + ' of ' + b + ' rows'; }, empty:'No rows', noMatch:'No rows found',
@@ -55,6 +56,7 @@
       google:'Open in Google Maps', copyAddr:'Copy addresses', photo:function(a,l){ return 'Photo: ' + a + ', ' + l; },
       more:'More info', approxPin:'approximate', mapLabel:'Map', listLabel:'Places',
       good:'favourable', bad:'unfavourable', flat:'unchanged', target:function(p, t){ return p + ' of target ' + t; }, limit:function(p, t){ return p + ' of budget ' + t; }, over:function(d, t){ return d + ' over budget ' + t; },
+      limitMax:function(p, t){ return p + ' of the limit of ' + t; }, overMax:function(d, t){ return d + ' over the limit of ' + t; },
       today:'Today', milestone:'Milestone', tlLabel:'Timeline', pick:'Choose a bar for the details.'}
   };
   function T(key){ var v = (TEXT[LANG] || TEXT.nl)[key]; var args = Array.prototype.slice.call(arguments, 1); return typeof v === 'function' ? v.apply(null, args) : v; }
@@ -186,12 +188,10 @@
   function revealEl(el, from){
     if(standalone || !el || (window.innerWidth || 0) >= 640) return;
     setTimeout(function(){
-      // A frame taller than the chat allows scrolls inside itself first (only the frame, never the chat).
-      var r = el.getBoundingClientRect(), vh = window.innerHeight || 0;
-      var ft = from && from.getBoundingClientRect ? from.getBoundingClientRect().top : null;
-      if(vh && r.bottom > vh){ var by = r.bottom - vh + 8; if(ft !== null) by = Math.min(by, Math.max(0, ft - 8)); window.scrollBy(0, by); r = el.getBoundingClientRect(); if(ft !== null) ft = from.getBoundingClientRect().top; }
+      // The chat decides how far to scroll, itself and this frame (it knows what is hidden).
+      var r = el.getBoundingClientRect();
       var msg = {type:'reveal', y:Math.round(r.bottom + 8)};
-      if(ft !== null) msg.from = Math.round(ft);
+      if(from && from.getBoundingClientRect) msg.from = Math.round(from.getBoundingClientRect().top);
       post(msg);
     }, 60);
   }
@@ -483,7 +483,9 @@
             // A year (2026) or another number stays; the goal's own amount goes.
             return near || ((cur || unit || tail) && !/^\d{4}$/.test(num)) ? ' ' : all;
           });
-          base = base.replace(/\s+/g, ' ').replace(/[:\s(]+$/, '').trim();
+          // Leftovers of a written amount (",-", "~", "±", "/jaar", "USD", brackets) go too.
+          base = base.replace(/\/\s*[\p{L}]+/gu, ' ').replace(/\b(usd|eur|euro|gbp)\b/gi, ' ').replace(/[,.]-|[~±≈()€$]/g, ' ');
+          base = base.replace(/\s+/g, ' ').replace(/[:,.\s]+$/, '').trim();
           var label = (base ? base + ' ' : '') + f(target.value);
           ctx.save();
           ctx.font = '500 11px ' + (getComputedStyle(document.body).fontFamily || 'sans-serif');
@@ -959,7 +961,19 @@
         // When the value is written short (millions), the target and the overrun are too.
         var short = Math.abs(it.value) >= 1e6 && it.decimals == null && it.format !== 'percent';
         var tf = function(v){ return short ? K.kpiValueText({value:v, format:it.format, decimals:null}, LANG) : fmt(v, it.format, it.decimals); };
-        var text = h('span', 'k-target-text', (it.over ? T('over', tf(it.value - it.target), tf(it.target)) : T(it.good === 'down' ? 'limit' : 'target', pct, tf(it.target))));
+        // "Budget" only for money; a churn or complaints ceiling is a maximum. A percentage
+        // over its maximum is said in points, never as a percentage of a percentage.
+        var money = it.format === 'currency', pctFmt = it.format === 'percent';
+        function targetLine(){
+          if(it.over){
+            var over = pctFmt ? K.kpiDeltaText({delta:Math.round((it.value - it.target) * 100) / 100, deltaFormat:'number', format:'percent'}, LANG).replace(/^\+/, '') : tf(it.value - it.target);
+            return T(money ? 'over' : 'overMax', over, tf(it.target));
+          }
+          if(it.good !== 'down') return T('target', pct, tf(it.target));
+          if(pctFmt) return (LANG === 'nl' ? 'Maximum ' : 'Limit ') + tf(it.target);
+          return T(money ? 'limit' : 'limitMax', pct, tf(it.target));
+        }
+        var text = h('span', 'k-target-text', targetLine());
         bar.setAttribute('aria-label', text.textContent);
         target.append(bar, text);
         tile.appendChild(target);
@@ -1149,6 +1163,7 @@
     if(!msg || msg.iui !== 1 || typeof msg.type !== 'string') return;
     if(msg.type === 'theme') applyTheme(msg.vars, msg.mode);
     else if(msg.type === 'kit'){ if(msg.final) render(msg); }
+    else if(msg.type === 'scroll'){ var by = Number(msg.by) || 0; if(by > 0 && by < 4000) window.scrollBy(0, by); }
     else if(msg.type === 'measure'){ if(typeof msg.full === 'boolean') setFull(msg.full); scheduleHeight(true); }
   });
   post({type:'ready', kit:1});

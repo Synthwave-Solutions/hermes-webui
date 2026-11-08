@@ -62,3 +62,7 @@
 .k-flow-detail.is-set{color:var(--sw-fg)}
 @media (pointer:coarse){.k-flow-node{min-height:44px}}
 @media (prefers-reduced-motion:reduce){.k-flow-edge,.k-flow-elabel,.k-flow-node,.k-flow-line,.k-flow-head{transition:none}}
+@media (max-width:479px){
+  .k-flow-detail:not(:empty){position:sticky;bottom:0;z-index:3;padding:8px 10px;border-radius:10px;
+    background:var(--sw-surface);border:1px solid var(--sw-border);box-shadow:0 -6px 16px rgba(0,0,0,.18);color:var(--sw-fg)}
+}

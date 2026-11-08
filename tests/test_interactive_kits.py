@@ -52,9 +52,10 @@ def test_renderers_never_write_markup_or_run_strings():
     assert "scrollWheelZoom:false" in KITS and "referrerPolicy:'origin'" in KITS
 
 
-def test_frame_accepts_only_kit_theme_and_measure_messages():
+def test_frame_accepts_only_kit_theme_measure_and_scroll_messages():
     handled = set(re.findall(r"msg\.type === '([a-z-]+)'", KITS))
-    assert handled == {"theme", "kit", "measure"}, handled
+    # scroll: the chat asks the frame to scroll itself (bounded) so tapped details come into view.
+    assert handled == {"theme", "kit", "measure", "scroll"}, handled
 
 
 def test_kpi_and_timeline_carry_meaning_beyond_colour():
