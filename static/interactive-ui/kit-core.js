@@ -524,8 +524,8 @@
   }
   // build(kind, text, {lang, fence}) -> {spec, title, errors, warnings, estHeight}
   function build(kind,text,opts){
-    const lang=pickLang(opts&&opts.lang);
-    const m=messenger(lang);
+    let lang=pickLang(opts&&opts.lang);
+    let m=messenger(lang);
     const fence=String(opts&&opts.fence||'').toLowerCase();
     const src=String(text==null?'':text);
     const res={spec:null,title:'',errors:[],warnings:[],estHeight:120,kind};
@@ -540,11 +540,14 @@
       raw=parsed.value;
       if(!isObj(raw)){res.errors.push(m('notObject'));return res;}
     }
+    // The block may name the conversation language; it sets labels and number format.
+    const own=String(raw&&raw.lang||'').toLowerCase();
+    if(own==='nl'||own==='en'){lang=own;m=messenger(lang);}
     const fn=kind==='table'?validateTable:kind==='chart'?validateChart:kind==='map'?validateMap:null;
     if(!fn){res.errors.push(m('notObject'));return res;}
     const r=fn(raw,lang);
     res.errors=r.errors;res.warnings=r.warnings;
-    if(r.spec&&!r.errors.length){res.spec=r.spec;res.title=r.spec.title;res.estHeight=estHeight(kind,r.spec);}
+    if(r.spec&&!r.errors.length){r.spec.lang=lang;res.spec=r.spec;res.title=r.spec.title;res.estHeight=estHeight(kind,r.spec);}
     else res.title=str(raw&&raw.title,LIMITS.title);
     return res;
   }

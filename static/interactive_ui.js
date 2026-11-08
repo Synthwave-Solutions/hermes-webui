@@ -288,12 +288,14 @@ const _iui=(function(){
     try{if(JSON.stringify(data).length<=KIT_DATA_MAX) return data;}catch(_){}
     return Object.assign({},data,{places:(data.places||[]).map(p=>Object.assign({},p,{photo:undefined}))});
   }
+  // A data block follows the language of the conversation when it says so.
+  function kitLang(ctrl){const l=ctrl&&ctrl.parsed&&ctrl.parsed.spec&&String(ctrl.parsed.spec.lang||'').toLowerCase();return l==='nl'||l==='en'?l:lang();}
   function pushKit(ctrl){
     if(!ctrl.ready||ctrl.sentFinal||!ctrl.final) return;
     const p=ctrl.parsed;
     if(!p||!p.spec) return;
     if(ctrl.kit==='map'&&!ctrl.kitData){ensureMapData(ctrl);if(!ctrl.kitData) return;}
-    postTo(ctrl,{type:'kit',kit:ctrl.kit,spec:p.spec,data:kitDataFor(ctrl),final:true,restore:loadState(ctrl.stateKey),lang:lang()});
+    postTo(ctrl,{type:'kit',kit:ctrl.kit,spec:p.spec,data:kitDataFor(ctrl),final:true,restore:loadState(ctrl.stateKey),lang:kitLang(ctrl)});
     ctrl.sentFinal=true;
   }
   function ensureMapData(ctrl){
@@ -308,7 +310,7 @@ const _iui=(function(){
       pushKit(ctrl);
     };
     let first=true;
-    Promise.resolve().then(()=>interactiveUiMapResolve(p.spec,ctrl.stateKey,{lang:lang(),onUpdate:data=>{if(!first)apply(data);}}))
+    Promise.resolve().then(()=>interactiveUiMapResolve(p.spec,ctrl.stateKey,{lang:kitLang(ctrl),onUpdate:data=>{if(!first)apply(data);}}))
       .then(data=>{first=false;ctrl.resolving=false;if(ctrl.state==='building')setState(ctrl,ctrl.rendered?'ready':'loading');apply(data);},
         ()=>{first=false;ctrl.resolving=false;if(ctrl.state==='building')setState(ctrl,'loading');apply(K.mapLocalData(p.spec,'later'));
           // Busy or offline: try once more a little later.
@@ -829,7 +831,7 @@ const _iui=(function(){
     const at=doc.indexOf('<script>');
     if(!/id="kit-root"/.test(doc)||at<0||!p.spec) return '';
     const vars=Object.keys(theme.vars).map(k=>`${k}:${theme.vars[k]}`).join(';');
-    const payload={kit:ctrl.kit,spec:p.spec,data:kitDataFor(ctrl),final:true,restore:loadState(ctrl.stateKey)||{},lang:lang(),theme:theme.mode};
+    const payload={kit:ctrl.kit,spec:p.spec,data:kitDataFor(ctrl),final:true,restore:loadState(ctrl.stateKey)||{},lang:kitLang(ctrl),theme:theme.mode};
     const json=JSON.stringify(payload).replace(/</g,'\\u003c').replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029');
     doc=doc.slice(0,at)+'<script>window.__SWKIT_DOC='+json+';<\/script>'+doc.slice(at);
     const open='<html lang="nl" data-theme="dark">', i=doc.indexOf(open);
