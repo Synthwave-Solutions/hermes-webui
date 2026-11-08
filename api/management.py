@@ -441,8 +441,8 @@ _CONN: dict = {"at": 0.0, "by_user": {}}
 _CONN_TTL = 300
 
 
-def _bot_assets(name: str, force: bool = False) -> tuple[set, set]:
-    """Skill names and enabled MCP server names of one bot, cached for ten minutes.
+def _bot_assets(name: str, force: bool = False) -> tuple[dict, set]:
+    """Enabled skills (name -> (category, SKILL.md path)) and MCP server names of one bot, cached.
 
     Walking a large shared skill library takes a while, so ``warm_assets``
     keeps this cache filled in the background and the chart stays fast.
@@ -454,7 +454,7 @@ def _bot_assets(name: str, force: bool = False) -> tuple[set, set]:
     hit = _ASSETS.get(name)
     if hit and not force and time.time() - hit[0] < _ASSET_TTL:
         return hit[1], hit[2]
-    skills: set = set()
+    skills: dict = {}
     mcp: set = set()
     try:
         from api.profiles import get_hermes_home_for_profile
@@ -464,13 +464,17 @@ def _bot_assets(name: str, force: bool = False) -> tuple[set, set]:
         base_depth = len(root.parts)
         for dirpath, dirnames, filenames in os.walk(root, followlinks=True):
             if "SKILL.md" in filenames:
-                skills.add(Path(dirpath).name)
+                here = Path(dirpath)
+                category = here.parent.name if len(here.parts) - base_depth >= 2 else ""
+                skills.setdefault(here.name, (category, str(here / "SKILL.md")))
                 dirnames[:] = []
             elif len(Path(dirpath).parts) - base_depth >= 4:
                 dirnames[:] = []
         cfg = yaml.safe_load((home / "config.yaml").read_text(encoding="utf-8")) if (home / "config.yaml").exists() else {}
         disabled = ((cfg or {}).get("skills") or {}).get("disabled") or []
-        skills -= {str(d).rstrip("/").rsplit("/", 1)[-1] for d in disabled if d}
+        for d in disabled:
+            if d:
+                skills.pop(str(d).rstrip("/").rsplit("/", 1)[-1], None)
         for key, conf in ((cfg or {}).get("mcp_servers") or {}).items():
             if not (isinstance(conf, dict) and conf.get("enabled") is False):
                 mcp.add(str(key))
@@ -526,7 +530,7 @@ def _summary(people: set, bots: list, jobs: list, saved: float, conn_by_user: di
     connections: set = set()
     for b in bots:
         s, m = _bot_assets(b["name"])
-        skills |= s
+        skills |= set(s)
         connections |= {"mcp:" + x for x in m}
     for email in people:
         connections |= {"app:" + x for x in conn_by_user.get(integrations.end_user_id(email), set())}
@@ -535,6 +539,105 @@ def _summary(people: set, bots: list, jobs: list, saved: float, conn_by_user: di
             "skills": len(skills), "connections": len(connections),
             "connection_names": sorted({c.split(":", 1)[1] for c in connections})[:60],
             "saved_minutes": round(saved or 0)}
+
+
+
+_DESC: dict = {}
+
+
+def _skill_description(path: str) -> str:
+    """The ``description`` line of a SKILL.md front matter, cached by path."""
+    if path in _DESC:
+        return _DESC[path]
+    text = ""
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            head = fh.read(4000)
+        if head.startswith("---"):
+            for line in head.split("\n")[1:60]:
+                if line.strip() == "---":
+                    break
+                if line.lower().startswith("description:"):
+                    text = line.split(":", 1)[1].strip().strip("\"'")
+                    break
+    except OSError:
+        pass
+    _DESC[path] = text[:240]
+    return _DESC[path]
+
+
+DETAIL_KINDS = ("people", "bots", "tasks", "connections", "skills")
+
+
+def chart_detail(view: org_structure.ViewScope, kind: str, level: str, key: str) -> dict:
+    """What lies behind one number of the org chart: which people, bots, tasks,
+    connections or skills, and through whom. Uses the viewer's own chart, so it
+    never shows more than the chart itself."""
+    from api import integrations
+
+    if kind not in DETAIL_KINDS:
+        raise ValueError("Unknown detail")
+    c = chart(view)
+    if level == "org":
+        teams, title = [t for d in c["departments"] for t in d["teams"]], ""
+    elif level == "dept":
+        dept = next((d for d in c["departments"] if d["key"] == key), None)
+        if dept is None:
+            raise KeyError("Department not found")
+        teams, title = dept["teams"], dept["name"]
+    elif level == "team":
+        team = next((t for d in c["departments"] for t in d["teams"] if t["key"] == key), None)
+        if team is None:
+            raise KeyError("Team not found")
+        teams, title = [team], team["name"]
+    else:
+        raise ValueError("Unknown level")
+    people: dict = {}
+    bots: dict = {}
+    jobs: dict = {}
+    for t in teams:
+        for email in set(t.get("members") or []) | ({t["lead"]} if t.get("lead") else set()):
+            people.setdefault(email, []).append(t["name"])
+        for b in t.get("bot_list") or []:
+            bots.setdefault(b["name"], b)
+        for jb in t.get("job_list") or []:
+            jobs.setdefault((jb.get("store"), jb["id"]), jb)
+    items: list = []
+    if kind == "people":
+        for email, team_names in sorted(people.items()):
+            p = (c.get("people") or {}).get(email) or {}
+            items.append({"email": email, "title": p.get("title") or "", "avatar_url": p.get("avatar_url") or "",
+                          "teams": sorted(set(team_names))})
+    elif kind == "bots":
+        items = sorted(bots.values(), key=lambda b: (b.get("category") or "~", b["title"].lower()))
+    elif kind == "tasks":
+        items = sorted((jb for jb in jobs.values() if jb.get("state") != "paused"),
+                       key=lambda jb: (-(jb.get("saved_minutes") or 0), str(jb.get("name") or "").lower()))
+    elif kind == "skills":
+        found: dict = {}
+        for b in bots.values():
+            for name, (category, path) in _bot_assets(b["name"])[0].items():
+                row = found.setdefault(name, {"name": name, "category": category, "path": path, "bots": []})
+                row["bots"].append(b["title"])
+        for row in found.values():
+            row["description"] = _skill_description(row.pop("path"))
+            row["bots"] = sorted(set(row["bots"]))
+        items = sorted(found.values(), key=lambda r: (r["category"] or "~", r["name"]))
+    elif kind == "connections":
+        found = {}
+        for b in bots.values():
+            for name in _bot_assets(b["name"])[1]:
+                row = found.setdefault(("mcp", name), {"name": name, "kind": "mcp", "via": []})
+                row["via"].append(b["title"])
+        by_user = _personal_connections()
+        for email in people:
+            for provider in by_user.get(integrations.end_user_id(email), set()):
+                row = found.setdefault(("app", provider), {"name": provider, "kind": "app", "via": []})
+                row["via"].append(email)
+        for row in found.values():
+            row["via"] = sorted(set(row["via"]))
+        items = sorted(found.values(), key=lambda r: (r["kind"], -len(r["via"]), r["name"]))
+    return {"kind": kind, "level": level, "key": key, "title": title, "count": len(items), "items": items}
 
 
 def chart(view: org_structure.ViewScope) -> dict:
@@ -663,7 +766,11 @@ def handle_get(handler, parsed) -> bool:
                 j(handler, {"error": "forbidden", "reason": "org_scope", "viewer": view.to_dict()}, status=403)
                 return True
             _collect_safely()
-            j(handler, chart(view))
+            detail = (qs.get("detail") or [""])[0]
+            if detail:
+                j(handler, chart_detail(view, detail, (qs.get("level") or ["org"])[0], (qs.get("key") or [""])[0]))
+            else:
+                j(handler, chart(view))
             return True
         if path == "/api/value/chat":
             sid = (qs.get("session_id") or [""])[0]
@@ -694,6 +801,8 @@ def handle_get(handler, parsed) -> bool:
         j(handler, {"error": str(e)}, status=403)
     except KeyError as e:
         j(handler, {"error": str(e).strip("'")}, status=404)
+    except ValueError as e:
+        j(handler, {"error": str(e)}, status=400)
     except Exception:
         logger.exception("GET %s failed", path)
         j(handler, {"error": "internal_error"}, status=500)

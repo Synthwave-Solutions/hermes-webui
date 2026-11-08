@@ -261,6 +261,29 @@ def main() -> int:
             page.screenshot(path=str(art / "03-org-chart.png"))
             ok("org chart: totals on top, a collapsible department and team with its numbers, the lead with people and bots beneath; the bot is placed from the chart")
 
+            # every number opens what is behind it
+            team.locator('> summary .om-mini-stat[data-om-detail="tasks"]').click()
+            page.wait_for_selector('#mainOrganisation .om-detail [data-om-detail-list] .om-row', timeout=10000)
+            assert team.evaluate("d => d.open"), "clicking a number must not fold the team"
+            listed = page.locator("#mainOrganisation .om-detail").inner_text()
+            assert "Debiteurenlijst" in listed and "Geplande taken" in listed, listed
+            page.locator('#mainOrganisation [data-om-detail-q]').fill("bankmut")
+            page.wait_for_timeout(500)
+            page.wait_for_function("() => /Bankmutaties/.test(document.querySelector('#mainOrganisation [data-om-detail-list]').innerText) && !/Debiteurenlijst/.test(document.querySelector('#mainOrganisation [data-om-detail-list]').innerText)", timeout=5000)
+            page.locator('#mainOrganisation .om-strip [data-om-detail="people"]').click()
+            page.wait_for_function("() => /lisa@example.com/.test(document.querySelector('#mainOrganisation .om-detail')?.innerText || '')", timeout=10000)
+            page.locator('.om-dept2[data-om-open="dept:finance"] > summary .om-mini-stat[data-om-detail="bots"]').click()
+            page.wait_for_function("() => /Finance Bot/.test(document.querySelector('#mainOrganisation .om-detail')?.innerText || '')", timeout=10000)
+            for kind in ("connections", "skills"):
+                d = ctx.request.get(f"/api/org/chart?detail={kind}&level=team&key=finance/debiteuren").json()
+                assert d["kind"] == kind and isinstance(d["items"], list), d
+            assert ctx.request.get("/api/org/chart?detail=secrets&level=org").status == 400
+            assert ctx.request.get("/api/org/chart?detail=bots&level=team&key=nope/none").status == 404
+            page.screenshot(path=str(art / "03c-org-detail.png"))
+            page.keyboard.press("Escape")
+            page.wait_for_function("() => !document.querySelector('#mainOrganisation .om-detail')", timeout=5000)
+            ok("every number in the org chart opens which people, bots, tasks, connections or skills are behind it, searchable")
+
             # sub-team under Debiteuren, collapsible and remembered
             r = ctx.request.post("/api/org/structure", data={"op": "team.save", "department": "finance", "name": "Incasso",
                                                               "lead": "anna@example.com", "members": ["anna@example.com"], "parent": "finance/debiteuren"})
