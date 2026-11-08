@@ -57,7 +57,10 @@ const APP_TITLEBAR_KEYS = {
   profiles: 'tab_profiles', todos: 'tab_todos', insights: 'tab_insights', logs: 'tab_logs', governance: 'tab_governance', integrations: 'tab_integrations', projects: 'tab_projects', settings: 'tab_settings',
 };
 const MAIN_VIEW_PANELS = ['studio','organisation','management','msp','apps','modules','approvals','settings','skills','memory','tasks','kanban','workspaces','profiles','insights','logs','governance','integrations','projects','plugin'];
-const MAIN_VIEW_SIDEBAR_PANEL_FALLBACKS = { plugin: 'settings' };
+const MAIN_VIEW_SIDEBAR_PANEL_FALLBACKS = { plugin: 'settings', organisation: 'studio', management: 'studio' };
+// Organisation and Management live inside the Studio screen: one nav item, the
+// Studio sidebar is their second-level navigation.
+const PANEL_NAV_HOME = { organisation: 'studio', management: 'studio' };
 
 /**
  * Update the top app titlebar to reflect the current page or selected conversation.
@@ -78,7 +81,7 @@ function syncAppTitlebar() {
     if (/^webui$/i.test(sourceLabel)) sourceLabel = '';
   } else {
     const key = APP_TITLEBAR_KEYS[panel];
-    mainText = panel === 'studio' ? 'Studio' : panel === 'organisation' ? (document.documentElement.lang.startsWith('en') ? 'Organisation' : 'Organisatie') : panel === 'management' ? 'Management' : panel === 'msp' ? 'Support' : key && typeof t === 'function' ? t(key) : (panel.charAt(0).toUpperCase() + panel.slice(1));
+    mainText = (panel === 'studio' || panel === 'organisation' || panel === 'management') ? 'Studio' : panel === 'msp' ? 'Support' : key && typeof t === 'function' ? t(key) : (panel.charAt(0).toUpperCase() + panel.slice(1));
   }
 
   // Don't touch the element while an inline rename is in progress — replacing
@@ -409,12 +412,13 @@ async function switchPanel(name, opts = {}) {
   _currentPanel = nextPanel;
   if(window.SynthPulseSkillActivity) window.SynthPulseSkillActivity.sync();
   // Update nav tabs (rail + mobile sidebar-nav share data-panel)
-  document.querySelectorAll('[data-panel]').forEach(t => t.classList.toggle('active', t.dataset.panel === nextPanel));
+  const navPanel = PANEL_NAV_HOME[nextPanel] || nextPanel;
+  document.querySelectorAll('[data-panel]').forEach(t => t.classList.toggle('active', t.dataset.panel === navPanel));
   // Refresh aria-expanded on the newly-active rail button to mirror sidebar state.
   if (typeof _syncSidebarAria === 'function') _syncSidebarAria();
   // Update panel views
   document.querySelectorAll('.panel-view').forEach(p => p.classList.remove('active'));
-  const panelEl = $('panel' + nextPanel.charAt(0).toUpperCase() + nextPanel.slice(1));
+  const panelEl = $('panel' + navPanel.charAt(0).toUpperCase() + navPanel.slice(1));
   if (panelEl) panelEl.classList.add('active');
   // Update main content view. Each entry in MAIN_VIEW_PANELS gets a matching
   // showing-<name> class on <main>; no class means chat (the default).
@@ -428,6 +432,7 @@ async function switchPanel(name, opts = {}) {
   if (nextPanel === 'studio' && window.SPStudio) await window.SPStudio.load();
   if (nextPanel === 'organisation' && window.SPOrg) await window.SPOrg.load();
   if (nextPanel === 'management' && window.SPManagement) await window.SPManagement.load();
+  if (navPanel === 'studio' && window.SPStudio && window.SPStudio.renderSide) window.SPStudio.renderSide();
   if (nextPanel === 'apps' && window.SynthPulseApps) await window.SynthPulseApps.load();
   if (nextPanel === 'modules' && window.SynthPulseModules) await window.SynthPulseModules.load();
   // Lazy-load panel data

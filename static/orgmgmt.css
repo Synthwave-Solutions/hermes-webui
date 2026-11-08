@@ -172,3 +172,59 @@ main.main.showing-organisation>#mainOrganisation,main.main.showing-management>#m
 .om-chat-value .sm-btn{min-height:28px;padding:0 10px;font-size:12px;border-radius:999px;border:1px solid var(--border2,var(--border));background:var(--surface);color:var(--text);cursor:pointer;font-weight:600}
 .om-chat-value .sm-btn.primary{background:var(--sp-action-bg);color:var(--sp-on-action);border-color:var(--sp-action-bg)}
 .om-chat-value .om-chip-text{color:var(--text)}
+
+/* ── Calm layout (8 Nov 2026, one Studio screen): more air, fewer lines ── */
+.om-wrap{max-width:1160px;padding:4px 4px 72px}
+.om-intro{margin:0 0 32px;font-size:14px}
+.om-section{margin:52px 0 0}
+.om-section-head{margin:0 0 16px}
+.om-card{padding:20px 22px}
+.om-kpis{grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:16px}
+.om-kpi{padding:20px 22px 18px;gap:6px}
+.om-kpi-value{font-size:30px}
+.om-kpi-sub{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.om-decisions{grid-template-columns:minmax(0,1fr);gap:10px}
+.om-decision>summary{padding:16px 20px}
+.om-decision-body{max-height:none}
+.om-row{padding:11px 20px;gap:14px}
+.om-tree{padding:0;overflow:visible}
+.om-depts{grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:36px 24px;margin:0;padding:0;border:0}
+.om-depts::before{display:none}
+.om-dept-label{margin:0 0 12px!important;font-size:11.5px!important;font-weight:650;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.om-dept-label span{font-weight:500;text-transform:none;letter-spacing:0;margin-left:6px}
+.om-dept-teams{gap:14px;margin:0}
+.om-team-card{display:flex;flex-direction:column;gap:12px;padding:18px 20px}
+.om-team-top{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding-right:14px}
+.om-team-card .om-team-name{font-size:15px;margin:0;padding:0}
+.om-team-card .om-flag{top:14px;right:14px}
+.om-team-saving{margin:0;font-size:18px;font-weight:700;letter-spacing:-.01em;white-space:nowrap;font-variant-numeric:tabular-nums}
+.om-team-saving small{font-size:11.5px;font-weight:600;margin-left:4px}
+.om-team-saving.none{font-size:12px}
+.om-stats{gap:14px}
+.om-faces{display:flex;align-items:center}
+.om-faces .om-person{width:28px;height:28px;border:2px solid var(--surface);margin-left:-6px;font-size:10.5px}
+.om-faces .om-person:first-child{margin-left:0}
+.om-person.lead{box-shadow:0 0 0 2px var(--accent)}
+.om-person.more{background:transparent;color:var(--muted);border-color:transparent;margin-left:2px}
+.om-chips{margin:0;gap:6px}
+.om-chip{padding:3px 9px;font-size:12px}
+.om-chip.more{background:transparent;border:1px solid var(--border);color:var(--muted)}
+.om-layout{gap:28px}
+.om-layout.has-drawer{grid-template-columns:minmax(0,1fr) minmax(340px,420px)}
+.om-drawer{padding:22px 24px}
+.om-drawer h4{margin:24px 0 8px}
+.om-unassigned{margin-top:52px}
+.om-team-edit{padding:16px 18px;gap:14px;margin-bottom:12px}
+.om-dept-block{margin:0 0 32px}
+.om-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}
+#omSettings{margin:0 0 36px}
+.om-person.lead{box-shadow:none;border-color:var(--accent)!important}
+.om-drawer .om-row{align-items:flex-start;padding:12px 0}
+.om-drawer .om-row-actions{flex-direction:column;align-items:flex-end;gap:6px}
+@media (max-width:1100px){.om-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:640px){.om-kpis{grid-template-columns:minmax(0,1fr)}.om-wrap{padding-bottom:40px}.om-section{margin-top:40px}}
+.om-bot-cell{display:inline-flex;gap:10px;align-items:center}
+.om-bots-table tbody+tbody .om-group-row th{border-top:1px solid var(--border)}
+.om-group-row th{position:static;background:var(--surface-subtle,rgba(127,127,127,.05));padding:14px 12px 8px;font-size:12px;font-weight:650;text-transform:uppercase;letter-spacing:.05em;color:var(--strong,var(--text));border-bottom:1px solid color-mix(in srgb,var(--border) 60%,transparent)}
+.om-group-meta{margin-left:12px;font-weight:500;text-transform:none;letter-spacing:0;color:var(--muted)}
+.om-group-row:hover{background:transparent!important;cursor:default}

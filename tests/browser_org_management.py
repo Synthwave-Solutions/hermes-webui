@@ -43,6 +43,13 @@ LEAD = "lisa@example.com"
 MEMBER = "tom@example.com"
 
 
+
+def hub(page, key):
+    """Open a section of the Studio screen through its sidebar navigation."""
+    page.evaluate("async () => { if (!['studio', 'organisation', 'management'].includes(_currentPanel)) await switchPanel('studio'); }")
+    page.wait_for_selector(f'#panelStudio [data-st-hub="{key}"]', state="visible", timeout=10000)
+    page.locator(f'#panelStudio [data-st-hub="{key}"]').click()
+
 def ok(msg):
     print("OK  " + msg, flush=True)
 
@@ -196,10 +203,12 @@ def main() -> int:
             page.wait_for_function("() => typeof S !== 'undefined' && S._bootReady !== false", timeout=30000)
 
             # 1. nav and empty state
-            page.wait_for_selector('.rail [data-panel="organisation"]:not([hidden])', timeout=10000)
-            assert page.locator('.rail [data-panel="management"]').is_visible()
-            ok("navigation shows Organisatie and Management for the organisation admin")
-            page.locator('.rail [data-panel="organisation"]').click()
+            assert not page.locator('[data-panel="organisation"], [data-panel="management"]').count()
+            page.locator('.rail [data-panel="studio"]').click()
+            page.wait_for_selector('#panelStudio [data-st-hub="chart"]', timeout=10000)
+            assert page.locator('#panelStudio [data-st-hub="mgmt"]').is_visible() and page.locator('#panelStudio [data-st-hub="teams"]').is_visible()
+            ok("one Studio item in the navigation; its sidebar holds Organigram, Teams beheren and Management for the organisation admin")
+            page.locator('#panelStudio [data-st-hub="chart"]').click()
             page.wait_for_selector("#mainOrganisation .om-empty", timeout=10000)
             assert "nog niet ingericht" in page.locator("#mainOrganisation .om-empty").inner_text()
             page.screenshot(path=str(art / "01-org-empty.png"))
@@ -232,7 +241,7 @@ def main() -> int:
             ok("department with hourly rate and a team with lead and members saved through the UI")
 
             # 3. chart and placing unassigned work
-            page.locator('[data-om-view="chart"]').click()
+            hub(page, "chart")
             page.wait_for_selector('.om-team-card[data-om-team="finance/debiteuren"]', timeout=10000)
             # j1/j2/j3 belong to MEMBER, who is now in the team: they follow the owner's team.
             card_text = page.locator('.om-team-card[data-om-team="finance/debiteuren"]').inner_text()
@@ -254,7 +263,8 @@ def main() -> int:
             ok("team drawer shows savings, what needs action, what runs and the people")
 
             # 5. Management
-            page.locator('.rail [data-panel="management"]').click()
+            hub(page, "mgmt")
+            assert page.locator('.rail [data-panel="studio"].active').count() == 1
             page.wait_for_selector("#mainManagement .om-kpis", timeout=15000)
             kpis = page.locator("#mainManagement .om-kpis").inner_text()
             # j1: 6 runs x 40 min + j3: 6 runs x 50 min = 540 min = 9 h
@@ -262,7 +272,13 @@ def main() -> int:
             dec = page.locator("#mainManagement .om-decisions").inner_text()
             assert "Taken die herhaald falen" in dec and "Taken zonder waarde" in dec and "Schattingen niet bevestigd" in dec, dec
             page.screenshot(path=str(art / "05-management.png"), full_page=True)
-            ok("Management shows measured hours and the decisions that need attention")
+            assert page.locator("#mainManagement .om-bots-table .om-group-row").count() >= 1, page.locator("#mainManagement").inner_text()[-800:]
+            page.locator('[data-om-bot-group="team"]').click()
+            page.wait_for_selector('#mainManagement [data-om-bot-group="team"][aria-pressed="true"]', timeout=5000)
+            groups = page.locator("#mainManagement .om-bots-table .om-group-row").all_inner_texts()
+            assert any("debiteuren" in g.lower() for g in groups), groups
+            page.locator('[data-om-bot-group="category"]').click()
+            ok("Management shows measured hours and the decisions that need attention; bots grouped by category or team")
 
             missing = page.locator('.om-decision:has-text("Taken zonder waarde")')
             missing.locator("summary").click()

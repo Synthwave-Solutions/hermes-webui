@@ -255,6 +255,7 @@ def build(view: org_structure.ViewScope, days: int, start: float, end: float) ->
         team = (bot["serves"] or [""])[0] or UNASSIGNED
         estimate = value_tracking.bot_estimate_per_week(name)
         bot_rows[name] = {"name": name, "title": bot["title"], "team": team, "serves": bot["serves"],
+                          "category": " ".join(str(bot.get("category") or "").split())[:60],
                           "avatar_url": bot["avatar_url"], "color": bot["color"], "role": bot["role"],
                           "suggested_team": suggest_team(bot.get("category"), structure) if team == UNASSIGNED else "",
                           "duties": len(bot["duties"]), "duties_with_value": estimate["duties_with_value"],

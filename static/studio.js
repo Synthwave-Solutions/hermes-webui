@@ -14,9 +14,9 @@
   const NL = {
     n_goal: 'Gewenst doel', n_pain: 'Knelpunt', n_opp: 'Kans', n_sol: 'Oplossing', untitled: 'Naamloze use case', cause: 'Oorzaak', test: 'Kleinste test',
     q_quick: 'Snelle winst', q_big: 'Grote inzet', q_fill: 'Opvulling', q_pit: 'Geldput',
-    tab_uc: 'Use cases', tab_backlog: 'Backlog', tab_pb: 'Playbooks', view_matrix: 'Matrix', view_tree: 'Boom', to_backlog: 'Naar backlog', in_backlog: 'In backlog', all_to_backlog: 'Alle kansen naar de backlog', make_pb: 'Maak er een Playbook van', no_goal: 'Overig',
+    tab_uc: 'Use cases', tab_backlog: 'Backlog', tab_pb: 'Playbooks', nav_work: 'Werk', nav_org: 'Organisatie', nav_chart: 'Organigram', nav_teams: 'Teams beheren', nav_mgmt: 'Management', nav_recent: 'Recent', conv_hide: 'Gesprek verbergen', conv_show: 'Gesprek tonen', view_matrix: 'Matrix', view_tree: 'Boom', to_backlog: 'Naar backlog', in_backlog: 'In backlog', all_to_backlog: 'Alle kansen naar de backlog', make_pb: 'Maak er een Playbook van', no_goal: 'Overig',
     studio: 'Studio', intro: 'Ontdek waar AI je werk overneemt, richt het proces in en laat de Super Agent het bouwen.',
-    new_uc: 'Nieuwe use case', team: 'Team', none: 'Geen team', title_ph: 'Naam van deze use case', back: 'Alle use cases',
+    new_uc: 'Nieuwe use case', team: 'Team', none: 'Geen team', title_ph: 'Naam van deze use case', back: 'Use cases',
     p_discover: 'Ontdekken', p_design: 'Inrichten', p_playbook: 'Bouwplan', p_build: 'Bouwen', p_measure: 'Meten',
     conv: 'Gesprek', send: 'Verstuur', speak: 'Praten', listening: 'Luistert…', thinking: 'De Super Agent denkt na…',
     ph_discover: 'Vertel over je werk: wat doe je elke week, wat kost veel tijd, wat gaat er mis?',
@@ -49,9 +49,9 @@
   const EN = {
     n_goal: 'Desired outcome', n_pain: 'Pain point', n_opp: 'Opportunity', n_sol: 'Solution', untitled: 'Untitled use case', cause: 'Cause', test: 'Smallest test',
     q_quick: 'Quick wins', q_big: 'Big bets', q_fill: 'Fill-ins', q_pit: 'Money pit',
-    tab_uc: 'Use cases', tab_backlog: 'Backlog', tab_pb: 'Playbooks', view_matrix: 'Matrix', view_tree: 'Tree', to_backlog: 'To backlog', in_backlog: 'In backlog', all_to_backlog: 'All opportunities to the backlog', make_pb: 'Turn it into a Playbook', no_goal: 'Other',
+    tab_uc: 'Use cases', tab_backlog: 'Backlog', tab_pb: 'Playbooks', nav_work: 'Work', nav_org: 'Organisation', nav_chart: 'Org chart', nav_teams: 'Manage teams', nav_mgmt: 'Management', nav_recent: 'Recent', conv_hide: 'Hide conversation', conv_show: 'Show conversation', view_matrix: 'Matrix', view_tree: 'Tree', to_backlog: 'To backlog', in_backlog: 'In backlog', all_to_backlog: 'All opportunities to the backlog', make_pb: 'Turn it into a Playbook', no_goal: 'Other',
     studio: 'Studio', intro: 'Discover where AI takes work off your hands, design the process and let the Super Agent build it.',
-    new_uc: 'New use case', team: 'Team', none: 'No team', title_ph: 'Name of this use case', back: 'All use cases',
+    new_uc: 'New use case', team: 'Team', none: 'No team', title_ph: 'Name of this use case', back: 'Use cases',
     p_discover: 'Discover', p_design: 'Design', p_playbook: 'Build plan', p_build: 'Build', p_measure: 'Measure',
     conv: 'Conversation', send: 'Send', speak: 'Speak', listening: 'Listening…', thinking: 'The Super Agent is thinking…',
     ph_discover: 'Tell about your work: what do you do every week, what takes a lot of time, what goes wrong?',
@@ -91,13 +91,15 @@
   const errMsg = e => (e && e.message) || String(e);
   const PHASES = ['discover', 'design', 'playbook', 'build', 'measure'];
 
-  const St = { list: null, teams: [], doc: null, busy: false, listening: false, rec: null, draft: '', building: false, presetTeam: '', tab: 'usecases', oppView: 'matrix', backlogged: new Set() };
+  const St = { list: null, teams: [], doc: null, busy: false, listening: false, rec: null, draft: '', building: false, presetTeam: '', tab: 'usecases', oppView: 'matrix', backlogged: new Set(), counts: {}, me: null,
+    convOpen: (() => { try { return localStorage.getItem('sp-studio-conv') !== '0'; } catch (_e) { return true; } })() };
 
   function root(){ return $id('mainStudio'); }
-  function head(actions){
+  function head(actions, title){
     const r = root();
     if (!r) return null;
-    if (!r.querySelector('.main-view-body')) r.innerHTML = `<div class="main-view-header"><div><div class="main-view-title">${H(w('studio'))}</div></div><div class="om-head-actions" data-st-actions></div></div><div class="main-view-body"><div class="om-wrap st-wrap" data-st-body></div></div>`;
+    if (!r.querySelector('.main-view-body')) r.innerHTML = `<div class="main-view-header"><div><div class="main-view-title" data-st-title-h></div></div><div class="om-head-actions" data-st-actions></div></div><div class="main-view-body"><div class="om-wrap st-wrap" data-st-body></div></div>`;
+    r.querySelector('[data-st-title-h]').textContent = title || w('tab_uc');
     r.querySelector('[data-st-actions]').innerHTML = actions || '';
     return r.querySelector('[data-st-body]');
   }
@@ -105,6 +107,13 @@
   async function loadList(){
     try { const d = await call('/api/studio/usecases'); St.list = d.usecases || []; St.teams = d.teams || []; }
     catch (e) { St.list = []; toast(errMsg(e)); }
+  }
+  async function loadCounts(){
+    const [bl, pb, me] = await Promise.all([
+      call('/api/studio/backlog').catch(() => null), call('/api/studio/playbooks').catch(() => null),
+      St.me ? Promise.resolve(St.me) : call('/api/org/structure/me').catch(() => ({ can_view: false, can_manage: false }))]);
+    St.counts = { backlog: bl ? (bl.items || []).filter(i => !['live', 'parked'].includes(i.status)).length : null, playbooks: pb ? (pb.playbooks || []).length : null };
+    St.me = me;
   }
   async function open(id){
     try { St.doc = await call('/api/studio/usecase?id=' + encodeURIComponent(id)); St.draft = ''; if (St.doc.ui_view) St.oppView = St.doc.ui_view; }
@@ -131,11 +140,11 @@
   }
   function renderList(){
     if (St.tab !== 'usecases' && window.SPLibrary) {
-      const body = head(tabsHtml());
+      const body = head('', w(St.tab === 'backlog' ? 'tab_backlog' : 'tab_pb'));
       if (body) window.SPLibrary.render(body, St.tab, St.teams);
       return;
     }
-    const body = head(tabsHtml() + `<button type="button" class="sm-btn primary" data-st-new>${H(w('new_uc'))}</button>`);
+    const body = head(`<button type="button" class="sm-btn primary" data-st-new>${H(w('new_uc'))}</button>`, w('tab_uc'));
     if (!body) return;
     const rows = St.list || [];
     const teamName = k => (St.teams.find(t => t.key === k) || {}).name || '';
@@ -216,7 +225,8 @@
         <div class="st-tree-children" role="group">${groups[g].map(o => `<div class="st-tree-opp">
           <div class="st-node pain"><span class="st-node-kind">${H(w('n_opp'))}</span><strong>${H(o.title)}</strong>${o.cause ? `<span class="om-small om-muted">${H(w('cause'))}: ${H(o.cause)}</span>` : ''}</div>
           <div class="st-tree-sols">${sols.filter(s => s.opp.id === o.id).map(s => `<div class="st-node sol bb-${H(s.building_block)} ${doc.selected === s.id ? 'sel' : ''}">
-            <span class="st-node-kind">${H(w('n_sol'))} ${H(s.label)} · ${H(w('b_' + s.building_block))} · ${H(w('impact'))} ${s.impact} · ${H(w('effort'))} ${s.effort}</span><strong>${H(s.title)}</strong>
+            <span class="st-node-kind">${H(w('n_sol'))} ${H(s.label)}</span><strong>${H(s.title)}</strong>
+            <span class="st-node-meta"><span class="om-badge">${H(w('b_' + s.building_block))}</span><span>${H(w('impact'))} ${s.impact}</span><span>${H(w('effort'))} ${s.effort}</span></span>
             ${s.test ? `<span class="om-small om-muted">${H(w('test'))}: ${H(s.test)}</span>` : ''}
             <span class="st-node-actions"><button type="button" class="sm-btn ${doc.selected === s.id ? 'primary' : ''}" data-st-select="${H(s.id)}">${H(doc.selected === s.id ? w('chosen') : w('choose'))}</button><button type="button" class="sm-btn" data-st-backlog="${H(s.id)}" ${St.backlogged.has(doc.id + ':' + s.id) ? 'disabled' : ''}>${H(St.backlogged.has(doc.id + ':' + s.id) ? w('in_backlog') : w('to_backlog'))}</button></span></div>`).join('')}</div>
         </div>`).join('')}</div></div>`;
@@ -304,32 +314,62 @@
   }
   function renderDoc(){
     const doc = St.doc;
-    const body = head(tabsHtml() + `<button type="button" class="sm-btn" data-st-back>← ${H(w('back'))}</button>${doc.editable ? `<button type="button" class="sm-btn danger" data-st-delete>${H(w('delete'))}</button>` : ''}`);
+    const body = head(`<button type="button" class="sm-btn" data-st-conv-toggle aria-pressed="${St.convOpen}">${H(St.convOpen ? w('conv_hide') : w('conv_show'))}</button>${doc.editable ? `<button type="button" class="sm-btn st-quiet-danger" data-st-delete>${H(w('delete'))}</button>` : ''}`,
+      w('tab_uc'));
+    const r = root(); const t = r && r.querySelector('[data-st-title-h]');
+    if (t && !(document.activeElement && document.activeElement.matches && document.activeElement.matches('[data-st-title]'))) t.innerHTML = `<button type="button" class="st-crumb" data-st-back>${H(w('back'))}</button><span class="st-crumb-sep" aria-hidden="true">/</span><input class="st-crumb-input" data-st-title value="${H(doc.title)}" placeholder="${H(w('title_ph'))}" aria-label="${H(w('title_ph'))}" ${doc.editable ? '' : 'readonly'}>`;
     if (!body) return;
     const canvas = { discover: discoverHtml, design: designHtml, playbook: playbookHtml, build: buildHtml, measure: measureHtml }[doc.phase || 'discover'](doc);
-    body.innerHTML = `<div class="st-top"><input class="st-title" data-st-title value="${H(doc.title)}" placeholder="${H(w('title_ph'))}" aria-label="${H(w('title_ph'))}">
-        <label class="om-inline-form om-small om-muted">${H(w('team'))} <select class="om-select" data-st-team><option value="">${H(w('none'))}</option>${St.teams.map(t => `<option value="${H(t.key)}" ${doc.team === t.key ? 'selected' : ''}>${H(t.name)}</option>`).join('')}</select></label></div>
-      ${stepper(doc)}
-      <div class="st-layout">${convHtml(doc)}<section class="st-canvas" aria-live="polite">${canvas}</section></div>`;
+    body.innerHTML = `<div class="st-top">${stepper(doc)}
+        <label class="om-inline-form om-small om-muted st-team-pick">${H(w('team'))} <select class="om-select" data-st-team><option value="">${H(w('none'))}</option>${St.teams.map(t => `<option value="${H(t.key)}" ${doc.team === t.key ? 'selected' : ''}>${H(t.name)}</option>`).join('')}</select></label></div>
+      <div class="st-layout ${St.convOpen || St.live ? '' : 'conv-closed'}">${St.convOpen || St.live ? convHtml(doc) : ''}<section class="st-canvas" aria-live="polite">${canvas}</section></div>`;
     const notes = body.querySelector('.st-notes');
     if (notes) notes.scrollTop = notes.scrollHeight;
+  }
+  function section(){
+    const cur = typeof _currentPanel === 'string' ? _currentPanel : 'studio';
+    if (cur === 'management') return 'mgmt';
+    if (cur === 'organisation') return window.SPOrg && window.SPOrg.view && window.SPOrg.view() === 'manage' ? 'teams' : 'chart';
+    return St.tab;
   }
   function renderSide(){
     const panel = $id('panelStudio');
     if (!panel) return;
     let box = panel.querySelector('.om-side');
     if (!box) {
-      box = document.createElement('nav'); box.className = 'om-side'; panel.append(box);
+      box = document.createElement('nav'); box.className = 'om-side st-hub-nav'; panel.append(box);
       box.addEventListener('click', async ev => {
         const b = ev.target.closest('button');
         if (!b) return;
-        if (b.dataset.stSideOpen) await open(b.dataset.stSideOpen);
-        if (b.hasAttribute('data-st-side-new')) { try { St.doc = await post('/api/studio/usecase', {}); } catch (e) { toast(errMsg(e)); } render(); }
+        const go = b.dataset.stHub;
+        if ((go || b.dataset.stSideOpen || b.hasAttribute('data-st-side-new')) && typeof _isDesktopWidth === 'function' && !_isDesktopWidth() && typeof closeMobileSidebar === 'function') closeMobileSidebar();
+        if (go === 'usecases' || go === 'backlog' || go === 'playbooks') {
+          St.tab = go; St.doc = null;
+          if (window.SPLibrary && window.SPLibrary.reset) window.SPLibrary.reset();
+          if (_currentPanel !== 'studio' && typeof switchPanel === 'function') await switchPanel('studio'); else { await loadList(); render(); }
+          return;
+        }
+        if (go === 'chart' || go === 'teams') { if (window.SPOrg && window.SPOrg.show) await window.SPOrg.show(go === 'teams' ? 'manage' : 'chart'); renderSide(); return; }
+        if (go === 'mgmt') { if (typeof switchPanel === 'function') await switchPanel('management'); renderSide(); return; }
+        if (b.dataset.stSideOpen) { St.tab = 'usecases'; if (_currentPanel !== 'studio' && typeof switchPanel === 'function') await switchPanel('studio'); await open(b.dataset.stSideOpen); return; }
+        if (b.hasAttribute('data-st-side-new')) {
+          St.tab = 'usecases';
+          if (_currentPanel !== 'studio' && typeof switchPanel === 'function') await switchPanel('studio');
+          try { St.doc = await post('/api/studio/usecase', {}); } catch (e) { toast(errMsg(e)); }
+          render();
+        }
       });
     }
-    const rows = St.list || [];
-    box.innerHTML = `<button type="button" data-st-side-new>＋ ${H(w('new_uc'))}</button><div class="om-side-label">${H(w('studio'))}</div>`
-      + rows.map(r => `<button type="button" data-st-side-open="${H(r.id)}" aria-current="${!!(St.doc && St.doc.id === r.id)}"><span class="${r.title ? '' : 'st-side-untitled'}">${H(r.title || w('untitled'))}</span><span class="om-side-count">${H(w('p_' + (r.phase || 'discover')))}</span></button>`).join('');
+    const sec = section();
+    const me = St.me || {};
+    const item = (key, label, count, flag) => `<button type="button" data-st-hub="${key}" aria-current="${sec === key && !(key === 'usecases' && St.doc)}">${flag ? '<span class="om-side-flag" aria-hidden="true"></span>' : ''}${H(label)}${count != null ? `<span class="om-side-count">${H(count)}</span>` : ''}</button>`;
+    const rows = (St.list || []).slice(0, 5);
+    box.setAttribute('aria-label', w('studio'));
+    box.innerHTML = `<button type="button" class="st-side-new" data-st-side-new>＋ ${H(w('new_uc'))}</button>
+      <div class="om-side-label">${H(w('nav_work'))}</div>
+      ${item('usecases', w('tab_uc'), (St.list || []).length || null)}${item('backlog', w('tab_backlog'), St.counts.backlog || null)}${item('playbooks', w('tab_pb'), St.counts.playbooks || null)}
+      ${me.can_view ? `<div class="om-side-label">${H(w('nav_org'))}</div>${item('chart', w('nav_chart'))}${me.can_manage ? item('teams', w('nav_teams')) + item('mgmt', w('nav_mgmt')) : ''}` : ''}
+      ${rows.length ? `<div class="om-side-label">${H(w('nav_recent'))}</div>` + rows.map(r => `<button type="button" class="st-side-recent" data-st-side-open="${H(r.id)}" aria-current="${!!(St.doc && St.doc.id === r.id && sec === 'usecases')}"><span class="st-side-recent-title ${r.title ? '' : 'st-side-untitled'}">${H(r.title || w('untitled'))}</span><span class="om-side-count">${H(w('p_' + (r.phase || 'discover')))}</span></button>`).join('') : ''}`;
   }
   function render(){ if (St.doc) renderDoc(); else renderList(); renderSide(); }
 
@@ -523,6 +563,7 @@
     r.addEventListener('click', async ev => {
       const b = ev.target.closest('button');
       if (!b) return;
+      if (b.hasAttribute('data-st-conv-toggle')) { St.convOpen = !St.convOpen; try { localStorage.setItem('sp-studio-conv', St.convOpen ? '1' : '0'); } catch (_e) {} render(); return; }
       if (b.dataset.stTab) { St.tab = b.dataset.stTab; St.doc = null; if (St.tab === 'usecases') await loadList(); render(); return; }
       if (b.dataset.stOppview) { St.oppView = b.dataset.stOppview; render(); if (St.doc) await save({ ui_view: St.oppView }, true); return; }
       if (b.dataset.stBacklog || b.hasAttribute('data-st-backlog-all')) {
@@ -574,7 +615,9 @@
   window.SPStudio = {
     openUseCase: async (id) => { St.tab = 'usecases'; if (typeof switchPanel === 'function') await switchPanel('studio'); await open(id); },
     setTab: (tab) => { St.tab = tab; St.doc = null; render(); },
-    load: async () => { bind(); await loadList(); render(); },
+    load: async () => { bind(); await Promise.all([loadList(), loadCounts()]); render(); },
+    renderSide: async () => { if (St.list === null) await Promise.all([loadList(), loadCounts()]); renderSide(); },
+    refreshCounts: async () => { await loadCounts(); renderSide(); },
     newForTeam: async (team) => { St.presetTeam = team || ''; St.doc = null; if (typeof switchPanel === 'function') await switchPanel('studio'); bind(); try { St.doc = await post('/api/studio/usecase', { team: St.presetTeam }); St.presetTeam = ''; } catch (e) { toast(errMsg(e)); } render(); }
   };
 })();

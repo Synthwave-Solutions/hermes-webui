@@ -396,9 +396,11 @@ def test_job_follows_its_bots_team_before_the_owners(env, engine_store, monkeypa
     _jobs(env.homes["finbot"], [_job("b1", owner_email=MEMBER)])  # MEMBER is in finance/debiteuren
     monkeypatch.setattr(mgmt, "_bots", lambda: {"finbot": {"name": "finbot", "title": "F", "kind": "bot", "role": "",
                                                            "reports_to": "", "serves": ["sales/inside-sales"],
-                                                           "duties": [], "avatar_url": "", "color": "", "category": ""}})
+                                                           "duties": [], "avatar_url": "", "color": "", "category": "  Finance   Ops "}})
     model = mgmt.build(_view(ADMIN), 28, time.time() - 86400, time.time())
     assert next(j for j in model["jobs"] if j["id"] == "b1")["team"] == "sales/inside-sales"
+    # The bot keeps its category so Management can group bots by it.
+    assert next(b for b in model["bots"] if b["name"] == "finbot")["category"] == "Finance Ops"
 
 
 def test_high_estimate_is_flagged(env, engine_store, monkeypatch):

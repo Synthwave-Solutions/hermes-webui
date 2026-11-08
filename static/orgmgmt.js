@@ -64,7 +64,7 @@
       per_team: 'Per team', per_bot: 'Bots', top: 'Meeste waarde',
       col_team: 'Team', col_lead: 'Lead', col_bots: 'Bots', col_tasks: 'Taken', col_runs: 'Runs', col_success: 'Gelukt',
       col_saved: 'Bespaard', col_estimate: 'Geschat', col_cost: 'AI-kosten', col_net: 'Netto',
-      col_bot: 'Bot', col_chats: 'Gesprekken', col_people: 'Mensen', col_labeled: 'Bevestigd bespaard', col_week: 'Schatting per week',
+      col_bot: 'Bot', col_category: 'Categorie', group_by: 'Groeperen', g_category: 'Categorie', g_team: 'Team', g_none: 'Geen', no_category: 'Zonder categorie', col_chats: 'Gesprekken', col_people: 'Mensen', col_labeled: 'Bevestigd bespaard', col_week: 'Schatting per week',
       last_collect: 'Gegevens bijgewerkt', price_title: 'Prijzen voor AI-kosten (API-equivalent)',
       price_intro: 'Per model de prijs in euro per miljoen tokens. Gebruik * voor alle overige modellen. Zonder prijs blijft de AI-prijs onbekend en tonen we het aantal tokens.',
       model: 'Model', p_in: 'Invoer', p_out: 'Uitvoer', p_cache: 'Cache', add_row: 'Regel toevoegen',
@@ -135,7 +135,7 @@
       per_team: 'Per team', per_bot: 'Bots', top: 'Most value',
       col_team: 'Team', col_lead: 'Lead', col_bots: 'Bots', col_tasks: 'Tasks', col_runs: 'Runs', col_success: 'Succeeded',
       col_saved: 'Saved', col_estimate: 'Estimated', col_cost: 'AI cost', col_net: 'Net',
-      col_bot: 'Bot', col_chats: 'Chats', col_people: 'People', col_labeled: 'Confirmed saved', col_week: 'Estimate per week',
+      col_bot: 'Bot', col_category: 'Category', group_by: 'Group by', g_category: 'Category', g_team: 'Team', g_none: 'None', no_category: 'No category', col_chats: 'Chats', col_people: 'People', col_labeled: 'Confirmed saved', col_week: 'Estimate per week',
       last_collect: 'Data updated', price_title: 'Prices for AI cost (API equivalent)',
       price_intro: 'Per model the price in euro per million tokens. Use * for all other models. Without a price the AI cost stays unknown and we show the token count.',
       model: 'Model', p_in: 'Input', p_out: 'Output', p_cache: 'Cache', add_row: 'Add row',
@@ -203,6 +203,7 @@
     if (!root.querySelector('.main-view-body')) {
       root.innerHTML = `<div class="main-view-header"><div><div class="main-view-title">${H(title)}</div></div><div class="om-head-actions" data-om-actions></div></div><div class="main-view-body"><div class="om-wrap" data-om-body></div></div>`;
     }
+    root.querySelector('.main-view-title').textContent = title;
     root.querySelector('[data-om-actions]').innerHTML = actions || '';
     return root.querySelector('[data-om-body]');
   }
@@ -221,28 +222,25 @@
   }
 
   function orgActions(){
-    const tabs = `<div class="om-seg" role="group" aria-label="${H(w('org'))}">
-      <button type="button" aria-pressed="${O.view === 'chart'}" data-om-view="chart">${H(w('chart'))}</button>
-      ${me && me.can_manage ? `<button type="button" aria-pressed="${O.view === 'manage'}" data-om-view="manage">${H(w('manage'))}</button>` : ''}
-    </div>`;
-    const layer = O.view === 'chart' ? `<div class="om-seg" role="group" aria-label="${H(w('chart'))}">
+    return O.view === 'chart' ? `<div class="om-seg" role="group" aria-label="${H(w('chart'))}">
       ${['people', 'bots', 'both'].map(l => `<button type="button" aria-pressed="${O.layer === l}" data-om-layer="${l}">${H(w(l))}</button>`).join('')}
     </div>` : '';
-    return tabs + layer + `<button type="button" class="sm-btn" data-om-refresh>${H(w('refresh'))}</button>`;
   }
 
   function teamCardHtml(team){
     const s = team.stats || {};
     const flag = (s.failing || 0) > 0 || (s.missing_value || 0) > 0;
-    const saving = (s.saved_minutes || 0) > 0 ? `<div class="om-team-saving">${H(hrs(s.saved_minutes))} ${H(w('saved_hours').replace(/^\S+\s*/, ''))}</div>`
-      : `<div class="om-team-saving none">${H((s.jobs || 0) + (s.bots || 0) ? '' : w('nothing_yet'))}</div>`;
-    const people = O.layer !== 'bots' ? `<div class="om-chips">${(team.people || []).slice(0, 6).map(p => `<span class="om-chip" title="${H(p.email)}">${H(p.email === team.lead ? '★ ' : '')}${H(p.email.replace(/@.*/, ''))}</span>`).join('')}${(team.people || []).length > 6 ? `<span class="om-chip">+${(team.people || []).length - 6}</span>` : ''}</div>` : '';
-    const bots = O.layer !== 'people' ? `<div class="om-chips">${(team.bot_list || []).slice(0, 5).map(b => `<span class="om-chip">🤖 ${H(b.title)}</span>`).join('')}</div>` : '';
+    const people = team.people || [], bots = team.bot_list || [];
+    const tasks = (team.job_list || []).filter(j => j.state !== 'paused').length;
+    const saving = (s.saved_minutes || 0) > 0 ? `<span class="om-team-saving">${H(hrs(s.saved_minutes))}<small>${H(w('saved_hours').replace(/^\S+\s*/, ''))}</small></span>`
+      : `<span class="om-team-saving none">${H(tasks + bots.length ? '' : w('nothing_yet'))}</span>`;
+    const faces = O.layer !== 'bots' && people.length ? `<span class="om-faces">${people.slice(0, 5).map(p => `<span class="om-person ${p.email === team.lead ? 'lead' : ''}" title="${H(p.email)}${p.email === team.lead ? ' · ' + H(w('lead')) : ''}">${H(initials(p.email))}</span>`).join('')}${people.length > 5 ? `<span class="om-person more">+${people.length - 5}</span>` : ''}</span>` : '';
+    const botChips = O.layer !== 'people' && bots.length ? `<span class="om-chips">${bots.slice(0, 3).map(b => `<span class="om-chip">${H(b.title)}</span>`).join('')}${bots.length > 3 ? `<span class="om-chip more">+${bots.length - 3}</span>` : ''}</span>` : '';
     return `<button type="button" class="om-team-card" data-om-team="${H(team.key)}" aria-pressed="${O.selected === team.key}">
       ${flag ? `<span class="om-flag" title="${H(w('waiting'))}"></span>` : ''}
-      <span class="om-team-name">${H(team.name)}</span>
-      <span class="om-stats"><span><b>${(team.people || []).length}</b> ${H(((team.people || []).length === 1 ? w('person') : w('people')).toLowerCase())}</span><span><b>${(team.bot_list || []).length}</b> ${H(w('bots').toLowerCase())}</span><span><b>${(team.job_list || []).filter(j => j.state !== 'paused').length}</b> ${H(w('tasks').toLowerCase())}</span></span>
-      ${saving}${people}${bots}
+      <span class="om-team-top"><span class="om-team-name">${H(team.name)}</span>${saving}</span>
+      <span class="om-stats"><span><b>${people.length}</b> ${H((people.length === 1 ? w('person') : w('people')).toLowerCase())}</span><span><b>${bots.length}</b> ${H(w('bots').toLowerCase())}</span><span><b>${tasks}</b> ${H(w('tasks').toLowerCase())}</span></span>
+      ${faces}${botChips}
     </button>`;
   }
 
@@ -310,40 +308,10 @@
     return null;
   }
 
-  function sideEl(id){
-    const panel = $id(id);
-    if (!panel) return null;
-    let box = panel.querySelector('.om-side');
-    if (!box) { box = document.createElement('nav'); box.className = 'om-side'; panel.append(box); }
-    return box;
-  }
-  function renderOrgSide(){
-    const box = sideEl('panelOrganisation');
-    if (!box) return;
-    box.setAttribute('aria-label', w('teams'));
-    const depts = (O.chart && O.chart.departments) || [];
-    const u = O.chart && O.chart.unassigned;
-    const uCount = u ? (u.job_list || []).filter(j => j.state !== 'paused').length + (u.bot_list || []).length : 0;
-    box.innerHTML = depts.map(d => `<div class="om-side-label">${H(d.name)}</div>${(d.teams || []).map(t => {
-        const s = t.stats || {};
-        const flag = (s.failing || 0) + (s.missing_value || 0) > 0;
-        return `<button type="button" data-om-side-team="${H(t.key)}" aria-current="${O.selected === t.key}">${flag ? '<span class="om-side-flag" aria-hidden="true"></span>' : ''}${H(t.name)}<span class="om-side-count">${(t.job_list || []).filter(j => j.state !== 'paused').length + (t.bot_list || []).length}</span></button>`;
-      }).join('')}`).join('') + (uCount ? `<div class="om-side-label">${H(w('other'))}</div><button type="button" data-om-side-unassigned>${H(w('unassigned'))}<span class="om-side-count">${uCount}</span></button>` : '');
-    if (!box.dataset.omBound) {
-      box.dataset.omBound = '1';
-      box.addEventListener('click', ev => {
-        const b = ev.target.closest('button');
-        if (!b) return;
-        if (b.dataset.omSideTeam) { O.view = 'chart'; O.selected = b.dataset.omSideTeam; renderOrg(); return; }
-        if (b.hasAttribute('data-om-side-unassigned')) { O.view = 'chart'; renderOrg(); const el = document.querySelector('#mainOrganisation .om-unassigned'); if (el) el.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
-      });
-    }
-  }
-
   function renderOrg(){
-    const body = shell('mainOrganisation', w('org'), orgActions());
+    const body = shell('mainOrganisation', O.view === 'manage' ? w('manage') : w('chart'), orgActions());
     if (!body) return;
-    renderOrgSide();
+    if (window.SPStudio && window.SPStudio.renderSide) window.SPStudio.renderSide();
     if (O.error) { body.innerHTML = `<p class="om-intro">${H(w('org_intro'))}</p><div class="om-empty"><h3>${H(w('org'))}</h3><p>${H(O.error)}</p></div>`; return; }
     if (!O.chart) { body.innerHTML = `<p class="om-muted">…</p>`; return; }
     if (O.view === 'manage' && me && me.can_manage) { body.innerHTML = manageHtml(); if (window.SpPicker) SpPicker.mountAll(body); return; }
@@ -356,12 +324,10 @@
       return;
     }
     const selected = O.selected ? findTeam(O.selected) : null;
-    const orgName = lang() === 'en' ? 'Organisation' : 'Organisatie';
     body.innerHTML = `<p class="om-intro">${H(w('org_intro'))}</p>
       <div class="om-layout ${selected ? 'has-drawer' : ''}">
-        <div class="om-tree"><div class="om-tree-root"><div class="om-org-node">${H(orgName)}</div>
-          <div class="om-depts">${depts.map(d => `<div class="om-dept"><div class="om-dept-node"><strong>${H(d.name)}</strong><span class="om-muted om-small">${(d.teams || []).length} ${H(((d.teams || []).length === 1 ? w('team') : w('teams')).toLowerCase())}</span></div>
-            <div class="om-dept-teams">${(d.teams || []).map(teamCardHtml).join('')}</div></div>`).join('')}</div></div>
+        <div class="om-tree"><div class="om-depts">${depts.map(d => `<section class="om-dept" aria-label="${H(d.name)}"><h4 class="om-dept-label">${H(d.name)}${(d.teams || []).length > 1 ? ` <span>${(d.teams || []).length} ${H(w('teams').toLowerCase())}</span>` : ''}</h4>
+            <div class="om-dept-teams">${(d.teams || []).map(teamCardHtml).join('')}</div></section>`).join('')}</div>
           ${unassignedHtml()}</div>
         ${drawerHtml(selected)}
       </div>`;
@@ -490,7 +456,8 @@
   }
 
   // ── Management screen ─────────────────────────────────────────────────────
-  const M = { period: '28', compare: true, data: null, error: '', sort: 'saved_minutes', dir: -1, settings: false, pricing: null };
+  const M = { period: '28', compare: true, data: null, error: '', sort: 'saved_minutes', dir: -1, settings: false, pricing: null,
+    botGroup: (() => { try { return localStorage.getItem('sp-mgmt-bot-group') || 'category'; } catch (_e) { return 'category'; } })() };
 
   async function loadMgmt(){
     await loadMe(true);
@@ -503,8 +470,7 @@
   function mgmtActions(){
     return `<select class="om-select" data-om-period aria-label="${H(w('period'))}">${['7', '28', '90', '365'].map(p => `<option value="${p}" ${M.period === p ? 'selected' : ''}>${H(w('d' + p))}</option>`).join('')}</select>
       <button type="button" class="sm-btn" data-om-settings aria-expanded="${M.settings}">${H(w('settings'))}</button>
-      <button type="button" class="sm-btn" data-om-export>${H(w('export'))}</button>
-      <button type="button" class="sm-btn" data-om-mrefresh>${H(w('refresh'))}</button>`;
+      <button type="button" class="sm-btn" data-om-export>${H(w('export'))}</button>`;
   }
 
   function delta(now, prev, invert){
@@ -555,7 +521,7 @@
   function decisionsHtml(d){
     const list = d.decisions || [];
     if (!list.length) return `<div class="om-card om-muted">${H(w('decisions_none'))}</div>`;
-    return `<div class="om-decisions">${list.map(x => `<details class="om-decision sev-${SEV[x.kind] || 'low'}" ${x.kind === 'failing' ? 'open' : ''}>
+    return `<div class="om-decisions">${list.map(x => `<details class="om-decision sev-${SEV[x.kind] || 'low'}" ${x === list[0] ? 'open' : ''}>
       <summary><span class="om-decision-count">${H(x.count)}</span><div><div class="om-decision-title">${H(w('d_' + x.kind))}</div><div class="om-decision-sub">${H(w('d_' + x.kind + '_sub'))}</div></div></summary>
       ${(x.items || []).length ? `<div class="om-decision-body">${x.kind === 'unassigned' && x.suggestions ? `<div class="om-row"><div class="om-row-main"><div class="om-row-sub">${H(w('suggest_intro', { n: x.suggestions }))}</div></div><div class="om-row-actions"><button type="button" class="sm-btn primary" data-om-apply-suggestions>${H(w('apply_suggestions'))}</button></div></div>` : ''}${x.items.map(i => decisionItemHtml(x.kind, i)).join('')}</div>` : (x.kind === 'old_approvals' ? `<div class="om-decision-body"><div class="om-row"><button type="button" class="sm-btn" data-om-goto-gov>${H(w('open'))}</button></div></div>` : '')}
     </details>`).join('')}</div>`;
@@ -581,15 +547,29 @@
   }
 
   function botsTableHtml(d){
-    const rows = d.bots || [];
+    const rows = (d.bots || []).slice();
     if (!rows.length) return '';
-    return `<section class="om-section" data-om-anchor="bots"><div class="om-section-head"><h3>${H(w('per_bot'))}</h3></div><div class="om-table-wrap"><table class="om-table"><thead><tr><th>${H(w('col_bot'))}</th><th>${H(w('col_team'))}</th><th class="num">${H(w('col_tasks'))}</th><th class="num">${H(w('col_chats'))}</th><th class="num">${H(w('col_people'))}</th><th class="num">${H(w('col_labeled'))}</th><th class="num">${H(w('col_week'))}</th><th class="num">${H(w('col_cost'))}</th></tr></thead><tbody>
-      ${rows.map(b => `<tr data-om-bot-row="${H(b.name)}" tabindex="0"><td><span style="display:inline-flex;gap:8px;align-items:center"><span class="om-avatar" style="${b.color ? 'background:' + H(b.color) : ''}">${b.avatar_url ? `<img src="${H(b.avatar_url)}" alt="">` : H(initials(b.title))}</span>${H(b.title)}</span></td>
-        <td class="om-small">${H(b.team === '_unassigned' ? w('unassigned') : ((d.team_names || {})[b.team] || b.team))}</td><td class="num">${H(b.jobs)}</td><td class="num">${H(b.chats)}</td><td class="num">${H(b.people)}</td>
+    const teamOf = b => b.team === '_unassigned' ? w('unassigned') : ((d.team_names || {})[b.team] || b.team);
+    const keyOf = b => M.botGroup === 'team' ? teamOf(b) : M.botGroup === 'category' ? (b.category || w('no_category')) : '';
+    const groups = new Map();
+    for (const b of rows.sort((x, y) => (y.jobs + y.chats) - (x.jobs + x.chats) || x.title.localeCompare(y.title))) {
+      const k = keyOf(b); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(b);
+    }
+    const ordered = [...groups.entries()].sort((x, y) => (x[0] === w('no_category') || x[0] === w('unassigned')) - (y[0] === w('no_category') || y[0] === w('unassigned')) || y[1].length - x[1].length || x[0].localeCompare(y[0]));
+    const row = b => `<tr data-om-bot-row="${H(b.name)}" tabindex="0"><td><span class="om-bot-cell"><span class="om-avatar" style="${b.color ? 'background:' + H(b.color) : ''}">${b.avatar_url ? `<img src="${H(b.avatar_url)}" alt="">` : H(initials(b.title))}</span>${H(b.title)}</span></td>
+        <td class="om-small">${H(M.botGroup === 'team' ? (b.category || '') : teamOf(b))}</td><td class="num">${H(b.jobs)}</td><td class="num">${H(b.chats)}</td><td class="num">${H(b.people)}</td>
         <td class="num">${b.labeled_minutes ? H(hrs(b.labeled_minutes)) : '<span class="om-muted">·</span>'}</td>
         <td class="num">${b.estimate_minutes_per_week ? H(hrs(b.estimate_minutes_per_week)) + (b.estimate_confirmed ? '' : ' <span class="om-badge estimated">~</span>') : `<span class="om-muted">${b.duties ? '·' : ''}</span>`}</td>
-        <td class="num">${b.ai_cost_eur ? H(eur(b.ai_cost_eur)) : (b.unpriced_tokens ? '<span class="om-muted">?</span>' : '<span class="om-muted">·</span>')}</td></tr>`).join('')}
-      </tbody></table></div></section>`;
+        <td class="num">${b.ai_cost_eur ? H(eur(b.ai_cost_eur)) : (b.unpriced_tokens ? '<span class="om-muted">?</span>' : '<span class="om-muted">·</span>')}</td></tr>`;
+    const head = k => {
+      const list = groups.get(k);
+      const jobs = list.reduce((a, b) => a + (b.jobs || 0), 0), chats = list.reduce((a, b) => a + (b.chats || 0), 0);
+      return `<tr class="om-group-row"><th colspan="8" scope="rowgroup"><span>${H(k)}</span><span class="om-group-meta">${list.length} ${H((list.length === 1 ? w('col_bot') : w('bots')).toLowerCase())} · ${jobs} ${H(w('col_tasks').toLowerCase())} · ${chats} ${H(w('col_chats').toLowerCase())}</span></th></tr>`;
+    };
+    const seg = `<div class="om-seg" role="group" aria-label="${H(w('group_by'))}">${['category', 'team', 'none'].map(g => `<button type="button" aria-pressed="${M.botGroup === g}" data-om-bot-group="${g}">${H(w('g_' + g))}</button>`).join('')}</div>`;
+    return `<section class="om-section" data-om-anchor="bots"><div class="om-section-head"><h3>${H(w('per_bot'))}</h3><span class="om-muted">${rows.length}</span><span style="margin-left:auto">${seg}</span></div><div class="om-table-wrap"><table class="om-table om-bots-table"><thead><tr><th>${H(w('col_bot'))}</th><th>${H(M.botGroup === 'team' ? w('col_category') : w('col_team'))}</th><th class="num">${H(w('col_tasks'))}</th><th class="num">${H(w('col_chats'))}</th><th class="num">${H(w('col_people'))}</th><th class="num">${H(w('col_labeled'))}</th><th class="num">${H(w('col_week'))}</th><th class="num">${H(w('col_cost'))}</th></tr></thead>
+      ${ordered.map(([k, list]) => `<tbody>${M.botGroup === 'none' ? '' : head(k)}${list.map(row).join('')}</tbody>`).join('')}
+      </table></div></section>`;
   }
 
   function topHtml(d){
@@ -610,30 +590,9 @@
       <button type="button" class="sm-btn" data-om-goto-rates>${H(w('manage'))}</button></section>`;
   }
 
-  function renderMgmtSide(){
-    const box = sideEl('panelManagement');
-    if (!box) return;
-    box.setAttribute('aria-label', w('mgmt'));
-    const d = M.data || {};
-    const dec = (d.decisions || []).reduce((a, x) => a + (x.count || 0), 0);
-    const items = [['kpis', w('k_saved')], ['decisions', w('decisions'), dec], ['teams', w('per_team'), (d.teams || []).length], ['bots', w('per_bot'), (d.bots || []).length], ['top', w('top')]];
-    box.innerHTML = `<div class="om-side-label">${H(w('mgmt'))}</div>` + items.map(([k, label, n]) => `<button type="button" data-om-jump="${k}">${k === 'decisions' && n ? '<span class="om-side-flag" aria-hidden="true"></span>' : ''}${H(label)}${n != null ? `<span class="om-side-count">${H(n)}</span>` : ''}</button>`).join('')
-      + `<div class="om-side-label">${H(w('period'))}</div>` + ['7', '28', '90', '365'].map(p => `<button type="button" data-om-side-period="${p}" aria-current="${M.period === p}">${H(w('d' + p))}</button>`).join('');
-    if (!box.dataset.omBound) {
-      box.dataset.omBound = '1';
-      box.addEventListener('click', async ev => {
-        const b = ev.target.closest('button');
-        if (!b) return;
-        if (b.dataset.omSidePeriod) { M.period = b.dataset.omSidePeriod; await loadMgmt(); return; }
-        if (b.dataset.omJump) { const el = document.querySelector(`#mainManagement [data-om-anchor="${b.dataset.omJump}"]`); if (el) el.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
-      });
-    }
-  }
-
   function renderMgmt(){
     const body = shell('mainManagement', w('mgmt'), mgmtActions());
     if (!body) return;
-    renderMgmtSide();
     if (M.error) { body.innerHTML = `<div class="om-empty"><h3>${H(w('mgmt'))}</h3><p>${H(M.error)}</p></div>`; return; }
     const d = M.data;
     if (!d) { body.innerHTML = '<p class="om-muted">…</p>'; return; }
@@ -673,6 +632,7 @@
       if (!t) return;
       if (t.hasAttribute('data-om-mrefresh')) { try { await post('/api/value/collect', {}); } catch (_e) {} await loadMgmt(); return; }
       if (t.hasAttribute('data-om-export')) { exportCsv(); return; }
+      if (t.dataset.omBotGroup) { M.botGroup = t.dataset.omBotGroup; try { localStorage.setItem('sp-mgmt-bot-group', M.botGroup); } catch (_e) {} renderMgmt(); const el = root.querySelector('[data-om-anchor="bots"]'); if (el) el.scrollIntoView({ block: 'nearest' }); return; }
       if (t.hasAttribute('data-om-settings')) { M.settings = !M.settings; if (M.settings && !M.pricing) { try { M.pricing = await call('/api/management/pricing'); } catch (e) { toast(errMsg(e)); } } renderMgmt(); return; }
       if (t.hasAttribute('data-om-add-price')) { const tb = root.querySelector('[data-om-pricing] tbody'); const tr = tb && tb.querySelector('tr'); if (tr) { const c = tr.cloneNode(true); c.querySelectorAll('input').forEach(i => { i.value = ''; }); tb.append(c); } return; }
       if (t.hasAttribute('data-om-goto-rates')) { O.view = 'manage'; if (typeof switchPanel === 'function') await switchPanel('organisation'); return; }
@@ -962,7 +922,8 @@
   setInterval(() => { refreshChip().catch(() => {}); }, 2500);
 
   // ── Panel hooks ───────────────────────────────────────────────────────────
-  window.SPOrg = { load: async () => { bindOrg(); await loadOrg(); }, refreshNav };
+  window.SPOrg = { load: async () => { bindOrg(); await loadOrg(); }, refreshNav, view: () => O.view,
+    show: async (view) => { O.view = view === 'manage' ? 'manage' : 'chart'; if (typeof _currentPanel !== 'undefined' && _currentPanel === 'organisation') { renderOrg(); return; } if (typeof switchPanel === 'function') await switchPanel('organisation'); } };
   window.SPManagement = { load: async () => { bindMgmt(); await loadMgmt(); } };
   window.SPValue = { createFieldsHtml, createValueFromForm, jobCardHtml, dutyFieldsHtml, dutyFromForm, dutyChipHtml, servesFieldHtml, mountServes };
 
