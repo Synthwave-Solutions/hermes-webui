@@ -16596,7 +16596,7 @@ window.SynthPulseFeatureCatalog = {
       ],
       "source_refs": [
         "static/studio_prompts.js:159",
-        "api/studio_library.py:638",
+        "api/studio_library.py:654",
         "api/studio_library.py:550"
       ],
       "related": [
@@ -16631,6 +16631,110 @@ window.SynthPulseFeatureCatalog = {
           "permissions": "Iedereen in Studio leest het profiel; alleen organisatiebeheerders wijzigen het en laten de website onderzoeken.",
           "limits": "Het onderzoek leest alleen openbare websites en stelt alleen voor; er wordt niets opgeslagen tot je Opslaan kiest. De agent krijgt hooguit een korte samenvatting mee.",
           "example": "Sector installatietechniek, systemen Exact, Outlook en Excel, doel sneller offreren."
+        }
+      }
+    },
+    {
+      "id": "webui.studio.intake_me",
+      "area": "studio",
+      "status": "available",
+      "conditions": [],
+      "anchors": [
+        "?help_feature=webui.studio.intake_me",
+        "[data-tour='studio-intake']",
+        "[data-tour='studio-intake-tasks']",
+        "[data-tour='studio-intake-note']"
+      ],
+      "source_refs": [
+        "static/studio_intake.js:217",
+        "api/studio_library.py:777",
+        "api/studio_library.py:746"
+      ],
+      "related": [
+        "webui.studio.org_profile",
+        "webui.studio.backlog",
+        "webui.studio.discover"
+      ],
+      "locales": {
+        "en": {
+          "title": "About you: the personal intake",
+          "purpose": "In six steps you tell the Super Agent who you are: your role and team, your recurring work (describe your week, the agent pulls out the tasks), your systems, what AI may do, how the agent should work with you and a short AI check. A short summary goes into your user profile, so the agent takes it into account in every conversation.",
+          "when": "The first time in Studio, and when your role or work changes.",
+          "steps": [
+            "Choose About you at the top of the Studio sidebar.",
+            "Fill in your role, describe your week and choose Find the tasks; adjust tasks, frequency and minutes.",
+            "Choose your systems, sort per task what AI may do, and set your preferences for language, tone, length and form.",
+            "Choose Save to my profile. Then put the tasks AI may do on the backlog with one click."
+          ],
+          "permissions": "Everyone fills in their own intake; nobody else sees or changes it.",
+          "limits": "Only one short note goes into your user profile and replaces the previous intake; your own notes stay. The profile has limited room; the intake respects it.",
+          "example": "Debtors team lead, calls weekly, wants short answers in bullets and never the agent mailing on its own."
+        },
+        "nl": {
+          "title": "Over jou: de persoonlijke intake",
+          "purpose": "In zes stappen vertel je de Super Agent wie je bent: je rol en team, je terugkerende werk (beschrijf je week, de agent haalt de taken eruit), je systemen, wat AI mag doen, hoe de agent met je moet werken en een korte AI-check. Een korte samenvatting komt in je gebruikersprofiel, zodat de agent er in elk gesprek rekening mee houdt.",
+          "when": "De eerste keer in Studio, en als je rol of werk verandert.",
+          "steps": [
+            "Kies Over jou bovenaan de zijbalk van Studio.",
+            "Vul je rol in, beschrijf je week en kies Haal taken eruit; pas de taken, frequentie en minuten aan.",
+            "Kies je systemen, deel per taak in wat AI mag doen, en geef je voorkeuren voor taal, toon, lengte en vorm.",
+            "Kies Opslaan in mijn profiel. Zet daarna met één klik de taken die AI mag doen in de backlog."
+          ],
+          "permissions": "Iedereen vult zijn eigen intake in; niemand anders ziet of wijzigt die.",
+          "limits": "Alleen één korte notitie gaat naar je gebruikersprofiel en vervangt de vorige intake; je eigen notities blijven. Het profiel heeft beperkte ruimte; de intake houdt daar rekening mee.",
+          "example": "Teamlead debiteuren, belt wekelijks na, wil korte antwoorden in opsommingen en nooit dat de agent zelf mailt."
+        }
+      }
+    },
+    {
+      "id": "webui.studio.intake_org",
+      "area": "studio",
+      "status": "conditional",
+      "conditions": [
+        "organisation-admin-to-edit"
+      ],
+      "anchors": [
+        "?help_feature=webui.studio.intake_org",
+        "[data-tour='studio-intake']",
+        "[data-tour='studio-intake-rules']"
+      ],
+      "source_refs": [
+        "static/studio_intake.js:201",
+        "api/studio_library.py:539",
+        "api/studio_library.py:550"
+      ],
+      "related": [
+        "webui.studio.org_profile",
+        "webui.org.teams"
+      ],
+      "locales": {
+        "en": {
+          "title": "Organisation intake",
+          "purpose": "Seven steps for the organisation profile: name and website (with research of the site), checking what was found, the structure of departments and teams, at most three goals with a KPI, the systems, rules for AI and data, and finishing with exactly the text the agent reads.",
+          "when": "When Studio starts in an organisation, and when goals or policy change.",
+          "steps": [
+            "Choose Organisation profile in the sidebar; while it is empty the intake starts by itself.",
+            "Fill in name and website and optionally choose Research the website; check what was found.",
+            "Give the goals with their KPI, choose the systems and tick the rules that apply.",
+            "Choose Save organisation profile. Do the intake again walks you through it later."
+          ],
+          "permissions": "Only organisation admins do the intake; everyone in Studio reads the profile.",
+          "limits": "Your draft is kept in this browser until you save. Research reads public websites only and only proposes.",
+          "example": "Goal: quotes out faster, KPI lead time from 3 to 1 day; rule: a person checks everything that goes to customers."
+        },
+        "nl": {
+          "title": "Organisatie-intake",
+          "purpose": "Zeven stappen voor het organisatieprofiel: naam en website (met onderzoek van de site), controleren wat gevonden is, de structuur van afdelingen en teams, hooguit drie doelen met een KPI, de systemen, regels voor AI en data, en afronden met precies de tekst die de agent meeleest.",
+          "when": "Bij de start van Studio in een organisatie, en als doelen of beleid veranderen.",
+          "steps": [
+            "Kies Organisatieprofiel in de zijbalk; zolang het leeg is, start de intake vanzelf.",
+            "Vul naam en website in en kies eventueel Onderzoek de website; controleer de gevonden gegevens.",
+            "Geef de doelen met hun KPI, kies de systemen en vink de regels aan die gelden.",
+            "Kies Organisatieprofiel opslaan. Met Intake opnieuw doen loop je hem later weer door."
+          ],
+          "permissions": "Alleen organisatiebeheerders doen de intake; iedereen in Studio leest het profiel.",
+          "limits": "Je concept blijft in deze browser bewaard tot je opslaat. Het onderzoek leest alleen openbare websites en stelt alleen voor.",
+          "example": "Doel: offertes sneller de deur uit, KPI doorlooptijd van 3 naar 1 dag; regel: een mens controleert alles wat naar klanten gaat."
         }
       }
     }

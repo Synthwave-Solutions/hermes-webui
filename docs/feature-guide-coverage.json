@@ -3343,7 +3343,27 @@
       "status": "conditional",
       "source_refs": [
         "static/studio_prompts.js:159",
-        "api/studio_library.py:638",
+        "api/studio_library.py:654",
+        "api/studio_library.py:550"
+      ]
+    },
+    {
+      "id": "webui.studio.intake_me",
+      "area": "studio",
+      "status": "available",
+      "source_refs": [
+        "static/studio_intake.js:217",
+        "api/studio_library.py:777",
+        "api/studio_library.py:746"
+      ]
+    },
+    {
+      "id": "webui.studio.intake_org",
+      "area": "studio",
+      "status": "conditional",
+      "source_refs": [
+        "static/studio_intake.js:201",
+        "api/studio_library.py:539",
         "api/studio_library.py:550"
       ]
     }
@@ -8741,6 +8761,8 @@
     "webui.studio.conversation",
     "webui.studio.design",
     "webui.studio.discover",
+    "webui.studio.intake_me",
+    "webui.studio.intake_org",
     "webui.studio.org_profile",
     "webui.studio.plan",
     "webui.studio.playbook_edit",

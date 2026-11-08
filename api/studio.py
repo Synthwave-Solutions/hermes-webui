@@ -502,6 +502,9 @@ def run_step(view, body: dict) -> dict:
     from api import studio_library
     org = studio_library.context_text()
     org_block = f"Over de organisatie (gebruik dit als context, verzin er niets bij):\n{org}\n\n" if org else ""
+    person = studio_library.person_context_text(doc.get("owner") or view.email)
+    if person:
+        org_block += f"Over de persoon die dit vertelt:\n{person}\n\n"
     if step == "discover":
         answer = _ask_json(DISCOVER, f"{org_block}Team: {team_name or 'onbekend'}\nWat de persoon vertelt:\n{history}")
         opps = clean_opportunities(answer.get("opportunities"))

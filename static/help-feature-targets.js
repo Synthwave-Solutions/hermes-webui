@@ -2883,6 +2883,21 @@
       "[data-tour='studio-profile']",
       "[data-tour='studio-profile-research']"
     ]
+  },
+  "webui.studio.intake_me": {
+    "panel": "studio",
+    "targets": [
+      "[data-tour='studio-intake']",
+      "[data-tour='studio-intake-tasks']",
+      "[data-tour='studio-intake-note']"
+    ]
+  },
+  "webui.studio.intake_org": {
+    "panel": "studio",
+    "targets": [
+      "[data-tour='studio-intake']",
+      "[data-tour='studio-intake-rules']"
+    ]
   }
 };
   for (const entry of Object.values(entries)) {
