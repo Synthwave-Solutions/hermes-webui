@@ -144,3 +144,14 @@ def test_deep_dive_process_baseline_and_data():
     q = studio.clean_process({"as_is": [{"step": "x", "minutes": 10}], "data_sensitivity": "geheim", "frequency": {"per": "jaar"}})
     assert q["data_sensitivity"] == "" and q["frequency"] == {"count": 0, "per": "week"}
     assert "hours_week_before" not in q["baseline"]
+
+
+def test_reuse_needs_a_real_fit():
+    from api import studio
+    words = studio._stems("Maak een concept-offerte in de vaste huisstijl Concept-offertes automatisch opstellen")
+    assert studio._reuse_score(words, "acture huisstijl document") == 0
+    assert studio._reuse_score(words, "goes serres offerte writer") == 0
+    assert studio._reuse_score(words, "offerte writer") > 0
+    assert studio._reuse_score(words, "concept offertes maken huisstijl") > 0
+    assert studio._reuse_score(studio._stems("debiteurenlijst maandag"), "Debiteurenlijst") > 0
+    assert studio._reuse_score(studio._stems("Agent maakt lijst en concept-mails"), "manage agent") == 0
