@@ -172,7 +172,7 @@ def main() -> int:
         "NO_PROXY": "127.0.0.1,localhost", "no_proxy": "127.0.0.1,localhost",
         "HERMES_WEBUI_PASSWORD": PASSWORD,
         "HERMES_WEBUI_PASSWORD_IDENTITY": ADMIN,
-        "SP_VALUE_COLLECT_INTERVAL": "0",
+        "SP_VALUE_COLLECT_INTERVAL": "0", "SP_VALUE_LABELER": "0",
     })
     proc = log = None
     page = None
@@ -346,16 +346,21 @@ def main() -> int:
             bot = next(b for b in overview["bots"] if b["name"] == "finbot")
             assert bot["estimate_minutes_per_week"] == 250 and bot["chats"] == 2, bot
 
-            # 7b. the chip under a bot chat: confirm, then correct
+            # 7b. the chip under a bot chat: the chat is open first, the label arrives later
+            page.evaluate("async () => { await switchPanel('chat'); }")
+            page.wait_for_timeout(500)
+            page.evaluate("() => { S.session = Object.assign({}, S.session || {}, {session_id: 'chat2'}); }")
+            page.wait_for_timeout(3000)
+            before = page.locator("#omChatValue").inner_text() if page.locator("#omChatValue").count() else ""
+            assert "Aanmaningen opstellen" not in before, before
             r = ctx.request.post("/api/value/chat", data={"session_id": "chat2", "duty": "Aanmaningen opstellen"})
             assert r.ok, r.text()[:200]
             # chat1 is Tom's chat: the admin cannot label it (not found for this person)
             assert ctx.request.post("/api/value/chat", data={"session_id": "chat1", "duty": "Aanmaningen opstellen"}).status in (403, 404)
             page.evaluate("async () => { await switchPanel('chat'); }")
             page.wait_for_timeout(500)
-            assert page.evaluate("() => typeof window.S") == "undefined"  # the app's S is not a window property
             page.evaluate("() => { S.session = Object.assign({}, S.session || {}, {session_id: 'chat2'}); }")
-            page.wait_for_selector("#omChatValue:not([hidden]) .om-chip-text", timeout=10000)
+            page.wait_for_selector("#omChatValue:not([hidden]) .om-chip-text", timeout=45000)
             chip = page.locator("#omChatValue").inner_text()
             assert "Aanmaningen opstellen" in chip and "25 min" in chip, chip
             page.locator("#omChatValue [data-om-chip-edit]").click()

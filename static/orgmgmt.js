@@ -939,8 +939,12 @@
     // S is the app's global state (a script-level binding, not a window property).
     const state = typeof S !== 'undefined' ? S : null;
     const sid = (state && state.session && state.session.session_id) || '';
-    if (sid === C.sid) return;
-    C.sid = sid; C.data = null; C.editing = false; paintChip();
+    // A label arrives later than the chat (the collector labels finished
+    // chats), so look again every 15 s until it is final.
+    const final = C.data && (C.data.label_state === 'confirmed' || C.data.label_state === 'removed');
+    if (sid === C.sid && (final || C.editing || Date.now() - (C.at || 0) < 15000)) return;
+    if (sid !== C.sid) { C.sid = sid; C.data = null; C.editing = false; paintChip(); }
+    C.at = Date.now();
     if (!sid) return;
     try { const d = await call('/api/value/chat?session_id=' + encodeURIComponent(sid)); if (C.sid === sid) { C.data = d; paintChip(); } } catch (_e) {}
   }
