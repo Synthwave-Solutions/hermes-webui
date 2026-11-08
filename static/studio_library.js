@@ -83,11 +83,15 @@
         <div class="om-row-sub">${H(it.pain || it.why || '')}</div>
         <div class="om-chips"><span class="om-chip">${H(BLOCK[it.building_block] || it.building_block)}</span><span class="om-chip">${H(w('impact'))} ${it.impact} · ${H(w('effort'))} ${it.effort}</span>${score >= 2 ? '<span class="om-chip bl-quick">Quick win</span>' : ''}${it.team ? `<span class="om-chip">${H(teamName(it.team) || it.team)}</span>` : ''}${apHtml}</div></div>
       <div class="om-row-actions">
+        <span class="bl-secondary">
         ${it.editable ? `<select class="om-select" data-bl-status aria-label="Status">${STATUSES.map(s => `<option value="${s}" ${it.status === s ? 'selected' : ''}>${H(w('s_' + s))}</option>`).join('')}</select>
-        <button type="button" class="sm-btn bl-arrow" data-bl-move="-1" ${i === 0 ? 'disabled' : ''} aria-label="${H(w('up'))}">↑</button><button type="button" class="sm-btn bl-arrow" data-bl-move="1" ${i === n - 1 ? 'disabled' : ''} aria-label="${H(w('down'))}">↓</button>` : `<span class="om-badge">${H(w('s_' + it.status))}</span>`}
-        ${it.use_case ? `<button type="button" class="sm-btn" data-bl-open="${H(it.use_case)}">${H(w('open_uc'))}</button>` : `<button type="button" class="sm-btn" data-bl-work>${H(w('work_out'))}</button>`}
-        ${!it.use_case || (ap && ap.failed) ? `<button type="button" class="sm-btn primary" data-bl-agent>✨ ${H(w('agent_make'))}</button>` : ''}
-        ${it.editable ? `<button type="button" class="sm-btn" data-bl-remove aria-label="${H(w('remove'))}">✕</button>` : ''}
+        <button type="button" class="sm-btn bl-arrow" data-bl-move="-1" ${i === 0 ? 'disabled' : ''} aria-label="${H(w('up'))}">↑</button><button type="button" class="sm-btn bl-arrow" data-bl-move="1" ${i === n - 1 ? 'disabled' : ''} aria-label="${H(w('down'))}">↓</button>` : ''}
+        ${it.use_case ? '' : `<button type="button" class="sm-btn" data-bl-work>${H(w('work_out'))}</button>`}
+        ${it.editable ? `<button type="button" class="sm-btn bl-arrow" data-bl-remove aria-label="${H(w('remove'))}">✕</button>` : ''}
+        </span>
+        ${it.editable ? '' : `<span class="om-badge">${H(w('s_' + it.status))}</span>`}
+        ${it.use_case ? `<button type="button" class="sm-btn" data-bl-open="${H(it.use_case)}">${H(w('open_uc'))}</button>` : ''}
+        ${!it.use_case || (ap && ap.failed) ? `<button type="button" class="sm-btn ${i === 0 ? 'primary' : ''}" data-bl-agent>✨ ${H(w('agent_make'))}</button>` : ''}
       </div></li>`;
   }
   function paintBacklog(){
@@ -318,5 +322,5 @@
     });
   }
 
-  window.SPLibrary = { render, openPlaybook: async (id) => { L.pb = null; try { L.pb = await call('/api/studio/playbook?id=' + encodeURIComponent(id)); } catch (e) { toast(errMsg(e)); } if (window.SPStudio) window.SPStudio.setTab('playbooks'); } };
+  window.SPLibrary = { reset: () => { L.pb = null; L.runMode = null; }, render, openPlaybook: async (id) => { L.pb = null; try { L.pb = await call('/api/studio/playbook?id=' + encodeURIComponent(id)); } catch (e) { toast(errMsg(e)); } if (window.SPStudio) window.SPStudio.setTab('playbooks'); } };
 })();

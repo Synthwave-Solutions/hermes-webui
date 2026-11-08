@@ -104,6 +104,13 @@ class FakeOmniRoute:
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
 
 
+
+def hub(page, key):
+    """Open a section of the Studio screen through its sidebar navigation."""
+    page.evaluate("async () => { if (!['studio', 'organisation', 'management'].includes(_currentPanel)) await switchPanel('studio'); }")
+    page.wait_for_selector(f'#panelStudio [data-st-hub="{key}"]', state="visible", timeout=10000)
+    page.locator(f'#panelStudio [data-st-hub="{key}"]').click()
+
 def main() -> int:
     from playwright.sync_api import sync_playwright
 
@@ -154,8 +161,7 @@ def main() -> int:
 
             # 1. from the org chart into Studio for the team
             assert page.locator('.rail [data-panel="studio"]').is_visible()
-            page.wait_for_selector('.rail [data-panel="organisation"]:not([hidden])', timeout=10000)
-            page.locator('.rail [data-panel="organisation"]').click()
+            hub(page, "chart")
             page.locator('.om-team-card[data-om-team="finance/debiteuren"]').click()
             page.locator('[data-om-new-automation="finance/debiteuren"]').click()
             page.wait_for_selector("#mainStudio .st-stepper", timeout=15000)
@@ -288,7 +294,7 @@ def main() -> int:
             ok("the built task shows in Management under its team")
 
             # Playbook from the use case
-            page.locator('.rail [data-panel="studio"]').click()
+            hub(page, "usecases")
             page.wait_for_selector("[data-st-side-open]", timeout=10000)
             page.locator("[data-st-side-open]").first.click()
             page.wait_for_selector("[data-st-make-pb]", timeout=10000)
@@ -328,9 +334,7 @@ def main() -> int:
             ok("Playbook run recorded with time and steps; a step's prompt opens in the Super Agent chat")
 
             # backlog: reorder and let the agent make an idea
-            page.locator('.rail [data-panel="studio"]').click()
-            page.wait_for_selector('[data-st-tab="backlog"]', timeout=10000)
-            page.locator('[data-st-tab="backlog"]').click()
+            hub(page, "backlog")
             page.wait_for_selector(".bl-item", timeout=10000)
             first = page.locator(".bl-item").first.get_attribute("data-bl")
             page.locator(".bl-item").first.locator('[data-bl-move="1"]').click()
@@ -345,7 +349,7 @@ def main() -> int:
             ok("backlog reorders; the agent works an idea out to the dry run, ready for a person to build")
 
             # the team's playbooks in the organisation chart
-            page.locator('.rail [data-panel="organisation"]').click()
+            hub(page, "chart")
             page.wait_for_selector('.om-team-card[data-om-team="finance/debiteuren"]', timeout=10000)
             if not page.locator(".om-drawer").count():
                 page.locator('.om-team-card[data-om-team="finance/debiteuren"]').click()
@@ -355,8 +359,7 @@ def main() -> int:
             ok("the team's playbooks show in the organisation chart and open in Studio")
 
             # list view
-            page.locator('.rail [data-panel="studio"]').click()
-            page.locator('[data-st-tab="usecases"]').click()
+            hub(page, "usecases")
             page.wait_for_selector(".st-card", timeout=10000)
             cards = page.locator(".st-card").all_inner_texts()
             assert any("Debiteurenopvolging" in c and "4 gebouwd" in c for c in cards), cards
