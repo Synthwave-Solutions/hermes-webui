@@ -19,6 +19,7 @@ import pytest
 REPO = Path(__file__).resolve().parents[1]
 KITS = (REPO / "static" / "interactive-ui" / "kits.js").read_text(encoding="utf-8")
 CORE = (REPO / "static" / "interactive-ui" / "kit-core.js").read_text(encoding="utf-8")
+MAP_HOST = (REPO / "static" / "interactive_ui_map.js").read_text(encoding="utf-8")
 NODE = shutil.which("node")
 LONG_DASHES = "[" + chr(0x2013) + chr(0x2014) + "]"
 
@@ -55,6 +56,12 @@ def test_frame_accepts_only_kit_theme_and_measure_messages():
     assert handled == {"theme", "kit", "measure"}, handled
 
 
+def test_map_host_calls_the_endpoint_once_per_block():
+    assert "const PREFIX='iui-map:', RETRY_MS=3000" in MAP_HOST
+    assert "inflight.has(key)" in MAP_HOST
+    assert "'api/map/resolve'" in MAP_HOST and "method:'POST'" in MAP_HOST
+
+
 def test_copy_has_no_long_dashes():
-    for text in (KITS, CORE, (REPO / "static" / "interactive-ui" / "kits.css").read_text(encoding="utf-8")):
+    for text in (KITS, CORE, MAP_HOST, (REPO / "static" / "interactive-ui" / "kits.css").read_text(encoding="utf-8")):
         assert not re.search(LONG_DASHES, text)

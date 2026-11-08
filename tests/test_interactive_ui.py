@@ -341,6 +341,19 @@ def test_kit_frame_hashes_match_the_served_scripts():
     assert interactive_ui.BASE_CSS in interactive_ui.KIT_FRAME_HTML
 
 
+@pytest.mark.parametrize("tiles,origin", [
+    ("https://tiles.example.nl/osm/{z}/{x}/{y}.png", "https://tiles.example.nl"),
+    ({"url": "https://maps.example.com:8443/t/{z}/{x}/{y}.png", "attribution": "Eigen kaart"}, "https://maps.example.com:8443"),
+    ("http://insecure.example/{z}/{x}/{y}.png", "https://tile.openstreetmap.org"),
+    ("https://evil.example/{z}/{x}.png", "https://tile.openstreetmap.org"),
+    ("https://a.example/{z}/{x}/{y}.png; script-src *", "https://tile.openstreetmap.org"),
+])
+def test_kit_frame_image_source_follows_the_tile_setting(tiles, origin, monkeypatch):
+    monkeypatch.delenv("HERMES_WEBUI_MAP_TILES", raising=False)
+    csp = _directives(interactive_ui.kit_frame_csp({"webui_map_tiles": tiles}))
+    assert csp["img-src"].split() == ["data:", origin, "https://upload.wikimedia.org"]
+
+
 def test_vendored_libraries_match_their_recorded_hashes():
     import hashlib
     for rel in ("chartjs/4.4.7", "leaflet/1.9.4"):
@@ -353,9 +366,22 @@ def test_vendored_libraries_match_their_recorded_hashes():
     assert "Leaflet 1.9.4" in (STATIC / "vendor/leaflet/1.9.4/leaflet.js").read_text(encoding="utf-8")[:200]
 
 
+def test_routes_serve_the_kit_frame_and_the_map_endpoint():
+    routes = (REPO / "api" / "routes.py").read_text(encoding="utf-8")
+    kit = 'if parsed.path in ("/static/interactive-ui/kit.html", "/session/static/interactive-ui/kit.html"):'
+    assert routes.count(kit) == 1
+    assert routes.index(kit) < routes.index('if parsed.path.startswith("/session/static/"):')
+    post = 'if parsed.path == "/api/map/resolve":'
+    assert routes.count(post) == 1
+    # After the CSRF gate, before the generic body reader.
+    assert routes.index("if not _csrf_exempt_path(parsed.path) and not _check_csrf(handler):") < routes.index(post)
+    assert routes.index(post) < routes.index("body = read_body(handler)", routes.index(post) - 5000)
+
+
 def test_kit_assets_load_in_order():
     core = '<script src="static/interactive-ui/kit-core.js?v=__WEBUI_VERSION__" defer></script>'
-    assert INDEX.index(core) < INDEX.index("static/interactive_ui.js") < INDEX.index('src="static/ui.js')
-    assert "'./static/interactive-ui/kit-core.js' + VQ" in SW
+    host_map = '<script src="static/interactive_ui_map.js?v=__WEBUI_VERSION__" defer></script>'
+    assert INDEX.index(core) < INDEX.index("static/interactive_ui.js") < INDEX.index(host_map) < INDEX.index('src="static/ui.js')
+    assert "'./static/interactive-ui/kit-core.js' + VQ" in SW and "'./static/interactive_ui_map.js' + VQ" in SW
     assert "iframe.setAttribute('sandbox','allow-scripts');" in MODULE
     assert "if(e.origin!=='null') return;" in MODULE

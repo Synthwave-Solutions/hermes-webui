@@ -14736,6 +14736,10 @@ def handle_post(handler, parsed) -> bool:
         from api import ops_reporter
         return ops_reporter.handle_client_error(handler, None)
 
+    if parsed.path == "/api/map/resolve":
+        from api import map_resolve
+        return map_resolve.handle(handler)
+
     if parsed.path == "/api/client-events/log":
         if diag:
             diag.stage("read_client_event_body")
