@@ -18401,8 +18401,7 @@ function renderMessages(options){
         const outTok=msg._turnUsage.output_tokens||0;
         const cost=msg._turnUsage.estimated_cost;
         let text=`${_fmtTokens(inTok)} in · ${_fmtTokens(outTok)} out`;
-        if(msg._turnUsage.cost_status==='unknown') text+=' · Cost unavailable';
-        else if(typeof cost==='number' && Number.isFinite(cost) && (cost!==0 || ['actual','estimated','included'].includes(msg._turnUsage.cost_status))) text+=` · ~$${cost<0.01?cost.toFixed(4):cost.toFixed(2)}`;
+        if(typeof cost==='number' && Number.isFinite(cost) && (cost!==0 || ['actual','estimated','included'].includes(msg._turnUsage.cost_status))) text+=` · ~$${cost<0.01?cost.toFixed(4):cost.toFixed(2)}`;
         const cacheHitPct=msg._turnUsage.cache_hit_percent;
         if(cacheHitPct!=null) text+=` · ${t('usage_cached_percent',cacheHitPct)}`;
         usage.textContent=text;

@@ -349,7 +349,7 @@
     const steps=n?(n===1?text('tools_one'):text('tools_many',{n})):'';
     const d=String(o.duration||'').trim();
     const head=o.live?text('working')+(d?' · '+d:''):(d?text('processed_in',{d}):text('processed'));
-    return '⚙️ '+head+(steps?' · '+steps:'');
+    return head+(steps?' · '+steps:'');
   }
 
   // One-line group summary: "🛠️ Werkstappen (12)" plus "💻 5 · 📄 3 · ⚠️ 1".

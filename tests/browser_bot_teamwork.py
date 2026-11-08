@@ -160,20 +160,22 @@ def _wait_rendered(page):
     # The bot catalog arrives after boot; names repaint once it is in.
     page.wait_for_function("() => !!(window.groupRouting && groupRouting.botInfo('linus-research'))", timeout=15000)
     page.wait_for_function(
-        "() => ((document.querySelector('#msgInner') || {}).innerText || '').includes('Sanne heeft Linus gevraagd')",
+        "() => ((document.querySelector('#msgInner') || {}).innerText || '').includes('Linus is klaar')",
         timeout=10000)
 
 
 def _assert_story(page, where):
     text = _chat_text(page)
-    for want in ("Sanne heeft Linus gevraagd: Vergelijk de drie offertes", "Bekijk de opdracht",
-                 "Linus is klaar", "Antwoord gaat naar Sanne", "Bekijk het werk van Linus", "met hulp van Linus",
+    for want in ("Bekijk de opdracht",
+                 "Linus is klaar", "Antwoord gaat naar Sanne", "Bekijk het werk van Linus",
                  "Grace neemt het hierna over in dit gesprek", "Opdracht van Sanne aan Grace", FINAL, GRACE_REPLY):
         assert want in text, f"{where}: missing {want!r}"
     # The list call alone is a work step, not a line in the conversation.
     assert "Sanne keek wie kan helpen" not in text, where
-    # Every handoff shows exactly once: as its own line in a settled turn, or
-    # as the visible work step when that turn's steps are open.
+    # Once a helper reported back, its result card tells the story: the
+    # handoff line and the helper chip step back. A handoff without a report
+    # yet (Grace taking over) still shows as its own line.
+    assert "Sanne heeft Linus gevraagd" not in text and "met hulp van Linus" not in text, where
     shown = page.evaluate("""() => {
         const visible = el => el.getClientRects().length > 0;
         const lines = [...document.querySelectorAll('#msgInner .sp-handoff-line')].filter(visible).map(el => ({
@@ -187,14 +189,14 @@ def _assert_story(page, where):
     }""")
     asked = [item for item in shown if item["text"].startswith("Sanne heeft Linus gevraagd")]
     takeover = [item for item in shown if item["text"] == "Grace neemt het hierna over in dit gesprek"]
-    assert len(asked) == 1 and len(takeover) == 1, shown
-    assert len(shown) == 2, shown
+    assert len(asked) == 0 and len(takeover) == 1, shown
+    assert len(shown) == 1, shown
     assert all(item["avatars"] == 2 and item["photo"] for item in shown), shown
     assert all(item["font"] == "13px" and item["height"] < 34 for item in shown if item["where"] == "line"), shown
-    assert asked[0]["where"] == "line", shown
-    # Exactly one helper chip, on the reply right after the report.
-    chips = page.evaluate("""() => [...document.querySelectorAll('#msgInner .sp-assisted-chip')].map(c => c.textContent)""")
-    assert chips == ["met hulp van Linus"], chips
+    # The helper chip exists for assistive tech and tooltips but is not shown
+    # next to a reply that directly follows the result card.
+    chips = page.evaluate("""() => [...document.querySelectorAll('#msgInner .sp-assisted-chip')].filter(c => c.getClientRects().length > 0).map(c => c.textContent)""")
+    assert chips == [], chips
     # The bot-written task is folded; the human-readable author line is visible.
     task_open = page.evaluate("() => document.querySelector('#msgInner details.sp-handoff-task').open")
     assert task_open is False, "the bot-written task should start folded"
@@ -303,12 +305,14 @@ def _drive(page, art, webui_state, errors):
     ok("Teamwerk strip is folded once everything is done")
 
     # Expand the brief behind "Bekijk de opdracht".
-    page.locator("#msgInner .sp-handoff-line[data-kind=queued] summary").click()
-    assert page.is_visible("#msgInner .sp-handoff-line[data-kind=queued] .sp-handoff-brief")
-    assert TASK in page.locator("#msgInner .sp-handoff-line[data-kind=queued] .sp-handoff-brief").inner_text()
-    page.locator("#msgInner .sp-handoff-line[data-kind=queued]").scroll_into_view_if_needed()
+    # The handoff that is still open (Grace takes over) keeps its line and brief.
+    line = page.locator("#msgInner details.sp-handoff-task").first
+    line.locator("summary").click()
+    assert line.locator(".msg-body").is_visible()
+    assert "customer reply" in line.locator(".msg-body").inner_text()
+    line.scroll_into_view_if_needed()
     page.screenshot(path=str(art / "01-desktop-dark.png"), full_page=False)
-    page.locator("#msgInner .sp-handoff-line[data-kind=queued] summary").click()
+    line.locator("summary").click()
     ok("the task opens behind 'Bekijk de opdracht'")
 
     # Someone starts working: the strip opens with photo and plain status.
@@ -352,7 +356,7 @@ def _drive(page, art, webui_state, errors):
     page.screenshot(path=str(art / "05-mobile-light.png"), full_page=False)
     page.evaluate("() => _applyTheme('dark')")
     time.sleep(0.3)
-    page.locator("#msgInner .sp-handoff-line[data-kind=queued]").scroll_into_view_if_needed()
+    page.locator("#msgInner details.sp-handoff-task").first.scroll_into_view_if_needed()
     page.screenshot(path=str(art / "06-mobile-dark.png"), full_page=False)
     page.locator("#msgInner .msg-row:has(.sp-handoff-author)").screenshot(path=str(art / "07-mobile-dark-task.png"))
     page.locator("#spSubagentDock").scroll_into_view_if_needed()

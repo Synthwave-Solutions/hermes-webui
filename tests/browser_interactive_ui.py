@@ -469,9 +469,10 @@ def data_blocks(page, ctx, gateway, art, base_runs):
     missing = frame.locator(".k-missing").inner_text()
     assert "Niet op de kaart gevonden" in missing and "Kantoor Haarlem" in missing, missing
     assert frame.locator(".k-items li").count() == 3
-    assert "De lijn toont de volgorde" in frame.locator(".k-notes").inner_text()
+    assert "De lijn toont alleen de volgorde" in frame.locator(".k-notes").inner_text()
     chips = frame.locator(".k-chip").all_inner_texts()
-    assert chips == ["4 locaties", "Route"], chips
+    assert chips == ["4 locaties"], chips
+    assert frame.locator(".k-action", has_text="Opnieuw afspelen").count() == 0
     card.scroll_into_view_if_needed()
     time.sleep(2.8)  # the drop-in and the route draw once, then stand still
     card.screenshot(path=str(art / "12-map-desktop-dark.png"))

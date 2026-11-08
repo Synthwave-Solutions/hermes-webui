@@ -8858,3 +8858,22 @@ button.bg-badge{border:0;cursor:pointer;min-width:28px;min-height:28px;}
   .bot-scout-actions .sm-btn{flex:1 1 100%;}
   .bot-scout-people summary{gap:10px;}
 }
+
+/* ── Calmer chat chrome (interactive answers release) ───────────────── */
+/* The jump-to-question pill: quiet, and on pointer devices only on hover. */
+.msg-question-jump-btn{box-shadow:none;background:transparent;border-color:transparent;height:28px;font-weight:500}
+.msg-question-jump-btn.session-jump-btn{box-shadow:none!important;background:transparent!important}
+@media (hover:hover){
+  .msg-question-jump-btn{opacity:0;transition:opacity .15s,color .12s,border-color .12s,background .12s}
+  .assistant-turn:hover .msg-question-jump-btn,.msg-row[data-role="assistant"]:hover .msg-question-jump-btn,.msg-question-jump-btn:focus-visible{opacity:1}
+}
+/* Once a helper bot reported back, its card says it all: no extra handoff line or chip. */
+.process-wakeup-row:has(.sp-bot-result) + .assistant-turn .msg-role.assistant .sp-assisted-chip{display:none}
+.assistant-turn:has(+ .process-wakeup-row .sp-bot-result) .sp-handoff-line{display:none}
+@media (max-width:640px){
+  /* Floating pills sit on top of card headers on a phone. */
+  #jumpToSessionStartBtn,.messages-shell .hwx-pin-header-btn{display:none!important}
+  .messages-inner{padding-bottom:112px}
+  .msg-role.assistant .sp-assisted-chip{display:none}
+  #btnSplitView{display:none!important}
+}

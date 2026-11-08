@@ -60,7 +60,8 @@
   .bot-builder .bot-builder-tabs button{min-height:42px;white-space:nowrap}
 }
 @media(max-width:640px){
-  #btnPageHelp{max-width:90px;padding-inline:6px;font-size:11px}
+  #btnPageHelp{width:44px;max-width:44px;height:44px;padding:0;gap:0;justify-content:center}
+  #btnPageHelp>span{display:none}
   .main-view-empty{padding:32px 24px;gap:12px}
   .main-view-empty-title{font-size:22px}
   .main-view-empty-sub{font-size:13px}

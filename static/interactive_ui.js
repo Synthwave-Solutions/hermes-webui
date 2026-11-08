@@ -668,7 +668,7 @@ const _iui=(function(){
     const title=p.title||(ctrl.kit?kitWord('kitName',ctrl.kit):tx('title'));
     ctrl.pill.hidden=!(p.spec&&p.spec.example);
     if(ctrl.kit) ctrl.pill.textContent=(TEXT[kitLang(ctrl)]||TEXT.en).example;
-    if(ctrl.titleEl.textContent!==title) ctrl.titleEl.textContent=title;
+    if(ctrl.titleEl.textContent!==title){ctrl.titleEl.textContent=title;ctrl.titleEl.title=title;}
     ctrl.card.setAttribute('aria-label',title);
     ctrl.moreBtn.hidden=!ctrl.final;
     if(!ctrl.sourceBox.hidden) ctrl.code.textContent=ctrl.source;
@@ -893,11 +893,35 @@ const _iui=(function(){
     block.appendChild(wrap);
   }
 
+  // A reply that names a bot by its technical id gets the display name instead
+  // ("Chief Financial Bot (`synthwave-cfo`)" becomes "Chief Financial Bot").
+  function humanizeBotIds(root){
+    const gr=window.groupRouting;
+    if(!root||!root.querySelectorAll||!gr||typeof gr.botInfo!=='function') return;
+    const ID=/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+    root.querySelectorAll('.assistant-turn .msg-body code, .msg-row[data-role="assistant"] .msg-body code, .assistant-segment .msg-body code').forEach(code=>{
+      if(code.closest('pre,.sp-handoff-task,.iui-card,.iui-block')) return;
+      const id=(code.textContent||'').trim();
+      if(!ID.test(id)) return;
+      let info=null;try{info=gr.botInfo(id);}catch(_){}
+      const title=info&&info.title?String(info.title).trim():'';
+      if(!title) return;
+      const prev=code.previousSibling,next=code.nextSibling;
+      const before=prev&&prev.nodeType===3?prev.nodeValue:'';
+      const m=before.match(/\s*\(\s*$/);
+      const named=m&&before.slice(0,m.index).replace(/\s+$/,'').toLowerCase().endsWith(title.toLowerCase());
+      if(named&&next&&next.nodeType===3&&/^\s*\)/.test(next.nodeValue)){
+        prev.nodeValue=before.slice(0,m.index);next.nodeValue=next.nodeValue.replace(/^\s*\)/,'');code.remove();
+      } else code.replaceWith(document.createTextNode(title));
+    });
+  }
+
   // ── Settled render (after the reply is complete) ────────────────────────
   function renderBlocks(container){
     const root=container||document;
     if(!root.querySelectorAll) return;
     prune();
+    try{humanizeBotIds(root);}catch(_){}
     // Settled cards replace live ones; drop live cards left in hidden copies.
     liveCards.forEach((c,k)=>{if(!c.card.isConnected||c.card.offsetParent===null){if(c.card.isConnected&&!c.mounted)c.card.remove();liveCards.delete(k);}});
     root.querySelectorAll('.iui-block:not([data-iui-mounted])').forEach(block=>{

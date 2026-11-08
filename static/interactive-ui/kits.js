@@ -38,7 +38,7 @@
       sortHint:'Sorteren', view:'Weergave', chart:'Grafiek', table:'Tabel',
       chartFail:'Grafiek kon niet laden, hier zijn de cijfers.', places:function(n){ return n === 1 ? '1 locatie' : n + ' locaties'; },
       route:'Route', replay:'Opnieuw afspelen', status:function(i,n,name){ return 'Locatie ' + i + ' van ' + n + ': ' + name; },
-      routeNote:'De lijn toont de volgorde, geen route over de weg.', approx:'Sommige locaties zijn bij benadering.',
+      routeNote:'De lijn toont alleen de volgorde, niet de weg.', approx:'Sommige locaties zijn bij benadering.',
       unresolved:'Niet op de kaart gevonden', later:'Wordt nog opgezocht', tilesFail:'De kaart laadt nu niet. De lijst klopt wel.',
       google:'Open in Google Maps', copyAddr:'Kopieer adressen', photo:function(a,l){ return 'Foto: ' + a + ', ' + l; },
       more:'Meer info', approxPin:'bij benadering', mapLabel:'Kaart', listLabel:'Locaties'},
@@ -47,7 +47,7 @@
       sortHint:'Sort', view:'View', chart:'Chart', table:'Table',
       chartFail:'The chart could not load, here are the numbers.', places:function(n){ return n === 1 ? '1 place' : n + ' places'; },
       route:'Route', replay:'Play again', status:function(i,n,name){ return 'Place ' + i + ' of ' + n + ': ' + name; },
-      routeNote:'The line shows the order, not a road route.', approx:'Some places are approximate.',
+      routeNote:'The line shows the order, not the road.', approx:'Some places are approximate.',
       unresolved:'Not found on the map', later:'Still being looked up', tilesFail:'The map does not load right now. The list is correct.',
       google:'Open in Google Maps', copyAddr:'Copy addresses', photo:function(a,l){ return 'Photo: ' + a + ', ' + l; },
       more:'More info', approxPin:'approximate', mapLabel:'Map', listLabel:'Places'}
@@ -351,33 +351,40 @@
       if(spec.xLabel) (horizontal ? valueAxis : catAxis).title = {display:true, text:spec.xLabel, color:t.muted};
       if(spec.yLabel) (horizontal ? catAxis : valueAxis).title = {display:true, text:spec.yLabel, color:t.muted};
       var target = spec.target;
-      var targetPlugin = {id:'swTarget', afterDatasetsDraw:function(ch){
-        if(!target) return;
-        var sc = horizontal ? ch.scales.x : ch.scales.y, area = ch.chartArea, ctx = ch.ctx;
-        if(!sc || !area) return;
-        var p = sc.getPixelForValue(target.value);
-        if(!Number.isFinite(p)) return;
-        ctx.save();
-        ctx.strokeStyle = t.strong || t.fg; ctx.globalAlpha = 0.7; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]);
-        ctx.beginPath();
-        if(horizontal){ ctx.moveTo(p, area.top); ctx.lineTo(p, area.bottom); } else { ctx.moveTo(area.left, p); ctx.lineTo(area.right, p); }
-        ctx.stroke();
-        ctx.setLineDash([]); ctx.globalAlpha = 1; ctx.fillStyle = t.fg; ctx.font = '600 11px ' + (getComputedStyle(document.body).fontFamily || 'sans-serif');
-        // A label that already names the amount is shown as it is.
-        var label = target.label && /\d/.test(target.label) ? target.label : (target.label ? target.label + ': ' : '') + f(target.value);
-        var w = ctx.measureText(label).width + 10, x, y;
-        if(horizontal){ x = Math.min(p + 4, area.right - w); y = area.top + 2; }
-        else { x = area.right - w; y = p - 20; }
-        ctx.fillStyle = t.surface || t.bg || '#171a23'; ctx.globalAlpha = 0.92;
-        ctx.fillRect(x, y, w, 17);
-        ctx.globalAlpha = 1; ctx.fillStyle = t.fg; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-        ctx.fillText(label, x + 5, y + 9);
-        ctx.restore();
-      }};
+      var targetPlugin = {id:'swTarget',
+        beforeDatasetsDraw:function(ch){
+          if(!target) return;
+          var sc = horizontal ? ch.scales.x : ch.scales.y, area = ch.chartArea, ctx = ch.ctx;
+          if(!sc || !area) return;
+          var p = sc.getPixelForValue(target.value);
+          if(!Number.isFinite(p)) return;
+          ctx.save();
+          ctx.strokeStyle = t.muted || t.fg; ctx.globalAlpha = 0.7; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
+          ctx.beginPath();
+          if(horizontal){ ctx.moveTo(p, area.top); ctx.lineTo(p, area.bottom); } else { ctx.moveTo(area.left, p); ctx.lineTo(area.right, p); }
+          ctx.stroke();
+          ctx.restore();
+        },
+        afterDraw:function(ch){
+          if(!target) return;
+          var area = ch.chartArea, ctx = ch.ctx;
+          if(!area) return;
+          // A label that already names the amount is shown as it is.
+          var label = target.label && /\d/.test(target.label) ? target.label : (target.label ? target.label + ': ' : '') + f(target.value);
+          ctx.save();
+          ctx.font = '500 11px ' + (getComputedStyle(document.body).fontFamily || 'sans-serif');
+          var tw = ctx.measureText(label).width, y = area.top - 10, xr = area.right;
+          ctx.strokeStyle = t.muted || t.fg; ctx.globalAlpha = 0.8; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
+          ctx.beginPath(); ctx.moveTo(xr - tw - 22, y); ctx.lineTo(xr - tw - 6, y); ctx.stroke();
+          ctx.setLineDash([]); ctx.globalAlpha = 1;
+          ctx.fillStyle = t.muted || t.fg; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+          ctx.fillText(label, xr, y);
+          ctx.restore();
+        }};
       var cfg = {type:kind, data:{labels:spec.labels.slice(), datasets:datasets}, plugins:[targetPlugin],
         options:{responsive:true, maintainAspectRatio:false, animation:REDUCED ? false : {duration:500},
           indexAxis:horizontal ? 'y' : 'x', interaction:{mode:round ? 'nearest' : 'index', intersect:round},
-          layout:{padding:{top:target && !horizontal ? 14 : 4, right:8}},
+          layout:{padding:{top:target ? 22 : 4, right:8}},
           plugins:{legend:{display:!round && spec.series.length > 1, position:'bottom', labels:{color:t.fg, boxWidth:10, boxHeight:10, usePointStyle:true, padding:14}},
             tooltip:{backgroundColor:t.surface2 || t.surface, titleColor:t.strong || t.fg, bodyColor:t.fg, borderColor:t.border, borderWidth:1, padding:10,
               callbacks:{label:function(ctx){
@@ -475,7 +482,6 @@
     var head = h('div', 'k-tools');
     var chips = h('div', 'k-chips');
     chips.appendChild(h('span', 'k-chip', T('places', spec.places.length)));
-    if(route) chips.appendChild(h('span', 'k-chip k-chip--accent', T('route')));
     head.appendChild(chips);
     if(cats.length){
       var legendEl = h('div', 'k-cats');
@@ -506,23 +512,17 @@
     var actions = h('div', 'k-actions');
     var gUrl = K.googleMapsUrl(onMap.map(function(x){ return {lat:x.ll[0], lng:x.ll[1]}; }));
     if(gUrl){
-      var bG = h('button', 'k-action', T('google'));
+      var bG = h('button', 'k-action k-action--primary', T('google'));
       bG.type = 'button';
       bG.addEventListener('click', function(){ api.open(gUrl); });
       actions.appendChild(bG);
     }
-    var bCopy = h('button', 'k-action', T('copyAddr'));
+    var bCopy = h('button', 'k-action k-action--quiet', T('copyAddr'));
     bCopy.type = 'button';
     bCopy.addEventListener('click', function(){
       api.copy(spec.places.map(function(p){ var r = byK[p.k] || {}; var a = p.address || r.label || ''; return p.n + '. ' + p.name + (a ? ', ' + a : ''); }).join('\n'));
     });
     actions.appendChild(bCopy);
-    var bReplay = null;
-    if(route){
-      bReplay = h('button', 'k-action k-action--quiet', T('replay'));
-      bReplay.type = 'button';
-      actions.appendChild(bReplay);
-    }
     foot.append(notes, actions);
     wrap.append(head, bodyEl, status, foot);
     box.appendChild(wrap);
@@ -594,13 +594,9 @@
       wrap.style.setProperty('--sw-route-dur', ((n - 1) * stagger + 550) + 'ms');
       void wrap.offsetWidth;
       wrap.classList.add('is-played');
+      // Whatever happens to the animation, the pins and route end up shown.
+      setTimeout(function(){ wrap.classList.add('is-settled'); }, (n - 1) * stagger + 900);
     }
-    function replay(){
-      wrap.classList.remove('is-played');
-      void wrap.offsetWidth;
-      requestAnimationFrame(function(){ wrap.classList.add('is-played'); });
-    }
-    if(bReplay) bReplay.addEventListener('click', replay);
     function popupNode(x){
       var d = h('div', 'k-pop');
       if(x.photo){

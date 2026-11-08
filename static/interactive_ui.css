@@ -114,6 +114,7 @@ html.iui-has-full .messages,html.iui-has-full #messages{z-index:auto!important}
 
 @media (max-width:640px){
   .iui-head{padding:6px 4px 6px 12px}
+  .iui-title{white-space:normal;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;line-height:1.3;overflow-wrap:break-word}
   .iui-btn{min-width:40px;height:40px}
   .iui-card.iui-full{inset:0;border-radius:0}
   .iui-card.iui-full .iui-stage{border-radius:0}

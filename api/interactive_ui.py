@@ -125,6 +125,7 @@ th{color:var(--sw-muted);font-weight:600;font-size:.82rem}
 td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 
 .card{background:var(--sw-surface);border:1px solid var(--sw-border);border-radius:var(--sw-radius);padding:14px 16px}
+#iui-root>.card:only-child{background:transparent;border:0;border-radius:0;padding:0;box-shadow:none}
 .grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(var(--min,180px),1fr))}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .stack{display:flex;flex-direction:column;gap:10px}
