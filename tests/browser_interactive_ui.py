@@ -755,9 +755,13 @@ def form_block(page, gateway, art, base_runs):
     assert len(gateway.runs) == runs and "is-locked" not in (form.get_attribute("class") or ""), "a synthetic click must not send"
     page.evaluate("""() => { window.__toasts = []; const o = window.showToast;
         window.showToast = function (m, d, k) { window.__toasts.push(String(m)); return typeof o === 'function' ? o.apply(this, arguments) : undefined; }; }""")
-    # Enter in the number box sends, like Versturen.
+    # Enter in the first box moves on to the next question and sends nothing.
     form.locator("[data-field=budget] input").focus()
     page.keyboard.press("Enter")
+    time.sleep(0.6)
+    assert len(gateway.runs) == runs, "Enter in a question that is not the last must not send"
+    assert page.evaluate("() => !!document.activeElement.closest('[data-field=start]')"), "Enter moves to the next question"
+    form.locator(".iui-form-submit").click()
     body = wait_runs(gateway, runs + 1)
     for line in ("Mijn antwoorden:", "- Budget: € 5.000 per maand", "- Start: 1 december", "- Welke teams doen mee? Sales en Operations",
                  "- Tempo: Snel", "- Uren per week voor training: 7 uur", "- Eerst een pilot? Ja", "- Nog iets dat ik moet weten? Vooral de training van het team."):
@@ -807,7 +811,7 @@ def form_block(page, gateway, art, base_runs):
     slider.click()
     assert fresh.locator("[data-field=uren] .iui-slider-val").inner_text().endswith(" uur")
     assert slider.get_attribute("aria-valuetext").endswith(" uur")
-    ok("questions form: Dutch date box, arrow keys, Enter sends, synthetic clicks ignored, own toast, /btw ignored, slider thumb click counts")
+    ok("questions form: Dutch date box, arrow keys, Enter moves to the next question, synthetic clicks ignored, own toast, /btw ignored, slider thumb click counts")
     shots = []
     for theme in ("light", "dark"):
         page.evaluate(f"() => _applyTheme('{theme}')")

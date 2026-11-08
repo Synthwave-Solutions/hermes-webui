@@ -55,7 +55,7 @@ const messy = build(`{ // werving
     ["Eerste selectie", 420],
     {"label": "Telefonisch gesprek", "count": "180"},
     {"label": "", "value": 50},
-    {"label": "Assessment", "value": "veel"},
+    {"label": "Assessment", "value": "ca. 90"},
     {"label": "Tweede gesprek", "value": 60},
     {"label": "Aanbod", "value": 75},
     {"label": "Aangenomen", "value": -3},
@@ -69,21 +69,25 @@ const messy = build(`{ // werving
 assert.deepStrictEqual(messy.errors, []);
 const w = messy.warnings.join('\n');
 for(const want of ['De titel ontbreekt.', 'heeft 3 waarden, verwacht 11; ze is weggelaten', 'Er zijn 11 fasen; alleen de eerste 8', 'Onbekend format "taart"',
-  'is ingekort tot 40 tekens', 'Fase 4 heeft geen naam', '"Assessment" heeft geen getal',
+  'is ingekort tot 40 tekens', 'Fase 4 heeft geen naam',
   '"Aanbod" is groter dan de fase ervoor ("Tweede gesprek")', '"Aangenomen" had een negatieve waarde']) assert.ok(w.includes(want), 'warning: ' + want + '\n' + w);
 assert.ok(!dashes.test(w), 'no long dashes in messages');
+// A stage without any number stops the block: conversions never jump over a missing stage.
+assert.deepStrictEqual(K.build('funnel', JSON.stringify({title: 't', stages: [{label: 'A', value: 10}, {label: 'B', value: 'veel'}, {label: 'C', value: 2}]}), {lang: 'nl'}).errors,
+  ['Fase "B" heeft geen getal. Geef elke fase een aantal.']);
+assert.deepStrictEqual(K.build('funnel', JSON.stringify({title: 't', stages: [{label: 'A', value: 'ca. 1.240'}, {label: 'B', value: '310+'}, {label: 'C', value: '1,2k'}]}), {lang: 'nl'}).spec.stages.map(x => x.value), [1240, 310, 1200]);
 const ms = messy.spec;
 assert.strictEqual(ms.title, 'Trechter');
 assert.strictEqual(ms.format, 'number');
-assert.deepStrictEqual(ms.stages.map(x => x.label), ['Sollicitaties ontvangen via de website…', 'Eerste selectie', 'Telefonisch gesprek', 'Tweede gesprek', 'Aanbod', 'Aangenomen']);
+assert.deepStrictEqual(ms.stages.map(x => x.label), ['Sollicitaties ontvangen via de website…', 'Eerste selectie', 'Telefonisch gesprek', 'Assessment', 'Tweede gesprek', 'Aanbod', 'Aangenomen']);
 assert.ok(ms.stages[0].label.length <= 40);
-assert.deepStrictEqual(ms.stages.map(x => x.value), [1250, 420, 180, 60, 75, 0]);
-assert.strictEqual(ms.stages[4].grows, true);
-assert.strictEqual(ms.stages[4].conv, 125, 'a growing stage is still drawn');
-assert.strictEqual(ms.stages[5].conv, 0);
-assert.strictEqual(ms.drop, 5, 'the biggest drop never points at a growing stage');
+assert.deepStrictEqual(ms.stages.map(x => x.value), [1250, 420, 180, 90, 60, 75, 0]);
+assert.strictEqual(ms.stages[5].grows, true);
+assert.strictEqual(ms.stages[5].conv, 125, 'a growing stage is still drawn');
+assert.strictEqual(ms.stages[6].conv, 0);
+assert.strictEqual(ms.drop, 6, 'the biggest drop never points at a growing stage');
 // A compare list of the wrong length is dropped as a whole, never applied by position.
-assert.deepStrictEqual(ms.stages.map(x => x.prev), [null, null, null, null, null, null]);
+assert.deepStrictEqual(ms.stages.map(x => x.prev), [null, null, null, null, null, null, null]);
 assert.strictEqual(ms.compare, false);
 assert.strictEqual(K.kitTable('funnel', ms).header.length, 4, 'no Vorige periode column');
 // A list of the right length with one bad value: only that value is left out.
@@ -174,7 +178,7 @@ assert.strictEqual(build({title: 'P', format: 'procent', stages: [{label: 'A', v
 const noStages = build({title: 'Leeg'});
 assert.deepStrictEqual(noStages.errors, ['Er zijn geen fasen (stages).']);
 assert.strictEqual(noStages.spec, null);
-const oneStage = build({title: 'Eén', stages: [{label: 'A', value: 'geen'}, {label: 'B', value: 4}]});
+const oneStage = build({title: 'Eén', stages: [{label: 'B', value: 4}]});
 assert.strictEqual(oneStage.errors.length, 1);
 assert.ok(/minstens twee fasen/.test(oneStage.errors[0]) && /er is er 1/.test(oneStage.errors[0]));
 const allZero = build({title: 'Nul', stages: [{label: 'A', value: 0}, {label: 'B', value: 0}]});
