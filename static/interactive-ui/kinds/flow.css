@@ -45,7 +45,7 @@
 .k-flow-node.is-wait .k-flow-label{font-weight:500;color:var(--sw-fg)}
 .k-flow-node.is-decision{background:transparent;border:0;border-radius:0;padding-top:0;padding-bottom:0}
 .k-flow-diamond{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
-.k-flow-diamond polygon{fill:color-mix(in srgb,var(--sw-info) 9%,var(--sw-surface));stroke:color-mix(in srgb,var(--sw-info) 55%,var(--sw-border));stroke-width:1.25;stroke-linejoin:round}
+.k-flow-diamond polygon{fill:color-mix(in srgb,var(--sw-accent) 9%,var(--sw-surface));stroke:color-mix(in srgb,var(--sw-accent) 50%,var(--sw-border));stroke-width:1.25;stroke-linejoin:round}
 .k-flow-node:hover{border-color:color-mix(in srgb,var(--sw-accent) 60%,var(--sw-border))}
 .k-flow-node.is-decision:hover polygon{stroke:color-mix(in srgb,var(--sw-accent) 60%,var(--sw-border))}
 /* Selected: an accent fill and border, no ring. Keyboard focus: a dashed ring

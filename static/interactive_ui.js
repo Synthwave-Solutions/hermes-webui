@@ -257,6 +257,22 @@ const _iui=(function(){
     const c=[m[1],m[2],m[3]].map(v=>{v=Number(v)/255;return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4);});
     return 0.2126*c[0]+0.7152*c[1]+0.0722*c[2];
   }
+  const BASE_PAL=['#f97316','#3b82f6','#22c55e','#a855f7','#eab308','#ec4899','#14b8a6','#94a3b8'];
+  function hueOf(c){
+    let m=/^#([0-9a-f]{6})$/i.exec(String(c||'').trim()),r,g,b;
+    if(m){r=parseInt(m[1].slice(0,2),16);g=parseInt(m[1].slice(2,4),16);b=parseInt(m[1].slice(4),16);}
+    else{m=/rgba?\(\s*(\d+)[ ,]+(\d+)[ ,]+(\d+)/i.exec(String(c||''));if(!m)return null;r=+m[1];g=+m[2];b=+m[3];}
+    const mx=Math.max(r,g,b),mn=Math.min(r,g,b),d=mx-mn;
+    if(d<20) return null;
+    const h=mx===r?((g-b)/d)%6:mx===g?(b-r)/d+2:(r-g)/d+4;
+    return (h*60+360)%360;
+  }
+  function accentPalette(accent){
+    const ha=hueOf(accent);
+    if(ha===null) return [];
+    const rest=BASE_PAL.filter(c=>{const h=hueOf(c);if(h===null)return true;const d=Math.abs(h-ha);return Math.min(d,360-d)>32;});
+    return [accent].concat(rest).slice(0,8);
+  }
   function themeMessage(){
     const cs=getComputedStyle(document.documentElement);
     const pick=(...names)=>{for(const n of names){const v=cssVar(cs,n);if(v)return v;}return '';};
@@ -273,6 +289,8 @@ const _iui=(function(){
       '--sw-border':pick('--border'),
     };
     Object.keys(vars).forEach(k=>{if(!vars[k])delete vars[k];});
+    // One chart palette for apps, data blocks and downloads: the accent first.
+    accentPalette(vars['--sw-accent']).forEach((c,i)=>{vars['--sw-c'+(i+1)]=c;});
     // The chat marks dark mode with html.dark; fall back to the surface colour.
     const root=document.documentElement;
     let mode;
@@ -380,11 +398,18 @@ const _iui=(function(){
       case 'reveal':{
         // A tapped step's details sit below the diagram: bring them into view.
         if(ctrl.card.classList.contains('iui-full')||!ctrl.iframe) break;
-        const y=Math.max(0,Math.min(Number(data.y)||0,ctrl.iframe.offsetHeight||0));
         const sc=scroller(), fr=ctrl.iframe.getBoundingClientRect();
         if(!sc) break;
-        const limit=sc.getBoundingClientRect().bottom-96, at=fr.top+y;
-        if(at>limit) sc.scrollBy({top:at-limit,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
+        const how=matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth', box=sc.getBoundingClientRect();
+        if(typeof data.top==='number'){
+          // Bring a part higher up in the card (the map above its list) into view.
+          const at=fr.top+Math.max(0,Math.min(data.top,ctrl.iframe.offsetHeight||0)), floor=box.top+56;
+          if(at<floor) sc.scrollBy({top:at-floor,behavior:how});
+          break;
+        }
+        const y=Math.max(0,Math.min(Number(data.y)||0,ctrl.iframe.offsetHeight||0));
+        const limit=box.bottom-96, at=fr.top+y;
+        if(at>limit) sc.scrollBy({top:at-limit,behavior:how});
         break;
       }
       case 'open':
@@ -852,7 +877,7 @@ const _iui=(function(){
       .replace('<html lang="nl" data-theme="dark">',`<html lang="${lang()}" data-theme="${theme.mode}" style="${escHtml(vars)}">`)
       .replace('<style id="iui-user-style"></style>',()=>`<style id="iui-user-style">${p.css.replace(/<\/style/gi,'<\\/style')}</style>`)
       .replace('<div id="iui-root"></div>',()=>`<div id="iui-root">${p.html}</div>`)
-      .replace(/<\/body>/i,()=>`<script>window.synthwave={theme:{palette:['#f97316','#3b82f6','#22c55e','#a855f7','#eab308','#ec4899','#14b8a6','#94a3b8'],mode:${JSON.stringify(theme.mode)}},sendPrompt:function(){return false},copy:function(t){try{navigator.clipboard.writeText(String(t))}catch(e){}},onTheme:function(){},resize:function(){}};<\/script>\n`+scripts+'\n</body>');
+      .replace(/<\/body>/i,()=>`<script>window.synthwave={theme:{palette:${JSON.stringify(accentPalette(theme.vars['--sw-accent']).length?accentPalette(theme.vars['--sw-accent']):BASE_PAL)},mode:${JSON.stringify(theme.mode)}},sendPrompt:function(){return false},copy:function(t){try{navigator.clipboard.writeText(String(t))}catch(e){}},onTheme:function(){},resize:function(){}};<\/script>\n`+scripts+'\n</body>');
     return doc;
   }
   function fileName(ctrl,fallback){

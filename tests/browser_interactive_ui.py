@@ -588,7 +588,7 @@ def data_blocks(page, ctx, gateway, art, base_runs):
     bar_colours = frame.evaluate("""() => Object.fromEntries(['done', 'doing', 'risk', 'todo'].map(s =>
         [s, getComputedStyle(document.querySelector('.k-tl-bar.is-' + s)).backgroundColor]))""")
     accent = frame.evaluate(PROBE, "--sw-accent")
-    assert bar_colours["done"] == good and bar_colours["risk"] == bad and bar_colours["doing"] == accent, (bar_colours, good, bad, accent)
+    assert bar_colours["done"] == good and bar_colours["risk"] == bad and bar_colours["doing"] == frame.evaluate(PROBE, "--sw-info"), (bar_colours, good, bad, accent)
     assert bar_colours["todo"] not in (good, bad, accent), bar_colours
     today_x = frame.evaluate("""() => { const t=document.querySelector('.k-tl-today').getBoundingClientRect();
         const r=document.querySelector('.k-tl-track').getBoundingClientRect(); return (t.left + t.width / 2 - r.left) / r.width; }""")

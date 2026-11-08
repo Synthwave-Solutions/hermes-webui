@@ -92,7 +92,8 @@ BASE_CSS = r"""
 --sw-c1:#f97316;--sw-c2:#3b82f6;--sw-c3:#22c55e;--sw-c4:#a855f7;--sw-c5:#eab308;--sw-c6:#ec4899;--sw-c7:#14b8a6;--sw-c8:#94a3b8;
 color-scheme:dark}
 :root[data-theme=light]{color-scheme:light;--sw-bg:#ffffff;--sw-surface:#ffffff;--sw-surface-2:#f1f3f7;--sw-fg:#1f2430;
---sw-strong:#0b0e14;--sw-muted:#5b6475;--sw-accent-soft:rgba(249,115,22,.12);--sw-border:#dfe3ea}
+--sw-strong:#0b0e14;--sw-muted:#5b6475;--sw-accent-soft:rgba(249,115,22,.12);--sw-border:#dfe3ea;
+--sw-good:#15803d;--sw-warn:#a16207;--sw-bad:#b91c1c;--sw-info:#1d4ed8}
 *,*::before,*::after{box-sizing:border-box}
 html,body{margin:0;padding:0;background:transparent;color:var(--sw-fg);font:14px/1.5 var(--sw-font);-webkit-font-smoothing:antialiased}
 body{padding:14px}

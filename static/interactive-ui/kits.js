@@ -184,7 +184,12 @@
   };
   function revealEl(el){
     if(standalone || !el || (window.innerWidth || 0) >= 640) return;
-    setTimeout(function(){ var r = el.getBoundingClientRect(); post({type:'reveal', y:Math.round(r.bottom + (window.scrollY || 0) + 8)}); }, 60);
+    setTimeout(function(){
+      // A frame taller than the chat allows scrolls inside itself first (only the frame, never the chat).
+      var r = el.getBoundingClientRect(), vh = window.innerHeight || 0;
+      if(vh && r.bottom > vh){ window.scrollBy(0, r.bottom - vh + 8); r = el.getBoundingClientRect(); }
+      post({type:'reveal', y:Math.round(r.bottom + 8)});
+    }, 60);
   }
 
   var stateTimer = 0;
@@ -370,6 +375,8 @@
     bar.appendChild(seg);
     var canvasBox = h('div', 'k-canvas');
     canvasBox.style.height = spec.height + 'px';
+    // Lying bars on a phone need room per name.
+    if(spec.type === 'bar' && (box.clientWidth || window.innerWidth) < 480 && spec.labels.length > 4) canvasBox.style.height = Math.max(spec.height, 60 + spec.labels.length * 40) + 'px';
     // A radar on a phone follows the width, so the shape is not lost in empty space.
     if(spec.type === 'radar'){ var bw = box.clientWidth || window.innerWidth; if(bw < 480) canvasBox.style.height = Math.max(260, Math.round(bw * 0.86)) + 'px'; }
     var canvas = h('canvas');
@@ -397,6 +404,10 @@
     function config(){
       var c = colors(), t = c.t, hl = spec.highlight, hlSeries = hl && spec.series.some(function(s){ return s.name === hl; });
       var kind = spec.type === 'hbar' || spec.type === 'stacked' ? 'bar' : spec.type === 'area' ? 'line' : spec.type === 'donut' ? 'doughnut' : spec.type;
+      // On a phone, many or long category names read better as lying bars.
+      var narrowC = (box.clientWidth || window.innerWidth) < 480;
+      var timeLike = spec.labels.every(function(l){ return /^(\d{4}([-\/]\d{1,2})?|q[1-4]|[a-z]{3}\.?|week \d+|wk \d+|\d{1,2}[-\/]\d{1,2})$/i.test(String(l).trim()); });
+      var autoH = narrowC && spec.type === 'bar' && !timeLike && (spec.labels.length > 4 || spec.labels.some(function(l){ return String(l).length > 10; }));
       var radar = kind === 'radar';
       var datasets = spec.series.map(function(s, i){
         var color = hl ? (hlSeries ? (s.name === hl ? c.accent : c.muted) : c.pal[i % 8]) : c.pal[i % 8];
@@ -421,10 +432,17 @@
         return ds;
       });
       var stacked = spec.type === 'stacked' || (spec.type === 'area' && spec.series.length > 1);
-      var horizontal = spec.type === 'hbar';
+      var horizontal = spec.type === 'hbar' || autoH;
       var valueAxis = {stacked:stacked, beginAtZero:true, grid:{color:alpha(t.border || '#2a2f3d', 0.9), drawTicks:false}, border:{display:false},
-        ticks:{color:t.muted, padding:6, callback:function(v){ return f(v); }}};
-      var catAxis = {stacked:stacked, grid:{display:false}, border:{color:t.border}, ticks:{color:t.muted, autoSkip:true, maxRotation:0}};
+        ticks:{color:t.muted, padding:6, maxRotation:0, maxTicksLimit:horizontal && narrowC ? 4 : 8, callback:function(v){ return f(v); }}};
+      // The goal line always falls inside the chart.
+      if(spec.target && Number.isFinite(spec.target.value)) valueAxis.suggestedMax = spec.target.value * 1.06;
+      // Named categories are never skipped on a phone: they wrap instead (dates and months may skip).
+      var catTicks = {color:t.muted, autoSkip:timeLike, maxRotation:0, font:{size:narrowC ? 10.5 : 12}};
+      if(!timeLike) catTicks.callback = function(v, i){ var l = this.getLabelForValue ? this.getLabelForValue(v) : spec.labels[i]; return wrapLabel(l, narrowC ? (horizontal ? 14 : 9) : 16); };
+      var catAxis = {stacked:stacked, grid:{display:false}, border:{color:t.border}, ticks:catTicks};
+      // A horizontal bar's name column takes at most 45% of the width.
+      if(horizontal) catAxis.afterFit = function(sc){ var cap = Math.round((box.clientWidth || window.innerWidth) * 0.45); if(sc.width > cap) sc.width = cap; };
       if(spec.xLabel) (horizontal ? valueAxis : catAxis).title = {display:true, text:spec.xLabel, color:t.muted};
       if(spec.yLabel) (horizontal ? catAxis : valueAxis).title = {display:true, text:spec.yLabel, color:t.muted};
       var target = spec.target;
@@ -448,7 +466,14 @@
           if(!area) return;
           // A label that already names the amount is shown as it is.
           // Always the chart's own number format: 'Doel 130.000' becomes 'Doel € 130.000'.
-          var base = String(target.label || '').replace(/(^|\s)[€$]?\s*[\d.,]+\s*(%|euro|eur)?\s*$/i, '').replace(/[:\s]+$/, '').trim();
+          // Strip an amount the label already names ("Doel 130k", "Doel € 130.000"); a year like 2026 stays.
+          var raw = String(target.label || ''), mm = /(^|\s)([€$]?)\s*([\d.,]+)\s*(k|mln\.?|mld\.?|miljoen|duizend)?\s*(%|euro|eur)?\s*$/i.exec(raw), base = raw;
+          if(mm){
+            var amount = K.parseNumber(mm[3]).n, mult = !mm[4] ? 1 : /^k|duizend/i.test(mm[4]) ? 1e3 : /^mld/i.test(mm[4]) ? 1e9 : 1e6;
+            var near = Number.isFinite(amount) && target.value && Math.abs(amount * mult - target.value) <= Math.abs(target.value) * 0.25;
+            if(mm[2] || mm[4] || mm[5] || near) base = raw.slice(0, mm.index);
+          }
+          base = base.replace(/[:\s]+$/, '').trim();
           var label = (base ? base + ' ' : '') + f(target.value);
           ctx.save();
           ctx.font = '500 11px ' + (getComputedStyle(document.body).fontFamily || 'sans-serif');
@@ -483,7 +508,7 @@
         var narrow = (box.clientWidth || window.innerWidth) < 480;
         // On a phone long criterion names do not fit around the shape: number the
         // axes and list the full names under the chart instead of cutting them.
-        var numbered = narrow && spec.labels.some(function(l){ return String(l).length > 18; });
+        var numbered = narrow && spec.labels.some(function(l){ return String(l).length > 18 || String(l).split(/\s+/).some(function(w){ return w.length > 12; }); });
         if(numbered) radarKey();
         cfg.options.scales = {r:{beginAtZero:true, max:rMax, angleLines:{color:alpha(t.border || '#2a2f3d', 0.9)}, grid:{color:alpha(t.border || '#2a2f3d', 0.9)},
           pointLabels:{color:t.fg, font:{size:narrow ? 10.5 : 12}, padding:narrow ? 3 : 8,
@@ -501,8 +526,11 @@
       canvasBox.insertAdjacentElement('afterend', ol);
     }
     // Break a long Dutch compound before a familiar last part: "Implementatie-snelheid".
-    var TAILS = ['betrouwbaarheid','tevredenheid','dienstverlening','snelheid','kwaliteit','zekerheid','baarheid','verlening','onderzoek','gesprek','overleg','analyse','kosten','beheer','planning','termijn','ervaring','heid','tijd','prijs','proces','ing'];
+    var TAILS = ['betrouwbaarheid','tevredenheid','dienstverlening','snelheid','kwaliteit','zekerheid','baarheid','verlening','onderzoek','gesprek','overleg','analyse','niveau','kosten','beheer','planning','termijn','ervaring','verhouding','heid','tijd','prijs','proces'];
     function splitAt(w){
+      // An existing hyphen is the best place to break.
+      var hy = w.indexOf('-');
+      if(hy >= 3 && hy < w.length - 3) return hy + 1;
       var lw = w.toLowerCase();
       for(var i = 0; i < TAILS.length; i++){
         var k = lw.lastIndexOf(TAILS[i]);
@@ -512,12 +540,12 @@
         var m = lw.indexOf(TAILS[j], 4);
         if(m >= 4 && lw.length - m >= 4) return m;
       }
-      return Math.ceil(w.length / 2);
+      return 0;
     }
     function wrapLabel(l, max){
       var words = [];
       String(l || '').split(/\s+/).filter(Boolean).forEach(function(w){
-        for(var guard = 0; w.length > max + 2 && guard < 4; guard++){ var at = splitAt(w); if(!(at > 0 && at < w.length)) break; words.push(w.slice(0, at) + '-'); w = w.slice(at); }
+        for(var guard = 0; w.length > max + 2 && guard < 4; guard++){ var at = splitAt(w); if(!(at > 0 && at < w.length)) break; var head = w.slice(0, at); words.push(/-$/.test(head) ? head : head + '-'); w = w.slice(at); }
         words.push(w);
       });
       var lines = [], cur = '';
@@ -808,6 +836,11 @@
         else if(bottom > listBox.scrollTop + listBox.clientHeight) listBox.scrollTop = bottom - listBox.clientHeight + 8;
       }
       if(fromMap) try{ lis[i].querySelector('button').focus({preventScroll:true}); }catch(_){}
+      // On a phone the map sits above the list: a tap in the list brings the map into view.
+      if(!fromMap && !restore && !standalone && (window.innerWidth || 0) < 640 && mapBox){
+        var mt = mapBox.getBoundingClientRect().top;
+        post({type:'reveal', top:Math.round(mt - 8)});
+      }
       if(!restore) saveState({a:i});
     }
 
