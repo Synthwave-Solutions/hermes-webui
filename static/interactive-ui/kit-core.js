@@ -653,7 +653,8 @@
   function kpiDeltaText(item,lang){
     const d=item.delta;
     if(d===null||d===undefined) return '';
-    const dec=autoDecimals(d,item.decimals);
+    // The change keeps its own precision: 0,4 procentpunt must not round to 0.
+    const dec=autoDecimals(d,item.deltaDecimals!=null?item.deltaDecimals:null);
     const o={signDisplay:'exceptZero',minimumFractionDigits:dec,maximumFractionDigits:dec};
     if(item.deltaFormat==='percent') return kpiFormatter(lang,'dp'+dec,Object.assign({style:'percent'},o)).format(d/100);
     if(item.format==='currency') return kpiFormatter(lang,'dc'+dec,Object.assign({style:'currency',currency:'EUR'},o)).format(d);

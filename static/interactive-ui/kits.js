@@ -830,12 +830,14 @@
       var x1 = Math.max(x0, Math.min(1, (it.e - axis.min) / span));
       b.style.left = pct(x0);
       if(!it.milestone) b.style.width = 'max(6px, ' + pct(x1 - x0) + ')';
+      b.tabIndex = i === 0 ? 0 : -1;
       b.addEventListener('click', function(){ select(i, false); });
       b.addEventListener('keydown', function(e){
         var to = e.key === 'ArrowDown' || e.key === 'ArrowRight' ? i + 1 : e.key === 'ArrowUp' || e.key === 'ArrowLeft' ? i - 1 : e.key === 'Home' ? 0 : e.key === 'End' ? n - 1 : -2;
         if(to === -2) return;
         e.preventDefault();
         to = Math.max(0, Math.min(n - 1, to));
+        bars.forEach(function(x, j){ x.tabIndex = j === to ? 0 : -1; });
         bars[to].focus();
       });
       track.appendChild(b);
@@ -863,7 +865,7 @@
     function select(i, restore){
       var it = spec.items[i];
       if(!it) return;
-      bars.forEach(function(b, j){ b.setAttribute('aria-pressed', String(j === i)); b.classList.toggle('is-active', j === i); });
+      bars.forEach(function(b, j){ b.setAttribute('aria-pressed', String(j === i)); b.classList.toggle('is-active', j === i); b.tabIndex = j === i ? 0 : -1; });
       var parts = [it.label, K.timelinePeriod(spec, it, LANG), it.milestone ? T('milestone') : '', it.owner, K.statusWord(it.status, LANG), it.note];
       detail.textContent = parts.filter(Boolean).join(' · ');
       detail.classList.add('is-set');
