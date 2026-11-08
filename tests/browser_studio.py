@@ -378,6 +378,27 @@ def main() -> int:
             page.screenshot(path=str(art / "07-list.png"))
             ok("use case list shows the use case with built parts")
 
+            # help: the page explanation and the feature guide cover Studio, the org chart and Management
+            page.locator("#btnPageHelp").click()
+            page.wait_for_function("() => /Bedenk samen met de Super Agent/.test(document.body.innerText)", timeout=10000)
+            page.screenshot(path=str(art / "11-page-help.png"))
+            page.keyboard.press("Escape")
+            page.locator("#studioHubNav .st-side-help").click()
+            page.wait_for_selector("#spFeatureGuide[open]", timeout=15000)
+            guide = page.locator("#spFeatureGuide").inner_text()
+            assert "Use cases in Studio" in guide and "Ontdekken" in guide and "Backlog" in guide, guide[:600]
+            page.keyboard.press("Escape")
+            hub(page, "chart")
+            page.wait_for_selector(".om-strip", timeout=15000)
+            page.locator("#studioHubNav .st-side-help").click()
+            page.wait_for_selector("#spFeatureGuide[open]", timeout=15000)
+            guide = page.locator("#spFeatureGuide").inner_text()
+            assert "Organigram" in guide and "Doorklikken op de cijfers" in guide, guide[:600]
+            page.keyboard.press("Escape")
+            hub(page, "usecases")
+            page.wait_for_selector(".st-card", timeout=10000)
+            ok("Explain this page and the feature guide explain Studio, the org chart and Management")
+
             # 7. narrow
             page.set_viewport_size({"width": 390, "height": 844})
             page.locator('.st-card:has-text("Debiteurenopvolging")').first.click()

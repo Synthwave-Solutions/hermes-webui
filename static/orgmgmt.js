@@ -246,7 +246,7 @@
 
   function statsRow(sum, level, key){
     sum = sum || {};
-    return `<span class="om-mini">${STAT_KEYS.map(([k, l]) => `<button type="button" class="om-mini-stat" data-om-detail="${k}" data-om-level="${H(level || 'org')}" data-om-key="${H(key || '')}" aria-pressed="${!!(O.detail && O.detail.kind === k && O.detail.level === (level || 'org') && O.detail.key === (key || ''))}" title="${H(w(l))}: ${H(w('show_which'))}">${icon(k, 17)}<b>${H(nf(0).format(sum[k] || 0))}</b></button>`).join('')}</span>`;
+    return `<span class="om-mini">${STAT_KEYS.map(([k, l]) => `<button type="button" class="om-mini-stat" data-om-detail="${k}" data-om-level="${H(level || 'org')}" data-om-key="${H(key || '')}" aria-pressed="${!!(O.detail && O.detail.kind === k && O.detail.level === (level || 'org') && O.detail.key === (key || ''))}" title="${H(w(l))}: ${H(w('show_which'))}">${icon(k, 17)}<b>${sum.pending && (k === 'skills' || k === 'connections') ? '…' : H(nf(0).format(sum[k] || 0))}</b></button>`).join('')}</span>`;
   }
   function savedHtml(sum, level, key){
     const m = (sum || {}).saved_minutes || 0;
@@ -254,7 +254,7 @@
   }
   function orgStripHtml(sum){
     sum = sum || {};
-    return `<div class="om-strip">${STAT_KEYS.map(([k, l]) => `<button type="button" class="om-strip-tile" data-om-detail="${k}" data-om-level="org" data-om-key="" ${k === 'connections' ? `title="${H(w('s_conn_hint'))}"` : ''}><span class="om-strip-icon">${icon(k, 18)}</span><span class="om-strip-value">${H(nf(0).format(sum[k] || 0))}</span><span class="om-strip-label">${H(w(l))}</span></button>`).join('')}
+    return `<div class="om-strip" data-tour="org-totals">${STAT_KEYS.map(([k, l]) => `<button type="button" class="om-strip-tile" data-om-detail="${k}" data-om-level="org" data-om-key="" ${k === 'connections' ? `title="${H(w('s_conn_hint'))}"` : ''}><span class="om-strip-icon">${icon(k, 18)}</span><span class="om-strip-value">${sum.pending && (k === 'skills' || k === 'connections') ? '…' : H(nf(0).format(sum[k] || 0))}</span><span class="om-strip-label">${H(w(l))}</span></button>`).join('')}
       <button type="button" class="om-strip-tile saved" data-om-detail="tasks" data-om-level="org" data-om-key=""><span class="om-strip-icon">${icon('saved', 18)}</span><span class="om-strip-value">${H(hrs(sum.saved_minutes || 0))}</span><span class="om-strip-label">${H(w('s_saved'))} <small>${H(w('s_saved_sub'))}</small></span></button></div>`;
   }
 
@@ -321,7 +321,7 @@
     const dt = O.detail;
     const label = { people: 's_people', bots: 's_bots', tasks: 's_tasks', connections: 's_conn', skills: 's_skills' }[dt.kind];
     const where = dt.level === 'org' ? w('whole_org') : dt.level === 'dept' ? (((O.chart.departments || []).find(d => d.key === dt.key) || {}).name || dt.key) : ((findTeam(dt.key) || {}).name || dt.key);
-    return `<aside class="om-drawer om-detail" aria-label="${H(w(label))}">
+    return `<aside class="om-drawer om-detail" data-tour="org-detail" aria-label="${H(w(label))}">
       <div class="om-drawer-head"><span class="om-strip-icon">${icon(dt.kind === 'tasks' ? 'tasks' : dt.kind, 18)}</span><div><h3>${H(w(label))} <span class="om-detail-count" data-om-detail-count>${dt.data ? H(dt.data.count) : ''}</span></h3><div class="om-muted om-small">${H(where)}</div></div>
       <button type="button" class="om-drawer-close" data-om-detail-close aria-label="${H(w('cancel'))}">×</button></div>
       ${dt.kind === 'connections' ? `<p class="om-small om-muted" style="margin:0 0 10px">${H(w('s_conn_hint'))}</p>` : ''}
@@ -441,7 +441,7 @@
     const bots = team.bot_list || [];
     const waiting = jobs.filter(j => j.state === 'error' || j.value_label === 'missing');
     const money = me && me.can_manage && s.net_eur != null ? ` · ${H(eur(s.net_eur))}` : '';
-    return `<aside class="om-drawer" aria-label="${H(team.name)}">
+    return `<aside class="om-drawer" data-tour="org-team" aria-label="${H(team.name)}">
       <div class="om-drawer-head"><div><h3>${H(team.name)}</h3><div class="om-muted om-small">${H(w('lead'))}: ${H(team.lead || '·')}</div></div>
       <button type="button" class="om-drawer-close" data-om-close aria-label="${H(w('cancel'))}">×</button></div>
       <h4>${H(w('saving'))}</h4>
@@ -484,11 +484,14 @@
     body.innerHTML = `<p class="om-intro">${H(w('org_intro'))}</p>
       ${orgStripHtml(O.chart.summary)}
       <div class="om-layout ${selected || O.detail ? 'has-drawer' : ''}">
-        <div class="om-tree2">${depts.map(deptHtml).join('')}${unassignedHtml()}</div>
+        <div class="om-tree2" data-tour="org-chart">${depts.map(deptHtml).join('')}${unassignedHtml()}</div>
         ${O.detail ? detailDrawerHtml() : drawerHtml(selected)}
       </div>`;
     if (O.detail) paintDetail();
     else if (selected) loadTeamPlaybooks(selected.key);
+    if (O.chart.summary && O.chart.summary.pending && !O.pendingTimer && (O.pendingTries || 0) < 12) {
+      O.pendingTimer = setTimeout(async () => { O.pendingTimer = null; O.pendingTries = (O.pendingTries || 0) + 1; if (typeof _currentPanel !== 'undefined' && _currentPanel === 'organisation' && O.view === 'chart') await loadOrg(); }, 4000);
+    } else if (O.chart.summary && !O.chart.summary.pending) O.pendingTries = 0;
   }
   async function loadTeamPlaybooks(key){
     let rows = [];
@@ -522,7 +525,7 @@
         <div class="om-row-actions"><button type="submit" class="sm-btn primary">${H(w('save'))}</button>${t ? `<button type="button" class="sm-btn danger" data-om-delete-team="${H(t.key)}">${H(w('delete'))}</button>` : ''}</div>
       </form>`;
     return `<p class="om-intro">${H(w('org_intro'))}</p>
-      ${depts.map(d => `<section class="om-dept-block"><header><h3>${H(d.name)}</h3>
+      ${depts.map(d => `<section class="om-dept-block" data-tour="org-teams"><header><h3>${H(d.name)}</h3>
           ${d.editable ? `<label class="om-inline-form om-small om-muted">${H(w('rate'))} <input type="number" min="0" step="1" data-om-dept-rate="${H(d.key)}" value="${H(d.hourly_rate ?? '')}" placeholder="€"></label>` : ''}
           <span class="om-muted om-small">${H(d.source === 'policy' ? 'policy' : '')}</span></header>
         ${(teamsBy[d.key] || []).sort((a, b) => a.name.localeCompare(b.name)).map(t => teamRow(t, d.key)).join('')}
@@ -648,7 +651,7 @@
   function kpisHtml(d){
     const t = d.totals || {}, p = d.previous_totals || {};
     const cover = t.coverage == null ? null : Math.round(t.coverage * 100);
-    return `<div class="om-kpis">
+    return `<div class="om-kpis" data-tour="mgmt-kpis">
       <div class="om-kpi"><span class="om-kpi-label">${H(w('k_saved'))}</span><span class="om-kpi-value">${H(hrs(t.saved_minutes))}</span>${delta(t.saved_minutes, p.saved_minutes)}
         <span class="om-kpi-sub">${H(w('k_saved_sub'))}${t.saved_minutes ? `<br><strong>${H(t.saved_confirmed_minutes ? w('of_which_confirmed', { h: hrs(t.saved_confirmed_minutes) }) : w('all_estimated'))}</strong>` : ''}${t.estimate_minutes ? `<br>+ ${H(hrs(t.estimate_minutes))} ${H(w('k_estimate'))}` : ''}</span></div>
       <div class="om-kpi"><span class="om-kpi-label">${H(w('k_net'))}</span>${t.net_eur != null ? `<span class="om-kpi-value">${H(eur(t.net_eur))}</span>${delta(t.net_eur, p.net_eur)}<span class="om-kpi-sub">${H(w('k_net_sub'))}</span>` : `<span class="om-kpi-value om-muted">·</span><button type="button" class="om-link" data-om-goto-rates>${H(w('k_net_missing'))}</button>`}</div>
@@ -685,7 +688,7 @@
   function decisionsHtml(d){
     const list = d.decisions || [];
     if (!list.length) return `<div class="om-card om-muted">${H(w('decisions_none'))}</div>`;
-    return `<div class="om-decisions">${list.map(x => `<details class="om-decision sev-${SEV[x.kind] || 'low'}" ${x === list[0] ? 'open' : ''}>
+    return `<div class="om-decisions" data-tour="mgmt-decisions">${list.map(x => `<details class="om-decision sev-${SEV[x.kind] || 'low'}" ${x === list[0] ? 'open' : ''}>
       <summary><span class="om-decision-count">${H(x.count)}</span><div><div class="om-decision-title">${H(w('d_' + x.kind))}</div><div class="om-decision-sub">${H(w('d_' + x.kind + '_sub'))}</div></div></summary>
       ${(x.items || []).length ? `<div class="om-decision-body">${x.kind === 'unassigned' && x.suggestions ? `<div class="om-row"><div class="om-row-main"><div class="om-row-sub">${H(w('suggest_intro', { n: x.suggestions }))}</div></div><div class="om-row-actions"><button type="button" class="sm-btn primary" data-om-apply-suggestions>${H(w('apply_suggestions'))}</button></div></div>` : ''}${x.items.map(i => decisionItemHtml(x.kind, i)).join('')}</div>` : (x.kind === 'old_approvals' ? `<div class="om-decision-body"><div class="om-row"><button type="button" class="sm-btn" data-om-goto-gov>${H(w('open'))}</button></div></div>` : '')}
     </details>`).join('')}</div>`;
@@ -731,7 +734,7 @@
       return `<tr class="om-group-row"><th colspan="8" scope="rowgroup"><span>${H(k)}</span><span class="om-group-meta">${list.length} ${H((list.length === 1 ? w('col_bot') : w('bots')).toLowerCase())} · ${jobs} ${H(w('col_tasks').toLowerCase())} · ${chats} ${H(w('col_chats').toLowerCase())}</span></th></tr>`;
     };
     const seg = `<div class="om-seg" role="group" aria-label="${H(w('group_by'))}">${['category', 'team', 'none'].map(g => `<button type="button" aria-pressed="${M.botGroup === g}" data-om-bot-group="${g}">${H(w('g_' + g))}</button>`).join('')}</div>`;
-    return `<section class="om-section" data-om-anchor="bots"><div class="om-section-head"><h3>${H(w('per_bot'))}</h3><span class="om-muted">${rows.length}</span><span style="margin-left:auto">${seg}</span></div><div class="om-table-wrap"><table class="om-table om-bots-table"><thead><tr><th>${H(w('col_bot'))}</th><th>${H(M.botGroup === 'team' ? w('col_category') : w('col_team'))}</th><th class="num">${H(w('col_tasks'))}</th><th class="num">${H(w('col_chats'))}</th><th class="num">${H(w('col_people'))}</th><th class="num">${H(w('col_labeled'))}</th><th class="num">${H(w('col_week'))}</th><th class="num">${H(w('col_cost'))}</th></tr></thead>
+    return `<section class="om-section" data-om-anchor="bots" data-tour="mgmt-bots"><div class="om-section-head"><h3>${H(w('per_bot'))}</h3><span class="om-muted">${rows.length}</span><span style="margin-left:auto">${seg}</span></div><div class="om-table-wrap"><table class="om-table om-bots-table"><thead><tr><th>${H(w('col_bot'))}</th><th>${H(M.botGroup === 'team' ? w('col_category') : w('col_team'))}</th><th class="num">${H(w('col_tasks'))}</th><th class="num">${H(w('col_chats'))}</th><th class="num">${H(w('col_people'))}</th><th class="num">${H(w('col_labeled'))}</th><th class="num">${H(w('col_week'))}</th><th class="num">${H(w('col_cost'))}</th></tr></thead>
       ${ordered.map(([k, list]) => `<tbody>${M.botGroup === 'none' ? '' : head(k)}${list.map(row).join('')}</tbody>`).join('')}
       </table></div></section>`;
   }
@@ -769,7 +772,7 @@
       ${settingsHtml()}
       <div data-om-anchor="kpis">${kpisHtml(d)}</div>
       <section class="om-section" data-om-anchor="decisions"><div class="om-section-head"><h3>${H(w('decisions'))}</h3></div>${decisionsHtml(d)}</section>
-      <section class="om-section" data-om-anchor="teams"><div class="om-section-head"><h3>${H(w('per_team'))}</h3><span class="om-muted">${H(w('d' + d.period_days) || '')}</span></div>${teamsTableHtml(d)}</section>
+      <section class="om-section" data-om-anchor="teams" data-tour="mgmt-teams"><div class="om-section-head"><h3>${H(w('per_team'))}</h3><span class="om-muted">${H(w('d' + d.period_days) || '')}</span></div>${teamsTableHtml(d)}</section>
       ${botsTableHtml(d)}${topHtml(d)}`;
   }
 
@@ -965,7 +968,7 @@
   // ── Bot responsibilities: minutes before / now / times per week ──────────
   function dutyFieldsHtml(d){
     d = d || {};
-    return `<div class="om-duty-value">
+    return `<div class="om-duty-value" data-tour="bot-duty-value">
       <label for="botDutyMinBefore">${H(w('duty_minutes_before'))}<input id="botDutyMinBefore" type="number" min="0" max="6000" value="${H(d.minutes_before ?? '')}"></label>
       <label for="botDutyMinNow">${H(w('duty_minutes_now'))}<input id="botDutyMinNow" type="number" min="0" max="6000" value="${H(d.minutes_now ?? '')}"></label>
       <label for="botDutyTimes">${H(w('duty_times'))}<input id="botDutyTimes" type="number" min="0" max="500" step="0.5" value="${H(d.times_per_week ?? '')}"></label>

@@ -247,3 +247,6 @@ main.main.showing-studio>#mainStudio{display:flex;flex-direction:column;overflow
 .pb-group[open]>summary .om-chev{transform:rotate(90deg)}
 .pb-group>.pb-grid{padding:0 0 16px}
 .pb-summary{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.st-hub-nav .st-side-help{margin-top:18px;color:var(--muted);font-size:12.5px;border-top:1px solid var(--border);border-radius:0;padding-top:14px}
+.st-hub-nav .st-side-help::before{content:"?";width:18px;height:18px;border-radius:50%;border:1px solid currentColor;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex:0 0 auto}
+.st-hub-nav .st-side-help:hover{color:var(--text)}

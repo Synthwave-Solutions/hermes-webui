@@ -98,12 +98,12 @@
   function paintBacklog(){
     const items = L.items.filter(i => (!L.team || i.team === L.team) && (!L.status || i.status === L.status));
     L.body.innerHTML = `<p class="om-intro">${H(w('backlog_intro'))}</p>
-      <form class="bl-add om-card" data-bl-add><input name="title" required maxlength="140" placeholder="${H(w('idea_ph'))}" aria-label="${H(w('idea_ph'))}">
+      <form class="bl-add om-card" data-bl-add data-tour="studio-backlog-add"><input name="title" required maxlength="140" placeholder="${H(w('idea_ph'))}" aria-label="${H(w('idea_ph'))}">
         <select name="team" class="om-select" aria-label="${H(w('team'))}"><option value="">${H(w('none'))}</option>${L.teams.map(t => `<option value="${H(t.key)}">${H(t.name)}</option>`).join('')}</select>
         <button type="submit" class="sm-btn primary">${H(w('add_idea'))}</button></form>
       <div class="bl-filters"><select class="om-select" data-bl-filter-team><option value="">${H(w('all_teams'))}</option>${L.teams.map(t => `<option value="${H(t.key)}" ${L.team === t.key ? 'selected' : ''}>${H(t.name)}</option>`).join('')}</select>
         <select class="om-select" data-bl-filter-status><option value="">${H(w('all_status'))}</option>${STATUSES.map(s => `<option value="${s}" ${L.status === s ? 'selected' : ''}>${H(w('s_' + s))}</option>`).join('')}</select></div>
-      ${items.length ? `<ol class="bl-list">${items.map((it, i) => itemRow(it, i, items.length)).join('')}</ol>` : `<div class="om-empty"><p>${H(w('empty_backlog'))}</p></div>`}`;
+      ${items.length ? `<ol class="bl-list" data-tour="studio-backlog">${items.map((it, i) => itemRow(it, i, items.length)).join('')}</ol>` : `<div class="om-empty"><p>${H(w('empty_backlog'))}</p></div>`}`;
     const busy = L.items.some(i => i.autopilot && !i.autopilot.done);
     clearTimeout(L.poll);
     if (busy) L.poll = setTimeout(async () => { if (L.tab === 'backlog' && document.body.contains(L.body)) { await loadBacklog(); paintBacklog(); } }, 3000);
@@ -135,10 +135,10 @@
         <select class="om-select" data-pb-team><option value="">${H(w('all_teams'))}</option>${L.teams.map(t => `<option value="${H(t.key)}" ${L.team === t.key ? 'selected' : ''}>${H(t.name)}</option>`).join('')}</select>
         ${cats.length ? `<select class="om-select" data-pb-cat><option value="">${H(w('all_categories'))}</option>${cats.map(c => `<option value="${H(c)}" ${L.cat === c ? 'selected' : ''}>${H(c)}</option>`).join('')}</select>` : ''}
         <div class="om-seg" role="group" aria-label="${H(w('group_by'))}">${['category', 'team', 'none'].map(g => `<button type="button" aria-pressed="${L.group === g}" data-pb-group="${g}">${H(w('g_' + g))}</button>`).join('')}</div>
-        <button type="button" class="sm-btn primary" data-pb-new style="margin-left:auto">${H(w('new_pb'))}</button></div>
+        <button type="button" class="sm-btn primary" data-pb-new data-tour="studio-playbook-new" style="margin-left:auto">${H(w('new_pb'))}</button></div>
       ${!rows.length ? `<div class="om-empty"><p>${H(w('empty_pb'))}</p><div class="om-actions"><button type="button" class="sm-btn primary" data-pb-new>${H(w('new_pb'))}</button></div></div>`
         : L.group === 'none' ? grid(rows)
-        : `<div class="pb-groups">${ordered.map(([k, list]) => { const id = L.group + ':' + k; return `<details class="pb-group" data-pb-gopen="${H(id)}" ${open[id] === false ? '' : 'open'}>
+        : `<div class="pb-groups" data-tour="studio-playbooks">${ordered.map(([k, list]) => { const id = L.group + ':' + k; return `<details class="pb-group" data-pb-gopen="${H(id)}" ${open[id] === false ? '' : 'open'}>
             <summary><span class="om-chev" aria-hidden="true"></span><strong>${H(k)}</strong><span class="om-side-count">${list.length}</span></summary>${grid(list)}</details>`; }).join('')}</div>`}`;
   }
 
@@ -203,7 +203,7 @@
       </div>
       ${linkHtml ? `<p>${H(w('links'))}: ${linkHtml}</p>` : ''}
       <p class="om-small om-muted">${H(w('media_note'))} ${H(w('paste_hint'))}</p>
-      <ol class="pb-steps">${(pb.steps || []).map((s, i) => `<li class="pb-step" data-pb-step="${i}">
+      <ol class="pb-steps" data-tour="studio-playbook-steps">${(pb.steps || []).map((s, i) => `<li class="pb-step" data-pb-step="${i}">
         <div class="pb-step-head"><span class="st-num">${i + 1}</span><input class="pb-step-title" data-pb-s="${i}:title" value="${H(s.title)}" placeholder="${H(w('step_title'))}" aria-label="${H(w('step_title'))}"><input class="pb-actor" data-pb-s="${i}:actor" value="${H(s.actor || '')}" placeholder="${H(w('actor'))}" aria-label="${H(w('actor'))}"></div>
         <textarea data-pb-s="${i}:text" rows="3" placeholder="${H(w('text'))}" aria-label="${H(w('text'))}">${H(s.text || '')}</textarea>
         <div class="pb-prompt-edit"><textarea data-pb-s="${i}:prompt" rows="2" placeholder="${H(w('prompt'))}" aria-label="${H(w('prompt'))}">${H(s.prompt || '')}</textarea>${s.prompt ? `<button type="button" class="sm-btn" data-pb-try="${i}">💬 ${H(w('try_chat'))}</button>` : ''}</div>

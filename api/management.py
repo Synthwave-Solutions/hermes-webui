@@ -454,6 +454,8 @@ def _bot_assets(name: str, force: bool = False) -> tuple[dict, set]:
     hit = _ASSETS.get(name)
     if hit and not force and time.time() - hit[0] < _ASSET_TTL:
         return hit[1], hit[2]
+    if hit and not force:
+        return hit[1], hit[2]  # stale but usable; the warm-up thread refreshes it
     skills: dict = {}
     mcp: set = set()
     try:
@@ -484,12 +486,34 @@ def _bot_assets(name: str, force: bool = False) -> tuple[dict, set]:
     return skills, mcp
 
 
+_WARMING = {"thread": None}
+
+
+def _ensure_warm(names) -> None:
+    """Fill the asset cache in the background for bots the chart saw cold."""
+    import threading
+
+    t = _WARMING["thread"]
+    if t is not None and t.is_alive():
+        return
+    todo = [n for n in names if n not in _ASSETS]
+    if not todo:
+        return
+
+    def run():
+        for name in todo:
+            _bot_assets(name)
+
+    _WARMING["thread"] = threading.Thread(target=run, daemon=True, name="org-chart-assets-once")
+    _WARMING["thread"].start()
+
+
 def warm_assets() -> None:
     """Background thread: refresh every bot's skills and MCP servers before the cache expires."""
     import threading
 
     def run():
-        time.sleep(15)
+        time.sleep(3)
         while True:
             try:
                 for name in list(_bots()):
@@ -528,7 +552,11 @@ def _summary(people: set, bots: list, jobs: list, saved: float, conn_by_user: di
 
     skills: set = set()
     connections: set = set()
+    pending = False
     for b in bots:
+        if b["name"] not in _ASSETS:  # never block the chart on a cold skill walk
+            pending = True
+            continue
         s, m = _bot_assets(b["name"])
         skills |= set(s)
         connections |= {"mcp:" + x for x in m}
@@ -538,7 +566,7 @@ def _summary(people: set, bots: list, jobs: list, saved: float, conn_by_user: di
             "tasks": len({(j.get("store"), j["id"]) for j in jobs if j.get("state") != "paused"}),
             "skills": len(skills), "connections": len(connections),
             "connection_names": sorted({c.split(":", 1)[1] for c in connections})[:60],
-            "saved_minutes": round(saved or 0)}
+            "saved_minutes": round(saved or 0), "pending": pending}
 
 
 
@@ -701,6 +729,8 @@ def chart(view: org_structure.ViewScope) -> dict:
         unassigned = {"bot_list": [b for b in bots if b["team"] == UNASSIGNED],
                       "job_list": [jb for jb in jobs if jb["team"] == UNASSIGNED],
                       "stats": team_stats.get(UNASSIGNED, {})}
+    if any(d["summary"].get("pending") for d in nodes):
+        _ensure_warm([b["name"] for b in bots])
     return {"departments": nodes, "unassigned": unassigned, "viewer": view.to_dict(),
             "summary": _summary(org_people, list(org_bots.values()), org_jobs, org_saved, conn_by_user),
             "people": people_titles, "updated_at": snap.get("updated_at")}

@@ -188,7 +188,8 @@ window.SynthPulseHelpContent = {
           "related": [
             "bot_builder",
             "profile_switching",
-            "skills"
+            "skills",
+            "organisation"
           ]
         },
         "bot_builder": {
@@ -271,7 +272,8 @@ window.SynthPulseHelpContent = {
           ],
           "related": [
             "kanban",
-            "profiles"
+            "profiles",
+            "studio"
           ]
         },
         "kanban": {
@@ -656,6 +658,181 @@ window.SynthPulseHelpContent = {
           "related": [
             "apps"
           ]
+        },
+        "studio": {
+          "title": "Studio",
+          "summary": "Work out with the Super Agent which work AI can take over, design the process and have it built. The sidebar also holds the backlog, the Playbooks, the org chart and Management.",
+          "sections": [
+            {
+              "id": "nav",
+              "title": "The Studio sidebar",
+              "body": "Work holds your use cases, the backlog of ideas and the Playbooks. Organisation holds the org chart, Manage teams and Management, if you have access. Recent shows your last five use cases.",
+              "target": "#studioHubNav",
+              "dynamic": true
+            },
+            {
+              "id": "usecases",
+              "title": "Use cases",
+              "body": "Every card is a use case with its team, the step it is at and what has been built. Choose New use case to start.",
+              "target": "[data-tour='studio-usecases']",
+              "dynamic": true
+            },
+            {
+              "id": "steps",
+              "title": "Five steps",
+              "body": "Discover builds the opportunity solution tree, Design the Deep Dive with a baseline, Build plan the parts, Build creates them after a dry run, and Measure shows what it delivers.",
+              "target": "[data-tour='studio-steps']",
+              "dynamic": true
+            },
+            {
+              "id": "conversation",
+              "title": "The conversation",
+              "body": "Tell the agent about your work here: type, dictate, or talk live with the voice agent. Hide conversation gives the canvas the full width.",
+              "target": "[data-tour='studio-conversation']",
+              "dynamic": true
+            },
+            {
+              "id": "opportunities",
+              "title": "Opportunities and solutions",
+              "body": "See the opportunities as a matrix of impact against effort or as a tree of outcome, opportunity and solutions. Choose a solution, or send it to the backlog.",
+              "target": "[data-tour='studio-opportunities']",
+              "dynamic": true
+            },
+            {
+              "id": "baseline",
+              "title": "Baseline and data",
+              "body": "How often the process runs, the minutes per run before and after, the hours per week and how sensitive the data is.",
+              "target": "[data-tour='studio-baseline']",
+              "dynamic": true
+            },
+            {
+              "id": "plan",
+              "title": "Build plan",
+              "body": "The parts that will be built. Edit them, switch them off, and choose Dry run.",
+              "target": "[data-tour='studio-plan']",
+              "dynamic": true
+            },
+            {
+              "id": "build",
+              "title": "Build",
+              "body": "After the dry run you build with your own rights. Tasks are created paused and never send anything themselves.",
+              "target": "[data-tour='studio-build']",
+              "dynamic": true
+            },
+            {
+              "id": "backlog",
+              "title": "Backlog",
+              "body": "Ideas in order of priority. Drag to reorder and let the agent work an idea out to the dry run.",
+              "target": "[data-tour='studio-backlog']",
+              "dynamic": true
+            },
+            {
+              "id": "playbooks",
+              "title": "Playbooks",
+              "body": "How a process runs today with the Super Agent, grouped by category or team, with screenshots, recordings and prompts you can try in chat.",
+              "target": "[data-tour='studio-playbooks']",
+              "dynamic": true
+            }
+          ],
+          "related": [
+            "tasks",
+            "profiles",
+            "kanban"
+          ]
+        },
+        "organisation": {
+          "title": "Org chart",
+          "summary": "Departments, teams and sub-teams with their people and bots, and six numbers per level: people, bots, scheduled tasks, connections, skills and time saved. Click a number to see what is behind it.",
+          "sections": [
+            {
+              "id": "totals",
+              "title": "The whole organisation",
+              "body": "Six numbers for the whole organisation. Click a number for the list: which people, bots, tasks, connections or skills.",
+              "target": "[data-tour='org-totals']",
+              "dynamic": true
+            },
+            {
+              "id": "chart",
+              "title": "Departments and teams",
+              "body": "Fold departments, teams and bots open or closed. Inside a team you see the lead, the people, the bots and which bots work under another bot. Sub-teams sit under their team.",
+              "target": "[data-tour='org-chart']",
+              "dynamic": true
+            },
+            {
+              "id": "detail",
+              "title": "What is behind a number",
+              "body": "Search the list and open groups. Skills are listed by category with their description and bots; connections with the bots or people that use them. Close with Escape.",
+              "target": "[data-tour='org-detail']",
+              "dynamic": true
+            },
+            {
+              "id": "team",
+              "title": "Team details",
+              "body": "Saving, what waits for action, what runs, the Playbooks and the people of a team, and a button for a new automation.",
+              "target": "[data-tour='org-team']",
+              "dynamic": true
+            },
+            {
+              "id": "teams",
+              "title": "Manage teams",
+              "body": "Departments and teams with lead, members, hourly rate and the team a sub-team sits under.",
+              "target": "[data-tour='org-teams']",
+              "dynamic": true
+            }
+          ],
+          "parent": "studio",
+          "related": [
+            "studio",
+            "management",
+            "profiles"
+          ]
+        },
+        "management": {
+          "title": "Management",
+          "summary": "What automation delivers and costs per team and per bot, and where a decision is needed. Every number can be traced.",
+          "sections": [
+            {
+              "id": "kpis",
+              "title": "Key figures",
+              "body": "Time saved (confirmed and estimated), net value, AI cost, return, what is active and which share is confirmed, for the chosen period.",
+              "target": "[data-tour='mgmt-kpis']",
+              "dynamic": true
+            },
+            {
+              "id": "decisions",
+              "title": "Decision needed",
+              "body": "Tasks that fail, have no value or an unconfirmed estimate, and teams without automation. Resolve them right here.",
+              "target": "[data-tour='mgmt-decisions']",
+              "dynamic": true
+            },
+            {
+              "id": "teams",
+              "title": "By team",
+              "body": "Hours, value, runs and success per team. Click a team to open it in the org chart.",
+              "target": "[data-tour='mgmt-teams']",
+              "dynamic": true
+            },
+            {
+              "id": "bots",
+              "title": "By bot",
+              "body": "All bots, grouped by category, by team or not at all, with tasks, chats and estimated saving.",
+              "target": "[data-tour='mgmt-bots']",
+              "dynamic": true
+            },
+            {
+              "id": "pricing",
+              "title": "Prices and rates",
+              "body": "Prices per model for AI cost and hourly rates for the net value.",
+              "target": "#omSettings",
+              "dynamic": true
+            }
+          ],
+          "parent": "studio",
+          "related": [
+            "studio",
+            "organisation",
+            "tasks"
+          ]
         }
       },
       "tour_steps": {
@@ -922,7 +1099,8 @@ window.SynthPulseHelpContent = {
           "related": [
             "bot_builder",
             "profile_switching",
-            "skills"
+            "skills",
+            "organisation"
           ]
         },
         "bot_builder": {
@@ -1005,7 +1183,8 @@ window.SynthPulseHelpContent = {
           ],
           "related": [
             "kanban",
-            "profiles"
+            "profiles",
+            "studio"
           ]
         },
         "kanban": {
@@ -1389,6 +1568,181 @@ window.SynthPulseHelpContent = {
           ],
           "related": [
             "apps"
+          ]
+        },
+        "studio": {
+          "title": "Studio",
+          "summary": "Bedenk samen met de Super Agent welk werk AI kan overnemen, richt het proces in en laat het bouwen. In de zijbalk vind je ook de backlog, de Playbooks, het organigram en Management.",
+          "sections": [
+            {
+              "id": "nav",
+              "title": "De zijbalk van Studio",
+              "body": "Werk bevat je use cases, de backlog met ideeën en de Playbooks. Onder Organisatie staan het organigram, Teams beheren en Management, als je daar rechten voor hebt. Recent toont je laatste vijf use cases.",
+              "target": "#studioHubNav",
+              "dynamic": true
+            },
+            {
+              "id": "usecases",
+              "title": "Use cases",
+              "body": "Elke kaart is een use case met zijn team, de stap waar hij staat en wat er al gebouwd is. Kies Nieuwe use case om te beginnen.",
+              "target": "[data-tour='studio-usecases']",
+              "dynamic": true
+            },
+            {
+              "id": "steps",
+              "title": "Vijf stappen",
+              "body": "Ontdekken maakt de oplossingsboom, Inrichten de Deep Dive met nulmeting, Bouwplan de onderdelen, Bouwen maakt ze aan na een droogrun, en Meten laat zien wat het oplevert.",
+              "target": "[data-tour='studio-steps']",
+              "dynamic": true
+            },
+            {
+              "id": "conversation",
+              "title": "Het gesprek",
+              "body": "Vertel hier over je werk, typ of spreek in, of praat live met de spraakagent. Met Gesprek verbergen krijgt het werkvlak de hele breedte.",
+              "target": "[data-tour='studio-conversation']",
+              "dynamic": true
+            },
+            {
+              "id": "opportunities",
+              "title": "Kansen en oplossingen",
+              "body": "Bekijk de kansen als matrix van impact tegen moeite of als boom van doel, kans en oplossingen. Kies een oplossing, of zet hem naar de backlog.",
+              "target": "[data-tour='studio-opportunities']",
+              "dynamic": true
+            },
+            {
+              "id": "baseline",
+              "title": "Nulmeting en data",
+              "body": "Hoe vaak het proces loopt, de minuten per keer voor en na, de uren per week en hoe gevoelig de gegevens zijn.",
+              "target": "[data-tour='studio-baseline']",
+              "dynamic": true
+            },
+            {
+              "id": "plan",
+              "title": "Bouwplan",
+              "body": "De onderdelen die gebouwd worden. Pas ze aan, zet ze uit, en kies Droogrun.",
+              "target": "[data-tour='studio-plan']",
+              "dynamic": true
+            },
+            {
+              "id": "build",
+              "title": "Bouwen",
+              "body": "Na de droogrun bouw je met jouw rechten. Taken komen gepauzeerd en verzenden nooit zelf iets.",
+              "target": "[data-tour='studio-build']",
+              "dynamic": true
+            },
+            {
+              "id": "backlog",
+              "title": "Backlog",
+              "body": "Ideeën op volgorde van prioriteit. Sleep om te ordenen en laat de agent een idee uitwerken tot de droogrun.",
+              "target": "[data-tour='studio-backlog']",
+              "dynamic": true
+            },
+            {
+              "id": "playbooks",
+              "title": "Playbooks",
+              "body": "Hoe een proces nu met de Super Agent loopt, gegroepeerd per categorie of team, met screenshots, opnames en prompts die je in de chat probeert.",
+              "target": "[data-tour='studio-playbooks']",
+              "dynamic": true
+            }
+          ],
+          "related": [
+            "tasks",
+            "profiles",
+            "kanban"
+          ]
+        },
+        "organisation": {
+          "title": "Organigram",
+          "summary": "Afdelingen, teams en subteams met hun mensen en bots, en per niveau zes cijfers: mensen, bots, geplande taken, koppelingen, skills en tijd bespaard. Klik op een cijfer om te zien wat erachter zit.",
+          "sections": [
+            {
+              "id": "totals",
+              "title": "De hele organisatie",
+              "body": "Zes cijfers voor de hele organisatie. Klik op een cijfer voor de lijst: welke mensen, bots, taken, koppelingen of skills.",
+              "target": "[data-tour='org-totals']",
+              "dynamic": true
+            },
+            {
+              "id": "chart",
+              "title": "Afdelingen en teams",
+              "body": "Klap afdelingen, teams en bots open of dicht. In een team zie je de lead, de mensen, de bots en welke bots onder een andere bot werken. Subteams staan onder hun team.",
+              "target": "[data-tour='org-chart']",
+              "dynamic": true
+            },
+            {
+              "id": "detail",
+              "title": "Wat achter een cijfer zit",
+              "body": "Zoek in de lijst en klap groepen open. Skills staan per categorie met hun beschrijving en bots; koppelingen met de bots of mensen die ze gebruiken. Sluit met Escape.",
+              "target": "[data-tour='org-detail']",
+              "dynamic": true
+            },
+            {
+              "id": "team",
+              "title": "Teamdetails",
+              "body": "Besparing, wat op actie wacht, wat er draait, de Playbooks en de mensen van een team, en een knop voor een nieuwe automatisering.",
+              "target": "[data-tour='org-team']",
+              "dynamic": true
+            },
+            {
+              "id": "teams",
+              "title": "Teams beheren",
+              "body": "Afdelingen en teams met lead, leden, uurtarief en het team waar een subteam onder valt.",
+              "target": "[data-tour='org-teams']",
+              "dynamic": true
+            }
+          ],
+          "parent": "studio",
+          "related": [
+            "studio",
+            "management",
+            "profiles"
+          ]
+        },
+        "management": {
+          "title": "Management",
+          "summary": "Wat automatisering per team en per bot oplevert en kost, en waar een beslissing nodig is. Elk getal is te herleiden.",
+          "sections": [
+            {
+              "id": "kpis",
+              "title": "Kerncijfers",
+              "body": "Bespaarde tijd (bevestigd en geschat), netto waarde, AI-kosten, rendement, wat actief is en welk deel bevestigd is, voor de gekozen periode.",
+              "target": "[data-tour='mgmt-kpis']",
+              "dynamic": true
+            },
+            {
+              "id": "decisions",
+              "title": "Beslissing nodig",
+              "body": "Taken die falen, zonder waarde of met een onbevestigde schatting, en teams zonder automatisering. Los ze hier direct op.",
+              "target": "[data-tour='mgmt-decisions']",
+              "dynamic": true
+            },
+            {
+              "id": "teams",
+              "title": "Per team",
+              "body": "Uren, waarde, runs en succes per team. Klik op een team om het in het organigram te openen.",
+              "target": "[data-tour='mgmt-teams']",
+              "dynamic": true
+            },
+            {
+              "id": "bots",
+              "title": "Per bot",
+              "body": "Alle bots, gegroepeerd per categorie, per team of zonder groepen, met taken, gesprekken en geschatte besparing.",
+              "target": "[data-tour='mgmt-bots']",
+              "dynamic": true
+            },
+            {
+              "id": "pricing",
+              "title": "Prijzen en tarieven",
+              "body": "Prijzen per model voor de AI-kosten en uurtarieven voor de netto waarde.",
+              "target": "#omSettings",
+              "dynamic": true
+            }
+          ],
+          "parent": "studio",
+          "related": [
+            "studio",
+            "organisation",
+            "tasks"
           ]
         }
       },
