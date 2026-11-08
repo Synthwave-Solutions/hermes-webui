@@ -374,7 +374,9 @@ def chart(view: org_structure.ViewScope) -> dict:
             "people": people_titles, "updated_at": snap.get("updated_at")}
 
 
-def job_detail(view, store: str, job_id: str, days: int, start: float, end: float) -> dict:
+def job_detail(view, store: str, job_id: str, days: int, start: float, end: float, handler=None) -> dict:
+    """One job's value and runs. For its owner, people who may see the job,
+    and organisation or department admins of its team."""
     from api import cron_bots
 
     job, owner = cron_bots.find_job(job_id, store)
@@ -382,8 +384,16 @@ def job_detail(view, store: str, job_id: str, days: int, start: float, end: floa
         raise KeyError("Job not found")
     structure = org_structure.load()
     team = _job_team(job, structure) or UNASSIGNED
-    if view.scope != org_structure.SCOPE_ALL and team not in org_structure.snapshot(view, structure)["teams"]:
-        raise PermissionError("This task is outside your scope")
+    allowed = view.scope == org_structure.SCOPE_ALL or (
+        team != UNASSIGNED and view.scope == org_structure.SCOPE_DEPARTMENTS and view.edits_team(team))
+    if not allowed and handler is not None:
+        from api import cron_scope
+        from api.governance.enforce import _request_identity
+
+        identity = _request_identity(handler)
+        allowed = cron_scope.identity_sees_cron_row(identity, job, store_profile=owner)
+    if not allowed:
+        raise KeyError("Job not found")
     pricing = value_tracking.load_pricing()
     rate = org_structure.team_rate(team, structure) if team != UNASSIGNED else None
     runs = []
@@ -396,7 +406,13 @@ def job_detail(view, store: str, job_id: str, days: int, start: float, end: floa
                      **money})
     runs.sort(key=lambda r: -(r["finished_at"] or 0))
     return {"job": {"id": job_id, "store": owner, "name": job.get("name"), "team": team},
-            "value": value_tracking.job_value(job), "rate": rate if view.sees_money else None,
+            "value": value_tracking.job_value(job), "raw_value": job.get("value") if isinstance(job.get("value"), dict) else None,
+            "rate": rate if view.sees_money else None,
+            # Names only, so the owner can place the task in a team.
+            "teams": sorted(({"key": k, "name": (t or {}).get("name") or k,
+                              "department": (t or {}).get("department") or k.split("/", 1)[0]}
+                             for k, t in (structure.get("teams") or {}).items() if isinstance(t, dict)),
+                            key=lambda r: (r["department"], r["name"].lower())),
             "runs": runs, "period_days": days}
 
 
@@ -420,6 +436,13 @@ def handle_get(handler, parsed) -> bool:
             _collect_safely()
             j(handler, chart(view))
             return True
+        if path == "/api/management/job":
+            _collect_safely()
+            days, start, end = _period(qs)
+            store = (qs.get("store") or ["default"])[0]
+            job_id = (qs.get("job_id") or [""])[0]
+            j(handler, job_detail(view, store, job_id, days, start, end, handler=handler))
+            return True
         if view.scope not in (org_structure.SCOPE_ALL, org_structure.SCOPE_DEPARTMENTS):
             j(handler, {"error": "forbidden", "reason": "management_scope", "viewer": view.to_dict()}, status=403)
             return True
@@ -428,11 +451,6 @@ def handle_get(handler, parsed) -> bool:
             return True
         _collect_safely()
         days, start, end = _period(qs)
-        if path == "/api/management/job":
-            store = (qs.get("store") or ["default"])[0]
-            job_id = (qs.get("job_id") or [""])[0]
-            j(handler, job_detail(view, store, job_id, days, start, end))
-            return True
         payload = build(view, days, start, end)
         compare = (qs.get("compare") or [""])[0]
         if compare == "previous":
