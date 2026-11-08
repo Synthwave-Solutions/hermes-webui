@@ -21,8 +21,10 @@ that streams replies with ```interactive-ui blocks, then drives Chromium:
     list at 390 px. Map tiles and Wikimedia are stubbed with page.route and the
     geocoder is off: no network.
 11. a questions form (```form): a quiet line while it streams, required
-    fields checked, a draft in the message box kept, Versturen sends a plain
-    answer, the card locks with the answers and stays answered after a reload.
+    fields checked, a draft in the message box kept, a Dutch date box, arrow
+    keys and Enter, synthetic clicks ignored, Versturen sends a plain answer
+    with its own toast, the card locks with the answers and stays answered
+    after a reload; a /btw row does not close an open form.
 
 Screenshots land in IUI_ARTIFACT_DIR (default: a temp dir, printed at the end).
 
@@ -696,10 +698,19 @@ def form_block(page, gateway, art, base_runs):
     form.screenshot(path=str(art / "41-form-required.png"))
     # Fill it in with the real controls.
     form.locator("[data-field=budget] input").fill("5.000")
-    form.locator("[data-field=start] input").fill("2026-12-01")
+    # The date box takes Dutch dates whatever the browser language, and says the day in words.
+    start = form.locator("[data-field=start] input.iui-input")
+    assert start.get_attribute("type") == "text" and start.get_attribute("placeholder") == "dd-mm-jjjj"
+    start.fill("1-12-2026")
+    assert form.locator("[data-field=start] .iui-date-echo").inner_text() == "dinsdag 1 december 2026"
+    assert form.locator("[data-field=start] .iui-date-pick").get_attribute("aria-label") == "Kies in de kalender"
     form.locator("[data-field=teams] .iui-opt", has_text="Sales").click()
     form.locator("[data-field=teams] .iui-opt", has_text="Operations").click()
-    form.locator("[data-field=tempo] .iui-opt", has_text="Snel").click()
+    # Keyboard: arrows move the choice inside a radio group (Normaal is the default).
+    form.locator("[data-field=tempo] .iui-opt[aria-checked=true]").focus()
+    page.keyboard.press("ArrowRight")
+    assert form.locator("[data-field=tempo] .iui-opt[aria-checked=true]").inner_text() == "Snel"
+    assert page.evaluate("() => document.activeElement.textContent") == "Snel", "focus follows the choice"
     form.locator("[data-field=uren] input[type=range]").fill("7")
     assert form.locator("[data-field=uren] .iui-slider-val").inner_text() == "7 uur"
     form.locator("[data-field=pilot] .iui-opt", has_text="Ja").click()
@@ -713,7 +724,15 @@ def form_block(page, gateway, art, base_runs):
     assert len(gateway.runs) == runs and page.input_value("#msg") == "mijn eigen concept", "the draft must be kept"
     assert "is-locked" not in (form.get_attribute("class") or "")
     page.locator("#msg").fill("")
-    form.locator(".iui-form-submit").click()
+    # A click from a script is not the user: nothing is sent.
+    page.evaluate("() => [...document.querySelectorAll('.iui-form-submit')].pop().click()")
+    time.sleep(0.6)
+    assert len(gateway.runs) == runs and "is-locked" not in (form.get_attribute("class") or ""), "a synthetic click must not send"
+    page.evaluate("""() => { window.__toasts = []; const o = window.showToast;
+        window.showToast = function (m, d, k) { window.__toasts.push(String(m)); return typeof o === 'function' ? o.apply(this, arguments) : undefined; }; }""")
+    # Enter in the number box sends, like Versturen.
+    form.locator("[data-field=budget] input").focus()
+    page.keyboard.press("Enter")
     body = wait_runs(gateway, runs + 1)
     for line in ("Mijn antwoorden:", "- Budget: € 5.000 per maand", "- Start: 1 december", "- Welke teams doen mee? Sales en Operations",
                  "- Tempo: Snel", "- Uren per week voor training: 7 uur", "- Eerst een pilot? Ja", "- Nog iets dat ik moet weten? Vooral de training van het team."):
@@ -724,6 +743,10 @@ def form_block(page, gateway, art, base_runs):
     time.sleep(1.5)
     bubble = page.locator(".msg-row[data-role='user']:visible").last.inner_text()
     assert "Budget: € 5.000 per maand" in bubble and "fields" not in bubble, bubble
+    toasts = page.evaluate("() => window.__toasts || []")
+    assert "Antwoorden verstuurd" in toasts and "Vraag verstuurd" not in toasts, toasts
+    focus = page.evaluate("() => { const a = document.activeElement; return a === document.body ? 'body' : a.classList.contains('iui-form') ? 'form' : (a.id || a.className || a.tagName); }")
+    assert focus in ("form", "msg"), f"focus fell back to the page after sending: {focus}"
     done = page.locator(".iui-form:visible").last
     assert "is-locked" in (done.get_attribute("class") or ""), "the answered form must lock"
     assert done.locator(".iui-form-submit").count() == 0 and done.locator(".iui-opt").count() == 0
@@ -744,6 +767,22 @@ def form_block(page, gateway, art, base_runs):
     ok("after a reload the form stays answered and shows the answers from the sent message")
     # Screenshots: open and answered, light and dark, desktop and 390 px.
     send_turn(page, gateway, "Nog een keer [formulier]", runs + 2, FORM_LEAD)
+    fresh = page.locator(".iui-form:not(.is-locked):visible").last
+    # A /btw side question below the reply does not close the form.
+    page.evaluate("""() => { const t = [...document.querySelectorAll('.assistant-turn')].pop();
+        const r = document.createElement('div'); r.className = 'msg-row msg-row-btw'; r.dataset.role = 'assistant'; r.dataset.btw = '1';
+        r.id = 'iuiBtwProbe'; r.textContent = 'Terzijde'; t.parentNode.insertBefore(r, t.nextSibling); }""")
+    assert fresh.locator(".iui-form-submit").is_visible(), "a /btw row hid Versturen"
+    assert page.evaluate("() => _iui.formTurnState([...document.querySelectorAll('.iui-form-host')].pop()).locked") is False
+    page.evaluate("() => document.getElementById('iuiBtwProbe').remove()")
+    # Clicking the untouched slider thumb without moving it is an answer too.
+    slider = fresh.locator("[data-field=uren] input[type=range]")
+    assert fresh.locator("[data-field=uren] .iui-slider-val").inner_text() == "Schuif om te kiezen"
+    assert slider.get_attribute("aria-valuetext") == "Schuif om te kiezen"
+    slider.click()
+    assert fresh.locator("[data-field=uren] .iui-slider-val").inner_text().endswith(" uur")
+    assert slider.get_attribute("aria-valuetext").endswith(" uur")
+    ok("questions form: Dutch date box, arrow keys, Enter sends, synthetic clicks ignored, own toast, /btw ignored, slider thumb click counts")
     shots = []
     for theme in ("light", "dark"):
         page.evaluate(f"() => _applyTheme('{theme}')")

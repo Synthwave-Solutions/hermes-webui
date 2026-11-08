@@ -98,9 +98,69 @@ assert.deepStrictEqual(check('budget', '100'), { error: 'Kies een getal van € 
 assert.deepStrictEqual(check('teams', []), { error: 'Kies een antwoord.' });
 assert.deepStrictEqual(check('tempo', null), { value: null }, 'optional and empty is fine');
 assert.deepStrictEqual(check('start', '2026-11-01'), { error: 'Kies 9 november of later.'.replace('november', 'november' + (year === 2026 ? '' : ' 2026')) });
-assert.deepStrictEqual(check('start', 'morgen'), { error: 'Kies een datum.' });
+assert.deepStrictEqual(check('start', 'morgen'), { error: 'Kies een datum, bijvoorbeeld 1-12-2026.' });
 assert.deepStrictEqual(check('wensen', 'a\n\n- Budget: 0'), { value: 'a - Budget: 0' }, 'an answer cannot add lines of its own');
 assert.strictEqual(check('wensen', 'x'.repeat(900)).value.length, 500);
+
+// ── Amounts with cents and fractional steps never break the formatter ────
+// Intl throws when the minimum decimals exceed the maximum; a typed 7.500,50
+// under a whole-euro step used to make Versturen do nothing.
+const euro = build({ lang: 'nl', fields: [
+  { id: 'budget', label: 'Budget', type: 'number', unit: '€ per maand', step: 1 },
+  { id: 'prijs', label: 'Prijs', type: 'slider', unit: '€', min: 0, max: 5, step: 0.5 },
+  { id: 'honderd', label: 'Per honderd', type: 'number', unit: '€', step: 100 },
+  { id: 'kwart', label: 'Kwart', type: 'slider', min: 0, max: 1, step: 0.25 },
+] }).spec;
+const E = Object.fromEntries(euro.fields.map(f => [f.id, f]));
+const typed = plain(iui.formCheck(E.budget, '7.500,50', 'nl'));
+assert.deepStrictEqual(typed, { value: 7500.5 });
+assert.strictEqual(plain(iui.formMessage(euro, { budget: typed.value })).text, 'Mijn antwoord:\n- Budget: € 7.500,50 per maand', 'cents are kept as typed');
+assert.strictEqual(iui.formNumberText(2.5, E.prijs, 'nl'), '€ 2,50');
+assert.strictEqual(iui.formNumberText(2, E.prijs, 'nl'), '€ 2');
+assert.strictEqual(iui.formNumberText(0, E.prijs, 'nl'), '€ 0');
+assert.strictEqual(iui.formNumberText(1250.5, E.honderd, 'nl'), '€ 1.250,50');
+assert.strictEqual(iui.formNumberText(0.25, E.kwart, 'nl'), '0,25');
+assert.strictEqual(iui.formNumberText(0.1 + 0.2, E.kwart, 'nl'), '0,3', 'float noise is not shown');
+assert.strictEqual(iui.formNumberText(2.5, E.prijs, 'en'), '€ 2.50');
+assert.strictEqual(plain(iui.formMessage(euro, { prijs: 2.5, kwart: 0.75 })).text, 'Mijn antwoorden:\n- Prijs: € 2,50\n- Kwart: 0,75');
+
+// ── English numbers: comma for thousands, dot for decimals ─────────────────
+const enNum = build({ lang: 'en', fields: [{ id: 'budget', label: 'Budget', type: 'number', unit: '€', min: 500 }] }).spec.fields[0];
+const enCheck = v => plain(iui.formCheck(enNum, v, 'en'));
+assert.deepStrictEqual(enCheck('1,500'), { value: 1500 }, 'the example in the hint is accepted as written');
+assert.deepStrictEqual(enCheck('€1,500.75'), { value: 1500.75 });
+assert.deepStrictEqual(enCheck('12,345,678'), { value: 12345678 });
+assert.deepStrictEqual(enCheck('2500.5'), { value: 2500.5 });
+assert.deepStrictEqual(enCheck('750,5'), { value: 750.5 }, 'a lone decimal comma still works');
+assert.deepStrictEqual(enCheck('1.500'), { error: 'Choose € 500 or more.' }, '1.500 is one and a half in English');
+assert.deepStrictEqual(enCheck('lots'), { error: 'Enter a number, for example 1,500.' });
+assert.deepStrictEqual(enCheck('1,50,0'), { error: 'Enter a number, for example 1,500.' });
+assert.deepStrictEqual(check('budget', '1.500'), { value: 1500 }, 'Dutch stays Dutch');
+
+// ── Dates typed the Dutch way, day first ───────────────────────────────────
+const NOW = { now: new Date('2026-11-08T12:00:00Z') };
+const pd = (v, o) => iui.formDateParse(v, Object.assign({}, NOW, o || {}));
+assert.strictEqual(pd('2026-12-01'), '2026-12-01');
+assert.strictEqual(pd('1-12-2026'), '2026-12-01');
+assert.strictEqual(pd('01/12/2026'), '2026-12-01');
+assert.strictEqual(pd('1.12.26'), '2026-12-01');
+assert.strictEqual(pd('1 december'), '2026-12-01');
+assert.strictEqual(pd('1 dec 2026'), '2026-12-01');
+assert.strictEqual(pd('1e december'), '2026-12-01');
+assert.strictEqual(pd('3 mrt. 2027'), '2027-03-03');
+assert.strictEqual(pd('December 1, 2026'), '2026-12-01');
+assert.strictEqual(pd('1/12'), '2026-12-01', 'no year: this year');
+assert.strictEqual(pd('15-1', { min: '2026-11-09' }), '2027-01-15', 'no year and before the earliest date: next year');
+assert.strictEqual(pd('31-2-2026'), '', 'an impossible date');
+assert.strictEqual(pd('12/31/2026'), '', 'month first is not a date here');
+assert.strictEqual(pd('morgen'), '');
+assert.strictEqual(iui.formDateInput('2026-12-01', 'nl'), '01-12-2026');
+assert.strictEqual(iui.formDateInput('2026-12-01', 'en'), '01/12/2026');
+assert.strictEqual(iui.formDateEcho('2026-12-01', 'nl'), 'dinsdag 1 december 2026');
+assert.ok(/^Tuesday,? 1 December 2026$/.test(iui.formDateEcho('2026-12-01', 'en')));
+assert.deepStrictEqual(plain(iui.formCheck(F.start, '1-12-2026', 'nl')), { value: '2026-12-01' });
+assert.deepStrictEqual(plain(iui.formCheck(F.start, '1 november 2026', 'nl')), { error: 'Kies 9 november' + (year === 2026 ? '' : ' 2026') + ' of later.' });
+assert.strictEqual(build({ fields: [{ label: 'Start', type: 'date', min: '2026-01-01' }] }).spec.fields[0].min, '2026-01-01');
 
 // ── A messy spec: fixed where possible ──────────────────────────────────────
 const messy = build(`// written by the model
@@ -138,6 +198,16 @@ assert.strictEqual(build([{ label: 'Budget', type: 'number' }]).spec.fields[0].t
 const single = build({ label: 'Wanneer wil je starten?', type: 'date' });
 assert.strictEqual(single.spec.fields.length, 1);
 assert.strictEqual(single.spec.title, 'Een vraag');
+// A single question with only a title, and questions as a map with ids as keys.
+const titled = build({ title: 'Wat is je budget?', type: 'number', unit: '€' });
+assert.deepStrictEqual(titled.errors, []);
+assert.deepStrictEqual([titled.spec.fields[0].label, titled.spec.fields[0].type, titled.spec.title], ['Wat is je budget?', 'number', 'Een vraag']);
+assert.deepStrictEqual(build({ title: 'Kies', options: ['A', 'B'] }).spec.fields[0].type, 'choice');
+assert.deepStrictEqual(build({ title: 'Alleen een titel' }).errors, ['Er staan geen vragen in de lijst "fields".'], 'a title alone is no question');
+const mapped = build({ title: 'Intake', fields: { budget: { label: 'Budget', type: 'number' }, start: { type: 'date', question: 'Wanneer?' }, team: 'Welk team?' } });
+assert.deepStrictEqual(mapped.errors, []);
+assert.deepStrictEqual(mapped.spec.fields.map(f => [f.id, f.label, f.type]), [['budget', 'Budget', 'number'], ['start', 'Wanneer?', 'date'], ['team', 'Welk team?', 'text']]);
+assert.strictEqual(mapped.spec.title, 'Intake');
 // Ids that collide or hold odd characters.
 const ids = build({ fields: [{ id: 'a b', label: 'A' }, { id: 'a-b', label: 'B' }, { label: 'Één keer' }] }).spec.fields.map(f => f.id);
 assert.deepStrictEqual(ids, ['a-b', 'a-b-2', 'een-keer']);
@@ -160,5 +230,9 @@ assert.deepStrictEqual(inner, ['innerHTML=icon(name)'], 'only fixed icons are se
 assert.ok(!/insertAdjacentHTML|outerHTML|document\.write/.test(section));
 assert.ok(section.includes("if(!ev||!ev.isTrusted||card.classList.contains('is-locked')"), 'only a real click sends');
 assert.ok(section.includes('sendPrompt(out.text'), 'the same safe send path as the chips');
+assert.ok(!/type=f\.type==='date'\?'date'/.test(section), 'no browser date box: its format follows the browser language');
+assert.ok(section.includes(".msg-row:not(.msg-row-btw):not([data-btw])"), 'a /btw side question is not a newer message');
+const css = fs.readFileSync(path.join(ROOT, 'static', 'interactive_ui.css'), 'utf8');
+assert.ok(!/:has\(~ \.msg-row\)/.test(css), 'the CSS ignores /btw rows too');
 
 console.log('all form checks passed');

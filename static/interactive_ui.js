@@ -158,6 +158,7 @@ const _iui=(function(){
     gauge:'<rect x="3" y="5" width="8" height="6" rx="1.5"/><rect x="13" y="5" width="8" height="6" rx="1.5"/><rect x="3" y="13" width="8" height="6" rx="1.5"/><rect x="13" y="13" width="8" height="6" rx="1.5"/>',
     gantt:'<path d="M4 6h8"/><path d="M8 12h9"/><path d="M13 18h7"/><path d="M3 3v18"/>',
     check:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+    calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M8 3v4"/><path d="M16 3v4"/>',
     sheet:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M8 13h8"/><path d="M8 17h8"/>',
   };
   function icon(name){return `<svg class="iui-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${ICON[name]||''}</svg>`;}
@@ -460,7 +461,7 @@ const _iui=(function(){
   }
   // Returns false when it could not even try; onDone(ok) reports whether the
   // message really left (the composer was emptied by send()).
-  function sendPrompt(text,onDone){
+  function sendPrompt(text,onDone,opts){
     const box=document.getElementById('msg');
     if(!box||typeof window.send!=='function') return false;
     if(composerBusy()){toast(tx('draftBusy'));return false;}
@@ -468,7 +469,7 @@ const _iui=(function(){
     try{box.dispatchEvent(new Event('input',{bubbles:true}));}catch(_){}
     const settle=()=>{
       const ok=box.value.trim()!==String(text).trim();
-      if(ok) toast(tx('sent'));
+      if(ok) toast(opts&&opts.sentToast||tx('sent'));
       else if(box.value.trim()===String(text).trim()){box.value='';try{box.dispatchEvent(new Event('input',{bubbles:true}));}catch(_){}}
       if(onDone) onDone(ok);
     };
@@ -949,8 +950,9 @@ const _iui=(function(){
       head:n=>n===1?'Mijn antwoord:':'Mijn antwoorden:',missing:'Vul dit nog in.',pick:'Kies een antwoord.',slide:'Schuif om te kiezen',
       left:n=>n===1?'Nog 1 vraag in te vullen.':`Nog ${n} vragen in te vullen.`,empty:'Beantwoord minstens één vraag.',
       notNumber:'Vul een getal in, bijvoorbeeld 1.500.',between:(a,b)=>`Kies een getal van ${a} tot en met ${b}.`,atLeast:a=>`Kies ${a} of meer.`,atMost:b=>`Kies ${b} of minder.`,
-      badDate:'Kies een datum.',dateBetween:(a,b)=>`Kies een datum van ${a} tot en met ${b}.`,dateFrom:a=>`Kies ${a} of later.`,dateUntil:b=>`Kies ${b} of eerder.`,
+      badDate:'Kies een datum, bijvoorbeeld 1-12-2026.',dateBetween:(a,b)=>`Kies een datum van ${a} tot en met ${b}.`,dateFrom:a=>`Kies ${a} of later.`,dateUntil:b=>`Kies ${b} of eerder.`,
       sent:'Verstuurd',answered:'Beantwoord',closed:'Het gesprek is verder gegaan.',waiting:'Vragen worden klaargezet',
+      sentToast:n=>n===1?'Antwoord verstuurd':'Antwoorden verstuurd',datePh:'dd-mm-jjjj',calendar:'Kies in de kalender',
       fail:'Deze vragen konden niet worden getoond.',repairPrompt:'Kun je je vragen opnieuw stellen? Het formulier werkte niet.',
       json:line=>`De vragen zijn geen geldige JSON${line?` (regel ${line})`:''}.`,notObject:()=>'De vragen moeten één JSON-object zijn met een lijst "fields".',
       tooBig:()=>'Het formulier is te groot (meer dan 64 kB).',noFields:()=>'Er staan geen vragen in de lijst "fields".',
@@ -965,8 +967,9 @@ const _iui=(function(){
       head:n=>n===1?'My answer:':'My answers:',missing:'Please fill this in.',pick:'Choose an answer.',slide:'Slide to choose',
       left:n=>n===1?'1 question still to answer.':`${n} questions still to answer.`,empty:'Answer at least one question.',
       notNumber:'Enter a number, for example 1,500.',between:(a,b)=>`Choose a number from ${a} to ${b}.`,atLeast:a=>`Choose ${a} or more.`,atMost:b=>`Choose ${b} or less.`,
-      badDate:'Choose a date.',dateBetween:(a,b)=>`Choose a date from ${a} to ${b}.`,dateFrom:a=>`Choose ${a} or later.`,dateUntil:b=>`Choose ${b} or earlier.`,
+      badDate:'Choose a date, for example 1/12/2026.',dateBetween:(a,b)=>`Choose a date from ${a} to ${b}.`,dateFrom:a=>`Choose ${a} or later.`,dateUntil:b=>`Choose ${b} or earlier.`,
       sent:'Sent',answered:'Answered',closed:'The conversation has moved on.',waiting:'Preparing the questions',
+      sentToast:n=>n===1?'Answer sent':'Answers sent',datePh:'dd/mm/yyyy',calendar:'Choose in the calendar',
       fail:'These questions could not be shown.',repairPrompt:'Can you ask your questions again? The form did not work.',
       json:line=>`The questions are not valid JSON${line?` (line ${line})`:''}.`,notObject:()=>'The questions must be one JSON object with a "fields" list.',
       tooBig:()=>'The form is too large (over 64 kB).',noFields:()=>'There are no questions in the "fields" list.',
@@ -987,9 +990,28 @@ const _iui=(function(){
     if(max&&s.length>max) s=s.slice(0,max-1).trimEnd()+'…';
     return s;
   }
-  function formNum(v){
+  // English answers use a comma for thousands and a dot for decimals
+  // ("1,500.50"); a lone comma with one or two digits after it is a decimal
+  // comma ("7,5"). Dutch answers (and the agent's spec) go through parseNumber.
+  function formNumEn(v){
+    let s=v.trim().replace(/[\u00a0\u202f\u2009 ]/g,'');
+    let neg=false;
+    if(/^[-\u2212]/.test(s)){neg=true;s=s.slice(1);}
+    s=s.replace(/^(€|eur|\$|usd|£|gbp)/i,'').replace(/(€|eur|\$|usd|£|gbp)$/i,'');
+    if(!neg&&/^[-\u2212]/.test(s)){neg=true;s=s.slice(1);}
+    let norm='';
+    if(/^\d{1,3}(,\d{3})+(\.\d+)?$/.test(s)) norm=s.replace(/,/g,'');
+    else if(/^\d+(\.\d+)?$|^\.\d+$/.test(s)) norm=s;
+    else if(/^\d+,\d{1,2}$/.test(s)) norm=s.replace(',','.');
+    else return NaN;
+    if(/^0\d/.test(norm)) return NaN;
+    const n=Number(norm);
+    return Number.isFinite(n)?(neg?-n:n):NaN;
+  }
+  function formNum(v,l){
     if(typeof v==='number') return Number.isFinite(v)?v:NaN;
     if(typeof v!=='string'||!v.trim()) return NaN;
+    if(l==='en') return formNumEn(v);
     const K=kits();
     if(K&&typeof K.parseNumber==='function') return K.parseNumber(v).n;
     const n=Number(v.trim().replace(/\s/g,'').replace(',','.'));
@@ -1000,6 +1022,44 @@ const _iui=(function(){
     if(!/^\d{4}-\d{2}-\d{2}$/.test(s)) return '';
     const d=new Date(s+'T12:00:00Z');
     return Number.isFinite(d.getTime())&&d.toISOString().slice(0,10)===s?s:'';
+  }
+  const FORM_MONTHS={jan:1,januari:1,january:1,feb:2,febr:2,februari:2,february:2,mrt:3,maa:3,maart:3,mar:3,march:3,apr:4,april:4,
+    mei:5,may:5,jun:6,juni:6,june:6,jul:7,juli:7,july:7,aug:8,augustus:8,august:8,sep:9,sept:9,september:9,okt:10,oct:10,oktober:10,october:10,
+    nov:11,november:11,dec:12,december:12};
+  function formYmd(y,m,d){
+    const iso=String(y).padStart(4,'0')+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    return formIso(iso);
+  }
+  // A typed date, day first as in Dutch: "1-12-2026", "1/12", "1 december",
+  // "1 dec 2026", "december 1" or 2026-12-01. Without a year: this year, or
+  // next year when this year's date falls before the earliest allowed date.
+  function formDateParse(v,opts){
+    const s=String(v==null?'':v).trim().toLowerCase().replace(/\s+/g,' ');
+    if(!s) return '';
+    const iso=formIso(s);
+    if(iso) return iso;
+    const o=opts||{}, now=o.now||new Date();
+    const thisYear=now.getFullYear();
+    let d=0,m=0,y=0,hit;
+    if((hit=/^(\d{1,2})[-/.](\d{1,2})(?:[-/.](\d{2}|\d{4}))?$/.exec(s))){d=+hit[1];m=+hit[2];y=hit[3]?+hit[3]:0;}
+    else if((hit=/^(\d{1,2})(?:e|ste|de|st|nd|rd|th)?\.? ([a-z]+)\.?,? ?(\d{4})?$/.exec(s))){d=+hit[1];m=FORM_MONTHS[hit[2]]||0;y=hit[3]?+hit[3]:0;}
+    else if((hit=/^([a-z]+)\.? (\d{1,2})(?:st|nd|rd|th)?,? ?(\d{4})?$/.exec(s))){m=FORM_MONTHS[hit[1]]||0;d=+hit[2];y=hit[3]?+hit[3]:0;}
+    if(!d||!m) return '';
+    if(y&&y<100) y+=2000;
+    if(y) return formYmd(y,m,d);
+    let out=formYmd(thisYear,m,d);
+    if(out&&o.min&&out<o.min){const next=formYmd(thisYear+1,m,d);if(next&&next>=o.min&&(!o.max||next<=o.max))out=next;}
+    return out||formYmd(thisYear+1,m,d);
+  }
+  // How a date stands in the text box: 01-12-2026 (Dutch) or 01/12/2026.
+  function formDateInput(iso,l){
+    const [y,m,d]=String(iso).split('-');
+    return l==='en'?`${d}/${m}/${y}`:`${d}-${m}-${y}`;
+  }
+  // The chosen date read back in words, so a mixed-up order shows before sending.
+  function formDateEcho(iso,l){
+    const dt=new Date(iso+'T12:00:00Z');
+    return dt.toLocaleDateString(l==='nl'?'nl-NL':'en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric',timeZone:'UTC'});
   }
   function formBool(v){
     if(v===true||v===false) return v;
@@ -1017,10 +1077,20 @@ const _iui=(function(){
     if(u==='%') return {pre:'',post:'%'};
     return {pre:'',post:u?' '+u:''};
   }
+  // Decimals of the value itself (at most 4), so a typed 7.500,50 stays 7.500,50.
+  function formValueDecimals(n){
+    let d=0;
+    while(d<4&&Math.abs(Math.round(n*Math.pow(10,d))-n*Math.pow(10,d))>1e-6) d++;
+    return d;
+  }
   function formNumberText(n,field,l){
-    const dec=field.step?formDecimals(field.step):(Number.isInteger(n)?0:2);
-    const txt=new Intl.NumberFormat(l==='nl'?'nl-NL':'en-GB',{maximumFractionDigits:dec,minimumFractionDigits:field.unit&&formUnit(field.unit).pre&&!Number.isInteger(n)?2:0}).format(n);
     const u=formUnit(field.unit);
+    const own=formValueDecimals(n);
+    let dec=Math.max(field.step?formDecimals(field.step):0,own);
+    // An amount in euros with cents always shows two: € 2,50, never € 2,5.
+    const min=u.pre&&own>0?2:0;
+    dec=Math.max(dec,min);
+    const txt=new Intl.NumberFormat(l==='nl'?'nl-NL':'en-GB',{maximumFractionDigits:dec,minimumFractionDigits:min}).format(n);
     return u.pre+txt+u.post;
   }
   function formDateText(iso,l,nowYear){
@@ -1053,7 +1123,7 @@ const _iui=(function(){
     const hit=options.find(o=>o.label.toLowerCase()===s)||options.find(o=>o.value&&o.value.toLowerCase()===s);
     return hit?hit.label:'';
   }
-  function formField(f,i,warn,ids){
+  function formField(f,i,warn,ids,l){
     if(typeof f==='string') f={label:f,type:'text'};
     if(!f||typeof f!=='object'||Array.isArray(f)){warn('fieldNotObject',i+1);return null;}
     const label=formClean(f.label!=null?f.label:(f.question!=null?f.question:(f.title!=null?f.title:f.name)),FORM_LIMITS.label);
@@ -1104,7 +1174,7 @@ const _iui=(function(){
         if(d&&(!out.min||d>=out.min)&&(!out.max||d<=out.max)) out.default=d; else warn('badDefault',label);
       }
     } else {
-      let mn=formNum(f.min), mx=formNum(f.max), step=formNum(f.step);
+      let mn=formNum(f.min,l), mx=formNum(f.max,l), step=formNum(f.step,l);
       if(type==='slider'){
         if(!Number.isFinite(mn)&&!Number.isFinite(mx)){warn('sliderRange',label);mn=0;mx=10;}
         else if(!Number.isFinite(mn)) mn=Math.min(0,mx-1);
@@ -1127,7 +1197,7 @@ const _iui=(function(){
       else if(rawType==='currency'||rawType==='bedrag') out.unit='€';
       if(type==='number'){const ph=formClean(f.placeholder,FORM_LIMITS.placeholder);if(ph)out.placeholder=ph;}
       if(dflt!=null&&dflt!==''){
-        const d=formNum(dflt);
+        const d=formNum(dflt,l);
         if(Number.isFinite(d)&&(!Number.isFinite(mn)||d>=mn)&&(!Number.isFinite(mx)||d<=mx)) out.default=d;
         else if(Number.isFinite(d)&&type==='slider'){out.default=Math.max(mn,Math.min(mx,d));warn('badDefault',label);}
         else warn('badDefault',label);
@@ -1155,15 +1225,25 @@ const _iui=(function(){
     if(!raw||typeof raw!=='object'){res.errors.push(msg('notObject'));return res;}
     l=formLangOf(raw.lang)||l;
     const warn=(key,...a)=>res.warnings.push(msg(key,...a));
-    let fields=[raw.fields,raw.questions,raw.vragen,raw.items].find(Array.isArray);
+    const listKey=['fields','questions','vragen','items'].find(k=>raw[k]!=null);
+    let fields=listKey?raw[listKey]:null;
+    // A map of questions ({"budget":{...}}) becomes a list with the keys as ids.
+    if(fields&&typeof fields==='object'&&!Array.isArray(fields)){
+      fields=Object.keys(fields).map(k=>{const f=fields[k];
+        if(f&&typeof f==='object'&&!Array.isArray(f)) return Object.assign({id:k},f.label==null&&f.question==null&&f.title==null&&f.name==null?{label:k}:{},f);
+        return typeof f==='string'?{id:k,label:f}:f;});
+    }
+    if(!Array.isArray(fields)) fields=null;
     if(!fields||!fields.length){
-      // A single question written at the top level.
-      if(raw.label||raw.question) fields=[raw];
+      // A single question written at the top level: a label, or a title or
+      // name together with a known type or options.
+      const typed=FORM_TYPES[formClean(raw.type,30).toLowerCase()]||raw.options!=null||raw.choices!=null;
+      if(!listKey&&(raw.label||raw.question||((raw.title||raw.name)&&typed))) fields=[raw];
       else {res.errors.push(msg('noFields'));return res;}
     }
     if(fields.length>FORM_LIMITS.fields){warn('manyFields',fields.length,FORM_LIMITS.fields);fields=fields.slice(0,FORM_LIMITS.fields);}
     const ids=new Set();
-    const out=fields.map((f,i)=>formField(f,i,warn,ids)).filter(Boolean);
+    const out=fields.map((f,i)=>formField(f,i,warn,ids,l)).filter(Boolean);
     if(!out.length){res.errors.push(msg('noneUsable'));return res;}
     const L=FORM_TEXT[l]||FORM_TEXT.en;
     const single=fields===raw||fields[0]===raw;
@@ -1213,12 +1293,12 @@ const _iui=(function(){
     return display;
   }
   // Checks one field's control state; returns {value} or {error}.
-  function formCheck(field,raw,l){
+  function formCheck(field,raw,l,opts){
     const L=FORM_TEXT[l]||FORM_TEXT.en;
     const empty=raw==null||(Array.isArray(raw)?!raw.length:String(raw).trim()==='');
     if(empty) return field.required?{error:field.type==='choice'||field.type==='multi'||field.type==='yesno'||field.type==='slider'?L.pick:L.missing}:{value:null};
     if(field.type==='number'){
-      const n=typeof raw==='number'?raw:formNum(String(raw).replace(/€/g,'').trim());
+      const n=typeof raw==='number'?raw:formNum(String(raw).replace(/€/g,'').trim(),l);
       if(!Number.isFinite(n)) return {error:L.notNumber};
       const has=k=>typeof field[k]==='number', fmt=x=>formNumberText(x,field,l);
       if(has('min')&&has('max')&&(n<field.min||n>field.max)) return {error:L.between(fmt(field.min),fmt(field.max))};
@@ -1227,7 +1307,7 @@ const _iui=(function(){
       return {value:n};
     }
     if(field.type==='date'){
-      const d=formIso(raw);
+      const d=formDateParse(raw,{min:field.min,max:field.max,now:opts&&opts.now});
       if(!d) return {error:L.badDate};
       const fmt=x=>formDateText(x,l);
       if(field.min&&field.max&&(d<field.min||d>field.max)) return {error:L.dateBetween(fmt(field.min),fmt(field.max))};
@@ -1247,20 +1327,32 @@ const _iui=(function(){
     if(!turn) return {locked:false,user:null};
     let n=turn.nextElementSibling, user=null, newer=false;
     while(n){
-      if(n.matches&&n.matches('.msg-row')){newer=true;if(!user&&n.matches('[data-role="user"]'))user=n;}
+      if(n.matches&&n.matches('.msg-row:not(.msg-row-btw):not([data-btw])')){newer=true;if(!user&&n.matches('[data-role="user"]'))user=n;}
       n=n.nextElementSibling;
     }
     return {locked:newer,user};
   }
+  // The chat redraws the turn after a send, so focus on the old card would fall
+  // back to the page; for a short while a redrawn copy of that form takes it.
+  let formFocus=null;
   function formShowLocked(card,spec,display,how){
     const L=FORM_TEXT[spec.lang]||FORM_TEXT.en;
+    const hadFocus=!!(document.activeElement&&card.contains(document.activeElement));
     card.classList.add('is-locked');
     card.querySelectorAll('.iui-form-body,.iui-form-foot,.iui-form-summary,.iui-form-closed').forEach(n=>n.remove());
+    // Focus would fall back to the page once the controls are gone.
+    const keepFocus=()=>{
+      const a=document.activeElement, lost=!a||a===document.body;
+      const mine=formFocus&&formFocus.key===card.dataset.formKey&&Date.now()<formFocus.until;
+      if(!hadFocus&&!(mine&&lost&&card.isConnected)) return;
+      card.tabIndex=-1;try{card.focus({preventScroll:true});}catch(_){}
+    };
     const pill=card.querySelector('.iui-form-done');
     const ids=Object.keys(display||{}).filter(k=>display[k]);
     if(!ids.length){
       card.appendChild(el('p','iui-form-closed',L.closed));
       if(pill) pill.hidden=true;
+      keepFocus();
       return;
     }
     if(pill){pill.querySelector('.iui-form-done-text').textContent=how==='sent'?L.sent:L.answered;pill.hidden=false;}
@@ -1272,6 +1364,7 @@ const _iui=(function(){
       dl.appendChild(row);
     });
     card.appendChild(dl);
+    keepFocus();
   }
   function formError(block,errors,fence){
     const l=lang(), L=FORM_TEXT[l];
@@ -1283,12 +1376,13 @@ const _iui=(function(){
     const b=el('button','iui-form-repair',tx('repair'));b.type='button';
     b.addEventListener('click',ev=>{
       if(!ev.isTrusted||b.dataset.sent) return;
+      if(formTurnState(block).locked){b.remove();return;}
       if(chatBusy()){toast(tx('chipsBusy'));return;}
       b.dataset.sent='1';b.disabled=true;
       const report=`\n\n[View report]\nBlock: ${fence}\nProblem: ${String(errors[0]||'unknown').replace(/\[\/?View report\]/g,'')}\nFix the cause and send the complete ${fence} block again.\n[/View report]`;
       if(!sendPrompt(L.repairPrompt+report)){b.dataset.sent='';b.disabled=false;}
     });
-    row.appendChild(b);
+    if(!formTurnState(block).locked) row.appendChild(b);
     card.appendChild(row);
     block.appendChild(card);
   }
@@ -1305,6 +1399,7 @@ const _iui=(function(){
     const card=el('div','iui-form');
     card.setAttribute('role','group');
     card.setAttribute('lang',l);
+    card.dataset.formKey=key;
     const head=el('div','iui-form-head');
     const badge=el('span','iui-badge');badge.appendChild(iconEl('form'));head.appendChild(badge);
     const title=el('div','iui-form-title',spec.title);title.id=uid+'-t';head.appendChild(title);
@@ -1324,8 +1419,8 @@ const _iui=(function(){
         const found=formAnswersFrom(spec,t);
         if(Object.keys(found).length) display=found;
       }
-      formShowLocked(card,spec,display||{},'answered');
       block.appendChild(card);
+      formShowLocked(card,spec,display||{},'answered');
       return;
     }
 
@@ -1339,9 +1434,9 @@ const _iui=(function(){
       wrap.appendChild(lab);
       const hintText=f.hint||(f.type==='multi'?L.multiHint:'');
       if(hintText){const h=el('div','iui-field-hint',hintText);h.id=uid+'-h'+fi;wrap.appendChild(h);}
-      const err=el('div','iui-field-err');err.id=uid+'-e'+fi;err.hidden=true;err.setAttribute('aria-live','polite');
+      const err=el('div','iui-field-err');err.id=uid+'-e'+fi;err.setAttribute('aria-live','polite');
       const describe=n=>{n.setAttribute('aria-describedby',[hintText?uid+'-h'+fi:'',err.id].filter(Boolean).join(' '));};
-      const clearErr=()=>{if(!err.hidden){err.hidden=true;wrap.classList.remove('is-invalid');}};
+      const clearErr=()=>{if(err.textContent){err.textContent='';wrap.classList.remove('is-invalid');}};
       if(f.type==='choice'||f.type==='yesno'||f.type==='multi'){
         const multi=f.type==='multi';
         const opts=f.type==='yesno'?[L.yes,L.no]:f.options;
@@ -1400,10 +1495,14 @@ const _iui=(function(){
           input.style.setProperty('--p',((n-f.min)/(f.max-f.min)*100).toFixed(2)+'%');
           out.textContent=touched?formNumberText(n,f,l):L.slide;
           row.classList.toggle('is-untouched',!touched);
-          input.setAttribute('aria-valuetext',formNumberText(n,f,l));
+          input.setAttribute('aria-valuetext',touched?formNumberText(n,f,l):L.slide);
         };
-        input.addEventListener('input',()=>{touched=true;show();clearErr();});
-        input.addEventListener('change',()=>{touched=true;show();});
+        const touch=()=>{if(card.classList.contains('is-locked'))return;touched=true;show();clearErr();};
+        input.addEventListener('input',touch);
+        input.addEventListener('change',touch);
+        // Clicking the thumb without moving it fires no input event.
+        input.addEventListener('pointerup',touch);
+        input.addEventListener('keydown',ev=>{if(/^(Arrow(Left|Right|Up|Down)|Home|End|PageUp|PageDown)$/.test(ev.key))touch();});
         show();
         const track=el('div','iui-slider-track');
         const ends=el('div','iui-slider-ends');ends.setAttribute('aria-hidden','true');
@@ -1416,13 +1515,40 @@ const _iui=(function(){
       } else {
         let input;
         if(f.type==='text'&&f.long){input=el('textarea','iui-input');input.rows=3;}
-        else {input=el('input','iui-input');input.type=f.type==='date'?'date':'text';}
+        else {input=el('input','iui-input');input.type='text';}
         input.setAttribute('aria-labelledby',lab.id);describe(input);
         if(f.required) input.setAttribute('aria-required','true');
         if(f.type==='text'){input.maxLength=FORM_LIMITS.text;input.autocomplete='off';}
         if(f.placeholder) input.placeholder=f.placeholder;
-        if(f.type==='date'){if(f.min)input.min=f.min;if(f.max)input.max=f.max;}
-        let host=input;
+        let host=input, echo=null;
+        if(f.type==='date'){
+          // The browser's own date box follows the browser language (mm/dd/yyyy
+          // under a Dutch label), so the box takes Dutch dates and says the
+          // chosen day in words; the calendar button fills it in.
+          input.autocomplete='off';input.maxLength=40;input.spellcheck=false;
+          if(!f.placeholder) input.placeholder=L.datePh;
+          host=el('div','iui-date');host.appendChild(input);
+          const native=document.createElement('input');native.type='date';native.className='iui-date-native';
+          native.tabIndex=-1;native.setAttribute('aria-hidden','true');
+          if(f.min)native.min=f.min;if(f.max)native.max=f.max;
+          const pick=el('button','iui-date-pick');pick.type='button';pick.setAttribute('aria-label',L.calendar);pick.title=L.calendar;
+          pick.appendChild(iconEl('calendar'));
+          host.appendChild(pick);host.appendChild(native);
+          echo=el('div','iui-date-echo');echo.id=uid+'-d'+fi;
+          const paintEcho=()=>{const iso=formDateParse(input.value,{min:f.min,max:f.max});echo.textContent=iso?formDateEcho(iso,l):'';};
+          input.addEventListener('input',paintEcho);
+          native.addEventListener('change',()=>{
+            if(!native.value||card.classList.contains('is-locked')) return;
+            input.value=formDateInput(native.value,l);paintEcho();clearErr();input.focus();
+          });
+          pick.addEventListener('click',()=>{
+            if(card.classList.contains('is-locked')) return;
+            native.value=formDateParse(input.value,{min:f.min,max:f.max})||'';
+            try{if(typeof native.showPicker==='function'){native.showPicker();return;}}catch(_){}
+            input.focus();
+          });
+          input.__paintEcho=paintEcho;
+        }
         if(f.type==='number'){
           input.inputMode='decimal';input.autocomplete='off';input.maxLength=40;
           const u=formUnit(f.unit);
@@ -1431,10 +1557,12 @@ const _iui=(function(){
           host.appendChild(input);
           if(u.post){const p=el('span','iui-num-unit',u.post.trim());p.setAttribute('aria-hidden','true');host.appendChild(p);}
         }
-        if(f.default!=null) input.value=f.type==='number'?new Intl.NumberFormat(l==='nl'?'nl-NL':'en-GB',{maximumFractionDigits:4,useGrouping:false}).format(f.default):String(f.default);
+        if(f.default!=null) input.value=f.type==='number'?new Intl.NumberFormat(l==='nl'?'nl-NL':'en-GB',{maximumFractionDigits:4,useGrouping:false}).format(f.default):f.type==='date'?formDateInput(f.default,l):String(f.default);
+        if(input.__paintEcho) input.__paintEcho();
         input.addEventListener('input',clearErr);
         if(input.tagName==='INPUT') input.addEventListener('keydown',ev=>{if(ev.key==='Enter'&&!ev.isComposing){ev.preventDefault();submitForm(ev);}});
         wrap.appendChild(host);
+        if(echo){wrap.appendChild(echo);input.setAttribute('aria-describedby',[echo.id,input.getAttribute('aria-describedby')||''].filter(Boolean).join(' '));}
         readers.push(()=>input.value);
         wrap.__focus=()=>input.focus();
       }
@@ -1459,20 +1587,21 @@ const _iui=(function(){
       const wraps=[...body.querySelectorAll('.iui-field')];
       spec.fields.forEach((f,i)=>{
         const r=formCheck(f,readers[i](),l), w=wraps[i];
-        if(r.error){bad++;w.__err.textContent=r.error;w.__err.hidden=false;w.classList.add('is-invalid');if(!firstBad)firstBad=w;}
-        else{w.__err.hidden=true;w.classList.remove('is-invalid');answers[f.id]=r.value;}
+        if(r.error){bad++;w.__err.textContent=r.error;w.classList.add('is-invalid');if(!firstBad)firstBad=w;}
+        else{w.__err.textContent='';w.classList.remove('is-invalid');answers[f.id]=r.value;}
       });
       if(bad){hint.textContent=L.left(bad);if(firstBad&&firstBad.__focus)firstBad.__focus();return;}
       const out=formMessage(spec,answers);
       if(!out.text){hint.textContent=L.empty;return;}
       hint.textContent='';
+      if(card.contains(document.activeElement)) formFocus={key,until:Date.now()+15000};
       card.classList.add('is-pending');submit.disabled=true;
       const started=sendPrompt(out.text,ok=>{
         card.classList.remove('is-pending');submit.disabled=false;
         if(!ok) return;
         saveState(key,{display:out.display});
         formShowLocked(card,spec,out.display,'sent');
-      });
+      },{sentToast:L.sentToast(Object.keys(out.display).length)});
       if(!started){card.classList.remove('is-pending');submit.disabled=false;}
     }
     submit.addEventListener('click',submitForm);
@@ -1520,7 +1649,14 @@ const _iui=(function(){
       }
       if(FORM_LANGS.has(block.getAttribute('data-iui-kind')||'')){
         // A questions form belongs to the assistant; elsewhere the text stays plain.
-        if(block.closest('.assistant-turn,.msg-row[data-role="assistant"],#liveAssistantTurn')) renderForm(block);
+        if(block.closest('.assistant-turn,.msg-row[data-role="assistant"],#liveAssistantTurn')){
+          try{renderForm(block);}
+          catch(err){
+            try{console.warn('[interactive-ui] form failed',err);}catch(_){}
+            block.textContent='';
+            formError(block,[String(err&&err.message||err||'render failed').slice(0,200)],block.getAttribute('data-iui-kind')||'form');
+          }
+        }
         else{const pre=document.createElement('pre');const c=document.createElement('code');c.textContent=block.textContent||'';pre.appendChild(c);block.replaceWith(pre);}
         return;
       }
@@ -1621,7 +1757,7 @@ const _iui=(function(){
     if(ev.target&&ev.target.closest&&(ev.target.closest('.iui-menu')||ev.target.closest('.iui-actions')))return;
     closeMenu(false);
   },true);
-  return {parse,renderBlocks,streamTick,allowedUrl,rewriteUrl,themeMessage,chipTexts,kitKindOf,FENCE_LANGS,CHIP_LANGS,FORM_LANGS,formSpec,formMessage,formAnswersFrom,formCheck,_byWindow:byWindow,_controllers:controllers};
+  return {parse,renderBlocks,streamTick,allowedUrl,rewriteUrl,themeMessage,chipTexts,kitKindOf,FENCE_LANGS,CHIP_LANGS,FORM_LANGS,formSpec,formMessage,formAnswersFrom,formCheck,formNumberText,formDateParse,formDateInput,formDateEcho,formTurnState,_byWindow:byWindow,_controllers:controllers};
 })();
 
 // A reply that starts with the interactive block's title comment but has no

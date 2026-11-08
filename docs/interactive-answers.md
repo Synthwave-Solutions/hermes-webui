@@ -157,9 +157,15 @@ characters. A body that does not start with `{` or `[` stays a code block.
   click is a real click of the user. Choices are pills, `multi` are toggles,
   a slider shows its value as it moves ("7 uur"), yes/no is two pills,
   numbers take Dutch notation ("5.000", "€ 7.500,50") with the unit around
-  the box ("€ ... per maand"). Required questions carry a `*` and are
-  checked on Versturen ("Vul dit nog in.", "Nog 2 vragen in te vullen.").
-- **Checking** fixes what it can (a bare list or a single question, a string
+  the box ("€ ... per maand"); an English form reads "1,500.50". A date is a
+  text box that takes Dutch dates ("1-12-2026", "1 december", day first,
+  whatever the browser language) and says the day in words below it
+  ("dinsdag 1 december 2026"); the calendar button fills it in. Required
+  questions carry a `*` and are checked on Versturen ("Vul dit nog in.",
+  "Nog 2 vragen in te vullen."). Arrow keys move a single choice, Enter in a
+  text or number box sends, and a click from a script never sends.
+- **Checking** fixes what it can (a bare list or a single question, also
+  one with only a `title` and a type, questions as a map keyed by id, a string
   as an open question, aliases such as `dropdown`, `getal`, `ja-nee`,
   duplicate or extra options, swapped min and max, a default that does not
   fit, a slider without a range) and keeps the fixes as warnings. When no
@@ -169,12 +175,15 @@ characters. A body that does not start with `{` or `[` stays a code block.
   for example `Mijn antwoorden:\n- Budget: € 5.000 per maand\n- Start: 1
   december`, and sends it through the same path as the reply chips: while a
   reply is running it waits, and a draft in the message box is never
-  overwritten. Unanswered optional questions are left out.
+  overwritten. Unanswered optional questions are left out. The toast says
+  "Antwoorden verstuurd".
 - **After sending** the card locks and lists the answers in a muted style
   with "Verstuurd". A form under an older reply is shown answered: the
   answers come from this tab's memory or are read back from the next user
   message; otherwise it says "Het gesprek is verder gegaan." Only the form
-  under the latest reply can be used.
+  under the latest reply can be used; a /btw side question does not count as
+  a newer message. A form that fails to draw shows the error card, and the
+  other blocks in the reply still mount.
 - **While the reply streams** one quiet line ("Vragen worden klaargezet")
   stands in for the block; the JSON is never shown.
 
