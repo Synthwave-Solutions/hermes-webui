@@ -8468,6 +8468,57 @@ span.sidebar-bot-scout{cursor:default;background:transparent;}
   .sp-friendly-tool .sp-details-label{display:none;}
 }
 
+/* Bot teamwork: handoff line, task author line, result card, helper credit.
+   Quiet metadata on the same tokens as the dock; bot photos with the
+   initial underneath as a fallback. */
+.sp-bot-avatar{position:relative;display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;flex:0 0 20px;border-radius:6px;overflow:hidden;background:var(--sp-active-bg,var(--accent-bg));color:var(--accent-text);font-size:10.5px;font-weight:700;line-height:1;box-shadow:0 0 0 1px var(--border);}
+.sp-bot-avatar img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+.sp-bot-avatar-initial{pointer-events:none;}
+.sp-handoff-avatars{display:inline-flex;align-items:center;gap:3px;flex:0 0 auto;}
+.sp-handoff-arrow{font-size:11px;color:var(--muted);opacity:.8;}
+.sp-friendly-tool .tool-card-icon .sp-handoff-avatars .sp-bot-avatar{width:18px;height:18px;flex-basis:18px;font-size:9.5px;}
+.sp-friendly-tool .tool-card-icon:has(.sp-handoff-avatars){width:auto;flex:0 0 auto;}
+.sp-handoff-line{margin:6px 0 2px;font-size:13px;color:var(--muted);max-width:100%;}
+.sp-handoff-summary{display:flex;align-items:center;gap:8px;min-width:0;list-style:none;cursor:default;padding:3px 0;}
+details.sp-handoff-line > .sp-handoff-summary{cursor:pointer;}
+.sp-handoff-summary::-webkit-details-marker{display:none;}
+.sp-handoff-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);opacity:.82;}
+.sp-handoff-line[data-kind="error"] .sp-handoff-text{color:var(--error);opacity:1;}
+.sp-handoff-more{flex:0 0 auto;margin-left:auto;font-size:11.5px;color:var(--muted);opacity:.75;padding:1px 6px;border-radius:999px;border:1px solid transparent;}
+.sp-handoff-summary:hover .sp-handoff-more{opacity:1;border-color:var(--border2,var(--border));}
+.sp-handoff-line[open] .sp-handoff-more{opacity:1;}
+.sp-handoff-brief{margin:4px 0 6px 28px;padding:8px 10px;border-left:2px solid var(--border);color:var(--text);opacity:.85;font-size:12.5px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;max-height:320px;overflow:auto;}
+.tool-card-detail .sp-handoff-brief{margin-left:0;}
+.msg-author.sp-handoff-author{gap:4px;}
+.msg-author.sp-handoff-author .msg-author-name{margin-left:2px;}
+.sp-handoff-task > summary{cursor:pointer;font-size:12px;color:var(--muted);padding:2px 0;}
+.sp-handoff-task[open] > summary{margin-bottom:4px;}
+.sp-bot-result{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 12px;border:1px solid var(--border);border-radius:var(--sp-radius-lg,12px);background:var(--sp-card-bg,var(--surface));}
+.sp-bot-result .sp-bot-avatar{width:28px;height:28px;flex-basis:28px;border-radius:8px;font-size:13px;}
+.sp-bot-result-main{display:flex;flex-direction:column;gap:1px;min-width:0;flex:1 1 180px;}
+.sp-bot-result-title{font-size:13.5px;font-weight:600;color:var(--text);}
+.sp-bot-result[data-state="partial"] .sp-bot-result-title{color:var(--warning,#b45309);}
+.sp-bot-result-sub{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);}
+.sp-bot-result-sub .msg-time{font-size:11px;opacity:.75;}
+.sp-bot-result-open{font:inherit;font-size:12.5px;color:var(--accent-text);background:none;border:1px solid var(--border);border-radius:999px;padding:3px 10px;cursor:pointer;flex:0 0 auto;}
+.sp-bot-result-open:hover{background:var(--hover-bg);}
+.msg-role.assistant .sp-assisted-chip{display:inline-flex;align-items:center;min-width:0;max-width:100%;margin-left:8px;padding:0 8px;border-radius:999px;border:1px solid var(--border-subtle,var(--border));color:var(--muted);font-size:11px;font-weight:400;line-height:1.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sp-subagent-avatar.sp-bot-avatar{width:28px;height:28px;flex:0 0 28px;border-radius:9px;font-size:13px;}
+.sp-subagent-status{font-size:12px;color:var(--text);opacity:.78;white-space:nowrap;}
+.sp-subagent-card[data-state="failed"] .sp-subagent-status{color:var(--error);opacity:1;}
+.sp-subagent-card[data-state="done"] .sp-subagent-status{opacity:.6;}
+.sp-chip-sep{color:var(--muted);opacity:.6;font-size:11px;align-self:center;}
+/* The result card is the whole notice: no second frame around it. */
+.process-wakeup-notice:has(> .sp-bot-result){padding:0;border:0;background:none;}
+@media (max-width:640px){
+  .sp-handoff-more{display:none;}
+  .sp-handoff-brief{margin-left:0;}
+  .msg-role.assistant .sp-assisted-chip{max-width:46vw;margin-left:6px;}
+  .sp-subagent-status{display:none;}
+  .sp-bot-result-open{width:100%;text-align:center;}
+  .sp-chip-sep{display:none;}
+}
+
 /* Log out icon in the rail and the mobile nav */
 .sp-logout-btn[hidden]{display:none!important;}
 
