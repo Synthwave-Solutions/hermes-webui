@@ -7652,7 +7652,7 @@ html[data-nav-audience="admin"] .app-titlebar-title::after{content:' Control';}
 
 /* Provider grid */
 .intg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;}
-.intg-card{border:1px solid var(--border);border-radius:12px;padding:14px;background:var(--input-bg);display:flex;flex-direction:column;gap:6px;transition:border-color .15s ease;}
+.intg-card{border:1px solid var(--border);border-radius:12px;padding:14px;background:var(--input-bg);display:flex;flex-direction:column;gap:6px;transition:border-color .15s ease;min-width:0;}
 .intg-card.configured:hover{border-color:var(--accent);}
 .intg-card:not(.configured){opacity:.72;}
 .intg-card-head{display:flex;align-items:center;gap:8px;}
@@ -7663,10 +7663,13 @@ html[data-nav-audience="admin"] .app-titlebar-title::after{content:' Control';}
 .intg-badge{display:inline-flex;align-items:center;border:1px solid var(--border);border-radius:999px;padding:1px 8px;font-size:10px;font-weight:600;color:var(--muted);line-height:1.5;}
 .intg-badge-cat{color:#5cc8ff;border-color:rgba(46,161,255,.3);}
 .intg-badge-ok{color:#5cd58a;border-color:rgba(72,199,116,.4);}
+.intg-badge-cli{color:#7cc4ff;border-color:rgba(124,196,255,.4);}
 .intg-badge-error{color:#f0717b;border-color:rgba(240,113,123,.4);}
 .intg-badge-pending{color:#e8a44c;border-color:rgba(232,164,76,.4);}
 .intg-requests{display:flex;flex-wrap:wrap;align-items:center;gap:4px;font-size:12px;margin-bottom:14px;line-height:1.5;}
-.intg-card-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:auto;padding-top:6px;}
+.intg-card-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:auto;padding-top:6px;flex-wrap:wrap;}
+#intgChannelGrid .intg-card-actions{justify-content:flex-start;align-items:stretch;}
+.intg-card-actions .sm-btn{max-width:100%;white-space:normal;text-align:center;}
 .intg-docs-link{font-size:11px;color:var(--muted);text-decoration:none;font-weight:600;}
 .intg-docs-link:hover{color:var(--accent);text-decoration:underline;}
 

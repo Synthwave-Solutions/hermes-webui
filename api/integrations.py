@@ -785,13 +785,20 @@ def request_provider_approval(owner_email: str | None, provider_config_key: str)
 def _catalog_item(key: str, entry: dict) -> dict:
     categories = entry.get("categories")
     mcp_setup = str(entry.get("auth_mode") or "").upper() == "MCP_OAUTH2"
+    from api.app_connections import cli_env_names
+    cli_env = cli_env_names(key)
+    cats = [str(c) for c in categories] if isinstance(categories, list) else []
+    if cli_env and "cli" not in cats:
+        # A personal connection of this provider also feeds the person's own CLIs.
+        cats.append("cli")
     return {
         "key": key,
         "display_name": str(entry.get("display_name") or key),
         "auth_mode": str(entry.get("auth_mode") or ""),
         "credential_fields": (["client_id", "client_secret"] if _setup_kind(entry) == "static"
                               else list(_OAUTH_CREDENTIAL_FIELDS.get(str(entry.get("auth_mode") or "").upper(), ()))),
-        "categories": [str(c) for c in categories] if isinstance(categories, list) else [],
+        "categories": cats,
+        "cli_env": cli_env,
         "docs": _safe_docs_url(entry.get("docs")),
         "configured": False,
         "unique_key": None,

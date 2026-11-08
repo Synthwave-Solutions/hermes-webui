@@ -6,7 +6,7 @@ def bind(identity):
     from api import personal_context
     from api.hosted_connectors import personal_token, authorize_connection
     from agent.vault_scope import bind_personal_vault, reset_personal_vault
-    from tools.connectors.identity import bind_connector_identity
+    from tools.connectors.identity import bind_connector_identity, reset_connector_identity
     captured = dict(identity) if isinstance(identity, dict) else {"email": identity}
     root = personal_context.ensure_home(captured)
     vault = bind_personal_vault(root)
@@ -18,17 +18,29 @@ def bind(identity):
     except BaseException:
         reset_personal_vault(vault)
         raise
-    return vault, connectors
+    try:
+        from api import app_connections
+        apps = app_connections.bind(captured)
+    except BaseException:
+        reset_connector_identity(connectors)
+        reset_personal_vault(vault)
+        raise
+    return vault, connectors, apps
 
 
 def reset(tokens):
     from agent.vault_scope import reset_personal_vault
     from tools.connectors.identity import reset_connector_identity
-    vault, connectors = tokens
+    vault, connectors, *rest = tokens
     try:
-        reset_connector_identity(connectors)
+        if rest:
+            from api import app_connections
+            app_connections.reset(rest[0])
     finally:
-        reset_personal_vault(vault)
+        try:
+            reset_connector_identity(connectors)
+        finally:
+            reset_personal_vault(vault)
 
 
 @contextmanager

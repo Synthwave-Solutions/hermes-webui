@@ -370,6 +370,7 @@ function _intgFilteredProviders() {
     if (String(p.display_name || '').toLowerCase().includes(q)) return true;
     if (String(p.key || '').toLowerCase().includes(q)) return true;
     if (String(p.description || '').toLowerCase().includes(q)) return true;
+    if ((p.cli_env || []).some(v => String(v).toLowerCase().includes(q))) return true;
     return (p.categories || []).some(c => String(c).toLowerCase().includes(q));
   });
   // Configured providers first; within each group keep the backend's
@@ -395,12 +396,14 @@ function _intgRenderGrid() {
   grid.innerHTML = visible.map(p => {
     if (p._hosted) return _hostedCardHtml(p);
     const authLabel = _intgAuthModeLabel(p.auth_mode);
-    const cats = (p.categories || []).slice(0, 3);
+    const cats = (p.categories || []).filter(c => c !== 'cli').slice(0, 3);
+    const cliEnv = (p.cli_env || []);
     const connected = p.configured && p.unique_key && connectedKeys.has(p.unique_key);
     let approval = _intgApprovalOf(p);
     if ((p.unique_key && pendingKeys.has(p.unique_key)) || pendingKeys.has(p.key)) approval = 'pending';
     const badges = (authLabel ? '<span class="intg-badge">' + _intgEsc(authLabel) + '</span>' : '')
       + cats.map(c => '<span class="intg-badge intg-badge-cat">' + _intgEsc(c) + '</span>').join('')
+      + (cliEnv.length ? '<span class="intg-badge intg-badge-cli" title="' + _intgEsc(_intgT('integrations_cli_env_hint', 'Your own connection also feeds your CLIs in chat:') + ' ' + cliEnv.join(', ')) + '">' + _intgEsc(_intgT('integrations_cli_badge', 'CLI key')) + '</span>' : '')
       + (connected ? '<span class="intg-badge intg-badge-ok">' + _intgEsc(_intgT('integrations_connected', 'Connected')) + '</span>' : '')
       + (p.configured && p.needs_setup ? '<span class="intg-badge intg-badge-warn">' + _intgEsc(_intgT('integrations_setup_needed', 'Setup needed')) + '</span>' : '')
       + (approval === 'pending' ? '<span class="intg-badge intg-badge-pending">' + _intgEsc(_intgT('integrations_awaiting_approval', 'Waiting for admin approval')) + '</span>' : '');
@@ -915,7 +918,10 @@ function chRenderGrid() {
       : '<span class="intg-badge">' + _intgT('channels_not_configured', 'Not connected') + '</span>');
     if (p.configured && p.allow_all) badges.push('<span class="intg-badge intg-badge-warn">' + _intgT('channels_allow_all_short', 'open to all') + '</span>');
     if (p.pending_count) badges.push('<span class="intg-badge intg-badge-pending">' + p.pending_count + ' ' + _intgT('channels_pairing_short', 'pairing') + '</span>');
-    let meta = p.configured ? '<div class="ch-card-meta">' + _intgT('channels_people_count', '{n} people mapped').replace('{n}', String(p.mapped_count || 0)) + (p.approved_count ? ' · ' + p.approved_count + ' approved' : '') + '</div>' : '';
+    const _mapped = Number(p.mapped_count || 0);
+    const _peopleKey = _mapped === 1 ? 'channels_people_count_one' : 'channels_people_count';
+    let meta = p.configured ? '<div class="ch-card-meta">' + _intgT(_peopleKey, _mapped === 1 ? '{n} person mapped' : '{n} people mapped').replace('{n}', String(_mapped))
+      + (p.approved_count ? ' · ' + _intgT('channels_approved_count', '{n} approved').replace('{n}', String(p.approved_count)) : '') + '</div>' : '';
     if (p.public) {
       if (p.public.state === 'published') {
         meta += '<div class="ch-card-meta ch-public"><span>' + _intgEsc(p.public.label) + ':</span> <code>' + _intgEsc(p.public.url) + '</code> <button type="button" class="sm-btn ch-copy" onclick="chCopy(this)" data-copy="' + _intgEsc(p.public.url) + '">' + _intgT('copy', 'Copy') + '</button></div>';
