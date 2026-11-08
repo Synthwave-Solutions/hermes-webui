@@ -18,9 +18,14 @@ test('US-SP-BOT-HANDOFF delegates through real engine and replies in the same ch
  expect(read.session_id).toBe(sid);
  await page.reload();await expect(page.locator('#messages')).toContainText('QA_BOT_HANDOFF_DONE');
  await expect(page.locator('#messages')).not.toContainText('not a new human instruction');
- await expect(page.locator('.msg-author').filter({hasText:'default → qa-research'})).toBeVisible();
+ // The task row names both bots by display name; profile IDs stay in the tooltip.
+ const author=page.locator('.msg-author.sp-handoff-author').first();
+ await expect(author).toBeVisible();
+ await expect(author).toHaveAttribute('title','@default ↪ @qa-research');
+ await expect(author).not.toContainText('qa-research');
+ await expect(page.locator('details.sp-handoff-task').first()).toBeVisible();
  await page.screenshot({path:testInfo.outputPath('handoff-desktop.png'),fullPage:true});
  await page.setViewportSize({width:390,height:844});
- await expect(page.locator('.msg-author').filter({hasText:'default → qa-research'})).toBeVisible();
+ await expect(author).toBeVisible();
  await page.screenshot({path:testInfo.outputPath('handoff-mobile.png'),fullPage:true});
 });
