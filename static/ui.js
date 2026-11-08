@@ -8152,7 +8152,7 @@ function renderMd(raw){
     const firstMermaidLine=codeLines.map(line=>line.trim()).find(line=>line&&!line.startsWith('%%'))||'';
     const looksLikeLineNumberedToolOutput=/^\s*\d+\|/.test(firstCodeLine);
     const looksLikeMermaidStart=firstMermaidLine==='---'||/^(graph|flowchart|sequenceDiagram|classDiagram|classDiagram-v2|stateDiagram|stateDiagram-v2|erDiagram|journey|gantt|pie|gitGraph|mindmap|timeline|quadrantChart|requirementDiagram|C4Context|C4Container|C4Component|C4Dynamic|c4Context|c4Container|c4Component|c4Dynamic|sankey-beta|block-beta|packet-beta|xychart-beta|kanban|architecture-beta)\b/.test(firstMermaidLine);
-    if(_interactiveUiFenceAccepts(lang,code)) return lead+_interactiveUiPlaceholder(code,lang);
+    if(_iuiFenceOk(lang,code)) return lead+_iuiPlaceholder(code,lang);
     if(_svgVisualFenceAccepts(lang,code)) return lead+_svgVisualPlaceholder(code);
     if(lang==='mermaid'&&!looksLikeLineNumberedToolOutput&&looksLikeMermaidStart){
       const id='mermaid-'+Math.random().toString(36).slice(2,10);
@@ -8623,8 +8623,7 @@ function renderMd(raw){
   // in depth.
   // The svg-visual-block alternation (plan addendum AE-3) only ever matches
   // placeholders built above: _tag strips that class from raw HTML.
-  // iui-block (interactive answers) is protected the same way: its escaped
-  // source keeps blank lines that must not become paragraphs.
+  // Same for iui-block: its source keeps blank lines.
   s=s.replace(/(<div class="pre-header">[\s\S]*?<\/div>)?<pre[^>]*>[\s\S]*?<\/pre>|<div class="(mermaid-block|katex-block)"[\s\S]*?<\/div>|<div class="iui-block"[\s\S]*?<\/div>|<div class="svg-visual-block"[\s\S]*?<\/div>/g,m=>{
     _pre_stash.push(m);
     return '\x00E'+(_pre_stash.length-1)+'\x00';
@@ -8646,11 +8645,11 @@ function renderMd(raw){
   // static/interactive_ui.js may define interactiveUiFenceAccepts(lang,code).
   // The renderer builds the placeholder itself with the source escaped; the
   // card and its sandboxed frame are mounted later in postProcess.
-  function _interactiveUiFenceAccepts(lang,code){
+  function _iuiFenceOk(lang,code){
     if(typeof interactiveUiFenceAccepts!=='function') return false;
     try{return interactiveUiFenceAccepts(lang,code)===true;}catch(_){return false;}
   }
-  function _interactiveUiPlaceholder(code,lang){
+  function _iuiPlaceholder(code,lang){
     const id='iui-'+Math.random().toString(36).slice(2,10);
     const kind=/^[a-z-]+$/.test(lang||'')?lang:'interactive-ui';
     _preBlock_stash.push(`<div class="iui-block" data-iui-id="${id}" data-iui-kind="${kind}">${esc(code.trim())}</div>`);

@@ -156,6 +156,8 @@ ROUTE_CATALOG: tuple[RouteRule, ...] = (
 
     # chat execution (incl. SSE streams, approval/clarify, voice)
     RouteRule("/api/chat",                "chat:use", "chat:use"),
+    # Map places in chat answers (interactive answers): anyone who may chat.
+    RouteRule("/api/map/resolve",         "chat:use", "chat:use", match="exact"),
     RouteRule("/api/btw",                 "chat:use", "chat:use", match="exact"),
     RouteRule("/api/goal",                "chat:use", "chat:use", match="exact"),
     RouteRule("/api/approval",            "chat:use", "chat:use"),

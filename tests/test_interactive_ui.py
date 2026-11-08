@@ -208,7 +208,7 @@ def test_prompt_text_names_the_contract_and_has_no_long_dashes():
 # ── Wiring ──────────────────────────────────────────────────────────────────
 
 def test_fence_seam_is_guarded_and_runs_before_svg_and_mermaid():
-    call = "if(_interactiveUiFenceAccepts(lang,code)) return lead+_interactiveUiPlaceholder(code,lang);"
+    call = "if(_iuiFenceOk(lang,code)) return lead+_iuiPlaceholder(code,lang);"
     assert UI.count(call) == 1
     assert UI.index(call) < UI.index("if(_svgVisualFenceAccepts(lang,code))") < UI.index("if(lang==='mermaid'")
     assert "if(typeof interactiveUiFenceAccepts!=='function') return false;" in UI
