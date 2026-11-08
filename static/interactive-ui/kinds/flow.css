@@ -1,0 +1,55 @@
+/* Flow: a process diagram. Buttons hold the steps, one SVG under them holds
+   the connectors. Only --sw-* theme variables. */
+.k-flow{display:flex;flex-direction:column;gap:8px}
+.k-flow-scroll{overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;padding:2px 0}
+.k-flow-scroll:focus-visible{outline:2px solid var(--sw-accent);outline-offset:2px;border-radius:6px}
+.k-flow-sizer{position:relative;margin:0 auto}
+.k-flow-scroll.is-wide .k-flow-sizer{margin:0}
+.k-flow-canvas{position:absolute;left:0;top:0;transform-origin:0 0}
+.k-flow-edges{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
+.k-flow-line{fill:none;stroke:color-mix(in srgb,var(--sw-muted) 62%,transparent);stroke-width:1.5;stroke-linejoin:round;stroke-linecap:round}
+.k-flow-head{fill:color-mix(in srgb,var(--sw-muted) 80%,transparent)}
+.k-flow-edge.is-back .k-flow-line{stroke-dasharray:5 4}
+.k-flow-edge,.k-flow-elabel,.k-flow-node{transition:opacity .15s ease}
+.k-flow-line,.k-flow-head{transition:stroke .15s ease,fill .15s ease}
+.has-active .k-flow-edge{opacity:.38}
+.has-active .k-flow-edge.is-hot{opacity:1}
+.k-flow-edge.is-hot .k-flow-line{stroke:var(--sw-accent);stroke-width:2}
+.k-flow-edge.is-hot .k-flow-head{fill:var(--sw-accent)}
+.k-flow-elabel{position:absolute;z-index:2;height:16px;line-height:16px;padding:0 5px;border-radius:5px;white-space:nowrap;
+  font-size:.72rem;font-weight:600;color:var(--sw-muted);background:var(--k-solid)}
+.has-active .k-flow-elabel{opacity:.5}
+.has-active .k-flow-elabel.is-hot{opacity:1;color:var(--sw-accent)}
+
+/* Steps */
+.k-flow-node{all:unset;box-sizing:border-box;position:absolute;z-index:1;display:flex;align-items:center;justify-content:center;
+  padding:7px 12px;border-radius:10px;cursor:pointer;text-align:center;
+  background:var(--k-solid-2);border:1px solid var(--sw-border);color:var(--sw-strong)}
+.k-flow-text{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0;max-width:100%;position:relative}
+.k-flow-label{font-size:.84rem;font-weight:550;line-height:1.28;overflow-wrap:break-word;hyphens:manual}
+.k-flow-owner{display:inline-flex;align-items:center;gap:5px;max-width:100%;font-size:.72rem;font-weight:500;line-height:1.25;color:var(--sw-muted);overflow-wrap:break-word}
+.k-flow-dot{flex:0 0 auto;width:6px;height:6px;border-radius:50%;background:color-mix(in srgb,var(--sw-muted) 70%,transparent)}
+.k-flow-dot.is-o0{background:var(--sw-c2)}.k-flow-dot.is-o1{background:var(--sw-c4)}.k-flow-dot.is-o2{background:var(--sw-c7)}
+.k-flow-dot.is-o3{background:var(--sw-c6)}.k-flow-dot.is-o4{background:var(--sw-c5)}.k-flow-dot.is-o5{background:var(--sw-c3)}
+.k-flow-node.is-start,.k-flow-node.is-end{border-radius:999px;padding:7px 16px;white-space:normal}
+.k-flow-node.is-start{background:linear-gradient(var(--sw-accent-soft),var(--sw-accent-soft)),var(--k-solid);border-color:color-mix(in srgb,var(--sw-accent) 55%,transparent)}
+.k-flow-node.is-end{background:var(--k-solid-2);border:1.5px solid color-mix(in srgb,var(--sw-strong) 45%,transparent)}
+.k-flow-node.is-wait{border-style:dashed;border-color:color-mix(in srgb,var(--sw-muted) 70%,transparent);background:var(--k-solid)}
+.k-flow-node.is-wait .k-flow-label{font-weight:500;color:var(--sw-fg)}
+.k-flow-node.is-decision{background:transparent;border:0;border-radius:0;padding-top:0;padding-bottom:0}
+.k-flow-diamond{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.k-flow-diamond polygon{fill:color-mix(in srgb,var(--sw-info) 9%,var(--sw-surface));stroke:color-mix(in srgb,var(--sw-info) 55%,var(--sw-border));stroke-width:1.25;stroke-linejoin:round}
+.k-flow-node:hover{border-color:color-mix(in srgb,var(--sw-accent) 60%,var(--sw-border))}
+.k-flow-node.is-decision:hover polygon{stroke:color-mix(in srgb,var(--sw-accent) 60%,var(--sw-border))}
+.k-flow-node:focus-visible{outline:2px solid var(--sw-accent);outline-offset:3px}
+.k-flow-node.is-decision:focus-visible{outline:0}
+.k-flow-node.is-decision:focus-visible polygon{stroke:var(--sw-accent);stroke-width:2.5}
+.k-flow-node.is-active{box-shadow:0 0 0 2px var(--sw-surface),0 0 0 4px var(--sw-accent)}
+.k-flow-node.is-decision.is-active{box-shadow:none}
+.k-flow-node.is-decision.is-active polygon{stroke:var(--sw-accent);stroke-width:2.5;fill:color-mix(in srgb,var(--sw-accent) 12%,var(--sw-surface))}
+.k-flow-node.is-near{border-color:color-mix(in srgb,var(--sw-accent) 45%,var(--sw-border))}
+.k-flow-node.is-decision.is-near polygon{stroke:color-mix(in srgb,var(--sw-accent) 45%,var(--sw-border))}
+.k-flow-detail{margin:0;font-size:.84rem;color:var(--sw-muted);min-height:1.3em}
+.k-flow-detail.is-set{color:var(--sw-fg)}
+@media (pointer:coarse){.k-flow-node{min-height:44px}}
+@media (prefers-reduced-motion:reduce){.k-flow-edge,.k-flow-elabel,.k-flow-node,.k-flow-line,.k-flow-head{transition:none}}
