@@ -5512,6 +5512,8 @@ function _applyReasoningChip(eff){
   if(chip){
     const inactive=!effort||effort==='none';
     chip.classList.toggle('inactive',inactive);
+    // At the usual level the icon alone is enough; a word only when it differs.
+    chip.classList.toggle('is-default',!effort||effort==='default'||effort==='medium');
     const labelText=(typeof spT==='function')?spT('reasoning_chip_title','Thinking level: {0}',text):'Reasoning effort: '+text;
     chip.title=labelText;
     chip.setAttribute('aria-label',labelText);

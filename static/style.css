@@ -8883,3 +8883,6 @@ button.bg-badge{border:0;cursor:pointer;min-width:28px;min-height:28px;}
 /* Context ring: the colour says enough; exact numbers stay in the tooltip. */
 #ctxIndicatorWrap .ctx-ring-center{display:none!important}
 #composerMobileCtxRing #ctx-num{display:none}
+/* Thinking level: icon only at the usual level; the tooltip names it. */
+#composerReasoningChip.is-default #composerReasoningLabel{display:none}
+#composerReasoningChip.is-default{gap:0;padding-inline:8px}
