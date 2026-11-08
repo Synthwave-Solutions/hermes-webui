@@ -124,3 +124,23 @@ def test_voice_gets_studio_tools_only_in_its_own_use_case(env):
     assert "Taak" in " ".join(out["components"]) or out["components"]
     with pytest.raises(ValueError):
         ctl._studio_tool("studio_capture", {"step": "build", "input": "x"})
+
+
+def test_deep_dive_process_baseline_and_data():
+    from api import studio
+    p = studio.clean_process({
+        "frequency": {"count": 15, "per": "week"},
+        "as_is": [{"step": "Prijzen zoeken", "minutes": 20, "tools": ["Word", "", "Excel"], "pain": "Verspreid", "decision": "ja"},
+                  {"step": "Offerte maken", "minutes": 25}],
+        "to_be": [{"step": "Agent maakt concept", "actor": "agent", "building_block": "task", "minutes": 5, "replaces": [1, "2", -1, "x"]}],
+        "data_sensitivity": "personal", "data_note": "Klantnamen", "questions": ["Waar staan de oude offertes?", ""]})
+    assert p["as_is"][0]["tools"] == ["Word", "Excel"] and p["as_is"][0]["decision"] is True
+    assert p["to_be"][0]["replaces"] == [1, 2]
+    assert p["baseline"] == {"minutes_before": 45, "minutes_after": 5, "runs_per_week": 15,
+                             "hours_week_before": 11.2, "hours_week_after": 1.2}
+    assert p["data_sensitivity"] == "personal" and p["questions"] == ["Waar staan de oude offertes?"]
+    # Idempotent: saving an edited process again keeps the same shape.
+    assert studio.clean_process(p)["baseline"] == p["baseline"]
+    q = studio.clean_process({"as_is": [{"step": "x", "minutes": 10}], "data_sensitivity": "geheim", "frequency": {"per": "jaar"}})
+    assert q["data_sensitivity"] == "" and q["frequency"] == {"count": 0, "per": "week"}
+    assert "hours_week_before" not in q["baseline"]

@@ -34,7 +34,7 @@ from browser_conversation_lifecycle import _terminate_process  # noqa: E402
 from browser_org_management import ADMIN, LEAD, MEMBER, PASSWORD, ok, seed, start_server  # noqa: E402
 
 ANSWERS = {
-    "AI-consultant": {"title": "Debiteurenopvolging",
+    "opportunity solution tree (QuickScan)": {"title": "Debiteurenopvolging",
                       "goals": [{"name": "Facturen sneller betaald", "kpi": "Gemiddelde betaaltermijn", "baseline": "41 dagen", "target": "30 dagen"},
                                 {"name": "Minder handwerk", "kpi": "Uren per week", "baseline": "3 uur", "target": "doelwaarde nog bepalen"}],
                       "opportunities": [
@@ -46,12 +46,17 @@ ANSWERS = {
                           {"id": "o3", "goal": "Minder handwerk", "title": "De toon van herinneringen wisselt", "cause": "Iedereen schrijft anders",
                            "solutions": [{"id": "o3s1", "title": "Huisstijl aanmaning als werkwijze", "building_block": "skill", "impact": 3, "effort": 1, "how": "Vaste stappen", "test": "Tien concepten laten beoordelen"}]}],
                       "questions": ["Hoeveel van de drie uur gaat naar nabellen?"]},
-    "werkproces opnieuw": {"as_is": [{"step": "Openstaande posten uit SnelStart halen", "actor": "mens", "minutes": 20},
-                                     {"step": "Per klant mail schrijven", "actor": "mens", "minutes": 40}],
-                           "to_be": [{"step": "Agent maakt lijst en concept-mails", "actor": "agent", "building_block": "task", "note": "maandag 08:00"},
-                                     {"step": "Werkwijze aanmaning", "actor": "agent", "building_block": "skill"},
-                                     {"step": "Medewerker kijkt na en verstuurt", "actor": "mens", "building_block": "human"}],
-                           "metrics": [{"name": "DSO", "baseline": "41 dagen", "target": "30 dagen"}]},
+    "Deep Dive op een gekozen oplossing": {
+        "frequency": {"count": 1, "per": "week"},
+        "as_is": [{"step": "Openstaande posten uit SnelStart halen", "actor": "mens", "minutes": 20, "tools": ["SnelStart", "Excel"], "pain": "Lijst is elke week anders opgemaakt", "decision": False},
+                  {"step": "Per klant mail schrijven", "actor": "mens", "minutes": 40, "tools": ["Outlook"], "pain": "", "decision": False},
+                  {"step": "Bepalen wie gebeld wordt", "actor": "mens", "minutes": 120, "tools": [], "pain": "Kost de meeste tijd", "decision": True}],
+        "to_be": [{"step": "Agent maakt lijst en concept-mails", "actor": "agent", "building_block": "task", "minutes": 0, "replaces": [1, 2], "note": "maandag 08:00"},
+                  {"step": "Werkwijze aanmaning", "actor": "agent", "building_block": "skill", "minutes": 0, "replaces": [2]},
+                  {"step": "Medewerker kijkt na en verstuurt", "actor": "mens", "building_block": "human", "minutes": 15, "replaces": [3]}],
+        "data_sensitivity": "personal", "data_note": "Namen en openstaande bedragen van klanten",
+        "metrics": [{"name": "DSO", "baseline": "41 dagen", "target": "30 dagen"}],
+        "questions": ["Wie mag een aanmaning versturen?"]},
     "uitvoerbaar Playbook": {"components": [
         {"type": "bot", "name": "Debiteuren Bot", "description": "Maakt concept-aanmaningen",
          "instructions": "Je helpt het team Debiteuren met aanmaningen. Je verstuurt nooit zelf iets."},
@@ -225,8 +230,13 @@ def main() -> int:
             page.locator("[data-st-send] button[type=submit]").click()
             page.wait_for_selector(".st-lane .st-step.bb-task", timeout=20000)
             assert page.locator(".st-lane").count() == 2
+            bl = page.locator(".st-bl-row").inner_text()
+            assert "3 u" in bl and "0,2 u" in bl and "Persoonsgegevens" in bl, bl
+            assert page.locator(".st-step.has-pain").count() == 2 and page.locator(".st-decision").count() == 1
+            assert "SnelStart" in page.locator(".st-tools").first.inner_text()
+            assert "Wie mag een aanmaning versturen?" in page.locator(".st-questions").inner_text()
             page.screenshot(path=str(art / "03-design.png"), full_page=True)
-            ok("design gives the as-is and to-be lanes with a building block per step")
+            ok("design (Deep Dive): baseline in hours per week, data sensitivity, tools, pain points, decisions, open questions, and both lanes")
 
             # 4. playbook
             page.locator("[data-st-make-playbook]").first.click()
@@ -361,7 +371,7 @@ def main() -> int:
             overflow = page.evaluate("() => document.querySelector('#mainStudio .om-wrap').scrollWidth - document.querySelector('#mainStudio .om-wrap').clientWidth")
             assert overflow <= 2, overflow
             ok("narrow layout without horizontal overflow")
-            assert fake.calls.count("AI-consultant") == 2 and fake.calls.count("uitvoerbaar Playbook") == 2, fake.calls
+            assert fake.calls.count("opportunity solution tree (QuickScan)") == 2 and fake.calls.count("uitvoerbaar Playbook") == 2, fake.calls
             ours = [e for e in console_errors if "studio" in e.lower() or "SPStudio" in e]
             assert not ours, ours
             ok("no console errors from Studio")

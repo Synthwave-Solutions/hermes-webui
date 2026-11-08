@@ -29,6 +29,7 @@
     goals: 'Doelen', opps: 'Kansen en oplossingen', impact: 'Impact', effort: 'Moeite', choose: 'Kies', chosen: 'Gekozen',
     quick_win: 'Snel resultaat', next_design: 'Verder naar inrichten', next_playbook: 'Maak het bouwplan', next_build: 'Droogrun',
     as_is: 'Zoals het nu gaat', to_be: 'Zoals het wordt', metrics: 'Succesmetingen', reuse: 'Bestaat al',
+    bl_title: 'Nulmeting', bl_freq: 'Hoe vaak', bl_freq_unknown: 'nog bepalen', bl_min: 'Handwerk per keer', bl_hours: 'Uren per week', freq_day: 'per dag', freq_week: 'per week', freq_month: 'per maand', decision: 'Beslissing', replaces: 'Vervangt stap', data: 'Data', d_public: 'Openbaar', d_internal: 'Intern', d_confidential: 'Vertrouwelijk', d_personal: 'Persoonsgegevens', open_q: 'Nog nodig voor het bouwen',
     a_bot: 'Nieuwe bot, alleen voor jou zichtbaar, werkt voor het team', instructions: 'Instructies', live: 'Live praten', live_stop: 'Stop live', live_on: 'Live gesprek met de Super Agent: hij vult het werkvlak terwijl je praat. Wat je zegt komt ook in het tekstvak.', open_work: 'Open werk', conn_ok: 'Al verbonden', conn_req: 'Aangevraagd bij beheer', conn_none: 'Niet in de catalogus; vraag het aan via Verbindingen',
     b_task: 'Geplande taak', b_skill: 'Skill', b_bot: 'Bot', b_human: 'Blijft mens', b_connection: 'Koppeling', b_custom: 'Maatwerk',
     include: 'Meenemen', name: 'Naam', schedule: 'Ritme (cron)', prompt: 'Opdracht', before: 'Min. eerst', now: 'Min. nu', per: 'Per',
@@ -63,6 +64,7 @@
     goals: 'Goals', opps: 'Opportunities and solutions', impact: 'Impact', effort: 'Effort', choose: 'Choose', chosen: 'Chosen',
     quick_win: 'Quick win', next_design: 'Continue to design', next_playbook: 'Make the build plan', next_build: 'Dry run',
     as_is: 'As it is', to_be: 'As it will be', metrics: 'Success measures', reuse: 'Already exists',
+    bl_title: 'Baseline', bl_freq: 'How often', bl_freq_unknown: 'to be determined', bl_min: 'Manual work per run', bl_hours: 'Hours per week', freq_day: 'per day', freq_week: 'per week', freq_month: 'per month', decision: 'Decision', replaces: 'Replaces step', data: 'Data', d_public: 'Public', d_internal: 'Internal', d_confidential: 'Confidential', d_personal: 'Personal data', open_q: 'Still needed to build',
     a_bot: 'New bot, visible to you only, works for the team', instructions: 'Instructions', live: 'Talk live', live_stop: 'Stop live', live_on: 'Live conversation with the Super Agent: it fills the canvas while you talk. What you say also lands in the text box.', open_work: 'Open work', conn_ok: 'Already connected', conn_req: 'Requested from admins', conn_none: 'Not in the catalogue; request it in Connections',
     b_task: 'Scheduled task', b_skill: 'Skill', b_bot: 'Bot', b_human: 'Stays human', b_connection: 'Connection', b_custom: 'Custom',
     include: 'Include', name: 'Name', schedule: 'Rhythm (cron)', prompt: 'Instruction', before: 'Min. before', now: 'Min. now', per: 'Per',
@@ -229,19 +231,35 @@
       <div class="om-value-actions"><button type="button" class="sm-btn primary" data-st-goto="design" ${doc.selected ? '' : 'disabled'}>${H(w('next_design'))}</button></div>`;
   }
   function laneHtml(steps, toBe){
-    return `<div class="st-lane">${(steps || []).map((s, i) => `<div class="st-step ${toBe ? 'bb-' + (s.building_block || 'human') : ''}">
-        <span class="st-step-n">${i + 1}</span><strong>${H(s.step)}</strong>
+    return `<div class="st-lane">${(steps || []).map((s, i) => `<div class="st-step ${toBe ? 'bb-' + (s.building_block || 'human') : ''} ${!toBe && s.pain ? 'has-pain' : ''}">
+        <span class="st-step-n">${i + 1}${!toBe && s.decision ? ` <span class="om-badge st-decision">${H(w('decision'))}</span>` : ''}</span><strong>${H(s.step)}</strong>
         <span class="om-small om-muted">${H(s.actor)}${s.minutes ? ' · ' + s.minutes + ' min' : ''}</span>
-        ${toBe ? `<span class="om-badge">${H(w('b_' + (s.building_block || 'human')))}</span>${s.note ? `<span class="om-small">${H(s.note)}</span>` : ''}${(s.reuse || []).length ? `<span class="om-small st-reuse">${H(w('reuse'))}: ${H(s.reuse.join(', '))}</span>` : ''}` : ''}
+        ${!toBe && (s.tools || []).length ? `<span class="st-tools">${s.tools.map(t => `<span class="st-tool">${H(t)}</span>`).join('')}</span>` : ''}
+        ${!toBe && s.pain ? `<span class="om-small st-pain">${H(s.pain)}</span>` : ''}
+        ${toBe ? `<span class="om-badge">${H(w('b_' + (s.building_block || 'human')))}</span>${s.note ? `<span class="om-small">${H(s.note)}</span>` : ''}${(s.replaces || []).length ? `<span class="om-small om-muted">${H(w('replaces'))} ${H(s.replaces.join(', '))}</span>` : ''}${(s.reuse || []).length ? `<span class="om-small st-reuse">${H(w('reuse'))}: ${H(s.reuse.join(', '))}</span>` : ''}` : ''}
       </div>`).join('')}</div>`;
+  }
+  const num = v => Number(v || 0).toLocaleString(lang() === 'en' ? 'en-GB' : 'nl-NL', {maximumFractionDigits: 1});
+  function baselineHtml(p){
+    const b = p.baseline || {}, f = p.frequency || {};
+    if (!b.minutes_before && !p.data_sensitivity) return '';
+    const freq = f.count ? `${f.count} ${w('freq_' + (f.per || 'week'))}` : w('bl_freq_unknown');
+    const cell = (label, before, after) => `<div class="om-card st-bl"><span class="st-node-kind">${H(label)}</span><span class="st-kpi"><b>${H(before)}</b>${after !== undefined ? ` → <b>${H(after)}</b>` : ''}</span></div>`;
+    return `<h3>${H(w('bl_title'))}</h3><div class="st-bl-row">
+      ${cell(w('bl_freq'), freq)}
+      ${b.minutes_before ? cell(w('bl_min'), b.minutes_before + ' min', (b.minutes_after || 0) + ' min') : ''}
+      ${b.hours_week_before != null ? cell(w('bl_hours'), num(b.hours_week_before) + ' u', num(b.hours_week_after) + ' u') : ''}
+      ${p.data_sensitivity ? `<div class="om-card st-bl st-data-${H(p.data_sensitivity)}"><span class="st-node-kind">${H(w('data'))}</span><b>${H(w('d_' + p.data_sensitivity))}</b>${p.data_note ? `<span class="om-small om-muted">${H(p.data_note)}</span>` : ''}</div>` : ''}
+    </div>`;
   }
   function designHtml(doc){
     const p = doc.process || {};
     const chosen = allSolutions(doc).find(s => s.id === doc.selected) || allSolutions(doc).find(s => s.opp.id === doc.selected);
     const head = chosen ? `<div class="st-chosen"><span class="st-node-kind">${H(w('n_opp'))}</span> ${H(chosen.opp.title)}<br><span class="st-node-kind">${H(w('n_sol'))}</span> <strong>${H(chosen.title)}</strong> <span class="om-badge">${H(w('b_' + chosen.building_block))}</span></div>` : '';
     if (!(p.to_be || []).length) return `${head}<p class="om-muted">${H(w('ph_design'))}</p>`;
-    return `${head}<h3>${H(w('as_is'))}</h3>${laneHtml(p.as_is)}<h3 style="margin-top:18px">${H(w('to_be'))}</h3>${laneHtml(p.to_be, true)}
+    return `${head}${baselineHtml(p)}<h3 style="margin-top:18px">${H(w('as_is'))}</h3>${laneHtml(p.as_is)}<h3 style="margin-top:18px">${H(w('to_be'))}</h3>${laneHtml(p.to_be, true)}
       ${(p.metrics || []).length ? `<h3 style="margin-top:18px">${H(w('metrics'))}</h3><div class="st-goals">${p.metrics.map(m => `<div class="om-card st-goal"><strong>${H(m.name)}</strong><span class="om-small om-muted">${H(m.baseline)} → ${H(m.target)}</span></div>`).join('')}</div>` : ''}
+      ${(p.questions || []).length ? `<div class="om-card st-questions"><strong>${H(w('open_q'))}</strong><ul>${p.questions.map(q => `<li>${H(q)}</li>`).join('')}</ul></div>` : ''}
       <div class="om-value-actions"><button type="button" class="sm-btn primary" data-st-make-playbook>${H(w('next_playbook'))}</button></div>`;
   }
   function compHtml(c, i){

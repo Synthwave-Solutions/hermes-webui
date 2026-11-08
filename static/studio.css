@@ -166,3 +166,15 @@ main.main.showing-studio>#mainStudio{display:flex;flex-direction:column;overflow
 .st-kpi{font-size:12.5px;font-variant-numeric:tabular-nums;color:var(--text)}
 .st-chosen{padding:10px 12px;border:1px solid var(--border);border-radius:var(--sp-radius);background:var(--surface);margin-bottom:12px;font-size:13px;line-height:1.6}
 @media (max-width:900px){.st-tree-opp{grid-template-columns:1fr}}
+
+/* Deep Dive: baseline, tools, pain points, decisions, data sensitivity */
+.st-bl-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.st-bl{display:flex;flex-direction:column;gap:4px;padding:12px}
+.st-tools{display:flex;flex-wrap:wrap;gap:4px}
+.st-tool{font-size:11px;padding:1px 7px;border-radius:999px;border:1px solid var(--border);color:var(--muted)}
+.st-pain{color:var(--warning,#b7791f)}
+.st-step.has-pain{border-top:2px solid var(--warning,#b7791f)}
+.st-decision{font-size:10px}
+.st-data-personal,.st-data-confidential{border-color:var(--warning,#b7791f)}
+.st-questions{margin-top:14px;padding:12px 14px}
+.st-questions ul{margin:6px 0 0 18px;padding:0}

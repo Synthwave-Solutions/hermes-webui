@@ -162,6 +162,10 @@ def selection(doc) -> tuple[dict | None, dict | None]:
     return None, None
 
 
+DATA_LEVELS = ("public", "internal", "confidential", "personal")
+PER_WEEK = {"day": 5, "week": 1, "month": 12 / 52}
+
+
 def clean_process(raw) -> dict:
     raw = raw if isinstance(raw, dict) else {}
 
@@ -176,13 +180,40 @@ def clean_process(raw) -> dict:
                 row["building_block"] = s.get("building_block") if s.get("building_block") in BLOCKS else "human"
                 row["note"] = _txt(s.get("note"), 240)
                 row["reuse"] = [_txt(r, 120) for r in (s.get("reuse") or [])[:3]]
+                row["replaces"] = sorted({_int(n, 1, 20) for n in (s.get("replaces") or [])[:10]
+                                          if str(n).strip().lstrip("-").isdigit() and int(n) > 0})
+            else:
+                tools = s.get("tools") if isinstance(s.get("tools"), list) else []
+                row["tools"] = [t for t in (_txt(t, 40) for t in tools[:5]) if t]
+                row["pain"] = _txt(s.get("pain"), 200)
+                row["decision"] = bool(s.get("decision"))
             out.append(row)
         return out
 
-    metrics = [{"name": _txt(m.get("name"), 80), "baseline": _txt(m.get("baseline"), 40), "target": _txt(m.get("target"), 40)}
+    metrics = [{"name": _txt(m.get("name"), 80), "baseline": _txt(m.get("baseline"), 60), "target": _txt(m.get("target"), 60)}
                for m in (raw.get("metrics") or [])[:3] if isinstance(m, dict) and _txt(m.get("name"))]
-    return {"as_is": steps(raw.get("as_is")), "to_be": steps(raw.get("to_be"), True), "metrics": metrics,
+    freq = raw.get("frequency") if isinstance(raw.get("frequency"), dict) else {}
+    frequency = {"count": _int(freq.get("count"), 0, 10000),
+                 "per": freq.get("per") if freq.get("per") in PER_WEEK else "week"}
+    data = raw.get("data_sensitivity") if raw.get("data_sensitivity") in DATA_LEVELS else ""
+    as_is, to_be = steps(raw.get("as_is")), steps(raw.get("to_be"), True)
+    return {"as_is": as_is, "to_be": to_be, "metrics": metrics, "frequency": frequency,
+            "data_sensitivity": data, "data_note": _txt(raw.get("data_note"), 240) if data else "",
+            "questions": [q for q in (_txt(q, 200) for q in (raw.get("questions") or [])[:3]) if q],
+            "baseline": baseline(as_is, to_be, frequency),
             "description": str(raw.get("description") or "")[:MAX_TEXT]}
+
+
+def baseline(as_is, to_be, frequency) -> dict:
+    """Minutes per run before and after, and hours per week when the frequency is known."""
+    before = sum(s.get("minutes") or 0 for s in as_is)
+    after = sum(s.get("minutes") or 0 for s in to_be)
+    runs = (frequency.get("count") or 0) * PER_WEEK.get(frequency.get("per") or "week", 1)
+    out = {"minutes_before": before, "minutes_after": after, "runs_per_week": round(runs, 2)}
+    if runs and before:
+        out["hours_week_before"] = round(before * runs / 60, 1)
+        out["hours_week_after"] = round(after * runs / 60, 1)
+    return out
 
 
 _SLUG = re.compile(r"[^a-z0-9]+")
@@ -300,12 +331,31 @@ Antwoord in het Nederlands, alleen JSON:
                   "how": "...", "test": "..."}]}],
  "questions": ["..."]}"""
 
-DESIGN = """Je ontwerpt een werkproces opnieuw met AI. Gegeven de gekozen kans en de beschrijving van het huidige
-proces: maak het proces zoals het nu is (as_is: stap, actor mens/systeem, minuten per keer) en zoals het wordt
-(to_be: stap, actor agent/mens/systeem, building_block task/skill/bot/human/connection/custom, korte note).
-Houd menselijke beslissingen bij de mens. Geef 1 tot 3 metrics met nulmeting en doel. Nederlands, alleen JSON:
-{"as_is": [{"step": "...", "actor": "mens", "minutes": 20}], "to_be": [{"step": "...", "actor": "agent",
- "building_block": "task", "note": "..."}], "metrics": [{"name": "...", "baseline": "...", "target": "..."}]}"""
+DESIGN = """Je bent de AI-consultant van SynthPulse en doet de Deep Dive op een gekozen oplossing.
+Je krijgt het doel, de kans, de gekozen oplossing en wat de persoon vertelt over het huidige proces.
+
+1. NULMETING: hoe vaak loopt dit proces (frequency: count plus per day/week/month). Gebruik alleen wat de persoon
+   noemt; weet je het niet, zet count op 0 en stel er een vraag over.
+2. ZOALS HET NU GAAT (as_is, 3 tot 10 stappen, in volgorde): per stap step (werkwoord vooraan), actor (mens of
+   systeem), minutes per keer (schatting mag, wees realistisch), tools (systemen of bestanden die erbij gebruikt
+   worden, zoals Excel, Outlook, Exact), pain (het knelpunt in die stap, leeg als er geen is) en decision (true als
+   er in die stap een menselijke beslissing valt).
+3. ZOALS HET WORDT (to_be): per stap step, actor (agent, mens of systeem), building_block (task, skill, bot,
+   human, connection, custom), minutes (handwerk dat per keer overblijft, ook controle), replaces (nummers van de
+   as_is-stappen die deze stap vervangt) en een korte note. Beslissingen blijven bij de mens: een stap met
+   decision in as_is komt terug als stap voor een mens (human). De agent maakt concepten en verstuurt nooit zelf.
+4. DATA: data_sensitivity is public, internal, confidential of personal (persoonsgegevens) met data_note (waarom,
+   een zin). Bij personal: noem in de note welke gegevens het zijn.
+5. METRICS (1 tot 3): sluit aan op de KPI van het doel; baseline en target kort, een getal met eenheid, of
+   "nog bepalen".
+6. QUESTIONS (0 tot 3): wat je nog moet weten om het ontwerp te kunnen bouwen.
+
+Nederlands, eenvoudige woorden. Alleen JSON:
+{"frequency": {"count": 15, "per": "week"},
+ "as_is": [{"step": "...", "actor": "mens", "minutes": 20, "tools": ["Word"], "pain": "...", "decision": false}],
+ "to_be": [{"step": "...", "actor": "agent", "building_block": "task", "minutes": 5, "replaces": [1, 2], "note": "..."}],
+ "data_sensitivity": "internal", "data_note": "...",
+ "metrics": [{"name": "...", "baseline": "...", "target": "..."}], "questions": ["..."]}"""
 
 PLAYBOOK = """Maak van het nieuwe proces een uitvoerbaar Playbook voor SynthPulse. Componenten:
 - bot: alleen als het team een vaste AI-collega voor dit werk nodig heeft. Velden: name (bijv. "Debiteuren Bot"),
@@ -317,6 +367,8 @@ PLAYBOOK = """Maak van het nieuwe proces een uitvoerbaar Playbook voor SynthPuls
 - skill: een werkwijze als Markdown. Velden: name (kort), description, content (SKILL-tekst met stappen).
 - human: een stap die bij een mens blijft. Velden: name, who, what.
 - connection: een benodigde koppeling. Velden: name, provider, why.
+Gebruik de nulmeting voor before_minutes en review_minutes. Bij persoonsgegevens of vertrouwelijke data: de prompt
+en de instructies zeggen dat de gegevens binnen SynthPulse blijven en alleen in concepten voor een mens staan.
 Maximaal 7 componenten, alleen wat nodig is. Alleen JSON: {"components": [{"type": "task", "name": "...", ...}]}"""
 
 
@@ -433,16 +485,32 @@ def run_step(view, body: dict) -> dict:
             if isinstance(s, dict) and s.get("building_block") in ("task", "skill", "bot"):
                 s["reuse"] = _reuse_candidates(s.get("step", "") + " " + sol["title"])
         answer["description"] = text
-        update(view, {"id": doc["id"], "process": answer, "phase": "design", "notes": notes + [
-            {"role": "agent", "text": "Proces as-is en to-be staan klaar. Pas aan en ga door naar het bouwplan.", "at": time.time()}]})
+        process = clean_process(answer)
+        b = process["baseline"]
+        msg = "Proces zoals het nu gaat en zoals het wordt staan klaar."
+        if b.get("hours_week_before") is not None:
+            nl = lambda v: f"{v:g}".replace(".", ",")
+            msg += f" Nu {nl(b['hours_week_before'])} uur per week, straks {nl(b['hours_week_after'])} uur."
+        if process["questions"]:
+            msg += "\nNog nodig voor het bouwen:\n" + "\n".join("• " + q for q in process["questions"])
+        else:
+            msg += " Pas aan en ga door naar het bouwplan."
+        update(view, {"id": doc["id"], "process": process, "phase": "design", "notes": notes + [
+            {"role": "agent", "text": msg, "at": time.time()}]})
     elif step == "playbook":
         process = doc.get("process") or {}
         opp, sol = selection(doc)
         opp, sol = opp or {}, sol or {}
         to_be = "\n".join(f"- [{s.get('building_block')}] {s.get('step')} ({s.get('actor')}) {s.get('note') or ''}"
                           for s in process.get("to_be") or [])
+        b = process.get("baseline") or {}
+        freq = process.get("frequency") or {}
+        data = process.get("data_sensitivity") or "onbekend"
         answer = _ask_json(PLAYBOOK, f"Kans: {opp.get('title')}\nOplossing: {sol.get('title')} (test: {sol.get('test') or '-'})\n"
                                      f"Team: {team_name or 'onbekend'}\nNieuw proces:\n{to_be}\n"
+                                     f"Nulmeting: {b.get('minutes_before') or '?'} minuten handwerk per keer, straks "
+                                     f"{b.get('minutes_after') or '?'}; {freq.get('count') or '?'} keer per {freq.get('per') or 'week'}\n"
+                                     f"Gevoeligheid van de data: {data} ({process.get('data_note') or '-'})\n"
                                      f"Extra wensen: {text or 'geen'}")
         components = answer.get("components") or []
         for c in components:
