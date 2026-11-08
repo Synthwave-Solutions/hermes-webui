@@ -72,9 +72,12 @@ for(const want of ['De titel ontbreekt.', 'heeft 3 waarden, verwacht 11; ze is w
   'is ingekort tot 40 tekens', 'Fase 4 heeft geen naam',
   '"Aanbod" is groter dan de fase ervoor ("Tweede gesprek")', '"Aangenomen" had een negatieve waarde']) assert.ok(w.includes(want), 'warning: ' + want + '\n' + w);
 assert.ok(!dashes.test(w), 'no long dashes in messages');
+// Estimates stay estimates: the stage remembers it, so the frame shows "ca." and whole percents.
+{ const est = K.build('funnel', JSON.stringify({title: 't', stages: [{label: 'A', value: 'ca. 1.000'}, {label: 'B', value: '>200'}, {label: 'C', value: 50}]}), {lang: 'nl'}).spec;
+  assert.deepStrictEqual(est.stages.map(x => x.rough), ['ca', 'gt', '']); }
 // A stage without any number stops the block: conversions never jump over a missing stage.
 assert.deepStrictEqual(K.build('funnel', JSON.stringify({title: 't', stages: [{label: 'A', value: 10}, {label: 'B', value: 'veel'}, {label: 'C', value: 2}]}), {lang: 'nl'}).errors,
-  ['Fase "B" heeft geen getal. Geef elke fase een aantal.']);
+  ['Bij "B" staat geen getal.']);
 assert.deepStrictEqual(K.build('funnel', JSON.stringify({title: 't', stages: [{label: 'A', value: 'ca. 1.240'}, {label: 'B', value: '310+'}, {label: 'C', value: '1,2k'}]}), {lang: 'nl'}).spec.stages.map(x => x.value), [1240, 310, 1200]);
 const ms = messy.spec;
 assert.strictEqual(ms.title, 'Trechter');

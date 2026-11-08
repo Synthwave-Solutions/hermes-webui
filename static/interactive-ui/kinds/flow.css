@@ -57,7 +57,8 @@
 .k-flow-node:focus-visible{outline:2px dashed var(--sw-accent);outline-offset:4px}
 .k-flow-node.is-near{border-color:color-mix(in srgb,var(--sw-accent) 45%,var(--sw-border))}
 .k-flow-node.is-decision.is-near polygon{stroke:color-mix(in srgb,var(--sw-accent) 45%,var(--sw-border))}
-.k-flow-detail{margin:0;font-size:.84rem;color:var(--sw-muted);min-height:1.3em}
+.k-flow-detail{margin:0;font-size:.84rem;color:var(--sw-muted)}
+.k-flow-detail:empty{display:none}
 .k-flow-detail.is-set{color:var(--sw-fg)}
 @media (pointer:coarse){.k-flow-node{min-height:44px}}
 @media (prefers-reduced-motion:reduce){.k-flow-edge,.k-flow-elabel,.k-flow-node,.k-flow-line,.k-flow-head{transition:none}}

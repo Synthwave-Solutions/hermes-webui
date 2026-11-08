@@ -92,6 +92,25 @@
     return o;
   }
   var listeners = [];
+  // The chart palette starts with the chat's own accent, so series 1 matches KPI,
+  // funnel and compare; a default colour too close to that accent is left out.
+  var BASE_PAL = ['#f97316','#3b82f6','#22c55e','#a855f7','#eab308','#ec4899','#14b8a6','#94a3b8'];
+  function hueOf(c){
+    var m = /^#([0-9a-f]{6})$/i.exec(String(c).trim()), r, g, b;
+    if(m){ r = parseInt(m[1].slice(0, 2), 16); g = parseInt(m[1].slice(2, 4), 16); b = parseInt(m[1].slice(4), 16); }
+    else { m = /rgba?\(\s*(\d+)[ ,]+(\d+)[ ,]+(\d+)/i.exec(String(c)); if(!m) return null; r = +m[1]; g = +m[2]; b = +m[3]; }
+    var mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+    if(d < 20) return null;
+    var h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    return (h * 60 + 360) % 360;
+  }
+  function rebasePalette(){
+    var d = document.documentElement, accent = getComputedStyle(d).getPropertyValue('--sw-accent').trim();
+    var ha = hueOf(accent);
+    if(ha === null) return;
+    var rest = BASE_PAL.filter(function(c){ var h = hueOf(c); if(h === null) return true; var dist = Math.abs(h - ha); return Math.min(dist, 360 - dist) > 32; });
+    [accent].concat(rest).slice(0, 8).forEach(function(c, i){ d.style.setProperty('--sw-c' + (i + 1), c); });
+  }
   function readTheme(){
     var cs = getComputedStyle(document.documentElement), out = {};
     ['bg','surface','surface-2','fg','strong','muted','accent','accent-fg','border','good','warn','bad','info',
@@ -159,8 +178,14 @@
     theme: function(){ return api.theme; },
     save: function(values){ saveState(values); },
     resize: function(){ scheduleHeight(true); },
-    copy: function(text){ api.copy(text); }
+    copy: function(text){ api.copy(text); },
+    // On a phone, ask the chat to scroll so this element (a details line) is in view.
+    reveal: function(el){ revealEl(el); }
   };
+  function revealEl(el){
+    if(standalone || !el || (window.innerWidth || 0) >= 640) return;
+    setTimeout(function(){ var r = el.getBoundingClientRect(); post({type:'reveal', y:Math.round(r.bottom + (window.scrollY || 0) + 8)}); }, 60);
+  }
 
   var stateTimer = 0;
   function saveState(values){
@@ -175,6 +200,7 @@
       });
     }
     if(mode === 'light' || mode === 'dark') d.setAttribute('data-theme', mode);
+    rebasePalette();
     api.theme = readTheme();
     listeners.forEach(function(cb){ try{ cb(api.theme); }catch(_){} });
     if(current && current.onTheme) try{ current.onTheme(); }catch(err){ reportError(err && err.message, err && err.stack); }
@@ -438,7 +464,7 @@
         options:{responsive:true, maintainAspectRatio:false, animation:REDUCED ? false : {duration:500},
           indexAxis:horizontal ? 'y' : 'x', interaction:{mode:round ? 'nearest' : 'index', intersect:round},
           layout:{padding:{top:target ? 22 : 4, right:8}},
-          plugins:{legend:{display:!round && spec.series.length > 1, position:'bottom', labels:{color:t.fg, boxWidth:10, boxHeight:10, usePointStyle:true, padding:14}},
+          plugins:{legend:{display:!round && spec.series.length > 1, position:'bottom', labels:{color:t.fg, font:{size:12}, boxWidth:8, boxHeight:8, usePointStyle:true, pointStyle:'rectRounded', pointStyleWidth:10, padding:16}},
             tooltip:{backgroundColor:t.surface2 || t.surface, titleColor:t.strong || t.fg, bodyColor:t.fg, borderColor:t.border, borderWidth:1, padding:10,
               callbacks:{label:function(ctx){
                 var v = ctx.parsed && (round ? ctx.parsed : radar ? ctx.parsed.r : (horizontal ? ctx.parsed.x : ctx.parsed.y));
@@ -451,23 +477,39 @@
         // The outer ring is the scale the scores are on ("op 10"), never just the highest score.
         var all = [].concat.apply([], spec.series.map(function(s){ return s.data.filter(function(v){ return typeof v === 'number'; }); }));
         var top = Math.max.apply(null, all.concat([0])), low = Math.min.apply(null, all.concat([0]));
-        var rMax = spec.max || (spec.format === 'percent' ? 100 : (low >= 0 && top <= 10 ? 10 : (low >= 0 && top <= 100 && top > 10 ? 100 : undefined)));
+        // A 1 to 5 scale is named in the title or subtitle ("op 5", "1 tot 5", "1-5").
+        var five = /(op|uit|of|out of)\s*5\b|\b1\s*(tot|-|to|t\/m)\s*5\b|\/\s*5\b/i.test((spec.title || '') + ' ' + (spec.subtitle || ''));
+        var rMax = spec.max || (spec.format === 'percent' ? 100 : (low >= 0 && top <= 5 && five ? 5 : (low >= 0 && top <= 10 ? 10 : (low >= 0 && top <= 100 && top > 10 ? 100 : undefined))));
         var narrow = (box.clientWidth || window.innerWidth) < 480;
+        // On a phone long criterion names do not fit around the shape: number the
+        // axes and list the full names under the chart instead of cutting them.
+        var numbered = narrow && spec.labels.some(function(l){ return String(l).length > 18; });
+        if(numbered) radarKey();
         cfg.options.scales = {r:{beginAtZero:true, max:rMax, angleLines:{color:alpha(t.border || '#2a2f3d', 0.9)}, grid:{color:alpha(t.border || '#2a2f3d', 0.9)},
-          pointLabels:{color:t.fg, font:{size:narrow ? 11 : 12}, padding:narrow ? 4 : 8,
-            // Long criterion names wrap onto two lines instead of being cut at the edge.
-            callback:function(l){ return wrapLabel(l, narrow ? 12 : 16); }},
-          ticks:{display:false, maxTicksLimit:5, stepSize:rMax === 10 ? 2 : undefined}}};
+          pointLabels:{color:t.fg, font:{size:narrow ? 10.5 : 12}, padding:narrow ? 3 : 8,
+            // Long criterion names wrap at words (a very long word gets a hyphen) instead of being cut.
+            callback:function(l, i){ return numbered ? String(i + 1) : wrapLabel(l, narrow ? 11 : 16); }},
+          ticks:{display:false, maxTicksLimit:5, stepSize:rMax === 10 ? 2 : rMax === 5 ? 1 : undefined}}};
       }
       else cfg.options.scales = horizontal ? {x:valueAxis, y:catAxis} : {x:catAxis, y:valueAxis};
       return cfg;
     }
+    function radarKey(){
+      if(wrap.querySelector('.k-radar-key')) return;
+      var ol = h('ol', 'k-radar-key');
+      spec.labels.forEach(function(l){ ol.appendChild(h('li', '', l)); });
+      canvasBox.insertAdjacentElement('afterend', ol);
+    }
     function wrapLabel(l, max){
-      var words = String(l || '').split(/\s+/), lines = [], cur = '';
-      words.forEach(function(w){ if(cur && (cur + ' ' + w).length > max){ lines.push(cur); cur = w; } else cur = cur ? cur + ' ' + w : w; });
+      var words = [];
+      String(l || '').split(/\s+/).filter(Boolean).forEach(function(w){
+        while(w.length > max + 2){ var cut = Math.min(w.length - 3, max); words.push(w.slice(0, cut) + '-'); w = w.slice(cut); }
+        words.push(w);
+      });
+      var lines = [], cur = '';
+      words.forEach(function(w){ var glue = /-$/.test(cur) ? '' : ' '; if(cur && (cur + glue + w).length > max){ lines.push(cur); cur = w; } else cur = cur ? cur + glue + w : w; });
       if(cur) lines.push(cur);
-      if(lines.length > 2) lines = [lines[0], lines.slice(1).join(' ').slice(0, max + 6) + (lines.slice(1).join(' ').length > max + 6 ? '…' : '')];
-      return lines.length > 1 ? lines : lines[0] || '';
+      return lines.length > 1 ? lines.slice(0, 3) : lines[0] || '';
     }
     // The middle of a donut names the total, so the slices read as parts of it.
     function centerPlugin(t){
@@ -973,7 +1015,7 @@
       var parts = [it.label, K.timelinePeriod(spec, it, LANG), it.milestone ? T('milestone') : '', it.owner, K.statusWord(it.status, LANG), it.note];
       detail.textContent = parts.filter(Boolean).join(' · ');
       detail.classList.add('is-set');
-      if(!restore) saveState({a:i});
+      if(!restore){ saveState({a:i}); revealEl(detail); }
       scheduleHeight(false);
     }
     if(typeof view.a === 'number' && view.a >= 0 && view.a < n) select(view.a, true);

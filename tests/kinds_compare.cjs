@@ -133,7 +133,7 @@ assert.ok(r.warnings.some(x => x.includes('titel ontbreekt')));
 // ── Fatal: one plain sentence ───────────────────────────────────────────────
 r = build({title: 'x', options: [{name: 'Alleen deze'}, {price: 4}]});
 assert.strictEqual(r.spec, null);
-assert.deepStrictEqual(r.errors, ['Een vergelijking heeft minstens twee opties met een naam (name); er is er 1.']);
+assert.deepStrictEqual(r.errors, ['Een vergelijking heeft minstens twee opties met een naam; er is er 1.']);
 r = build({title: 'x', options: 'geen'});
 assert.deepStrictEqual(r.errors, ['Er zijn geen opties (options) om te vergelijken.']);
 r = build({title: 'x', lang: 'en', options: []});

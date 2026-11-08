@@ -3,7 +3,7 @@
    the share that moves on. Under 480 px the names go above the bars. */
 .k-fn{display:flex;flex-direction:column;gap:10px}
 .k-fn-overall{margin:0;display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;font-size:.88rem;color:var(--sw-fg)}
-.k-fn-overall-main{font-weight:600;color:var(--sw-strong);font-variant-numeric:tabular-nums}
+.k-fn-overall-main{font-weight:400;color:var(--sw-muted);font-variant-numeric:tabular-nums}
 .k-fn-overall-prev{font-size:.8rem;color:var(--sw-muted);font-variant-numeric:tabular-nums}
 .k-fn-list{display:grid;grid-template-columns:minmax(104px,28%) minmax(0,1fr);column-gap:14px;align-items:center}
 .k-fn-row{display:contents}

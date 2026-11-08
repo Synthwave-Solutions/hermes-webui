@@ -19,7 +19,7 @@
   var MSG = {
     nl:{
       noOptions:function(){ return 'Er zijn geen opties (options) om te vergelijken.'; },
-      tooFew:function(n){ return 'Een vergelijking heeft minstens twee opties met een naam (name); er ' + (n === 1 ? 'is er 1' : 'zijn er ' + n) + '.'; },
+      tooFew:function(n){ return 'Een vergelijking heeft minstens twee opties met een naam; er ' + (n === 1 ? 'is er 1' : 'zijn er ' + n) + '.'; },
       many:function(n, max){ return 'Er zijn ' + n + ' opties; alleen ' + max + ' worden getoond.'; },
       item:function(i){ return 'Optie ' + i + ' is geen object met een naam en is weggelaten.'; },
       name:function(i){ return 'Optie ' + i + ' heeft geen naam (name) en is weggelaten.'; },
@@ -33,7 +33,7 @@
       fact:function(n, k){ return 'Het feit "' + k + '" bij "' + n + '" heeft geen tekst of getal als waarde en is weggelaten.'; },
       manyFacts:function(max){ return 'Er zijn meer dan ' + max + ' soorten feiten; alleen de eerste ' + max + ' worden getoond.'; },
       rec:function(r){ return 'De aanrader "' + r + '" is geen van de opties; het label is weggelaten.'; },
-      recWhich:function(r){ return 'De aanrader (recommended: ' + r + ') wijst geen van de opties aan; geef de naam of het nummer van een optie. Het label is weggelaten.'; },
+      recWhich:function(r){ return 'De aanrader (recommended: ' + r + ') wijst geen van de opties aan; er staat geen aanrader bij.'; },
       currency:function(n){ return 'De prijs van "' + n + '" staat niet in euro en wordt als tekst getoond.'; },
       manyCriteria:function(max){ return 'Er zijn meer dan ' + max + ' criteria; alleen de eerste ' + max + ' worden getoond.'; },
       recMany:function(n){ return 'Er is meer dan één aanrader; alleen "' + n + '" krijgt het label.'; },
@@ -56,7 +56,7 @@
       fact:function(n, k){ return 'The fact "' + k + '" of "' + n + '" has no text or number as its value and was left out.'; },
       manyFacts:function(max){ return 'There are more than ' + max + ' kinds of facts; only the first ' + max + ' are shown.'; },
       rec:function(r){ return 'The recommended option "' + r + '" is not one of the options; the label was left out.'; },
-      recWhich:function(r){ return 'The recommended value (' + r + ') points at none of the options; give the name or the number of an option. The label was left out.'; },
+      recWhich:function(r){ return 'The recommended value (' + r + ') points at none of the options; no option is marked as recommended.'; },
       currency:function(n){ return 'The price of "' + n + '" is not in euros and is shown as text.'; },
       manyCriteria:function(max){ return 'There are more than ' + max + ' criteria; only the first ' + max + ' are shown.'; },
       recMany:function(n){ return 'More than one option is recommended; only "' + n + '" gets the label.'; },

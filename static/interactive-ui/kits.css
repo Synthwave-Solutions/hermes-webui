@@ -237,3 +237,10 @@ th .k-sort{white-space:normal}
 .k-legend{column-gap:28px}
 .k-legend .k-legend-label{flex:0 1 auto}
 .k-legend .k-legend-value{margin-left:6px}
+.k-legend{display:flex;flex-wrap:wrap;justify-content:center;gap:6px 22px}
+.k-legend li{flex:0 1 auto}
+.k-scroll{overscroll-behavior-x:contain;overscroll-behavior-y:auto}
+@media (pointer:coarse),(max-width:640px){.k-scroll{max-height:min(440px,52vh)}}
+.k-list{overscroll-behavior-y:auto}
+.k-radar-key{margin:6px 0 0;padding:0 0 0 22px;font-size:.82rem;color:var(--sw-fg);display:grid;gap:2px}
+.k-radar-key li::marker{color:var(--sw-muted);font-variant-numeric:tabular-nums}
