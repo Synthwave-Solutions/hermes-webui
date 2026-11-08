@@ -1,7 +1,11 @@
 /* Interactive answers in chat (static/interactive_ui.js). Calm by default:
    one title, full screen and a menu; status only while building or on error. */
 .iui-block{display:block;margin:14px 0;white-space:normal;font-size:inherit;color:inherit}
-.iui-block:not([data-iui-mounted]){height:120px;overflow:hidden;color:transparent;font-size:0;border-radius:16px;
+/* Before mounting: a quiet placeholder in the chat; anywhere a block is never
+   mounted (exports, other previews) the source stays readable as text. */
+.iui-block:not([data-iui-mounted]){font:12px/1.5 ui-monospace,"SF Mono",Menlo,monospace;white-space:pre-wrap;color:var(--muted);
+  max-height:320px;overflow:auto;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:var(--code-bg)}
+:is(#messages,.messages,.preview-md,#previewMd) .iui-block:not([data-iui-mounted]){height:120px;overflow:hidden;color:transparent;font-size:0;padding:0;border:0;border-radius:16px;
   background:linear-gradient(90deg,var(--hover-bg) 0%,var(--border-subtle,var(--border)) 50%,var(--hover-bg) 100%);background-size:200% 100%;animation:iui-shimmer 1.6s linear infinite}
 .iui-raw-hidden{display:none!important}
 

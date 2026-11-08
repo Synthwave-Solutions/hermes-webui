@@ -134,7 +134,7 @@ assert.deepStrictEqual(plain(shorthand.spec.series), [{name: 'x', data: [1, 2]}]
 assert.deepStrictEqual(build('chart', {title: 'x', labels: [], series: [{data: [1]}]}).errors, ['De labels ontbreken.']);
 assert.deepStrictEqual(build('chart', {title: 'x', labels: ['a'], series: [{data: ['n/a']}]}).errors, ['Er zijn geen reeksen (series) met getallen.']);
 assert.ok(build('chart', {title: 'x', labels: ['a'], series: [{data: [1]}], highlight: 'zz'}).warnings.some(w => w.includes('"zz"')));
-assert.deepStrictEqual(plain(K.kitTable('chart', chart.spec)), {header: ['Label', 'Omzet', 'Kosten'],
+assert.deepStrictEqual(plain(K.kitTable('chart', chart.spec)), {header: ['Categorie', 'Omzet', 'Kosten'],
   rows: [['Jan', 100, 50], ['Feb', 1200, 60], ['Mrt', null, null]], types: ['text', 'currency', 'currency']});
 
 // ── map ──────────────────────────────────────────────────────────────────────

@@ -114,7 +114,7 @@
       ?`<button type="button" class="sp-subagent-open" data-sp-subagent-open="${esc(w.child_session_id)}" data-sp-subagent-profile="${esc(w.bot_profile||'')}">${esc(openLabel)} <span aria-hidden="true">↗</span></button>`
       :'';
     const word=statusWord(w,st);
-    const tip=w.bot_profile?` title="${esc('@'+w.bot_profile)}"`:'';
+    const tip='';
     return `<article class="sp-subagent-card" data-state="${esc(st)}" data-kind="${esc(w.kind||'worker')}" data-worker-id="${esc(w.id)}">
       <button type="button" class="sp-subagent-head" aria-expanded="${isOpen?'true':'false'}" data-sp-subagent-toggle="${esc(w.id)}"${tip}>
         ${avatarHtml(w,who)}
@@ -391,6 +391,11 @@
 
   function start(){
     observe();
+    // Opening or folding the work steps of a turn can show the tool row for a
+    // handoff; decorate again shortly after so the line never shows twice.
+    root.document.addEventListener('click',event=>{
+      if(event.target?.closest?.('.assistant-turn')) setTimeout(scheduleDecorate,60);
+    },true);
     root.document.addEventListener('click',event=>{
       const button=event.target?.closest?.('[data-sp-specialist-open]');
       if(!button)return;

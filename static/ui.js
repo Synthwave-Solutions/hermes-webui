@@ -16865,7 +16865,7 @@ function _processWakeupCardHtml(info, rawText, extras){
     const helperName=_bt.name(helper), leadName=_bt.name(lead);
     const open=/^[a-f0-9]{12}$/.test(_delegation.session_id||'')
       ?`<button type="button" class="sp-bot-result-open" data-sp-specialist-open="${esc(_delegation.session_id)}" data-sp-specialist-profile="${esc(helper)}">${esc(t('bot_team_result_open',helperName))} <span aria-hidden="true">↗</span></button>`:'';
-    return `<div class="sp-bot-result" data-state="${uncertain?'partial':'done'}" title="${esc('@'+helper)}">${_bt.avatarHtml(helper,helperName,'sp-bot-result-avatar')}<div class="sp-bot-result-main"><div class="sp-bot-result-title">${esc(t(uncertain?'bot_team_result_partial':'bot_team_result_done',helperName))}</div><div class="sp-bot-result-sub">${esc(t('bot_team_result_to',leadName))}${extras.timeHtml||''}</div></div>${open}</div>`;
+    return `<div class="sp-bot-result" data-state="${uncertain?'partial':'done'}" title="${esc(helperName)}">${_bt.avatarHtml(helper,helperName,'sp-bot-result-avatar')}<div class="sp-bot-result-main"><div class="sp-bot-result-title">${esc(t(uncertain?'bot_team_result_partial':'bot_team_result_done',helperName))}</div><div class="sp-bot-result-sub">${esc(t('bot_team_result_to',leadName))}${extras.timeHtml||''}</div></div>${open}</div>`;
   }
   if(info.type==='delegation'||info.type==='async_delegation'){
     // Agent instructions and subagent transcripts stay in model history, not
@@ -16920,7 +16920,7 @@ function _groupAuthorLineHtml(message){
         const from=String(handoff.from||''), to=String(handoff.to||'');
         const fromName=bt.name(from), toName=bt.name(to);
         const label=t(handoff.result?'bot_team_answer_from_to':'bot_team_task_from_to', fromName, toName);
-        return `<div class="msg-author sp-handoff-author" title="${esc('@'+from+' ↪ @'+to)}">${bt.avatarHtml(from,fromName,'sp-bot-avatar-from')}${bt.avatarHtml(to,toName,'sp-bot-avatar-to')}<span class="msg-author-name">${esc(label)}</span>${childLink}</div>`;
+        return `<div class="msg-author sp-handoff-author" title="${esc(fromName+' ↪ '+toName)}">${bt.avatarHtml(from,fromName,'sp-bot-avatar-from')}${bt.avatarHtml(to,toName,'sp-bot-avatar-to')}<span class="msg-author-name">${esc(label)}</span>${childLink}</div>`;
       }
       return `<div class="msg-author"><span class="msg-author-name">${esc(String(handoff.from||''))} → ${esc(String(handoff.to||''))}</span>${childLink}</div>`;
     }
@@ -17658,7 +17658,7 @@ function renderMessages(options){
           avatar.onload=()=>{icon.style.fontSize='0';icon.style.color='transparent';};
           icon.appendChild(avatar);
         }
-        role.title='@'+String(m.bot_profile);
+        role.title=String(m.bot_name||'');
       }
     }
     {
@@ -17669,7 +17669,7 @@ function renderMessages(options){
         const chip=document.createElement('span');
         chip.className='sp-assisted-chip';
         chip.textContent=t('bot_team_assisted_by',_bt.joinNames(helpers.map(id=>_bt.name(id))));
-        chip.title=helpers.map(id=>'@'+id).join(', ');
+        chip.title=helpers.map(id=>_bt.name(id)).join(', ');
         role.appendChild(chip);
       }
     }

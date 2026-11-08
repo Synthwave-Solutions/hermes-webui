@@ -1019,7 +1019,9 @@ function renderMarkdownPreviewContent(data){
   const target=data&&data.el?data.el:$('previewMd');
   if(!data||!data.el) showPreview('md');
   target.innerHTML=renderMd(data.content);
-  requestAnimationFrame(()=>{if(typeof renderKatexBlocks==='function')renderKatexBlocks();});
+  requestAnimationFrame(()=>{if(typeof renderKatexBlocks==='function')renderKatexBlocks();
+    // Tables, charts, maps and apps in markdown files render like in chat.
+    if(typeof renderInteractiveUiBlocks==='function'){try{renderInteractiveUiBlocks(target);}catch(_){}}});
 }
 
 function renderCodePreviewContent(path, content){

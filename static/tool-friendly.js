@@ -553,7 +553,7 @@
     const h=handoffInfo(tc);
     const short=h.kind==='queued'&&h.task?': '+clip(h.task,72):'';
     const line=`${avatarPairHtml(h.from,h.fromName,h.to,h.toName,h.kind)}<span class="sp-handoff-text">${esc(h.sentence+short)}</span>`;
-    const tip=h.to?` title="${esc('@'+h.from+' ↪ @'+h.to)}"`:'';
+    const tip=h.to?` title="${esc(h.fromName&&h.toName?h.fromName+' ↪ '+h.toName:'')}"`:'';
     if(!h.task) return `<div class="sp-handoff-line" data-kind="${esc(h.kind)}"${tip}><div class="sp-handoff-summary">${line}</div></div>`;
     return `<details class="sp-handoff-line" data-kind="${esc(h.kind)}"${tip}><summary class="sp-handoff-summary">${line}<span class="sp-handoff-more">${esc(text('handoff_view_task'))}</span></summary><div class="sp-handoff-brief">${esc(h.task)}</div></details>`;
   }

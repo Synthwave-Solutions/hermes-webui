@@ -643,14 +643,16 @@
       return {header:spec.columns.map(c=>c.label),rows:idx.map(i=>spec.rows[i]),types:spec.columns.map(c=>c.type)};
     }
     if(kind==='chart'){
-      return {header:['Label'].concat(spec.series.map(s=>s.name)),
+      const en=spec.lang==='en';
+      return {header:[en?'Label':'Categorie'].concat(spec.series.map(s=>s.name)),
         rows:spec.labels.map((l,i)=>[l].concat(spec.series.map(s=>s.data[i]))),
         types:['text'].concat(spec.series.map(()=>spec.format))};
     }
     if(kind==='map'){
       const byK={};
       ((data&&data.places)||[]).forEach(p=>{if(p&&typeof p.k==='string')byK[p.k]=p;});
-      return {header:['Nr','Naam','Adres','Tijd','Notitie','Breedtegraad','Lengtegraad'],
+      const en=spec.lang==='en';
+      return {header:en?['No.','Name','Address','Time','Note','Latitude','Longitude']:['Nr','Naam','Adres','Tijd','Notitie','Breedtegraad','Lengtegraad'],
         rows:spec.places.map(p=>{
           const r=byK[p.k]||{};
           const lat=Number.isFinite(r.lat)?r.lat:p.lat, lng=Number.isFinite(r.lng)?r.lng:p.lng;

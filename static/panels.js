@@ -6215,6 +6215,7 @@ function _enhanceSkillMarkdown(root) {
     const mdRoot = root.querySelector('.preview-md') || root;
     if (typeof highlightCode === 'function') highlightCode(mdRoot);
     if (typeof renderKatexBlocks === 'function') renderKatexBlocks(mdRoot);
+    if (typeof renderInteractiveUiBlocks === 'function') { try { renderInteractiveUiBlocks(mdRoot); } catch (_) {} }
   });
 }
 

@@ -1,6 +1,7 @@
 """Background specialists keep identity/ceilings and do not join group chats."""
 from copy import deepcopy
 import json
+import time
 from types import SimpleNamespace
 
 import pytest
@@ -329,10 +330,16 @@ def test_snapshot_includes_handoff_jobs_with_plain_statuses(team, monkeypatch):
                           ('started', 'running'), ('completed', 'completed'), ('failed', 'failed'),
                           ('interrupted', 'failed'), ('cancelled', 'cancelled')]:
         with bots._db() as db:
-            db.execute('UPDATE jobs SET state=? WHERE id=?', (state, 'h1'))
+            db.execute('UPDATE jobs SET state=?, updated=? WHERE id=?', (state, time.time(), 'h1'))
         row = next(r for r in specialists.snapshot(sid) if r['kind'] == 'handoff')
         assert row['status'] == status, state
         assert ('duration_seconds' in row) == (status in ('completed', 'failed', 'cancelled'))
+    # A handoff that has not moved for half an hour reads as not finished.
+    for state in ('pending', 'started'):
+        with bots._db() as db:
+            db.execute('UPDATE jobs SET state=?, updated=? WHERE id=?', (state, time.time() - 3600, 'h1'))
+        row = next(r for r in specialists.snapshot(sid) if r['kind'] == 'handoff')
+        assert row['status'] == 'failed', state
 
 
 def test_snapshot_falls_back_to_specialists_when_handoff_store_fails(team, monkeypatch):

@@ -283,7 +283,7 @@
   // ── Chart ───────────────────────────────────────────────────────────────
   function chartTableSpec(spec){
     return {title:spec.title, source:'', filter:false, total:false, tones:{}, sort:null,
-      columns:[{label:LANG === 'nl' ? 'Label' : 'Label', type:'text', decimals:null}].concat(spec.series.map(function(s){ return {label:s.name, type:spec.format, decimals:spec.decimals}; })),
+      columns:[{label:LANG === 'nl' ? 'Categorie' : 'Label', type:'text', decimals:null}].concat(spec.series.map(function(s){ return {label:s.name, type:spec.format, decimals:spec.decimals}; })),
       rows:spec.labels.map(function(l, i){ return [l].concat(spec.series.map(function(s){ return s.data[i]; })); })};
   }
   function renderChart(box, spec, view){

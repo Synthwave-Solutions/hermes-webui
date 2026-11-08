@@ -231,6 +231,9 @@ _HANDOFF_STATUS = {'pending': 'queued', 'ready': 'queued', 'starting': 'running'
                    'interrupted': 'failed', 'cancelled': 'cancelled'}
 
 
+_HANDOFF_STALE_SECONDS = 30 * 60
+
+
 def _handoff_rows(db, session_id):
     """Read-only handoff records; any problem leaves the specialist list alone."""
     try:
@@ -278,9 +281,15 @@ def snapshot(session_id):
                   'cancelled' if state == 'cancelled' else 'failed')
         result.append(record(row, 'specialist', status,
                              row['child_id'] if state not in ('pending', 'ready') else ''))
+    now = time.time()
     for row in handoffs:
         try:
-            result.append(record(row, 'handoff', _HANDOFF_STATUS.get(row['state'], 'failed')))
+            status = _HANDOFF_STATUS.get(row['state'], 'failed')
+            # A handoff that has not moved for half an hour will not finish by
+            # itself (its turn died): show it as not finished, not as working.
+            if status in ('queued', 'running') and now - float(row['updated'] or row['created'] or now) > _HANDOFF_STALE_SECONDS:
+                status = 'failed'
+            result.append(record(row, 'handoff', status))
         except (KeyError, IndexError, TypeError):
             continue
     # Oldest first, as before; the dock shows the newest on top.
