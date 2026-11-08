@@ -500,10 +500,24 @@
       spec.labels.forEach(function(l){ ol.appendChild(h('li', '', l)); });
       canvasBox.insertAdjacentElement('afterend', ol);
     }
+    // Break a long Dutch compound before a familiar last part: "Implementatie-snelheid".
+    var TAILS = ['betrouwbaarheid','tevredenheid','dienstverlening','snelheid','kwaliteit','zekerheid','baarheid','verlening','onderzoek','gesprek','overleg','analyse','kosten','beheer','planning','termijn','ervaring','heid','tijd','prijs','proces','ing'];
+    function splitAt(w){
+      var lw = w.toLowerCase();
+      for(var i = 0; i < TAILS.length; i++){
+        var k = lw.lastIndexOf(TAILS[i]);
+        if(k >= 4 && k + TAILS[i].length === lw.length && TAILS[i].length >= 4) return k;
+      }
+      for(var j = 0; j < TAILS.length; j++){
+        var m = lw.indexOf(TAILS[j], 4);
+        if(m >= 4 && lw.length - m >= 4) return m;
+      }
+      return Math.ceil(w.length / 2);
+    }
     function wrapLabel(l, max){
       var words = [];
       String(l || '').split(/\s+/).filter(Boolean).forEach(function(w){
-        while(w.length > max + 2){ var cut = Math.min(w.length - 3, max); words.push(w.slice(0, cut) + '-'); w = w.slice(cut); }
+        for(var guard = 0; w.length > max + 2 && guard < 4; guard++){ var at = splitAt(w); if(!(at > 0 && at < w.length)) break; words.push(w.slice(0, at) + '-'); w = w.slice(at); }
         words.push(w);
       });
       var lines = [], cur = '';
