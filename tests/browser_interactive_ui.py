@@ -387,6 +387,8 @@ def data_blocks(page, ctx, gateway, art, base_runs):
         else:
             route.fulfill(status=200, body=tile, headers={"Content-Type": "image/png", "Cache-Control": "no-store"})
     ctx.route("https://tile.openstreetmap.org/**", tiles)
+    if os.environ.get("IUI_REAL_TILES") != "1":  # set it to look at the real map tiles
+        ctx.route("**/static/interactive-ui/tiles/**", tiles)  # tiles come from this server now
     ctx.route("https://upload.wikimedia.org/**", lambda r: r.fulfill(status=200, body=photo, headers={"Content-Type": "image/png"}))
     page.set_viewport_size({"width": 1280, "height": 900})
     # Data blocks speak the chat's language; check the Dutch copy (saved, so it survives the reload).
@@ -506,17 +508,18 @@ def data_blocks(page, ctx, gateway, art, base_runs):
     assert frame.locator(".sw-pin.is-active").inner_text() == "2"
     assert frame.locator(".leaflet-popup .k-pop-name").inner_text() == "Anne Frank Huis"
     ok(f"map: 3 pins, route line, 'Niet op de kaart gevonden' lists the address, list click sets the status line, chat stays at {after}")
-    # Tiles that do not load leave the list and say so.
-    state["tiles"] = "block"
-    menu_action(page, "Opnieuw starten", "Restart", card=".iui-card.iui-kit--map")
-    frame = kit_frame_for(page, page.locator(".iui-card.iui-kit--map:visible").last)
-    frame.wait_for_selector(".k-tile-note:not([hidden])", timeout=12000)
-    assert "De kaart laadt nu niet" in frame.locator(".k-tile-note").inner_text()
-    time.sleep(1.0)
-    assert frame.locator(".k-items li").count() == 3
-    page.locator(".iui-card.iui-kit--map:visible").last.screenshot(path=str(art / "13-map-tiles-blocked.png"))
-    state["tiles"] = "stub"
-    ok("map without tiles: calm note, list still there")
+    # Tiles that do not load leave the list and say so (only with stubbed tiles).
+    if os.environ.get("IUI_REAL_TILES") != "1":
+        state["tiles"] = "block"
+        menu_action(page, "Opnieuw starten", "Restart", card=".iui-card.iui-kit--map")
+        frame = kit_frame_for(page, page.locator(".iui-card.iui-kit--map:visible").last)
+        frame.wait_for_selector(".k-tile-note:not([hidden])", timeout=12000)
+        assert "De kaart laadt nu niet" in frame.locator(".k-tile-note").inner_text()
+        time.sleep(1.0)
+        assert frame.locator(".k-items li").count() == 3
+        page.locator(".iui-card.iui-kit--map:visible").last.screenshot(path=str(art / "13-map-tiles-blocked.png"))
+        state["tiles"] = "stub"
+        ok("map without tiles: calm note, list still there")
 
     # 10g. kpi: tiles, delta pills coloured by which direction is good, a target bar
     runs += 1
@@ -895,6 +898,8 @@ def main() -> int:
             body = wait_runs(gateway, 4)
             assert ("herstel" in body.lower() or "can you fix" in body.lower()) and "nietBestaandeFunctie" in body, body
             wait_idle(page)
+            bubble = page.locator(".msg-row[data-role='user']:visible").last.inner_text()
+            assert "View report" not in bubble and "nietBestaandeFunctie" not in bubble and "interactive-ui" not in bubble, f"repair bubble must stay plain: {bubble!r}"
             ok(f"broken widget: plain sentence {lead!r}, details on demand, repair asks the agent")
 
             # 7b. reply chips under the latest reply; a click sends the text, older unused chips disappear

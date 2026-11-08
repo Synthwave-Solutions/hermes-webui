@@ -12446,6 +12446,9 @@ def handle_get(handler, parsed) -> bool:
         if not interactive_ui.serve(handler, parsed):
             j(handler, {"error": "not found"}, status=404)
         return True
+    if parsed.path.startswith(("/static/interactive-ui/tiles/", "/session/static/interactive-ui/tiles/")):
+        from api import map_tiles
+        return map_tiles.serve(handler, parsed)
     if parsed.path in ("/static/interactive-ui/kit.html", "/session/static/interactive-ui/kit.html"):
         from api import interactive_ui
         if not interactive_ui.serve(handler, parsed):

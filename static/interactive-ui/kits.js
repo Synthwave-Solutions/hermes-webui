@@ -60,6 +60,14 @@
   function T(key){ var v = (TEXT[LANG] || TEXT.nl)[key]; var args = Array.prototype.slice.call(arguments, 1); return typeof v === 'function' ? v.apply(null, args) : v; }
   function h(tag, cls, text){ var e = document.createElement(tag); if(cls) e.className = cls; if(text != null) e.textContent = String(text); return e; }
   function fmt(v, type, decimals){ return K.formatValue(v, type, decimals, LANG); }
+  // When a place is named after its street address, show the address only once.
+  function addrAfterName(name, addr){
+    var n = String(name || '').trim().toLowerCase(), a = String(addr || '').trim();
+    if(!n || !a) return a;
+    if(a.toLowerCase() === n) return '';
+    if(a.toLowerCase().indexOf(n) === 0) return a.slice(n.length).replace(/^[\s,;·-]+/, '');
+    return a;
+  }
   // The target bar already states the goal or budget: a note that only repeats it is dropped.
   function noteRepeatsTarget(note, target, value){
     if(target === null || target === undefined || !isFinite(target)) return false;
@@ -491,7 +499,6 @@
     var byK = {};
     (Array.isArray(data.places) ? data.places : []).forEach(function(p){ if(p && typeof p.k === 'string') byK[p.k] = p; });
     var tiles = data.tiles && K.tileUrlOk(data.tiles.url) ? data.tiles : K.OSM_TILES;
-    var isOsm = /^https:\/\/tile\.openstreetmap\.org\//.test(tiles.url);
     var items = spec.places.map(function(p){
       var r = byK[p.k] || {}, lat = Number(r.lat), lng = Number(r.lng);
       var ok = r.status === 'ok' && inRange(lat, lng);
@@ -499,10 +506,21 @@
         photo:photoOf(r), later:r.status === 'later'};
     });
     var onMap = items.filter(function(x){ return x.ll; }), missing = items.filter(function(x){ return !x.ll; });
+    // Tiles from this server: the calm grey Kadaster map when every place is in
+    // the Netherlands, OpenStreetMap otherwise.
+    var localStyle = '';
+    if(tiles.url === 'local'){
+      var inNl = onMap.every(function(x){ return x.ll[0] > 50.6 && x.ll[0] < 53.7 && x.ll[1] > 3.2 && x.ll[1] < 7.3; });
+      localStyle = inNl ? 'nl' : 'world';
+      var base = String(location.href).split(/[?#]/)[0].replace(/[^\/]*$/, '');
+      tiles = {url:base + 'tiles/' + localStyle + '/{z}/{x}/{y}.png', maxZoom:19,
+        attribution:localStyle === 'nl' ? (LANG === 'nl' ? 'Kaart: Kadaster / PDOK' : 'Map: Kadaster / PDOK') : ''};
+    }
+    var isOsm = localStyle === 'world' || /^https:\/\/tile\.openstreetmap\.org\//.test(tiles.url);
     var route = spec.kind === 'route' && onMap.length >= 2;
     var cats = spec.categories || [];
 
-    var wrap = h('div', 'k-map' + (route ? ' is-route' : ''));
+    var wrap = h('div', 'k-map' + (route ? ' is-route' : '') + (localStyle ? ' tiles-' + localStyle : ''));
     var head = h('div', 'k-tools');
     if(cats.length){
       var legendEl = h('div', 'k-cats');
@@ -541,7 +559,7 @@
     var bCopy = h('button', 'k-action k-action--quiet', T('copyAddr'));
     bCopy.type = 'button';
     bCopy.addEventListener('click', function(){
-      api.copy(spec.places.map(function(p){ var r = byK[p.k] || {}; var a = p.address || r.label || ''; return p.n + '. ' + p.name + (a ? ', ' + a : ''); }).join('\n'));
+      api.copy(spec.places.map(function(p){ var r = byK[p.k] || {}; var a = addrAfterName(p.name, p.address || r.label || ''); return p.n + '. ' + p.name + (a ? ', ' + a : ''); }).join('\n'));
     });
     actions.appendChild(bCopy);
     foot.append(notes, actions);
@@ -558,7 +576,7 @@
       if(x.p.category){ var ci = cats.indexOf(x.p.category); if(ci >= 0) num.style.setProperty('--k-pin', 'var(--sw-c' + (ci + 2) + ')'); }
       var text = h('span', 'k-item-text');
       text.appendChild(h('span', 'k-item-name', x.p.name));
-      var meta = [x.p.time, x.p.address || x.r.label || ''].filter(Boolean).join(' · ');
+      var meta = [x.p.time, addrAfterName(x.p.name, x.p.address || x.r.label || '')].filter(Boolean).join(' · ');
       if(meta) text.appendChild(h('span', 'k-item-meta', meta));
       if(x.p.note) text.appendChild(h('span', 'k-item-note', x.p.note));
       if(x.approx) text.appendChild(h('span', 'k-item-approx', T('approxPin')));
@@ -601,7 +619,7 @@
     } else attrib.textContent = String(tiles.attribution || '').slice(0, 160);
     (Array.isArray(data.attribution) ? data.attribution : []).forEach(function(a){
       a = String(a || '').slice(0, 60);
-      if(a && !/openstreetmap/i.test(a)) attrib.appendChild(document.createTextNode(' · ' + a));
+      if(a && !/openstreetmap/i.test(a) && !(localStyle === 'nl' && /kadaster|pdok/i.test(a))) attrib.appendChild(document.createTextNode(' · ' + a));
     });
 
     var map = null, markers = [], pins = [], line = null, active = -1, started = false, loads = 0, errs = 0;
@@ -629,7 +647,7 @@
         d.appendChild(img);
       }
       d.appendChild(h('strong', 'k-pop-name', x.p.name));
-      var meta = [x.p.time, x.p.address || x.r.label || ''].filter(Boolean).join(' · ');
+      var meta = [x.p.time, addrAfterName(x.p.name, x.p.address || x.r.label || '')].filter(Boolean).join(' · ');
       if(meta) d.appendChild(h('span', 'k-pop-meta', meta));
       if(x.p.note) d.appendChild(h('span', 'k-pop-note', x.p.note));
       var linkRow = h('span', 'k-pop-links');
@@ -679,7 +697,9 @@
       if(typeof L === 'undefined') showTileNote();
     } else {
       try{
-        map = L.map(mapEl, {scrollWheelZoom:false, zoomControl:true, attributionControl:false, keyboard:true, tap:false});
+        // On a touch screen one finger scrolls the chat; pinch still zooms the map.
+        var coarse = !!(window.matchMedia && window.matchMedia('(pointer:coarse)').matches);
+        map = L.map(mapEl, {scrollWheelZoom:false, zoomControl:true, attributionControl:false, keyboard:true, tap:false, dragging:!coarse});
         var layer = L.tileLayer(tiles.url, {maxZoom:Math.max(1, Math.min(19, Number(tiles.maxZoom) || 19)), referrerPolicy:'origin', detectRetina:false});
         layer.on('tileload', function(){ loads++; if(loads === 1){ start(); } });
         layer.on('tileerror', function(){ errs++; if((loads === 0 && errs >= 4) || (errs + loads >= 10 && errs / (errs + loads) > 0.6)) showTileNote(); });
@@ -789,19 +809,17 @@
     var span = axis.max - axis.min;
     var used = {};
     spec.items.forEach(function(it){ if(it.status) used[it.status] = true; });
+    // Every row already names its status and the today line carries its own
+    // label: a legend only helps when some rows have no status word.
+    var allNamed = spec.items.every(function(it){ return !!it.status || it.milestone; });
     var wrap = h('div', 'k-tl');
     var legend = h('div', 'k-tl-legend');
     ['done', 'doing', 'todo', 'risk'].forEach(function(st){
-      if(!used[st]) return;
+      if(!used[st] || allNamed) return;
       var s = h('span', 'k-tl-key'), sw = h('span', 'k-tl-swatch is-' + st);
       s.append(sw, document.createTextNode(K.statusWord(st, LANG)));
       legend.appendChild(s);
     });
-    if(axis.todayX !== null){
-      var tk = h('span', 'k-tl-key'), tl = h('span', 'k-tl-swatch is-today');
-      tk.append(tl, document.createTextNode(T('today')));
-      legend.appendChild(tk);
-    }
     if(legend.childNodes.length) wrap.appendChild(legend);
 
     var chart = h('div', 'k-tl-chart');

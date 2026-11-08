@@ -1034,7 +1034,8 @@ function base(spec,lang,kind,m,warnings,limits){
   }
 
   // ── Map helpers ──────────────────────────────────────────────────────────
-  const OSM_TILES={url:'https://tile.openstreetmap.org/{z}/{x}/{y}.png',maxZoom:19};
+  // "local": tiles come from this server (PDOK for the Netherlands, OSM elsewhere).
+  const OSM_TILES={url:'local',maxZoom:19};
   function mapRequest(spec,lang){
     return {v:1,lang:pickLang(lang),region:spec.region,photos:!!spec.photos,
       places:spec.places.map(p=>{

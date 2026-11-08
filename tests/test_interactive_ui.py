@@ -324,7 +324,7 @@ def test_kit_frame_csp_runs_only_its_own_hashed_scripts():
     assert "'unsafe-inline'" not in csp["script-src"]
     for host in interactive_ui.CDN_HOSTS:
         assert host not in interactive_ui.KIT_FRAME_CSP
-    assert csp["img-src"].split() == ["data:", "https://tile.openstreetmap.org", "https://upload.wikimedia.org"]
+    assert csp["img-src"].split() == ["data:", "'self'", "https://upload.wikimedia.org"]
     # The widget frame keeps its own policy.
     assert "allow-popups" in interactive_ui.FRAME_CSP and "allow-popups" not in interactive_ui.KIT_FRAME_CSP
 
@@ -344,9 +344,9 @@ def test_kit_frame_hashes_match_the_served_scripts():
 @pytest.mark.parametrize("tiles,origin", [
     ("https://tiles.example.nl/osm/{z}/{x}/{y}.png", "https://tiles.example.nl"),
     ({"url": "https://maps.example.com:8443/t/{z}/{x}/{y}.png", "attribution": "Eigen kaart"}, "https://maps.example.com:8443"),
-    ("http://insecure.example/{z}/{x}/{y}.png", "https://tile.openstreetmap.org"),
-    ("https://evil.example/{z}/{x}.png", "https://tile.openstreetmap.org"),
-    ("https://a.example/{z}/{x}/{y}.png; script-src *", "https://tile.openstreetmap.org"),
+    ("http://insecure.example/{z}/{x}/{y}.png", "'self'"),
+    ("https://evil.example/{z}/{x}.png", "'self'"),
+    ("https://a.example/{z}/{x}/{y}.png; script-src *", "'self'"),
 ])
 def test_kit_frame_image_source_follows_the_tile_setting(tiles, origin, monkeypatch):
     monkeypatch.delenv("HERMES_WEBUI_MAP_TILES", raising=False)

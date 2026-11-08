@@ -165,7 +165,7 @@ assert.deepStrictEqual(plain(K.mapRequest(map.spec, 'nl')), {v: 1, lang: 'nl', r
   {k: '3', name: 'Lon', q: 'Lon', lat: 52.1, lng: 5.1}]});
 const local = K.mapLocalData(map.spec);
 assert.deepStrictEqual(plain(local.places.map(p => p.status)), ['ok', 'not_found', 'not_found', 'ok']);
-assert.strictEqual(local.tiles.url, 'https://tile.openstreetmap.org/{z}/{x}/{y}.png');
+assert.strictEqual(local.tiles.url, 'local');
 const oneStop = build('map', {title: 'x', kind: 'route', places: [{name: 'A'}]});
 assert.strictEqual(oneStop.spec.kind, 'places', 'a route needs two places');
 assert.deepStrictEqual(build('map', {title: 'x', places: [{note: 'no name'}]}).errors, ['Er zijn geen plaatsen (places).']);

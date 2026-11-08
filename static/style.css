@@ -8904,3 +8904,18 @@ html:not([data-nav-audience="admin"]) .msg-usage-inline{display:none!important}
 /* Mobile settings button: a plain settings icon; the length ring only when the chat is long. */
 #composerMobileConfigBtn:not(.ctx-high) #composerMobileCtxRing{display:none!important}
 #composerMobileConfigBtn.ctx-high .composer-mobile-config-icon{display:none}
+/* Update banner: one plain line; build strings only for admins. */
+html:not([data-nav-audience="admin"]) #staleClientVersions{display:none!important}
+/* Value chip that has nothing to say stays out of sight. */
+.om-chat-value[hidden]{display:none!important}
+/* Pinned-messages button only when this chat has pins; never on top of a card. */
+.messages-shell .hwx-pin-header-btn:not(.hwx-pin-header-btn--has-pins){display:none!important}
+/* Sidebar tabs: labels share the width; unread tints the count instead of a stacked dot. */
+.session-kind-btn{flex:1 1 auto;overflow:hidden;text-overflow:ellipsis}
+.session-kind-btn:has(.session-kind-count) .session-kind-unread{display:none}
+.session-kind-btn:has(.session-kind-unread) .session-kind-count{background:var(--accent);color:#fff}
+@media (max-width:640px){
+  .app-titlebar-profile{min-height:44px}
+  #hwxExportBtn{min-width:44px;min-height:44px}
+  #profileChip{display:none!important}
+}

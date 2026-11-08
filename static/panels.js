@@ -3795,8 +3795,11 @@ function _showStaleWebUIClientBanner(clientVersion,serverVersion){
   if(!banner) return;
   const msg=document.getElementById('staleClientMessage');
   const versions=document.getElementById('staleClientVersions');
-  if(msg) msg.textContent='This tab is running a different WebUI version. Hard refresh to restore full functionality.';
+  // One plain sentence for the user; the build strings stay for admins and support.
+  const plain=(typeof t==='function'&&t('stale_client_message')!=='stale_client_message')?t('stale_client_message'):'A new version of SynthPulse is ready.';
+  if(msg) msg.textContent=plain;
   if(versions) versions.textContent='Running: '+clientVersion+' → Server: '+serverVersion;
+  banner.title=clientVersion+' → '+serverVersion;
   banner.style.display='flex';
 }
 

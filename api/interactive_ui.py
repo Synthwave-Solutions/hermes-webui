@@ -62,7 +62,7 @@ FRAME_CSP = (
     f"script-src 'unsafe-inline' 'unsafe-eval' blob: {_CDN}; "
     f"style-src 'unsafe-inline' {_CDN} https://fonts.googleapis.com; "
     f"font-src data: {_CDN} https://fonts.gstatic.com; "
-    "img-src data: blob: https:; "
+    "img-src 'self' data: blob: https:; "
     "media-src data: blob: https:; "
     f"connect-src {_CDN}; "
     "worker-src blob:; "
@@ -125,7 +125,8 @@ th{color:var(--sw-muted);font-weight:600;font-size:.82rem}
 td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 
 .card{background:var(--sw-surface);border:1px solid var(--sw-border);border-radius:var(--sw-radius);padding:14px 16px}
-#iui-root>.card:only-child{background:transparent;border:0;border-radius:0;padding:0;box-shadow:none}
+#iui-root>.card:only-child,#iui-root>:only-child>.card:only-child{background:transparent;border:0;border-radius:0;padding:0;box-shadow:none}
+#iui-root>:only-child{max-width:none!important;margin-left:0!important;margin-right:0!important}
 .grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(var(--min,180px),1fr))}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .stack{display:flex;flex-direction:column;gap:10px}
@@ -421,7 +422,10 @@ KIT_SCRIPT_FILES = (
     "interactive-ui/kit-core.js",
     "interactive-ui/kits.js",
 )
-DEFAULT_TILE_ORIGIN = "https://tile.openstreetmap.org"
+# Tiles come from this server by default (api/map_tiles.py): PDOK for the
+# Netherlands, OpenStreetMap elsewhere, cached and fetched with a proper
+# User-Agent, so no browser gets a "blocked" tile.
+DEFAULT_TILE_ORIGIN = "'self'"
 PHOTO_ORIGIN = "https://upload.wikimedia.org"
 _ORIGIN_RE = re.compile(r"^https://[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+(?::\d{2,5})?$")
 
@@ -463,13 +467,34 @@ def tile_origin(config_data=None) -> str:
         url = map_resolve.tiles(config_data)["url"]
     except Exception:
         return DEFAULT_TILE_ORIGIN
+    if url == "local":
+        return DEFAULT_TILE_ORIGIN
     match = re.match(r"^(https://[^/]+)/", str(url or ""))
     origin = match.group(1).lower() if match else ""
     return origin if _ORIGIN_RE.match(origin) else DEFAULT_TILE_ORIGIN
 
 
-def kit_frame_csp(config_data=None) -> str:
-    images = " ".join(dict.fromkeys((tile_origin(config_data), PHOTO_ORIGIN)))
+_HOST_RE = re.compile(r"^[a-z0-9](?:[a-z0-9.-]{0,252})(?::\d{2,5})?$")
+
+
+def own_origins(handler) -> tuple[str, ...]:
+    """This server's origins as the browser sees them, for the kit's img-src.
+
+    The kit frame has an opaque origin, where browsers differ on what 'self'
+    matches, so the host is also named explicitly."""
+    try:
+        host = str(handler.headers.get("Host") or "").strip().lower()
+    except Exception:
+        host = ""
+    if not _HOST_RE.match(host):
+        return ()
+    return (f"https://{host}", f"http://{host}")
+
+
+def kit_frame_csp(config_data=None, self_origins=()) -> str:
+    tile = tile_origin(config_data)
+    extra = tuple(self_origins) if tile == DEFAULT_TILE_ORIGIN else ()
+    images = " ".join(dict.fromkeys((tile,) + extra + (PHOTO_ORIGIN,)))
     return (
         "sandbox allow-scripts; "
         "default-src 'none'; "
@@ -521,7 +546,7 @@ def serve(handler, parsed) -> bool:
     elif path == KIT_FRAME_PATH:
         # About 450 KB that only changes with a release or the tile setting:
         # the browser keeps it and asks again with If-None-Match (304).
-        csp = kit_frame_csp(_config())
+        csp = kit_frame_csp(_config(), own_origins(handler))
         body = KIT_FRAME_BYTES
         etag = '"' + hashlib.sha256(body + csp.encode("utf-8")).hexdigest()[:32] + '"'
         # A versioned URL (the chat always adds ?v=<release>) may be reused for an
@@ -562,9 +587,9 @@ def serve(handler, parsed) -> bool:
 PROMPT_DATA = """
 WebUI data blocks:
 - For data, write a fenced block that holds only JSON; the chat draws it in the theme, sortable and downloadable, and runs none of your code. ```table: more than 6 rows, or when the user will sort, filter or copy (```csv also works). ```chart: trends, rankings or shares. ```map: real places, addresses, customer visits or a trip.
-- ```kpi: 1 to 8 headline figures, such as revenue, MRR or conversion, with their change: {"title", "items":[{"label", "value", "format"?, "delta"? (change in percent; with "deltaFormat":"number" in the value's unit, points for a percent), "good"?:"up|down" (down for costs or churn), "target"?, "note"?}]}; the tile already shows the target, so "note" never repeats it.
+- ```kpi: 1 to 8 headline figures, such as revenue, MRR or conversion, with their change: {"title", "items":[{"label", "value", "format"?, "delta"? (change in percent; with "deltaFormat":"number" in the value's unit, points for a percent), "good"?:"up|down" (down for costs or churn), "target"?, "note"?}]}; "note" never repeats the target.
 - ```timeline: a plan, roadmap or project phases, drawn as a Gantt: {"title", "unit":"day|week|month", "start"?:"YYYY-MM-DD", "today"?, "items":[{"label", "start", "end", "owner"?, "status"?:"todo|doing|done|risk", "milestone"?:true, "note"?}]}; start and end are dates or unit numbers counted from "start", end included.
-- Shapes: table {"title", "columns":["Naam", {"label":"Omzet", "type":"currency"}], "rows":[["Bakkerij Jansen", 1200]], "sort"?, "total"?}; chart {"title", "type":"bar|hbar|stacked|line|area|pie|donut", "labels":[], "series":[{"name", "data":[]}], "format"?:"number|currency|percent", "highlight"?, "target"?:{"value", "label"}}; map {"title", "kind":"places|route", "places":[{"name", "address", "time"?, "note"?}], "photos"?}. Every block may add "subtitle" (never repeating the title or the target), "source" (only an outside source such as a tool, report or website, never the user or the conversation), and "example":true for illustrative figures. Always set "lang" to the user's language ("nl" or "en"); it sets the labels and number format. A goal, budget or threshold is "target", never an extra series.
+- Shapes: table {"title", "columns":["Naam", {"label":"Omzet", "type":"currency"}], "rows":[["Bakkerij Jansen", 1200]], "sort"?, "total"?}; chart {"title", "type":"bar|hbar|stacked|line|area|pie|donut", "labels":[], "series":[{"name", "data":[]}], "format"?:"number|currency|percent", "highlight"?, "target"?:{"value", "label"}}; map {"title", "kind":"places|route", "places":[{"name", "address", "time"?, "note"?}], "photos"?}; "name" is the place's name, never its street address. Every block may add "subtitle" (never repeating title or target), "source" (outside sources only, never the user or the chat), and "example":true for illustrative figures. Always set "lang" to the user's language ("nl" or "en"); it sets the labels and number format. A goal, budget or threshold is "target", never an extra series.
 - Numbers are JSON numbers, never formatted text: set the column type or the chart format and the chat formats them (percent: 12.5 means 12,5%). Every row and series has exactly one value per column or label.
 - Use only figures and places from the conversation or tools. Give real addresses; add lat and lng only when a tool or the user supplied them. Never put travel times, distances or opening hours in a block unless a tool returned them. Set photos:true only for landmarks.
 - At most one data block per reply; tables of up to 6 rows stay markdown. Always add one or two sentences outside the block with the takeaway.
@@ -577,8 +602,9 @@ WebUI interactive answers:
 - Order: <!-- title: Short title --> and <!-- height: 420 --> (expected height in px), then one <style>, then readable markup with real labels and default results, then <script> tags last. Markup shows while streaming; scripts run when the block is complete, after the page has loaded, so run setup code directly (DOMContentLoaded and load are replayed, but do not rely on them). Never close the block early; keep it under 25 KB.
 - Scripts: plain inline scripts or <script src> from cdn.jsdelivr.net, unpkg.com, cdnjs.cloudflare.com or esm.sh only; anything else is removed. No Tailwind, Bootstrap, jQuery or font links: write plain CSS. Use addEventListener in the script rather than onclick attributes. Classic scripts cannot use top-level await or import; for modules use <script type="module"> with bare imports three, d3, gsap, chart.js or leaflet. No fetch to other hosts, no document.write, no alert, confirm or prompt; storage is temporary. Put all data inline.
 - Layout: the frame grows to its content, so never size anything to 100vh, height:100% or innerHeight; give charts a fixed-height container (Chart.js with maintainAspectRatio:false inside a div of e.g. 260px). It must work at 360 px wide.
-- Look: the frame already follows the chat theme. Use only the variables --sw-fg, --sw-strong, --sw-muted, --sw-surface, --sw-surface-2, --sw-border, --sw-accent, --sw-accent-soft, --sw-good, --sw-bad and the chart palette synthwave.theme.palette (in canvas use synthwave.theme.fg, muted and border). Never hardcode colours, greys, white or black, and never set a body background. Ready classes: .card .grid .row .stack .stat(.label .value) .badge .chip .bar .note, button.primary.
-- Maps: for places use a map data block. Only a custom map (areas, a heatmap) belongs here: Leaflet with tiles https://tile.openstreetmap.org/{z}/{x}/{y}.png and the tileLayer option referrerPolicy:'origin' (without it the tiles are refused), credit OpenStreetMap.
+- Look: the frame already follows the chat theme. Use only the variables --sw-fg, --sw-strong, --sw-muted, --sw-surface, --sw-surface-2, --sw-border, --sw-accent, --sw-accent-soft, --sw-good, --sw-bad and the chart palette synthwave.theme.palette (in canvas use synthwave.theme.fg, muted and border). Never hardcode colours, greys, white or black, and never set a body background. Ready classes: .card .grid .row .stack .stat(.label .value) .badge .chip .bar .note, button.primary. The chat already draws the outer card: never wrap the whole app in .card or a max-width container; use .card only for small result tiles.
+- Repair: a user message can end with a [View report] block naming the block and the problem the chat saw. Fix that cause and send the complete block again, never a diff, and do not quote the report back.
+- Maps: for places use a map data block. Only a custom map (areas, a heatmap) belongs here: Leaflet with the tile URL 'tiles/nl/{z}/{x}/{y}.png' (Kadaster grey map, Netherlands, credit "Kaart: Kadaster / PDOK") or 'tiles/world/{z}/{x}/{y}.png' (elsewhere, credit "© OpenStreetMap"), exactly as written; never another tile server.
 - Follow-ups: a button may call synthwave.sendPrompt("...") with the chosen values; the user confirms it before it is sent. synthwave.onTheme(cb) fires on a theme switch, redraw charts there.
 - Other bots: always call them by exactly the display name shown in the chat (for example "Chief Financial Bot"), never a shorter nickname, abbreviation or a technical id such as synthwave-cfo.
 - Content: labels in the user's language, Dutch number and currency format for Dutch users (Intl.NumberFormat('nl-NL')), real numbers, assumptions labelled as examples in the app itself. Always add one or two sentences outside the block with the takeaway.
