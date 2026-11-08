@@ -391,7 +391,7 @@
   async function toggleLive(){
     const voice = window.synPulseVoice;
     if (!voice) return;
-    if (St.live) { stopLive(); return; }
+    if (St.live) { await stopLive(); return; }
     let sid = St.doc.voice_session;
     if (!sid) {
       const data = await post('/api/session/new', {});
@@ -401,8 +401,17 @@
       await save({ voice_session: sid }, true);
     }
     const base = (root().querySelector('[data-st-send] textarea') || {}).value || '';
+    // The voice client only runs for the conversation that is open in the chat
+    // (d.current()), so open this use case's voice conversation in the
+    // background and put the previous one back when live talking stops.
+    const state = typeof S !== 'undefined' ? S : null;
+    const previous = state && state.session && state.session.session_id;
+    if (typeof loadSession === 'function' && previous !== sid) {
+      try { await loadSession(sid); } catch (_e) {}
+      if (typeof switchPanel === 'function') await switchPanel('studio');
+    }
     const original = voice.d.transcript;
-    St.live = { original, base };
+    St.live = { original, base, previous };
     voice.d.transcript = entries => {
       try { if (original) original(entries); } catch (_e) {}
       const said = (entries || []).filter(e => e.role === 'user').map(e => e.text).join(' ').trim();
@@ -413,10 +422,15 @@
     render();
     try { await voice.start(sid); } catch (e) { toast(errMsg(e)); stopLive(); }
   }
-  function stopLive(){
+  async function stopLive(){
     const voice = window.synPulseVoice;
+    const previous = St.live && St.live.previous;
     if (voice && St.live) { voice.d.transcript = St.live.original; try { voice.stop(); } catch (_e) {} }
     St.live = null; render();
+    if (previous && typeof loadSession === 'function') {
+      try { await loadSession(previous); } catch (_e) {}
+      if (typeof switchPanel === 'function') await switchPanel('studio');
+    }
   }
 
   function dictate(){
