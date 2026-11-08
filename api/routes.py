@@ -12446,6 +12446,11 @@ def handle_get(handler, parsed) -> bool:
         if not interactive_ui.serve(handler, parsed):
             j(handler, {"error": "not found"}, status=404)
         return True
+    if parsed.path in ("/static/interactive-ui/kit.html", "/session/static/interactive-ui/kit.html"):
+        from api import interactive_ui
+        if not interactive_ui.serve(handler, parsed):
+            j(handler, {"error": "not found"}, status=404)
+        return True
 
     if parsed.path.startswith("/session/static/"):
         # Strip the leading "/session" so _serve_static() sees a path that

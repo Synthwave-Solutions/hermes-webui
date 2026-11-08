@@ -22,6 +22,14 @@ The frame document is the only thing served here, always with its own headers:
 switch is ``webui_interactive_ui`` in the config; ``HERMES_WEBUI_INTERACTIVE_UI``
 (``1`` or ``0``) overrides it. The default is on.
 
+Data blocks (```table, ```csv, ```chart, ```map) use a second document,
+``KIT_FRAME_PATH``. It never runs model code: the chat checks the JSON and the
+frame draws it with fixed renderers (``static/interactive-ui/kits.js``) and
+vendored Chart.js and Leaflet, all inlined and each allowed by its own
+sha256 hash in ``KIT_FRAME_CSP``. Its sandbox only has ``allow-scripts``;
+images only come from the map tiles host and Wikimedia, nothing else is
+fetched.
+
 The approach (ordered streaming of CSS, markup and script into an isolated
 frame, a validated host bridge for follow-up prompts) follows CopilotKit's
 Open Generative UI / Open Intelligent UI (MIT); no code is vendored.
@@ -29,7 +37,11 @@ Open Generative UI / Open Intelligent UI (MIT); no code is vendored.
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import os
+import re
+from pathlib import Path
 
 FRAME_PATH = "/static/interactive-ui/frame.html"
 CONFIG_KEY = "webui_interactive_ui"
@@ -395,36 +407,148 @@ FRAME_HTML = (
 )
 FRAME_BYTES = FRAME_HTML.encode("utf-8")
 
+# ── Data blocks: the kit frame ──────────────────────────────────────────────
+KIT_FRAME_PATH = "/static/interactive-ui/kit.html"
+_STATIC_DIR = Path(__file__).resolve().parents[1] / "static"
+KIT_STYLE_FILES = (
+    "vendor/leaflet/1.9.4/leaflet.css",
+    "interactive-ui/kits.css",
+)
+KIT_SCRIPT_FILES = (
+    "vendor/chartjs/4.4.7/chart.umd.js",
+    "vendor/leaflet/1.9.4/leaflet.js",
+    "interactive-ui/kit-core.js",
+    "interactive-ui/kits.js",
+)
+DEFAULT_TILE_ORIGIN = "https://tile.openstreetmap.org"
+PHOTO_ORIGIN = "https://upload.wikimedia.org"
+_ORIGIN_RE = re.compile(r"^https://[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+(?::\d{2,5})?$")
 
-def headers() -> list[tuple[str, str]]:
+
+def _kit_asset(rel: str) -> str:
+    text = (_STATIC_DIR / rel).read_text(encoding="utf-8")
+    # Never let an inline script or style end its own element early.
+    return re.sub(r"</(script|style)", r"<\\/\1", text, flags=re.IGNORECASE)
+
+
+def _sha256(text: str) -> str:
+    return "'sha256-" + base64.b64encode(hashlib.sha256(text.encode("utf-8")).digest()).decode("ascii") + "'"
+
+
+def _build_kit_frame():
+    styles = [BASE_CSS] + [_kit_asset(rel) for rel in KIT_STYLE_FILES]
+    scripts = [_kit_asset(rel) for rel in KIT_SCRIPT_FILES]
+    html = (
+        "<!doctype html>\n<html lang=\"nl\" data-theme=\"dark\"><head><meta charset=\"utf-8\">"
+        "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+        "<meta name=\"referrer\" content=\"no-referrer\">"
+        "<title>Gegevens</title>"
+        + "".join("<style>" + css + "</style>" for css in styles)
+        + "</head><body><div id=\"kit-root\"></div>"
+        + "".join("<script>" + js + "</script>" for js in scripts)
+        + "</body></html>\n"
+    )
+    return html, tuple(_sha256(js) for js in scripts)
+
+
+KIT_FRAME_HTML, KIT_SCRIPT_HASHES = _build_kit_frame()
+KIT_FRAME_BYTES = KIT_FRAME_HTML.encode("utf-8")
+
+
+def tile_origin(config_data=None) -> str:
+    """The https origin of the configured map tiles (``webui_map_tiles``)."""
+    try:
+        from api import map_resolve
+        url = map_resolve.tiles(config_data)["url"]
+    except Exception:
+        return DEFAULT_TILE_ORIGIN
+    match = re.match(r"^(https://[^/]+)/", str(url or ""))
+    origin = match.group(1).lower() if match else ""
+    return origin if _ORIGIN_RE.match(origin) else DEFAULT_TILE_ORIGIN
+
+
+def kit_frame_csp(config_data=None) -> str:
+    images = " ".join(dict.fromkeys((tile_origin(config_data), PHOTO_ORIGIN)))
+    return (
+        "sandbox allow-scripts; "
+        "default-src 'none'; "
+        f"script-src {' '.join(KIT_SCRIPT_HASHES)}; "
+        "style-src 'unsafe-inline'; "
+        f"img-src data: {images}; "
+        "connect-src 'none'; font-src 'none'; media-src 'none'; worker-src 'none'; "
+        "frame-src 'none'; object-src 'none'; manifest-src 'none'; "
+        "base-uri 'none'; form-action 'none'; "
+        "frame-ancestors 'self'"
+    )
+
+
+KIT_FRAME_CSP = kit_frame_csp({})
+
+
+def headers(csp: str = FRAME_CSP, cache: str = "no-store") -> list[tuple[str, str]]:
     return [
         ("Content-Type", "text/html; charset=utf-8"),
-        ("Content-Security-Policy", FRAME_CSP),
+        ("Content-Security-Policy", csp),
         ("X-Content-Type-Options", "nosniff"),
         ("X-Frame-Options", "SAMEORIGIN"),
         ("Referrer-Policy", "no-referrer"),
-        ("Cache-Control", "no-store"),
+        ("Cache-Control", cache),
         ("Permissions-Policy", PERMISSIONS_POLICY),
         ("Cross-Origin-Resource-Policy", "same-origin"),
     ]
 
 
+def _config():
+    try:
+        from api.config import get_config
+        data = get_config()
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
 def serve(handler, parsed) -> bool:
-    """Serve the frame document; False for any other path."""
+    """Serve the widget frame or the kit frame; False for any other path."""
     path = str(getattr(parsed, "path", "") or "")
     if path.startswith("/session/"):
         path = path[len("/session"):]
-    if path != FRAME_PATH or getattr(parsed, "params", ""):
+    if getattr(parsed, "params", ""):
         return False
+    etag = ""
+    if path == FRAME_PATH:
+        body, header_list = FRAME_BYTES, headers()
+    elif path == KIT_FRAME_PATH:
+        # About 450 KB that only changes with a release or the tile setting:
+        # the browser keeps it and asks again with If-None-Match (304).
+        csp = kit_frame_csp(_config())
+        body = KIT_FRAME_BYTES
+        etag = '"' + hashlib.sha256(body + csp.encode("utf-8")).hexdigest()[:32] + '"'
+        header_list = headers(csp, "private, no-cache") + [("ETag", etag)]
+    else:
+        return False
+    sent_tag = ""
+    request_headers = getattr(handler, "headers", None)
+    try:
+        if etag and request_headers is not None and hasattr(request_headers, "get"):
+            sent_tag = str(request_headers.get("If-None-Match") or "")
+    except Exception:
+        sent_tag = ""
+    if etag and etag in [t.strip() for t in sent_tag.split(",")]:
+        handler.send_response(304)
+        for header, value in header_list:
+            if header != "Content-Type":
+                handler.send_header(header, value)
+        handler.end_headers()
+        return True
     handler.send_response(200)
-    for header, value in headers():
+    for header, value in header_list:
         handler.send_header(header, value)
-    handler.send_header("Content-Length", str(len(FRAME_BYTES)))
+    handler.send_header("Content-Length", str(len(body)))
     handler.end_headers()
     if getattr(handler, "command", "GET") == "HEAD":
         return True
     try:
-        handler.wfile.write(FRAME_BYTES)
+        handler.wfile.write(body)
     except (BrokenPipeError, ConnectionResetError):
         pass
     return True

@@ -17,11 +17,25 @@
 // a follow-up question is shown in the card and only sent after a click on
 // the host's own button.
 //
+// Data blocks (```table, ```csv, ```chart, ```map and their Dutch names)
+// hold JSON or CSV instead of code. The chat checks them with SWKit.build()
+// (static/interactive-ui/kit-core.js) and sends only the cleaned spec to a
+// second frame, static/interactive-ui/kit.html, which draws it with fixed
+// renderers and never runs model code (`sandbox allow-scripts`, scripts by
+// hash). Maps first get their coordinates from POST /api/map/resolve through
+// static/interactive_ui_map.js. The card, menu, full screen, height cache and
+// saved settings are the same for both kinds.
+//
 // Globals: interactiveUiFenceAccepts, renderInteractiveUiBlocks,
 // interactiveUiStreamTick, parseInteractiveUiSource. Internals in _iui.
 
 const _iui=(function(){
   const FRAME_URL='static/interactive-ui/frame.html';
+  const KIT_URL='static/interactive-ui/kit.html';
+  const KIT_STREAM_H={table:300,chart:380,map:460};
+  const KIT_DATA_MAX=200*1024;
+  function kits(){return typeof SWKit!=='undefined'&&SWKit&&typeof SWKit.build==='function'?SWKit:null;}
+  function kitKindOf(lang){const K=kits();return K?K.kitKind(lang):'';}
   const FENCE_LANGS=new Set(['interactive-ui','interactive','iui']);
   const CHIP_LANGS=new Set(['suggestions','replies']);
   const CDN_ORIGINS=new Set(['https://cdn.jsdelivr.net','https://unpkg.com','https://cdnjs.cloudflare.com','https://esm.sh']);
@@ -73,7 +87,11 @@ const _iui=(function(){
       removed:'Overgeslagen bron',ask:'Vraag uit deze weergave',send:'Versturen',cancel:'Annuleren',
       draftBusy:'Je concept staat nog in het invoerveld. Verstuur of wis dat eerst.',
       repairPrompt:(title,msg)=>`Kun je de weergave "${title}" herstellen? Die werkt niet helemaal (${msg}). Stuur het volledige interactive-ui-blok opnieuw.`,
-      sandboxNote:'Draait los van je account en de chat',chipsLabel:'Voorgestelde antwoorden',chipsBusy:'Even wachten tot het huidige antwoord klaar is.'},
+      sandboxNote:'Draait los van je account en de chat',chipsLabel:'Voorgestelde antwoorden',chipsBusy:'Even wachten tot het huidige antwoord klaar is.',
+      kitNoun:{table:'tabel',chart:'grafiek',map:'kaart'},kitName:{table:'Tabel',chart:'Grafiek',map:'Kaart'},
+      kitFail:noun=>`Deze ${noun} kon niet worden gemaakt.`,downloadCsv:'Download als CSV',copyTable:'Kopieer als tabel',
+      viewData:'Gegevens bekijken',hideData:'Gegevens verbergen',copyData:'Gegevens kopiëren',example:'Voorbeeld',
+      kitRepairPrompt:(noun,title,msg,fence)=>`Kun je de ${noun} "${title}" herstellen? ${msg} Stuur het volledige ${fence}-blok opnieuw.`},
     en:{title:'Interactive view',building:'Building',
       restart:'Restart',viewCode:'View code',hideCode:'Hide code',copyCode:'Copy code',download:'Download',
       devGroup:'For developers',full:'Full screen',exitFull:'Close',more:'More options',repair:'Fix it',
@@ -82,13 +100,18 @@ const _iui=(function(){
       removed:'Skipped source',ask:'Question from this view',send:'Send',cancel:'Cancel',
       draftBusy:'Your draft is still in the message box. Send or clear it first.',
       repairPrompt:(title,msg)=>`Can you fix the view "${title}"? It is not fully working (${msg}). Send the complete interactive-ui block again.`,
-      sandboxNote:'Runs separately from your account and the chat',chipsLabel:'Suggested replies',chipsBusy:'Wait until the current reply is finished.'},
+      sandboxNote:'Runs separately from your account and the chat',chipsLabel:'Suggested replies',chipsBusy:'Wait until the current reply is finished.',
+      kitNoun:{table:'table',chart:'chart',map:'map'},kitName:{table:'Table',chart:'Chart',map:'Map'},
+      kitFail:noun=>`This ${noun} could not be made.`,downloadCsv:'Download as CSV',copyTable:'Copy as table',
+      viewData:'View data',hideData:'Hide data',copyData:'Copy data',example:'Example',
+      kitRepairPrompt:(noun,title,msg,fence)=>`Can you fix the ${noun} "${title}"? ${msg} Send the complete ${fence} block again.`},
   };
   function lang(){
     const l=String((typeof _currentLang!=='undefined'&&_currentLang)||document.documentElement.lang||navigator.language||'en').toLowerCase();
     return l.startsWith('nl')?'nl':'en';
   }
   function tx(key,...args){const v=(TEXT[lang()]||TEXT.en)[key];return typeof v==='function'?v(...args):(v||key);}
+  function kitWord(field,kind){const m=(TEXT[lang()]||TEXT.en)[field];return (m&&m[kind])||kind;}
   function toast(msg){try{if(typeof showToast==='function')showToast(msg,2600);}catch(_){}}
 
   const ICON={
@@ -105,6 +128,10 @@ const _iui=(function(){
     close:'<path d="M18 6L6 18"/><path d="M6 6l12 12"/>',
     dots:'<circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/>',
     send:'<path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/>',
+    table:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M9 10v10"/>',
+    chart:'<path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/>',
+    pin:'<path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>',
+    sheet:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M8 13h8"/><path d="M8 17h8"/>',
   };
   function icon(name){return `<svg class="iui-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${ICON[name]||''}</svg>`;}
   function escHtml(v){return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -245,12 +272,45 @@ const _iui=(function(){
     try{w.postMessage(Object.assign({iui:1},msg),'*');}catch(_){}
   }
   function pushRender(ctrl){
+    if(ctrl.kit){pushKit(ctrl);return;}
     if(!ctrl.ready||ctrl.sentFinal) return;
     const p=ctrl.parsed;
     if(!p||p.tooBig) return;
     const restore=ctrl.final?loadState(ctrl.stateKey):null;
     postTo(ctrl,{type:'render',css:p.css,html:p.html,scripts:ctrl.final?p.scripts:[],final:ctrl.final,restore});
     if(ctrl.final) ctrl.sentFinal=true;
+  }
+  // A data block gets its cleaned spec (and, for a map, the resolved places)
+  // as a structured clone: nothing the model wrote becomes code or markup.
+  function kitDataFor(ctrl){
+    const data=ctrl.kitData;
+    if(!data) return null;
+    try{if(JSON.stringify(data).length<=KIT_DATA_MAX) return data;}catch(_){}
+    return Object.assign({},data,{places:(data.places||[]).map(p=>Object.assign({},p,{photo:undefined}))});
+  }
+  function pushKit(ctrl){
+    if(!ctrl.ready||ctrl.sentFinal||!ctrl.final) return;
+    const p=ctrl.parsed;
+    if(!p||!p.spec) return;
+    if(ctrl.kit==='map'&&!ctrl.kitData){ensureMapData(ctrl);if(!ctrl.kitData) return;}
+    postTo(ctrl,{type:'kit',kit:ctrl.kit,spec:p.spec,data:kitDataFor(ctrl),final:true,restore:loadState(ctrl.stateKey),lang:lang()});
+    ctrl.sentFinal=true;
+  }
+  function ensureMapData(ctrl){
+    const p=ctrl.parsed, K=kits();
+    if(ctrl.kit!=='map'||!ctrl.final||!p||!p.spec||!K||ctrl.kitData||ctrl.resolving) return;
+    if(typeof interactiveUiMapResolve!=='function'){ctrl.kitData=K.mapLocalData(p.spec);return;}
+    ctrl.resolving=true;
+    if(ctrl.state!=='error') setState(ctrl,'building');
+    const apply=data=>{
+      ctrl.kitData=data&&typeof data==='object'?data:K.mapLocalData(p.spec);
+      ctrl.sentFinal=false;
+      pushKit(ctrl);
+    };
+    let first=true;
+    Promise.resolve().then(()=>interactiveUiMapResolve(p.spec,ctrl.stateKey,{lang:lang(),onUpdate:data=>{if(!first)apply(data);}}))
+      .then(data=>{first=false;ctrl.resolving=false;if(ctrl.state==='building')setState(ctrl,ctrl.rendered?'ready':'loading');apply(data);},
+        ()=>{first=false;ctrl.resolving=false;if(ctrl.state==='building')setState(ctrl,'loading');apply(K.mapLocalData(p.spec,'later'));});
   }
   function onMessage(e){
     const data=e&&e.data;
@@ -270,7 +330,8 @@ const _iui=(function(){
         break;
       case 'rendered':
         ctrl.rendered=true;
-        setState(ctrl,ctrl.errors.length?'error':'ready');
+        setState(ctrl,ctrl.errors.length?'error':(ctrl.resolving?'building':'ready'));
+        revealIfReady(ctrl);
         break;
       case 'error':
         addError(ctrl,String(data.message||''),String(data.detail||''));
@@ -279,7 +340,7 @@ const _iui=(function(){
         if(ctrl.final&&ctrl.stateKey) saveState(ctrl.stateKey,data.values);
         break;
       case 'prompt':
-        offerPrompt(ctrl,String(data.text||''));
+        if(!ctrl.kit) offerPrompt(ctrl,String(data.text||''));
         break;
       case 'copy':
         copyFromWidget(String(data.text||''));
@@ -464,7 +525,7 @@ const _iui=(function(){
   function openMenuFor(ctrl){
     if(openMenu&&openMenu.menu===ctrl.menu){closeMenu(true);return;}
     closeMenu(false);
-    ctrl.codeItem.querySelector('span').textContent=ctrl.sourceBox.hidden?tx('viewCode'):tx('hideCode');
+    ctrl.codeItem.querySelector('span').textContent=ctrl.kit?(ctrl.sourceBox.hidden?tx('viewData'):tx('hideData')):(ctrl.sourceBox.hidden?tx('viewCode'):tx('hideCode'));
     ctrl.menu.hidden=false;
     ctrl.moreBtn.setAttribute('aria-expanded','true');
     openMenu={menu:ctrl.menu,trigger:ctrl.moreBtn};
@@ -477,16 +538,18 @@ const _iui=(function(){
 
   function createController(source,opts){
     const final=!!(opts&&opts.final);
+    const kit=(opts&&opts.kit)||'', fence=(opts&&opts.fence)||kit;
     const card=document.createElement('div');
-    card.className='iui-card';
+    card.className='iui-card'+(kit?' iui-kit iui-kit--'+kit:'');
     card.dataset.iuiCard=String(++seq);
     card.setAttribute('role','group');
     const head=document.createElement('div');head.className='iui-head';
-    const badge=document.createElement('span');badge.className='iui-badge';badge.innerHTML=icon('spark');
+    const badge=document.createElement('span');badge.className='iui-badge';badge.innerHTML=icon(kit==='table'?'table':kit==='chart'?'chart':kit==='map'?'pin':'spark');
     const titleEl=document.createElement('span');titleEl.className='iui-title';
+    const pill=document.createElement('span');pill.className='iui-pill';pill.textContent=tx('example');pill.hidden=true;
     const status=document.createElement('span');status.className='iui-status';
     const actions=document.createElement('div');actions.className='iui-actions';
-    head.append(badge,titleEl,status,actions);
+    head.append(badge,titleEl,pill,status,actions);
     const stage=document.createElement('div');stage.className='iui-stage';
     const skeleton=document.createElement('div');skeleton.className='iui-skeleton';skeleton.innerHTML='<span></span><span></span><span></span>';
     stage.appendChild(skeleton);
@@ -506,10 +569,12 @@ const _iui=(function(){
     sourceBox.appendChild(pre);
     card.append(head,stage,askBar,errorBar,errorDetails,sourceBox);
 
-    const ctrl={card,head,titleEl,status,actions,stage,skeleton,askBar,askText,errorBar,errorDetails,sourceBox,code,
+    if(kit) code.className='language-'+(fence==='csv'?'csv':'json');
+    const ctrl={card,head,titleEl,pill,status,actions,stage,skeleton,askBar,askText,errorBar,errorLead,errorDetails,sourceBox,code,
       iframe:null,ready:false,final,sentFinal:false,rendered:false,source:'',parsed:null,errors:[],state:'loading',
       fp:'',stateKey:'',height:0,lastPrompt:0,pendingPrompt:'',rejectedPrompts:0,lastTick:0,tickTimer:0,
-      mounted:false,mountedAt:0,detachedAt:0};
+      mounted:false,mountedAt:0,detachedAt:0,kit,fence,kitData:null,resolving:false};
+    if(kit) errorLead.textContent=tx('kitFail',kitWord('kitNoun',kit));
 
     const askSend=button('send',tx('send'),(b,ev)=>{
       if(!ev||!ev.isTrusted) return;
@@ -525,6 +590,11 @@ const _iui=(function(){
     const repair=button('wrench',tx('repair'),(b,ev)=>{
       if(!ev||!ev.isTrusted) return;
       const first=ctrl.errors[0]?friendly(ctrl.errors[0].message).slice(0,160):'';
+      if(ctrl.kit){
+        const msg=first||((ctrl.parsed&&ctrl.parsed.warnings||[])[0]||'');
+        sendPrompt(tx('kitRepairPrompt',kitWord('kitNoun',ctrl.kit),ctrl.parsed&&ctrl.parsed.title||kitWord('kitName',ctrl.kit),msg,ctrl.fence||ctrl.kit));
+        return;
+      }
       sendPrompt(tx('repairPrompt',ctrl.parsed&&ctrl.parsed.title||tx('title'),first));
     },'iui-btn--text');
     const detailsBtn=button('code',tx('details'),b=>{
@@ -547,13 +617,20 @@ const _iui=(function(){
     const restartItem=menuItem('reload',tx('restart'),pick(()=>reload(ctrl)));
     const sep=document.createElement('div');sep.className='iui-menu-sep';sep.setAttribute('role','separator');
     const group=document.createElement('div');group.className='iui-menu-group';group.textContent=tx('devGroup');group.setAttribute('aria-hidden','true');
-    const codeItem=menuItem('code',tx('viewCode'),pick(()=>{
+    const codeItem=menuItem('code',kit?tx('viewData'):tx('viewCode'),pick(()=>{
       sourceBox.hidden=!sourceBox.hidden;
       if(!sourceBox.hidden){code.textContent=ctrl.source;try{if(typeof Prism!=='undefined'&&Prism.highlightElement)Prism.highlightElement(code);}catch(_){}}
     }),'iui-menu-dev');
-    const copyItem=menuItem('copy',tx('copyCode'),pick(()=>copyText(ctrl.source)),'iui-menu-dev');
-    const note=document.createElement('div');note.className='iui-menu-note';note.innerHTML=icon('lock')+`<span>${escHtml(tx('sandboxNote'))}</span>`;
-    menu.append(dlItem,restartItem,sep,group,codeItem,copyItem,note);
+    const copyItem=menuItem('copy',kit?tx('copyData'):tx('copyCode'),pick(()=>copyText(ctrl.source)),'iui-menu-dev');
+    if(kit){
+      // Data blocks: exports first, no sandbox note (nothing of the model runs).
+      const csvItem=menuItem('sheet',tx('downloadCsv'),pick(()=>downloadCsv(ctrl)));
+      const tsvItem=menuItem('copy',tx('copyTable'),pick(()=>copyText(kitExport(ctrl,'tsv'))));
+      menu.append(csvItem,tsvItem,dlItem,restartItem,sep,group,codeItem,copyItem);
+    } else {
+      const note=document.createElement('div');note.className='iui-menu-note';note.innerHTML=icon('lock')+`<span>${escHtml(tx('sandboxNote'))}</span>`;
+      menu.append(dlItem,restartItem,sep,group,codeItem,copyItem,note);
+    }
     menu.addEventListener('keydown',ev=>{
       const items=[...menu.querySelectorAll('.iui-menu-item')];
       const at=items.indexOf(document.activeElement);
@@ -569,19 +646,34 @@ const _iui=(function(){
     update(ctrl,source,final);
     return ctrl;
   }
+  function kitParse(ctrl){
+    const K=kits(), kind=ctrl.kit;
+    const base={kit:kind,css:'',html:'',scripts:[],warnings:[],errors:[],spec:null,tooBig:false,title:'',height:KIT_STREAM_H[kind]||300};
+    if(!K) return Object.assign(base,{errors:['kit unavailable']});
+    if(!ctrl.final) return Object.assign(base,{title:K.streamingTitle(ctrl.source)});
+    const r=K.build(kind,ctrl.source,{lang:lang(),fence:ctrl.fence});
+    return Object.assign(base,{title:r.title,height:r.estHeight,spec:r.spec,errors:r.errors,warnings:r.warnings});
+  }
   function update(ctrl,source,final){
     ctrl.source=String(source||'');
     ctrl.final=!!final;
-    ctrl.parsed=parse(ctrl.source,{final:ctrl.final});
+    ctrl.parsed=ctrl.kit?kitParse(ctrl):parse(ctrl.source,{final:ctrl.final});
     if(!ctrl.fp||!ctrl.final) ctrl.fp=fingerprint(ctrl.source);
     ctrl.stateKey=ctrl.final?hashSource(ctrl.source.trim()):'';
     const p=ctrl.parsed;
-    const title=p.title||tx('title');
+    const title=p.title||(ctrl.kit?kitWord('kitName',ctrl.kit):tx('title'));
+    ctrl.pill.hidden=!(p.spec&&p.spec.example);
     if(ctrl.titleEl.textContent!==title) ctrl.titleEl.textContent=title;
     ctrl.card.setAttribute('aria-label',title);
     ctrl.moreBtn.hidden=!ctrl.final;
     if(!ctrl.sourceBox.hidden) ctrl.code.textContent=ctrl.source;
     if(p.tooBig){addError(ctrl,tx('tooBig'),'');return;}
+    if(ctrl.kit&&ctrl.final&&!p.spec){
+      // Nothing can be drawn: one plain sentence and the repair button, no empty frame.
+      ctrl.card.classList.add('iui-kit-fatal');
+      addError(ctrl,p.errors[0]||tx('kitFail',kitWord('kitNoun',ctrl.kit)),'');
+      return;
+    }
     renderDetails(ctrl);
     if(!ctrl.height){
       const cached=heightCache.get(ctrl.fp);
@@ -589,6 +681,7 @@ const _iui=(function(){
       if(cached) ctrl.skeleton.classList.add('is-quiet');
     }
     if(ctrl.state!=='error') setState(ctrl,ctrl.final?(ctrl.rendered?'ready':'loading'):'building');
+    if(ctrl.kit==='map') ensureMapData(ctrl);
     if(ctrl.mounted) pushRender(ctrl);
     revealIfReady(ctrl);
   }
@@ -597,10 +690,11 @@ const _iui=(function(){
     ctrl.mounted=true;
     const iframe=document.createElement('iframe');
     iframe.className='iui-frame';
-    iframe.setAttribute('sandbox','allow-scripts allow-forms allow-popups');
+    if(ctrl.kit) iframe.setAttribute('sandbox','allow-scripts');
+    else iframe.setAttribute('sandbox','allow-scripts allow-forms allow-popups');
     iframe.setAttribute('referrerpolicy','no-referrer');
     iframe.setAttribute('title',ctrl.parsed&&ctrl.parsed.title||tx('title'));
-    iframe.src=FRAME_URL+'?v='+encodeURIComponent(String((typeof WEBUI_VERSION!=='undefined'&&WEBUI_VERSION)||'1'));
+    iframe.src=(ctrl.kit?KIT_URL:FRAME_URL)+'?v='+encodeURIComponent(String((typeof WEBUI_VERSION!=='undefined'&&WEBUI_VERSION)||'1'));
     iframe.addEventListener('load',()=>{ctrl.frameLoaded=true;revealIfReady(ctrl);});
     ctrl.iframe=iframe;
     ctrl.mountedAt=Date.now();
@@ -611,6 +705,7 @@ const _iui=(function(){
   }
   // Keep the placeholder until the app has something to show.
   function revealIfReady(ctrl){
+    if(ctrl.kit){if(ctrl.rendered) ctrl.skeleton.classList.add('is-gone');return;}
     if(ctrl.frameLoaded&&(ctrl.final||(ctrl.parsed&&ctrl.parsed.html.trim()))) ctrl.skeleton.classList.add('is-gone');
   }
   function lazyMount(ctrl){
@@ -632,7 +727,7 @@ const _iui=(function(){
     if(!ctrl.iframe) return;
     byWindow.delete(ctrl.iframe.contentWindow);
     ctrl.iframe.remove();
-    Object.assign(ctrl,{iframe:null,mounted:false,ready:false,sentFinal:false,rendered:false,frameLoaded:false,errors:[]});
+    Object.assign(ctrl,{iframe:null,mounted:false,ready:false,sentFinal:false,rendered:false,frameLoaded:false,errors:ctrl.kit&&!ctrl.parsed.spec?ctrl.errors:[]});
     ctrl.errorBar.hidden=true;ctrl.errorDetails.hidden=true;hideAsk(ctrl);
     ctrl.skeleton.classList.remove('is-gone');
     setState(ctrl,'loading');
@@ -680,7 +775,7 @@ const _iui=(function(){
       const back=ctrl._returnFocus;ctrl._returnFocus=null;
       try{(back&&back.isConnected?back:b).focus({preventScroll:true});}catch(_){}
     }
-    setTimeout(()=>postTo(ctrl,{type:'measure'}),50);
+    setTimeout(()=>postTo(ctrl,{type:'measure',full:on}),50);
   }
   function standaloneHtml(ctrl,frameHtml){
     const p=ctrl.parsed, theme=themeMessage();
@@ -702,8 +797,55 @@ const _iui=(function(){
       .replace(/<\/body>/i,()=>`<script>window.synthwave={theme:{palette:['#f97316','#3b82f6','#22c55e','#a855f7','#eab308','#ec4899','#14b8a6','#94a3b8'],mode:${JSON.stringify(theme.mode)}},sendPrompt:function(){return false},copy:function(t){try{navigator.clipboard.writeText(String(t))}catch(e){}},onTheme:function(){},resize:function(){}};<\/script>\n`+scripts+'\n</body>');
     return doc;
   }
+  function fileName(ctrl,fallback){
+    return ((ctrl.parsed&&ctrl.parsed.title)||fallback).toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||fallback;
+  }
+  function saveBlob(blob,name){
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);a.download=name;
+    document.body.appendChild(a);a.click();
+    setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1500);
+  }
+  // Exports follow what the user sees: the table's sort and search are kept.
+  function kitExport(ctrl,format){
+    const K=kits(), p=ctrl.parsed;
+    if(!K||!p||!p.spec) return '';
+    const view=ctrl.kit==='table'?Object.assign(K.initialView(p.spec),loadState(ctrl.stateKey)||{}):null;
+    const table=K.kitTable(ctrl.kit,p.spec,view,ctrl.kitData);
+    return format==='csv'?K.toCsv(table,{delimiter:';',decimalComma:true}):K.toTsv(table,{decimalComma:true});
+  }
+  function downloadCsv(ctrl){
+    const text=kitExport(ctrl,'csv');
+    if(!text) return;
+    saveBlob(new Blob([text],{type:'text/csv;charset=utf-8'}),fileName(ctrl,kitWord('kitName',ctrl.kit).toLowerCase())+'.csv');
+  }
+  // A downloaded data block is the kit page itself with the spec built in;
+  // the JSON is escaped so it cannot end the script element.
+  function kitStandaloneHtml(ctrl,frameHtml){
+    const p=ctrl.parsed, theme=themeMessage();
+    let doc=String(frameHtml||'');
+    const at=doc.indexOf('<script>');
+    if(!/id="kit-root"/.test(doc)||at<0||!p.spec) return '';
+    const vars=Object.keys(theme.vars).map(k=>`${k}:${theme.vars[k]}`).join(';');
+    const payload={kit:ctrl.kit,spec:p.spec,data:kitDataFor(ctrl),final:true,restore:loadState(ctrl.stateKey)||{},lang:lang(),theme:theme.mode};
+    const json=JSON.stringify(payload).replace(/</g,'\\u003c').replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029');
+    doc=doc.slice(0,at)+'<script>window.__SWKIT_DOC='+json+';<\/script>'+doc.slice(at);
+    const open='<html lang="nl" data-theme="dark">', i=doc.indexOf(open);
+    if(i>=0) doc=doc.slice(0,i)+`<html lang="${lang()}" data-theme="${theme.mode}" style="${escHtml(vars)}">`+doc.slice(i+open.length);
+    const t=doc.indexOf('<title>Gegevens</title>');
+    if(t>=0) doc=doc.slice(0,t)+`<title>${escHtml(p.title||kitWord('kitName',ctrl.kit))}</title>`+doc.slice(t+'<title>Gegevens</title>'.length);
+    return doc;
+  }
   function download(ctrl){
     if(!ctrl.final) return;
+    if(ctrl.kit){
+      const v=encodeURIComponent(String((typeof WEBUI_VERSION!=='undefined'&&WEBUI_VERSION)||'1'));
+      fetch(KIT_URL+'?v='+v,{credentials:'same-origin'}).then(r=>r.ok?r.text():'').then(html=>{
+        const doc=kitStandaloneHtml(ctrl,html);
+        if(doc) saveBlob(new Blob([doc],{type:'application/octet-stream'}),fileName(ctrl,'gegevens')+'.html');
+      },()=>{});
+      return;
+    }
     const finish=html=>{
       // An octet-stream blob is only ever saved, never shown in this origin.
       const blob=new Blob([standaloneHtml(ctrl,html)],{type:'application/octet-stream'});
@@ -762,9 +904,17 @@ const _iui=(function(){
         return;
       }
       const source=block.textContent||'';
-      const ctrl=createController(source,{final:true});
+      const kindAttr=block.getAttribute('data-iui-kind')||'';
+      const kit=kitKindOf(kindAttr);
+      if(!kit&&!FENCE_LANGS.has(kindAttr)){
+        // A data block whose helpers did not load stays readable text.
+        const pre=document.createElement('pre');const c=document.createElement('code');c.textContent=source;pre.appendChild(c);block.replaceWith(pre);
+        return;
+      }
+      const ctrl=createController(source,kit?{final:true,kit,fence:kindAttr}:{final:true});
       block.textContent='';
       block.appendChild(ctrl.card);
+      if(kit&&!ctrl.parsed.spec) return;  // nothing to draw: the error bar says why
       lazyMount(ctrl);
     });
     // One chip row per reply: keep only the last.
@@ -776,12 +926,26 @@ const _iui=(function(){
 
   // ── Live render while a reply streams ───────────────────────────────────
   function liveKey(text){const t=String(text||'').trim();return t.length>=24?hashSource(t.slice(0,160)):'';}
+  function streamKit(code,cls){
+    const m=/ (?:language-)?(table|tabel|csv|chart|grafiek|map|kaart) /.exec(cls);
+    if(!m) return '';
+    const pre=code.parentElement;
+    if(pre.__iuiLive) return pre.__iuiLive.kit||'';
+    if(pre.__iuiNotKit) return '';
+    const text=code.textContent||'';
+    if(!text.trim()) return '';
+    // A ```chart with code in it stays a code block; only JSON (or CSV) is data.
+    if(m[1]!=='csv'&&!/^\s*\{/.test(text)){pre.__iuiNotKit=true;return '';}
+    return kitKindOf(m[1]);
+  }
   function streamTick(root){
     if(!root||!root.querySelectorAll) return;
     root.querySelectorAll('pre > code').forEach(code=>{
       const cls=' '+(code.className||'')+' ';
       if(/ (language-)?(suggestions|replies) /.test(cls)){code.parentElement.classList.add('iui-raw-hidden');return;}
-      if(!/ (language-)?(interactive-ui|interactive|iui) /.test(cls)) return;
+      const kit=streamKit(code,cls);
+      if(!kit&&!/ (language-)?(interactive-ui|interactive|iui) /.test(cls)) return;
+      const fence=kit?(/ (?:language-)?(table|tabel|csv|chart|grafiek|map|kaart) /.exec(cls)||[])[1]:'';
       const pre=code.parentElement;
       let ctrl=pre.__iuiLive;
       if(!ctrl){
@@ -790,10 +954,10 @@ const _iui=(function(){
         const text=code.textContent||'';
         const key=liveKey(text);
         const prev=key&&liveCards.get(key);
-        if(prev&&!prev.card.isConnected&&!prev.final){
+        if(prev&&!prev.card.isConnected&&!prev.final&&(prev.kit||'')===kit){
           ctrl=prev;
         } else {
-          ctrl=createController(text,{final:false});
+          ctrl=createController(text,kit?{final:false,kit,fence}:{final:false});
           ctrl.card.classList.add('iui-live');
         }
         if(key) liveCards.set(key,ctrl);
@@ -801,7 +965,9 @@ const _iui=(function(){
         pre.__iuiLive=ctrl;
         pre.classList.add('iui-raw-hidden');
         pre.parentNode.insertBefore(ctrl.card,pre);
-        if(ctrl.mounted){update(ctrl,text,false);return;}
+        // A data block draws once it is complete; while it streams the card
+        // only shows its title and a placeholder, without a frame.
+        if(ctrl.mounted||ctrl.kit){update(ctrl,text,false);return;}
         // Only frames that are actually on screen load: the chat keeps a hidden
         // copy of the streaming text, which must not run a second widget.
         lazyMount(ctrl);
@@ -819,7 +985,7 @@ const _iui=(function(){
     if(ev.target&&ev.target.closest&&(ev.target.closest('.iui-menu')||ev.target.closest('.iui-actions')))return;
     closeMenu(false);
   },true);
-  return {parse,renderBlocks,streamTick,allowedUrl,rewriteUrl,themeMessage,chipTexts,FENCE_LANGS,CHIP_LANGS,_byWindow:byWindow,_controllers:controllers};
+  return {parse,renderBlocks,streamTick,allowedUrl,rewriteUrl,themeMessage,chipTexts,kitKindOf,FENCE_LANGS,CHIP_LANGS,_byWindow:byWindow,_controllers:controllers};
 })();
 
 // Copy of a reply without its suggestion buttons block.
@@ -828,7 +994,12 @@ function stripReplySuggestions(text){
 }
 function interactiveUiFenceAccepts(lang,code){
   const l=String(lang||'').toLowerCase();
-  return (_iui.FENCE_LANGS.has(l)||_iui.CHIP_LANGS.has(l))&&String(code||'').trim().length>0;
+  const c=String(code||'');
+  if(!c.trim()) return false;
+  if(_iui.FENCE_LANGS.has(l)||_iui.CHIP_LANGS.has(l)) return true;
+  // Data blocks: JSON only (a ```chart with Chart.js code stays code); CSV always.
+  if(_iui.kitKindOf(l)) return l==='csv'||/^\s*\{/.test(c);
+  return false;
 }
 function renderInteractiveUiBlocks(container){_iui.renderBlocks(container);}
 function interactiveUiStreamTick(root){_iui.streamTick(root);}

@@ -145,3 +145,14 @@ html.iui-has-full .messages,html.iui-has-full #messages{z-index:auto!important}
 .iui-chips.is-pending .iui-chip{pointer-events:none;opacity:.7}
 @media (max-width:640px){.iui-chip{min-height:40px;font-size:14px}}
 @media (prefers-reduced-motion:reduce){.iui-chip{animation:none}}
+
+/* Data blocks (```table, ```csv, ```chart, ```map): same card, own frame. */
+.iui-pill{flex:0 0 auto;font-size:11px;font-weight:600;line-height:1;padding:4px 8px;border-radius:999px;color:var(--muted);
+  background:var(--hover-bg);border:1px solid var(--border-subtle,var(--border))}
+.iui-pill[hidden]{display:none}
+.iui-card.iui-kit-fatal .iui-stage{display:none}
+.iui-card.iui-kit-fatal .iui-error{border-top:0;border-radius:0 0 15px 15px}
+/* Where the chat does not mount cards (file previews, shared pages) a data
+   block stays readable as plain text instead of a shimmer. */
+.iui-block:not([data-iui-mounted]):is([data-iui-kind=table],[data-iui-kind=tabel],[data-iui-kind=csv],[data-iui-kind=chart],[data-iui-kind=grafiek],[data-iui-kind=map],[data-iui-kind=kaart]):not(#messages *):not(#liveAssistantTurn *){
+  height:auto;color:inherit;font:12px/1.5 ui-monospace,"SF Mono",Menlo,monospace;white-space:pre-wrap;animation:none;background:var(--code-bg);padding:10px 12px;border-radius:10px}

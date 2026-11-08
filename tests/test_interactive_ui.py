@@ -260,3 +260,102 @@ def test_parser_in_node():
                             capture_output=True, text=True, timeout=60)
     assert result.returncode == 0, result.stdout + result.stderr
     assert "all parser checks passed" in result.stdout
+
+
+# ── Data blocks: the kit frame ──────────────────────────────────────────────
+
+class _Request(_Handler):
+    """A handler with request headers kept apart from the response headers."""
+
+    def __init__(self, command="GET", request_headers=None):
+        super().__init__(command)
+        self.request_headers = dict(request_headers or {})
+
+
+def _get_kit(path=interactive_ui.KIT_FRAME_PATH, request_headers=None, config=None, monkeypatch=None):
+    if monkeypatch is not None:
+        monkeypatch.setattr(interactive_ui, "_config", lambda: dict(config or {}))
+    handler = _Request("GET", request_headers)
+    # serve() reads If-None-Match from handler.headers (the request headers in the real server).
+    real_headers = handler.headers
+    handler.headers = _HeaderView(handler.request_headers, real_headers)
+    ok = interactive_ui.serve(handler, SimpleNamespace(path=path, params=""))
+    return ok, handler
+
+
+class _HeaderView(list):
+    def __init__(self, request, sent):
+        super().__init__(sent)
+        self._request = request
+
+    def get(self, name, default=None):
+        return self._request.get(name, default)
+
+
+def _sent(handler, name):
+    values = [v for k, v in list(handler.headers) if k.lower() == name.lower()]
+    assert len(values) == 1, (name, values)
+    return values[0]
+
+
+@pytest.mark.parametrize("path", [interactive_ui.KIT_FRAME_PATH, "/session" + interactive_ui.KIT_FRAME_PATH])
+def test_kit_frame_is_served_with_its_own_policy(path, monkeypatch):
+    ok, handler = _get_kit(path, config={}, monkeypatch=monkeypatch)
+    assert ok is True and handler.status == 200
+    assert handler.body == interactive_ui.KIT_FRAME_BYTES
+    assert _sent(handler, "Content-Security-Policy") == interactive_ui.kit_frame_csp({})
+    assert _sent(handler, "Cache-Control") == "private, no-cache"
+    assert _sent(handler, "Referrer-Policy") == "no-referrer"
+    assert _sent(handler, "X-Frame-Options") == "SAMEORIGIN"
+    etag = _sent(handler, "ETag")
+    ok, again = _get_kit(path, request_headers={"If-None-Match": etag}, config={}, monkeypatch=monkeypatch)
+    assert ok and again.status == 304 and again.body == b""
+
+
+def test_kit_frame_csp_runs_only_its_own_hashed_scripts():
+    csp = _directives(interactive_ui.KIT_FRAME_CSP)
+    assert csp["sandbox"].split() == ["allow-scripts"], "no popups, forms or same origin"
+    assert csp["default-src"] == "'none'"
+    assert csp["connect-src"] == "'none'"
+    assert csp["form-action"] == "'none'" and csp["base-uri"] == "'none'" and csp["frame-ancestors"] == "'self'"
+    scripts = csp["script-src"].split()
+    assert scripts and all(re.fullmatch(r"'sha256-[A-Za-z0-9+/]{43}='", s) for s in scripts), scripts
+    assert "unsafe-eval" not in interactive_ui.KIT_FRAME_CSP
+    assert "'unsafe-inline'" not in csp["script-src"]
+    for host in interactive_ui.CDN_HOSTS:
+        assert host not in interactive_ui.KIT_FRAME_CSP
+    assert csp["img-src"].split() == ["data:", "https://tile.openstreetmap.org", "https://upload.wikimedia.org"]
+    # The widget frame keeps its own policy.
+    assert "allow-popups" in interactive_ui.FRAME_CSP and "allow-popups" not in interactive_ui.KIT_FRAME_CSP
+
+
+def test_kit_frame_hashes_match_the_served_scripts():
+    import base64
+    import hashlib
+    bodies = re.findall(r"<script>([\s\S]*?)</script>", interactive_ui.KIT_FRAME_HTML)
+    assert len(bodies) == len(interactive_ui.KIT_SCRIPT_FILES) == len(interactive_ui.KIT_SCRIPT_HASHES)
+    served = ["'sha256-" + base64.b64encode(hashlib.sha256(b.encode("utf-8")).digest()).decode() + "'" for b in bodies]
+    assert served == list(interactive_ui.KIT_SCRIPT_HASHES)
+    assert "<script " not in interactive_ui.KIT_FRAME_HTML, "no external or typed scripts"
+    assert '<div id="kit-root"></div>' in interactive_ui.KIT_FRAME_HTML
+    assert interactive_ui.BASE_CSS in interactive_ui.KIT_FRAME_HTML
+
+
+def test_vendored_libraries_match_their_recorded_hashes():
+    import hashlib
+    for rel in ("chartjs/4.4.7", "leaflet/1.9.4"):
+        folder = STATIC / "vendor" / rel
+        recorded = dict(re.findall(r"\| `([^`]+)`[^|]*\| `([0-9a-f]{64})` \|", (folder / "VENDOR.md").read_text(encoding="utf-8")))
+        assert recorded, rel
+        for name, digest in recorded.items():
+            assert hashlib.sha256((folder / name).read_bytes()).hexdigest() == digest, name
+    assert (STATIC / "vendor/chartjs/4.4.7/chart.umd.js").read_text(encoding="utf-8").startswith("/*!\n * Chart.js v4.4.7")
+    assert "Leaflet 1.9.4" in (STATIC / "vendor/leaflet/1.9.4/leaflet.js").read_text(encoding="utf-8")[:200]
+
+
+def test_kit_assets_load_in_order():
+    core = '<script src="static/interactive-ui/kit-core.js?v=__WEBUI_VERSION__" defer></script>'
+    assert INDEX.index(core) < INDEX.index("static/interactive_ui.js") < INDEX.index('src="static/ui.js')
+    assert "'./static/interactive-ui/kit-core.js' + VQ" in SW
+    assert "iframe.setAttribute('sandbox','allow-scripts');" in MODULE
+    assert "if(e.origin!=='null') return;" in MODULE
