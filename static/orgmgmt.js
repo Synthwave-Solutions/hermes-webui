@@ -19,6 +19,8 @@
       per_label: 'Eenheid', per_run_opt: 'per keer', per_day_opt: 'per dag', per_week_opt: 'per week', per_hint: 'Draait de taak vaker dan dagelijks? Kies per dag: de besparing telt dan één keer per dag met een geslaagde run.',
       of_which_confirmed: 'waarvan {h} bevestigd', all_estimated: 'nog geheel op basis van AI-schattingen',
       d_check_high: 'Schatting lijkt hoog', d_check_high_sub: 'meer dan 4 uur per dag voor één taak; controleer eenheid en minuten',
+      measuring_since: 'Meting loopt sinds {d}: eerdere runs waren al opgeschoond, dus deze periode is nog niet compleet.',
+      person: 'Persoon',
       other: 'Overig', fails: 'faalt', no_value: 'zonder waarde', suggested: 'voorstel',
       suggest_intro: '{n} voorstellen op basis van de bestaande categorie.', apply_suggestions: 'Neem alle voorstellen over', applied_n: '{n} ingedeeld',
       org: 'Organisatie', mgmt: 'Management', chart: 'Organigram', manage: 'Teams beheren',
@@ -42,7 +44,7 @@
       confirm_delete: 'Team verwijderen? Mensen blijven bestaan, alleen de indeling verdwijnt.',
       period: 'Periode', d7: '7 dagen', d28: '4 weken', d90: '3 maanden', d365: '12 maanden',
       compare: 'Vergelijk met vorige periode', refresh: 'Vernieuwen', settings: 'Prijzen en tarieven', export: 'Exporteer CSV',
-      k_saved: 'Tijd bespaard', k_saved_sub: 'gemeten uit geslaagde runs en bevestigde gesprekken',
+      k_saved: 'Tijd bespaard', k_saved_sub: 'uit geslaagde runs en gesprekken',
       k_estimate: 'geschat via bot-verantwoordelijkheden',
       k_net: 'Netto waarde', k_net_sub: 'indicatief, op basis van uurtarieven', k_net_missing: 'Stel uurtarieven in',
       k_cost: 'AI-kosten', k_cost_sub: 'API-equivalent', k_cost_missing: 'Prijzen instellen', tokens: 'tokens zonder prijs',
@@ -87,6 +89,8 @@
       per_label: 'Unit', per_run_opt: 'per run', per_day_opt: 'per day', per_week_opt: 'per week', per_hint: 'Runs more than daily? Choose per day: the saving then counts once per day with a completed run.',
       of_which_confirmed: 'of which {h} confirmed', all_estimated: 'still entirely based on AI estimates',
       d_check_high: 'Estimate looks high', d_check_high_sub: 'more than 4 hours a day for one task; check unit and minutes',
+      measuring_since: 'Measuring since {d}: earlier runs had already been pruned, so this period is not complete yet.',
+      person: 'Person',
       other: 'Other', fails: 'failing', no_value: 'without value', suggested: 'suggested',
       suggest_intro: '{n} suggestions based on the existing category.', apply_suggestions: 'Apply all suggestions', applied_n: '{n} placed',
       org: 'Organisation', mgmt: 'Management', chart: 'Org chart', manage: 'Manage teams',
@@ -110,7 +114,7 @@
       confirm_delete: 'Delete this team? People stay, only the grouping goes.',
       period: 'Period', d7: '7 days', d28: '4 weeks', d90: '3 months', d365: '12 months',
       compare: 'Compare with previous period', refresh: 'Refresh', settings: 'Prices and rates', export: 'Export CSV',
-      k_saved: 'Time saved', k_saved_sub: 'measured from completed runs and confirmed chats',
+      k_saved: 'Time saved', k_saved_sub: 'from completed runs and chats',
       k_estimate: 'estimated from bot responsibilities',
       k_net: 'Net value', k_net_sub: 'indicative, based on hourly rates', k_net_missing: 'Set hourly rates',
       k_cost: 'AI cost', k_cost_sub: 'API equivalent', k_cost_missing: 'Set prices', tokens: 'tokens without a price',
@@ -235,7 +239,7 @@
     return `<button type="button" class="om-team-card" data-om-team="${H(team.key)}" aria-pressed="${O.selected === team.key}">
       ${flag ? `<span class="om-flag" title="${H(w('waiting'))}"></span>` : ''}
       <span class="om-team-name">${H(team.name)}</span>
-      <span class="om-stats"><span><b>${(team.people || []).length}</b> ${H(w('people').toLowerCase())}</span><span><b>${(team.bot_list || []).length}</b> ${H(w('bots').toLowerCase())}</span><span><b>${(team.job_list || []).length}</b> ${H(w('tasks').toLowerCase())}</span></span>
+      <span class="om-stats"><span><b>${(team.people || []).length}</b> ${H(((team.people || []).length === 1 ? w('person') : w('people')).toLowerCase())}</span><span><b>${(team.bot_list || []).length}</b> ${H(w('bots').toLowerCase())}</span><span><b>${(team.job_list || []).filter(j => j.state !== 'paused').length}</b> ${H(w('tasks').toLowerCase())}</span></span>
       ${saving}${people}${bots}
     </button>`;
   }
@@ -320,7 +324,7 @@
     box.innerHTML = depts.map(d => `<div class="om-side-label">${H(d.name)}</div>${(d.teams || []).map(t => {
         const s = t.stats || {};
         const flag = (s.failing || 0) + (s.missing_value || 0) > 0;
-        return `<button type="button" data-om-side-team="${H(t.key)}" aria-current="${O.selected === t.key}">${flag ? '<span class="om-side-flag" aria-hidden="true"></span>' : ''}${H(t.name)}<span class="om-side-count">${(t.job_list || []).length + (t.bot_list || []).length}</span></button>`;
+        return `<button type="button" data-om-side-team="${H(t.key)}" aria-current="${O.selected === t.key}">${flag ? '<span class="om-side-flag" aria-hidden="true"></span>' : ''}${H(t.name)}<span class="om-side-count">${(t.job_list || []).filter(j => j.state !== 'paused').length + (t.bot_list || []).length}</span></button>`;
       }).join('')}`).join('') + (uCount ? `<div class="om-side-label">${H(w('other'))}</div><button type="button" data-om-side-unassigned>${H(w('unassigned'))}<span class="om-side-count">${uCount}</span></button>` : '');
     if (!box.dataset.omBound) {
       box.dataset.omBound = '1';
@@ -622,7 +626,9 @@
     if (!d) { body.innerHTML = '<p class="om-muted">…</p>'; return; }
     const updated = d.last_collect_at ? new Date(d.last_collect_at * 1000).toLocaleString(lang() === 'en' ? 'en-GB' : 'nl-NL', { dateStyle: 'medium', timeStyle: 'short' }) : '';
     const noTeams = !(d.teams || []).some(t => t.key !== '_unassigned');
+    const since = d.ledger_since && d.ledger_since > d.start ? new Date(d.ledger_since * 1000).toLocaleString(lang() === 'en' ? 'en-GB' : 'nl-NL', { dateStyle: 'medium', timeStyle: 'short' }) : '';
     body.innerHTML = `<p class="om-intro">${H(w('mgmt_intro'))}${updated ? ` <span class="om-small">${H(w('last_collect'))}: ${H(updated)}</span>` : ''}</p>
+      ${since ? `<p class="om-small om-muted" style="margin:-12px 0 18px">${H(w('measuring_since', { d: since }))}</p>` : ''}
       ${noTeams ? `<div class="om-empty" style="margin-bottom:18px"><h3>${H(w('empty_title'))}</h3><p>${H(w('empty_body'))}</p><div class="om-actions"><button type="button" class="sm-btn primary" data-om-goto-rates>${H(w('manage'))}</button></div></div>` : ''}
       ${settingsHtml()}
       <div data-om-anchor="kpis">${kpisHtml(d)}</div>

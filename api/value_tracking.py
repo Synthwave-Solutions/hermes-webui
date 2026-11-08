@@ -618,6 +618,16 @@ def chats_between(start: float, end: float) -> list[dict]:
         conn.close()
 
 
+def ledger_since() -> float | None:
+    """When the earliest run in the ledger finished: measuring starts there."""
+    conn = _connect()
+    try:
+        row = conn.execute("SELECT MIN(finished_at) AS m FROM runs").fetchone()
+        return float(row["m"]) if row and row["m"] else None
+    finally:
+        conn.close()
+
+
 def last_collect_at() -> float | None:
     conn = _connect()
     try:

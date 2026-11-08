@@ -37,6 +37,15 @@ def _period(qs) -> tuple[int, float, float]:
     return days, end - days * 86400, end
 
 
+import os as _os
+
+# Personal and private profiles are people's own assistants, not bots that
+# work for a team; they stay out of the organisation chart and Management.
+PRIVATE_BOT_CATEGORIES = {c.strip().lower() for c in _os.environ.get(
+    "SP_ORG_EXCLUDE_BOT_CATEGORIES",
+    "Persoonlijke assistenten,Partner-assistenten,Gedeelde inbox,Privé,Prive,Private,Personal").split(",") if c.strip()}
+
+
 def _bots() -> dict:
     """``{name: {title, kind, serves, duties, avatar}}`` for every profile."""
     from api import bot_metadata
@@ -241,7 +250,7 @@ def build(view: org_structure.ViewScope, days: int, start: float, end: float) ->
     # chatting person's team.
     bot_rows = {}
     for name, bot in bots.items():
-        if bot["kind"] != "bot":
+        if bot["kind"] != "bot" or str(bot.get("category") or "").strip().lower() in PRIVATE_BOT_CATEGORIES:
             continue
         team = (bot["serves"] or [""])[0] or UNASSIGNED
         estimate = value_tracking.bot_estimate_per_week(name)
@@ -409,6 +418,7 @@ def build(view: org_structure.ViewScope, days: int, start: float, end: float) ->
     return {
         "period_days": days, "start": start, "end": end,
         "last_collect_at": value_tracking.last_collect_at(),
+        "ledger_since": value_tracking.ledger_since(),
         "viewer": view.to_dict(), "totals": totals,
         "teams": sorted(teams.values(), key=lambda t: (t["key"] == UNASSIGNED, t["department"], t["name"])),
         "departments": snap["departments"], "team_names": team_names,
