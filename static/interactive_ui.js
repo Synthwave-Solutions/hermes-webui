@@ -12,8 +12,10 @@
 // api/interactive_ui.py with its own CSP (`sandbox allow-scripts allow-forms
 // allow-popups`, never allow-same-origin, network only to a few public CDNs).
 // The widget source never touches this document's DOM: it is sent to the
-// frame with postMessage, and every message back is checked against the
-// iframe's own window before it is used.
+// frame with postMessage, and every message back is matched to the window of
+// a known iframe. Nothing the widget sends can act for the user on its own:
+// a follow-up question is shown in the card and only sent after a click on
+// the host's own button.
 //
 // Globals: interactiveUiFenceAccepts, renderInteractiveUiBlocks,
 // interactiveUiStreamTick, parseInteractiveUiSource. Internals in _iui.
@@ -22,29 +24,64 @@ const _iui=(function(){
   const FRAME_URL='static/interactive-ui/frame.html';
   const FENCE_LANGS=new Set(['interactive-ui','interactive','iui']);
   const CDN_ORIGINS=new Set(['https://cdn.jsdelivr.net','https://unpkg.com','https://cdnjs.cloudflare.com','https://esm.sh']);
+  const STYLE_ORIGINS=new Set([...CDN_ORIGINS,'https://fonts.googleapis.com']);
   const MAX_SOURCE=200*1024;
-  const MIN_H=80, DEFAULT_H=360, STREAM_THROTTLE_MS=220, PROMPT_GAP_MS=2500, INTERACT_WINDOW_MS=5000;
+  const MIN_H=80, DEFAULT_H=360, STREAM_THROTTLE_MS=220, PROMPT_GAP_MS=1500, MAX_PENDING_PROMPTS=3;
   const byWindow=new Map();     // contentWindow -> controller
   const controllers=new Set();  // every mounted controller (a moved iframe gets a new window)
-  const heightCache=new Map();  // source fingerprint -> last height
-  let seq=0, themeObserver=null, intersection=null;
+  const heightCache=new Map();  // hashed fingerprint -> last height (LRU, persisted per tab)
+  const stateCache=new Map();   // source hash -> control values the user set
+  const liveCards=new Map();    // first part of a streaming block -> its live card
+  const STATE_PREFIX='iui-state:', H_KEY='iui-heights-v1', H_MAX=200;
+  let seq=0, themeObserver=null, intersection=null, heightSaveTimer=0;
+
+  function hashSource(src){
+    let h=0x811c9dc5;const s=String(src||'');
+    for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}
+    return (h>>>0).toString(36)+'-'+s.length.toString(36);
+  }
+  try{const saved=JSON.parse(sessionStorage.getItem(H_KEY)||'{}');Object.keys(saved).forEach(k=>{if(saved[k]>0)heightCache.set(k,saved[k]);});}catch(_){}
+  function rememberHeight(key,h){
+    if(!key||!(h>0)) return;
+    heightCache.delete(key);heightCache.set(key,h);
+    while(heightCache.size>H_MAX) heightCache.delete(heightCache.keys().next().value);
+    clearTimeout(heightSaveTimer);
+    heightSaveTimer=setTimeout(()=>{try{sessionStorage.setItem(H_KEY,JSON.stringify(Object.fromEntries(heightCache)));}catch(_){}},500);
+  }
+  function loadState(key){
+    if(!key) return null;
+    if(stateCache.has(key)) return stateCache.get(key);
+    try{const raw=sessionStorage.getItem(STATE_PREFIX+key);if(raw){const v=JSON.parse(raw);stateCache.set(key,v);return v;}}catch(_){}
+    return null;
+  }
+  function saveState(key,values){
+    if(!key||!values||typeof values!=='object') return;
+    const json=JSON.stringify(values);
+    if(json.length>20000) return;
+    stateCache.set(key,values);
+    try{sessionStorage.setItem(STATE_PREFIX+key,json);}catch(_){}
+  }
 
   // ── Text ────────────────────────────────────────────────────────────────
   const TEXT={
-    nl:{title:'Interactieve weergave',building:'Wordt opgebouwd',ready:'Interactief',loading:'Laden',error:'Fout in de weergave',
-      reload:'Opnieuw laden',source:'Broncode',hideSource:'Verberg broncode',copySource:'Kopieer broncode',download:'Download als HTML',
-      newTab:'Open in nieuw tabblad',full:'Volledig scherm',exitFull:'Sluit volledig scherm',repair:'Laat de agent dit herstellen',
-      dismiss:'Verbergen',copied:'Gekopieerd',sent:'Vervolgvraag verstuurd',blocked:'Klik eerst in de weergave om een vervolgvraag te sturen',
-      tooBig:'Deze weergave is te groot om te tonen',removed:'Niet toegestane bron overgeslagen',
-      repairPrompt:(title,msg)=>`De interactieve weergave "${title}" gaf deze fout: ${msg}\nHerstel het en stuur het volledige interactive-ui-blok opnieuw.`,
-      popupBlocked:'De browser blokkeerde het nieuwe tabblad',sandboxNote:'Draait afgeschermd: geen toegang tot je account of de chat'},
-    en:{title:'Interactive view',building:'Building',ready:'Interactive',loading:'Loading',error:'Error in the view',
-      reload:'Reload',source:'Source',hideSource:'Hide source',copySource:'Copy source',download:'Download as HTML',
-      newTab:'Open in new tab',full:'Full screen',exitFull:'Exit full screen',repair:'Ask the agent to fix this',
-      dismiss:'Dismiss',copied:'Copied',sent:'Follow-up sent',blocked:'Click inside the view first to send a follow-up',
-      tooBig:'This view is too large to show',removed:'Skipped a source that is not allowed',
-      repairPrompt:(title,msg)=>`The interactive view "${title}" failed with: ${msg}\nFix it and send the complete interactive-ui block again.`,
-      popupBlocked:'The browser blocked the new tab',sandboxNote:'Runs isolated: no access to your account or the chat'},
+    nl:{title:'Interactieve weergave',building:'Wordt gemaakt',
+      restart:'Opnieuw starten',viewCode:'Code bekijken',hideCode:'Code verbergen',copyCode:'Code kopiëren',download:'Downloaden',
+      devGroup:'Voor ontwikkelaars',full:'Volledig scherm',exitFull:'Sluiten',more:'Meer opties',repair:'Laat repareren',
+      details:'Details',hideDetails:'Verberg details',dismiss:'Verbergen',copied:'Gekopieerd',sent:'Vraag verstuurd',
+      errorLead:'Deze weergave werkt niet helemaal.',tooBig:'Deze weergave is te groot om te tonen.',
+      removed:'Overgeslagen bron',ask:'Vraag uit deze weergave',send:'Versturen',cancel:'Annuleren',
+      draftBusy:'Je concept staat nog in het invoerveld. Verstuur of wis dat eerst.',
+      repairPrompt:(title,msg)=>`Kun je de weergave "${title}" herstellen? Die werkt niet helemaal (${msg}). Stuur het volledige interactive-ui-blok opnieuw.`,
+      sandboxNote:'Draait los van je account en de chat'},
+    en:{title:'Interactive view',building:'Building',
+      restart:'Restart',viewCode:'View code',hideCode:'Hide code',copyCode:'Copy code',download:'Download',
+      devGroup:'For developers',full:'Full screen',exitFull:'Close',more:'More options',repair:'Fix it',
+      details:'Details',hideDetails:'Hide details',dismiss:'Dismiss',copied:'Copied',sent:'Question sent',
+      errorLead:'This view is not fully working.',tooBig:'This view is too large to show.',
+      removed:'Skipped source',ask:'Question from this view',send:'Send',cancel:'Cancel',
+      draftBusy:'Your draft is still in the message box. Send or clear it first.',
+      repairPrompt:(title,msg)=>`Can you fix the view "${title}"? It is not fully working (${msg}). Send the complete interactive-ui block again.`,
+      sandboxNote:'Runs separately from your account and the chat'},
   };
   function lang(){
     const l=String((typeof _currentLang!=='undefined'&&_currentLang)||document.documentElement.lang||navigator.language||'en').toLowerCase();
@@ -58,7 +95,6 @@ const _iui=(function(){
     reload:'<path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/>',
     code:'<path d="M16 18l6-6-6-6"/><path d="M8 6l-6 6 6 6"/>',
     download:'<path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/>',
-    external:'<path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/>',
     expand:'<path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/>',
     shrink:'<path d="M4 14h6v6"/><path d="M20 10h-6V4"/><path d="M14 10l7-7"/><path d="M3 21l7-7"/>',
     copy:'<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>',
@@ -66,13 +102,24 @@ const _iui=(function(){
     wrench:'<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/>',
     lock:'<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
     close:'<path d="M18 6L6 18"/><path d="M6 6l12 12"/>',
+    dots:'<circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/>',
+    send:'<path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/>',
   };
   function icon(name){return `<svg class="iui-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${ICON[name]||''}</svg>`;}
+  function escHtml(v){return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 
   // ── Source parsing ──────────────────────────────────────────────────────
+  // Popular hosts models reach for, mapped to the same library on jsdelivr.
+  const REWRITE=[
+    [/^https:\/\/code\.jquery\.com\/jquery-(\d+\.\d+\.\d+)(?:\.min)?\.js$/i,m=>`https://cdn.jsdelivr.net/npm/jquery@${m[1]}/dist/jquery.min.js`],
+    [/^https:\/\/cdn\.plot\.ly\/plotly-(\d+\.\d+\.\d+)(?:\.min)?\.js$/i,m=>`https://cdn.jsdelivr.net/npm/plotly.js-dist-min@${m[1]}/plotly.min.js`],
+    [/^https:\/\/cdn\.plot\.ly\/plotly-latest(?:\.min)?\.js$/i,()=>'https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2/plotly.min.js'],
+    [/^https:\/\/cdn\.tailwindcss\.com\/?(?:\?.*)?$/i,()=>'https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4'],
+  ];
+  function rewriteUrl(raw){const s=String(raw||'').trim();for(const [re,fn] of REWRITE){const m=re.exec(s);if(m)return fn(m);}return s;}
   function hostOf(raw){try{return new URL(String(raw||'').trim(),'https://invalid.invalid/').host||String(raw||'').slice(0,60);}catch(_){return String(raw||'').slice(0,60);}}
-  function allowedUrl(raw){
-    try{const u=new URL(String(raw||'').trim(),'https://invalid.invalid/');return u.protocol==='https:'&&CDN_ORIGINS.has(u.origin)?u.href:null;}catch(_){return null;}
+  function allowedUrl(raw,origins){
+    try{const u=new URL(String(raw||'').trim(),'https://invalid.invalid/');return u.protocol==='https:'&&(origins||CDN_ORIGINS).has(u.origin)?u.href:null;}catch(_){return null;}
   }
   function attr(tag,name){
     const m=new RegExp('\\s'+name+'\\s*=\\s*("([^"]*)"|\'([^\']*)\'|([^\\s>]+))','i').exec(tag);
@@ -80,44 +127,67 @@ const _iui=(function(){
   }
   function parse(source,opts){
     const final=!!(opts&&opts.final);
-    let s=String(source||'');
+    let s=String(source||'').replace(/\u0000/g,'');
     const out={title:'',height:0,css:'',html:'',scripts:[],warnings:[],bytes:s.length,tooBig:s.length>MAX_SOURCE};
     if(out.tooBig) return out;
-    const meta=(key)=>{const m=new RegExp('<!--\\s*'+key+'\\s*:\\s*([\\s\\S]*?)\\s*-->','i').exec(s);return m?m[1].trim():'';};
-    out.title=meta('title').slice(0,120);
-    const h=parseInt(meta('height'),10);if(h>0)out.height=Math.max(MIN_H,Math.min(h,2000));
-    s=s.replace(/<!--\s*(title|height)\s*:[\s\S]*?-->/gi,'');
+    const inert=[];
+    // One left-to-right pass classifies comments and scripts first, so a
+    // commented-out script never runs and tags inside script bodies are kept.
+    s=s.replace(/<!--[\s\S]*?-->|<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi,(m,attrs,body)=>{
+      if(attrs===undefined){
+        const meta=/^<!--\s*(title|height)\s*:([\s\S]*?)-->$/i.exec(m);
+        if(meta){
+          const v=meta[2].trim();
+          if(meta[1].toLowerCase()==='title'&&!out.title) out.title=v.slice(0,120);
+          else if(meta[1].toLowerCase()==='height'){const h=parseInt(v,10);if(h>0)out.height=Math.max(MIN_H,Math.min(h,2000));}
+        }
+        return '';
+      }
+      const tag='<script '+attrs+'>';
+      const type=(attr(tag,'type')||'').toLowerCase().trim();
+      if(type&&type!=='module'&&type!=='text/javascript'&&type!=='application/javascript'){
+        if(/json|template|text\//.test(type)){
+          const id=attr(tag,'id');
+          inert.push(`<script type="${type.replace(/[^a-z0-9/+.-]/g,'')}"${id?` id="${String(id).replace(/[^A-Za-z0-9_-]/g,'')}"`:''}>${body}<\/script>`);
+          return '\u0000S'+(inert.length-1)+'\u0000';
+        }
+        return '';
+      }
+      const src=attr(tag,'src');
+      if(src){const u=allowedUrl(rewriteUrl(src));if(u)out.scripts.push({src:u,type:type==='module'?'module':''});else out.warnings.push(tx('removed')+': '+hostOf(src));}
+      else if(body.trim()) out.scripts.push({code:body,type:type==='module'?'module':''});
+      return '';
+    });
+    if(!final){
+      // Still streaming: whatever follows an unfinished script or comment waits.
+      const cut=[s.search(/<script\b/i),s.search(/<!--/)].filter(i=>i>=0);
+      if(cut.length) s=s.slice(0,Math.min(...cut));
+    }
+    // An SVG keeps its own <title>; only a document title names the card.
+    const svgs=[];
+    s=s.replace(/<svg\b[\s\S]*?<\/svg>/gi,m=>{svgs.push(m);return '\u0000V'+(svgs.length-1)+'\u0000';});
     if(!out.title){const m=/<title[^>]*>([\s\S]*?)<\/title>/i.exec(s);if(m)out.title=m[1].replace(/<[^>]+>/g,'').trim().slice(0,120);}
     s=s.replace(/<title[^>]*>[\s\S]*?<\/title>/gi,'')
       .replace(/<!doctype[^>]*>/gi,'').replace(/<\/?(html|head|body)\b[^>]*>/gi,'')
       .replace(/<meta\b[^>]*>/gi,'').replace(/<base\b[^>]*>/gi,'');
     const imports=[], css=[];
     s=s.replace(/<link\b[^>]*>/gi,(tag)=>{
-      if(/rel\s*=\s*["']?stylesheet/i.test(tag)){const u=allowedUrl(attr(tag,'href'));if(u)imports.push(`@import url("${u.replace(/"/g,'%22')}");`);else out.warnings.push(tx('removed')+': '+hostOf(attr(tag,'href')));}
+      if(/rel\s*=\s*["']?stylesheet/i.test(tag)){
+        const href=attr(tag,'href');
+        const u=allowedUrl(rewriteUrl(href),STYLE_ORIGINS);
+        if(u)imports.push(`@import url("${u.replace(/"/g,'%22')}");`);else out.warnings.push(tx('removed')+': '+hostOf(href));
+      }
       return '';
     });
     s=s.replace(/<style\b[^>]*>([\s\S]*?)<\/style>/gi,(_,body)=>{css.push(body);return '';});
-    s=s.replace(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi,(_,attrs,body)=>{
-      const tag='<script '+attrs+'>';
-      const type=(attr(tag,'type')||'').toLowerCase();
-      if(type&&type!=='module'&&type!=='text/javascript'&&type!=='application/javascript'){
-        if(/json|template|text\//.test(type)) return `<script type="${type.replace(/"/g,'')}"${attr(tag,'id')?` id="${String(attr(tag,'id')).replace(/"/g,'')}"`:''}>${body}<\/script>`;
-        return '';
-      }
-      const src=attr(tag,'src');
-      if(src){const u=allowedUrl(src);if(u)out.scripts.push({src:u,type:type==='module'?'module':''});else out.warnings.push(tx('removed')+': '+hostOf(src));}
-      else if(body.trim()) out.scripts.push({code:body,type:type==='module'?'module':''});
-      return '';
-    });
     if(!final){
-      // Still streaming: an unfinished <style> already styles what is there,
-      // an unfinished <script> and a half-written tag are left out.
+      // An unfinished <style> already styles what is there; a half tag waits.
       const openStyle=/<style\b[^>]*>([\s\S]*)$/i.exec(s);
       if(openStyle){css.push(openStyle[1]);s=s.slice(0,openStyle.index);}
-      const openScript=/<script\b[\s\S]*$/i.exec(s);
-      if(openScript) s=s.slice(0,openScript.index);
       s=s.replace(/<[^>]*$/,'');
+      s=s.replace(/\u0000V\d*$/,'');
     }
+    s=s.replace(/\u0000V(\d+)\u0000/g,(_,i)=>svgs[+i]||'').replace(/\u0000S(\d+)\u0000/g,(_,i)=>inert[+i]||'');
     out.css=imports.concat(css).join('\n');
     out.html=s.trim();
     return out;
@@ -151,13 +221,11 @@ const _iui=(function(){
     const root=document.documentElement;
     let mode;
     if(root.classList.contains('dark')) mode='dark';
-    else if(root.classList.contains('light')||root.dataset.theme==='light') mode='light';
+    else if(root.classList.contains('light')||root.dataset.theme==='light'||typeof _resolvedThemeBaseDark!=='undefined') mode='light';
     else{
-      const probe=document.body?getComputedStyle(document.body).backgroundColor:'';
-      const lum=luminance(probe);
+      const lum=luminance(document.body?getComputedStyle(document.body).backgroundColor:'');
       mode=lum==null||lum<0.45?'dark':'light';
     }
-    if(!root.classList.contains('dark')&&typeof _resolvedThemeBaseDark!=='undefined') mode='light';
     return {type:'theme',vars,mode};
   }
   function broadcastTheme(){const msg=themeMessage();byWindow.forEach(ctrl=>postTo(ctrl,msg));}
@@ -179,21 +247,17 @@ const _iui=(function(){
     if(!ctrl.ready||ctrl.sentFinal) return;
     const p=ctrl.parsed;
     if(!p||p.tooBig) return;
-    postTo(ctrl,{type:'render',css:p.css,html:p.html,scripts:ctrl.final?p.scripts:[],final:ctrl.final});
+    const restore=ctrl.final?loadState(ctrl.stateKey):null;
+    postTo(ctrl,{type:'render',css:p.css,html:p.html,scripts:ctrl.final?p.scripts:[],final:ctrl.final,restore});
     if(ctrl.final) ctrl.sentFinal=true;
   }
   function onMessage(e){
     const data=e&&e.data;
     if(!data||data.iui!==1||typeof data.type!=='string') return;
-    let ctrl=byWindow.get(e.source);
-    let popup=false;
-    if(!ctrl) ctrl=adopt(e.source);
-    if(!ctrl){
-      // A widget opened in its own tab talks to us through window.opener.
-      byWindow.forEach(c=>{if(c.popup&&c.popup===e.source){ctrl=c;popup=true;}});
-      if(!ctrl) return;
-    }
-    if(popup){handlePopup(ctrl,e.source,data);return;}
+    // Our frames always run in an opaque origin.
+    if(e.origin!=='null') return;
+    const ctrl=byWindow.get(e.source)||adopt(e.source);
+    if(!ctrl) return;
     switch(data.type){
       case 'ready':
         ctrl.ready=true;ctrl.sentFinal=false;
@@ -204,57 +268,62 @@ const _iui=(function(){
         setHeight(ctrl,Number(data.height)||0);
         break;
       case 'rendered':
+        ctrl.rendered=true;
         setState(ctrl,ctrl.errors.length?'error':'ready');
         break;
       case 'error':
         addError(ctrl,String(data.message||''),String(data.detail||''));
         break;
-      case 'interact':
-        ctrl.lastInteract=Date.now();
+      case 'state':
+        if(ctrl.final&&ctrl.stateKey) saveState(ctrl.stateKey,data.values);
         break;
       case 'prompt':
-        followUp(ctrl,String(data.text||''),document.activeElement===ctrl.iframe);
+        offerPrompt(ctrl,String(data.text||''));
         break;
       case 'copy':
-        copyText(String(data.text||''));
+        copyFromWidget(String(data.text||''));
         break;
       case 'open':
         openLink(String(data.url||''));
         break;
       case 'key':
-        if(data.key==='Escape'&&ctrl.card.classList.contains('iui-full')) toggleFull(ctrl);
+        if(data.key==='Escape'&&ctrl.card.classList.contains('iui-full')) toggleFull(ctrl,false);
         break;
       case 'log':
-        try{console.warn('[interactive-ui]',String(data.message||''));}catch(_){}
+        try{console.warn('[interactive-ui]',String(data.message||'').slice(0,300));}catch(_){}
         break;
     }
   }
   // A frame that was moved in the DOM reloads with a new window; find its
-  // controller by asking each iframe for its current window.
+  // controller by asking each live iframe for its current window.
   function adopt(win){
+    prune();
     let found=null;
-    controllers.forEach(c=>{
-      if(!c.iframe){controllers.delete(c);return;}
-      if(!c.card.isConnected&&Date.now()-c.mountedAt>60000){controllers.delete(c);return;}
-      if(c.iframe.contentWindow===win){found=c;}
-    });
+    controllers.forEach(c=>{if(c.iframe&&c.iframe.contentWindow===win)found=c;});
     if(found){byWindow.set(win,found);found.ready=false;found.sentFinal=false;}
     return found;
   }
-  function handlePopup(ctrl,win,data){
-    if(data.type==='ready'){
-      const p=ctrl.parsed;
-      try{
-        win.postMessage(Object.assign({iui:1},themeMessage()),'*');
-        win.postMessage({iui:1,type:'render',css:p.css,html:p.html,scripts:p.scripts,final:true},'*');
-      }catch(_){}
-    } else if(data.type==='interact'){ctrl.popupInteract=Date.now();}
-    else if(data.type==='prompt'){followUp(ctrl,String(data.text||''),Date.now()-(ctrl.popupInteract||0)<INTERACT_WINDOW_MS);}
-    else if(data.type==='open'){openLink(String(data.url||''));}
+  // Drop controllers whose card left the page a while ago.
+  function prune(){
+    const now=Date.now();
+    controllers.forEach(c=>{
+      if(c.card.isConnected){c.detachedAt=0;return;}
+      if(!c.detachedAt){c.detachedAt=now;return;}
+      if(now-c.detachedAt<30000) return;
+      controllers.delete(c);
+      byWindow.forEach((v,k)=>{if(v===c)byWindow.delete(k);});
+      if(intersection) try{intersection.unobserve(c.card);}catch(_){}
+      if(c.card.classList.contains('iui-full')) toggleFull(c,false);
+    });
   }
   function openLink(url){
     if(!/^https?:\/\//i.test(url)) return;
     try{window.open(url,'_blank','noopener,noreferrer');}catch(_){}
+  }
+  function hostActive(){
+    // A click inside the frame also activates this page (user activation
+    // propagates to ancestors); a timer or load handler does not.
+    try{return !navigator.userActivation||navigator.userActivation.isActive;}catch(_){return true;}
   }
   function copyText(text){
     if(!text) return;
@@ -264,66 +333,135 @@ const _iui=(function(){
     }catch(_){}
     fallbackCopy(text,done);
   }
+  function copyFromWidget(text){
+    if(!text||!hostActive()) return;
+    copyText(text.slice(0,20000));
+  }
   function fallbackCopy(text,done){
     try{const ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();done();}catch(_){}
   }
-  function followUp(ctrl,text,userActive){
-    text=text.trim().slice(0,4000);
-    if(!text) return;
-    const now=Date.now();
-    const recent=now-(ctrl.lastInteract||0)<INTERACT_WINDOW_MS;
-    if(!(userActive||recent)){toast(tx('blocked'));return;}
-    if(now-(ctrl.lastPrompt||0)<PROMPT_GAP_MS) return;
-    ctrl.lastPrompt=now;
-    sendPrompt(text);
+  function cleanPrompt(text){
+    return String(text||'').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f\u200b\ufeff]/g,'')
+      .replace(/^[\s/]+/,'').slice(0,4000).trim();
+  }
+  // A follow-up question from a widget is shown in the card; only a click on
+  // the host's own Send button sends it.
+  function offerPrompt(ctrl,text){
+    text=cleanPrompt(text);
+    if(!text||ctrl.rejectedPrompts>=MAX_PENDING_PROMPTS) return;
+    if(ctrl.pendingPrompt) ctrl.rejectedPrompts=(ctrl.rejectedPrompts||0)+1;
+    ctrl.pendingPrompt=text;
+    ctrl.askText.textContent=text.length>300?text.slice(0,300)+'…':text;
+    ctrl.askBar.hidden=false;
+    if(hostActive()) try{ctrl.askSend.focus({preventScroll:true});}catch(_){}
+  }
+  function hideAsk(ctrl){ctrl.pendingPrompt='';ctrl.askBar.hidden=true;}
+  function composerBusy(){
+    const box=document.getElementById('msg');
+    const files=(typeof S!=='undefined'&&S&&Array.isArray(S.pendingFiles))?S.pendingFiles.length:0;
+    const sel=(typeof _pendingSelections!=='undefined'&&Array.isArray(_pendingSelections))?_pendingSelections.length:0;
+    return !!((box&&box.value.trim())||files||sel);
   }
   function sendPrompt(text){
     const box=document.getElementById('msg');
-    if(!box||typeof window.send!=='function') return;
+    if(!box||typeof window.send!=='function') return false;
+    if(composerBusy()){toast(tx('draftBusy'));return false;}
     box.value=text;
     try{box.dispatchEvent(new Event('input',{bubbles:true}));}catch(_){}
     try{
-      window.send();
-      toast(tx('sent'));
+      const r=window.send();
+      if(r&&typeof r.then==='function') r.then(()=>toast(tx('sent')),()=>{});
+      else toast(tx('sent'));
     }catch(err){try{console.warn('[interactive-ui] follow-up failed',err);}catch(_){}}
+    return true;
   }
 
   // ── Card ────────────────────────────────────────────────────────────────
-  function fingerprint(src){return String(src||'').slice(0,400);}
+  function fingerprint(src){return hashSource(String(src||'').slice(0,400));}
+  function scroller(){return document.getElementById('messages');}
   function setHeight(ctrl,h){
     if(!(h>0)) return;
     ctrl.height=h;
-    heightCache.set(ctrl.fp,h);
     if(ctrl.card.classList.contains('iui-full')) return;
+    if(ctrl.final) rememberHeight(ctrl.fp,h);
     const max=Math.max(320,Math.round((window.innerHeight||900)*0.86));
-    ctrl.stage.style.height=Math.max(MIN_H,Math.min(h,max))+'px';
+    const next=Math.max(MIN_H,Math.min(h,max));
+    const prev=ctrl.stage.offsetHeight;
+    const delta=next-prev;
+    // Keep the reader's place when a card above the visible area resizes.
+    const sc=scroller();
+    const above=sc&&delta&&ctrl.card.isConnected&&ctrl.card.getBoundingClientRect().bottom<=sc.getBoundingClientRect().top+1;
+    if(above){
+      ctrl.stage.style.transition='none';
+      ctrl.stage.style.height=next+'px';
+      sc.scrollTop+=delta;
+      requestAnimationFrame(()=>{ctrl.stage.style.transition='';});
+    } else {
+      ctrl.stage.style.height=next+'px';
+    }
     ctrl.stage.classList.toggle('iui-stage--scroll',h>max);
   }
   function setState(ctrl,state){
     ctrl.state=state;
     ctrl.card.dataset.state=state;
-    const label=state==='building'?tx('building'):state==='error'?tx('error'):state==='ready'?tx('ready'):tx('loading');
-    ctrl.status.textContent=label;
-    if(state==='building'&&ctrl.parsed) ctrl.status.textContent=label+' · '+formatBytes(ctrl.parsed.bytes);
+    // The error bar explains problems; the header only says "building".
+    const label=state==='building'?tx('building'):'';
+    if(ctrl.status.textContent!==label) ctrl.status.textContent=label;
+    ctrl.status.hidden=state!=='building';
   }
-  function formatBytes(n){return n<1024?n+' B':(n/1024).toFixed(1).replace('.',lang()==='nl'?',':'.')+' KB';}
+  function friendly(message){return String(message||'').replace(/^Uncaught\s+/,'').slice(0,240);}
   function addError(ctrl,message,detail){
     if(!message) return;
     if(ctrl.errors.some(e=>e.message===message)) return;
     ctrl.errors.push({message,detail});
-    ctrl.errorText.textContent=ctrl.errors.slice(0,3).map(e=>e.message).join(' · ');
+    renderDetails(ctrl);
     ctrl.errorBar.hidden=false;
     setState(ctrl,'error');
+  }
+  // Skipped sources are not errors: they only show in the details.
+  function renderDetails(ctrl){
+    const lines=ctrl.errors.slice(0,5).map(e=>friendly(e.message)).concat((ctrl.parsed&&ctrl.parsed.warnings)||[]);
+    ctrl.errorDetails.textContent=lines.join('\n');
   }
   function button(name,label,onClick,extra){
     const b=document.createElement('button');
     b.type='button';b.className='iui-btn'+(extra?' '+extra:'');
     b.title=label;b.setAttribute('aria-label',label);
     b.innerHTML=icon(name)+`<span class="iui-btn-label">${escHtml(label)}</span>`;
+    b.addEventListener('click',ev=>{ev.preventDefault();ev.stopPropagation();onClick(b,ev);});
+    return b;
+  }
+  function menuItem(name,label,onClick,extra){
+    const b=document.createElement('button');
+    b.type='button';b.className='iui-menu-item'+(extra?' '+extra:'');b.setAttribute('role','menuitem');b.tabIndex=-1;
+    b.innerHTML=icon(name)+`<span>${escHtml(label)}</span>`;
     b.addEventListener('click',ev=>{ev.preventDefault();ev.stopPropagation();onClick(b);});
     return b;
   }
-  function escHtml(v){return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+  let openMenu=null;
+  function closeMenu(focusTrigger){
+    if(!openMenu) return;
+    const {menu,trigger}=openMenu;
+    menu.hidden=true;trigger.setAttribute('aria-expanded','false');
+    openMenu=null;
+    window.removeEventListener('blur',onMenuBlur);
+    window.removeEventListener('resize',onMenuBlur);
+    if(focusTrigger) try{trigger.focus();}catch(_){}
+  }
+  function onMenuBlur(){closeMenu(false);}
+  function openMenuFor(ctrl){
+    if(openMenu&&openMenu.menu===ctrl.menu){closeMenu(true);return;}
+    closeMenu(false);
+    ctrl.codeItem.querySelector('span').textContent=ctrl.sourceBox.hidden?tx('viewCode'):tx('hideCode');
+    ctrl.menu.hidden=false;
+    ctrl.moreBtn.setAttribute('aria-expanded','true');
+    openMenu={menu:ctrl.menu,trigger:ctrl.moreBtn};
+    // A click inside a frame never reaches this document; the window blurs.
+    window.addEventListener('blur',onMenuBlur);
+    window.addEventListener('resize',onMenuBlur);
+    const first=ctrl.menu.querySelector('.iui-menu-item');
+    if(first) first.focus();
+  }
 
   function createController(source,opts){
     const final=!!(opts&&opts.final);
@@ -334,46 +472,87 @@ const _iui=(function(){
     const head=document.createElement('div');head.className='iui-head';
     const badge=document.createElement('span');badge.className='iui-badge';badge.innerHTML=icon('spark');
     const titleEl=document.createElement('span');titleEl.className='iui-title';
-    const status=document.createElement('span');status.className='iui-status';status.setAttribute('aria-live','polite');
+    const status=document.createElement('span');status.className='iui-status';
     const actions=document.createElement('div');actions.className='iui-actions';
     head.append(badge,titleEl,status,actions);
     const stage=document.createElement('div');stage.className='iui-stage';
     const skeleton=document.createElement('div');skeleton.className='iui-skeleton';skeleton.innerHTML='<span></span><span></span><span></span>';
     stage.appendChild(skeleton);
+    // Follow-up question offered by the widget, sent only by the host button.
+    const askBar=document.createElement('div');askBar.className='iui-ask';askBar.hidden=true;
+    const askLabel=document.createElement('span');askLabel.className='iui-ask-label';askLabel.textContent=tx('ask');
+    const askText=document.createElement('span');askText.className='iui-ask-text';
+    const askBody=document.createElement('div');askBody.className='iui-ask-body';askBody.append(askLabel,askText);
+    askBar.append(askBody);
     const errorBar=document.createElement('div');errorBar.className='iui-error';errorBar.hidden=true;
-    const errorText=document.createElement('span');errorText.className='iui-error-text';
-    errorBar.innerHTML=icon('alert');errorBar.appendChild(errorText);
+    errorBar.setAttribute('role','status');
+    const errorLead=document.createElement('span');errorLead.className='iui-error-text';errorLead.textContent=tx('errorLead');
+    const errorDetails=document.createElement('pre');errorDetails.className='iui-error-details';errorDetails.hidden=true;
+    errorBar.innerHTML=icon('alert');errorBar.appendChild(errorLead);
     const sourceBox=document.createElement('div');sourceBox.className='iui-source';sourceBox.hidden=true;
     const pre=document.createElement('pre');const code=document.createElement('code');code.className='language-html';pre.appendChild(code);
     sourceBox.appendChild(pre);
-    const foot=document.createElement('div');foot.className='iui-foot';foot.innerHTML=icon('lock')+`<span>${escHtml(tx('sandboxNote'))}</span>`;
-    card.append(head,stage,errorBar,sourceBox,foot);
+    card.append(head,stage,askBar,errorBar,errorDetails,sourceBox);
 
-    const ctrl={card,head,titleEl,status,actions,stage,skeleton,errorBar,errorText,sourceBox,code,foot,
-      iframe:null,ready:false,final,sentFinal:false,source:'',parsed:null,errors:[],state:'loading',
-      fp:'',height:0,lastInteract:0,lastPrompt:0,popup:null,popupInteract:0,lastTick:0,tickTimer:0,mounted:false,mountedAt:0};
+    const ctrl={card,head,titleEl,status,actions,stage,skeleton,askBar,askText,errorBar,errorDetails,sourceBox,code,
+      iframe:null,ready:false,final,sentFinal:false,rendered:false,source:'',parsed:null,errors:[],state:'loading',
+      fp:'',stateKey:'',height:0,lastPrompt:0,pendingPrompt:'',rejectedPrompts:0,lastTick:0,tickTimer:0,
+      mounted:false,mountedAt:0,detachedAt:0};
 
-    const repair=button('wrench',tx('repair'),()=>{
-      const msg=ctrl.errors.map(e=>e.message).join('; ');
-      sendPrompt(tx('repairPrompt',ctrl.parsed&&ctrl.parsed.title||tx('title'),msg));
+    const askSend=button('send',tx('send'),(b,ev)=>{
+      if(!ev||!ev.isTrusted) return;
+      const now=Date.now();
+      if(now-ctrl.lastPrompt<PROMPT_GAP_MS||!ctrl.pendingPrompt) return;
+      if(sendPrompt(ctrl.pendingPrompt)){ctrl.lastPrompt=now;hideAsk(ctrl);}
+    },'iui-btn--text iui-btn--primary');
+    const askCancel=button('close',tx('cancel'),()=>{ctrl.rejectedPrompts=(ctrl.rejectedPrompts||0)+1;hideAsk(ctrl);},'iui-btn--text iui-btn--quiet');
+    askBar.append(askSend,askCancel);
+    ctrl.askSend=askSend;
+
+    const repair=button('wrench',tx('repair'),(b,ev)=>{
+      if(!ev||!ev.isTrusted) return;
+      const first=ctrl.errors[0]?friendly(ctrl.errors[0].message).slice(0,160):'';
+      sendPrompt(tx('repairPrompt',ctrl.parsed&&ctrl.parsed.title||tx('title'),first));
     },'iui-btn--text');
-    const dismiss=button('close',tx('dismiss'),()=>{errorBar.hidden=true;},'iui-btn--icon');
-    errorBar.append(repair,dismiss);
+    const detailsBtn=button('code',tx('details'),b=>{
+      errorDetails.hidden=!errorDetails.hidden;
+      b.querySelector('.iui-btn-label').textContent=errorDetails.hidden?tx('details'):tx('hideDetails');
+      b.setAttribute('aria-expanded',String(!errorDetails.hidden));
+    },'iui-btn--text iui-btn--quiet');
+    detailsBtn.setAttribute('aria-expanded','false');
+    const dismiss=button('close',tx('dismiss'),()=>{errorBar.hidden=true;errorDetails.hidden=true;},'iui-btn--icon');
+    errorBar.append(repair,detailsBtn,dismiss);
 
-    const srcBtn=button('code',tx('source'),b=>{
-      sourceBox.hidden=!sourceBox.hidden;
-      b.classList.toggle('is-on',!sourceBox.hidden);
-      b.setAttribute('aria-pressed',String(!sourceBox.hidden));
-      if(!sourceBox.hidden){code.textContent=ctrl.source;try{if(typeof Prism!=='undefined'&&Prism.highlightElement)Prism.highlightElement(code);}catch(_){}}
-    });
-    const copyBtn=button('copy',tx('copySource'),()=>copyText(ctrl.source));
-    const reloadBtn=button('reload',tx('reload'),()=>reload(ctrl));
-    const dlBtn=button('download',tx('download'),()=>download(ctrl));
-    const tabBtn=button('external',tx('newTab'),()=>openTab(ctrl));
+    // Header: full screen stays visible, everything else lives in one menu.
     const fullBtn=button('expand',tx('full'),()=>toggleFull(ctrl));
-    ctrl.fullBtn=fullBtn;
-    actions.append(srcBtn,copyBtn,reloadBtn,dlBtn,tabBtn,fullBtn);
-    ctrl.finalOnly=[copyBtn,reloadBtn,dlBtn,tabBtn];
+    const moreBtn=button('dots',tx('more'),()=>openMenuFor(ctrl));
+    moreBtn.setAttribute('aria-haspopup','menu');moreBtn.setAttribute('aria-expanded','false');
+    const menu=document.createElement('div');menu.className='iui-menu';menu.hidden=true;menu.setAttribute('role','menu');
+    menu.setAttribute('aria-label',tx('more'));
+    const pick=fn=>b=>{closeMenu(true);fn(b);};
+    const dlItem=menuItem('download',tx('download'),pick(()=>download(ctrl)));
+    const restartItem=menuItem('reload',tx('restart'),pick(()=>reload(ctrl)));
+    const sep=document.createElement('div');sep.className='iui-menu-sep';sep.setAttribute('role','separator');
+    const group=document.createElement('div');group.className='iui-menu-group';group.textContent=tx('devGroup');group.setAttribute('aria-hidden','true');
+    const codeItem=menuItem('code',tx('viewCode'),pick(()=>{
+      sourceBox.hidden=!sourceBox.hidden;
+      if(!sourceBox.hidden){code.textContent=ctrl.source;try{if(typeof Prism!=='undefined'&&Prism.highlightElement)Prism.highlightElement(code);}catch(_){}}
+    }),'iui-menu-dev');
+    const copyItem=menuItem('copy',tx('copyCode'),pick(()=>copyText(ctrl.source)),'iui-menu-dev');
+    const note=document.createElement('div');note.className='iui-menu-note';note.innerHTML=icon('lock')+`<span>${escHtml(tx('sandboxNote'))}</span>`;
+    menu.append(dlItem,restartItem,sep,group,codeItem,copyItem,note);
+    menu.addEventListener('keydown',ev=>{
+      const items=[...menu.querySelectorAll('.iui-menu-item')];
+      const at=items.indexOf(document.activeElement);
+      if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();closeMenu(true);}
+      else if(ev.key==='ArrowDown'){ev.preventDefault();(items[at+1]||items[0]).focus();}
+      else if(ev.key==='ArrowUp'){ev.preventDefault();(items[at-1]||items[items.length-1]).focus();}
+      else if(ev.key==='Home'){ev.preventDefault();items[0].focus();}
+      else if(ev.key==='End'){ev.preventDefault();items[items.length-1].focus();}
+      else if(ev.key==='Tab'){closeMenu(false);}
+    });
+    Object.assign(ctrl,{fullBtn,moreBtn,menu,codeItem});
+    actions.append(moreBtn,fullBtn,menu);
     update(ctrl,source,final);
     return ctrl;
   }
@@ -382,19 +561,21 @@ const _iui=(function(){
     ctrl.final=!!final;
     ctrl.parsed=parse(ctrl.source,{final:ctrl.final});
     if(!ctrl.fp||!ctrl.final) ctrl.fp=fingerprint(ctrl.source);
+    ctrl.stateKey=ctrl.final?hashSource(ctrl.source.trim()):'';
     const p=ctrl.parsed;
     const title=p.title||tx('title');
-    ctrl.titleEl.textContent=title;
+    if(ctrl.titleEl.textContent!==title) ctrl.titleEl.textContent=title;
     ctrl.card.setAttribute('aria-label',title);
-    ctrl.finalOnly.forEach(b=>{b.disabled=!ctrl.final;});
+    ctrl.moreBtn.hidden=!ctrl.final;
     if(!ctrl.sourceBox.hidden) ctrl.code.textContent=ctrl.source;
-    if(p.tooBig){setState(ctrl,'error');addError(ctrl,tx('tooBig'),'');return;}
-    p.warnings.forEach(w=>addError(ctrl,w,''));
+    if(p.tooBig){addError(ctrl,tx('tooBig'),'');return;}
+    renderDetails(ctrl);
     if(!ctrl.height){
       const cached=heightCache.get(ctrl.fp);
       ctrl.stage.style.height=(cached||p.height||DEFAULT_H)+'px';
+      if(cached) ctrl.skeleton.classList.add('is-quiet');
     }
-    setState(ctrl,ctrl.final?(ctrl.state==='ready'?'ready':'loading'):'building');
+    if(ctrl.state!=='error') setState(ctrl,ctrl.final?(ctrl.rendered?'ready':'loading'):'building');
     if(ctrl.mounted) pushRender(ctrl);
   }
   function mount(ctrl){
@@ -405,14 +586,12 @@ const _iui=(function(){
     iframe.setAttribute('sandbox','allow-scripts allow-forms allow-popups');
     iframe.setAttribute('referrerpolicy','no-referrer');
     iframe.setAttribute('title',ctrl.parsed&&ctrl.parsed.title||tx('title'));
-    iframe.setAttribute('loading','eager');
     iframe.src=FRAME_URL+'?v='+encodeURIComponent(String((typeof WEBUI_VERSION!=='undefined'&&WEBUI_VERSION)||'1'));
     iframe.addEventListener('load',()=>{ctrl.skeleton.classList.add('is-gone');});
     ctrl.iframe=iframe;
     ctrl.mountedAt=Date.now();
     controllers.add(ctrl);
     ctrl.stage.appendChild(iframe);
-    // contentWindow exists as soon as the iframe is in the document.
     if(iframe.contentWindow) byWindow.set(iframe.contentWindow,ctrl);
     watchTheme();
   }
@@ -435,35 +614,55 @@ const _iui=(function(){
     if(!ctrl.iframe) return;
     byWindow.delete(ctrl.iframe.contentWindow);
     ctrl.iframe.remove();
-    ctrl.iframe=null;ctrl.mounted=false;ctrl.ready=false;ctrl.sentFinal=false;ctrl.errors=[];ctrl.errorBar.hidden=true;
+    Object.assign(ctrl,{iframe:null,mounted:false,ready:false,sentFinal:false,rendered:false,errors:[]});
+    ctrl.errorBar.hidden=true;ctrl.errorDetails.hidden=true;hideAsk(ctrl);
     ctrl.skeleton.classList.remove('is-gone');
     setState(ctrl,'loading');
+    renderDetails(ctrl);
     mount(ctrl);
   }
-  function toggleFull(ctrl){
-    const on=!ctrl.card.classList.contains('iui-full');
+  // Full screen is an overlay of the card itself (the iframe never moves, so
+  // it never reloads); the message row and list stop clipping it meanwhile.
+  function toggleFull(ctrl,force){
+    const on=force===undefined?!ctrl.card.classList.contains('iui-full'):!!force;
+    if(on===ctrl.card.classList.contains('iui-full')) return;
+    closeMenu(false);
     ctrl.card.classList.toggle('iui-full',on);
     document.documentElement.classList.toggle('iui-has-full',on);
+    const row=ctrl.card.closest('.msg-row,.assistant-turn,.assistant-segment');
     const b=ctrl.fullBtn;
-    b.innerHTML=icon(on?'shrink':'expand')+`<span class="iui-btn-label">${escHtml(on?tx('exitFull'):tx('full'))}</span>`;
+    b.innerHTML=icon(on?'close':'expand')+`<span class="iui-btn-label">${escHtml(on?tx('exitFull'):tx('full'))}</span>`;
     b.title=on?tx('exitFull'):tx('full');b.setAttribute('aria-label',b.title);
+    b.classList.toggle('iui-btn--text',on);
     if(on){
+      ctrl._fullRow=row;if(row)row.classList.add('iui-row-full');
+      ctrl._returnFocus=document.activeElement;
+      ctrl.card.setAttribute('role','dialog');ctrl.card.setAttribute('aria-modal','true');
       ctrl.stage.style.height='';
-      ctrl._esc=ev=>{if(ev.key==='Escape'){ev.preventDefault();toggleFull(ctrl);}};
+      ctrl._esc=ev=>{
+        if(ev.key==='Escape'){ev.preventDefault();toggleFull(ctrl,false);}
+        else if(ev.key==='Tab'){
+          // Keep focus inside the card while it covers the chat.
+          const f=[...ctrl.card.querySelectorAll('button:not([hidden]):not(:disabled),iframe')].filter(x=>x.offsetParent!==null);
+          if(!f.length) return;
+          const i=f.indexOf(document.activeElement);
+          if(ev.shiftKey&&i<=0){ev.preventDefault();f[f.length-1].focus();}
+          else if(!ev.shiftKey&&i===f.length-1){ev.preventDefault();f[0].focus();}
+        }
+      };
       document.addEventListener('keydown',ctrl._esc,true);
       b.focus();
     } else {
+      if(ctrl._fullRow) ctrl._fullRow.classList.remove('iui-row-full');
+      ctrl._fullRow=null;
+      ctrl.card.setAttribute('role','group');ctrl.card.removeAttribute('aria-modal');
       if(ctrl._esc) document.removeEventListener('keydown',ctrl._esc,true);
       ctrl._esc=null;
       if(ctrl.height) setHeight(ctrl,ctrl.height);
+      const back=ctrl._returnFocus;ctrl._returnFocus=null;
+      try{(back&&back.isConnected?back:b).focus({preventScroll:true});}catch(_){}
     }
     setTimeout(()=>postTo(ctrl,{type:'measure'}),50);
-  }
-  function openTab(ctrl){
-    if(!ctrl.final) return;
-    const w=window.open(FRAME_URL,'_blank');
-    if(!w){toast(tx('popupBlocked'));return;}
-    ctrl.popup=w;
   }
   function standaloneHtml(ctrl,frameHtml){
     const p=ctrl.parsed, theme=themeMessage();
@@ -476,19 +675,22 @@ const _iui=(function(){
     if(!/id="iui-root"/.test(doc)){
       doc='<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title></title><style id="iui-user-style"></style></head><body><div id="iui-root"></div></body></html>';
     }
-    doc=doc.replace(/<title>[\s\S]*?<\/title>/i,`<title>${title}</title>`)
+    // The download is a plain page: drop the chat shell, keep theme and widget.
+    doc=doc.replace(/<script>\s*\(function\(\)\{[\s\S]*?<\/script>/,'')
+      .replace(/<title>[\s\S]*?<\/title>/i,`<title>${title}</title>`)
       .replace('<html lang="nl" data-theme="dark">',`<html lang="${lang()}" data-theme="${theme.mode}" style="${escHtml(vars)}">`)
       .replace('<style id="iui-user-style"></style>',()=>`<style id="iui-user-style">${p.css.replace(/<\/style/gi,'<\\/style')}</style>`)
       .replace('<div id="iui-root"></div>',()=>`<div id="iui-root">${p.html}</div>`)
-      .replace(/<\/body>/i,()=>scripts+'\n</body>');
+      .replace(/<\/body>/i,()=>`<script>window.synthwave={theme:{palette:['#f97316','#3b82f6','#22c55e','#a855f7','#eab308','#ec4899','#14b8a6','#94a3b8'],mode:${JSON.stringify(theme.mode)}},sendPrompt:function(){return false},copy:function(t){try{navigator.clipboard.writeText(String(t))}catch(e){}},onTheme:function(){},resize:function(){}};<\/script>\n`+scripts+'\n</body>');
     return doc;
   }
   function download(ctrl){
     if(!ctrl.final) return;
     const finish=html=>{
-      const blob=new Blob([standaloneHtml(ctrl,html)],{type:'text/html'});
+      // An octet-stream blob is only ever saved, never shown in this origin.
+      const blob=new Blob([standaloneHtml(ctrl,html)],{type:'application/octet-stream'});
       const a=document.createElement('a');
-      const name=(ctrl.parsed.title||'interactieve-weergave').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'weergave';
+      const name=(ctrl.parsed.title||'weergave').toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'weergave';
       a.href=URL.createObjectURL(blob);a.download=name+'.html';
       document.body.appendChild(a);a.click();
       setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1500);
@@ -500,6 +702,9 @@ const _iui=(function(){
   function renderBlocks(container){
     const root=container||document;
     if(!root.querySelectorAll) return;
+    prune();
+    // Settled cards replace live ones; drop live cards left in hidden copies.
+    liveCards.forEach((c,k)=>{if(!c.card.isConnected||c.card.offsetParent===null){if(c.card.isConnected&&!c.mounted)c.card.remove();liveCards.delete(k);}});
     root.querySelectorAll('.iui-block:not([data-iui-mounted])').forEach(block=>{
       block.setAttribute('data-iui-mounted','1');
       const source=block.textContent||'';
@@ -511,6 +716,7 @@ const _iui=(function(){
   }
 
   // ── Live render while a reply streams ───────────────────────────────────
+  function liveKey(text){const t=String(text||'').trim();return t.length>=24?hashSource(t.slice(0,160)):'';}
   function streamTick(root){
     if(!root||!root.querySelectorAll) return;
     root.querySelectorAll('pre > code').forEach(code=>{
@@ -519,25 +725,41 @@ const _iui=(function(){
       const pre=code.parentElement;
       let ctrl=pre.__iuiLive;
       if(!ctrl){
-        ctrl=createController(code.textContent||'',{final:false});
-        ctrl.card.classList.add('iui-live');
+        // The chat sometimes rebuilds the streaming text node; take over the
+        // card that already shows this block instead of starting a new one.
+        const text=code.textContent||'';
+        const key=liveKey(text);
+        const prev=key&&liveCards.get(key);
+        if(prev&&!prev.card.isConnected&&!prev.final){
+          ctrl=prev;
+        } else {
+          ctrl=createController(text,{final:false});
+          ctrl.card.classList.add('iui-live');
+        }
+        if(key) liveCards.set(key,ctrl);
+        while(liveCards.size>20) liveCards.delete(liveCards.keys().next().value);
         pre.__iuiLive=ctrl;
         pre.classList.add('iui-raw-hidden');
         pre.parentNode.insertBefore(ctrl.card,pre);
+        if(ctrl.mounted){update(ctrl,text,false);return;}
         // Only frames that are actually on screen load: the chat keeps a hidden
         // copy of the streaming text, which must not run a second widget.
         lazyMount(ctrl);
         return;
       }
-      const now=Date.now();
-      const run=()=>{ctrl.lastTick=Date.now();ctrl.tickTimer=0;update(ctrl,code.textContent||'',false);};
-      if(now-ctrl.lastTick>=STREAM_THROTTLE_MS) run();
+      const run=()=>{ctrl.lastTick=Date.now();ctrl.tickTimer=0;if(code.isConnected)update(ctrl,code.textContent||'',false);};
+      if(Date.now()-ctrl.lastTick>=STREAM_THROTTLE_MS) run();
       else if(!ctrl.tickTimer) ctrl.tickTimer=setTimeout(run,STREAM_THROTTLE_MS);
     });
   }
 
   window.addEventListener('message',onMessage);
-  return {parse,renderBlocks,streamTick,allowedUrl,themeMessage,FENCE_LANGS,_byWindow:byWindow};
+  document.addEventListener('pointerdown',ev=>{
+    if(!openMenu) return;
+    if(ev.target&&ev.target.closest&&(ev.target.closest('.iui-menu')||ev.target.closest('.iui-actions')))return;
+    closeMenu(false);
+  },true);
+  return {parse,renderBlocks,streamTick,allowedUrl,rewriteUrl,themeMessage,FENCE_LANGS,_byWindow:byWindow,_controllers:controllers};
 })();
 
 function interactiveUiFenceAccepts(lang,code){

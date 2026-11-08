@@ -133,7 +133,13 @@ def test_frame_document_contains_shell_theme_and_import_map():
         assert any(url.startswith(h + "/") for h in interactive_ui.CDN_HOSTS)
     # The shell only listens to its host window and exposes the bridge.
     shell = interactive_ui.SHELL_JS
-    assert "if(e.source !== host) return;" in shell
+    assert "if(e.source !== host || (HOST_OK && e.origin !== HOST_ORIGIN)) return;" in shell
+    assert "host.postMessage(Object.assign({iui:1}, msg), HOST_OK ? HOST_ORIGIN : '*')" in shell
+    # Opened on its own (no parent), the frame renders nothing and exposes no bridge.
+    assert shell.index("if(!host || host === window){") < shell.index("window.synthwave = api;")
+    # Common model habits are made harmless.
+    for token in ("document.write = document.writeln", "memoryStorage()", "new Event('DOMContentLoaded'"):
+        assert token in shell
     assert "window.synthwave = api;" in shell
     assert "window.Websandbox" in shell
     for token in ("--sw-bg", "--sw-accent", "--sw-c1", ".card", ".stat", "button.primary"):
@@ -193,7 +199,7 @@ def test_prompt_text_names_the_contract_and_has_no_long_dashes():
     for host in ("cdn.jsdelivr.net", "unpkg.com", "cdnjs.cloudflare.com", "esm.sh"):
         assert host in text
     assert "synthwave.sendPrompt" in text
-    assert "Never call it automatically" in text
+    assert "the user confirms it" in text
     assert not re.search(LONG_DASHES, text)
     assert not re.search(LONG_DASHES, MODULE)
     assert not re.search(LONG_DASHES, CSS)
@@ -235,6 +241,10 @@ def test_host_never_puts_widget_source_into_its_own_dom_as_html():
     assert "iframe.setAttribute('sandbox','allow-scripts allow-forms allow-popups');" in MODULE
     assert "allow-same-origin" not in code
     assert "byWindow.get(e.source)" in code
+    assert "if(e.origin!=='null') return;" in code
+    # Widget prompts are only offered; the host's own trusted click sends them.
+    assert "if(!ev||!ev.isTrusted) return;" in code
+    assert "window.open(FRAME_URL" not in code
     assert "srcdoc" not in code
 
 

@@ -89,7 +89,7 @@ h1,h2,h3,h4{color:var(--sw-strong);line-height:1.25;margin:0 0 .5em}
 h1{font-size:1.35rem}h2{font-size:1.15rem}h3{font-size:1rem}
 p{margin:0 0 .75em}small,.muted{color:var(--sw-muted)}
 a{color:var(--sw-accent)}
-button,.btn{font:inherit;font-weight:600;cursor:pointer;border:1px solid var(--sw-border);background:var(--sw-surface-2);color:var(--sw-fg);
+button,.btn{font:inherit;font-weight:500;cursor:pointer;border:1px solid var(--sw-border);background:var(--sw-surface-2);color:var(--sw-fg);
 padding:.5em .95em;border-radius:var(--sw-radius-sm);transition:background .15s,border-color .15s,transform .05s}
 button:hover,.btn:hover{border-color:var(--sw-accent)}
 button:active,.btn:active{transform:translateY(1px)}
@@ -109,16 +109,16 @@ input[type=checkbox],input[type=radio]{accent-color:var(--sw-accent)}
 label{display:block;font-size:.85rem;color:var(--sw-muted);margin:0 0 .3em}
 table{border-collapse:collapse;width:100%;font-size:.9rem}
 th,td{text-align:left;padding:.5em .7em;border-bottom:1px solid var(--sw-border)}
-th{color:var(--sw-muted);font-weight:600;font-size:.8rem;text-transform:uppercase;letter-spacing:.03em}
+th{color:var(--sw-muted);font-weight:600;font-size:.82rem}
 td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
-tr:hover td{background:var(--sw-accent-soft)}
+
 .card{background:var(--sw-surface);border:1px solid var(--sw-border);border-radius:var(--sw-radius);padding:14px 16px}
 .grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(var(--min,180px),1fr))}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .stack{display:flex;flex-direction:column;gap:10px}
 .spacer{flex:1}
 .stat{display:flex;flex-direction:column;gap:2px}
-.stat .label{font-size:.78rem;color:var(--sw-muted);text-transform:uppercase;letter-spacing:.04em}
+.stat .label{font-size:.82rem;color:var(--sw-muted)}
 .stat .value{font-size:1.6rem;font-weight:700;color:var(--sw-strong);font-variant-numeric:tabular-nums}
 .stat .delta.up{color:var(--sw-good)}.stat .delta.down{color:var(--sw-bad)}
 .badge{display:inline-flex;align-items:center;gap:4px;font-size:.75rem;font-weight:600;padding:.15em .55em;border-radius:999px;background:var(--sw-accent-soft);color:var(--sw-accent)}
@@ -134,7 +134,8 @@ tr:hover td{background:var(--sw-accent-soft)}
 .followup{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}
 canvas{max-width:100%}
 svg{max-width:100%}
-@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important}}
+@media (pointer:coarse){button,.btn,select,input[type=checkbox],input[type=radio],.chip{min-height:44px}input[type=range]{height:44px}}
 """
 
 # Bare module imports that widgets may use (import * as THREE from "three").
@@ -157,13 +158,41 @@ IMPORT_MAP = (
 SHELL_JS = r"""
 (function(){
   'use strict';
-  var host = window.opener && window.opener !== window ? window.opener : window.parent;
-  var standalone = host === window.opener;
   var root = document.getElementById('iui-root');
   var userStyle = document.getElementById('iui-user-style');
-  var finalDone = false, lastHeight = 0, heightRaf = 0, errorCount = 0;
-  var listeners = [];
-  function post(msg){ try{ host.postMessage(Object.assign({iui:1}, msg), '*'); }catch(_){} }
+  var host = window.parent;
+  // Only ever runs inside the chat: frame-ancestors 'self' keeps other sites
+  // from framing it, and a top-level visit renders nothing.
+  if(!host || host === window){
+    root.textContent = 'Open deze weergave vanuit de chat.';
+    return;
+  }
+  var HOST_ORIGIN = (function(){ try{ return new URL(location.href).origin; }catch(_){ return 'null'; } })();
+  var HOST_OK = /^https?:\/\//i.test(HOST_ORIGIN);
+  var finalDone = false, lastHeight = 0, lastDelta = null, warnedVh = false, heightRaf = 0, errorCount = 0;
+  var pendingRestore = null, lastHtml = null, listeners = [];
+  var dclSeen = document.readyState !== 'loading', loadSeen = document.readyState === 'complete';
+  document.addEventListener('DOMContentLoaded', function(){ dclSeen = true; });
+  window.addEventListener('load', function(){ dclSeen = true; loadSeen = true; scheduleHeight(true); });
+  function post(msg){ try{ host.postMessage(Object.assign({iui:1}, msg), HOST_OK ? HOST_ORIGIN : '*'); }catch(_){} }
+
+  // Make common model habits harmless in an opaque origin.
+  function memoryStorage(){
+    var data = {};
+    return { getItem:function(k){ k=String(k); return Object.prototype.hasOwnProperty.call(data,k) ? data[k] : null; },
+      setItem:function(k,v){ data[String(k)] = String(v); }, removeItem:function(k){ delete data[String(k)]; },
+      clear:function(){ data = {}; }, key:function(i){ return Object.keys(data)[i] || null; },
+      get length(){ return Object.keys(data).length; } };
+  }
+  ['localStorage','sessionStorage'].forEach(function(name){
+    var ok = false; try{ ok = !!window[name] && (window[name].length >= 0); }catch(_){}
+    if(!ok){ try{ Object.defineProperty(window, name, {value:memoryStorage(), configurable:true}); }catch(_){} }
+  });
+  document.write = document.writeln = function(){
+    try{ root.insertAdjacentHTML('beforeend', Array.prototype.join.call(arguments, '')); }catch(_){}
+  };
+  ['alert','confirm','prompt'].forEach(function(n){ window[n] = function(){ post({type:'log', level:'warn', message:n+'() is not available'}); return n === 'confirm' ? false : null; }; });
+
   function readTheme(){
     var cs = getComputedStyle(document.documentElement), out = {};
     ['bg','surface','surface-2','fg','strong','muted','accent','accent-fg','border','good','warn','bad','info',
@@ -180,10 +209,9 @@ SHELL_JS = r"""
       post({type:'prompt', text:text.slice(0, 4000)});
       return true;
     },
-    copy: function(text){ post({type:'copy', text:String(text == null ? '' : text).slice(0, 100000)}); },
+    copy: function(text){ post({type:'copy', text:String(text == null ? '' : text).slice(0, 20000)}); },
     resize: function(){ scheduleHeight(true); },
-    onTheme: function(cb){ if(typeof cb === 'function') listeners.push(cb); },
-    standalone: standalone
+    onTheme: function(cb){ if(typeof cb === 'function') listeners.push(cb); }
   };
   window.synthwave = api;
   // Compatibility with widgets written for Open Generative UI.
@@ -191,49 +219,48 @@ SHELL_JS = r"""
     sendPrompt:function(o){ return Promise.resolve(api.sendPrompt(o && o.text != null ? o.text : o)); },
     openLink:function(o){ var u = String(o && o.url != null ? o.url : o || ''); if(/^https:\/\//i.test(u)) post({type:'open', url:u}); return Promise.resolve(true); }
   }}};
-  ['alert','confirm','prompt'].forEach(function(n){ window[n] = function(){ post({type:'log', level:'warn', message:n+'() is not available in this answer'}); return n === 'confirm' ? false : null; }; });
 
   function measure(){
-    var b = document.body, d = document.documentElement;
-    return Math.ceil(Math.max(b.scrollHeight, b.offsetHeight, d.offsetHeight, root.getBoundingClientRect().bottom + 14));
+    var b = document.body;
+    return Math.ceil(Math.max(b.scrollHeight, b.offsetHeight, root.getBoundingClientRect().bottom + 14));
   }
+  // Content sized to the frame (100vh, height:100%) would grow it forever:
+  // a growth that tracks the viewport is ignored.
   function scheduleHeight(force){
     if(heightRaf) return;
     heightRaf = requestAnimationFrame(function(){
       heightRaf = 0;
-      var h = measure();
-      if(force || Math.abs(h - lastHeight) > 1){ lastHeight = h; post({type:'height', height:h}); }
+      var h = measure(), vh = window.innerHeight || 0, delta = h - vh;
+      var chasing = !force && h > lastHeight + 1 && lastDelta !== null && vh > 0 && Math.abs(delta - lastDelta) <= 2;
+      if(chasing){
+        if(!warnedVh){ warnedVh = true; post({type:'log', level:'warn', message:'Content is sized to the frame (100vh or 100%); give it a fixed height'}); }
+        return;
+      }
+      if(force || Math.abs(h - lastHeight) > 1){ lastHeight = h; lastDelta = delta; post({type:'height', height:h}); }
     });
   }
   if(typeof ResizeObserver === 'function'){ new ResizeObserver(function(){ scheduleHeight(false); }).observe(document.body); }
-  window.addEventListener('load', function(){ scheduleHeight(true); });
 
   function reportError(message, detail){
     errorCount++;
     if(errorCount > 5) return;
-    post({type:'error', message:String(message || 'Unknown error').slice(0, 600), detail:String(detail || '').slice(0, 1200)});
+    post({type:'error', message:String(message || 'Unknown error').slice(0, 300), detail:String(detail || '').slice(0, 800)});
   }
   window.addEventListener('error', function(e){
     if(e && e.target && e.target !== window && (e.target.src || e.target.href)){
-      reportError('Could not load ' + (e.target.src || e.target.href));
+      if(e.target.tagName === 'SCRIPT') reportError('Could not load ' + (e.target.src || e.target.href));
       return;
     }
     reportError(e && e.message, e && e.error && e.error.stack);
   }, true);
   window.addEventListener('unhandledrejection', function(e){ var r = e && e.reason; reportError(r && r.message || r, r && r.stack); });
   document.addEventListener('securitypolicyviolation', function(e){
-    reportError('Blocked by the sandbox: ' + (e.blockedURI || e.violatedDirective), e.violatedDirective);
+    // The server also sends a report-only policy; those reports block nothing.
+    if(e.disposition === 'report') return;
+    if(/^(img|media|font)-src/.test(e.effectiveDirective || e.violatedDirective || '')) return;
+    reportError('Blocked: ' + (e.blockedURI || e.violatedDirective), e.violatedDirective);
   });
   document.addEventListener('submit', function(e){ e.preventDefault(); }, false);
-  function syncRange(el){
-    if(!el || el.type !== 'range') return;
-    var min = +el.min || 0, max = el.max === '' ? 100 : +el.max, v = +el.value;
-    var pct = max > min ? ((v - min) / (max - min)) * 100 : 0;
-    el.style.setProperty('--sw-fill', Math.max(0, Math.min(100, pct)) + '%');
-  }
-  function syncAllRanges(){ Array.prototype.forEach.call(document.querySelectorAll('input[type=range]'), syncRange); }
-  document.addEventListener('input', function(e){ syncRange(e.target); }, true);
-  document.addEventListener('change', function(e){ syncRange(e.target); }, true);
   document.addEventListener('click', function(e){
     var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
     if(!a) return;
@@ -242,10 +269,47 @@ SHELL_JS = r"""
     e.preventDefault();
     if(/^https?:\/\//i.test(href)) post({type:'open', url:href});
   }, true);
-  ['pointerdown','keydown'].forEach(function(t){ document.addEventListener(t, function(e){
-    post({type:'interact'});
-    if(t === 'keydown' && e.key === 'Escape') post({type:'key', key:'Escape'});
-  }, true); });
+  document.addEventListener('keydown', function(e){ if(e.key === 'Escape') post({type:'key', key:'Escape'}); }, true);
+
+  function syncRange(el){
+    if(!el || el.type !== 'range') return;
+    var min = +el.min || 0, max = el.max === '' ? 100 : +el.max, v = +el.value;
+    var pct = max > min ? ((v - min) / (max - min)) * 100 : 0;
+    el.style.setProperty('--sw-fill', Math.max(0, Math.min(100, pct)) + '%');
+  }
+  function syncAllRanges(){ Array.prototype.forEach.call(document.querySelectorAll('input[type=range]'), syncRange); }
+  document.addEventListener('input', function(e){ syncRange(e.target); queueState(); }, true);
+  document.addEventListener('change', function(e){ syncRange(e.target); queueState(); }, true);
+
+  // Remember the user's settings so a re-rendered chat can put them back.
+  var stateTimer = 0, restoring = false;
+  function controls(){ return Array.prototype.filter.call(document.querySelectorAll('#iui-root input, #iui-root select, #iui-root textarea'), function(el){
+    return (el.id || el.name) && el.type !== 'password' && el.type !== 'file' && el.type !== 'hidden'; }); }
+  function keyOf(el){ return el.id ? '#' + el.id : (el.type === 'radio' ? 'r:' + el.name + ':' + el.value : 'n:' + el.name); }
+  function snapshot(){
+    var out = {};
+    controls().forEach(function(el){ out[keyOf(el)] = (el.type === 'checkbox' || el.type === 'radio') ? !!el.checked : String(el.value).slice(0, 2000); });
+    return out;
+  }
+  function queueState(){
+    if(restoring || !finalDone) return;
+    clearTimeout(stateTimer);
+    stateTimer = setTimeout(function(){ post({type:'state', values:snapshot()}); }, 250);
+  }
+  function restore(values){
+    if(!values || typeof values !== 'object') return;
+    restoring = true;
+    try{
+      controls().forEach(function(el){
+        var k = keyOf(el);
+        if(!Object.prototype.hasOwnProperty.call(values, k)) return;
+        var v = values[k];
+        if(el.type === 'checkbox' || el.type === 'radio'){ if(el.checked === !!v) return; el.checked = !!v; }
+        else { if(el.value === String(v)) return; el.value = String(v); }
+        try{ el.dispatchEvent(new Event('input', {bubbles:true})); el.dispatchEvent(new Event('change', {bubbles:true})); }catch(err){ reportError(err && err.message, err && err.stack); }
+      });
+    } finally { restoring = false; syncAllRanges(); }
+  }
 
   function applyTheme(vars, mode){
     var d = document.documentElement;
@@ -258,37 +322,55 @@ SHELL_JS = r"""
     api.theme = readTheme();
     listeners.forEach(function(cb){ try{ cb(api.theme); }catch(_){} });
   }
+  function finish(){
+    syncAllRanges(); setTimeout(syncAllRanges, 50);
+    // Scripts arrive after the page loaded: replay the start events models listen for.
+    if(dclSeen){ try{ document.dispatchEvent(new Event('DOMContentLoaded', {bubbles:true})); }catch(_){} }
+    if(loadSeen){ try{ window.dispatchEvent(new Event('load')); }catch(_){} }
+    if(pendingRestore){ restore(pendingRestore); pendingRestore = null; }
+    post({type:'rendered'});
+    lastDelta = null; scheduleHeight(true); setTimeout(function(){ scheduleHeight(true); }, 400);
+  }
   function runScripts(list, i){
-    if(i >= list.length){ syncAllRanges(); setTimeout(syncAllRanges, 50); post({type:'rendered'}); scheduleHeight(true); setTimeout(function(){ scheduleHeight(true); }, 400); return; }
-    var item = list[i] || {}, el = document.createElement('script');
+    if(i >= list.length){ finish(); return; }
+    var item = list[i] || {}, el = document.createElement('script'), done = false;
+    function next(){ if(done) return; done = true; runScripts(list, i + 1); }
     if(item.type === 'module') el.type = 'module';
     if(item.src){
       el.src = item.src; el.async = false; el.crossOrigin = 'anonymous';
-      el.onload = function(){ runScripts(list, i + 1); };
-      el.onerror = function(){ reportError('Could not load ' + item.src); runScripts(list, i + 1); };
+      el.onload = next;
+      el.onerror = function(){ reportError('Could not load ' + item.src); next(); };
+      setTimeout(next, 10000);
       document.body.appendChild(el);
+    } else if(item.type === 'module'){
+      el.textContent = String(item.code || '');
+      el.onload = next; el.onerror = next; setTimeout(next, 8000);
+      try{ document.body.appendChild(el); }catch(err){ reportError(err && err.message, err && err.stack); next(); }
     } else {
       el.textContent = String(item.code || '');
       try{ document.body.appendChild(el); }catch(err){ reportError(err && err.message, err && err.stack); }
-      runScripts(list, i + 1);
+      next();
     }
   }
   function render(msg){
     if(finalDone) return;
     if(typeof msg.css === 'string') userStyle.textContent = msg.css;
-    if(typeof msg.html === 'string'){
-      if(msg.final){ root.innerHTML = msg.html; }
-      else if(root.innerHTML !== msg.html){ root.innerHTML = msg.html; }
+    if(typeof msg.html === 'string' && (msg.final || msg.html !== lastHtml)){
+      // Compare with what was sent last, not with innerHTML: re-setting the
+      // same markup would reset what the user is typing while it streams.
+      lastHtml = msg.html;
+      root.innerHTML = msg.html;
       syncAllRanges();
     }
     scheduleHeight(false);
     if(msg.final){
       finalDone = true;
+      pendingRestore = msg.restore && typeof msg.restore === 'object' ? msg.restore : null;
       runScripts(Array.isArray(msg.scripts) ? msg.scripts : [], 0);
     }
   }
   window.addEventListener('message', function(e){
-    if(e.source !== host) return;
+    if(e.source !== host || (HOST_OK && e.origin !== HOST_ORIGIN)) return;
     var msg = e.data;
     if(!msg || msg.iui !== 1 || typeof msg.type !== 'string') return;
     if(msg.type === 'theme') applyTheme(msg.vars, msg.mode);
@@ -296,7 +378,7 @@ SHELL_JS = r"""
     else if(msg.type === 'measure') scheduleHeight(true);
   });
   api.theme = readTheme();
-  post({type:'ready', standalone:standalone});
+  post({type:'ready'});
 })();
 """
 
@@ -350,15 +432,15 @@ def serve(handler, parsed) -> bool:
 
 PROMPT = """
 WebUI interactive answers:
-- This chat renders a fenced block with the info string interactive-ui as a live mini app (HTML, CSS and JavaScript) inside your answer. It runs in a sandbox and streams in while you write. Use it when trying things out helps the user understand or decide faster than text: calculators and what-if models (price, ROI, cashflow, hours, planning), charts of numbers from the conversation or from tools, comparisons with filters, sliders or toggles, step-by-step explainers and simulations, timelines and Gantt views, maps, checklists or small forms, and 3D only when it truly adds understanding.
-- Do not use it for short factual answers, for drafts of emails or chat messages, for text the user will paste elsewhere, or when a plain markdown table or one mermaid diagram is enough. Use at most one per reply unless the user asks for more. When the user explicitly asks for something interactive, a dashboard, a calculator or a simulation, use it.
-- Order inside the block: first optional comments <!-- title: Short title --> and <!-- height: 420 -->, then one <style>, then the HTML markup, then the <script> tags last. CSS and markup show while streaming; scripts run once the block is complete, so the markup must already look right without them.
-- Sandbox rules: scripts and styles only inline or from cdn.jsdelivr.net, unpkg.com, cdnjs.cloudflare.com or esm.sh. No fetch or XHR to other hosts, no cookies, localStorage or sessionStorage, no alert, confirm or prompt, no navigation. Put all data inline. Keep the block under 40 KB.
-- Styling: the frame preloads a theme that follows the chat. Use the CSS variables --sw-bg, --sw-surface, --sw-surface-2, --sw-fg, --sw-strong, --sw-muted, --sw-accent, --sw-accent-soft, --sw-border, --sw-good, --sw-bad, --sw-c1 to --sw-c8 (chart palette) and the ready classes .card, .grid, .row, .stack, .stat (.label, .value, .delta.up/.down), .badge, .tabs, .chip, .bar, .note, .followup, button.primary, styled inputs, range sliders, selects and tables. Never hardcode a white or black background or text colour. The body is transparent; do not set a body background.
-- Libraries: Chart.js https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js for charts (take colours from synthwave.theme.palette and synthwave.theme.fg, muted, border), Leaflet https://unpkg.com/leaflet@1.9.4/dist/leaflet.js plus its CSS for maps, three.js as a module from https://esm.sh/three for 3D, d3 from jsdelivr when needed. Prefer plain HTML, CSS and SVG when that is enough.
-- Follow-ups: a button may call synthwave.sendPrompt("...") on click to ask you a follow-up with the values the user chose, for example "Werk het scenario met 12 FTE en 8% groei verder uit". Never call it automatically. synthwave.copy(text) copies text for the user.
-- Content: labels in the user's language, real numbers from the conversation or tools, illustrative assumptions marked as such, accessible controls (labels, keyboard, contrast) and a layout that also works at 360 px wide. Always add one or two sentences outside the block with the takeaway, so the answer still works without the widget.
-- For patterns and templates load the skill interactive-ui when it is available.
+- A fenced block with the info string interactive-ui renders as a live mini app (HTML, CSS, JavaScript) inside your reply. Use it only when trying things out beats reading: a calculator or what-if model with the user's numbers, a chart of real data from the conversation or tools, a comparison with filters or weights, a plan or timeline to explore, a map. Also when the user asks for something interactive, a dashboard, calculator or simulation. Otherwise answer in text, a markdown table or one mermaid diagram. At most one per reply. For a follow-up, answer in text unless the user asks to change the app.
+- Order: <!-- title: Short title --> and <!-- height: 420 --> (expected height in px), then one <style>, then readable markup with real labels and default results, then <script> tags last. Markup shows while streaming; scripts run when the block is complete, after the page has loaded, so run setup code directly (DOMContentLoaded and load are replayed, but do not rely on them). Never close the block early; keep it under 25 KB.
+- Scripts: plain inline scripts or <script src> from cdn.jsdelivr.net, unpkg.com, cdnjs.cloudflare.com or esm.sh only; anything else is removed. No Tailwind, Bootstrap, jQuery or font links: write plain CSS. Use addEventListener in the script rather than onclick attributes. Classic scripts cannot use top-level await or import; for modules use <script type="module"> with bare imports three, d3, gsap, chart.js or leaflet. No fetch to other hosts, no document.write, no alert, confirm or prompt; storage is temporary. Put all data inline.
+- Layout: the frame grows to its content, so never size anything to 100vh, height:100% or innerHeight; give charts a fixed-height container (Chart.js with maintainAspectRatio:false inside a div of e.g. 260px). It must work at 360 px wide.
+- Look: the frame already follows the chat theme. Use only the variables --sw-fg, --sw-strong, --sw-muted, --sw-surface, --sw-surface-2, --sw-border, --sw-accent, --sw-accent-soft, --sw-good, --sw-bad and the chart palette synthwave.theme.palette (in canvas use synthwave.theme.fg, muted and border). Never hardcode colours, greys, white or black, and never set a body background. Ready classes: .card .grid .row .stack .stat(.label .value) .badge .chip .bar .note, button.primary.
+- Maps: Leaflet with tiles https://tile.openstreetmap.org/{z}/{x}/{y}.png and the tileLayer option referrerPolicy:'origin' (without it the tiles are refused), credit OpenStreetMap.
+- Follow-ups: a button may call synthwave.sendPrompt("...") with the chosen values; the user confirms it before it is sent. synthwave.onTheme(cb) fires on a theme switch, redraw charts there.
+- Content: labels in the user's language, Dutch number and currency format for Dutch users (Intl.NumberFormat('nl-NL')), real numbers, assumptions labelled as examples in the app itself. Always add one or two sentences outside the block with the takeaway.
+- For templates load the skill interactive-ui when it is available.
 """.strip()
 
 

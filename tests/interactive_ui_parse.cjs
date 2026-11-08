@@ -9,7 +9,7 @@ const src = fs.readFileSync(path.join(__dirname, '..', 'static', 'interactive_ui
 const listeners = [];
 const sandbox = {
   window: { addEventListener: (t, f) => listeners.push([t, f]), innerHeight: 900 },
-  document: { documentElement: { lang: 'nl', classList: { contains: () => false } } },
+  document: { addEventListener: () => {}, documentElement: { lang: 'nl', classList: { contains: () => false } } },
   navigator: { language: 'nl-NL' },
   URL, console, setTimeout, clearTimeout, Map, Set,
 };

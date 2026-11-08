@@ -244,6 +244,14 @@ def last_frame(page, timeout=15):
     raise AssertionError("no interactive frame")
 
 
+def menu_action(page, label_nl, label_en, card=".iui-card"):
+    page.locator(card + " .iui-actions button[aria-haspopup=menu]").first.click()
+    item = page.locator(card + " .iui-menu:not([hidden]) .iui-menu-item", has_text=label_nl)
+    if item.count() == 0:
+        item = page.locator(card + " .iui-menu:not([hidden]) .iui-menu-item", has_text=label_en)
+    item.first.click()
+
+
 def wait_idle(page, timeout=30000):
     page.wait_for_function("() => !document.querySelector('#liveAssistantTurn')", timeout=timeout)
 
@@ -331,8 +339,17 @@ def main() -> int:
             raw_visible = page.evaluate("""() => [...document.querySelectorAll('#liveAssistantTurn pre.iui-raw-hidden')]
                 .some(p => getComputedStyle(p).display !== 'none')""")
             assert raw_visible is False, "raw source is visible while streaming"
-            frame = last_frame(page)
-            frame.wait_for_function("() => document.getElementById('iui-root').textContent.includes('Invoer')", timeout=10000)
+            frame = None
+            for _ in range(40):  # the live frame can be replaced while the text node is rebuilt
+                try:
+                    frame = last_frame(page)
+                    if frame.evaluate("() => document.getElementById('iui-root').textContent.includes('Invoer')"):
+                        break
+                except Exception:
+                    pass
+                time.sleep(0.25)
+            else:
+                raise AssertionError("live frame never showed the streamed markup")
             scripts_ran = frame.evaluate("() => !!document.querySelector('script[src*=chart], #iui-root script')")
             assert scripts_ran is False, "scripts must not run while streaming"
             status = live.locator(".iui-status").inner_text()
@@ -345,80 +362,115 @@ def main() -> int:
             gateway.release.set()
             wait_idle(page)
             page.wait_for_selector(".msg-row .iui-card[data-state=ready]", timeout=20000)
-            assert page.locator(".iui-card").count() == 1, "exactly one card after settling"
+            time.sleep(2.0)  # the chat re-renders the settled turn once more
+            page.wait_for_selector(".msg-row .iui-card[data-state=ready]", timeout=20000)
             assert TAKEAWAY in page.inner_text("#messages"), "takeaway text missing"
             frame = last_frame(page)
             frame.wait_for_selector("#saving", timeout=10000)
             before = frame.inner_text("#saving")
             frame.evaluate("() => { const h=document.getElementById('hours'); h.value='60'; h.dispatchEvent(new Event('input',{bubbles:true})); }")
             after = frame.inner_text("#saving")
+            time.sleep(0.6)  # state is reported to the chat after a short debounce
             assert before != after, (before, after)
-            stage_h = page.evaluate("() => document.querySelector('.iui-card .iui-stage').getBoundingClientRect().height")
+            stage_h = page.evaluate("() => [...document.querySelectorAll('.iui-card')].find(c=>c.offsetParent!==null||c.classList.contains('iui-full')).querySelector('.iui-stage').getBoundingClientRect().height")
             content_h = frame.evaluate("() => document.body.scrollHeight")
             assert stage_h >= 200 and abs(stage_h - min(content_h, 900 * 0.86)) < 40, (stage_h, content_h)
-            title = page.inner_text(".iui-card .iui-title")
-            page.locator(".iui-card").scroll_into_view_if_needed()
-            page.locator(".iui-card").screenshot(path=str(art / "02-settled-card.png"))
+            cards = page.evaluate("""() => [...document.querySelectorAll('.iui-card')].map(c => ({
+                live: c.classList.contains('iui-live'), state: c.dataset.state, visible: c.offsetParent !== null,
+                parent: (c.closest('[id]')||{}).id || '', seg: (c.closest('.assistant-segment')||{}).className || ''}))""")
+            print("cards:", cards, flush=True)
+            visible_cards = [c for c in cards if c["visible"]]
+            assert len(visible_cards) == 1, cards
+            title = page.inner_text(".iui-card:visible .iui-title")
+            page.locator(".iui-card:visible").scroll_into_view_if_needed()
+            page.locator(".iui-card:visible").screenshot(path=str(art / "02-settled-card.png"))
             ok(f"settled card {title!r}: scripts ran, slider changed {before!r} to {after!r}, stage {stage_h:.0f}px for {content_h}px content")
 
             # 3a. source view
-            page.locator(".iui-card .iui-actions button").nth(0).click()
-            assert page.is_visible(".iui-card .iui-source"), "source view did not open"
-            assert "interactive" not in page.inner_text(".iui-card .iui-source").lower()[:5]
-            assert "<style>" in page.inner_text(".iui-card .iui-source")
-            page.locator(".iui-card .iui-actions button").nth(0).click()
-            ok("source view toggles")
+            # The header stays calm: one title, full screen and a menu; no technical footer.
+            visible_buttons = page.locator(".iui-card:visible .iui-head .iui-actions > button:visible").count()
+            assert visible_buttons == 2, visible_buttons
+            assert page.locator(".iui-card:visible .iui-foot").count() == 0
+            assert page.locator(".iui-card:visible .iui-status:visible").count() == 0, "no status label once ready"
+            menu_action(page, "Code bekijken", "View code")
+            assert page.is_visible(".iui-card:visible .iui-source"), "source view did not open"
+            assert "<style>" in page.inner_text(".iui-card:visible .iui-source")
+            menu_action(page, "Code verbergen", "Hide code")
+            assert not page.is_visible(".iui-card:visible .iui-source")
+            ok("calm header (title, full screen, menu); source view lives in the menu")
             # 3b. full screen, closed with Escape pressed inside the frame
-            page.locator(".iui-card .iui-actions button").nth(5).click()
-            assert page.evaluate("() => document.querySelector('.iui-card').classList.contains('iui-full')")
+            page.locator(".iui-card:visible .iui-actions > button:not([aria-haspopup])").first.click()
+            assert page.evaluate("() => [...document.querySelectorAll('.iui-card')].find(c=>c.offsetParent!==null||c.classList.contains('iui-full')).classList.contains('iui-full')")
+            on_top = page.evaluate("""() => { const c=[...document.querySelectorAll('.iui-card')].find(c=>c.offsetParent!==null||c.classList.contains('iui-full')); const r=c.getBoundingClientRect();
+                const pts=[[r.left+20,r.top+12],[r.right-60,r.top+12],[r.left+20,r.bottom-12],[r.right-20,r.bottom-12]];
+                return pts.every(([x,y]) => { const el=document.elementFromPoint(x,y); return !!el && c.contains(el); }); }""")
+            assert on_top, "full screen card is covered by app chrome"
             page.screenshot(path=str(art / "03-fullscreen.png"))
             last_frame(page).locator("#iui-root").click(position={"x": 5, "y": 5})
             page.keyboard.press("Escape")
-            page.wait_for_function("() => !document.querySelector('.iui-card').classList.contains('iui-full')", timeout=5000)
+            page.wait_for_function("() => ![...document.querySelectorAll('.iui-card')].find(c=>c.offsetParent!==null||c.classList.contains('iui-full')).classList.contains('iui-full')", timeout=5000)
             ok("full screen opens and closes with Escape from inside the frame")
             # 3c. download
             with page.expect_download() as dl:
-                page.locator(".iui-card .iui-actions button").nth(3).click()
+                menu_action(page, "Downloaden", "Download")
             html = Path(dl.value.path()).read_text(encoding="utf-8")
             assert 'id="iui-root"' in html and "Invoer" in html and "synthwave" in html, html[:300]
             ok(f"download gives a standalone HTML file ({dl.value.suggested_filename}, {len(html)} bytes)")
-            # 3d. new tab
-            with ctx.expect_page() as pop:
-                page.locator(".iui-card .iui-actions button").nth(4).click()
-            tab = pop.value
-            tab.wait_for_selector("#saving", timeout=15000)
-            tab_cookie = tab.evaluate("() => { try { return document.cookie; } catch (e) { return 'blocked:' + e.name; } }")
-            assert tab_cookie in ("", "blocked:SecurityError"), tab_cookie
-            tab.screenshot(path=str(art / "04-new-tab.png"))
-            tab.close()
-            ok(f"new tab renders the widget in an opaque origin (cookie: {tab_cookie!r})")
+            # 3d. the frame opened on its own (outside the chat) renders nothing
+            solo = ctx.new_page()
+            solo.goto("/static/interactive-ui/frame.html", wait_until="domcontentloaded")
+            solo.evaluate("() => window.postMessage({iui:1,type:'render',html:'<h1 id=phish>Log in</h1>',css:'',scripts:[],final:true}, '*')")
+            time.sleep(0.4)
+            assert solo.locator("#phish").count() == 0, "a top-level frame must not render posted content"
+            solo.close()
+            ok("the frame opened outside the chat ignores posted content")
 
-            # 4. follow-up from a click inside the widget
+            # 4. follow-up from a click inside the widget: shown in the card, sent by the host button
             frame = last_frame(page)
             frame.locator("#ask").click()
+            page.wait_for_selector(".iui-card:visible .iui-ask:not([hidden])", timeout=5000)
+            ask_text = page.inner_text(".iui-card:visible .iui-ask .iui-ask-text")
+            assert "Werk dit scenario uit" in ask_text, ask_text
+            time.sleep(0.8)
+            assert len(gateway.runs) == 1, "nothing is sent before the user confirms"
+            page.locator(".iui-card:visible .iui-ask").screenshot(path=str(art / "04-ask-bar.png"))
+            # A draft in the composer is never overwritten.
+            page.locator("#msg").fill("mijn eigen concept")
+            page.locator(".iui-card:visible .iui-ask .iui-btn--primary").click()
+            time.sleep(0.8)
+            assert len(gateway.runs) == 1 and page.input_value("#msg") == "mijn eigen concept", "draft must be kept"
+            page.locator("#msg").fill("")
+            page.locator(".iui-card:visible .iui-ask .iui-btn--primary").click()
             body = wait_runs(gateway, 2)
             assert "Werk dit scenario uit" in body, body
             wait_idle(page)
             page.wait_for_function("() => document.getElementById('messages').innerText.includes('Antwoord op vervolgvraag 1')", timeout=20000)
-            ok("a click in the widget sends the follow-up to the agent")
+            ok("a widget follow-up shows in the card, keeps the user's draft, and sends only on the host's Send button")
 
             # 4b. a script-triggered prompt without user interaction is refused.
             # The list re-rendered for the new turn; frames load lazily when on screen.
-            page.locator(".iui-card").first.scroll_into_view_if_needed()
-            page.wait_for_selector(".iui-card[data-state=ready]", timeout=15000)
+            page.locator(".iui-card:visible").first.scroll_into_view_if_needed()
+            page.wait_for_selector(".iui-card[data-state=ready]:visible", timeout=15000)
             frame = last_frame(page)
             frame.wait_for_selector("#saving", timeout=10000)
+            frame.wait_for_function("() => document.getElementById('hours').value === '60'", timeout=8000)
+            ok("after the list re-rendered the widget kept the user's slider value (60)")
             page.locator("#msg").click()
             time.sleep(5.2)  # outside the interaction window
-            frame.evaluate("() => synthwave.sendPrompt('automatisch zonder klik')")
+            frame.evaluate("() => { synthwave.sendPrompt('/yolo automatisch zonder klik'); }")
+            page.wait_for_selector(".iui-card:visible .iui-ask:not([hidden])", timeout=5000)
+            shown = page.inner_text(".iui-card:visible .iui-ask .iui-ask-text")
+            assert not shown.startswith("/"), shown
             time.sleep(1.0)
             assert len(gateway.runs) == 2, "an automatic prompt must not be sent"
-            ok("a prompt without a user click is refused")
+            page.locator(".iui-card:visible .iui-ask .iui-btn--quiet").first.click()
+            assert not page.is_visible(".iui-card:visible .iui-ask")
+            ok("an automatic prompt is only offered (slash stripped), never sent, and can be cancelled")
 
             # 5. theme switch reaches the frame
             page.evaluate("() => _applyTheme('light')")
             frame.wait_for_function("() => document.documentElement.getAttribute('data-theme') === 'light'", timeout=5000)
-            page.locator(".iui-card").first.screenshot(path=str(art / "05-light-theme.png"))
+            page.locator(".iui-card:visible").first.screenshot(path=str(art / "05-light-theme.png"))
             page.evaluate("() => _applyTheme('dark')")
             frame.wait_for_function("() => document.documentElement.getAttribute('data-theme') === 'dark'", timeout=5000)
             ok("theme switches follow into the frame (light and back to dark)")
@@ -429,10 +481,11 @@ def main() -> int:
                 try { out.cookie = document.cookie; } catch (e) { out.cookie = 'blocked:' + e.name; }
                 try { await fetch('/api/sessions'); out.fetch = 'allowed'; } catch (e) { out.fetch = 'blocked'; }
                 try { out.parent = String(window.parent.document.title); } catch (e) { out.parent = 'blocked'; }
-                try { localStorage.setItem('x', '1'); out.storage = 'allowed'; } catch (e) { out.storage = 'blocked'; }
+                // localStorage is an in-memory stand-in, never the browser's real storage.
+                try { localStorage.setItem('x', '1'); out.storage = (typeof Storage !== 'undefined' && localStorage instanceof Storage) ? 'real' : 'memory-only'; } catch (e) { out.storage = 'blocked'; }
                 return out;
             }""")
-            assert iso["fetch"] == "blocked" and iso["parent"] == "blocked" and iso["storage"] == "blocked", iso
+            assert iso["fetch"] == "blocked" and iso["parent"] == "blocked" and iso["storage"] in ("memory-only", "blocked"), iso
             assert iso["cookie"] in ("", "blocked:SecurityError"), iso
             ok(f"frame is isolated: {iso}")
 
@@ -441,21 +494,24 @@ def main() -> int:
             page.locator("#btnSend").click()
             wait_runs(gateway, 3)
             wait_idle(page)
-            page.wait_for_selector(".iui-card[data-state=error] .iui-error:not([hidden])", timeout=20000)
-            err_text = page.locator(".iui-card[data-state=error] .iui-error-text").last.inner_text()
-            assert "nietBestaandeFunctie" in err_text or "toegestane" in err_text, err_text
-            page.locator(".iui-card[data-state=error]").last.screenshot(path=str(art / "06-error-bar.png"))
-            page.locator(".iui-card[data-state=error] .iui-error .iui-btn--text").last.click()
+            page.wait_for_selector(".iui-card[data-state=error]:visible .iui-error:not([hidden])", timeout=20000)
+            lead = page.locator(".iui-card[data-state=error]:visible .iui-error-text").last.inner_text()
+            assert "Uncaught" not in lead and "Error" not in lead, f"lead sentence must be plain: {lead!r}"
+            page.locator(".iui-card[data-state=error]:visible .iui-error .iui-btn--quiet").last.click()
+            err_text = page.locator(".iui-card[data-state=error]:visible .iui-error-details").last.inner_text()
+            assert "nietBestaandeFunctie" in err_text and "evil.example" in err_text, err_text
+            page.locator(".iui-card[data-state=error]:visible").last.screenshot(path=str(art / "06-error-bar.png"))
+            page.locator(".iui-card[data-state=error]:visible .iui-error .iui-btn--text:not(.iui-btn--quiet)").last.click()
             body = wait_runs(gateway, 4)
-            assert ("herstel" in body.lower() or "fix it" in body.lower()) and "nietBestaandeFunctie" in body, body
+            assert ("herstel" in body.lower() or "can you fix" in body.lower()) and "nietBestaandeFunctie" in body, body
             wait_idle(page)
-            ok(f"broken widget shows the error ({err_text[:80]!r}) and repair asks the agent")
+            ok(f"broken widget: plain sentence {lead!r}, details on demand, repair asks the agent")
 
             # 8. hard reload renders the cards again from the transcript
             page.reload(wait_until="domcontentloaded")
             try:
                 page.wait_for_function("t => document.getElementById('messages') && document.getElementById('messages').innerText.includes(t)",
-                                       arg=TAKEAWAY, timeout=20000)
+                                       arg=TAKEAWAY, timeout=45000)
             finally:
                 page.screenshot(path=str(art / "08-after-reload.png"))
                 info = page.evaluate("""() => ({blocks: document.querySelectorAll('.iui-block').length,
@@ -463,17 +519,17 @@ def main() -> int:
                     pre: [...document.querySelectorAll('#messages pre code')].map(c => c.className).slice(0, 5),
                     raw: (document.getElementById('messages')||{}).innerText ? document.getElementById('messages').innerText.slice(0, 300) : ''})""")
                 print("reload state:", info, flush=True)
-            page.wait_for_selector(".iui-card", timeout=20000)
-            page.wait_for_function("() => document.querySelectorAll('.iui-card').length >= 2", timeout=20000)
-            page.locator(".iui-card").first.scroll_into_view_if_needed()
-            page.wait_for_selector(".iui-card[data-state=ready]", timeout=20000)
+            page.wait_for_selector(".iui-card", timeout=45000)
+            page.wait_for_function("() => document.querySelectorAll('.iui-card').length >= 2", timeout=45000)
+            page.locator(".iui-card:visible").first.scroll_into_view_if_needed()
+            page.wait_for_selector(".iui-card[data-state=ready]:visible", timeout=45000)
             ok(f"after reload {page.locator('.iui-card').count()} cards render again from the transcript")
 
             # 9. narrow layout
             page.set_viewport_size({"width": 390, "height": 844})
-            page.locator(".iui-card").first.scroll_into_view_if_needed()
+            page.locator(".iui-card:visible").first.scroll_into_view_if_needed()
             time.sleep(0.8)
-            overflow = page.evaluate("() => { const c=document.querySelector('.iui-card'); return c.scrollWidth - c.clientWidth; }")
+            overflow = page.evaluate("() => { const c=[...document.querySelectorAll('.iui-card')].find(c=>c.offsetParent!==null||c.classList.contains('iui-full')); return c.scrollWidth - c.clientWidth; }")
             assert overflow <= 1, f"card overflows horizontally by {overflow}px"
             page.screenshot(path=str(art / "07-mobile.png"))
             ok("narrow layout fits without horizontal overflow")

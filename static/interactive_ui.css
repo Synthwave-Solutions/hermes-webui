@@ -1,74 +1,126 @@
-/* Interactive answers in chat (static/interactive_ui.js). */
-.iui-block{display:block;margin:12px 0;white-space:normal;font-size:inherit;color:inherit}
-.iui-block:not([data-iui-mounted]){font:12px/1.5 ui-monospace,"SF Mono",Menlo,monospace;white-space:pre-wrap;color:var(--muted);max-height:120px;overflow:hidden}
+/* Interactive answers in chat (static/interactive_ui.js). Calm by default:
+   one title, full screen and a menu; status only while building or on error. */
+.iui-block{display:block;margin:14px 0;white-space:normal;font-size:inherit;color:inherit}
+.iui-block:not([data-iui-mounted]){height:120px;overflow:hidden;color:transparent;font-size:0;border-radius:16px;
+  background:linear-gradient(90deg,var(--hover-bg) 0%,var(--border-subtle,var(--border)) 50%,var(--hover-bg) 100%);background-size:200% 100%;animation:iui-shimmer 1.6s linear infinite}
 .iui-raw-hidden{display:none!important}
-.iui-card{--iui-radius:14px;position:relative;margin:12px 0;border:1px solid var(--border);border-radius:var(--iui-radius);
-  background:var(--surface,var(--bg));overflow:hidden;box-shadow:0 1px 0 rgba(0,0,0,.04),0 8px 24px -18px rgba(0,0,0,.45);
-  transition:border-color .2s,box-shadow .2s;max-width:100%}
-.iui-card:hover{border-color:var(--border2,var(--border))}
-.iui-card[data-state=building]{border-color:var(--accent-bg-strong,var(--accent))}
-.iui-card[data-state=error]{border-color:rgba(239,68,68,.55)}
-.iui-card[data-state=building] .iui-head{position:relative}
-.iui-card[data-state=building] .iui-head::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;
-  background:linear-gradient(90deg,transparent 0%,var(--accent) 40%,var(--accent) 60%,transparent 100%);background-size:40% 100%;
-  background-repeat:no-repeat;animation:iui-progress 1.2s ease-in-out infinite}
-.iui-head{display:flex;align-items:center;gap:8px;min-height:40px;padding:6px 8px 6px 12px;border-bottom:1px solid var(--border-subtle,var(--border));
-  background:var(--surface-subtle,transparent)}
-.iui-badge{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:7px;flex:0 0 auto;
+
+.iui-card{position:relative;margin:14px 0;border:1px solid var(--border-subtle,var(--border));border-radius:16px;
+  background:var(--surface,var(--bg));overflow:visible;max-width:100%;
+  box-shadow:0 1px 2px rgba(0,0,0,.06),0 12px 32px -24px rgba(0,0,0,.5);transition:border-color .25s ease,box-shadow .25s ease}
+.iui-card:hover{border-color:var(--border)}
+.iui-card[data-state=error]{border-color:rgba(239,68,68,.45)}
+
+.iui-head{position:relative;display:flex;align-items:center;gap:10px;min-height:44px;padding:6px 6px 6px 14px;border-radius:16px 16px 0 0}
+.iui-badge{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:8px;flex:0 0 auto;
   background:var(--accent-bg,rgba(249,115,22,.14));color:var(--accent)}
 .iui-badge .iui-ico{width:14px;height:14px}
-.iui-title{font-weight:600;color:var(--strong,var(--text));font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-.iui-status{font-size:11.5px;color:var(--muted);white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
-.iui-status::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--muted);opacity:.6}
-.iui-card[data-state=building] .iui-status::before{background:var(--accent);opacity:1;animation:iui-pulse 1.1s ease-in-out infinite}
-.iui-card[data-state=ready] .iui-status::before{background:#22c55e;opacity:1}
-.iui-card[data-state=error] .iui-status::before{background:#ef4444;opacity:1}
+.iui-title{font-weight:600;color:var(--strong,var(--text));font-size:14px;letter-spacing:-.005em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.iui-status{font-size:12px;color:var(--muted);white-space:nowrap}
+.iui-status[hidden]{display:none}
+.iui-card[data-state=building] .iui-status::after{content:"";display:inline-block;width:1.2em;text-align:left;animation:iui-dots 1.2s steps(4,end) infinite}
 .iui-card[data-state=error] .iui-status{color:#ef4444}
-.iui-actions{margin-left:auto;display:flex;align-items:center;gap:2px;flex:0 0 auto}
-.iui-btn{display:inline-flex;align-items:center;gap:6px;height:28px;min-width:28px;padding:0 7px;border:1px solid transparent;border-radius:8px;
-  background:transparent;color:var(--muted);cursor:pointer;font:inherit;font-size:12px;transition:background .15s,color .15s,border-color .15s}
+.iui-card[data-state=building] .iui-head::after{content:"";position:absolute;left:14px;right:14px;bottom:0;height:2px;border-radius:2px;
+  background:linear-gradient(90deg,transparent 0%,var(--accent) 45%,var(--accent) 55%,transparent 100%);background-size:35% 100%;
+  background-repeat:no-repeat;animation:iui-progress 1.3s ease-in-out infinite;opacity:.85}
+
+.iui-actions{margin-left:auto;display:flex;align-items:center;gap:2px;flex:0 0 auto;position:relative}
+.iui-actions[hidden]{display:none}
+.iui-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;min-width:32px;padding:0 8px;border:1px solid transparent;border-radius:10px;
+  background:transparent;color:var(--muted);cursor:pointer;font:inherit;font-size:12.5px;font-weight:500;transition:background .15s,color .15s,border-color .15s}
 .iui-btn:hover:not(:disabled){background:var(--hover-bg);color:var(--text)}
 .iui-btn:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .iui-btn:disabled{opacity:.35;cursor:default}
-.iui-btn.is-on{color:var(--accent);background:var(--accent-bg)}
+.iui-btn[aria-expanded=true]{background:var(--hover-bg);color:var(--text)}
 .iui-btn .iui-btn-label{display:none}
 .iui-btn--text .iui-btn-label{display:inline}
-.iui-ico{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
-.iui-stage{position:relative;height:360px;transition:height .25s cubic-bezier(.2,.7,.2,1);background:transparent}
-.iui-frame{position:absolute;inset:0;width:100%;height:100%;border:0;display:block;background:transparent;color-scheme:normal}
-.iui-skeleton{position:absolute;inset:0;padding:18px;display:flex;flex-direction:column;gap:12px;pointer-events:none;transition:opacity .3s}
+.iui-ico{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+
+.iui-menu{position:absolute;top:calc(100% + 6px);right:0;z-index:9100;min-width:224px;padding:6px;border-radius:12px;
+  background:var(--surface,var(--bg));border:1px solid var(--border);box-shadow:0 16px 40px -12px rgba(0,0,0,.45);
+  animation:iui-pop .14s ease-out}
+.iui-menu[hidden]{display:none}
+.iui-menu-item{display:flex;align-items:center;gap:10px;width:100%;min-height:36px;padding:0 10px;border:0;border-radius:8px;background:transparent;
+  color:var(--text);font:inherit;font-size:13px;text-align:left;cursor:pointer}
+.iui-menu-item:hover:not(:disabled),.iui-menu-item:focus-visible{background:var(--hover-bg);outline:none}
+.iui-menu-item:disabled{opacity:.4;cursor:default}
+.iui-menu-item .iui-ico{color:var(--muted)}
+.iui-menu-sep{height:1px;margin:6px 4px;background:var(--border-subtle,var(--border))}
+.iui-menu-group{padding:6px 10px 2px;font-size:11px;color:var(--muted)}
+.iui-menu-dev{color:var(--muted)}
+.iui-menu-note{display:flex;align-items:center;gap:8px;padding:8px 10px 4px;font-size:11.5px;color:var(--muted)}
+.iui-menu-note .iui-ico{width:13px;height:13px}
+
+.iui-stage{position:relative;height:360px;overflow:hidden;transition:height .3s cubic-bezier(.2,.7,.2,1);border-radius:0 0 15px 15px}
+.iui-card:has(.iui-error:not([hidden])) .iui-stage,.iui-card:has(.iui-source:not([hidden])) .iui-stage,.iui-card:has(.iui-ask:not([hidden])) .iui-stage{border-radius:0}
+.iui-ask:last-child,.iui-error-details:last-child{border-radius:0 0 15px 15px}
+/* The frame's color-scheme must match its document or Chrome paints an opaque canvas. */
+.iui-frame{position:absolute;inset:0;width:100%;height:100%;border:0;display:block;background:transparent;color-scheme:light;
+  opacity:0;transition:opacity .25s ease}
+html.dark .iui-frame{color-scheme:dark}
+.iui-skeleton.is-gone+.iui-frame,.iui-skeleton.is-gone~.iui-frame{opacity:1}
+.iui-skeleton{position:absolute;inset:0;padding:18px 18px;display:flex;flex-direction:column;gap:12px;pointer-events:none;transition:opacity .3s}
 .iui-skeleton.is-gone{opacity:0}
-.iui-skeleton span{display:block;height:14px;border-radius:7px;background:linear-gradient(90deg,var(--hover-bg) 0%,var(--border) 50%,var(--hover-bg) 100%);
-  background-size:200% 100%;animation:iui-shimmer 1.4s linear infinite}
-.iui-skeleton span:nth-child(1){width:42%;height:18px}.iui-skeleton span:nth-child(2){width:86%}.iui-skeleton span:nth-child(3){width:64%;height:120px;border-radius:10px}
-.iui-error{display:flex;align-items:center;gap:8px;padding:8px 10px 8px 12px;border-top:1px solid rgba(239,68,68,.35);background:rgba(239,68,68,.08);color:#ef4444;font-size:12.5px}
+.iui-skeleton.is-quiet span{animation:none;opacity:.35}
+.iui-skeleton span{display:block;height:12px;border-radius:6px;background:linear-gradient(90deg,var(--hover-bg) 0%,var(--border-subtle,var(--border)) 50%,var(--hover-bg) 100%);
+  background-size:200% 100%;animation:iui-shimmer 1.6s linear infinite}
+.iui-skeleton span:nth-child(1){width:38%;height:16px}.iui-skeleton span:nth-child(2){width:82%}.iui-skeleton span:nth-child(3){width:100%;height:140px;border-radius:12px}
+
+.iui-error{display:flex;align-items:center;gap:8px;padding:8px 8px 8px 14px;border-top:1px solid rgba(239,68,68,.25);background:rgba(239,68,68,.06);
+  color:#ef4444;font-size:13px;border-radius:0 0 15px 15px}
 .iui-error[hidden]{display:none}
-.iui-error .iui-error-text{flex:1;min-width:0;color:var(--text);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
-.iui-error .iui-btn--text{color:var(--accent);border-color:var(--accent-bg-strong,var(--accent));background:var(--accent-bg)}
+.iui-error>.iui-ico{width:16px;height:16px}
+.iui-error .iui-error-text{flex:1;min-width:0;color:var(--text)}
+.iui-error .iui-btn--text{color:var(--accent);background:var(--accent-bg);border-color:transparent}
 .iui-error .iui-btn--text:hover{background:var(--accent);color:#fff}
-.iui-source{border-top:1px solid var(--border-subtle,var(--border));max-height:360px;overflow:auto;background:var(--code-bg)}
+.iui-error .iui-btn--quiet{color:var(--muted);background:transparent}
+.iui-error .iui-btn--quiet .iui-ico{display:none}
+.iui-error .iui-btn--quiet:hover{background:var(--hover-bg);color:var(--text)}
+.iui-error .iui-btn .iui-ico{width:14px;height:14px}
+.iui-btn--primary{color:var(--accent-text-on,#fff)!important;background:var(--accent)!important}
+.iui-btn--primary:hover{filter:brightness(1.08)}
+.iui-ask{display:flex;align-items:center;gap:8px;padding:10px 8px 10px 14px;border-top:1px solid var(--border-subtle,var(--border));
+  background:var(--accent-bg,rgba(249,115,22,.08));animation:iui-pop .16s ease-out}
+.iui-ask[hidden]{display:none}
+.iui-ask-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.iui-ask-label{font-size:11.5px;color:var(--muted)}
+.iui-ask-text{font-size:13.5px;color:var(--text);overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.iui-error-details{margin:0;padding:10px 14px;font:12px/1.5 ui-monospace,"SF Mono",Menlo,monospace;color:var(--muted);white-space:pre-wrap;
+  border-top:1px solid var(--border-subtle,var(--border));background:var(--code-bg)}
+.iui-error-details[hidden]{display:none}
+
+.iui-source{border-top:1px solid var(--border-subtle,var(--border));max-height:360px;overflow:auto;background:var(--code-bg);border-radius:0 0 15px 15px}
 .iui-source[hidden]{display:none}
 .iui-source pre{margin:0;padding:12px 14px;font-size:12px;line-height:1.55;color:var(--pre-text,var(--text));background:transparent;white-space:pre}
-.iui-foot{display:flex;align-items:center;gap:6px;padding:5px 12px;font-size:11px;color:var(--muted);border-top:1px solid var(--border-subtle,var(--border));opacity:.8}
-.iui-foot .iui-ico{width:12px;height:12px}
-.iui-card[data-state=building] .iui-foot{display:none}
-.iui-card.iui-full{position:fixed;inset:12px;z-index:9000;margin:0;display:flex;flex-direction:column;border-radius:16px;
-  box-shadow:0 30px 80px -20px rgba(0,0,0,.6),0 0 0 100vmax rgba(0,0,0,.55)}
-.iui-card.iui-full .iui-stage{flex:1;height:auto!important}
+
+.iui-card.iui-full{position:fixed;inset:16px;z-index:9000;margin:0;display:flex;flex-direction:column;border-radius:18px;
+  box-shadow:0 30px 80px -20px rgba(0,0,0,.6),0 0 0 100vmax rgba(0,0,0,.5);animation:iui-pop .18s ease-out}
+.iui-card.iui-full .iui-stage{flex:1;height:auto!important;border-radius:0 0 17px 17px}
 .iui-card.iui-full .iui-source{max-height:40vh}
 html.iui-has-full{overflow:hidden}
-@keyframes iui-pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(.6);opacity:.5}}
-@keyframes iui-progress{0%{background-position:-40% 0}100%{background-position:140% 0}}
+html.iui-has-full .messages,html.iui-has-full #messages{z-index:auto!important}
+.iui-row-full{contain:none!important;content-visibility:visible!important;transform:none!important;filter:none!important}
+.iui-card.iui-full{padding-bottom:env(safe-area-inset-bottom,0)}
+.iui-card.iui-full .iui-head{padding-top:max(6px,env(safe-area-inset-top,0))}
+
+@keyframes iui-progress{0%{background-position:-35% 0}100%{background-position:135% 0}}
 @keyframes iui-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+@keyframes iui-pop{from{opacity:0;transform:translateY(-4px) scale(.98)}to{opacity:1;transform:none}}
+@keyframes iui-dots{0%{content:""}25%{content:"."}50%{content:".."}75%{content:"..."}}
+
 @media (max-width:640px){
-  .iui-head{flex-wrap:wrap;padding:6px 6px 6px 10px}
-  .iui-status{order:3;width:100%;padding-left:30px;margin-top:-4px}
-  .iui-actions{gap:0}
-  .iui-btn{min-width:32px;height:32px}
+  .iui-head{padding:6px 4px 6px 12px}
+  .iui-btn{min-width:40px;height:40px}
   .iui-card.iui-full{inset:0;border-radius:0}
-  .iui-foot span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .iui-card.iui-full .iui-stage{border-radius:0}
+  .iui-error{flex-wrap:wrap}
+  .iui-error .iui-error-text{flex-basis:calc(100% - 30px)}
+  .iui-menu{position:fixed;top:auto;left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom,0));min-width:0;border-radius:16px;padding:8px;z-index:9100}
+  .iui-menu-item{min-height:44px;font-size:15px}
+  .iui-ask{flex-wrap:wrap}
+  .iui-ask-body{flex-basis:100%}
 }
 @media (prefers-reduced-motion:reduce){
-  .iui-stage,.iui-skeleton{transition:none}
-  .iui-skeleton span,.iui-card[data-state=building] .iui-status::before,.iui-card[data-state=building] .iui-head::after{animation:none}
+  .iui-stage,.iui-skeleton,.iui-frame,.iui-card{transition:none}
+  .iui-skeleton span,.iui-card[data-state=building] .iui-head::after,.iui-card[data-state=building] .iui-status::after,.iui-menu,.iui-card.iui-full{animation:none}
 }
