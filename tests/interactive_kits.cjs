@@ -127,10 +127,15 @@ assert.strictEqual(pie.spec.labels.length, 8);
 assert.strictEqual(pie.spec.labels[7], 'Overig');
 assert.deepStrictEqual(plain(pie.spec.series[0].data), [1, 2, 3, 4, 5, 6, 7, 8 + 9 + 0], 'the rest is summed; negatives become 0');
 assert.strictEqual(pie.spec.series.length, 1);
-const shorthand = build('chart', {title: 'x', labels: ['a', 'b'], data: [1, 2], type: 'radar'});
+const shorthand = build('chart', {title: 'x', labels: ['a', 'b'], data: [1, 2], type: 'bubble'});
 assert.strictEqual(shorthand.spec.type, 'bar');
 assert.ok(shorthand.warnings[0].startsWith('Onbekend grafiektype'));
 assert.deepStrictEqual(plain(shorthand.spec.series), [{name: 'x', data: [1, 2]}]);
+// A radar needs three axes; with two it is drawn as bars, and it never has a target line.
+assert.strictEqual(build('chart', {title: 'x', type: 'radar', labels: ['a', 'b'], series: [{name: 's', data: [1, 2]}]}).spec.type, 'bar');
+const radar = build('chart', {title: 'x', type: 'spider', labels: ['a', 'b', 'c'], series: [{name: 's', data: [1, 2, 3]}], target: 2});
+assert.strictEqual(radar.spec.type, 'radar');
+assert.strictEqual(radar.spec.target, null);
 assert.deepStrictEqual(build('chart', {title: 'x', labels: [], series: [{data: [1]}]}).errors, ['De labels ontbreken.']);
 assert.deepStrictEqual(build('chart', {title: 'x', labels: ['a'], series: [{data: ['n/a']}]}).errors, ['Er zijn geen reeksen (series) met getallen.']);
 assert.ok(build('chart', {title: 'x', labels: ['a'], series: [{data: [1]}], highlight: 'zz'}).warnings.some(w => w.includes('"zz"')));

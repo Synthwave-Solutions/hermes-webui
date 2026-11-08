@@ -412,16 +412,20 @@ FRAME_BYTES = FRAME_HTML.encode("utf-8")
 # ── Data blocks: the kit frame ──────────────────────────────────────────────
 KIT_FRAME_PATH = "/static/interactive-ui/kit.html"
 _STATIC_DIR = Path(__file__).resolve().parents[1] / "static"
+# Extra kinds live in static/interactive-ui/kinds/<kind>.js (+ optional .css):
+# each registers its checks with SWKit and its renderer with SWKitRender.
+_KIND_DIR = Path(__file__).resolve().parents[1] / "static" / "interactive-ui" / "kinds"
+KIND_FILES = tuple(sorted(p.stem for p in _KIND_DIR.glob("*.js"))) if _KIND_DIR.is_dir() else ()
 KIT_STYLE_FILES = (
     "vendor/leaflet/1.9.4/leaflet.css",
     "interactive-ui/kits.css",
-)
+) + tuple(f"interactive-ui/kinds/{k}.css" for k in KIND_FILES if (_KIND_DIR / f"{k}.css").is_file())
 KIT_SCRIPT_FILES = (
     "vendor/chartjs/4.4.7/chart.umd.js",
     "vendor/leaflet/1.9.4/leaflet.js",
     "interactive-ui/kit-core.js",
     "interactive-ui/kits.js",
-)
+) + tuple(f"interactive-ui/kinds/{k}.js" for k in KIND_FILES)
 # Tiles come from this server by default (api/map_tiles.py): PDOK for the
 # Netherlands, OpenStreetMap elsewhere, cached and fetched with a proper
 # User-Agent, so no browser gets a "blocked" tile.
@@ -586,10 +590,14 @@ def serve(handler, parsed) -> bool:
 # Data blocks come first: for tables, charts and places they beat model code.
 PROMPT_DATA = """
 WebUI data blocks:
-- For data, write a fenced block that holds only JSON; the chat draws it in the theme, sortable and downloadable, and runs none of your code. ```table: more than 6 rows, or when the user will sort, filter or copy (```csv also works). ```chart: trends, rankings or shares. ```map: real places, addresses, customer visits or a trip.
+- For data, write a fenced block that holds only JSON; the chat draws it in the theme, sortable and downloadable, and runs none of your code. ```table: more than 6 rows, or when the user will sort, filter or copy (```csv also works). ```chart: trends, rankings, shares of a whole (pie or donut, at most 8 slices) or options scored on several criteria (radar, 3 to 8 criteria). ```map: real places, addresses, customer visits or a trip.
 - ```kpi: 1 to 8 headline figures, such as revenue, MRR or conversion, with their change: {"title", "items":[{"label", "value", "format"?, "delta"? (change in percent; with "deltaFormat":"number" in the value's unit, points for a percent), "good"?:"up|down" (down for costs or churn), "target"?, "note"?}]}; "note" never repeats the target.
 - ```timeline: a plan, roadmap or project phases, drawn as a Gantt: {"title", "unit":"day|week|month", "start"?:"YYYY-MM-DD", "today"?, "items":[{"label", "start", "end", "owner"?, "status"?:"todo|doing|done|risk", "milestone"?:true, "note"?}]}; start and end are dates or unit numbers counted from "start", end included.
-- Shapes: table {"title", "columns":["Naam", {"label":"Omzet", "type":"currency"}], "rows":[["Bakkerij Jansen", 1200]], "sort"?, "total"?}; chart {"title", "type":"bar|hbar|stacked|line|area|pie|donut", "labels":[], "series":[{"name", "data":[]}], "format"?:"number|currency|percent", "highlight"?, "target"?:{"value", "label"}}; map {"title", "kind":"places|route", "places":[{"name", "address", "time"?, "note"?}], "photos"?}; "name" is the place's name, never its street address. Every block may add "subtitle" (never repeating title or target), "source" (outside sources only, never the user or the chat), and "example":true for illustrative figures. Always set "lang" to the user's language ("nl" or "en"); it sets the labels and number format. A goal, budget or threshold is "target", never an extra series.
+- ```form: only when you need structured answers before going on: {"title", "fields":[{"label", "type":"choice|multi|text|number|slider|date|yesno", "options"?, "min"?, "max"?, "unit"?, "required"?}]}; at most 8 questions, 12 options each. The answers arrive as the user's next message.
+- ```flow: a business process (onboarding, approval, sales, escalation) as a flowchart: {"title", "nodes":[{"id", "label", "type":"start|step|decision|end|wait", "owner"?, "note"?}], "edges":[{"from", "to", "label"?}]}; label decision branches "Ja"/"Nee", list the main path first; loops back are fine.
+- ```compare: 2 to 4 options to choose between (suppliers, plans, scenarios): {"title", "recommended"?, "options":[{"name", "price"?, "priceUnit"?, "score"?:0-10, "tag"?, "pros":[], "cons":[], "facts"?:{"Levertijd":"3 weken"}}]}; give every option the same fact labels.
+- ```funnel: a sales pipeline or any process from wide to narrow, 2 to 8 stages: {"title", "stages":[{"label", "value", "note"?}], "format"?:"number|currency"}; the chat computes the conversions and the biggest drop.
+- Shapes: table {"title", "columns":["Naam", {"label":"Omzet", "type":"currency"}], "rows":[["Bakkerij Jansen", 1200]], "sort"?, "total"?}; chart {"title", "type":"bar|hbar|stacked|line|area|pie|donut|radar", "labels":[], "series":[{"name", "data":[]}], "format"?:"number|currency|percent", "highlight"?, "target"?:{"value", "label"}}; map {"title", "kind":"places|route", "places":[{"name", "address", "time"?, "note"?}], "photos"?}; "name" is the place's name, never its street address. Every block may add "subtitle" (never repeating title or target), "source" (outside sources only, never the user or the chat), and "example":true for illustrative figures. Always set "lang" to the user's language ("nl" or "en"); it sets the labels and number format. A goal, budget or threshold is "target", never an extra series.
 - Numbers are JSON numbers, never formatted text: set the column type or the chart format and the chat formats them (percent: 12.5 means 12,5%). Every row and series has exactly one value per column or label.
 - Use only figures and places from the conversation or tools. Give real addresses; add lat and lng only when a tool or the user supplied them. Never put travel times, distances or opening hours in a block unless a tool returned them. Set photos:true only for landmarks.
 - At most one data block per reply; tables of up to 6 rows stay markdown. Always add one or two sentences outside the block with the takeaway.

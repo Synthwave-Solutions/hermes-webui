@@ -145,7 +145,7 @@ html.iui-has-full .messages,html.iui-has-full #messages{z-index:auto!important}
 /* Hidden once a newer message exists (also while the next reply streams). */
 .assistant-turn:not([data-latest-assistant-response="true"]) .iui-chips,
 .assistant-turn:has(~ .msg-row[data-role="user"]) .iui-chips,
-.assistant-turn:has(~ .msg-row) .iui-chips{display:none}
+.assistant-turn:has(~ .msg-row:not(.msg-row-btw):not([data-btw])) .iui-chips{display:none}
 .iui-block[data-iui-kind=suggestions]:not([data-iui-mounted]),.iui-block[data-iui-kind=replies]:not([data-iui-mounted]){display:none}
 .iui-chips.is-pending .iui-chip{pointer-events:none;opacity:.7}
 @media (max-width:640px){.iui-chip{min-height:40px;font-size:14px}}
@@ -161,3 +161,126 @@ html.iui-has-full .messages,html.iui-has-full #messages{z-index:auto!important}
    block stays readable as plain text instead of a shimmer. */
 .iui-block:not([data-iui-mounted]):is([data-iui-kind=table],[data-iui-kind=tabel],[data-iui-kind=csv],[data-iui-kind=chart],[data-iui-kind=grafiek],[data-iui-kind=map],[data-iui-kind=kaart]):not(#messages *):not(#liveAssistantTurn *){
   height:auto;color:inherit;font:12px/1.5 ui-monospace,"SF Mono",Menlo,monospace;white-space:pre-wrap;animation:none;background:var(--code-bg);padding:10px 12px;border-radius:10px}
+
+/* Questions form (```form, ```vraag): drawn by the chat itself under the reply.
+   Calm card, pills for choices, one primary button; locked once answered. */
+.iui-block.iui-form-host{margin:12px 0 4px}
+.iui-block:not([data-iui-mounted]):is([data-iui-kind=form],[data-iui-kind=vraag],[data-iui-kind=vragen],[data-iui-kind=questions]):is(#messages *,#liveAssistantTurn *){height:52px}
+.iui-form{position:relative;max-width:620px;box-sizing:border-box;padding:14px 16px 16px;border:1px solid var(--border-subtle,var(--border));border-radius:16px;
+  background:var(--surface,var(--bg));color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.05),0 12px 32px -26px rgba(0,0,0,.5);animation:iui-pop .2s ease-out both}
+.iui-form:focus{outline:none}
+.iui-form:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.iui-form-ico{display:inline-flex}
+.iui-form-head{display:flex;align-items:center;gap:10px;min-height:26px}
+.iui-form-title{flex:1;min-width:0;font-weight:600;font-size:14.5px;line-height:1.35;color:var(--strong,var(--text));letter-spacing:-.005em}
+.iui-form-intro{margin:8px 0 0;font-size:13.5px;line-height:1.5;color:var(--muted)}
+.iui-form-done{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:var(--muted)}
+.iui-form-done[hidden]{display:none}
+.iui-form-done .iui-ico{width:14px;height:14px;color:var(--success,#22c55e)}
+.iui-form-body{display:flex;flex-direction:column;gap:18px;margin-top:16px}
+.iui-field{display:flex;flex-direction:column;gap:8px;min-width:0}
+.iui-field-label{font-size:13.5px;font-weight:600;line-height:1.4;color:var(--text)}
+.iui-field-req{margin-left:3px;color:var(--accent);font-weight:700}
+.iui-field-hint{margin-top:-4px;font-size:12.5px;line-height:1.4;color:var(--muted)}
+.iui-opts{display:flex;flex-wrap:wrap;gap:8px}
+.iui-opt{display:inline-flex;align-items:center;gap:0;min-height:34px;max-width:100%;box-sizing:border-box;padding:6px 14px;border-radius:999px;cursor:pointer;
+  border:1px solid var(--border);background:transparent;color:var(--text);font:inherit;font-size:13.5px;line-height:1.3;text-align:left;
+  transition:border-color .15s,background .15s,color .15s}
+.iui-opt:hover{border-color:var(--accent)}
+.iui-opt:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.iui-opt[aria-checked=true],.iui-opt[aria-pressed=true]{border-color:var(--accent);background:var(--accent-bg-strong,var(--accent-bg));color:var(--strong,var(--text));font-weight:600}
+.iui-opt .iui-form-ico{width:0;overflow:hidden;transition:width .15s}
+.iui-opt .iui-ico{width:14px;height:14px;color:var(--accent);stroke-width:2.4}
+.iui-opt[aria-pressed=true] .iui-form-ico{width:14px;margin-right:6px}
+.iui-opt-text{min-width:0;overflow-wrap:anywhere}
+.iui-input{display:block;width:100%;max-width:100%;box-sizing:border-box;min-height:38px;padding:8px 12px;border-radius:10px;border:1px solid var(--border);
+  background:var(--input-bg,transparent);color:var(--text);font:inherit;font-size:14px;line-height:1.4;transition:border-color .15s,box-shadow .15s}
+.iui-input::placeholder{color:var(--muted);opacity:.8}
+textarea.iui-input{min-height:76px;resize:vertical}
+.iui-date{position:relative;display:flex;align-items:center;gap:6px;max-width:240px}
+.iui-date .iui-input{flex:1;min-width:0;font-variant-numeric:tabular-nums}
+.iui-date-pick{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;padding:0;border:1px solid var(--border);border-radius:10px;
+  background:transparent;color:var(--muted);cursor:pointer}
+.iui-date-pick:hover{color:var(--text);background:var(--hover-bg)}
+.iui-date-pick:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.iui-date-pick .iui-ico{width:16px;height:16px}
+.iui-date-native{position:absolute;left:0;bottom:0;width:1px;height:1px;padding:0;margin:0;border:0;opacity:0;pointer-events:none;color-scheme:light}
+html.dark .iui-date-native{color-scheme:dark}
+.iui-date-echo{margin-top:-4px;font-size:12.5px;line-height:1.4;color:var(--muted)}
+.iui-date-echo:empty{display:none}
+.iui-input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-bg)}
+.iui-num{display:flex;align-items:center;gap:8px;max-width:260px;min-height:38px;box-sizing:border-box;padding:0 12px;border-radius:10px;border:1px solid var(--border);
+  background:var(--input-bg,transparent);transition:border-color .15s,box-shadow .15s}
+.iui-num:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-bg)}
+.iui-num .iui-input{flex:1;min-width:0;border:0;padding:8px 0;background:transparent;box-shadow:none!important;font-variant-numeric:tabular-nums}
+.iui-num-unit{flex:0 0 auto;font-size:13.5px;color:var(--muted);white-space:nowrap}
+.iui-slider{display:flex;align-items:flex-start;gap:14px}
+.iui-slider-track{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.iui-range{width:100%;margin:0;height:28px;background:transparent;cursor:pointer;-webkit-appearance:none;appearance:none;--p:50%}
+.iui-range::-webkit-slider-runnable-track{height:4px;border-radius:4px;background:linear-gradient(90deg,var(--accent) var(--p),var(--border) var(--p))}
+.iui-range::-moz-range-track{height:4px;border-radius:4px;background:var(--border)}
+.iui-range::-moz-range-progress{height:4px;border-radius:4px;background:var(--accent)}
+.iui-range::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;margin-top:-7px;border-radius:50%;background:var(--accent);border:3px solid var(--surface,var(--bg));box-shadow:0 0 0 1px var(--accent),0 1px 3px rgba(0,0,0,.25)}
+.iui-range::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:var(--accent);border:3px solid var(--surface,var(--bg));box-shadow:0 0 0 1px var(--accent)}
+.iui-range:focus{outline:none}
+.iui-range:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 1px var(--accent),0 0 0 5px var(--accent-bg-strong,var(--accent-bg))}
+.iui-range:focus-visible::-moz-range-thumb{box-shadow:0 0 0 1px var(--accent),0 0 0 5px var(--accent-bg-strong,var(--accent-bg))}
+.iui-slider-val{flex:0 0 auto;min-width:72px;max-width:40%;line-height:28px;text-align:right;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--strong,var(--text))}
+.iui-slider.is-untouched .iui-slider-val{font-weight:400;font-size:12.5px;line-height:1.3;padding-top:6px;color:var(--muted)}
+.iui-slider.is-untouched .iui-range{--p:0%!important}
+.iui-slider.is-untouched .iui-range::-webkit-slider-thumb{background:var(--surface,var(--bg))}
+.iui-slider.is-untouched .iui-range::-moz-range-thumb{background:var(--surface,var(--bg))}
+.iui-slider-ends{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.iui-field-err{font-size:12.5px;line-height:1.4;color:var(--error,#ef4444)}
+.iui-field-err:empty{margin-top:-8px}
+.iui-field.is-invalid .iui-input:not(.iui-num .iui-input),.iui-field.is-invalid .iui-num{border-color:var(--error,#ef4444)}
+.iui-field.is-invalid .iui-opt:not([aria-checked=true]):not([aria-pressed=true]){border-color:color-mix(in srgb,var(--error,#ef4444) 55%,var(--border))}
+.iui-form-foot{display:flex;align-items:center;justify-content:flex-end;gap:12px;margin-top:20px}
+.iui-form-hint{flex:1;min-width:0;font-size:12.5px;line-height:1.4;color:var(--muted)}
+.iui-form-submit{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;gap:8px;height:38px;padding:0 20px;border:0;border-radius:10px;cursor:pointer;
+  background:var(--accent);color:var(--bg);font:inherit;font-size:14px;font-weight:600;transition:filter .15s,transform .05s}
+.iui-form-submit:hover:not(:disabled){filter:brightness(1.08)}
+.iui-form-submit:active:not(:disabled){transform:translateY(1px)}
+.iui-form-submit:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.iui-form-submit:disabled{opacity:.6;cursor:default}
+.iui-form.is-pending .iui-form-body{pointer-events:none;opacity:.7}
+/* Answered: the chosen answers in a muted list, nothing to click. */
+.iui-form.is-locked{background:transparent;box-shadow:none;animation:none}
+.iui-form.is-locked .iui-badge{background:var(--hover-bg);color:var(--muted)}
+.iui-form.is-locked .iui-form-title{color:var(--text)}
+.iui-form-summary{display:grid;grid-template-columns:minmax(110px,max-content) 1fr;gap:6px 18px;margin:12px 0 0;font-size:13.5px;line-height:1.45}
+.iui-form-sum-row{display:contents}
+.iui-form-summary dt{color:var(--muted)}
+.iui-form-summary dd{margin:0;color:var(--text);overflow-wrap:anywhere}
+.iui-form-closed{margin:10px 0 0;font-size:13px;color:var(--muted)}
+.iui-form.is-error{padding:10px 10px 10px 14px;border-color:rgba(239,68,68,.35)}
+.iui-form-errline{display:flex;align-items:center;gap:10px;font-size:13.5px}
+.iui-form-errline>.iui-form-ico{color:#ef4444}
+.iui-form-errline .iui-ico{width:16px;height:16px}
+.iui-form-errtext{flex:1;min-width:0}
+.iui-form-repair{flex:0 0 auto;height:32px;padding:0 12px;border:0;border-radius:10px;cursor:pointer;background:var(--accent-bg);color:var(--accent-text,var(--accent));font:inherit;font-size:13px;font-weight:600}
+.iui-form-repair:hover:not(:disabled){background:var(--accent-bg-strong,var(--accent-bg))}
+.iui-form-repair:disabled{opacity:.5;cursor:default}
+/* While the reply streams: one quiet line instead of the form. */
+.iui-form-wait{display:none}
+.iui-form-wait--live,#liveAssistantTurn .iui-form .iui-form-wait{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
+.iui-form-wait--live{max-width:620px;box-sizing:border-box;margin:12px 0 4px;padding:14px 16px;border:1px dashed var(--border-subtle,var(--border));border-radius:16px}
+#liveAssistantTurn .iui-form .iui-form-wait{margin-top:12px}
+.iui-form-wait::after{content:"";display:inline-block;width:1.2em;text-align:left;animation:iui-dots 1.2s steps(4,end) infinite}
+#liveAssistantTurn .iui-form :is(.iui-form-body,.iui-form-foot){display:none}
+/* An unanswered form under an older reply cannot be used any more. */
+.assistant-turn:has(~ .msg-row:not(.msg-row-btw):not([data-btw])) .iui-form:not(.is-locked) :is(.iui-form-body,.iui-form-foot){pointer-events:none;opacity:.5}
+.assistant-turn:has(~ .msg-row:not(.msg-row-btw):not([data-btw])) .iui-form:not(.is-locked) .iui-form-submit,
+.assistant-turn:has(~ .msg-row:not(.msg-row-btw):not([data-btw])) .iui-form-repair{display:none}
+@media (max-width:640px){
+  .iui-form{padding:14px 14px 14px}
+  .iui-opt{min-height:40px;font-size:14px}
+  .iui-form-foot{flex-direction:column-reverse;align-items:stretch;gap:8px}
+  .iui-form-submit{height:44px;width:100%}
+  .iui-form-hint:empty{display:none}
+  .iui-form-summary{grid-template-columns:1fr;gap:2px}
+  .iui-form-summary dd{margin-bottom:8px}
+  .iui-input{font-size:16px}
+  .iui-num{max-width:100%}
+}
+@media (prefers-reduced-motion:reduce){.iui-form,.iui-opt,.iui-opt .iui-form-ico{animation:none;transition:none}.iui-form-wait::after{animation:none;content:"..."}}
