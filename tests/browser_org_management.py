@@ -242,19 +242,48 @@ def main() -> int:
 
             # 3. chart and placing unassigned work
             hub(page, "chart")
-            page.wait_for_selector('.om-team-card[data-om-team="finance/debiteuren"]', timeout=10000)
+            page.wait_for_selector('.om-team[data-team-key="finance/debiteuren"]', timeout=10000)
             # j1/j2/j3 belong to MEMBER, who is now in the team: they follow the owner's team.
-            card_text = page.locator('.om-team-card[data-om-team="finance/debiteuren"]').inner_text()
+            card_text = page.locator('.om-team[data-team-key="finance/debiteuren"] > summary').inner_text()
             assert "3" in card_text, card_text
             sel = page.locator('.om-unassigned [data-bot="finbot"] select[data-om-assign-bot]')
             sel.select_option("finance/debiteuren")
             page.wait_for_function("() => !document.querySelector('.om-unassigned [data-bot=\"finbot\"]')", timeout=10000)
-            page.wait_for_function("() => (document.querySelector('.om-team-card[data-om-team=\"finance/debiteuren\"]')||{}).innerText?.includes('Finance Bot')", timeout=10000)
+            team = page.locator('.om-team[data-team-key="finance/debiteuren"]')
+            if not team.evaluate("d => d.open"):
+                team.locator("> summary .om-team-title").click()
+            page.wait_for_selector('.om-team[data-team-key="finance/debiteuren"] [data-om-bot-node="finbot"]', timeout=10000)
+            tree = team.locator(".om-team-body").inner_text()
+            assert "lisa" in tree and "tom" in tree and "Finance Bot" in tree, tree
+            strip = page.locator("#mainOrganisation .om-strip").inner_text()
+            assert "Mensen" in strip and "Koppelingen" in strip and "Skills" in strip and "Tijd bespaard" in strip, strip
+            assert page.locator('.om-dept2[data-om-open="dept:finance"] > summary .om-mini-stat').count() == 5
             page.screenshot(path=str(art / "03-org-chart.png"))
-            ok("org chart shows the team with its tasks; the bot is placed in the team from the chart")
+            ok("org chart: totals on top, a collapsible department and team with its numbers, the lead with people and bots beneath; the bot is placed from the chart")
+
+            # sub-team under Debiteuren, collapsible and remembered
+            r = ctx.request.post("/api/org/structure", data={"op": "team.save", "department": "finance", "name": "Incasso",
+                                                              "lead": "anna@example.com", "members": ["anna@example.com"], "parent": "finance/debiteuren"})
+            assert r.ok, r.text()
+            bad = ctx.request.post("/api/org/structure", data={"op": "team.save", "department": "finance", "key": "finance/debiteuren",
+                                                                "name": "Debiteuren", "parent": "finance/incasso"})
+            assert bad.status == 400, bad.status
+            hub(page, "chart")
+            page.wait_for_selector('.om-team[data-team-key="finance/debiteuren"] .om-subteams .om-team[data-team-key="finance/incasso"]', timeout=10000)
+            page.locator('[data-om-expand="0"]').click()
+            assert not page.locator('.om-team[data-team-key="finance/debiteuren"]').evaluate("d => d.open")
+            page.reload(); page.wait_for_selector("#msg", state="visible", timeout=20000)
+            hub(page, "chart")
+            page.wait_for_selector('.om-team[data-team-key="finance/debiteuren"]', state="attached", timeout=10000)
+            assert not page.locator('.om-dept2[data-om-open="dept:finance"]').evaluate("d => d.open")
+            assert not page.locator('.om-team[data-team-key="finance/debiteuren"]').evaluate("d => d.open")
+            page.locator('[data-om-expand="1"]').click()
+            assert page.locator('.om-team[data-team-key="finance/incasso"]').is_visible()
+            page.screenshot(path=str(art / "03b-org-subteam.png"), full_page=True)
+            ok("sub-teams sit under their team, a loop is refused, and collapsed state is remembered")
 
             # 4. drawer
-            page.locator('.om-team-card[data-om-team="finance/debiteuren"]').click()
+            page.locator('[data-om-team="finance/debiteuren"]').click()
             page.wait_for_selector(".om-drawer", timeout=5000)
             drawer = page.locator(".om-drawer").inner_text()
             assert "Debiteurenlijst" in drawer and "Finance Bot" in drawer and MEMBER in drawer, drawer

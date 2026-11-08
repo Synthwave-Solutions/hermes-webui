@@ -727,6 +727,8 @@ def main() -> None:
         from api.value_tracking import start_collector_thread
         if start_collector_thread():
             print('[ok] value collector started', flush=True)
+            from api.management import warm_assets
+            warm_assets()
     except Exception as e:
         print(f'[!!] WARNING: value collector failed to start: {e}', flush=True)
 

@@ -24,7 +24,7 @@
       person: 'Persoon',
       other: 'Overig', fails: 'faalt', no_value: 'zonder waarde', suggested: 'voorstel',
       suggest_intro: '{n} voorstellen op basis van de bestaande categorie.', apply_suggestions: 'Neem alle voorstellen over', applied_n: '{n} ingedeeld',
-      org: 'Organisatie', mgmt: 'Management', chart: 'Organigram', manage: 'Teams beheren',
+      org: 'Organisatie', mgmt: 'Management', chart: 'Organigram', manage: 'Teams beheren', parent: 'Onder team', parent_none: 'Geen, hoofdteam', subteams: 'Subteams', expand_all: 'Alles uitklappen', collapse_all: 'Alles inklappen', s_people: 'Mensen', s_bots: 'Bots', s_tasks: 'Geplande taken', s_conn: 'Koppelingen', s_skills: 'Skills', s_saved: 'Tijd bespaard', s_saved_sub: 'laatste 4 weken', s_conn_hint: 'MCP-servers van de bots plus persoonlijke koppelingen van de mensen', details: 'Details', hierarchy: 'Hiërarchie', h_note: 'Bots zonder bot-manager staan onder de teamlead.', no_lead: 'Geen teamlead', reports: 'rapporteert aan',
       people: 'Mensen', bots: 'Bots', both: 'Samen', tasks: 'Taken', team: 'Team', teams: 'Teams',
       department: 'Afdeling', departments: 'Afdelingen', lead: 'Lead', members: 'Leden', rate: 'Uurtarief',
       org_intro: 'Wie in welk team zit, welke bots en geplande taken voor dat team werken, en hoeveel tijd dat bespaart.',
@@ -95,7 +95,7 @@
       person: 'Person',
       other: 'Other', fails: 'failing', no_value: 'without value', suggested: 'suggested',
       suggest_intro: '{n} suggestions based on the existing category.', apply_suggestions: 'Apply all suggestions', applied_n: '{n} placed',
-      org: 'Organisation', mgmt: 'Management', chart: 'Org chart', manage: 'Manage teams',
+      org: 'Organisation', mgmt: 'Management', chart: 'Org chart', manage: 'Manage teams', parent: 'Under team', parent_none: 'None, top-level team', subteams: 'Sub-teams', expand_all: 'Expand all', collapse_all: 'Collapse all', s_people: 'People', s_bots: 'Bots', s_tasks: 'Scheduled tasks', s_conn: 'Connections', s_skills: 'Skills', s_saved: 'Time saved', s_saved_sub: 'last 4 weeks', s_conn_hint: 'MCP servers of the bots plus personal connections of the people', details: 'Details', hierarchy: 'Hierarchy', h_note: 'Bots without a bot manager sit under the team lead.', no_lead: 'No team lead', reports: 'reports to',
       people: 'People', bots: 'Bots', both: 'Both', tasks: 'Tasks', team: 'Team', teams: 'Teams',
       department: 'Department', departments: 'Departments', lead: 'Lead', members: 'Members', rate: 'Hourly rate',
       org_intro: 'Who is in which team, which bots and scheduled tasks work for that team, and how much time that saves.',
@@ -224,24 +224,108 @@
   function orgActions(){
     return O.view === 'chart' ? `<div class="om-seg" role="group" aria-label="${H(w('chart'))}">
       ${['people', 'bots', 'both'].map(l => `<button type="button" aria-pressed="${O.layer === l}" data-om-layer="${l}">${H(w(l))}</button>`).join('')}
-    </div>` : '';
+    </div><button type="button" class="sm-btn" data-om-expand="1">${H(w('expand_all'))}</button><button type="button" class="sm-btn" data-om-expand="0">${H(w('collapse_all'))}</button>` : '';
   }
 
-  function teamCardHtml(team){
-    const s = team.stats || {};
-    const flag = (s.failing || 0) > 0 || (s.missing_value || 0) > 0;
-    const people = team.people || [], bots = team.bot_list || [];
-    const tasks = (team.job_list || []).filter(j => j.state !== 'paused').length;
-    const saving = (s.saved_minutes || 0) > 0 ? `<span class="om-team-saving">${H(hrs(s.saved_minutes))}<small>${H(w('saved_hours').replace(/^\S+\s*/, ''))}</small></span>`
-      : `<span class="om-team-saving none">${H(tasks + bots.length ? '' : w('nothing_yet'))}</span>`;
-    const faces = O.layer !== 'bots' && people.length ? `<span class="om-faces">${people.slice(0, 5).map(p => `<span class="om-person ${p.email === team.lead ? 'lead' : ''}" title="${H(p.email)}${p.email === team.lead ? ' · ' + H(w('lead')) : ''}">${H(initials(p.email))}</span>`).join('')}${people.length > 5 ? `<span class="om-person more">+${people.length - 5}</span>` : ''}</span>` : '';
-    const botChips = O.layer !== 'people' && bots.length ? `<span class="om-chips">${bots.slice(0, 3).map(b => `<span class="om-chip">${H(b.title)}</span>`).join('')}${bots.length > 3 ? `<span class="om-chip more">+${bots.length - 3}</span>` : ''}</span>` : '';
-    return `<button type="button" class="om-team-card" data-om-team="${H(team.key)}" aria-pressed="${O.selected === team.key}">
-      ${flag ? `<span class="om-flag" title="${H(w('waiting'))}"></span>` : ''}
-      <span class="om-team-top"><span class="om-team-name">${H(team.name)}</span>${saving}</span>
-      <span class="om-stats"><span><b>${people.length}</b> ${H((people.length === 1 ? w('person') : w('people')).toLowerCase())}</span><span><b>${bots.length}</b> ${H(w('bots').toLowerCase())}</span><span><b>${tasks}</b> ${H(w('tasks').toLowerCase())}</span></span>
-      ${faces}${botChips}
-    </button>`;
+  // ── Org chart: collapsible departments, teams, sub-teams and the people/bot hierarchy ──
+  const IC = {
+    people: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
+    bots: '<rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01M9.5 17h5"/>',
+    tasks: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M8 15l2 2 4-4"/>',
+    connections: '<path d="M9 7V3M15 7V3M6 7h12v4a6 6 0 0 1-12 0zM12 17v4"/>',
+    skills: '<path d="M12 3l1.9 4.6L18.5 9l-4.6 1.9L12 15.5l-1.9-4.6L5.5 9l4.6-1.4z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
+    saved: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2h6"/>'
+  };
+  const icon = (k, size) => `<svg viewBox="0 0 24 24" width="${size || 14}" height="${size || 14}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[k]}</svg>`;
+  const STAT_KEYS = [['people', 's_people'], ['bots', 's_bots'], ['tasks', 's_tasks'], ['connections', 's_conn'], ['skills', 's_skills']];
+  const OPEN_KEY = 'sp-org-open';
+  const OPEN = (() => { try { return JSON.parse(localStorage.getItem(OPEN_KEY) || '{}') || {}; } catch (_e) { return {}; } })();
+  const isOpen = (id, dflt) => (id in OPEN ? !!OPEN[id] : dflt);
+  function setOpen(id, v){ OPEN[id] = !!v; try { localStorage.setItem(OPEN_KEY, JSON.stringify(OPEN)); } catch (_e) {} }
+  const hue = v => { let h = 0; for (const c of String(v || '')) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
+
+  function statsRow(sum){
+    sum = sum || {};
+    return `<span class="om-mini">${STAT_KEYS.map(([k, l]) => `<span class="om-mini-stat" title="${H(w(l))}${k === 'connections' ? ' · ' + H(w('s_conn_hint')) + ((sum.connection_names || []).length ? ': ' + H(sum.connection_names.join(', ')) : '') : ''}">${icon(k)}<b>${H(nf(0).format(sum[k] || 0))}</b></span>`).join('')}</span>`;
+  }
+  function savedHtml(sum){
+    const m = (sum || {}).saved_minutes || 0;
+    return `<span class="om-saved ${m ? '' : 'none'}" title="${H(w('s_saved'))} · ${H(w('s_saved_sub'))}">${icon('saved')}<b>${H(hrs(m))}</b></span>`;
+  }
+  function orgStripHtml(sum){
+    sum = sum || {};
+    return `<div class="om-strip">${STAT_KEYS.map(([k, l]) => `<div class="om-strip-tile" ${k === 'connections' ? `title="${H(w('s_conn_hint'))}"` : ''}><span class="om-strip-icon">${icon(k, 18)}</span><span class="om-strip-value">${H(nf(0).format(sum[k] || 0))}</span><span class="om-strip-label">${H(w(l))}</span></div>`).join('')}
+      <div class="om-strip-tile saved"><span class="om-strip-icon">${icon('saved', 18)}</span><span class="om-strip-value">${H(hrs(sum.saved_minutes || 0))}</span><span class="om-strip-label">${H(w('s_saved'))} <small>${H(w('s_saved_sub'))}</small></span></div></div>`;
+  }
+  function personAv(email, lead){
+    const p = ((O.chart && O.chart.people) || {})[email] || {};
+    return `<span class="om-face ${lead ? 'lead' : ''}" style="--h:${hue(email)}" title="${H(email)}">${p.avatar_url ? `<img src="${H(p.avatar_url)}" alt="" loading="lazy">` : H(initials(email))}</span>`;
+  }
+  function botAv(b){
+    return `<span class="om-face bot" style="${b.color ? '--bot:' + H(b.color) : ''}">${b.avatar_url ? `<img src="${H(b.avatar_url)}" alt="" loading="lazy">` : H(initials(b.title))}</span>`;
+  }
+  function hierarchyHtml(team){
+    const people = (O.chart && O.chart.people) || {};
+    const lead = team.lead || '';
+    const members = (team.people || []).map(p => p.email).filter(e => e !== lead);
+    const inTeam = new Set(members.concat(lead ? [lead] : []));
+    const kids = {};
+    if (O.layer !== 'bots') for (const e of members) {
+      let boss = (people[e] || {}).reports_to || '';
+      if (!inTeam.has(boss) || boss === e) boss = lead;
+      (kids[boss] = kids[boss] || []).push(e);
+    }
+    const bots = O.layer !== 'people' ? (team.bot_list || []) : [];
+    const names = new Set(bots.map(b => b.name));
+    const bkids = {};
+    for (const b of bots) { const boss = names.has(b.reports_to) && b.reports_to !== b.name ? b.reports_to : ''; (bkids[boss] = bkids[boss] || []).push(b); }
+    const branch = (id, row, children) => children ? `<li><details data-om-open="${H(id)}" ${isOpen(id, true) ? 'open' : ''}><summary>${row}</summary><ul class="om-h">${children}</ul></details></li>` : `<li>${row}</li>`;
+    const botNode = (b, depth) => {
+      const ch = depth < 6 ? (bkids[b.name] || []) : [];
+      const row = `<div class="om-node bot" data-om-bot-node="${H(b.name)}">${botAv(b)}<span class="om-node-text"><strong>${H(b.title)}</strong><span>${H(b.role || b.category || w('bots').replace(/s$/, ''))}</span></span>${ch.length ? `<span class="om-node-count" title="${H(w('bots'))}">${ch.length}</span>` : ''}</div>`;
+      return branch('bot:' + team.key + ':' + b.name, row, ch.length ? ch.map(c => botNode(c, depth + 1)).join('') : '');
+    };
+    const personNode = (e, depth) => {
+      const p = people[e] || {};
+      const ch = depth < 6 ? (kids[e] || []) : [];
+      const topBots = e === lead ? (bkids[''] || []) : [];
+      const row = `<div class="om-node person ${e === lead ? 'is-lead' : ''}">${personAv(e, e === lead)}<span class="om-node-text"><strong>${H(e.replace(/@.*/, ''))}</strong><span>${H(p.title || (e === lead ? w('lead') : e))}</span></span>${ch.length + topBots.length ? `<span class="om-node-count">${ch.length + topBots.length}</span>` : ''}</div>`;
+      const children = ch.map(c => personNode(c, depth + 1)).join('') + topBots.map(b => botNode(b, depth + 1)).join('');
+      return branch('person:' + team.key + ':' + e, row, children);
+    };
+    let roots = '';
+    if (lead && (O.layer !== 'bots' || (bkids[''] || []).length)) roots = personNode(lead, 0);
+    else roots = (kids[lead] || kids[''] || []).map(e => personNode(e, 0)).join('') + (bkids[''] || []).map(b => botNode(b, 0)).join('');
+    if (!roots) return `<p class="om-muted om-small">${H(w('nothing_runs'))}</p>`;
+    return `<ul class="om-h om-h-root">${roots}</ul>${!lead && (bkids[''] || []).length ? '' : (bots.length ? `<p class="om-h-note">${H(w('h_note'))}</p>` : '')}`;
+  }
+  function teamHtml(team, all, depth){
+    const id = 'team:' + team.key;
+    const subs = depth < 5 ? all.filter(t => t.parent === team.key) : [];
+    const st = team.stats || {};
+    const flag = (st.failing || 0) + (st.missing_value || 0) > 0;
+    return `<details class="om-team ${O.selected === team.key ? 'sel' : ''}" data-om-open="${H(id)}" data-team-key="${H(team.key)}" ${isOpen(id, false) ? 'open' : ''}>
+      <summary class="om-team-sum">
+        <span class="om-chev" aria-hidden="true"></span>
+        ${team.lead ? personAv(team.lead, true) : `<span class="om-face empty">${icon('people')}</span>`}
+        <span class="om-team-title"><strong>${H(team.name)}</strong><span>${H(team.lead ? team.lead.replace(/@.*/, '') : w('no_lead'))}${subs.length ? ' · ' + subs.length + ' ' + H(w('subteams').toLowerCase()) : ''}</span></span>
+        ${flag ? `<span class="om-flag-dot" title="${H(w('waiting'))}"></span>` : ''}
+        ${statsRow(team.summary)}${savedHtml(team.summary)}
+        <button type="button" class="sm-btn om-team-open" data-om-team="${H(team.key)}" aria-pressed="${O.selected === team.key}">${H(w('details'))}</button>
+      </summary>
+      <div class="om-team-body">${hierarchyHtml(team)}
+        ${subs.length ? `<div class="om-subteams"><div class="om-sub-label">${H(w('subteams'))}</div>${subs.map(t => teamHtml(t, all, depth + 1)).join('')}</div>` : ''}
+      </div></details>`;
+  }
+  function deptHtml(d){
+    const id = 'dept:' + d.key;
+    const teams = d.teams || [];
+    const tops = teams.filter(t => !t.parent);
+    return `<details class="om-dept2" data-om-open="${H(id)}" ${isOpen(id, true) ? 'open' : ''}>
+      <summary class="om-dept-sum"><span class="om-chev" aria-hidden="true"></span>
+        <span class="om-dept-title"><strong>${H(d.name)}</strong><span>${teams.length} ${H((teams.length === 1 ? w('team') : w('teams')).toLowerCase())}</span></span>
+        ${statsRow(d.summary)}${savedHtml(d.summary)}</summary>
+      <div class="om-dept-body">${tops.map(t => teamHtml(t, teams, 0)).join('') || `<p class="om-muted om-small">${H(w('nothing_yet'))}</p>`}</div></details>`;
   }
 
   function teamOptions(selected){
@@ -325,10 +409,9 @@
     }
     const selected = O.selected ? findTeam(O.selected) : null;
     body.innerHTML = `<p class="om-intro">${H(w('org_intro'))}</p>
+      ${orgStripHtml(O.chart.summary)}
       <div class="om-layout ${selected ? 'has-drawer' : ''}">
-        <div class="om-tree"><div class="om-depts">${depts.map(d => `<section class="om-dept" aria-label="${H(d.name)}"><h4 class="om-dept-label">${H(d.name)}${(d.teams || []).length > 1 ? ` <span>${(d.teams || []).length} ${H(w('teams').toLowerCase())}</span>` : ''}</h4>
-            <div class="om-dept-teams">${(d.teams || []).map(teamCardHtml).join('')}</div></section>`).join('')}</div>
-          ${unassignedHtml()}</div>
+        <div class="om-tree2">${depts.map(deptHtml).join('')}${unassignedHtml()}</div>
         ${drawerHtml(selected)}
       </div>`;
     if (selected) loadTeamPlaybooks(selected.key);
@@ -360,6 +443,7 @@
         <label class="om-field">${H(w('name'))}<input name="name" required maxlength="80" value="${H(t ? t.name : '')}"></label>
         <label class="om-field">${H(w('lead'))}<input name="lead" data-sp-picker data-sp-source="people" data-sp-custom="1" value="${H(t ? t.lead : '')}"></label>
         <label class="om-field">${H(w('members'))}<input name="members" data-sp-picker data-sp-source="people" data-sp-multi="1" data-sp-custom="1" value="${H(t ? (t.members || []).join(',') : '')}"></label>
+        <label class="om-field">${H(w('parent'))}<select name="parent"><option value="">${H(w('parent_none'))}</option>${(teamsBy[dept] || []).filter(x => !t || x.key !== t.key).sort((a, b) => a.name.localeCompare(b.name)).map(x => `<option value="${H(x.key)}" ${t && t.parent === x.key ? 'selected' : ''}>${H(x.name)}</option>`).join('')}</select></label>
         <label class="om-field">${H(w('rate'))}<input name="hourly_rate" type="number" min="0" step="1" value="${H(t && t.hourly_rate != null ? t.hourly_rate : '')}" placeholder="€"></label>
         <div class="om-row-actions"><button type="submit" class="sm-btn primary">${H(w('save'))}</button>${t ? `<button type="button" class="sm-btn danger" data-om-delete-team="${H(t.key)}">${H(w('delete'))}</button>` : ''}</div>
       </form>`;
@@ -398,13 +482,15 @@
     const root = $id('mainOrganisation');
     if (!root || root.dataset.omBound) return;
     root.dataset.omBound = '1';
+    root.addEventListener('toggle', ev => { const d = ev.target; if (d && d.dataset && d.dataset.omOpen) setOpen(d.dataset.omOpen, d.open); }, true);
     root.addEventListener('click', async ev => {
       const t = ev.target.closest('button,[data-om-view]');
       if (!t) return;
       if (t.dataset.omView) { O.view = t.dataset.omView; renderOrg(); return; }
       if (t.dataset.omLayer) { O.layer = t.dataset.omLayer; renderOrg(); return; }
       if (t.hasAttribute('data-om-refresh')) { await loadOrg(); return; }
-      if (t.dataset.omTeam) { O.selected = O.selected === t.dataset.omTeam ? '' : t.dataset.omTeam; renderOrg(); return; }
+      if (t.dataset.omTeam) { ev.preventDefault(); O.selected = O.selected === t.dataset.omTeam ? '' : t.dataset.omTeam; renderOrg(); return; }
+      if (t.dataset.omExpand) { const open = t.dataset.omExpand === '1'; root.querySelectorAll('details[data-om-open]').forEach(d => { d.open = open; setOpen(d.dataset.omOpen, open); }); return; }
       if (t.hasAttribute('data-om-close')) { O.selected = ''; renderOrg(); return; }
       if (t.hasAttribute('data-om-template')) { await applyTemplate(); return; }
       if (t.dataset.omNewAutomation) { if (window.SPStudio) { await window.SPStudio.newForTeam(t.dataset.omNewAutomation); return; } const team = findTeam(t.dataset.omNewAutomation); await startChat(w('chat_prompt_team', { team: team ? team.name : t.dataset.omNewAutomation })); return; }
@@ -439,7 +525,7 @@
         const val = n => String((form.querySelector(`[name="${n}"]`) || {}).value || '');
         const members = val('members').split(',').map(s => s.trim()).filter(Boolean);
         const rate = val('hourly_rate');
-        const body = { op: 'team.save', department: form.dataset.dept, name: val('name'), lead: val('lead').trim(), members, hourly_rate: rate === '' ? null : Number(rate) };
+        const body = { op: 'team.save', department: form.dataset.dept, name: val('name'), lead: val('lead').trim(), members, parent: val('parent'), hourly_rate: rate === '' ? null : Number(rate) };
         if (form.dataset.key) body.key = form.dataset.key;
         await orgMutate(body);
       } else if (form.hasAttribute('data-om-dept-form')) {
@@ -923,7 +1009,7 @@
 
   // ── Panel hooks ───────────────────────────────────────────────────────────
   window.SPOrg = { load: async () => { bindOrg(); await loadOrg(); }, refreshNav, view: () => O.view,
-    show: async (view) => { O.view = view === 'manage' ? 'manage' : 'chart'; if (typeof _currentPanel !== 'undefined' && _currentPanel === 'organisation') { renderOrg(); return; } if (typeof switchPanel === 'function') await switchPanel('organisation'); } };
+    show: async (view) => { O.view = view === 'manage' ? 'manage' : 'chart'; if (typeof _currentPanel !== 'undefined' && _currentPanel === 'organisation') { await loadOrg(); return; } if (typeof switchPanel === 'function') await switchPanel('organisation'); } };
   window.SPManagement = { load: async () => { bindMgmt(); await loadMgmt(); } };
   window.SPValue = { createFieldsHtml, createValueFromForm, jobCardHtml, dutyFieldsHtml, dutyFromForm, dutyChipHtml, servesFieldHtml, mountServes };
 

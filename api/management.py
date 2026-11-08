@@ -19,6 +19,7 @@ from __future__ import annotations
 import logging
 import time
 from collections import defaultdict
+from pathlib import Path
 from urllib.parse import parse_qs
 
 from api import org_structure, value_tracking
@@ -256,6 +257,7 @@ def build(view: org_structure.ViewScope, days: int, start: float, end: float) ->
         estimate = value_tracking.bot_estimate_per_week(name)
         bot_rows[name] = {"name": name, "title": bot["title"], "team": team, "serves": bot["serves"],
                           "category": " ".join(str(bot.get("category") or "").split())[:60],
+                          "reports_to": bot.get("reports_to") or "",
                           "avatar_url": bot["avatar_url"], "color": bot["color"], "role": bot["role"],
                           "suggested_team": suggest_team(bot.get("category"), structure) if team == UNASSIGNED else "",
                           "duties": len(bot["duties"]), "duties_with_value": estimate["duties_with_value"],
@@ -431,6 +433,110 @@ def build(view: org_structure.ViewScope, days: int, start: float, end: float) ->
     }
 
 
+# ── Org chart: what each bot brings (skills, MCP servers) and personal connections ──
+
+_ASSETS: dict = {}
+_ASSET_TTL = 600
+_CONN: dict = {"at": 0.0, "by_user": {}}
+_CONN_TTL = 300
+
+
+def _bot_assets(name: str, force: bool = False) -> tuple[set, set]:
+    """Skill names and enabled MCP server names of one bot, cached for ten minutes.
+
+    Walking a large shared skill library takes a while, so ``warm_assets``
+    keeps this cache filled in the background and the chart stays fast.
+    """
+    import os
+
+    import yaml
+
+    hit = _ASSETS.get(name)
+    if hit and not force and time.time() - hit[0] < _ASSET_TTL:
+        return hit[1], hit[2]
+    skills: set = set()
+    mcp: set = set()
+    try:
+        from api.profiles import get_hermes_home_for_profile
+
+        home = Path(get_hermes_home_for_profile(name))
+        root = home / "skills"
+        base_depth = len(root.parts)
+        for dirpath, dirnames, filenames in os.walk(root, followlinks=True):
+            if "SKILL.md" in filenames:
+                skills.add(Path(dirpath).name)
+                dirnames[:] = []
+            elif len(Path(dirpath).parts) - base_depth >= 4:
+                dirnames[:] = []
+        cfg = yaml.safe_load((home / "config.yaml").read_text(encoding="utf-8")) if (home / "config.yaml").exists() else {}
+        disabled = ((cfg or {}).get("skills") or {}).get("disabled") or []
+        skills -= {str(d).rstrip("/").rsplit("/", 1)[-1] for d in disabled if d}
+        for key, conf in ((cfg or {}).get("mcp_servers") or {}).items():
+            if not (isinstance(conf, dict) and conf.get("enabled") is False):
+                mcp.add(str(key))
+    except Exception:
+        logger.debug("bot assets unavailable for %s", name, exc_info=True)
+    _ASSETS[name] = (time.time(), skills, mcp)
+    return skills, mcp
+
+
+def warm_assets() -> None:
+    """Background thread: refresh every bot's skills and MCP servers before the cache expires."""
+    import threading
+
+    def run():
+        time.sleep(15)
+        while True:
+            try:
+                for name in list(_bots()):
+                    _bot_assets(name, force=True)
+                _CONN["at"] = 0.0
+                _personal_connections()
+            except Exception:
+                logger.debug("org chart warm-up failed", exc_info=True)
+            time.sleep(_ASSET_TTL - 90)
+
+    threading.Thread(target=run, daemon=True, name="org-chart-assets").start()
+
+
+def _personal_connections() -> dict:
+    """Providers each person connected themselves (Nango end user id -> set), cached."""
+    if time.time() - _CONN["at"] < _CONN_TTL:
+        return _CONN["by_user"]
+    by_user: dict = {}
+    try:
+        from api import integrations
+
+        if integrations.connect_configured():
+            for row in integrations.list_connections(None, is_admin=True):
+                user = (row.get("end_user") or {}).get("id")
+                if user and row.get("provider_config_key"):
+                    by_user.setdefault(user, set()).add(row["provider_config_key"])
+    except Exception:
+        logger.debug("connections unavailable for the org chart", exc_info=True)
+    _CONN.update(at=time.time(), by_user=by_user)
+    return by_user
+
+
+def _summary(people: set, bots: list, jobs: list, saved: float, conn_by_user: dict) -> dict:
+    """The six numbers of a team, department or the organisation."""
+    from api import integrations
+
+    skills: set = set()
+    connections: set = set()
+    for b in bots:
+        s, m = _bot_assets(b["name"])
+        skills |= s
+        connections |= {"mcp:" + x for x in m}
+    for email in people:
+        connections |= {"app:" + x for x in conn_by_user.get(integrations.end_user_id(email), set())}
+    return {"people": len(people), "bots": len({b["name"] for b in bots}),
+            "tasks": len({(j.get("store"), j["id"]) for j in jobs if j.get("state") != "paused"}),
+            "skills": len(skills), "connections": len(connections),
+            "connection_names": sorted({c.split(":", 1)[1] for c in connections})[:60],
+            "saved_minutes": round(saved or 0)}
+
+
 def chart(view: org_structure.ViewScope) -> dict:
     """Organisation chart: departments > teams > people, with bots and jobs."""
     structure = org_structure.load()
@@ -450,26 +556,50 @@ def chart(view: org_structure.ViewScope) -> dict:
                       for t in model["teams"]}
         bots = model["bots"]
         jobs = model["jobs"]
-    people_titles = snap["people"]
+    from api import user_avatars
+
+    people_titles = {e: {**p, "avatar_url": user_avatars.avatar_url(e)} for e, p in snap["people"].items()}
+    conn_by_user = _personal_connections()
     nodes = []
+    org_people, org_bots, org_jobs, org_saved = set(), {}, [], 0.0
     for dkey, dept in sorted(snap["departments"].items(), key=lambda kv: kv[1]["name"].lower()):
         dept_teams = []
+        d_people, d_bots, d_jobs, d_saved = set(), {}, [], 0.0
         for tkey, team in sorted(snap["teams"].items(), key=lambda kv: kv[1]["name"].lower()):
             if team["department"] != dkey:
                 continue
+            team_bots = [b for b in bots if b["team"] == tkey or tkey in (b.get("serves") or [])]
+            team_jobs = [jb for jb in jobs if jb["team"] == tkey]
+            stats = team_stats.get(tkey, {})
+            members = set(team["members"]) | ({team["lead"]} if team["lead"] else set())
             dept_teams.append({
-                **team, "stats": team_stats.get(tkey, {}),
+                **team, "stats": stats,
+                "summary": _summary(members, team_bots, team_jobs, stats.get("saved_minutes") or 0, conn_by_user),
                 "people": [people_titles.get(m, {"email": m}) for m in team["members"]],
-                "bot_list": [b for b in bots if b["team"] == tkey or tkey in (b.get("serves") or [])],
-                "job_list": [jb for jb in jobs if jb["team"] == tkey],
+                "bot_list": team_bots,
+                "job_list": team_jobs,
             })
-        nodes.append({**dept, "teams": dept_teams})
+            d_people |= members
+            d_bots.update({b["name"]: b for b in team_bots})
+            d_jobs += team_jobs
+            d_saved += stats.get("saved_minutes") or 0
+        keys = {t["key"] for t in dept_teams}
+        for t in dept_teams:  # a parent outside what this viewer sees makes the team top level here
+            if t.get("parent") not in keys:
+                t["parent"] = ""
+        nodes.append({**dept, "teams": dept_teams,
+                      "summary": _summary(d_people, list(d_bots.values()), d_jobs, d_saved, conn_by_user)})
+        org_people |= d_people
+        org_bots.update(d_bots)
+        org_jobs += d_jobs
+        org_saved += d_saved
     unassigned = None
     if view.scope == org_structure.SCOPE_ALL:
         unassigned = {"bot_list": [b for b in bots if b["team"] == UNASSIGNED],
                       "job_list": [jb for jb in jobs if jb["team"] == UNASSIGNED],
                       "stats": team_stats.get(UNASSIGNED, {})}
     return {"departments": nodes, "unassigned": unassigned, "viewer": view.to_dict(),
+            "summary": _summary(org_people, list(org_bots.values()), org_jobs, org_saved, conn_by_user),
             "people": people_titles, "updated_at": snap.get("updated_at")}
 
 
