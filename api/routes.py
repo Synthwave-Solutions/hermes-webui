@@ -23536,7 +23536,8 @@ def _cron_value_from_prompt(prompt) -> dict | None:
     if pairs.get("before") in ("unknown", "onbekend", "?"):
         raw.update({"unknown": True, "unknown_reason": pairs.get("reason") or "Nog niet bekend"})
     else:
-        raw.update({"before_minutes": pairs.get("before"), "review_minutes": pairs.get("now", 0)})
+        raw.update({"before_minutes": pairs.get("before"), "review_minutes": pairs.get("now", 0),
+                    "per": pairs.get("per", "run")})
     if pairs.get("team"):
         raw["team"] = pairs["team"]
     try:

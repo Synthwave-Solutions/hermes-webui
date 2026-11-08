@@ -71,16 +71,61 @@ def _bots() -> dict:
             "duties": bot.get("responsibilities") or [],
             "avatar_url": meta.get("bot_avatar_url") or "",
             "color": bot.get("color") or "",
+            "category": bot.get("category") or "",
         }
     return out
 
 
-def _job_team(job: dict, structure: dict) -> str:
+_CATEGORY_ALIASES = {
+    "sales": ("sales", "commercieel", "commercial", "verkoop"),
+    "commercieel": ("sales", "commercieel", "commercial", "verkoop"),
+    "engineering": ("engineering", "tech", "techniek", "platform", "development"),
+    "platform": ("platform", "tech", "engineering"),
+    "delivery": ("delivery", "projecten", "operations"),
+    "finance": ("finance", "financien", "financiën"),
+    "marketing": ("marketing",),
+    "management": ("management", "directie", "mt"),
+}
+
+
+def suggest_team(category: str, structure: dict) -> str:
+    """A team for an unassigned task or bot from its existing category: a
+    team with that name, else the only team of a department with that name."""
+    cat = " ".join(str(category or "").lower().split())
+    if not cat:
+        return ""
+    names = _CATEGORY_ALIASES.get(cat, (cat,))
+    teams = {k: v for k, v in (structure.get("teams") or {}).items() if isinstance(v, dict)}
+    for key, team in sorted(teams.items()):
+        if str(team.get("name") or "").lower() in names:
+            return key
+    depts = org_structure.departments(structure)
+    for dkey, dept in depts.items():
+        if dkey in names or str(dept.get("name") or "").lower() in names:
+            in_dept = sorted(k for k, v in teams.items() if v.get("department") == dkey)
+            if len(in_dept) == 1:
+                return in_dept[0]
+    return ""
+
+
+def _job_team(job: dict, structure: dict, bot_teams: dict | None = None, store: str | None = None) -> str:
+    """A task's team: its own ``value.team``, else the team its responsible
+    bot works for, else the team of its owner."""
     value = job.get("value") if isinstance(job.get("value"), dict) else {}
     if value.get("team"):
         return value["team"]
+    if bot_teams:
+        from api import cron_bots
+
+        team = bot_teams.get(cron_bots.job_bot(job, store if store is not None else job.get("owner_profile")))
+        if team:
+            return team
     owner = org_structure.norm_email(job.get("owner_email"))
     return org_structure.team_of(owner, structure) if owner else ""
+
+
+def _bot_teams(bots: dict) -> dict:
+    return {name: (b.get("serves") or [""])[0] for name, b in bots.items() if b.get("serves")}
 
 
 def _job_state(job: dict) -> str:
@@ -128,11 +173,12 @@ def build(view: org_structure.ViewScope, days: int, start: float, end: float) ->
         return key in snap["teams"]
 
     jobs = {}
+    bot_teams = _bot_teams(bots)
     for profile, job in value_tracking.iter_store_jobs():
         jid = str(job.get("id") or "")
         if not jid:
             continue
-        team = _job_team(job, structure) or UNASSIGNED
+        team = _job_team(job, structure, bot_teams, profile) or UNASSIGNED
         if not visible_team(team):
             continue
         value = value_tracking.job_value(job)
@@ -144,8 +190,9 @@ def build(view: org_structure.ViewScope, days: int, start: float, end: float) ->
             "schedule": job.get("schedule_display") or "",
             "owner_email": org_structure.norm_email(job.get("owner_email")),
             "value": value, "value_label": _value_label(value),
+            "suggested_team": suggest_team(job.get("category"), structure) if team == UNASSIGNED else "",
             "runs": 0, "ok_runs": 0, "failed_runs": 0, "saved_minutes": 0, "review_minutes": 0,
-            "ai_cost_eur": 0.0, "unpriced_tokens": 0, "net_eur": None,
+            "ai_cost_eur": 0.0, "unpriced_tokens": 0, "net_eur": None, "_periods": set(),
         }
 
     def rate_for(team: str):
@@ -160,14 +207,35 @@ def build(view: org_structure.ViewScope, days: int, start: float, end: float) ->
         money = value_tracking.run_money(run, rate_for(row["team"]), pricing)
         row["runs"] += 1
         row["ok_runs" if run["status"] == "ok" else "failed_runs"] += 1
-        row["saved_minutes"] += money["saved_minutes"]
-        row["review_minutes"] += money["review_minutes"]
+        per = (row["value"] or {}).get("per", "run")
+        if per == "run":
+            row["saved_minutes"] += money["saved_minutes"]
+            row["review_minutes"] += money["review_minutes"]
+        elif run["status"] == "ok" and money["has_value"] and run.get("finished_at"):
+            # Count once per day or ISO week with a completed run.
+            stamp = time.gmtime(run["finished_at"])
+            row["_periods"].add(time.strftime("%Y-%j", stamp) if per == "day" else time.strftime("%G-%V", stamp))
+            money = dict(money, saved_minutes=0, net_eur=(-(money["ai_cost_eur"] or 0) if money["net_eur"] is not None else None))
         if money["ai_cost_eur"] is None:
             row["unpriced_tokens"] += (run.get("tokens_in") or 0) + (run.get("tokens_out") or 0) + (run.get("tokens_cache") or 0)
         else:
             row["ai_cost_eur"] += money["ai_cost_eur"]
         if money["net_eur"] is not None:
             row["net_eur"] = round((row["net_eur"] or 0) + money["net_eur"], 2)
+
+    # Per-day and per-week values: the saving once per period with a run.
+    for row in jobs.values():
+        periods = row.pop("_periods")
+        value = row["value"] or {}
+        if periods and value.get("per") in ("day", "week"):
+            each = max(0, int(value.get("before_minutes") or 0) - int(value.get("review_minutes") or 0))
+            row["saved_minutes"] += each * len(periods)
+            row["review_minutes"] += int(value.get("review_minutes") or 0) * len(periods)
+            rate = rate_for(row["team"])
+            if rate is not None:
+                row["net_eur"] = round((row["net_eur"] or 0) + each * len(periods) / 60 * rate, 2)
+        row["confirmed"] = row["value_label"] == "confirmed"
+        row["saved_per_day"] = row["saved_minutes"] / max(1, days)
 
     # Bot chats in the period. Team = the bot's first served team, else the
     # chatting person's team.
@@ -179,6 +247,7 @@ def build(view: org_structure.ViewScope, days: int, start: float, end: float) ->
         estimate = value_tracking.bot_estimate_per_week(name)
         bot_rows[name] = {"name": name, "title": bot["title"], "team": team, "serves": bot["serves"],
                           "avatar_url": bot["avatar_url"], "color": bot["color"], "role": bot["role"],
+                          "suggested_team": suggest_team(bot.get("category"), structure) if team == UNASSIGNED else "",
                           "duties": len(bot["duties"]), "duties_with_value": estimate["duties_with_value"],
                           "estimate_minutes_per_week": estimate["minutes_per_week"],
                           "estimate_confirmed": estimate["confirmed"],
@@ -218,12 +287,13 @@ def build(view: org_structure.ViewScope, days: int, start: float, end: float) ->
                       "members": len(team["members"]), "hourly_rate": team.get("hourly_rate"),
                       "bots": 0, "jobs": 0, "active_jobs": 0, "runs": 0, "ok_runs": 0, "failed_runs": 0,
                       "saved_minutes": 0, "estimate_minutes": 0, "ai_cost_eur": 0.0, "unpriced_tokens": 0,
-                      "net_eur": None, "failing": 0, "missing_value": 0}
+                      "net_eur": None, "failing": 0, "missing_value": 0, "saved_confirmed_minutes": 0}
     if view.scope == org_structure.SCOPE_ALL:
         teams[UNASSIGNED] = {"key": UNASSIGNED, "name": "", "department": "", "lead": "", "members": 0,
                              "hourly_rate": None, "bots": 0, "jobs": 0, "active_jobs": 0, "runs": 0, "ok_runs": 0,
                              "failed_runs": 0, "saved_minutes": 0, "estimate_minutes": 0, "ai_cost_eur": 0.0,
-                             "unpriced_tokens": 0, "net_eur": None, "failing": 0, "missing_value": 0}
+                             "unpriced_tokens": 0, "net_eur": None, "failing": 0, "missing_value": 0,
+                             "saved_confirmed_minutes": 0}
     for row in jobs.values():
         team = teams.get(row["team"])
         if team is None:
@@ -232,6 +302,7 @@ def build(view: org_structure.ViewScope, days: int, start: float, end: float) ->
         team["active_jobs"] += 1 if row["enabled"] else 0
         for k in ("runs", "ok_runs", "failed_runs", "saved_minutes", "unpriced_tokens"):
             team[k] += row[k]
+        team["saved_confirmed_minutes"] += row["saved_minutes"] if row["confirmed"] else 0
         team["ai_cost_eur"] += row["ai_cost_eur"]
         if row["net_eur"] is not None:
             team["net_eur"] = round((team["net_eur"] or 0) + row["net_eur"], 2)
@@ -245,6 +316,7 @@ def build(view: org_structure.ViewScope, days: int, start: float, end: float) ->
             continue
         team["bots"] += 1
         team["saved_minutes"] += row["labeled_minutes"]
+        team["saved_confirmed_minutes"] += row["labeled_minutes"]
         # Estimate: chats a model linked to a duty; without such labels the
         # duties' own "times per week" stand in.
         team["estimate_minutes"] += row["auto_minutes"] if row["auto_chats"] else int(row["estimate_minutes_per_week"] * weeks)
@@ -260,6 +332,7 @@ def build(view: org_structure.ViewScope, days: int, start: float, end: float) ->
     confirmed = [r for r in active if r["value_label"] == "confirmed"]
     totals = {
         "saved_minutes": sum(t["saved_minutes"] for t in teams.values()),
+        "saved_confirmed_minutes": sum(t["saved_confirmed_minutes"] for t in teams.values()),
         "estimate_minutes": sum(t["estimate_minutes"] for t in teams.values()),
         "ai_cost_eur": round(sum(t["ai_cost_eur"] for t in teams.values()), 2),
         "unpriced_tokens": sum(t["unpriced_tokens"] for t in teams.values()),
@@ -281,7 +354,9 @@ def build(view: org_structure.ViewScope, days: int, start: float, end: float) ->
         return {"id": r["id"], "store": r["store"], "name": r["name"], "team": r["team"], "bot": r["bot"],
                 "saved_minutes": r["saved_minutes"], "net_eur": r["net_eur"], "ai_cost_eur": round(r["ai_cost_eur"], 2),
                 "runs": r["runs"], "failed_runs": r["failed_runs"], "value_label": r["value_label"],
-                "failure_streak": r["failure_streak"], "state": r["state"]}
+                "failure_streak": r["failure_streak"], "state": r["state"], "suggested_team": r.get("suggested_team", ""),
+                "per": (r["value"] or {}).get("per", "run"), "confirmed": r.get("confirmed", False),
+                "before_minutes": (r["value"] or {}).get("before_minutes"), "review_minutes": (r["value"] or {}).get("review_minutes")}
 
     decisions = []
     failing = [r for r in active if r["failure_streak"] >= FAILING_STREAK]
@@ -294,6 +369,10 @@ def build(view: org_structure.ViewScope, days: int, start: float, end: float) ->
     unconfirmed = [r for r in active if r["value_label"] in ("ai_estimate", "estimated")]
     if unconfirmed:
         decisions.append({"kind": "unconfirmed", "count": len(unconfirmed), "items": [job_ref(r) for r in unconfirmed[:50]]})
+    high = [r for r in active if r["saved_per_day"] > 240 and not r["confirmed"]]
+    if high:
+        decisions.append({"kind": "check_high", "count": len(high),
+                          "items": [job_ref(r) for r in sorted(high, key=lambda r: -r["saved_minutes"])[:20]]})
     negative = [r for r in active if r["net_eur"] is not None and r["net_eur"] < 0 and r["runs"]]
     if negative:
         decisions.append({"kind": "negative", "count": len(negative),
@@ -304,8 +383,12 @@ def build(view: org_structure.ViewScope, days: int, start: float, end: float) ->
                           "items": [{"key": t["key"], "name": t["name"]} for t in idle]})
     unassigned = teams.get(UNASSIGNED)
     if unassigned and (unassigned["jobs"] or unassigned["bots"]):
+        items = [job_ref(r) for r in jobs.values() if r["team"] == UNASSIGNED and r["enabled"]]
+        bot_items = [{"bot": b["name"], "name": b["title"], "suggested_team": b["suggested_team"]}
+                     for b in bot_rows.values() if b["team"] == UNASSIGNED]
         decisions.append({"kind": "unassigned", "count": unassigned["jobs"] + unassigned["bots"],
-                          "items": [job_ref(r) for r in jobs.values() if r["team"] == UNASSIGNED and r["enabled"]][:50]})
+                          "suggestions": sum(1 for x in items + bot_items if x.get("suggested_team")),
+                          "items": (bot_items + items)[:200]})
     try:
         from api import approvals
 
@@ -388,7 +471,7 @@ def job_detail(view, store: str, job_id: str, days: int, start: float, end: floa
     if job is None:
         raise KeyError("Job not found")
     structure = org_structure.load()
-    team = _job_team(job, structure) or UNASSIGNED
+    team = _job_team(job, structure, _bot_teams(_bots()), owner) or UNASSIGNED
     allowed = view.scope == org_structure.SCOPE_ALL or (
         team != UNASSIGNED and view.scope == org_structure.SCOPE_DEPARTMENTS and view.edits_team(team))
     if not allowed and handler is not None:
@@ -524,7 +607,7 @@ def _post_job_value(handler, view, body) -> bool:
         if job is None or view.scope != org_structure.SCOPE_ALL:
             raise KeyError("Job not found")
     structure = org_structure.load()
-    team_now = _job_team(job, structure)
+    team_now = _job_team(job, structure, _bot_teams(_bots()), store)
     is_owner = cron_scope.identity_owns_cron_job(identity, job)
     is_org = view.scope == org_structure.SCOPE_ALL or (team_now and view.edits_team(team_now))
     try:

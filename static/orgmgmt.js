@@ -16,7 +16,11 @@
 
   const W = {
     nl: {
-      other: 'Overig', fails: 'faalt', no_value: 'zonder waarde',
+      per_label: 'Eenheid', per_run_opt: 'per keer', per_day_opt: 'per dag', per_week_opt: 'per week', per_hint: 'Draait de taak vaker dan dagelijks? Kies per dag: de besparing telt dan één keer per dag met een geslaagde run.',
+      of_which_confirmed: 'waarvan {h} bevestigd', all_estimated: 'nog geheel op basis van AI-schattingen',
+      d_check_high: 'Schatting lijkt hoog', d_check_high_sub: 'meer dan 4 uur per dag voor één taak; controleer eenheid en minuten',
+      other: 'Overig', fails: 'faalt', no_value: 'zonder waarde', suggested: 'voorstel',
+      suggest_intro: '{n} voorstellen op basis van de bestaande categorie.', apply_suggestions: 'Neem alle voorstellen over', applied_n: '{n} ingedeeld',
       org: 'Organisatie', mgmt: 'Management', chart: 'Organigram', manage: 'Teams beheren',
       people: 'Mensen', bots: 'Bots', both: 'Samen', tasks: 'Taken', team: 'Team', teams: 'Teams',
       department: 'Afdeling', departments: 'Afdelingen', lead: 'Lead', members: 'Leden', rate: 'Uurtarief',
@@ -80,7 +84,11 @@
       chat_prompt_value: 'Help me de waarde van mijn geplande taak "{task}" te bepalen: hoeveel minuten kostte dit werk met de hand, en hoeveel tijd kost controle nu?'
     },
     en: {
-      other: 'Other', fails: 'failing', no_value: 'without value',
+      per_label: 'Unit', per_run_opt: 'per run', per_day_opt: 'per day', per_week_opt: 'per week', per_hint: 'Runs more than daily? Choose per day: the saving then counts once per day with a completed run.',
+      of_which_confirmed: 'of which {h} confirmed', all_estimated: 'still entirely based on AI estimates',
+      d_check_high: 'Estimate looks high', d_check_high_sub: 'more than 4 hours a day for one task; check unit and minutes',
+      other: 'Other', fails: 'failing', no_value: 'without value', suggested: 'suggested',
+      suggest_intro: '{n} suggestions based on the existing category.', apply_suggestions: 'Apply all suggestions', applied_n: '{n} placed',
       org: 'Organisation', mgmt: 'Management', chart: 'Org chart', manage: 'Manage teams',
       people: 'People', bots: 'Bots', both: 'Both', tasks: 'Tasks', team: 'Team', teams: 'Teams',
       department: 'Department', departments: 'Departments', lead: 'Lead', members: 'Members', rate: 'Hourly rate',
@@ -495,7 +503,7 @@
     const cover = t.coverage == null ? null : Math.round(t.coverage * 100);
     return `<div class="om-kpis">
       <div class="om-kpi"><span class="om-kpi-label">${H(w('k_saved'))}</span><span class="om-kpi-value">${H(hrs(t.saved_minutes))}</span>${delta(t.saved_minutes, p.saved_minutes)}
-        <span class="om-kpi-sub">${H(w('k_saved_sub'))}${t.estimate_minutes ? `<br>+ ${H(hrs(t.estimate_minutes))} ${H(w('k_estimate'))}` : ''}</span></div>
+        <span class="om-kpi-sub">${H(w('k_saved_sub'))}${t.saved_minutes ? `<br><strong>${H(t.saved_confirmed_minutes ? w('of_which_confirmed', { h: hrs(t.saved_confirmed_minutes) }) : w('all_estimated'))}</strong>` : ''}${t.estimate_minutes ? `<br>+ ${H(hrs(t.estimate_minutes))} ${H(w('k_estimate'))}` : ''}</span></div>
       <div class="om-kpi"><span class="om-kpi-label">${H(w('k_net'))}</span>${t.net_eur != null ? `<span class="om-kpi-value">${H(eur(t.net_eur))}</span>${delta(t.net_eur, p.net_eur)}<span class="om-kpi-sub">${H(w('k_net_sub'))}</span>` : `<span class="om-kpi-value om-muted">·</span><button type="button" class="om-link" data-om-goto-rates>${H(w('k_net_missing'))}</button>`}</div>
       <div class="om-kpi"><span class="om-kpi-label">${H(w('k_cost'))}</span>${t.pricing_set ? `<span class="om-kpi-value">${H(eur(t.ai_cost_eur || 0))}</span>${delta(t.ai_cost_eur, p.ai_cost_eur, true)}<span class="om-kpi-sub">${H(w('k_cost_sub'))}${t.unpriced_tokens ? ' · ' + H(nf(0).format(t.unpriced_tokens)) + ' ' + H(w('tokens')) : ''}</span>` : `<span class="om-kpi-value om-muted">·</span><span class="om-kpi-sub">${H(nf(0).format(t.unpriced_tokens || 0))} ${H(w('tokens'))}</span><button type="button" class="om-link" data-om-settings>${H(w('k_cost_missing'))}</button>`}</div>
       <div class="om-kpi"><span class="om-kpi-label">${H(w('k_return'))}</span><span class="om-kpi-value">${t.return_ratio != null ? H(nf(1).format(t.return_ratio)) + '×' : '<span class="om-muted">·</span>'}</span><span class="om-kpi-sub">${H(w('k_return_sub'))}</span></div>
@@ -504,23 +512,27 @@
     </div>`;
   }
 
-  const SEV = { failing: 'high', negative: 'high', missing_value: 'mid', unconfirmed: 'mid', unassigned: 'mid', old_approvals: 'mid', idle_teams: 'low' };
+  const SEV = { failing: 'high', negative: 'high', check_high: 'mid', missing_value: 'mid', unconfirmed: 'mid', unassigned: 'mid', old_approvals: 'mid', idle_teams: 'low' };
 
   function decisionItemHtml(kind, item){
     if (kind === 'idle_teams') return `<div class="om-row"><div class="om-row-main"><div class="om-row-title">${H(item.name)}</div></div><div class="om-row-actions"><button type="button" class="sm-btn" data-om-usecase="${H(item.name)}">${H(w('find_use_case'))}</button></div></div>`;
     const teamName = item.team && item.team !== '_unassigned' ? ((M.data.team_names || {})[item.team] || item.team) : w('unassigned');
     let extra = '';
-    if (kind === 'missing_value') extra = `<form class="om-inline-form" data-om-quick-value><input type="number" min="1" max="6000" name="before" placeholder="${H(w('duty_minutes_before'))}" aria-label="${H(w('minutes_before'))}" required><input type="number" min="0" max="6000" name="now" placeholder="${H(w('duty_minutes_now'))}" aria-label="${H(w('minutes_now'))}"><button type="submit" class="sm-btn primary">${H(w('save'))}</button></form>`;
+    if (kind === 'missing_value') extra = `<form class="om-inline-form" data-om-quick-value><input type="number" min="1" max="6000" name="before" placeholder="${H(w('duty_minutes_before'))}" aria-label="${H(w('minutes_before'))}" required><input type="number" min="0" max="6000" name="now" placeholder="${H(w('duty_minutes_now'))}" aria-label="${H(w('minutes_now'))}"><select class="om-select" name="per" aria-label="${H(w('per_label'))}">${['run', 'day', 'week'].map(p => `<option value="${p}">${H(w('per_' + p + '_opt'))}</option>`).join('')}</select><button type="submit" class="sm-btn primary">${H(w('save'))}</button></form>`;
     else if (kind === 'unconfirmed') extra = `<span class="om-confirm">${['yes', 'less', 'more'].map(a => `<button type="button" class="sm-btn" data-om-confirm="${a}">${H(w(a))}</button>`).join('')}</span>`;
-    else if (kind === 'unassigned') extra = `<select class="om-select" data-om-assign-job aria-label="${H(w('assign'))}">${mgmtTeamOptions()}</select>`;
-    const sub = kind === 'failing' ? `${item.failure_streak}× · ${teamName}` : kind === 'negative' ? `${eur(item.net_eur)} · ${teamName}` : teamName;
+    else if (kind === 'unassigned') extra = `<select class="om-select" ${item.bot ? 'data-om-assign-bot' : 'data-om-assign-job'} aria-label="${H(w('assign'))}">${mgmtTeamOptions(item.suggested_team)}</select>`;
+    if (kind === 'unassigned' && item.bot) return `<div class="om-row" data-bot="${H(item.bot)}"><span class="om-avatar">${H(initials(item.name))}</span><div class="om-row-main"><div class="om-row-title">${H(item.name)}</div><div class="om-row-sub">${H(w('bots'))}${item.suggested_team ? ' · ' + H(w('suggested')) : ''}</div></div><div class="om-row-actions">${extra}</div></div>`;
+    const unit = item.per ? w('per_' + item.per + '_opt') : '';
+    const sub = kind === 'failing' ? `${item.failure_streak}× · ${teamName}` : kind === 'negative' ? `${eur(item.net_eur)} · ${teamName}`
+      : kind === 'check_high' ? `${hrs(item.saved_minutes)} · ${item.runs} runs · ${item.before_minutes}→${item.review_minutes || 0} ${w('min')} ${unit}`
+      : kind === 'unconfirmed' && item.before_minutes ? `${item.before_minutes}→${item.review_minutes || 0} ${w('min')} ${unit} · ${teamName}` : teamName;
     return `<div class="om-row" data-job="${H(item.id)}" data-store="${H(item.store)}"><div class="om-row-main"><div class="om-row-title">${H(item.name)}</div><div class="om-row-sub">${H(sub)}</div></div>
       <div class="om-row-actions">${extra}<button type="button" class="sm-btn" data-om-open-job>${H(w('open'))}</button></div></div>`;
   }
 
-  function mgmtTeamOptions(){
+  function mgmtTeamOptions(selected){
     const names = (M.data && M.data.team_names) || {};
-    return `<option value="">${H(w('choose_team'))}</option>` + Object.entries(names).sort((a, b) => a[1].localeCompare(b[1])).map(([k, n]) => `<option value="${H(k)}">${H(n)}</option>`).join('');
+    return `<option value="">${H(w('choose_team'))}</option>` + Object.entries(names).sort((a, b) => a[1].localeCompare(b[1])).map(([k, n]) => `<option value="${H(k)}" ${k === selected ? 'selected' : ''}>${H(n)}${k === selected ? ' · ' + H(w('suggested')) : ''}</option>`).join('');
   }
 
   function decisionsHtml(d){
@@ -528,7 +540,7 @@
     if (!list.length) return `<div class="om-card om-muted">${H(w('decisions_none'))}</div>`;
     return `<div class="om-decisions">${list.map(x => `<details class="om-decision sev-${SEV[x.kind] || 'low'}" ${x.kind === 'failing' ? 'open' : ''}>
       <summary><span class="om-decision-count">${H(x.count)}</span><div><div class="om-decision-title">${H(w('d_' + x.kind))}</div><div class="om-decision-sub">${H(w('d_' + x.kind + '_sub'))}</div></div></summary>
-      ${(x.items || []).length ? `<div class="om-decision-body">${x.items.map(i => decisionItemHtml(x.kind, i)).join('')}</div>` : (x.kind === 'old_approvals' ? `<div class="om-decision-body"><div class="om-row"><button type="button" class="sm-btn" data-om-goto-gov>${H(w('open'))}</button></div></div>` : '')}
+      ${(x.items || []).length ? `<div class="om-decision-body">${x.kind === 'unassigned' && x.suggestions ? `<div class="om-row"><div class="om-row-main"><div class="om-row-sub">${H(w('suggest_intro', { n: x.suggestions }))}</div></div><div class="om-row-actions"><button type="button" class="sm-btn primary" data-om-apply-suggestions>${H(w('apply_suggestions'))}</button></div></div>` : ''}${x.items.map(i => decisionItemHtml(x.kind, i)).join('')}</div>` : (x.kind === 'old_approvals' ? `<div class="om-decision-body"><div class="om-row"><button type="button" class="sm-btn" data-om-goto-gov>${H(w('open'))}</button></div></div>` : '')}
     </details>`).join('')}</div>`;
   }
 
@@ -652,6 +664,22 @@
       if (t.dataset.omBotRow) { if (typeof switchPanel === 'function') await switchPanel('profiles'); if (typeof openProfileDetail === 'function') openProfileDetail(t.dataset.omBotRow); return; }
       const row = t.closest('[data-job]');
       if (row && t.hasAttribute('data-om-open-job')) { await openTask(row.dataset.job, row.dataset.store); return; }
+      if (t.hasAttribute('data-om-apply-suggestions')) {
+        const dec = ((M.data && M.data.decisions) || []).find(x => x.kind === 'unassigned');
+        t.disabled = true;
+        let n = 0;
+        for (const it of (dec && dec.items) || []) {
+          if (!it.suggested_team) continue;
+          try {
+            if (it.bot) await assignBot(it.bot, it.suggested_team);
+            else await post('/api/value/job', { action: 'team', job_id: it.id, store: it.store, team: it.suggested_team });
+            n++;
+          } catch (_e) {}
+        }
+        toast(w('applied_n', { n }));
+        await loadMgmt();
+        return;
+      }
       if (row && t.dataset.omConfirm) {
         try { await post('/api/value/job', { action: 'confirm', job_id: row.dataset.job, store: row.dataset.store, answer: t.dataset.omConfirm }); toast(w('value_saved')); await loadMgmt(); }
         catch (e) { toast(errMsg(e)); }
@@ -665,6 +693,11 @@
         try { await post('/api/value/job', { action: 'team', job_id: row.dataset.job, store: row.dataset.store, team: el.value }); toast(w('saved')); await loadMgmt(); }
         catch (e) { toast(errMsg(e)); }
       }
+      const brow = el.closest('[data-bot]');
+      if (brow && el.hasAttribute('data-om-assign-bot') && el.value) {
+        try { await assignBot(brow.dataset.bot, el.value); toast(w('saved')); await loadMgmt(); }
+        catch (e) { toast(errMsg(e)); }
+      }
     });
     root.addEventListener('keydown', ev => {
       if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.matches('tr[data-om-team-row],tr[data-om-bot-row]')) { ev.preventDefault(); ev.target.click(); }
@@ -676,7 +709,7 @@
         const row = form.closest('[data-job]');
         const fd = new FormData(form);
         try {
-          await post('/api/value/job', { job_id: row.dataset.job, store: row.dataset.store, value: { before_minutes: Number(fd.get('before')), review_minutes: Number(fd.get('now') || 0), source: 'owner', confidence: 'confirmed' } });
+          await post('/api/value/job', { job_id: row.dataset.job, store: row.dataset.store, value: { before_minutes: Number(fd.get('before')), review_minutes: Number(fd.get('now') || 0), per: String(fd.get('per') || 'run'), source: 'owner', confidence: 'confirmed' } });
           toast(w('value_saved')); await loadMgmt();
         } catch (e) { toast(errMsg(e)); }
       } else if (form.hasAttribute('data-om-pricing')) {
@@ -731,6 +764,7 @@
           <label class="om-field wide">${H(w('task_label'))}<input name="task" maxlength="120" value="${H(cur.task || '')}" placeholder="${H(w('task_ph'))}"></label>
           <label class="om-field">${H(w('minutes_before'))}<input name="before" type="number" min="0" max="6000" value="${H(cur.before_minutes ?? '')}"></label>
           <label class="om-field">${H(w('minutes_now'))}<input name="now" type="number" min="0" max="6000" value="${H(cur.review_minutes ?? '')}"></label>
+          <label class="om-field" title="${H(w('per_hint'))}">${H(w('per_label'))}<select name="per">${['run', 'day', 'week'].map(p => `<option value="${p}" ${(cur.per || 'run') === p ? 'selected' : ''}>${H(w('per_' + p + '_opt'))}</option>`).join('')}</select></label>
           ${teamSel}
           <label class="om-field wide" style="flex-direction:row;align-items:center;gap:8px;font-weight:500"><input type="checkbox" name="unknown" style="min-height:0;width:16px" ${cur.unknown ? 'checked' : ''}> ${H(w('unknown'))}</label>
           <label class="om-field wide" data-om-unknown-reason ${cur.unknown ? '' : 'hidden'}>${H(w('unknown_reason'))}<input name="reason" maxlength="200" value="${H(cur.unknown_reason || '')}"></label>
@@ -741,7 +775,7 @@
     } else {
       const per = Math.max(0, (v.before_minutes || 0) - (v.review_minutes || 0));
       inner = `${v.task ? `<p class="om-small" style="margin:2px 0 4px"><strong>${H(v.task)}</strong></p>` : ''}
-        <div class="om-value-figures"><div><span>${H(w('before'))}</span><strong>${H(v.before_minutes)} ${H(w('min'))}</strong></div><div><span>${H(w('now'))}</span><strong>${H(v.review_minutes || 0)} ${H(w('min'))}</strong></div><div><span>${H(w('saves'))} ${H(w('per_run'))}</span><strong>${H(per)} ${H(w('min'))}</strong></div></div>
+        <div class="om-value-figures"><div><span>${H(w('before'))}</span><strong>${H(v.before_minutes)} ${H(w('min'))}</strong></div><div><span>${H(w('now'))}</span><strong>${H(v.review_minutes || 0)} ${H(w('min'))}</strong></div><div><span>${H(w('saves'))} ${H(w('per_' + (v.per || 'run') + '_opt'))}</span><strong>${H(per)} ${H(w('min'))}</strong></div></div>
         <div class="om-small"><strong>${H(w('measured'))}:</strong> ${H(ok.length)} ${H(w('measured_runs'))}${runs.length - ok.length ? ', ' + H(runs.length - ok.length) + ' ' + H(w('failed_runs')) : ''} ${H(w('in_period'))} · ${H(hrs(saved))}${cost ? ' · ' + H(eur(cost)) + ' AI' : (unpriced ? ' · AI ?' : '')}${d.rate != null && saved ? ' · ' + H(eur(saved / 60 * d.rate - cost)) : ''}</div>
         ${label !== 'confirmed' ? `<div class="om-confirm"><span>${H(w('confirm_q'))}</span>${['yes', 'less', 'more'].map(a => `<button type="button" class="sm-btn" data-om-confirm="${a}">${H(w(a))}</button>`).join('')}</div>` : ''}
         <div style="margin-top:10px">${teamSel}</div>
@@ -778,7 +812,7 @@
       const before = Number(fd.get('before') || 0);
       if (!unknown && !(before > 0)) { toast(w('need_minutes')); return; }
       const value = unknown ? { unknown: true, unknown_reason: String(fd.get('reason') || '').trim() || '·', task: String(fd.get('task') || '') }
-        : { task: String(fd.get('task') || ''), before_minutes: before, review_minutes: Number(fd.get('now') || 0), source: 'owner', confidence: 'confirmed' };
+        : { task: String(fd.get('task') || ''), before_minutes: before, review_minutes: Number(fd.get('now') || 0), per: String(fd.get('per') || 'run'), source: 'owner', confidence: 'confirmed' };
       if (fd.get('team')) value.team = String(fd.get('team'));
       try { await post('/api/value/job', Object.assign(ids(), { value })); toast(w('value_saved')); await reload(); }
       catch (e) { toast(errMsg(e)); }
@@ -840,6 +874,7 @@
       <div class="om-value-form" style="margin-top:0">
         <label class="om-field">${H(w('minutes_before'))}<input id="cronFormValueBefore" type="number" min="1" max="6000" placeholder="45"></label>
         <label class="om-field">${H(w('minutes_now'))}<input id="cronFormValueNow" type="number" min="0" max="6000" placeholder="5"></label>
+        <label class="om-field" title="${H(w('per_hint'))}">${H(w('per_label'))}<select id="cronFormValuePer">${['run', 'day', 'week'].map(p => `<option value="${p}">${H(w('per_' + p + '_opt'))}</option>`).join('')}</select></label>
         <label class="om-field wide">${H(w('task_label'))}<input id="cronFormValueTask" maxlength="120" placeholder="${H(w('task_ph'))}"></label>
         <label class="om-field wide" style="flex-direction:row;align-items:center;gap:8px;font-weight:500"><input type="checkbox" id="cronFormValueUnknown" style="min-height:0;width:16px" onchange="document.getElementById('cronFormValueBefore').disabled=this.checked;document.getElementById('cronFormValueNow').disabled=this.checked"> ${H(w('unknown'))}</label>
       </div>
@@ -854,7 +889,7 @@
     if (unknown) return { value: { unknown: true, unknown_reason: lang() === 'en' ? 'Not known when created' : 'Nog onbekend bij aanmaken', task } };
     const before = Number(($id('cronFormValueBefore') || {}).value || 0);
     if (!(before > 0)) return { error: w('need_minutes') };
-    return { value: { before_minutes: before, review_minutes: Number(($id('cronFormValueNow') || {}).value || 0), task, source: 'owner', confidence: 'confirmed' } };
+    return { value: { before_minutes: before, review_minutes: Number(($id('cronFormValueNow') || {}).value || 0), per: String(($id('cronFormValuePer') || {}).value || 'run'), task, source: 'owner', confidence: 'confirmed' } };
   }
 
   // ── Panel hooks ───────────────────────────────────────────────────────────

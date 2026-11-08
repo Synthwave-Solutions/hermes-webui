@@ -36,12 +36,15 @@ MODELS = [os.environ.get("VALUE_BACKFILL_MODEL", "synthwave-auto"), "auto"]
 SYSTEM = """Je schat de waarde van een automatisering voor een Nederlands bedrijf.
 Gegeven een geplande taak (naam, ritme, prompt of script), schat:
 - task: in maximaal 10 woorden welk handwerk dit vervangt;
-- before_minutes: hoeveel minuten een medewerker dit werk PER KEER met de hand zou kosten;
-- review_minutes: hoeveel minuten een mens PER KEER nog kwijt is aan nakijken of opvolgen;
+- per: "run" (per keer dat de taak draait), "day" of "week". Draait de taak vaker dan
+  dagelijks (elke paar minuten of elk uur), kies dan "day": schat wat de taak PER DAG aan
+  handwerk vervangt, niet per run. Een wekelijkse taak is "run";
+- before_minutes: minuten handwerk per eenheid (per keer, per dag of per week);
+- review_minutes: minuten die een mens per eenheid nog kwijt is aan nakijken of opvolgen;
 - rationale: in maximaal 25 woorden waarom.
 Wees nuchter en eerder te laag dan te hoog. Vervangt de taak geen handwerk (technische bewaking,
 opschonen, een test), zet before_minutes op 0 en leg in rationale uit waarom.
-Antwoord alleen met JSON: {"task": "...", "before_minutes": 0, "review_minutes": 0, "rationale": "..."}"""
+Antwoord alleen met JSON: {"task": "...", "per": "run", "before_minutes": 0, "review_minutes": 0, "rationale": "..."}"""
 
 DUTY_SYSTEM = """Je schat de waarde van een verantwoordelijkheid van een AI-bot voor een Nederlands bedrijf.
 Gegeven de bot en de verantwoordelijkheid, schat:
@@ -92,7 +95,7 @@ def ask(system: str, context: str) -> dict | None:
     key = _key()
     for model in MODELS:
         for attempt in range(2):
-            body = json.dumps({"model": model, "temperature": 0.1, "max_tokens": 400, "stream": False,
+            body = json.dumps({"model": model, "temperature": 0.1, "max_tokens": 800, "stream": False,
                                "messages": [{"role": "system", "content": system},
                                             {"role": "user", "content": context}]}).encode()
             headers = {"Content-Type": "application/json"}
@@ -103,9 +106,11 @@ def ask(system: str, context: str) -> dict | None:
                 with urllib.request.urlopen(req, timeout=120) as resp:
                     raw = resp.read().decode()
                 text = _content(raw)
-                match = re.search(r"\{.*\}", text, re.S)
-                if match:
-                    return json.loads(match.group(0))
+                start = text.find("{")
+                if start >= 0:
+                    obj, _end = json.JSONDecoder().raw_decode(text[start:])
+                    if isinstance(obj, dict):
+                        return obj
             except Exception as exc:  # noqa: BLE001
                 print(f"  [{model}] attempt {attempt + 1}: {str(exc)[:120]}", file=sys.stderr)
                 time.sleep(2 * (attempt + 1))
@@ -165,7 +170,7 @@ def plan(limit: int | None, out: Path) -> int:
             est = row.get("estimate") or {}
             label = row.get("name") or f"{row.get('bot')}: {row.get('title')}"
             if row["kind"] == "job":
-                print(f"- {label[:60]:60} {est.get('before_minutes', '?'):>4} -> {est.get('review_minutes', '?'):>3} min  {str(est.get('task') or '')[:50]}", flush=True)
+                print(f"- {label[:60]:60} {est.get('before_minutes', '?'):>4} -> {est.get('review_minutes', '?'):>3} min/{est.get('per', 'run'):4} {str(est.get('task') or '')[:44]}", flush=True)
             else:
                 print(f"- {label[:60]:60} {est.get('minutes_before', '?'):>4} -> {est.get('minutes_now', '?'):>3} min x {est.get('times_per_week', '?')}/wk", flush=True)
     out.write_text(json.dumps({"created_at": time.time(), "rows": rows}, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -193,7 +198,8 @@ def apply(path: Path, actor: str) -> int:
                 value = {"unknown": True, "unknown_reason": str(est.get("rationale") or "Vervangt geen handwerk")[:200],
                          "task": str(est.get("task") or "")[:120], "source": "ai_estimate", "confidence": "estimated"}
             else:
-                value = {"before_minutes": before, "review_minutes": min(before, int(est.get("review_minutes") or 0)),
+                per = est.get("per") if est.get("per") in ("run", "day", "week") else "run"
+                value = {"before_minutes": before, "review_minutes": min(before, int(est.get("review_minutes") or 0)), "per": per,
                          "task": str(est.get("task") or "")[:120], "rationale": str(est.get("rationale") or "")[:400],
                          "source": "ai_estimate", "confidence": "estimated"}
             previous = job.get("value") if isinstance(job.get("value"), dict) else {}

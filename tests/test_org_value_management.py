@@ -195,8 +195,10 @@ def test_value_requires_minutes_or_a_reason(env):
         vt.validate_value({"unknown": True})
     assert vt.validate_value({"unknown": True, "unknown_reason": "new process"})["unknown"] is True
     clean = vt.validate_value({"before_minutes": 45, "review_minutes": 5, "task": " Debiteuren  lijst "})
-    assert clean == {"before_minutes": 45, "review_minutes": 5, "task": "Debiteuren lijst", "rationale": "",
+    assert clean == {"before_minutes": 45, "review_minutes": 5, "per": "run", "task": "Debiteuren lijst", "rationale": "",
                      "source": "owner", "confidence": "confirmed"}
+    with pytest.raises(ValueError):
+        vt.validate_value({"before_minutes": 10, "per": "month"})
     with pytest.raises(ValueError):
         vt.validate_value({"before_minutes": 10, "secret": "x"})
 
@@ -267,13 +269,14 @@ def test_collect_management_and_scope(env, engine_store, monkeypatch):
     admin = _view(ADMIN)
     model = mgmt.build(admin, 28, now - 28 * 86400, now + 60)
     team = next(t for t in model["teams"] if t["key"] == "finance/debiteuren")
-    assert team["runs"] == 3 and team["ok_runs"] == 2 and team["failed_runs"] == 1
+    # Every finbot task follows the bot's team (finance/debiteuren), also j2 of another owner.
+    assert team["runs"] == 4 and team["ok_runs"] == 2 and team["failed_runs"] == 2
     assert team["saved_minutes"] == 80  # 2 ok runs x (45 - 5); failed run saves nothing
     assert team["net_eur"] == 80.0  # 80 min at EUR 60/h, AI cost unknown counts as 0 in net but is flagged
     assert team["unpriced_tokens"] > 0
     assert model["totals"]["pricing_set"] is False
     kinds = {d["kind"] for d in model["decisions"]}
-    assert {"failing", "missing_value", "unassigned"} <= kinds
+    assert {"failing", "missing_value"} <= kinds and "unassigned" not in kinds
 
     vt.save_pricing({"synthwave-auto": {"in": 10, "out": 50, "cache": 1}}, ADMIN)
     model = mgmt.build(admin, 28, now - 28 * 86400, now + 60)
@@ -356,3 +359,58 @@ def test_finished_bot_chats_get_a_duty_label(env, monkeypatch):
     # The person's own correction wins and is final.
     vt.label_chat("finbot:w1", "", MEMBER)
     assert {r["session_id"]: r for r in vt.chats_between(0, now + 1)}["w1"]["label_state"] == "removed"
+
+
+def test_team_suggestion_from_category(env):
+    _structure(env)
+    data = org.load()
+    assert mgmt.suggest_team("Finance", data) == "finance/debiteuren"  # only team of the department
+    assert mgmt.suggest_team("Sales", data) == "sales/inside-sales"
+    assert mgmt.suggest_team("Inside sales", data) == "sales/inside-sales"  # team name
+    assert mgmt.suggest_team("Marketing", data) == ""
+    assert mgmt.suggest_team("", data) == ""
+
+
+def test_per_day_value_counts_once_per_day(env, engine_store, monkeypatch):
+    _structure(env)
+    now = time.time()
+    home = env.homes["finbot"]
+    _jobs(home, [_job("f1", value={"before_minutes": 20, "review_minutes": 0, "per": "day", "source": "owner",
+                                   "confidence": "confirmed", "team": "finance/debiteuren"})])
+    rows = []
+    for i in range(30):  # 30 runs spread over 3 days
+        ts = now - (i // 10) * 86400 - (i % 10) * 300 - 600
+        rows.append((f"r{i}", "f1", "s", "p", 1, "completed", _iso(ts), _iso(ts), _iso(ts + 5), None))
+    _executions(home, rows)
+    monkeypatch.setattr(mgmt, "_bots", lambda: {})
+    vt.collect(force=True)
+    model = mgmt.build(_view(ADMIN), 28, now - 28 * 86400, now + 60)
+    job = next(j for j in model["jobs"] if j["id"] == "f1")
+    days = len({time.strftime("%Y-%j", time.gmtime(now - (i // 10) * 86400 - (i % 10) * 300 - 595)) for i in range(30)})
+    assert job["saved_minutes"] == 20 * days and job["runs"] == 30
+    assert model["totals"]["saved_confirmed_minutes"] == job["saved_minutes"]
+
+
+def test_job_follows_its_bots_team_before_the_owners(env, engine_store, monkeypatch):
+    _structure(env)
+    _jobs(env.homes["finbot"], [_job("b1", owner_email=MEMBER)])  # MEMBER is in finance/debiteuren
+    monkeypatch.setattr(mgmt, "_bots", lambda: {"finbot": {"name": "finbot", "title": "F", "kind": "bot", "role": "",
+                                                           "reports_to": "", "serves": ["sales/inside-sales"],
+                                                           "duties": [], "avatar_url": "", "color": "", "category": ""}})
+    model = mgmt.build(_view(ADMIN), 28, time.time() - 86400, time.time())
+    assert next(j for j in model["jobs"] if j["id"] == "b1")["team"] == "sales/inside-sales"
+
+
+def test_high_estimate_is_flagged(env, engine_store, monkeypatch):
+    _structure(env)
+    now = time.time()
+    home = env.homes["finbot"]
+    _jobs(home, [_job("h1", value={"before_minutes": 15, "review_minutes": 0, "source": "ai_estimate",
+                                   "confidence": "estimated", "team": "finance/debiteuren"})])
+    rows = [(f"x{i}", "h1", "s", "p", 1, "completed", _iso(now - i * 180 - 60), _iso(now - i * 180 - 60),
+             _iso(now - i * 180 - 55), None) for i in range(200)]
+    _executions(home, rows)
+    monkeypatch.setattr(mgmt, "_bots", lambda: {})
+    vt.collect(force=True)
+    model = mgmt.build(_view(ADMIN), 7, now - 7 * 86400, now + 60)
+    assert "check_high" in {d["kind"] for d in model["decisions"]}

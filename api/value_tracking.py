@@ -53,6 +53,9 @@ logger = logging.getLogger(__name__)
 
 VALUE_SOURCES = ("owner", "ai_estimate", "playbook", "workshop")
 VALUE_CONFIDENCE = ("estimated", "confirmed")
+# A frequent job (every few minutes) replaces work per day, not per run: then
+# the saving counts once per day (or week) with at least one completed run.
+VALUE_PER = ("run", "day", "week")
 MINUTES_MAX = 6000
 USD_TO_EUR = float(os.environ.get("SP_VALUE_USD_TO_EUR", "0.92"))
 COLLECT_MIN_INTERVAL = int(os.environ.get("SP_VALUE_COLLECT_INTERVAL", "180"))
@@ -92,7 +95,7 @@ def validate_value(raw: Any) -> dict:
     """The normalized ``value`` block of a job. Raises ValueError."""
     if not isinstance(raw, dict):
         raise ValueError("Value must be an object")
-    allowed = {"task", "before_minutes", "review_minutes", "source", "confidence", "rationale",
+    allowed = {"task", "before_minutes", "review_minutes", "per", "source", "confidence", "rationale",
                "unknown", "unknown_reason", "team", "confirmed_by", "confirmed_at", "set_by", "set_at"}
     if set(raw) - allowed:
         raise ValueError("Unknown value field: " + ", ".join(sorted(set(raw) - allowed)))
@@ -107,6 +110,11 @@ def validate_value(raw: Any) -> dict:
         out["review_minutes"] = _minutes(raw.get("review_minutes"), "Minutes now")
         if out["before_minutes"] <= 0:
             raise ValueError("Fill in how many minutes this took by hand, or mark the value as unknown")
+    per = str(raw.get("per") or "run")
+    if per not in VALUE_PER:
+        raise ValueError("Per must be run, day or week")
+    if not out.get("unknown"):
+        out["per"] = per
     out["task"] = _text(raw.get("task"), 120, "Task")
     out["rationale"] = _text(raw.get("rationale"), 400, "Rationale")
     source = str(raw.get("source") or "owner")
