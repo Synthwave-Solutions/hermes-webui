@@ -470,7 +470,7 @@
       if (button.disabled !== disabled) button.disabled = disabled;
     }
     const hint = document.getElementById('chatMentionHint');
-    const hidden = !preparing && !(hint && hint.dataset.routeWarning) && !!collapsed() && !/(?:^|\s)@/.test(draft);
+    const hidden = !preparing && !(hint && hint.dataset.routeWarning) && !/(?:^|\s)@/.test(draft);
     if (hint && hint.hidden !== hidden) hint.hidden = hidden;
   }
   function starIcon(filled) {
@@ -551,10 +551,10 @@
     paintDraftState();
     const draft = (document.getElementById('msg') || {}).value || '';
     const unavailable = !preparing && !!route && route.reason === 'last_unavailable';
-    hint.hidden = !preparing && !unavailable && !!collapsed() && !/(?:^|\s)@/.test(draft);
+    hint.hidden = !preparing && !unavailable && !/(?:^|\s)@/.test(draft);
     hint.textContent = preparing ? tx('chat_mentions_preparing', 'Preparing recipients…')
       : unavailable ? tx('group_route_last_bot_unavailable', 'The last bot is not available to you. Choose a bot to continue.')
-      : tx('chat_mentions_hint', '@ people: new group from private chat. First @ bot responds.');
+      : tx('chat_mentions_hint', 'Type @ to bring in a colleague or another bot.');
     if (unavailable) hint.dataset.routeWarning = 'true'; else delete hint.dataset.routeWarning;
     paintedSignature = rosterSignature();
   }

@@ -8880,3 +8880,6 @@ button.bg-badge{border:0;cursor:pointer;min-width:28px;min-height:28px;}
   .msg-role.assistant .sp-assisted-chip{display:none}
   #btnSplitView{display:none!important}
 }
+/* Context ring: the colour says enough; exact numbers stay in the tooltip. */
+#ctxIndicatorWrap .ctx-ring-center{display:none!important}
+#composerMobileCtxRing #ctx-num{display:none}
