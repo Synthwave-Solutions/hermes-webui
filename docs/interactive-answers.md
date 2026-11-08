@@ -112,6 +112,27 @@ block: only a body that starts with `{` is data.
   list: label, period, then a slim full-width bar with today marked. The
   export has Onderdeel, Start, Einde, Eigenaar, Status, Mijlpaal and
   Notitie.
+- **Flow** (```` ```flow ````, also `flowchart`, `proces`, `stroomschema`): a
+  process diagram drawn as SVG with a layered layout: start and end as pills,
+  steps as boxes, decisions as diamonds with Ja/Nee branches, waits dashed,
+  loops back dashed around the side, the owner under each step. Clicking a
+  step or pressing Enter on it lights up its links and writes its details in a
+  status line; arrow keys move between steps. A phone always draws it top to
+  bottom. Export: Stap, Type, Eigenaar, Volgende stappen.
+- **Compare** (```` ```compare ````, also `vergelijk`): 2 to 4 option cards
+  side by side with price, a score bar, facts that line up across the cards,
+  pros and cons, and a calm accent on the recommended option; a phone swipes
+  card by card.
+- **Funnel** (```` ```funnel ````, also `trechter`): stages as centred bars
+  with "31% door" between them, the overall conversion once at the top, the
+  biggest drop marked and named in one plain line, and an optional previous
+  period.
+- **Extra kinds** live in `static/interactive-ui/kinds/<kind>.js` (plus
+  `.css`): each registers its checks with `SWKit.register` and its renderer
+  with `SWKitRender.register`; the chat page and the kit frame load them.
+  `tests/kind_preview.py` draws a block standalone in light, dark and 390 px.
+- **Charts** also draw `radar` (options on 3 to 8 criteria); a donut names
+  its total in the middle, and percentages that add up to 100 show once.
 - **Menu:** "Download als CSV" (`;`, decimal comma, UTF-8 BOM, as sorted and
   filtered), "Kopieer als tabel" (for Excel or Sheets), "Downloaden" (a
   standalone page) and, for developers, "Gegevens bekijken". There is no

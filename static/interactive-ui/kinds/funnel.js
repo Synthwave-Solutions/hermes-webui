@@ -161,13 +161,13 @@
     nl:{overall:function(a, b, p){ return 'Van ' + a + ' naar ' + b + ': ' + p; },
       overallPrev:function(p){ return 'vorige periode ' + p; },
       drop:function(a, b, p){ return 'Grootste uitval: van ' + a + ' naar ' + b + ' (' + p + ' gaat door)'; },
-      moveOn:'gaat door naar deze fase', grows:'meer dan de fase ervoor', prev:function(v){ return 'vorige periode ' + v; },
+      moveOn:'gaat door naar deze fase', through:'door', grows:'meer dan de fase ervoor', prev:function(v){ return 'vorige periode ' + v; },
       fromPrev:function(p, l){ return p + ' van ' + l; }, fromStart:function(p){ return p + ' van het begin'; },
       label:'Trechter', pick:'Kies een fase voor de details.'},
     en:{overall:function(a, b, p){ return 'From ' + a + ' to ' + b + ': ' + p; },
       overallPrev:function(p){ return 'previous period ' + p; },
       drop:function(a, b, p){ return 'Biggest drop: from ' + a + ' to ' + b + ' (' + p + ' move on)'; },
-      moveOn:'move on to this stage', grows:'more than the stage before', prev:function(v){ return 'previous period ' + v; },
+      moveOn:'move on to this stage', through:'through', grows:'more than the stage before', prev:function(v){ return 'previous period ' + v; },
       fromPrev:function(p, l){ return p + ' of ' + l; }, fromStart:function(p){ return p + ' of the start'; },
       label:'Funnel', pick:'Choose a stage for the details.'}
   };
@@ -261,7 +261,8 @@
         var chip = h('span', 'k-fn-chip');
         var arrow = h('span', 'k-fn-arrow', s.grows ? '↑' : '↓');
         arrow.setAttribute('aria-hidden', 'true');
-        chip.append(arrow, document.createTextNode(X.chip(i)), h('span', 'k-sr', ' ' + (s.grows ? t('grows') : t('moveOn'))));
+        // "25% door" reads as the share that moves on, never as a drop of 25%.
+        chip.append(arrow, document.createTextNode(X.chip(i) + (s.conv === null || s.grows ? '' : ' ' + t('through'))), h('span', 'k-sr', ' ' + (s.grows ? t('grows') : t('moveOn'))));
         // After a stage of 0 there is no share to show: the arrow alone keeps the rhythm.
         if(s.conv === null) chip.classList.add('is-empty');
         step.appendChild(chip);

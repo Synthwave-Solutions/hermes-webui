@@ -124,7 +124,13 @@ FORM_SPEC = {"title": "Uitrol Junior AI: een paar keuzes", "lang": "nl", "intro"
 ]}
 _FORM_JSON = json.dumps(FORM_SPEC, ensure_ascii=False, indent=1)
 FORM_LEAD = "Ik heb nog een paar dingen van je nodig."
+FLOW_SPEC = {"title": "Van aanvraag tot getekende offerte", "subtitle": "Zo loopt een nieuwe klantaanvraag bij ons", "lang": "nl", "nodes": [{"id": "in", "label": "Aanvraag binnen", "type": "start", "owner": "Website"}, {"id": "intake", "label": "Intakegesprek plannen", "owner": "Marcel", "note": "Binnen 2 werkdagen bellen"}, {"id": "fit", "label": "Past de vraag bij ons?", "type": "decision", "owner": "Marcel"}, {"id": "nee", "label": "Vriendelijk afwijzen", "type": "end", "owner": "Marcel"}, {"id": "offerte", "label": "Offerte opstellen", "owner": "Yaser"}, {"id": "wacht", "label": "Wachten op reactie klant", "type": "wait", "note": "Na 5 werkdagen een herinnering"}, {"id": "ok", "label": "Akkoord?", "type": "decision", "owner": "Klant"}, {"id": "aanpassen", "label": "Offerte aanpassen", "owner": "Yaser"}, {"id": "start", "label": "Getekend, project starten", "type": "end", "owner": "Michaël"}], "edges": [{"from": "in", "to": "intake"}, {"from": "intake", "to": "fit"}, {"from": "fit", "to": "offerte", "label": "Ja"}, {"from": "fit", "to": "nee", "label": "Nee"}, {"from": "offerte", "to": "wacht"}, {"from": "wacht", "to": "ok"}, {"from": "ok", "to": "start", "label": "Ja"}, {"from": "ok", "to": "aanpassen", "label": "Nee"}, {"from": "aanpassen", "to": "wacht"}]}
+COMPARE_SPEC = {"title": "Boekhoudpakket voor 12 medewerkers", "lang": "nl", "criteria": ["prijs", "koppeling met de bank", "support"], "recommended": "Moneybird", "options": [{"name": "Exact Online", "price": 69, "priceUnit": "per maand", "score": 7.5, "pros": ["Sterk in voorraad en projecten", "Veel koppelingen"], "cons": ["Duurder bij meer gebruikers", "Langere inwerktijd"], "facts": {"Bankkoppeling": "Alle grote banken", "Support": "Telefoon en chat", "Proefperiode": "30 dagen"}}, {"name": "Moneybird", "price": 32.5, "priceUnit": "per maand", "score": 8.5, "pros": ["Snel te leren", "Facturen en bonnetjes in de app", "Goede prijs"], "cons": ["Minder geschikt voor voorraad"], "facts": {"Bankkoppeling": "Alle grote banken", "Support": "Chat en mail", "Proefperiode": "30 dagen"}}, {"name": "SnelStart", "price": 45, "priceUnit": "per maand", "score": 7, "tag": "Met loonadministratie", "pros": ["Loonadministratie erbij"], "cons": ["Oudere uitstraling", "App heeft minder functies"], "facts": {"Bankkoppeling": "ING, Rabobank, ABN AMRO", "Support": "Telefoon", "Proefperiode": "14 dagen"}}], "source": "Prijslijsten van de leveranciers, november 2026"}
+FUNNEL_SPEC = {"title": "Salestrechter Q3", "subtitle": "Van eerste contact tot getekende opdracht", "lang": "nl", "stages": [{"label": "Leads", "value": 1240}, {"label": "Kennismaking", "value": 310, "note": "Via website en LinkedIn"}, {"label": "Offerte", "value": 96}, {"label": "Klant", "value": 37}], "compare": [1100, 260, 90, 30], "source": "Twenty CRM, export 1 oktober"}
 DATA_TURNS = {
+    "[flow]": ["Zo loopt het:\n\n```flow\n", json.dumps(FLOW_SPEC, ensure_ascii=False, indent=1), "\n```\n\nDe offerte is het moment waarop het vaak stokt."],
+    "[vergelijk]": ["De drie opties:\n\n```vergelijk\n", json.dumps(COMPARE_SPEC, ensure_ascii=False), "\n```\n\nMoneybird past het best bij jullie."],
+    "[trechter]": ["Je trechter:\n\n```trechter\n", json.dumps(FUNNEL_SPEC, ensure_ascii=False), "\n```\n\nDe meeste leads haken af voor de kennismaking."],
     "[tabel]": ["Hier zijn de klanten.\n\n```table\n", json.dumps(TABLE_SPEC, ensure_ascii=False, indent=1), "\n```\n\nBos 08 groeit het hardst."],
     "[csv]": ["Als CSV:\n\n```csv\n", CSV_BLOCK, "```\n\nEn als code:\n\n```chart\nnew Chart(ctx, {type: 'bar'});\n```\n"],
     "[grafiek]": ["De omzet per maand:\n\n```chart\n", json.dumps(CHART_SPEC, ensure_ascii=False), "\n```\n\nMaart sprong eruit."],
@@ -610,6 +616,25 @@ def data_blocks(page, ctx, gateway, art, base_runs):
     assert lines[0] == "Onderdeel;Start;Einde;Eigenaar;Status;Mijlpaal;Notitie", lines[0]
     assert "Bouw;2026-11-16;2026-12-13;Senna;Bezig;;Twee sprints" in lines, lines
     ok(f"timeline: 4 bars and 2 diamonds, status colours {bar_colours}, today line at {today_x:.3f}, click and ArrowDown plus Enter show the detail, CSV export")
+
+    # 10h. flow, compare and funnel: kinds from their own files, drawn through the chat
+    for tag, kind, expect, label in (("[flow]", "flow", "De offerte is het moment waarop het vaak stokt.", FLOW_SPEC["nodes"][1]["label"]),
+                                     ("[vergelijk]", "compare", "Moneybird past het best bij jullie.", COMPARE_SPEC["options"][0]["name"]),
+                                     ("[trechter]", "funnel", "De meeste leads haken af voor de kennismaking.", FUNNEL_SPEC["stages"][1]["label"])):
+        runs += 1
+        send_turn(page, gateway, "Laat het zien " + tag, runs, expect)
+        page.wait_for_function(LAST_READY, arg=kind, timeout=30000)
+        card = page.locator(".iui-card.iui-kit--" + kind + ":visible").last
+        frame = kit_frame_for(page, card)
+        frame.wait_for_selector("#kit-root.kit-" + kind, timeout=10000)
+        text = frame.locator("#kit-root").inner_text()
+        assert label in text, (kind, text[:300])
+        assert "{" not in card.inner_text(), "no JSON on screen"
+        overflow = card.evaluate("c => c.scrollWidth - c.clientWidth")
+        assert overflow <= 1, f"{kind} card overflows by {overflow}px"
+        card.scroll_into_view_if_needed(); time.sleep(0.8)
+        card.screenshot(path=str(art / f"17-{kind}-desktop-dark.png"))
+    ok("flow, compare and funnel: each drawn from its own kind file through the chat, no JSON on screen")
 
     # 10e. after a reload the chart comes back in the table view the user chose
     page.reload(wait_until="domcontentloaded")
