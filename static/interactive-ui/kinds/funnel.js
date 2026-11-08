@@ -168,7 +168,7 @@
     if(anyRough){ header.push(en ? 'Estimate' : 'Schatting'); types.push('text'); }
     if(spec.compare){ header.push(en ? 'Previous period' : 'Vorige periode'); types.push(spec.format); }
     // Whole percents from estimates; otherwise one decimal, and two significant digits below 1%.
-    var r1 = function(v, rough){ if(v === null || v === undefined) return null; if(rough) return Math.round(v); return v > 0 && v < 1 ? Number(v.toPrecision(2)) : Math.round(v * 10) / 10; };
+    var r1 = function(v, rough){ if(v === null || v === undefined) return null; if(rough) return v > 0 && v < 1 ? Number(v.toPrecision(2)) : Math.round(v); return v > 0 && v < 1 ? Number(v.toPrecision(2)) : Math.round(v * 10) / 10; };
     return {header:header, types:types, rows:spec.stages.map(function(s, i){
       var rp = !!(s.rough || (i && spec.stages[i - 1].rough)), rs = !!(s.rough || spec.stages[0].rough);
       var r = [s.label, s.value, r1(s.conv, rp), r1(s.fromStart, rs)];

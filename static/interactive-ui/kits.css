@@ -165,7 +165,7 @@ html[data-theme=dark] .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) bri
 .k-kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:10px}
 .k-tile{container-type:inline-size;display:flex;flex-direction:column;gap:4px;min-width:0;padding:12px 14px;border:1px solid var(--sw-border);border-radius:var(--sw-radius);background:var(--sw-surface-2)}
 .k-tile-label{font-size:.82rem;font-weight:500;color:var(--sw-muted);line-height:1.3;overflow-wrap:anywhere}
-.k-tile-value{font-size:clamp(1.05rem,10cqi,1.55rem);font-weight:650;line-height:1.15;color:var(--sw-strong);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.k-tile-value{font-size:clamp(1.15rem,15cqi,1.55rem);font-weight:650;line-height:1.15;color:var(--sw-strong);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .k-tile-meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;min-width:0}
 .k-delta{display:inline-flex;align-items:center;gap:4px;padding:.1em .55em;border-radius:999px;font-size:.78rem;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;
   background:var(--sw-surface);color:var(--sw-muted);border:1px solid var(--sw-border)}
@@ -247,3 +247,15 @@ th .k-sort{white-space:normal}
 .k-list{overscroll-behavior-y:auto}
 .k-radar-key{margin:6px 0 0;padding:0 0 0 22px;font-size:.82rem;color:var(--sw-fg);display:grid;gap:2px}
 .k-radar-key li::marker{color:var(--sw-muted);font-variant-numeric:tabular-nums}
+@media (max-width:479px){
+  /* On a phone the legend is the only place that names each slice: one column, names wrap. */
+  .k-legend{display:grid;grid-template-columns:auto 1fr auto;justify-content:stretch;gap:6px 10px}
+  .k-legend li{display:contents}
+  .k-legend .k-legend-label{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}
+  .k-legend .k-legend-value{margin-left:0;text-align:right}
+}
+/* On a phone the details of a tapped step or bar stick to the bottom of the visible card. */
+@media (max-width:479px){
+  .k-tl-detail.is-set{position:sticky;bottom:0;z-index:3;margin:0 -2px;padding:8px 10px;border-radius:10px;
+    background:var(--sw-surface);border:1px solid var(--sw-border);box-shadow:0 -6px 16px rgba(0,0,0,.18)}
+}

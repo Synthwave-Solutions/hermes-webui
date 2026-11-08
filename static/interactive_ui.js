@@ -291,6 +291,9 @@ const _iui=(function(){
     Object.keys(vars).forEach(k=>{if(!vars[k])delete vars[k];});
     // One chart palette for apps, data blocks and downloads: the accent first.
     accentPalette(vars['--sw-accent']).forEach((c,i)=>{vars['--sw-c'+(i+1)]=c;});
+    // "In progress" and info follow the accent, unless it looks like a status colour (red, amber, green).
+    const ha=hueOf(vars['--sw-accent']);
+    if(ha!==null&&![0,40,140].some(h=>{const d=Math.abs(ha-h);return Math.min(d,360-d)<28;})) vars['--sw-info']=vars['--sw-accent'];
     // The chat marks dark mode with html.dark; fall back to the surface colour.
     const root=document.documentElement;
     let mode;
@@ -407,12 +410,20 @@ const _iui=(function(){
           if(at<floor) sc.scrollBy({top:at-floor,behavior:how});
           break;
         }
-        const y=Math.max(0,Math.min(Number(data.y)||0,ctrl.iframe.offsetHeight||0));
-        const limit=box.bottom-96, at=fr.top+y;
-        // Never scroll the tapped step itself out of view at the top.
-        const keep=typeof data.from==='number'?(fr.top+Math.max(0,data.from))-(box.top+56):Infinity;
-        const d=Math.min(at-limit,keep);
-        if(d>0) sc.scrollBy({top:d,behavior:how});
+        // y and from are measured in the frame's own view. Scroll the chat first, then,
+        // when the frame is taller than its visible part, inside the frame; the tapped
+        // step never goes above the visible top.
+        const y=Math.max(0,Number(data.y)||0), fh=ctrl.iframe.offsetHeight||0;
+        const top=box.top+56, limit=box.bottom-96, from=typeof data.from==='number'?Math.max(0,data.from):null;
+        const keep=from===null?Infinity:(fr.top+from)-top;
+        const d=Math.max(0,Math.min(fr.top+Math.min(y,fh)-limit,keep));
+        if(d>0) sc.scrollBy({top:d,behavior:'auto'});
+        if(y>fh){
+          const ftop=fr.top-d, hidden=Math.max(0,top-ftop);
+          let inner=y-fh+8;
+          if(from!==null) inner=Math.min(inner,Math.max(0,from-hidden-8));
+          if(inner>0) postTo(ctrl,{type:'scroll',by:Math.round(inner)});
+        }
         break;
       }
       case 'open':
@@ -582,9 +593,20 @@ const _iui=(function(){
     return b;
   }
   let openMenu=null;
+  // Rows with CSS containment (touch screens) trap position:fixed; lift every
+  // row around a card while it is full screen or shows its menu sheet.
+  function escapeRows(card,on){
+    const rows=[];
+    for(let n=card&&card.parentElement;n&&n!==document.body;n=n.parentElement){
+      if(n.matches&&n.matches('.msg-row,.assistant-turn,.assistant-segment')) rows.push(n);
+    }
+    rows.forEach(r=>r.classList.toggle('iui-row-full',on));
+    return rows;
+  }
   function closeMenu(focusTrigger){
     if(!openMenu) return;
     const {menu,trigger}=openMenu;
+    if(openMenu.card&&!openMenu.card.classList.contains('iui-full')) escapeRows(openMenu.card,false);
     menu.hidden=true;trigger.setAttribute('aria-expanded','false');
     openMenu=null;
     window.removeEventListener('blur',onMenuBlur);
@@ -596,14 +618,15 @@ const _iui=(function(){
     if(openMenu&&openMenu.menu===ctrl.menu){closeMenu(true);return;}
     closeMenu(false);
     ctrl.codeItem.querySelector('span').textContent=ctrl.kit?(ctrl.sourceBox.hidden?tx('viewData'):tx('hideData')):(ctrl.sourceBox.hidden?tx('viewCode'):tx('hideCode'));
+    if(matchMedia('(max-width:640px)').matches) escapeRows(ctrl.card,true);
     ctrl.menu.hidden=false;
     ctrl.moreBtn.setAttribute('aria-expanded','true');
-    openMenu={menu:ctrl.menu,trigger:ctrl.moreBtn};
+    openMenu={menu:ctrl.menu,trigger:ctrl.moreBtn,card:ctrl.card};
     // A click inside a frame never reaches this document; the window blurs.
     window.addEventListener('blur',onMenuBlur);
     window.addEventListener('resize',onMenuBlur);
-    const first=ctrl.menu.querySelector('.iui-menu-item');
-    if(first) first.focus();
+    const first=ctrl.menu.querySelector('.iui-menu-item:not([hidden])');
+    if(first) try{first.focus({preventScroll:true});}catch(_){first.focus();}
   }
 
   function createController(source,opts){
@@ -828,7 +851,7 @@ const _iui=(function(){
     b.title=on?tx('exitFull'):tx('full');b.setAttribute('aria-label',b.title);
     b.classList.toggle('iui-btn--text',on);
     if(on){
-      ctrl._fullRow=row;if(row)row.classList.add('iui-row-full');
+      ctrl._fullRow=row;ctrl._fullRows=escapeRows(ctrl.card,true);
       ctrl._returnFocus=document.activeElement;
       ctrl.card.setAttribute('role','dialog');ctrl.card.setAttribute('aria-modal','true');
       ctrl.stage.style.height='';
@@ -852,8 +875,8 @@ const _iui=(function(){
       }
       b.focus();
     } else {
-      if(ctrl._fullRow) ctrl._fullRow.classList.remove('iui-row-full');
-      ctrl._fullRow=null;
+      (ctrl._fullRows||[]).forEach(r=>r.classList.remove('iui-row-full'));
+      ctrl._fullRow=null;ctrl._fullRows=null;
       ctrl.card.setAttribute('role','group');ctrl.card.removeAttribute('aria-modal');
       if(ctrl._esc) document.removeEventListener('keydown',ctrl._esc,true);
       ctrl._esc=null;

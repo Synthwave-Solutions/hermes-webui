@@ -1019,11 +1019,12 @@ function base(spec,lang,kind,m,warnings,limits){
     if(!spec) return {header:[],rows:[]};
     if(kind==='table'){
       const idx=viewIndices(spec,view||initialView(spec));
-      return {header:spec.columns.map(c=>c.label),rows:idx.map(i=>spec.rows[i]),types:spec.columns.map(c=>c.type)};
+      // The unit goes in the header, so a spreadsheet still says what 12,5 is.
+      return {header:spec.columns.map(c=>c.label+unitTag(c.type,c.label)),rows:idx.map(i=>spec.rows[i]),types:spec.columns.map(c=>c.type)};
     }
     if(kind==='chart'){
       const en=spec.lang==='en';
-      return {header:[en?'Label':'Categorie'].concat(spec.series.map(s=>s.name)),
+      return {header:[en?'Label':'Categorie'].concat(spec.series.map(s=>s.name+unitTag(spec.format,s.name))),
         rows:spec.labels.map((l,i)=>[l].concat(spec.series.map(s=>s.data[i]))),
         types:['text'].concat(spec.series.map(()=>spec.format))};
     }
@@ -1040,9 +1041,10 @@ function base(spec,lang,kind,m,warnings,limits){
     }
     if(kind==='kpi'){
       const en=spec.lang==='en';
-      return {header:en?['Figure','Value','Change','Target']:['Cijfer','Waarde','Verandering','Doel'],
-        rows:spec.items.map(i=>[i.label,i.value,i.delta,i.target]),
-        types:['text','number','number','number']};
+      return {header:en?['Figure','Value','Change','Change unit','Target']:['Cijfer','Waarde','Verandering','Eenheid verandering','Doel'],
+        // The change stays a number (a text "+12,5%" would get a formula guard); its unit has a column.
+        rows:spec.items.map(i=>[i.label,i.value,i.delta,i.delta===null?'':(i.deltaFormat==='percent'?'%':i.format==='percent'?(en?'points':'procentpunt'):i.format==='currency'?'€':''),i.target]),
+        types:['text','number','number','text','number']};
     }
     const x=extra(kind);
     if(x){try{const t=x.table?x.table(spec,view,data):null;if(t&&Array.isArray(t.header)&&Array.isArray(t.rows))return t;}catch(_){}return {header:[],rows:[]};}
@@ -1053,6 +1055,10 @@ function base(spec,lang,kind,m,warnings,limits){
         types:['text',pos,pos,'text','text','text','text']};
     }
     return {header:[],rows:[]};
+  }
+  function unitTag(type,label){
+    if(/\((%|€|eur)\)\s*$/i.test(String(label||''))) return '';
+    return type==='percent'?' (%)':type==='currency'?' (€)':'';
   }
   function exportCell(v,decimalComma){
     if(v===null||v===undefined) return '';
