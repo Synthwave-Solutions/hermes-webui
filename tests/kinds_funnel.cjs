@@ -92,7 +92,8 @@ assert.strictEqual(ms.drop, 6, 'the biggest drop never points at a growing stage
 // A compare list of the wrong length is dropped as a whole, never applied by position.
 assert.deepStrictEqual(ms.stages.map(x => x.prev), [null, null, null, null, null, null, null]);
 assert.strictEqual(ms.compare, false);
-assert.strictEqual(K.kitTable('funnel', ms).header.length, 4, 'no Vorige periode column');
+assert.strictEqual(K.kitTable('funnel', ms).header.length, 5, 'no Vorige periode column; Schatting because Assessment is ca. 90');
+assert.strictEqual(K.kitTable('funnel', ms).header[4], 'Schatting');
 // A list of the right length with one bad value: only that value is left out.
 const badCmp = build({title: 'Cmp', stages: [{label: 'A', value: 10}, {label: 'B', value: 5}, {label: 'C', value: 2}], compare: [9, 'x', 1]});
 assert.ok(badCmp.warnings.join('\n').includes('Vergelijkingswaarde 2 is geen getal'));
@@ -117,7 +118,7 @@ assert.ok(web.spec.overall > 0);
 const wt = texts(web.spec);
 assert.strictEqual(wt.overall(), 'Van Bezoekers naar Abonnement: 0,015%');
 assert.ok(wt.detail(6).includes('0,015% van het begin'), wt.detail(6));
-assert.strictEqual(K.kitTable('funnel', web.spec).rows[6][3], 0.0148, 'the export keeps the small share');
+assert.strictEqual(K.kitTable('funnel', web.spec).rows[6][3], 0.015, 'the export keeps the small share as the block shows it');
 // Bars always grow with the value, even 37 against 250.000.
 const ws = web.spec.stages.map(x => x.w);
 for(let i = 1; i < ws.length; i++) assert.ok(ws[i] < ws[i - 1] && ws[i] > 0, 'bar widths: ' + ws);
@@ -173,8 +174,8 @@ const pct = texts(pc.spec);
 assert.strictEqual(pct.num(pc.spec.stages[2].value), '1,5%');
 assert.strictEqual(pct.detail(1), 'Klik · 12% · 12% van Bereik · 12% van het begin');
 const pcT = K.kitTable('funnel', pc.spec);
-assert.deepStrictEqual(pcT.header, ['Fase', 'Aandeel', 'Conversie vanaf vorige', 'Conversie vanaf begin']);
-assert.deepStrictEqual(pcT.types, ['text', 'percent', 'percent', 'percent']);
+assert.deepStrictEqual(pcT.header, ['Fase', 'Aandeel', 'Conversie vanaf vorige (%)', 'Conversie vanaf begin (%)']);
+assert.deepStrictEqual(pcT.types, ['text', 'percent', 'number', 'number']);
 assert.strictEqual(build({title: 'P', format: 'procent', stages: [{label: 'A', value: 50}, {label: 'B', value: 5}]}).spec.format, 'percent');
 
 // ── Fatal: one plain error each ─────────────────────────────────────────────
@@ -194,18 +195,18 @@ assert.strictEqual(build('[1,2]').errors.length, 1);
 
 // ── Export table ────────────────────────────────────────────────────────────
 const t = K.kitTable('funnel', s);
-assert.deepStrictEqual(t.header, ['Fase', 'Aantal', 'Conversie vanaf vorige', 'Conversie vanaf begin', 'Vorige periode']);
-assert.deepStrictEqual(t.types, ['text', 'number', 'percent', 'percent', 'number']);
+assert.deepStrictEqual(t.header, ['Fase', 'Aantal', 'Conversie vanaf vorige (%)', 'Conversie vanaf begin (%)', 'Vorige periode']);
+assert.deepStrictEqual(t.types, ['text', 'number', 'number', 'number', 'number']);
 assert.deepStrictEqual(t.rows[0], ['Leads', 1240, null, 100, 1100]);
-assert.deepStrictEqual(t.rows[3], ['Klant', 37, 38.54, 2.984, 30]);
+assert.deepStrictEqual(t.rows[3], ['Klant', 37, 38.5, 3, 30]);
 const t2 = K.kitTable('funnel', two.spec);
-assert.deepStrictEqual(t2.header, ['Stage', 'Value', 'From previous', 'From start']);
-assert.deepStrictEqual(t2.rows[1], ['Orders', 212, 1.152, 1.152]);
+assert.deepStrictEqual(t2.header, ['Stage', 'Value', 'From previous (%)', 'From start (%)']);
+assert.deepStrictEqual(t2.rows[1], ['Orders', 212, 1.2, 1.2]);
 const csv = K.toCsv(t);
-assert.ok(csv.startsWith('﻿Fase;Aantal;Conversie vanaf vorige;Conversie vanaf begin;Vorige periode\r\n'));
-assert.ok(csv.includes('Klant;37;38,54;2,984;30\r\n'), csv);
+assert.ok(csv.startsWith('﻿Fase;Aantal;Conversie vanaf vorige (%);Conversie vanaf begin (%);Vorige periode\r\n'));
+assert.ok(csv.includes('Klant;37;38,5;3;30\r\n'), csv);
 const plain4 = build({title: 'Vier', stages: [{label: 'A', value: 4}, {label: 'B', value: 2}]});
-assert.deepStrictEqual(K.kitTable('funnel', plain4.spec).header, ['Fase', 'Aantal', 'Conversie vanaf vorige', 'Conversie vanaf begin']);
+assert.deepStrictEqual(K.kitTable('funnel', plain4.spec).header, ['Fase', 'Aantal', 'Conversie vanaf vorige (%)', 'Conversie vanaf begin (%)']);
 
 // ── Limits ──────────────────────────────────────────────────────────────────
 const big = build({title: 'x'.repeat(300), subtitle: 'y'.repeat(400),

@@ -104,7 +104,7 @@ const _iui=(function(){
       kitName:{table:'Tabel',chart:'Grafiek',map:'Kaart',kpi:'Kerncijfers',timeline:'Planning'},
       kitFail:noun=>noun==='kerncijfers'?'Deze kerncijfers konden niet worden gemaakt.':`Deze ${noun} kon niet worden gemaakt.`,downloadCsv:'Download als CSV',copyTable:'Kopieer als tabel',
       viewData:'Gegevens bekijken',hideData:'Gegevens verbergen',copyData:'Gegevens kopiëren',example:'Voorbeeld',
-      kitRepairPrompt:(noun,title)=>noun==='kerncijfers'?`Kun je de kerncijfers "${title}" herstellen? Die kloppen nog niet.`:`Kun je de ${noun} "${title}" herstellen? Die klopt nog niet.`},
+      kitRepairPrompt:(noun,title,generic)=>noun==='kerncijfers'?`Kun je ${generic?'deze kerncijfers':`de kerncijfers "${title}"`} herstellen? Die kloppen nog niet.`:`Kun je ${generic?'deze '+noun:`de ${noun} "${title}"`} herstellen? Die klopt nog niet.`},
     en:{title:'Interactive view',building:'Building',
       restart:'Restart',viewCode:'View code',hideCode:'Hide code',copyCode:'Copy code',download:'Download',
       devGroup:'For developers',full:'Full screen',exitFull:'Close',more:'More options',repair:'Fix it',
@@ -118,7 +118,7 @@ const _iui=(function(){
       kitName:{table:'Table',chart:'Chart',map:'Map',kpi:'Key figures',timeline:'Timeline'},
       kitFail:noun=>noun==='key figures'?'These key figures could not be made.':`This ${noun} could not be made.`,downloadCsv:'Download as CSV',copyTable:'Copy as table',
       viewData:'View data',hideData:'Hide data',copyData:'Copy data',example:'Example',
-      kitRepairPrompt:(noun,title)=>noun==='key figures'?`Can you fix the key figures "${title}"? They are not right yet.`:`Can you fix the ${noun} "${title}"? It is not right yet.`},
+      kitRepairPrompt:(noun,title,generic)=>noun==='key figures'?`Can you fix ${generic?'these key figures':`the key figures "${title}"`}? They are not right yet.`:`Can you fix ${generic?'this '+noun:`the ${noun} "${title}"`}? It is not right yet.`},
   };
   function lang(){
     const l=String((typeof _currentLang!=='undefined'&&_currentLang)||document.documentElement.lang||navigator.language||'en').toLowerCase();
@@ -409,7 +409,10 @@ const _iui=(function(){
         }
         const y=Math.max(0,Math.min(Number(data.y)||0,ctrl.iframe.offsetHeight||0));
         const limit=box.bottom-96, at=fr.top+y;
-        if(at>limit) sc.scrollBy({top:at-limit,behavior:how});
+        // Never scroll the tapped step itself out of view at the top.
+        const keep=typeof data.from==='number'?(fr.top+Math.max(0,data.from))-(box.top+56):Infinity;
+        const d=Math.min(at-limit,keep);
+        if(d>0) sc.scrollBy({top:d,behavior:how});
         break;
       }
       case 'open':
@@ -667,7 +670,7 @@ const _iui=(function(){
       const report=(fence,msg)=>`\n\n[View report]\nBlock: ${fence}\nProblem: ${String(msg||'unknown').replace(/\[\/?View report\]/g,'')}\nFix the cause and send the complete ${fence} block again.\n[/View report]`;
       if(ctrl.kit){
         const msg=first||((ctrl.parsed&&ctrl.parsed.warnings||[])[0]||'');
-        if(!sendPrompt(tx('kitRepairPrompt',kitWord('kitNoun',ctrl.kit),ctrl.parsed&&ctrl.parsed.title||kitWord('kitName',ctrl.kit))+report(ctrl.fence||ctrl.kit,msg))){b.dataset.sent='';b.disabled=false;}
+        if(!sendPrompt(tx('kitRepairPrompt',kitWord('kitNoun',ctrl.kit),ctrl.parsed&&ctrl.parsed.title||kitWord('kitName',ctrl.kit),!(ctrl.parsed&&ctrl.parsed.title))+report(ctrl.fence||ctrl.kit,msg))){b.dataset.sent='';b.disabled=false;}
         return;
       }
       if(!sendPrompt(tx('repairPrompt',ctrl.parsed&&ctrl.parsed.title||tx('title'))+report('interactive-ui',first))){b.dataset.sent='';b.disabled=false;}
@@ -727,7 +730,8 @@ const _iui=(function(){
     if(!K) return Object.assign(base,{errors:['kit unavailable']});
     if(!ctrl.final) return Object.assign(base,{title:K.streamingTitle(ctrl.source)});
     const r=K.build(kind,ctrl.source,{lang:lang(),fence:ctrl.fence});
-    return Object.assign(base,{title:r.title,height:r.estHeight,spec:r.spec,errors:r.errors,warnings:r.warnings});
+    // A block that cannot be drawn keeps the name the user saw while it streamed.
+    return Object.assign(base,{title:r.title||K.streamingTitle(ctrl.source),height:r.estHeight,spec:r.spec,errors:r.errors,warnings:r.warnings});
   }
   function update(ctrl,source,final){
     ctrl.source=String(source||'');
@@ -1604,9 +1608,12 @@ const _iui=(function(){
           input.inputMode='decimal';input.autocomplete='off';input.maxLength=40;
           const u=formUnit(f.unit);
           host=el('div','iui-num');
-          if(u.pre){const p=el('span','iui-num-unit',u.pre.trim());p.setAttribute('aria-hidden','true');host.appendChild(p);}
+          // The unit belongs to the question for screen readers too: "Budget € per maand".
+          const ids=[lab.id];
+          if(u.pre){const p=el('span','iui-num-unit',u.pre.trim());p.id=lab.id+'-up';ids.push(p.id);host.appendChild(p);}
           host.appendChild(input);
-          if(u.post){const p=el('span','iui-num-unit',u.post.trim());p.setAttribute('aria-hidden','true');host.appendChild(p);}
+          if(u.post){const p=el('span','iui-num-unit',u.post.trim());p.id=lab.id+'-uq';ids.push(p.id);host.appendChild(p);}
+          input.setAttribute('aria-labelledby',ids.join(' '));
         }
         if(f.default!=null) input.value=f.type==='number'?new Intl.NumberFormat(l==='nl'?'nl-NL':'en-GB',{maximumFractionDigits:4,useGrouping:false}).format(f.default):f.type==='date'?formDateInput(f.default,l):String(f.default);
         if(input.__paintEcho) input.__paintEcho();

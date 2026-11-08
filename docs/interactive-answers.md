@@ -92,7 +92,7 @@ block: only a body that starts with `{` is data.
   and, for a route, "Opnieuw afspelen". When tiles do not load the list stays
   with "De kaart laadt nu niet. De lijst klopt wel."
 - **KPI:** one to eight tiles side by side (two on a phone): the label, one
-  big number in the block's language (millions written short, "1,3 mln."),
+  big number in the block's language (millions written short, "1,25 mln."),
   a pill with the change ("+12,5%", "+0,4 pp" for a percentage, "€ -800"
   with `deltaFormat: "number"`) that is green or red by `good` (`up` by
   default, `down` for costs and churn) and also carries an arrow, the sign

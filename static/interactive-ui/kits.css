@@ -204,7 +204,9 @@ html[data-theme=dark] .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) bri
 .k-tl-today-label{position:absolute;top:3px;left:6px;font-size:.7rem;font-weight:600;color:var(--sw-strong);background:var(--sw-surface);padding:0 3px;border-radius:4px;white-space:nowrap}
 .k-tl-now{display:none}
 .k-tl-bar,.k-tl-ms{all:unset;box-sizing:border-box;position:absolute;top:50%;cursor:pointer;z-index:1}
-.k-tl-bar{height:14px;margin-top:-7px;border-radius:4px;background:var(--sw-c2)}
+.k-tl-bar{height:14px;margin-top:-7px;border-radius:4px;background:var(--sw-accent)}
+/* In a plan where some rows have a status, a row without one reads as still to do. */
+.k-tl.has-status .k-tl-bar.is-plain{background:color-mix(in srgb,var(--sw-muted) 45%,transparent)}
 .k-tl-ms{width:13px;height:13px;margin:-6.5px 0 0 -6.5px;transform:rotate(45deg);border-radius:2px;background:var(--sw-strong);border:2px solid var(--sw-surface)}
 .k-tl-bar.is-done,.k-tl-ms.is-done,.k-tl-swatch.is-done{background:var(--sw-good)}
 .k-tl-bar.is-doing,.k-tl-ms.is-doing,.k-tl-swatch.is-doing{background:var(--sw-info)}
