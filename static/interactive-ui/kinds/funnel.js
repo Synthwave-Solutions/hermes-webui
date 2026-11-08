@@ -9,6 +9,16 @@
 
 (function(root){
   'use strict';
+  // Models write rough numbers: "ca. 900", "120+", "± 300", "1,2k", "2 mln".
+  function approx(v, H){
+    var n = H.kpiNumber(v);
+    if(n || typeof v !== 'string') return n;
+    var s = v.trim().replace(/^(ca\.?|circa|ongeveer|about|approx\.?|around|±|~|≈|>|<|>=|<=)\s*/i, '').replace(/\s*\+$/, '');
+    var mult = 1, mm = /^(.*?)\s*(k|duizend|thousand|mln|mio|miljoen|million|m)\.?$/i.exec(s);
+    if(mm){ s = mm[1]; mult = /^(k|duizend|thousand)$/i.test(mm[2]) ? 1e3 : 1e6; }
+    n = H.kpiNumber(s);
+    return n ? {n:Math.round(n.n * mult * 100) / 100, kind:n.kind} : null;
+  }
   var K = root.SWKit;
   if(!K) return;
 
@@ -26,7 +36,7 @@
       asMap:function(){ return 'De fasen stonden als lijst van namen met getallen; ze zijn in die volgorde getoond.'; },
       item:function(i){ return 'Fase ' + i + ' is geen object met label en value en is weggelaten.'; },
       label:function(i){ return 'Fase ' + i + ' heeft geen naam (label) en is weggelaten.'; },
-      value:function(l){ return '"' + l + '" heeft geen getal als waarde (value) en is weggelaten.'; },
+      value:function(l){ return 'Fase "' + l + '" heeft geen getal. Geef elke fase een aantal.'; },
       negative:function(l){ return '"' + l + '" had een negatieve waarde; die is op 0 gezet.'; },
       grows:function(l, prev){ return '"' + l + '" is groter dan de fase ervoor ("' + prev + '"); controleer de volgorde.'; },
       format:function(f){ return 'Onbekend format "' + f + '"; gebruik number, currency of percent. Nu geldt number.'; },
@@ -46,7 +56,7 @@
       asMap:function(){ return 'The stages came as names with numbers; they are shown in that order.'; },
       item:function(i){ return 'Stage ' + i + ' is not an object with label and value and was left out.'; },
       label:function(i){ return 'Stage ' + i + ' has no name (label) and was left out.'; },
-      value:function(l){ return '"' + l + '" has no number as its value and was left out.'; },
+      value:function(l){ return 'Stage "' + l + '" has no number. Give every stage a count.'; },
       negative:function(l){ return '"' + l + '" had a negative value; it was set to 0.'; },
       grows:function(l, prev){ return '"' + l + '" is larger than the stage before it ("' + prev + '"); check the order.'; },
       format:function(f){ return 'Unknown format "' + f + '"; use number, currency or percent. Now number is used.'; },
@@ -87,6 +97,7 @@
     var format = '';
     if(fmtRaw){ format = FORMATS[fmtRaw] || ''; if(!format) warn('format', H.str(raw.format, 20)); }
     var sawCurrency = false, sawPercent = false;
+    if(errors.length) return {errors:errors, warnings:warnings};
     var stages = [], anyCompare = false;
     list.forEach(function(it, i){
       if(Array.isArray(it) && it.length >= 2) it = {label:it[0], value:it[1], note:it[2]};
@@ -94,8 +105,9 @@
       var label = H.str(it.label != null ? it.label : (it.name != null ? it.name : (it.stage != null ? it.stage : it.title)), LIM.label, warn, m('labelField', i + 1));
       if(!label){ warn('label', i + 1); return; }
       var vRaw = it.value != null ? it.value : (it.count != null ? it.count : (it.amount != null ? it.amount : it.n));
-      var v = H.kpiNumber(vRaw);
-      if(!v){ warn('value', label); return; }
+      var v = approx(vRaw, H);
+      // A stage without a number is never skipped: the conversions would jump over it.
+      if(!v){ errors.push(m('value', label)); return; }
       if(v.kind === 'currency') sawCurrency = true;
       if(v.kind === 'percent') sawPercent = true;
       var value = v.n;
@@ -109,6 +121,7 @@
       }
       stages.push({label:label, value:value, prev:prev, note:H.str(it.note, LIM.note, warn, m('noteField', label))});
     });
+    if(errors.length) return {errors:errors.slice(0, 1), warnings:warnings};
     if(stages.length < LIM.minStages){ errors.push(m('tooFew', stages.length)); return {errors:errors, warnings:warnings}; }
     if(stages.every(function(s){ return s.value === 0; })){ errors.push(m('allZero')); return {errors:errors, warnings:warnings}; }
     if(!format) format = sawCurrency ? 'currency' : sawPercent ? 'percent' : 'number';

@@ -455,6 +455,7 @@ function base(spec,lang,kind,m,warnings,limits){
 
   // ── chart ────────────────────────────────────────────────────────────────
   function validateChart(spec,lang){
+    const kinds=new Set();
     const m=messenger(lang), errors=[], warnings=[];
     const warn=(k,...a)=>warnings.push(m(k,...a));
     const out=base(spec,lang,'chart',m,warnings,LIMITS);
@@ -484,6 +485,7 @@ function base(spec,lang,kind,m,warnings,limits){
         if(v==null) return null;
         const p=parseNumber(v);
         if(!Number.isFinite(p.n)){bad=true;return null;}
+        kinds.add(typeof v==='number'?'plain':p.kind);
         return p.n;
       });
       if(bad) warn('seriesValue',name);
@@ -501,7 +503,9 @@ function base(spec,lang,kind,m,warnings,limits){
         s.data=s.data.slice(0,keep).concat([rest]);
       }
     }
-    let format=typeof spec.format==='string'?spec.format.trim().toLowerCase():'number';
+    // Amounts written as "€ 12.500" or "12,5%" keep their unit when the format is missing.
+    const inferred=kinds.size===1&&(kinds.has('currency')||kinds.has('percent'))?[...kinds][0]:'number';
+    let format=typeof spec.format==='string'?spec.format.trim().toLowerCase():inferred;
     if(format==='euro'||format==='eur') format='currency';
     if(!['number','currency','percent'].includes(format)) format='number';
     let highlight='';
@@ -526,6 +530,7 @@ function base(spec,lang,kind,m,warnings,limits){
       decimals:spec.decimals==null?null:clampInt(spec.decimals,0,2,null),
       highlight,target,
       xLabel:str(spec.xLabel,40),yLabel:str(spec.yLabel,40),
+      max:type==='radar'&&Number.isFinite(Number(spec.max))&&Number(spec.max)>0?Number(spec.max):null,
       height:Math.round(height),
     })};
   }

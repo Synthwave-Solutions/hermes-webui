@@ -1461,7 +1461,16 @@ const _iui=(function(){
           b.appendChild(el('span','iui-opt-text',o));
           b.addEventListener('click',()=>{
             if(card.classList.contains('is-locked')) return;
-            if(multi){if(chosen.has(o))chosen.delete(o);else chosen.add(o);}
+            // "Geen" or "Iedereen" stands alone: it clears the others, and they clear it.
+            if(multi){
+              const alone=/^(geen|nog geen|niets|niks|iedereen|alle|alles|none|nothing|everyone|all)\b/i;
+              if(chosen.has(o)) chosen.delete(o);
+              else{
+                if(alone.test(o)) chosen.clear();
+                else [...chosen].forEach(x=>{if(alone.test(x))chosen.delete(x);});
+                chosen.add(o);
+              }
+            }
             else chosen=chosen===o&&!f.required?'':o;
             paint();clearErr();
           });
@@ -1560,7 +1569,15 @@ const _iui=(function(){
         if(f.default!=null) input.value=f.type==='number'?new Intl.NumberFormat(l==='nl'?'nl-NL':'en-GB',{maximumFractionDigits:4,useGrouping:false}).format(f.default):f.type==='date'?formDateInput(f.default,l):String(f.default);
         if(input.__paintEcho) input.__paintEcho();
         input.addEventListener('input',clearErr);
-        if(input.tagName==='INPUT') input.addEventListener('keydown',ev=>{if(ev.key==='Enter'&&!ev.isComposing){ev.preventDefault();submitForm(ev);}});
+        // Enter moves to the next question; only in the last one does it send.
+        if(input.tagName==='INPUT') input.addEventListener('keydown',ev=>{
+          if(ev.key!=='Enter'||ev.isComposing) return;
+          ev.preventDefault();
+          const fields=[...body.children].filter(x=>typeof x.__focus==='function');
+          const i=fields.indexOf(wrap);
+          if(fields.length>1&&i>=0&&i<fields.length-1){fields[i+1].__focus();return;}
+          submitForm(ev);
+        });
         wrap.appendChild(host);
         if(echo){wrap.appendChild(echo);input.setAttribute('aria-describedby',[echo.id,input.getAttribute('aria-describedby')||''].filter(Boolean).join(' '));}
         readers.push(()=>input.value);
