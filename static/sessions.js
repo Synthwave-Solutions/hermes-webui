@@ -7610,9 +7610,22 @@ function _sessionVirtualWindow(opts){
   if(total<=threshold){
     return {virtualized:false,start:0,end:total,topPad:0,bottomPad:0,itemHeight,total};
   }
-  let start=Math.floor((Number(opts&&opts.scrollTop)||0)/itemHeight)-buffer;
-  start=Math.max(0, Math.min(start, Math.max(0,total-visibleRows)));
-  let end=Math.min(total, start+visibleRows+(buffer*2));
+  // Group headers take space too: with the real row positions the window
+  // covers what is actually on screen instead of leaving visible groups empty.
+  const rowTops=opts&&Array.isArray(opts.rowTops)&&opts.rowTops.length===total?opts.rowTops:null;
+  let start, end;
+  if(rowTops){
+    const top=Number(opts&&opts.scrollTop)||0, bottom=top+viewportHeight;
+    let lo=0, hi=total;
+    while(lo<hi){const mid=(lo+hi)>>1; if(rowTops[mid]+itemHeight<=top) lo=mid+1; else hi=mid;}
+    start=Math.max(0, lo-buffer);
+    let j=lo; while(j<total&&rowTops[j]<bottom) j++;
+    end=Math.min(total, j+buffer);
+  } else {
+    start=Math.floor((Number(opts&&opts.scrollTop)||0)/itemHeight)-buffer;
+    start=Math.max(0, Math.min(start, Math.max(0,total-visibleRows)));
+    end=Math.min(total, start+visibleRows+(buffer*2));
+  }
   const activeIndex=Number.isFinite(Number(opts&&opts.activeIndex))?Number(opts.activeIndex):-1;
   if(activeIndex>=0&&activeIndex<total&&(activeIndex<start||activeIndex>=end)){
     start=Math.max(0, Math.min(activeIndex-buffer, Math.max(0,total-visibleRows-(buffer*2))));
@@ -7662,6 +7675,7 @@ function _scheduleSessionVirtualizedRender(){
     if(liveList&&liveTotal>SESSION_VIRTUAL_THRESHOLD_ROWS){
       const nextWindow=_sessionVirtualWindow({
         total:liveTotal,
+        rowTops:liveList._sessionRowTops,
         scrollTop:liveList.scrollTop||0,
         viewportHeight:liveList.clientHeight||520,
         itemHeight:SESSION_VIRTUAL_ROW_HEIGHT,
@@ -8217,6 +8231,22 @@ function renderSessionListFromCache(){
     if(!g.forceExpanded&&_groupCollapsed[g.key||g.label]) continue;
     for(const s of g.items){ flatSessionRows.push({group:g,session:s}); }
   }
+  // Row positions including the group headers, for the virtual window.
+  // The header height comes from the previous render (the list is empty now);
+  // controls already placed at the top of the list push every row down.
+  const _hdrH=list._sessionHdrH||40;
+  let _rowsOffset=0;
+  for(const child of list.children) _rowsOffset+=child.offsetHeight||0;
+  const sessionRowTops=[];
+  {
+    let y=_rowsOffset;
+    for(const g of groups){
+      y+=_hdrH;
+      if(!g.forceExpanded&&_groupCollapsed[g.key||g.label]) continue;
+      for(let k=0;k<g.items.length;k++){ sessionRowTops.push(y); y+=SESSION_VIRTUAL_ROW_HEIGHT; }
+    }
+  }
+  list._sessionRowTops=sessionRowTops;
   _sessionVisibleSidebarIds=flatSessionRows.map(row=>row.session&&row.session.session_id).filter(Boolean);
   for(const row of flatSessionRows){
     const s=row.session;
@@ -8237,6 +8267,7 @@ function renderSessionListFromCache(){
   );
   const virtualWindowBeforeActiveAnchor=_sessionVirtualWindow({
     total:flatSessionRows.length,
+    rowTops:sessionRowTops,
     scrollTop:listScrollTopBeforeRender,
     viewportHeight:list.clientHeight||520,
     itemHeight:SESSION_VIRTUAL_ROW_HEIGHT,
@@ -8248,6 +8279,7 @@ function renderSessionListFromCache(){
   const shouldMoveSidebarToActive=shouldAnchorActive&&!activeWasAlreadyVisible;
   let virtualWindow=_sessionVirtualWindow({
     total:flatSessionRows.length,
+    rowTops:sessionRowTops,
     scrollTop:listScrollTopBeforeRender,
     viewportHeight:list.clientHeight||520,
     itemHeight:SESSION_VIRTUAL_ROW_HEIGHT,
@@ -8258,7 +8290,9 @@ function renderSessionListFromCache(){
   let virtualAnchorScrollTop=null;
   if(shouldMoveSidebarToActive&&virtualWindow.virtualized){
     list.dataset.sessionVirtualActiveAnchor=activeSidForSidebar;
-    virtualAnchorScrollTop=virtualWindow.topPad;
+    // Scroll to the real row position, group headers included.
+    const anchorTop=sessionRowTops[virtualWindow.start];
+    virtualAnchorScrollTop=Number.isFinite(anchorTop)?Math.max(0,anchorTop-_hdrH):virtualWindow.topPad;
   }else if(activeSidForSidebar){
     list.dataset.sessionVirtualActiveAnchor=activeSidForSidebar;
   }else{
@@ -8313,6 +8347,10 @@ function renderSessionListFromCache(){
     if(groupBottomPad>0){ body.appendChild(_sessionVirtualSpacer(groupBottomPad,'after')); }
     wrapper.appendChild(body);
     list.appendChild(wrapper);
+  }
+  {
+    const h=list.querySelector('.session-date-header');
+    if(h&&h.offsetHeight) list._sessionHdrH=h.offsetHeight;
   }
   if(virtualAnchorScrollTop!==null){
     list.scrollTop=virtualAnchorScrollTop;

@@ -113,4 +113,11 @@ assert.ok(wrapBare('<!-- title: X -->\n<style>.a{}</style>\n<div>hoi</div>\n<scr
 assert.ok(wrapBare('<!-- title: X -->\n<style>.a{}</style>\n<div>hoi</div>\n\nUitleg.').includes('```\n\n\nUitleg.'));
 assert.strictEqual(wrapBare('Gewoon tekst <!-- title: x --> <style>'), 'Gewoon tekst <!-- title: x --> <style>');
 assert.strictEqual(wrapBare('<!-- title: alleen een titel -->\nTekst'), '<!-- title: alleen een titel -->\nTekst');
+// A reply that already has the fence, with the comments above it, gets one fence.
+const pre = wrapBare('<!-- title: Rekenhulp -->\n<!-- height: 400 -->\n```interactive-ui\n<style>.a{}</style>\n<div>x</div>\n```\nUitleg.');
+assert.strictEqual((pre.match(/```interactive-ui/g) || []).length, 1, pre);
+assert.ok(pre.startsWith('```interactive-ui\n<!-- title: Rekenhulp -->\n<!-- height: 400 -->\n<style>'), pre);
+const plain = 'Intro\n\n```interactive-ui\n<!-- title: X -->\n<style>.a{}</style>\n```\n';
+assert.strictEqual(wrapBare(plain), plain);
+assert.strictEqual(wrapBare('<!-- title: X -->\n```interactive-ui\n<div></div>\n```'), '```interactive-ui\n<!-- title: X -->\n<div></div>\n```');
 console.log('all parser checks passed');

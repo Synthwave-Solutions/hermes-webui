@@ -18350,7 +18350,16 @@ function renderMessages(options){
       // assistant message contributes tool or thinking detail to a folded
       // Worklog above the final answer.
       const compactWorklogForMessage=isCompactWorklogMode()&&(toolCallAssistantIdxs.has(mi)||assistantThinking.has(mi));
-      const durationText=compactWorklogForMessage?'':_formatTurnDuration(msg._turnDuration);
+      // One duration per turn: an earlier segment of this turn with a Worklog already shows it.
+      let earlierWorklogInTurn=false;
+      if(isCompactWorklogMode()){
+        for(let j=mi-1;j>=0;j--){
+          const prev=S.messages[j];
+          if(!prev||prev.role==='user') break;
+          if(prev.role==='assistant'&&(toolCallAssistantIdxs.has(j)||assistantThinking.has(j))){ earlierWorklogInTurn=true; break; }
+        }
+      }
+      const durationText=(compactWorklogForMessage||earlierWorklogInTurn)?'':_formatTurnDuration(msg._turnDuration);
       const usedModelText=_usedModelTurnChipLabel(msg);
       if(!hasTurnUsage&&!durationText&&!gatewayText&&!failoverText&&!modelWarningText&&!usedModelText) continue;
       const seg=assistantSegments.get(mi);

@@ -336,14 +336,21 @@
     return s;
   }
   function clampInt(v,min,max,dflt){const n=Math.round(Number(v));return Number.isFinite(n)?Math.max(min,Math.min(max,n)):dflt;}
-  function base(spec,lang,kind,m,warnings,limits){
+  // "Bron: input van de gebruiker" tells the user nothing: only outside sources are shown.
+function outsideSource(v){
+  if(!v) return v;
+  const t=String(v).toLowerCase();
+  if(/\b(gebruiker|user|jij|jou|jouw|you|your|conversation|gesprek|chat|this chat|dit gesprek)\b/.test(t)&&!/https?:|\.(nl|com|org|eu|io)\b|cbs|rapport|report|productive|snelstart|twenty|attio|google|excel|sheet/.test(t)) return '';
+  return v;
+}
+function base(spec,lang,kind,m,warnings,limits){
     const warn=(k,...a)=>warnings.push(m(k,...a));
     let title=str(spec.title,limits.title,warn,lang==='nl'?'De titel':'The title');
     if(!title){warn('noTitle');title=NAME[lang][kind];}
     return {
       title,
       subtitle:str(spec.subtitle,limits.subtitle,warn,lang==='nl'?'De ondertitel':'The subtitle'),
-      source:str(spec.source,LIMITS.source,warn,lang==='nl'?'De bron':'The source'),
+      source:outsideSource(str(spec.source,LIMITS.source,warn,lang==='nl'?'De bron':'The source')),
       example:spec.example===true,
     };
   }

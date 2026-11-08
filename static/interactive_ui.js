@@ -1029,6 +1029,10 @@ const _iui=(function(){
 // fence around it is wrapped, so a model slip still shows the app.
 function interactiveUiWrapBare(text){
   const s=String(text||'');
+  // Already fenced: only pull title/height comments written above the fence inside it.
+  if(/(^|\n)[ ]{0,3}```[ \t]*interactive-ui\b/i.test(s)){
+    return s.replace(/^\s*((?:<!--[\s\S]*?-->\s*)+)([ ]{0,3}```[ \t]*interactive-ui[^\n]*\n)/i,(m,c,f)=>f+c.trim()+'\n');
+  }
   const lead=s.match(/^\s*/)[0].length;
   if(!/^<!--\s*title\s*:/i.test(s.slice(lead,lead+40))) return s;
   if(!/<(style|script)\b/i.test(s)) return s;
