@@ -1,0 +1,49 @@
+/* Funnel (static/interactive-ui/kinds/funnel.js): a name column and centred
+   bars whose width follows the value; between two stages a small chip with
+   the share that moves on. Under 480 px the names go above the bars. */
+.k-fn{display:flex;flex-direction:column;gap:10px}
+.k-fn-overall{margin:0;display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;font-size:.88rem;color:var(--sw-fg)}
+.k-fn-overall-main{font-weight:600;color:var(--sw-strong);font-variant-numeric:tabular-nums}
+.k-fn-overall-prev{font-size:.8rem;color:var(--sw-muted);font-variant-numeric:tabular-nums}
+.k-fn-list{display:grid;grid-template-columns:minmax(104px,28%) minmax(0,1fr);column-gap:14px;align-items:center}
+.k-fn-row{display:contents}
+.k-fn-label{display:flex;flex-direction:column;justify-content:center;gap:1px;min-width:0;min-height:38px;cursor:pointer}
+.k-fn-name{font-size:.88rem;font-weight:500;color:var(--sw-strong);line-height:1.3;overflow-wrap:anywhere}
+.k-fn-meta{font-size:.76rem;color:var(--sw-muted);line-height:1.3;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.k-fn-track{display:flex;justify-content:center;min-width:0}
+.k-fn-bar{all:unset;box-sizing:border-box;display:flex;align-items:center;justify-content:center;height:38px;max-width:100%;padding:0 8px;border-radius:8px;cursor:pointer;
+  background:color-mix(in srgb,var(--sw-accent) 22%,var(--sw-surface-2));border:1px solid color-mix(in srgb,var(--sw-accent) 42%,transparent);
+  transform-origin:50% 50%;animation:kFnGrow .5s cubic-bezier(.2,.8,.2,1) backwards;animation-delay:calc(var(--i,0) * 60ms)}
+.k-fn-row:first-child .k-fn-bar,.k-fn-list>.k-fn-row:first-child .k-fn-bar{background:color-mix(in srgb,var(--sw-accent) 30%,var(--sw-surface-2))}
+.k-fn-value{font-size:.9rem;font-weight:650;color:var(--sw-strong);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.k-fn-bar:hover{border-color:var(--sw-accent)}
+.k-fn-bar:focus-visible{outline:2px solid var(--sw-accent);outline-offset:2px}
+.k-fn-row.is-active .k-fn-bar{border-color:var(--sw-accent);box-shadow:0 0 0 1px var(--sw-accent)}
+.k-fn-row.is-active .k-fn-name{color:var(--sw-accent)}
+.k-fn-step{display:contents}
+.k-fn-gap{min-height:30px}
+.k-fn-chip{justify-self:center;display:inline-flex;align-items:center;gap:4px;margin:4px 0;padding:.08em .6em;border-radius:999px;font-size:.76rem;font-weight:600;
+  font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--sw-muted);background:var(--sw-surface-2);border:1px solid var(--sw-border)}
+.k-fn-arrow{font-size:.85em;line-height:1;opacity:.8}
+.k-fn-chip.is-empty{visibility:hidden}
+.k-fn-step.is-drop .k-fn-chip{color:var(--sw-warn);background:color-mix(in srgb,var(--sw-warn) 13%,transparent);border-color:color-mix(in srgb,var(--sw-warn) 40%,transparent)}
+.k-fn-drop{margin:2px 0 0;font-size:.84rem;color:var(--sw-fg);display:flex;align-items:center;gap:8px}
+.k-fn-drop::before{content:"";flex:0 0 auto;width:8px;height:8px;border-radius:50%;background:var(--sw-warn)}
+.k-fn-detail{margin:0;font-size:.84rem;color:var(--sw-muted);font-variant-numeric:tabular-nums}
+.k-fn-detail:not(.is-set){display:none}
+.k-fn-detail.is-set{color:var(--sw-fg)}
+html[data-theme=light] .k-fn-step.is-drop .k-fn-chip{color:color-mix(in srgb,var(--sw-warn) 55%,var(--sw-strong))}
+html[data-theme=light] .k-fn-drop::before{background:color-mix(in srgb,var(--sw-warn) 80%,var(--sw-strong))}
+@keyframes kFnGrow{from{transform:scaleX(.2);opacity:0}to{transform:none;opacity:1}}
+.k-fn.is-settled .k-fn-bar{animation:none}
+@media (prefers-reduced-motion:reduce){.k-fn-bar{animation:none!important}}
+@media (max-width:479px){
+  .k-fn-list{display:flex;flex-direction:column;align-items:stretch}
+  .k-fn-row{display:flex;flex-direction:column;gap:4px}
+  .k-fn-label{min-height:0;align-items:center;text-align:center}
+  .k-fn-bar{height:34px}
+  .k-fn-step{display:flex;justify-content:center}
+  .k-fn-gap{display:none}
+  .k-fn-chip{margin:8px 0 6px}
+}
+@media (pointer:coarse){.k-fn-bar{min-height:44px}}

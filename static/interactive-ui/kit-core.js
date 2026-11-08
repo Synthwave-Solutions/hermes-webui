@@ -20,7 +20,7 @@
     placeName:80,address:200,time:20,note:240,category:30,categories:6,tones:20,specBytes:200*1024,
     kpiItems:8,kpiLabel:40,kpiNote:80,tlItems:20,tlLabel:60,tlOwner:40,tlNote:160,tlMaxUnit:1000,tlTicks:12};
   const COLUMN_TYPES=new Set(['text','number','currency','percent','date','status','link']);
-  const CHART_TYPES=new Set(['bar','hbar','stacked','line','area','pie','donut']);
+  const CHART_TYPES=new Set(['bar','hbar','stacked','line','area','pie','donut','radar']);
   const TONES=new Set(['good','warn','bad','info']);
   const WIKI_LANGS=new Set(['nl','en','de','fr']);
   const NOUN={nl:{table:'tabel',chart:'grafiek',map:'kaart',kpi:'KPI-rij',timeline:'planning'},
@@ -461,6 +461,7 @@ function base(spec,lang,kind,m,warnings,limits){
     let type=typeof spec.type==='string'?spec.type.trim().toLowerCase():'bar';
     if(type==='doughnut') type='donut';
     if(type==='horizontal'||type==='horizontalbar'||type==='barh') type='hbar';
+    if(type==='spider'||type==='web'||type==='spin'||type==='spinneweb') type='radar';
     if(!CHART_TYPES.has(type)){warn('chartType',type);type='bar';}
     const round=type==='pie'||type==='donut';
     let labels=Array.isArray(spec.labels)?spec.labels.map(l=>str(l,LIMITS.label)):null;
@@ -516,7 +517,10 @@ function base(spec,lang,kind,m,warnings,limits){
       if(Number.isFinite(p.n)&&!round) target={value:p.n,label:str(t.label,40)};
       else if(!round) warn('target');
     }
-    const height=spec.height==null?(type==='hbar'?Math.max(220,Math.min(480,60+labels.length*28*Math.max(1,series.length*0.6))):300):clampInt(spec.height,180,480,300);
+    // A radar needs at least three axes to be a shape; with fewer it is a bar chart.
+    if(type==='radar'&&labels.length<3) type='bar';
+    if(type==='radar'&&target) target=null;
+    const height=spec.height==null?(type==='hbar'?Math.max(220,Math.min(480,60+labels.length*28*Math.max(1,series.length*0.6))):type==='radar'?340:300):clampInt(spec.height,180,480,300);
     return {errors,warnings,spec:Object.assign(out,{
       type,labels,series,format,
       decimals:spec.decimals==null?null:clampInt(spec.decimals,0,2,null),
@@ -844,9 +848,35 @@ function base(spec,lang,kind,m,warnings,limits){
     return {min,max,ticks,todayX,lines:bounds.slice(1,-1).map(b=>(b-min)/span)};
   }
 
+  // ── Extra kinds ──────────────────────────────────────────────────────────
+  // A kind in its own file (static/interactive-ui/kinds/*.js) registers here:
+  // register(kind, {fences:[...], name:{nl,en}, noun:{nl,en}, icon, streamHeight,
+  //   validate(raw, lang, helpers) -> {errors, warnings, spec}, estHeight(spec), table(spec)}).
+  // The same file registers its renderer with SWKitRender inside the kit frame.
+  const EXTRA={};
+  function register(kind,def){
+    if(!/^[a-z][a-z-]{1,20}$/.test(kind)||!def||typeof def.validate!=='function'||EXTRA[kind]||KIT_LANGS[kind]) return false;
+    EXTRA[kind]=def;
+    [kind].concat(Array.isArray(def.fences)?def.fences:[]).forEach(f=>{f=String(f).toLowerCase();if(/^[a-z][a-z-]{1,20}$/.test(f)&&!KIT_LANGS[f]||KIT_LANGS[f]===kind)KIT_LANGS[f]=kind;});
+    ['nl','en'].forEach(l=>{
+      if(def.noun&&def.noun[l]) NOUN[l][kind]=String(def.noun[l]);
+      if(def.name&&def.name[l]) NAME[l][kind]=String(def.name[l]);
+    });
+    return true;
+  }
+  function extra(kind){return Object.prototype.hasOwnProperty.call(EXTRA,kind)?EXTRA[kind]:null;}
+  // What a kind file may use to validate.
+  function helpers(lang){
+    const m=messenger(lang);
+    return {m,str,isObj,clampInt,parseNumber,kpiNumber,base:(spec,kind,warnings)=>base(spec,lang,kind,m,warnings,LIMITS),
+      fieldName:(nl,en)=>fieldName(lang,nl,en),pickLang,LIMITS,formatValue};
+  }
+
   // ── Entry point ──────────────────────────────────────────────────────────
   function estHeight(kind,spec){
     if(!spec) return 120;
+    const x=extra(kind);
+    if(x){try{return Math.max(80,Math.min(2000,Math.round(Number(x.estHeight?x.estHeight(spec):300))||300));}catch(_){return 300;}}
     if(kind==='table'){
       const shown=Math.min(spec.rows.length,50);
       return Math.round(28+(spec.subtitle?24:0)+(spec.filter?48:0)+Math.min(440,42+Math.max(1,shown)*37+(spec.total?37:0))+(spec.rows.length>50?48:0)+(spec.source?28:0));
@@ -883,9 +913,12 @@ function base(spec,lang,kind,m,warnings,limits){
     // The block may name the conversation language; it sets labels and number format.
     const own=String(raw&&raw.lang||'').toLowerCase();
     if(own==='nl'||own==='en'){lang=own;m=messenger(lang);}
-    const fn={table:validateTable,chart:validateChart,map:validateMap,kpi:validateKpi,timeline:validateTimeline}[kind]||null;
+    const x=extra(kind);
+    const fn=x?((raw,l)=>x.validate(raw,l,helpers(l))):({table:validateTable,chart:validateChart,map:validateMap,kpi:validateKpi,timeline:validateTimeline}[kind]||null);
     if(!fn){res.errors.push(m('notObject'));return res;}
-    const r=fn(raw,lang);
+    let r;
+    try{r=fn(raw,lang)||{errors:[m('notObject')],warnings:[]};}catch(err){r={errors:[m('notObject')],warnings:[]};}
+    r.errors=Array.isArray(r.errors)?r.errors:[];r.warnings=Array.isArray(r.warnings)?r.warnings:[];
     res.errors=r.errors;res.warnings=r.warnings;
     if(r.spec&&!r.errors.length){r.spec.lang=lang;res.spec=r.spec;res.title=r.spec.title;res.estHeight=estHeight(kind,r.spec);}
     else res.title=str(raw&&raw.title,LIMITS.title);
@@ -1005,6 +1038,8 @@ function base(spec,lang,kind,m,warnings,limits){
         rows:spec.items.map(i=>[i.label,i.value,i.delta,i.target]),
         types:['text','number','number','number']};
     }
+    const x=extra(kind);
+    if(x){try{const t=x.table?x.table(spec,view,data):null;if(t&&Array.isArray(t.header)&&Array.isArray(t.rows))return t;}catch(_){}return {header:[],rows:[]};}
     if(kind==='timeline'){
       const en=spec.lang==='en', lang=en?'en':'nl', pos=spec.mode==='date'?'date':'number';
       return {header:en?['Item','Start','End','Owner','Status','Milestone','Note']:['Onderdeel','Start','Einde','Eigenaar','Status','Mijlpaal','Notitie'],
@@ -1065,7 +1100,7 @@ function base(spec,lang,kind,m,warnings,limits){
       +(mid.length?'&waypoints='+encodeURIComponent(mid.join('|')):'')+'&travelmode=driving';
   }
 
-  const api={KIT_LANGS,kitKind,LIMITS,NOUN,NAME,pickLang,cleanJson,parseKit,parseCsv,detectDelimiter,parseNumber,
+  const api={register,extra,KIT_LANGS,kitKind,LIMITS,NOUN,NAME,pickLang,cleanJson,parseKit,parseCsv,detectDelimiter,parseNumber,
     validateTable,validateChart,validateMap,validateKpi,validateTimeline,build,estHeight,streamingTitle,compareCells,formatValue,viewIndices,
     initialView,totals,kitTable,toCsv,toTsv,mapRequest,mapLocalData,tileUrlOk,googleMapsUrl,OSM_TILES,
     kpiValueText,kpiDeltaText,timelineAxis,timelinePeriod,statusWord,dayOf,isoOf,STATUS_WORDS};
