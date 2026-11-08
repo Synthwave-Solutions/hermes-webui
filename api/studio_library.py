@@ -518,7 +518,7 @@ def save_prompt(view, body: dict) -> dict:
 # ── Organisation profile: context for every QuickScan ───────────────────────
 
 PROFILE_FIELDS = {"name": 120, "website": 200, "sector": 120, "size": 80, "description": 900, "customers": 400, "policy": 900}
-PROFILE_LISTS = {"goals": (8, 200), "systems": (40, 60), "products": (12, 120)}
+PROFILE_LISTS = {"goals": (8, 200), "systems": (40, 60), "products": (12, 120), "rules": (16, 200), "departments_note": (12, 120)}
 
 
 def load_profile() -> dict:
@@ -568,6 +568,8 @@ def context_text(limit: int = 1400) -> str:
         parts.append("Doelen: " + "; ".join(p["goals"]))
     if p.get("systems"):
         parts.append("Systemen in gebruik: " + ", ".join(p["systems"]))
+    if p.get("rules"):
+        parts.append("Regels voor AI: " + "; ".join(p["rules"]))
     if p.get("policy"):
         parts.append("Beleid voor AI en data: " + p["policy"])
     return "\n".join(parts)[:limit]
@@ -679,6 +681,143 @@ def research_profile(view, url: str) -> dict:
     proposal = clean_profile(dict(answer, website=final))
     return {"proposal": proposal, "summary": _txt(answer.get("summary"), 300), "sources": sources}
 
+
+# ── Personal intake: who you are, your tasks and how the agent should work with you ──
+# The full intake stays here for Studio; a short entry goes into the person's
+# user notes (personal USER.md, the "user profile" the agent reads in every
+# conversation). Only that one entry is replaced; the person's own notes stay.
+
+INTAKE_MARK = "Intake (Studio):"
+USER_NOTE_LIMIT = 1375          # the agent's user_char_limit
+INTAKE_NOTE_MAX = 700
+SENIORITY = ("junior", "medior", "senior", "lead", "management")
+WORK_TYPES = ("office", "hybrid", "remote", "field")
+CADENCES = ("daily", "weekly", "monthly", "adhoc")
+TASK_KINDS = ("automate", "assist", "human")
+LANGS, TONES, LENGTHS, FORMATS = ("nl", "en"), ("informal", "formal"), ("short", "detailed"), ("bullets", "prose")
+AI_LEVELS = ("beginner", "regular", "advanced")
+
+
+def _person_file(email: str) -> str:
+    import hashlib
+    return "people/" + hashlib.sha256(str(email or "").lower().encode()).hexdigest()[:32] + ".json"
+
+
+def load_person(email: str) -> dict:
+    (_dir() / "people").mkdir(parents=True, exist_ok=True)
+    return _read(_person_file(email), {})
+
+
+def clean_person(raw: dict) -> dict:
+    raw = raw if isinstance(raw, dict) else {}
+    role = raw.get("role") if isinstance(raw.get("role"), dict) else {}
+    lst = lambda v, n, m: [x for x in (_txt(i, m) for i in (v if isinstance(v, list) else re.split(r"[,\n]", str(v or "")))[: n * 2]) if x][:n]
+    out_role = {"title": _txt(role.get("title"), 100), "team": _txt(role.get("team"), 90), "speciality": _txt(role.get("speciality"), 100),
+                "seniority": role.get("seniority") if role.get("seniority") in SENIORITY else "",
+                "work_type": role.get("work_type") if role.get("work_type") in WORK_TYPES else "",
+                "focus": lst(role.get("focus"), 6, 80), "responsibilities": lst(role.get("responsibilities"), 8, 120)}
+    tasks = []
+    for t in (raw.get("tasks") or [])[:20]:
+        if not isinstance(t, dict) or not _txt(t.get("name")):
+            continue
+        tasks.append({"name": _txt(t.get("name"), 120), "cadence": t.get("cadence") if t.get("cadence") in CADENCES else "weekly",
+                      "minutes": studio._int(t.get("minutes"), 0, 2400), "tools": lst(t.get("tools"), 6, 40),
+                      "kind": t.get("kind") if t.get("kind") in TASK_KINDS else ""})
+    prefs = raw.get("prefs") if isinstance(raw.get("prefs"), dict) else {}
+    out_prefs = {"language": prefs.get("language") if prefs.get("language") in LANGS else "",
+                 "tone": prefs.get("tone") if prefs.get("tone") in TONES else "",
+                 "length": prefs.get("length") if prefs.get("length") in LENGTHS else "",
+                 "format": prefs.get("format") if prefs.get("format") in FORMATS else "",
+                 "hours": _txt(prefs.get("hours"), 80), "never": _txt(prefs.get("never"), 300), "notes": _txt(prefs.get("notes"), 300)}
+    lit = raw.get("literacy") if isinstance(raw.get("literacy"), dict) else {}
+    out_lit = {"self": lit.get("self") if lit.get("self") in AI_LEVELS else "", "score": studio._int(lit.get("score"), 0, 3),
+               "answered": bool(lit.get("answered"))}
+    return {"role": out_role, "tasks": tasks, "tools": lst(raw.get("tools"), 30, 40), "prefs": out_prefs, "literacy": out_lit}
+
+
+_NL = {"seniority": {"junior": "junior", "medior": "medior", "senior": "senior", "lead": "teamlead", "management": "management"},
+       "work_type": {"office": "op kantoor", "hybrid": "hybride", "remote": "op afstand", "field": "op locatie"},
+       "cadence": {"daily": "dagelijks", "weekly": "wekelijks", "monthly": "maandelijks", "adhoc": "af en toe"},
+       "language": {"nl": "Nederlands", "en": "Engels"}, "tone": {"informal": "informeel (je)", "formal": "formeel (u)"},
+       "length": {"short": "kort en bondig", "detailed": "uitgebreid"}, "format": {"bullets": "opsommingen", "prose": "lopende tekst"},
+       "ai": {"beginner": "beginner met AI", "regular": "gebruikt AI regelmatig", "advanced": "ervaren met AI"}}
+
+
+def person_note(intake: dict, team_name: str = "") -> str:
+    """One short user-notes entry the agent reads in every conversation."""
+    r, p, t = intake.get("role") or {}, intake.get("prefs") or {}, intake.get("tasks") or []
+    bits = []
+    role = ", ".join(x for x in (r.get("title"), team_name, _NL["seniority"].get(r.get("seniority"), ""), r.get("speciality")) if x)
+    if role:
+        bits.append("Rol: " + role + ("; werkt " + _NL["work_type"][r["work_type"]] if r.get("work_type") else "") + ".")
+    if r.get("focus"):
+        bits.append("Focus: " + "; ".join(r["focus"][:4]) + ".")
+    if t:
+        bits.append("Terugkerend werk: " + "; ".join(f"{x['name']} ({_NL['cadence'][x['cadence']]})" for x in t[:5]) + ".")
+    if intake.get("tools"):
+        bits.append("Systemen: " + ", ".join(intake["tools"][:10]) + ".")
+    pref = [x for x in (_NL["language"].get(p.get("language"), ""), _NL["tone"].get(p.get("tone"), ""),
+                        _NL["length"].get(p.get("length"), ""), _NL["format"].get(p.get("format"), "")) if x]
+    if pref:
+        bits.append("Voorkeur in antwoorden: " + ", ".join(pref) + ".")
+    if p.get("hours"):
+        bits.append("Werktijden: " + p["hours"] + ".")
+    if p.get("never"):
+        bits.append("Nooit: " + p["never"] + ".")
+    if p.get("notes"):
+        bits.append(p["notes"] + ".")
+    lvl = (intake.get("literacy") or {}).get("self")
+    if lvl:
+        bits.append("AI-ervaring: " + _NL["ai"][lvl] + ".")
+    text = INTAKE_MARK + " " + " ".join(bits)
+    text = re.sub(r"\.\.+", ".", text)
+    return text[:INTAKE_NOTE_MAX].rstrip()
+
+
+def save_person(view, identity, body: dict) -> dict:
+    """Store the personal intake and write its short entry into the person's user notes."""
+    from api import personal_context
+
+    intake = clean_person(body)
+    team_key = intake["role"]["team"]
+    teams = org_structure.load().get("teams") or {}
+    team_name = (teams.get(team_key) or {}).get("name") or ""
+    note = person_note(intake, team_name)
+    current = personal_context.read_file(personal_context.paths(identity)["user"])
+    entries = [e for e in current.split("\n§\n") if e.strip()] if current.strip() else []
+    entries = [e for e in entries if not e.strip().startswith(INTAKE_MARK)]
+    own = sum(len(e) for e in entries) + max(0, len(entries)) * 3
+    if own + len(note) > USER_NOTE_LIMIT:
+        note = note[: max(160, USER_NOTE_LIMIT - own - 3)].rstrip()
+    entries.append(note)
+    personal_context.write(identity, "user", "\n§\n".join(entries))
+    intake.update(updated_at=time.time(), email=view.email, note=note)
+    with _LOCK:
+        (_dir() / "people").mkdir(parents=True, exist_ok=True)
+        _write(_person_file(view.email), intake)
+    used = sum(len(e) for e in entries) + max(0, len(entries) - 1) * 3
+    return dict(intake, notes_used=used, notes_limit=USER_NOTE_LIMIT)
+
+
+def person_context_text(email: str) -> str:
+    p = load_person(email)
+    return p.get("note", "").replace(INTAKE_MARK, "").strip() if p else ""
+
+
+_TASKS = """Je helpt iemand zijn terugkerende werk in kaart te brengen. Je krijgt een beschrijving van een werkweek.
+Haal de concrete, terugkerende taken eruit (hooguit 10). Verzin niets: alleen wat genoemd wordt.
+Per taak: name (kort, werkwoord vooraan), cadence (daily, weekly, monthly of adhoc), minutes (per keer, alleen als
+het genoemd wordt of duidelijk volgt, anders 0), tools (systemen die bij die taak genoemd worden).
+Alleen JSON: {"tasks": [{"name": "...", "cadence": "weekly", "minutes": 30, "tools": ["Excel"]}]}"""
+
+
+def extract_tasks(text: str) -> list:
+    text = str(text or "").strip()
+    if len(text) < 10:
+        raise ValueError("Describe your week first")
+    answer = studio._ask_json(_TASKS, text[:6000])
+    return clean_person({"tasks": answer.get("tasks") or []})["tasks"]
+
 # ── HTTP ─────────────────────────────────────────────────────────────────────
 
 def handle_get(handler, parsed) -> bool:
@@ -694,6 +833,16 @@ def handle_get(handler, parsed) -> bool:
             j(handler, {"playbooks": playbooks_for(view)})
         elif parsed.path == "/api/studio/prompts":
             j(handler, prompts_for(view))
+        elif parsed.path == "/api/studio/profile" and (qs.get("who") or [""])[0] == "me":
+            from api import personal_context
+            from api.governance.enforce import _request_identity
+            notes = personal_context.read_file(personal_context.paths(_request_identity(handler))["user"])
+            data = org_structure.load()
+            mine = sorted(view.member_teams | view.lead_teams)
+            j(handler, dict(load_person(view.email), email=view.email, my_teams=mine,
+                            teams=[{"key": k, "name": (t or {}).get("name") or k} for k, t in sorted((data.get("teams") or {}).items()) if isinstance(t, dict)],
+                            org_systems=load_profile().get("systems") or [],
+                            notes_used=len(notes), notes_limit=USER_NOTE_LIMIT))
         elif parsed.path == "/api/studio/profile":
             j(handler, dict(load_profile(), editable=view.scope == org_structure.SCOPE_ALL, context=context_text()))
         elif parsed.path == "/api/studio/playbook":
@@ -733,6 +882,11 @@ def handle_post(handler, parsed, body) -> bool:
         elif path == "/api/studio/profile":
             if body.get("op") == "research":
                 j(handler, research_profile(view, body.get("url") or ""))
+            elif body.get("op") == "me":
+                from api.governance.enforce import _request_identity
+                j(handler, save_person(view, _request_identity(handler), body))
+            elif body.get("op") == "me_extract":
+                j(handler, {"tasks": extract_tasks(body.get("text") or "")})
             else:
                 j(handler, dict(save_profile(view, body), editable=True))
         elif path == "/api/studio/playbook/run":

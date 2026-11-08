@@ -746,6 +746,13 @@ window.SynthPulseHelpContent = {
               "body": "Who you are, your goals, systems and policy. The agent reads this in every QuickScan; let it research the website for a first proposal.",
               "target": "[data-tour='studio-profile']",
               "dynamic": true
+            },
+            {
+              "id": "intake",
+              "title": "Intakes",
+              "body": "About you: six steps to tell the agent who you are, your work and your preferences; a short summary goes into your user profile. The organisation intake fills the organisation profile.",
+              "target": "[data-tour='studio-intake']",
+              "dynamic": true
             }
           ],
           "related": [
@@ -1670,6 +1677,13 @@ window.SynthPulseHelpContent = {
               "title": "Organisatieprofiel",
               "body": "Wie jullie zijn, jullie doelen, systemen en beleid. De agent leest dit mee bij elke QuickScan; laat de website onderzoeken voor een eerste voorstel.",
               "target": "[data-tour='studio-profile']",
+              "dynamic": true
+            },
+            {
+              "id": "intake",
+              "title": "Intakes",
+              "body": "Over jou: zes stappen waarin je de agent vertelt wie je bent, je werk en je voorkeuren; een korte samenvatting komt in je gebruikersprofiel. De organisatie-intake vult het organisatieprofiel.",
+              "target": "[data-tour='studio-intake']",
               "dynamic": true
             }
           ],

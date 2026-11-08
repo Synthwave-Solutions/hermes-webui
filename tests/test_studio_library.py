@@ -199,3 +199,57 @@ def test_page_text_keeps_title_meta_and_structured_data(monkeypatch):
     url, text = lib.fetch_public_page("https://acme.example/")
     assert "Titel: Acme | Warmtepompen" in text and "description: Acme installeert warmtepompen" in text
     assert "numberOfEmployees" in text and "var x" not in text
+
+
+def test_personal_intake_writes_one_entry_into_the_user_notes(env, monkeypatch):
+    from api import personal_context
+    tom = V(OWNER, env)
+    ident = {"email": OWNER}
+    personal_context.write(ident, "user", "Houdt van korte mails\n§\nZit op dinsdag op kantoor")
+    body = {"role": {"title": "Debiteurenbeheerder", "team": "finance/debiteuren", "seniority": "senior", "work_type": "hybrid",
+                     "focus": "Betaaltermijn omlaag\nMinder nabellen"},
+            "tasks": [{"name": "Openstaande posten nabellen", "cadence": "weekly", "minutes": 120, "tools": ["Exact"], "kind": "assist"},
+                      {"name": "Aanmaningen opstellen", "cadence": "weekly", "minutes": 45, "kind": "automate"},
+                      {"name": "", "cadence": "daily"}],
+            "tools": "Exact, Outlook", "prefs": {"language": "nl", "tone": "informal", "length": "short", "format": "bullets",
+                                                 "never": "Nooit zelf mails versturen"},
+            "literacy": {"self": "regular", "score": 2, "answered": True}}
+    out = lib.save_person(tom, ident, body)
+    notes = personal_context.read_file(personal_context.paths(ident)["user"])
+    entries = notes.split("\n§\n")
+    assert entries[:2] == ["Houdt van korte mails", "Zit op dinsdag op kantoor"], "the person's own notes stay"
+    assert entries[2].startswith(lib.INTAKE_MARK) and "Debiteurenbeheerder, Debiteuren, senior" in entries[2]
+    assert "Openstaande posten nabellen (wekelijks)" in entries[2] and "Nooit: Nooit zelf mails versturen" in entries[2]
+    assert len(entries[2]) <= lib.INTAKE_NOTE_MAX and out["notes_used"] <= lib.USER_NOTE_LIMIT
+    assert len(out["tasks"]) == 2 and out["tasks"][1]["kind"] == "automate"
+    # A new intake replaces its entry and nothing else.
+    lib.save_person(tom, ident, dict(body, role=dict(body["role"], title="Teamlead debiteuren")))
+    entries = personal_context.read_file(personal_context.paths(ident)["user"]).split("\n§\n")
+    assert len(entries) == 3 and "Teamlead debiteuren" in entries[2]
+    assert lib.load_person(OWNER)["role"]["title"] == "Teamlead debiteuren"
+    # The intake also goes along as context in the person's own QuickScan.
+    seen = []
+    monkeypatch.setattr(studio, "_ask_json", lambda system, user: seen.append(user) or {"goals": [], "opportunities": []})
+    doc = studio.update(tom, {"title": "Nabellen"})
+    studio.run_step(tom, {"id": doc["id"], "step": "discover", "input": "Ik bel elke week na"})
+    assert "Over de persoon" in seen[0] and "Teamlead debiteuren" in seen[0]
+
+
+def test_user_notes_stay_within_the_agent_limit(env):
+    from api import personal_context
+    ident = {"email": OTHER}
+    personal_context.write(ident, "user", "x" * 1200)
+    out = lib.save_person(V(OTHER, env), ident, {"role": {"title": "Accountmanager " * 20}, "tasks": [{"name": "Offertes maken " * 5}]})
+    assert out["notes_used"] <= lib.USER_NOTE_LIMIT
+    assert personal_context.read_file(personal_context.paths(ident)["user"]).startswith("x" * 1200)
+
+
+def test_tasks_are_extracted_from_a_description_of_the_week(env, monkeypatch):
+    monkeypatch.setattr(studio, "_ask_json", lambda system, user: {"tasks": [
+        {"name": "Weekrapport maken", "cadence": "weekly", "minutes": 60, "tools": ["Excel"]},
+        {"name": "Mail lezen", "cadence": "nooit", "minutes": "veel"}]})
+    tasks = lib.extract_tasks("Elke maandag maak ik het weekrapport in Excel, dat kost een uur.")
+    assert tasks[0] == {"name": "Weekrapport maken", "cadence": "weekly", "minutes": 60, "tools": ["Excel"], "kind": ""}
+    assert tasks[1]["cadence"] == "weekly" and tasks[1]["minutes"] == 0
+    with pytest.raises(ValueError):
+        lib.extract_tasks("kort")

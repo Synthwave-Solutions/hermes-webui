@@ -70,6 +70,11 @@ ANSWERS = {
 }
 
 
+ANSWERS["terugkerende werk in kaart"] = {"tasks": [
+    {"name": "Openstaande posten nabellen", "cadence": "weekly", "minutes": 120, "tools": ["Exact"]},
+    {"name": "Weekrapport debiteuren maken", "cadence": "weekly", "minutes": 45, "tools": ["Excel"]}]}
+
+
 ANSWERS["Schrijf een Playbook voor collega"] = {
     "title": "Zo verwerk je aanmaningen met de Super Agent", "summary": "Elke maandag in tien minuten", "trigger": "Maandagochtend",
     "steps": [{"title": "Open de concepten", "actor": "jij", "text": "Open de chat van de Debiteuren Bot.", "prompt": "Laat de concept-aanmaningen van vandaag zien"},
@@ -405,7 +410,8 @@ def main() -> int:
             ok("Explain this page and the feature guide explain Studio, the org chart and Management")
 
             # shared prompts: per team, department or organisation, in Studio and in the chat box
-            assert page.locator(".st-profile-hint").is_visible(), "an empty organisation profile is pointed out to the admin"
+            assert page.locator(".st-org-hint").is_visible(), "an empty organisation profile is pointed out to the admin"
+            assert page.locator(".st-me-hint").is_visible(), "an empty personal intake is pointed out"
             hub(page, "prompts")
             page.wait_for_selector('.pb-group[data-pr-gopen="category:Debiteurenbeheer"] .pr-card', timeout=10000)
             page.locator("[data-pr-new]").click()
@@ -434,26 +440,74 @@ def main() -> int:
             page.screenshot(path=str(art / "12-prompts-popup.png"))
             ok("prompts are shared per team, department or organisation, grouped by category, used from Studio and from the chat box; a playbook step's prompt is saved for its team")
 
-            # organisation profile: context for every QuickScan
+            # organisation intake: seven steps that fill the profile every QuickScan reads
             hub(page, "profile")
-            pf = page.locator("[data-pf-form]")
-            pf.wait_for(timeout=10000)
-            pf.locator('[name="name"]').fill("Acme Installatie")
-            pf.locator('[name="sector"]').fill("Installatietechniek")
-            pf.locator('[name="systems"]').fill("Exact, Outlook, Excel")
-            pf.locator('[name="goals"]').fill("Sneller offreren\nMinder handwerk")
-            pf.locator('button[type="submit"]').click()
-            page.wait_for_function("() => /Systemen in gebruik: Exact, Outlook, Excel/.test(document.querySelector('.pf-context pre')?.textContent || '')", timeout=10000)
-            prof = ctx.request.get("/api/studio/profile").json()
-            assert prof["name"] == "Acme Installatie" and prof["goals"] == ["Sneller offreren", "Minder handwerk"], prof
-            pf.locator('[name="website"]').fill("http://127.0.0.1:1/")
-            page.locator("[data-pf-research]").click()
+            page.wait_for_selector('[data-tour="studio-intake"]', timeout=10000)
+            page.locator('[data-in-f="name"]').fill("Acme Installatie")
+            page.locator('[data-in-f="website"]').fill("http://127.0.0.1:1/")
+            page.locator("[data-in-research]").click()
             page.wait_for_function("() => /openbare websites/i.test(document.body.innerText)", timeout=15000)
-            page.screenshot(path=str(art / "13-profile.png"), full_page=True)
+            page.locator("[data-in-next]").click()
+            page.locator('[data-in-f="sector"]').fill("Installatietechniek")
+            page.locator("[data-in-next]").click()
+            page.wait_for_function("() => /Finance/.test(document.querySelector('.in-structure')?.innerText || '')", timeout=10000)
+            page.locator("[data-in-next]").click()
+            page.locator('[data-in-goal="0:goal"]').fill("Sneller offreren")
+            page.locator('[data-in-goal="0:kpi"]').fill("doorlooptijd van 3 naar 1 dag")
+            page.locator("[data-in-next]").click()
+            page.locator('[data-in-system="Exact"]').click()
+            page.locator('[data-in-system="Outlook"]').click()
+            page.locator("[data-in-next]").click()
+            page.locator('[data-in-rule="r1"]').check()
+            page.locator("[data-in-next]").click()
+            ctxt = page.locator(".in-context").inner_text()
+            assert "Acme Installatie (Installatietechniek)" in ctxt and "Sneller offreren (KPI: doorlooptijd van 3 naar 1 dag)" in ctxt, ctxt
+            assert "Systemen in gebruik: Exact, Outlook" in ctxt and "Een mens controleert" in ctxt, ctxt
+            page.screenshot(path=str(art / "13-org-intake.png"), full_page=True)
+            page.locator("[data-in-save]").click()
+            page.wait_for_selector("[data-in-redo]", timeout=10000)
+            prof = ctx.request.get("/api/studio/profile").json()
+            assert prof["name"] == "Acme Installatie" and prof["goals"] == ["Sneller offreren (KPI: doorlooptijd van 3 naar 1 dag)"], prof
+            assert prof["rules"] and prof["systems"] == ["Exact", "Outlook"] and "Regels voor AI" in prof["context"], prof
+            ok("organisation intake in seven steps fills the profile; research refuses a private address")
+
+            # personal intake: who you are, tasks pulled from your week, preferences, saved into your user notes
+            hub(page, "me")
+            page.wait_for_selector('[data-in-f="role.title"]', timeout=10000)
+            page.locator('[data-in-f="role.title"]').fill("Teamlead debiteuren")
+            page.locator('[data-in-set="role.seniority"][data-in-val="lead"]').click()
+            page.locator("[data-in-next]").click()
+            page.locator('[data-in-f="week"]').fill("Elke maandag haal ik de openstaande posten uit Exact en bel ik klanten na, twee uur. Vrijdag maak ik het weekrapport in Excel.")
+            page.locator("[data-in-extract]").click()
+            page.wait_for_function("() => document.querySelectorAll('.in-task').length === 2", timeout=15000)
+            page.locator("[data-in-next]").click()
+            page.locator('[data-in-tool="Outlook"]').click()
+            page.locator("[data-in-next]").click()
+            page.locator('[data-in-set="tasks.0.kind"][data-in-val="assist"]').click()
+            page.locator('[data-in-set="tasks.1.kind"][data-in-val="automate"]').click()
+            page.locator("[data-in-next]").click()
+            page.locator('[data-in-set="prefs.language"][data-in-val="nl"]').click()
+            page.locator('[data-in-set="prefs.length"][data-in-val="short"]').click()
+            page.locator('[data-in-f="prefs.never"]').fill("Nooit zelf mails versturen")
+            page.locator(".in-quiz summary").click()
+            page.locator('[data-in-quiz="q2"][value="b"]').check()
+            page.locator("[data-in-next]").click()
+            page.locator("[data-in-save]").click()
+            page.wait_for_selector(".in-saved", timeout=10000)
+            note = page.locator(".in-saved").inner_text()
+            assert "Intake (Studio):" in note and "Teamlead debiteuren" in note and "Nooit zelf mails versturen" in note, note
+            user_notes = ctx.request.get("/api/memory").json().get("user", "")
+            assert "Intake (Studio): Rol: Teamlead debiteuren" in user_notes and "kort en bondig" in user_notes, user_notes
+            me = ctx.request.get("/api/studio/profile?who=me").json()
+            assert [t["kind"] for t in me["tasks"]] == ["assist", "automate"] and me["literacy"]["score"] == 1, me
+            page.locator("[data-in-backlog]").click()
+            page.wait_for_function("() => /In de backlog gezet \\(2\\)/.test(document.body.innerText)", timeout=10000)
+            assert any(i["title"] == "Weekrapport debiteuren maken" for i in ctx.request.get("/api/studio/backlog").json()["items"])
+            page.screenshot(path=str(art / "14-me-intake.png"), full_page=True)
             hub(page, "usecases")
             page.wait_for_selector(".st-card", timeout=10000)
-            assert not page.locator(".st-profile-hint").count()
-            ok("organisation profile saved by the admin and shown as the context the agent reads; research refuses a private address")
+            assert not page.locator(".st-org-hint, .st-me-hint").count()
+            ok("personal intake: role, tasks pulled from a described week, systems, what AI may do, preferences and a short check; one entry saved into the user notes; tasks to the backlog")
 
             # 7. narrow
             page.set_viewport_size({"width": 390, "height": 844})
