@@ -137,6 +137,11 @@ html.iui-has-full .messages,html.iui-has-full #messages{z-index:auto!important}
 .iui-chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .iui-chips.is-used .iui-chip{cursor:default;opacity:.45}
 .iui-chips.is-used .iui-chip.is-chosen{opacity:1;border-color:var(--accent);background:var(--accent-bg)}
-.assistant-turn:not([data-latest-assistant-response="true"]) .iui-chips:not(.is-used){display:none}
+/* Hidden once a newer message exists (also while the next reply streams). */
+.assistant-turn:not([data-latest-assistant-response="true"]) .iui-chips,
+.assistant-turn:has(~ .msg-row[data-role="user"]) .iui-chips,
+.assistant-turn:has(~ .msg-row) .iui-chips{display:none}
+.iui-block[data-iui-kind=suggestions]:not([data-iui-mounted]),.iui-block[data-iui-kind=replies]:not([data-iui-mounted]){display:none}
+.iui-chips.is-pending .iui-chip{pointer-events:none;opacity:.7}
 @media (max-width:640px){.iui-chip{min-height:40px;font-size:14px}}
 @media (prefers-reduced-motion:reduce){.iui-chip{animation:none}}

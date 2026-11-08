@@ -9607,7 +9607,8 @@ function copyStatusSessionId(btn){
 }
 function copyMsg(btn){
   const row=btn.closest('[data-raw-text]');
-  const text=row?row.dataset.rawText:'';
+  const raw=row?row.dataset.rawText:'';
+  const text=typeof stripReplySuggestions==='function'?stripReplySuggestions(raw):raw;
   if(!text)return;
   _copyText(text).then(()=>{
     const orig=btn.innerHTML;btn.innerHTML=li('check',13);btn.style.color='var(--blue)';

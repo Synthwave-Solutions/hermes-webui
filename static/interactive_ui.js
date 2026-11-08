@@ -73,7 +73,7 @@ const _iui=(function(){
       removed:'Overgeslagen bron',ask:'Vraag uit deze weergave',send:'Versturen',cancel:'Annuleren',
       draftBusy:'Je concept staat nog in het invoerveld. Verstuur of wis dat eerst.',
       repairPrompt:(title,msg)=>`Kun je de weergave "${title}" herstellen? Die werkt niet helemaal (${msg}). Stuur het volledige interactive-ui-blok opnieuw.`,
-      sandboxNote:'Draait los van je account en de chat',chipsLabel:'Voorgestelde antwoorden'},
+      sandboxNote:'Draait los van je account en de chat',chipsLabel:'Voorgestelde antwoorden',chipsBusy:'Even wachten tot het huidige antwoord klaar is.'},
     en:{title:'Interactive view',building:'Building',
       restart:'Restart',viewCode:'View code',hideCode:'Hide code',copyCode:'Copy code',download:'Download',
       devGroup:'For developers',full:'Full screen',exitFull:'Close',more:'More options',repair:'Fix it',
@@ -82,7 +82,7 @@ const _iui=(function(){
       removed:'Skipped source',ask:'Question from this view',send:'Send',cancel:'Cancel',
       draftBusy:'Your draft is still in the message box. Send or clear it first.',
       repairPrompt:(title,msg)=>`Can you fix the view "${title}"? It is not fully working (${msg}). Send the complete interactive-ui block again.`,
-      sandboxNote:'Runs separately from your account and the chat',chipsLabel:'Suggested replies'},
+      sandboxNote:'Runs separately from your account and the chat',chipsLabel:'Suggested replies',chipsBusy:'Wait until the current reply is finished.'},
   };
   function lang(){
     const l=String((typeof _currentLang!=='undefined'&&_currentLang)||document.documentElement.lang||navigator.language||'en').toLowerCase();
@@ -342,7 +342,7 @@ const _iui=(function(){
     try{const ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();done();}catch(_){}
   }
   function cleanPrompt(text){
-    return String(text||'').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f\u200b\ufeff]/g,'')
+    return String(text||'').replace(/[\p{Cf}\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/gu,'')
       .replace(/^[\s/]+/,'').slice(0,4000).trim();
   }
   // A follow-up question from a widget is shown in the card; only a click on
@@ -363,17 +363,28 @@ const _iui=(function(){
     const sel=(typeof _pendingSelections!=='undefined'&&Array.isArray(_pendingSelections))?_pendingSelections.length:0;
     return !!((box&&box.value.trim())||files||sel);
   }
-  function sendPrompt(text){
+  function chatBusy(){
+    try{return !!(typeof S!=='undefined'&&S&&(S.busy||S.activeStreamId));}catch(_){return false;}
+  }
+  // Returns false when it could not even try; onDone(ok) reports whether the
+  // message really left (the composer was emptied by send()).
+  function sendPrompt(text,onDone){
     const box=document.getElementById('msg');
     if(!box||typeof window.send!=='function') return false;
     if(composerBusy()){toast(tx('draftBusy'));return false;}
     box.value=text;
     try{box.dispatchEvent(new Event('input',{bubbles:true}));}catch(_){}
+    const settle=()=>{
+      const ok=box.value.trim()!==String(text).trim();
+      if(ok) toast(tx('sent'));
+      else if(box.value.trim()===String(text).trim()){box.value='';try{box.dispatchEvent(new Event('input',{bubbles:true}));}catch(_){}}
+      if(onDone) onDone(ok);
+    };
     try{
       const r=window.send();
-      if(r&&typeof r.then==='function') r.then(()=>toast(tx('sent')),()=>{});
-      else toast(tx('sent'));
-    }catch(err){try{console.warn('[interactive-ui] follow-up failed',err);}catch(_){}}
+      if(r&&typeof r.then==='function') r.then(settle,()=>{if(onDone)onDone(false);});
+      else settle();
+    }catch(err){try{console.warn('[interactive-ui] follow-up failed',err);}catch(_){}if(onDone)onDone(false);}
     return true;
   }
 
@@ -504,6 +515,7 @@ const _iui=(function(){
       if(!ev||!ev.isTrusted) return;
       const now=Date.now();
       if(now-ctrl.lastPrompt<PROMPT_GAP_MS||!ctrl.pendingPrompt) return;
+      if(chatBusy()){toast(tx('chipsBusy'));return;}
       if(sendPrompt(ctrl.pendingPrompt)){ctrl.lastPrompt=now;hideAsk(ctrl);}
     },'iui-btn--text iui-btn--primary');
     const askCancel=button('close',tx('cancel'),()=>{ctrl.rejectedPrompts=(ctrl.rejectedPrompts||0)+1;hideAsk(ctrl);},'iui-btn--text iui-btn--quiet');
@@ -717,8 +729,16 @@ const _iui=(function(){
     texts.forEach(t=>{
       const b=document.createElement('button');b.type='button';b.className='iui-chip';b.textContent=t;
       b.addEventListener('click',ev=>{
-        if(!ev.isTrusted||wrap.classList.contains('is-used')) return;
-        if(sendPrompt(t)){wrap.classList.add('is-used');b.classList.add('is-chosen');wrap.querySelectorAll('.iui-chip').forEach(x=>{x.disabled=true;});}
+        if(!ev.isTrusted||wrap.classList.contains('is-used')||wrap.classList.contains('is-pending')) return;
+        if(chatBusy()){toast(tx('chipsBusy'));return;}
+        wrap.classList.add('is-pending');
+        const started=sendPrompt(t,ok=>{
+          wrap.classList.remove('is-pending');
+          if(!ok) return;
+          wrap.classList.add('is-used');b.classList.add('is-chosen');
+          wrap.querySelectorAll('.iui-chip').forEach(x=>{x.disabled=true;});
+        });
+        if(!started) wrap.classList.remove('is-pending');
       });
       wrap.appendChild(b);
     });
@@ -735,13 +755,23 @@ const _iui=(function(){
     liveCards.forEach((c,k)=>{if(!c.card.isConnected||c.card.offsetParent===null){if(c.card.isConnected&&!c.mounted)c.card.remove();liveCards.delete(k);}});
     root.querySelectorAll('.iui-block:not([data-iui-mounted])').forEach(block=>{
       block.setAttribute('data-iui-mounted','1');
-      if(CHIP_LANGS.has(block.getAttribute('data-iui-kind')||'')){renderChips(block);return;}
+      if(CHIP_LANGS.has(block.getAttribute('data-iui-kind')||'')){
+        // Reply chips belong to the assistant; elsewhere the text stays plain.
+        if(block.closest('.assistant-turn,.msg-row[data-role="assistant"],#liveAssistantTurn')) renderChips(block);
+        else{const pre=document.createElement('pre');const c=document.createElement('code');c.textContent=block.textContent||'';pre.appendChild(c);block.replaceWith(pre);}
+        return;
+      }
       const source=block.textContent||'';
       const ctrl=createController(source,{final:true});
       block.textContent='';
       block.appendChild(ctrl.card);
       lazyMount(ctrl);
     });
+    // One chip row per reply: keep only the last.
+    const turns=new Set();
+    if(root.closest){const t=root.closest('.assistant-turn');if(t)turns.add(t);}
+    root.querySelectorAll('.assistant-turn').forEach(t=>turns.add(t));
+    turns.forEach(t=>{const hosts=t.querySelectorAll('.iui-chips-host');for(let i=0;i<hosts.length-1;i++)hosts[i].remove();});
   }
 
   // ── Live render while a reply streams ───────────────────────────────────
@@ -792,6 +822,10 @@ const _iui=(function(){
   return {parse,renderBlocks,streamTick,allowedUrl,rewriteUrl,themeMessage,chipTexts,FENCE_LANGS,CHIP_LANGS,_byWindow:byWindow,_controllers:controllers};
 })();
 
+// Copy of a reply without its suggestion buttons block.
+function stripReplySuggestions(text){
+  return String(text||'').replace(/(^|\n)[ ]{0,3}```[ \t]*(?:suggestions|replies)[ \t]*\n[\s\S]*?\n[ ]{0,3}```[ \t]*(?=\n|$)/gi,'$1').replace(/\s+$/,'');
+}
 function interactiveUiFenceAccepts(lang,code){
   const l=String(lang||'').toLowerCase();
   return (_iui.FENCE_LANGS.has(l)||_iui.CHIP_LANGS.has(l))&&String(code||'').trim().length>0;

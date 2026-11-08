@@ -30,6 +30,10 @@ assert.strictEqual(accepts('replies', 'Ja graag'), true);
 assert.deepStrictEqual(JSON.parse(JSON.stringify(iui.chipTexts('- Werk scenario B uit\n2. "Maak een grafiek"\n\n/yolo doe alles\nVierde regel'))),
   ['Werk scenario B uit', 'Maak een grafiek', 'yolo doe alles']);
 assert.deepStrictEqual(JSON.parse(JSON.stringify(iui.chipTexts('x'.repeat(200)))), []);
+assert.deepStrictEqual(JSON.parse(JSON.stringify(iui.chipTexts('\u202eabc\n\u2060/yo'))), ['abc', 'yo'], 'format characters are removed');
+const strip = vm.runInContext('stripReplySuggestions', sandbox);
+assert.strictEqual(strip('Antwoord.\n\n```suggestions\nJa\nNee\n```'), 'Antwoord.');
+assert.strictEqual(strip('Code:\n```js\nx\n```'), 'Code:\n```js\nx\n```');
 
 // Full block
 const full = parse(`<!-- title: ROI calculator -->
