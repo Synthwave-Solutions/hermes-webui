@@ -3133,6 +3133,199 @@
         "static/bot-builder.js",
         "static/panels.js"
       ]
+    },
+    {
+      "id": "webui.studio.usecases",
+      "area": "studio",
+      "status": "available",
+      "source_refs": [
+        "static/studio.js:152",
+        "static/studio.js:340",
+        "api/studio.py:253"
+      ]
+    },
+    {
+      "id": "webui.studio.discover",
+      "area": "studio",
+      "status": "available",
+      "source_refs": [
+        "static/studio.js:238",
+        "api/studio.py:308",
+        "static/studio.js:213"
+      ]
+    },
+    {
+      "id": "webui.studio.design",
+      "area": "studio",
+      "status": "available",
+      "source_refs": [
+        "static/studio.js:258",
+        "api/studio.py:334",
+        "api/studio.py:207"
+      ]
+    },
+    {
+      "id": "webui.studio.plan",
+      "area": "studio",
+      "status": "available",
+      "source_refs": [
+        "static/studio.js:293",
+        "api/studio.py:361",
+        "static/studio.js:275"
+      ]
+    },
+    {
+      "id": "webui.studio.build",
+      "area": "studio",
+      "status": "available",
+      "source_refs": [
+        "static/studio.js:308",
+        "static/studio.js:377"
+      ]
+    },
+    {
+      "id": "webui.studio.conversation",
+      "area": "studio",
+      "status": "conditional",
+      "source_refs": [
+        "static/studio.js:170",
+        "static/studio.js:465",
+        "api/realtime_voice_runtime.py:38"
+      ]
+    },
+    {
+      "id": "webui.studio.backlog",
+      "area": "studio",
+      "status": "available",
+      "source_refs": [
+        "static/studio_library.js:106",
+        "api/studio_library.py:193"
+      ]
+    },
+    {
+      "id": "webui.studio.playbooks",
+      "area": "studio",
+      "status": "available",
+      "source_refs": [
+        "static/studio_library.js:141",
+        "static/studio_library.js:122",
+        "api/studio_library.py:263"
+      ]
+    },
+    {
+      "id": "webui.studio.playbook_edit",
+      "area": "studio",
+      "status": "available",
+      "source_refs": [
+        "static/studio_library.js:206",
+        "static/studio_library.js:235",
+        "api/studio_library.py:367"
+      ]
+    },
+    {
+      "id": "webui.studio.playbook_run",
+      "area": "studio",
+      "status": "available",
+      "source_refs": [
+        "static/studio_library.js:163",
+        "static/studio_library.js:175",
+        "api/studio_library.py:342"
+      ]
+    },
+    {
+      "id": "webui.org.chart",
+      "area": "organisation",
+      "status": "conditional",
+      "source_refs": [
+        "static/orgmgmt.js:487",
+        "static/orgmgmt.js:340",
+        "api/management.py:671"
+      ]
+    },
+    {
+      "id": "webui.org.numbers",
+      "area": "organisation",
+      "status": "conditional",
+      "source_refs": [
+        "static/orgmgmt.js:324",
+        "static/orgmgmt.js:262",
+        "api/management.py:600"
+      ]
+    },
+    {
+      "id": "webui.org.team",
+      "area": "organisation",
+      "status": "conditional",
+      "source_refs": [
+        "static/orgmgmt.js:444",
+        "static/orgmgmt.js:437"
+      ]
+    },
+    {
+      "id": "webui.org.teams",
+      "area": "organisation",
+      "status": "conditional",
+      "source_refs": [
+        "static/orgmgmt.js:528",
+        "api/org_structure.py:514"
+      ]
+    },
+    {
+      "id": "webui.mgmt.overview",
+      "area": "organisation",
+      "status": "conditional",
+      "source_refs": [
+        "static/orgmgmt.js:654",
+        "static/orgmgmt.js:691",
+        "api/management.py:169"
+      ]
+    },
+    {
+      "id": "webui.mgmt.tables",
+      "area": "organisation",
+      "status": "conditional",
+      "source_refs": [
+        "static/orgmgmt.js:737",
+        "static/orgmgmt.js:716"
+      ]
+    },
+    {
+      "id": "webui.mgmt.pricing",
+      "area": "organisation",
+      "status": "conditional",
+      "source_refs": [
+        "static/orgmgmt.js:752",
+        "api/value_tracking.py:585"
+      ]
+    },
+    {
+      "id": "webui.value.task",
+      "area": "organisation",
+      "status": "available",
+      "source_refs": [
+        "static/orgmgmt.js:884",
+        "static/orgmgmt.js:1018",
+        "api/value_tracking.py:95"
+      ]
+    },
+    {
+      "id": "webui.value.bot_duty",
+      "area": "organisation",
+      "status": "conditional",
+      "source_refs": [
+        "static/orgmgmt.js:971",
+        "static/orgmgmt.js:992",
+        "api/bot_metadata.py:12"
+      ]
+    },
+    {
+      "id": "webui.value.chat_chip",
+      "area": "organisation",
+      "status": "conditional",
+      "source_refs": [
+        "static/orgmgmt.js:1051",
+        "api/value_tracking.py:486"
+      ]
     }
   ],
   "controls": [
@@ -8299,70 +8492,240 @@
         "static/sessions.js"
       ],
       "feature_id": "webui.sessions.organize"
+    },
+    {
+      "control": "botDutyMinBefore",
+      "tag": "input",
+      "label": "Minutes before",
+      "source_refs": [
+        "static/orgmgmt.js:972"
+      ],
+      "feature_id": "webui.value.bot_duty"
+    },
+    {
+      "control": "botDutyMinNow",
+      "tag": "input",
+      "label": "Minutes now",
+      "source_refs": [
+        "static/orgmgmt.js:973"
+      ],
+      "feature_id": "webui.value.bot_duty"
+    },
+    {
+      "control": "botDutyTimes",
+      "tag": "input",
+      "label": "Times per week",
+      "source_refs": [
+        "static/orgmgmt.js:974"
+      ],
+      "feature_id": "webui.value.bot_duty"
+    },
+    {
+      "control": "botServes",
+      "tag": "input",
+      "label": "Works for team",
+      "source_refs": [
+        "static/orgmgmt.js:994"
+      ],
+      "feature_id": "webui.value.bot_duty"
+    },
+    {
+      "control": "botServesSelect",
+      "tag": "select",
+      "label": "Works for team",
+      "source_refs": [
+        "static/orgmgmt.js:1005"
+      ],
+      "feature_id": "webui.value.bot_duty"
+    },
+    {
+      "control": "botServesValue",
+      "tag": "input",
+      "label": "Works for team",
+      "source_refs": [
+        "static/orgmgmt.js:994"
+      ],
+      "feature_id": "webui.value.bot_duty"
+    },
+    {
+      "control": "cronFormValueBefore",
+      "tag": "input",
+      "label": "Minutes before",
+      "source_refs": [
+        "static/orgmgmt.js:1021"
+      ],
+      "feature_id": "webui.value.task"
+    },
+    {
+      "control": "cronFormValueNow",
+      "tag": "input",
+      "label": "Minutes now",
+      "source_refs": [
+        "static/orgmgmt.js:1022"
+      ],
+      "feature_id": "webui.value.task"
+    },
+    {
+      "control": "cronFormValuePer",
+      "tag": "select",
+      "label": "Per run, day or week",
+      "source_refs": [
+        "static/orgmgmt.js:1023"
+      ],
+      "feature_id": "webui.value.task"
+    },
+    {
+      "control": "cronFormValueTask",
+      "tag": "input",
+      "label": "Task description",
+      "source_refs": [
+        "static/orgmgmt.js:1024"
+      ],
+      "feature_id": "webui.value.task"
+    },
+    {
+      "control": "cronFormValueUnknown",
+      "tag": "input",
+      "label": "Value unknown",
+      "source_refs": [
+        "static/orgmgmt.js:1025"
+      ],
+      "feature_id": "webui.value.task"
+    },
+    {
+      "control": "action:applyBotScoutTemplate",
+      "tag": "button",
+      "label": "Scout template",
+      "source_refs": [
+        "static/panels.js:8243"
+      ],
+      "feature_id": "webui.bots.scout"
+    },
+    {
+      "control": "action:selectBotScoutPerson",
+      "tag": "button",
+      "label": "Scout person",
+      "source_refs": [
+        "static/panels.js:8237"
+      ],
+      "feature_id": "webui.bots.scout"
+    },
+    {
+      "control": "botScoutInheritTime",
+      "tag": "input",
+      "label": "Scout uses the bot time",
+      "source_refs": [
+        "static/panels.js:8219"
+      ],
+      "feature_id": "webui.bots.scout"
+    },
+    {
+      "control": "botScoutPause",
+      "tag": "button",
+      "label": "Pause Scout",
+      "source_refs": [
+        "static/panels.js:8252"
+      ],
+      "feature_id": "webui.bots.scout"
+    },
+    {
+      "control": "botScoutSave",
+      "tag": "button",
+      "label": "Save Scout",
+      "source_refs": [
+        "static/panels.js:8252"
+      ],
+      "feature_id": "webui.bots.scout"
+    },
+    {
+      "control": "botScoutSearch",
+      "tag": "input",
+      "label": "Search people for Scout",
+      "source_refs": [
+        "static/panels.js:8240"
+      ],
+      "feature_id": "webui.bots.scout"
     }
   ],
   "method": "Inventory of concrete HTML controls and inline handlers, supplemented by manual review of generated conversation menus, bot builder and knowledge controls, composer customization and the embedded read-only memory dashboard. Save/cancel and equivalent responsive controls share a feature. Hidden vendor login, server settings and inactive legacy visualizers are excluded from user workflows.",
   "dynamic_features": [
-    "webui.chat.mentions",
-    "webui.chat.svg",
-    "webui.chat.replay",
-    "webui.sessions.organize",
-    "webui.memory.company",
-    "webui.memory.project",
-    "webui.memory.identity",
-    "webui.memory.explorer",
-    "webui.memory.search",
-    "webui.memory.audit",
+    "webui.bots.access",
     "webui.bots.identity",
     "webui.bots.instructions",
+    "webui.bots.knowledge",
+    "webui.bots.knowledge_legacy",
+    "webui.bots.knowledge_upload",
+    "webui.bots.memory",
     "webui.bots.skills",
     "webui.bots.tools",
-    "webui.bots.memory",
-    "webui.bots.knowledge",
-    "webui.bots.access",
-    "webui.governance.organisation",
-    "webui.settings.composer_visibility",
-    "webui.planned.gateway",
-    "webui.planned.reporter",
-    "webui.planned.central_memory",
-    "webui.sessions.rename",
-    "webui.sessions.pin",
-    "webui.sessions.move_project",
-    "webui.sessions.archive",
-    "webui.sessions.delete",
-    "webui.sessions.regenerate_title",
-    "webui.sessions.link",
-    "webui.chat.save_prompt",
-    "webui.bots.knowledge_upload",
-    "webui.bots.knowledge_legacy",
-    "webui.memory.overview",
-    "webui.memory.today",
-    "webui.memory.visualiser",
-    "webui.memory.review",
-    "webui.memory.profile",
-    "webui.memory.lifecycle",
-    "webui.memory.graph",
-    "webui.memory.triples",
-    "webui.memory.recall",
-    "webui.memory.timeline",
-    "webui.memory.consolidations",
-    "webui.memory.structured_overview",
-    "webui.memory.facts",
-    "webui.memory.structured_timelines",
-    "webui.memory.instructions",
-    "webui.memory.structured_graph",
-    "webui.memory.preferences",
-    "webui.operations.extension_installed",
-    "webui.chat.slash",
-    "webui.chat.goal",
-    "webui.chat.queue",
-    "webui.chat.interrupt",
-    "webui.chat.steer",
     "webui.chat.aside",
     "webui.chat.background",
-    "webui.chat.status",
+    "webui.chat.goal",
+    "webui.chat.interrupt",
+    "webui.chat.mentions",
     "webui.chat.personality",
-    "webui.skills.use"
+    "webui.chat.queue",
+    "webui.chat.replay",
+    "webui.chat.save_prompt",
+    "webui.chat.slash",
+    "webui.chat.status",
+    "webui.chat.steer",
+    "webui.chat.svg",
+    "webui.governance.organisation",
+    "webui.memory.audit",
+    "webui.memory.company",
+    "webui.memory.consolidations",
+    "webui.memory.explorer",
+    "webui.memory.facts",
+    "webui.memory.graph",
+    "webui.memory.identity",
+    "webui.memory.instructions",
+    "webui.memory.lifecycle",
+    "webui.memory.overview",
+    "webui.memory.preferences",
+    "webui.memory.profile",
+    "webui.memory.project",
+    "webui.memory.recall",
+    "webui.memory.review",
+    "webui.memory.search",
+    "webui.memory.structured_graph",
+    "webui.memory.structured_overview",
+    "webui.memory.structured_timelines",
+    "webui.memory.timeline",
+    "webui.memory.today",
+    "webui.memory.triples",
+    "webui.memory.visualiser",
+    "webui.mgmt.overview",
+    "webui.mgmt.pricing",
+    "webui.mgmt.tables",
+    "webui.operations.extension_installed",
+    "webui.org.chart",
+    "webui.org.numbers",
+    "webui.org.team",
+    "webui.org.teams",
+    "webui.planned.central_memory",
+    "webui.planned.gateway",
+    "webui.planned.reporter",
+    "webui.sessions.archive",
+    "webui.sessions.delete",
+    "webui.sessions.link",
+    "webui.sessions.move_project",
+    "webui.sessions.organize",
+    "webui.sessions.pin",
+    "webui.sessions.regenerate_title",
+    "webui.sessions.rename",
+    "webui.settings.composer_visibility",
+    "webui.skills.use",
+    "webui.studio.backlog",
+    "webui.studio.build",
+    "webui.studio.conversation",
+    "webui.studio.design",
+    "webui.studio.discover",
+    "webui.studio.plan",
+    "webui.studio.playbook_edit",
+    "webui.studio.playbook_run",
+    "webui.studio.playbooks",
+    "webui.studio.usecases"
   ],
   "commands": {
     "help": "webui.chat.slash",

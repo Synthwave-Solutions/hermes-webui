@@ -1143,10 +1143,11 @@
   "webui.bots.scout": {
     "panel": "profiles",
     "targets": [
-      "#botScoutEnabled",
-      "#botScoutPerson",
+      "#botScoutSearch",
       "#botScoutFrequency",
-      "#botScoutPrompt"
+      "#botScoutPrompt",
+      "#botScoutSave",
+      "#botScoutPause"
     ],
     "entryTargets": [
       ".profile-card[data-name]"
@@ -2718,6 +2719,156 @@
       "en": "Open the relevant section after closing the guide. The guide does not activate controls or save changes.",
       "nl": "Open het bijbehorende onderdeel na het sluiten van de gids. De gids bedient geen knoppen en slaat geen wijzigingen op."
     }
+  },
+  "webui.studio.usecases": {
+    "panel": "studio",
+    "targets": [
+      "[data-tour='studio-usecases']",
+      "#studioHubNav"
+    ]
+  },
+  "webui.studio.discover": {
+    "panel": "studio",
+    "targets": [
+      "[data-tour='studio-opportunities']",
+      "[data-tour='studio-steps']"
+    ]
+  },
+  "webui.studio.design": {
+    "panel": "studio",
+    "targets": [
+      "[data-tour='studio-baseline']"
+    ]
+  },
+  "webui.studio.plan": {
+    "panel": "studio",
+    "targets": [
+      "[data-tour='studio-plan']"
+    ]
+  },
+  "webui.studio.build": {
+    "panel": "studio",
+    "targets": [
+      "[data-tour='studio-build']"
+    ]
+  },
+  "webui.studio.conversation": {
+    "panel": "studio",
+    "targets": [
+      "[data-tour='studio-conversation']"
+    ]
+  },
+  "webui.studio.backlog": {
+    "panel": "studio",
+    "targets": [
+      "[data-tour='studio-backlog']",
+      "[data-tour='studio-backlog-add']"
+    ]
+  },
+  "webui.studio.playbooks": {
+    "panel": "studio",
+    "targets": [
+      "[data-tour='studio-playbooks']",
+      "[data-tour='studio-playbook-new']"
+    ]
+  },
+  "webui.studio.playbook_edit": {
+    "panel": "studio",
+    "targets": [
+      "[data-tour='studio-playbook-steps']"
+    ]
+  },
+  "webui.studio.playbook_run": {
+    "panel": "studio",
+    "targets": [
+      "[data-pb-run]"
+    ]
+  },
+  "webui.org.chart": {
+    "panel": "organisation",
+    "targets": [
+      "[data-tour='org-totals']",
+      "[data-tour='org-chart']"
+    ]
+  },
+  "webui.org.numbers": {
+    "panel": "organisation",
+    "targets": [
+      "[data-tour='org-detail']",
+      ".om-mini-stat"
+    ]
+  },
+  "webui.org.team": {
+    "panel": "organisation",
+    "targets": [
+      "[data-tour='org-team']"
+    ],
+    "entryTargets": [
+      ".om-team-open"
+    ],
+    "entryHint": {
+      "nl": "Kies Details bij een team om dit paneel te openen.",
+      "en": "Choose Details on a team to open this panel."
+    }
+  },
+  "webui.org.teams": {
+    "panel": "organisation",
+    "targets": [
+      "[data-tour='org-teams']"
+    ]
+  },
+  "webui.mgmt.overview": {
+    "panel": "management",
+    "targets": [
+      "[data-tour='mgmt-kpis']",
+      "[data-tour='mgmt-decisions']"
+    ]
+  },
+  "webui.mgmt.tables": {
+    "panel": "management",
+    "targets": [
+      "[data-tour='mgmt-teams']",
+      "[data-tour='mgmt-bots']"
+    ]
+  },
+  "webui.mgmt.pricing": {
+    "panel": "management",
+    "targets": [
+      "#omSettings"
+    ],
+    "entryTargets": [
+      "[data-om-settings]"
+    ],
+    "entryHint": {
+      "nl": "Kies Prijzen en tarieven in de kop van Management.",
+      "en": "Choose Prices and rates in the Management header."
+    }
+  },
+  "webui.value.task": {
+    "panel": "tasks",
+    "targets": [
+      "#omValueCard"
+    ],
+    "entryTargets": [
+      "#cronFormValueRow"
+    ],
+    "entryHint": {
+      "nl": "De waarde vul je in bij het maken van een taak, of bij Waarde in de details van een taak.",
+      "en": "Fill in the value when creating a task, or under Value in a task's details."
+    }
+  },
+  "webui.value.bot_duty": {
+    "panel": "profiles",
+    "targets": [
+      "[data-tour='bot-duty-value']",
+      "#botServes"
+    ]
+  },
+  "webui.value.chat_chip": {
+    "panel": "chat",
+    "targets": [
+      "#omChatValue"
+    ]
   }
 };
   for (const entry of Object.values(entries)) {

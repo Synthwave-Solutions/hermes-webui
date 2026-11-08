@@ -78,6 +78,14 @@ window.SynthPulseFeatureCatalog = {
     "msp": {
       "nl": "Support",
       "en": "Support"
+    },
+    "studio": {
+      "en": "Studio",
+      "nl": "Studio"
+    },
+    "organisation": {
+      "en": "Organisation and value",
+      "nl": "Organisatie en waarde"
     }
   },
   "features": [
@@ -5126,10 +5134,11 @@ window.SynthPulseFeatureCatalog = {
       ],
       "anchors": [
         "?help_feature=webui.bots.scout",
-        "#botScoutEnabled",
-        "#botScoutPerson",
+        "#botScoutSearch",
         "#botScoutFrequency",
-        "#botScoutPrompt"
+        "#botScoutPrompt",
+        "#botScoutSave",
+        "#botScoutPause"
       ],
       "source_refs": [
         "static/bot-builder.js",
@@ -15516,6 +15525,1010 @@ window.SynthPulseFeatureCatalog = {
           "permissions": "Alleen taken die je met je bestaande rechten voor bots, taken en eigenaren mag zien en toewijzen worden aangeboden.",
           "limits": "Een toewijzing geeft geen nieuwe rechten en start de taak niet meteen. Taken en Scout hebben hun eigen opslagknoppen.",
           "example": "Wijs een wekelijks overzicht toe aan de bot met de juiste skills en context."
+        }
+      }
+    },
+    {
+      "id": "webui.studio.usecases",
+      "area": "studio",
+      "status": "available",
+      "conditions": [],
+      "anchors": [
+        "?help_feature=webui.studio.usecases",
+        "[data-tour='studio-usecases']",
+        "#studioHubNav"
+      ],
+      "source_refs": [
+        "static/studio.js:152",
+        "static/studio.js:340",
+        "api/studio.py:253"
+      ],
+      "related": [
+        "webui.studio.discover",
+        "webui.studio.backlog",
+        "webui.studio.playbooks"
+      ],
+      "locales": {
+        "en": {
+          "title": "Use cases in Studio",
+          "purpose": "Studio is where you work out with the Super Agent which work AI can take over, design the process and have it built. Every use case moves through five steps: Discover, Design, Build plan, Build and Measure.",
+          "when": "When you want to automate recurring work or see which ideas are already in progress.",
+          "steps": [
+            "Choose Studio in the navigation. Its sidebar is the Studio navigation: Work, Organisation and Recent.",
+            "Choose New use case, or open an existing card under Use cases.",
+            "Follow the steps at the top; you can always go back to an earlier step.",
+            "Rename it in the header, after Use cases, and choose the team the work is for."
+          ],
+          "permissions": "Anyone with Studio access can start a use case. Only its owner changes it, and building always runs with your own rights.",
+          "limits": "A use case builds nothing on its own. Only after a dry run and your click on Build is anything created.",
+          "example": "Start a use case Debtor follow-up for the Debtors team."
+        },
+        "nl": {
+          "title": "Use cases in Studio",
+          "purpose": "Studio is de plek waar je met de Super Agent bedenkt welk werk AI kan overnemen, het proces inricht en het laat bouwen. Elke use case doorloopt vijf stappen: Ontdekken, Inrichten, Bouwplan, Bouwen en Meten.",
+          "when": "Wanneer je een terugkerende klus wilt automatiseren of wilt zien welke ideeën er al lopen.",
+          "steps": [
+            "Kies Studio in de navigatie. De zijbalk is de navigatie van Studio: Werk, Organisatie en Recent.",
+            "Kies Nieuwe use case, of open een bestaande kaart onder Use cases.",
+            "Volg de stappen bovenaan; je kunt altijd terug naar een eerdere stap.",
+            "Pas de naam aan in de kop, achter Use cases, en kies het team waarvoor het werk is."
+          ],
+          "permissions": "Iedereen met toegang tot Studio kan een use case starten. Alleen de eigenaar wijzigt hem, en bouwen gebeurt altijd onder je eigen rechten.",
+          "limits": "Een use case bouwt niets vanzelf. Pas na een droogrun en jouw klik op Bouwen wordt er iets aangemaakt.",
+          "example": "Start een use case Debiteurenopvolging voor het team Debiteuren."
+        }
+      }
+    },
+    {
+      "id": "webui.studio.discover",
+      "area": "studio",
+      "status": "available",
+      "conditions": [],
+      "anchors": [
+        "?help_feature=webui.studio.discover",
+        "[data-tour='studio-opportunities']",
+        "[data-tour='studio-steps']"
+      ],
+      "source_refs": [
+        "static/studio.js:238",
+        "api/studio.py:308",
+        "static/studio.js:213"
+      ],
+      "related": [
+        "webui.studio.usecases",
+        "webui.studio.design",
+        "webui.studio.backlog"
+      ],
+      "locales": {
+        "en": {
+          "title": "Discover: the opportunity solution tree",
+          "purpose": "Describe your work and the Super Agent builds an opportunity solution tree (QuickScan): desired outcomes with a KPI, baseline and target; the opportunities that stand in the way, with their cause; and solutions per opportunity with building block, impact, effort and the smallest test.",
+          "when": "At the start, before anything is built, to choose what pays off most.",
+          "steps": [
+            "Type or say what you do, what takes time and what goes wrong, then choose Send.",
+            "Read the outcomes: a missing number shows as to be determined and the agent asks about it.",
+            "Switch between Matrix (impact against effort, quick wins top left) and Tree (outcome, opportunity, solutions).",
+            "Choose a solution with Choose, or put it on the backlog for later."
+          ],
+          "permissions": "Your own use case; anyone with Studio access may send solutions to the backlog.",
+          "limits": "The agent does not invent numbers. What you do not mention stays to be determined; check that the causes are right.",
+          "example": "Every Monday I chase invoices by phone; it takes me three hours."
+        },
+        "nl": {
+          "title": "Ontdekken: de oplossingsboom",
+          "purpose": "Vertel over je werk en de Super Agent maakt een oplossingsboom (QuickScan): gewenste doelen met een KPI, nulmeting en doelwaarde; de kansen die dat doel in de weg staan, met hun oorzaak; en per kans oplossingen met bouwblok, impact, moeite en de kleinste test.",
+          "when": "Aan het begin, voordat je iets laat bouwen, om te kiezen wat het meeste oplevert.",
+          "steps": [
+            "Typ of spreek in wat je doet, wat veel tijd kost en wat misgaat, en kies Verstuur.",
+            "Lees de doelen: ontbreekt een getal, dan staat er nog bepalen en stelt de agent er een vraag over.",
+            "Wissel tussen Matrix (impact tegen moeite, met snelle winst linksboven) en Boom (doel, kans, oplossingen).",
+            "Kies een oplossing met Kies, of zet hem met Naar backlog op de lijst voor later."
+          ],
+          "permissions": "Je eigen use case; de oplossingen naar de backlog sturen mag iedereen met toegang tot Studio.",
+          "limits": "De agent verzint geen getallen. Wat je niet noemt blijft nog bepalen; controleer of de oorzaken kloppen.",
+          "example": "Elke maandag bel ik facturen na; dat kost me drie uur."
+        }
+      }
+    },
+    {
+      "id": "webui.studio.design",
+      "area": "studio",
+      "status": "available",
+      "conditions": [],
+      "anchors": [
+        "?help_feature=webui.studio.design",
+        "[data-tour='studio-baseline']"
+      ],
+      "source_refs": [
+        "static/studio.js:258",
+        "api/studio.py:334",
+        "api/studio.py:207"
+      ],
+      "related": [
+        "webui.studio.discover",
+        "webui.studio.plan"
+      ],
+      "locales": {
+        "en": {
+          "title": "Design: the Deep Dive",
+          "purpose": "Describe how the process runs today. You get the baseline (how often, minutes per run, hours per week before and after), the steps as they are with systems, pain points and decisions, the steps as they will be with building block and minutes left, and how sensitive the data is.",
+          "when": "After you chose a solution, before you make the build plan.",
+          "steps": [
+            "Describe step by step who does what, in which system and how long it takes.",
+            "Check the baseline; it later becomes the value of the scheduled task.",
+            "Under Data, see whether it is public, internal, confidential or personal data.",
+            "Answer the questions under Still needed to build, then choose Make the build plan."
+          ],
+          "permissions": "Only the owner of the use case changes the design.",
+          "limits": "Minutes are estimates until you measure them. Decisions always stay with a person.",
+          "example": "I look up prices in old quotes, copy them into Word and mail the PDF; fifty minutes per quote."
+        },
+        "nl": {
+          "title": "Inrichten: de Deep Dive",
+          "purpose": "Beschrijf hoe het proces nu loopt. Je krijgt de nulmeting (hoe vaak, minuten per keer, uren per week voor en na), de stappen zoals het nu gaat met systemen, knelpunten en beslissingen, de stappen zoals het wordt met bouwblok en overgebleven minuten, en hoe gevoelig de data is.",
+          "when": "Nadat je een oplossing hebt gekozen, voordat je het bouwplan maakt.",
+          "steps": [
+            "Beschrijf stap voor stap wie wat doet, in welk systeem en hoe lang.",
+            "Controleer de nulmeting; die wordt later de waarde van de geplande taak.",
+            "Kijk bij Data of het om openbare, interne, vertrouwelijke gegevens of persoonsgegevens gaat.",
+            "Beantwoord de vragen onder Nog nodig voor het bouwen, en kies Maak het bouwplan."
+          ],
+          "permissions": "Alleen de eigenaar van de use case past het ontwerp aan.",
+          "limits": "Minuten zijn schattingen tot je ze meet. Beslissingen blijven altijd bij een mens.",
+          "example": "Ik zoek prijzen in oude offertes, kopieer ze naar Word en mail de pdf; vijftig minuten per offerte."
+        }
+      }
+    },
+    {
+      "id": "webui.studio.plan",
+      "area": "studio",
+      "status": "available",
+      "conditions": [],
+      "anchors": [
+        "?help_feature=webui.studio.plan",
+        "[data-tour='studio-plan']"
+      ],
+      "source_refs": [
+        "static/studio.js:293",
+        "api/studio.py:361",
+        "static/studio.js:275"
+      ],
+      "related": [
+        "webui.studio.design",
+        "webui.studio.build"
+      ],
+      "locales": {
+        "en": {
+          "title": "Build plan",
+          "purpose": "The Super Agent proposes the parts that are needed: a bot for the team, a scheduled task with prompt, rhythm and value, a skill, a step that stays with a person, and a connection. Edit or switch off each part; every save is a new version.",
+          "when": "When the design is right and you want to see what will be built.",
+          "steps": [
+            "Read each part and adjust name, rhythm, prompt or minutes.",
+            "Switch off parts you do not want with Include.",
+            "Choose Propose again when the plan is not right.",
+            "Choose Dry run to see exactly what will be created."
+          ],
+          "permissions": "Only the owner of the use case changes the build plan.",
+          "limits": "A task never sends anything to others on its own; it makes drafts. At most seven parts are proposed.",
+          "example": "A scheduled task every Monday at 8 that drafts payment reminders."
+        },
+        "nl": {
+          "title": "Bouwplan",
+          "purpose": "De Super Agent stelt de onderdelen voor die nodig zijn: een bot voor het team, een geplande taak met prompt, ritme en waarde, een skill, een stap die bij een mens blijft, en een koppeling. Je past elk onderdeel aan of zet het uit; elke keer opslaan is een nieuwe versie.",
+          "when": "Als het ontwerp klopt en je wilt zien wat er gebouwd gaat worden.",
+          "steps": [
+            "Lees elk onderdeel en pas naam, ritme, prompt of minuten aan.",
+            "Zet onderdelen die je niet wilt uit met Meenemen.",
+            "Kies Opnieuw voorstellen als het plan niet klopt.",
+            "Kies Droogrun om te zien wat er precies aangemaakt wordt."
+          ],
+          "permissions": "Alleen de eigenaar van de use case wijzigt het bouwplan.",
+          "limits": "Een taak verstuurt nooit zelf iets naar anderen; hij maakt concepten. Er worden hooguit zeven onderdelen voorgesteld.",
+          "example": "Een geplande taak elke maandag om 8 uur die concept-aanmaningen maakt."
+        }
+      }
+    },
+    {
+      "id": "webui.studio.build",
+      "area": "studio",
+      "status": "available",
+      "conditions": [],
+      "anchors": [
+        "?help_feature=webui.studio.build",
+        "[data-tour='studio-build']"
+      ],
+      "source_refs": [
+        "static/studio.js:308",
+        "static/studio.js:377"
+      ],
+      "related": [
+        "webui.studio.plan",
+        "webui.mgmt.overview",
+        "webui.value.task"
+      ],
+      "locales": {
+        "en": {
+          "title": "Build and measure",
+          "purpose": "After the dry run the Super Agent builds with your rights: a bot that works for the team, a paused scheduled task with value, a skill, a Kanban task for the human step and a request for a connection. Measure shows what was built and where to follow the saving.",
+          "when": "When the build plan is right.",
+          "steps": [
+            "Check the dry run: each part says what will happen.",
+            "Choose Build. Each part gets Done, Failed or Skipped.",
+            "Switch the paused task on under Scheduled tasks when you are ready to start.",
+            "Under Measure, open the task or Management, or turn it into a Playbook."
+          ],
+          "permissions": "Building uses your own rights. Skills from non administrators go through approval first; you set up connections yourself under Connections.",
+          "limits": "Tasks are created paused. Nothing is sent or switched on until you do it.",
+          "example": "Build the Debtors Bot and the Monday task, and switch the task on next week."
+        },
+        "nl": {
+          "title": "Bouwen en meten",
+          "purpose": "Na de droogrun bouwt de Super Agent onder jouw rechten: een bot die voor het team werkt, een gepauzeerde geplande taak met waarde, een skill, een Kanban-taak voor de menselijke stap en een aanvraag voor een koppeling. Meten laat zien wat er gebouwd is en waar je de besparing volgt.",
+          "when": "Als het bouwplan klopt.",
+          "steps": [
+            "Controleer de droogrun: per onderdeel staat wat er gebeurt.",
+            "Kies Bouwen. Elk onderdeel krijgt Klaar, Mislukt of Overgeslagen.",
+            "Zet de gepauzeerde taak aan bij Geplande taken als je klaar bent om te starten.",
+            "Bij Meten open je de taak of Management, of maak je er een Playbook van."
+          ],
+          "permissions": "Bouwen gebruikt je eigen rechten. Skills van niet-beheerders gaan eerst langs goedkeuring; koppelingen leg je zelf aan via Verbindingen.",
+          "limits": "Taken worden gepauzeerd aangemaakt. Niets wordt verstuurd of aangezet tot jij dat doet.",
+          "example": "Bouw de Debiteuren Bot en de maandagtaak, en zet de taak volgende week aan."
+        }
+      }
+    },
+    {
+      "id": "webui.studio.conversation",
+      "area": "studio",
+      "status": "conditional",
+      "conditions": [
+        "audio-provider",
+        "browser-support"
+      ],
+      "anchors": [
+        "?help_feature=webui.studio.conversation",
+        "[data-tour='studio-conversation']"
+      ],
+      "source_refs": [
+        "static/studio.js:170",
+        "static/studio.js:465",
+        "api/realtime_voice_runtime.py:38"
+      ],
+      "related": [
+        "webui.studio.discover"
+      ],
+      "locales": {
+        "en": {
+          "title": "Conversation, dictation and live talk in Studio",
+          "purpose": "Next to the canvas is the conversation with the agent. Type, dictate with Speak, or choose Talk live: the voice agent fills the canvas while you talk, chooses a solution when you ask and shows the tree or the process.",
+          "when": "When you would rather talk than type, for example during a workshop.",
+          "steps": [
+            "Choose Speak to dictate; what you say lands in the text box.",
+            "Choose Talk live for a conversation with the voice agent.",
+            "Say for example: choose solution 1.2, or show the tree.",
+            "Choose Hide conversation in the header for a wider canvas."
+          ],
+          "permissions": "Talking live follows the same rights as voice in chat.",
+          "limits": "Talking live only works when realtime voice is set up on this workstation and the voice service has credit. Dictation depends on your browser.",
+          "example": "Say: every week I plan the shifts of twelve engineers in Excel."
+        },
+        "nl": {
+          "title": "Gesprek, dicteren en live praten in Studio",
+          "purpose": "Naast het werkvlak staat het gesprek met de agent. Je typt, dicteert met Praten, of kiest Live praten: dan vult de spraakagent het werkvlak terwijl je praat, kiest hij op jouw verzoek een oplossing en laat hij de boom of het proces zien.",
+          "when": "Als je liever vertelt dan typt, bijvoorbeeld tijdens een workshop.",
+          "steps": [
+            "Kies Praten om in te spreken; wat je zegt komt in het tekstvak.",
+            "Kies Live praten voor een gesprek met de spraakagent.",
+            "Zeg bijvoorbeeld: kies oplossing 1.2 of laat de boom zien.",
+            "Kies Gesprek verbergen in de kop als je het werkvlak breder wilt."
+          ],
+          "permissions": "Live praten volgt dezelfde rechten als spraak in de chat.",
+          "limits": "Live praten werkt alleen als realtime spraak op deze werkplek is ingesteld en de spraakdienst tegoed heeft. Dicteren hangt af van je browser.",
+          "example": "Zeg: ik plan elke week de diensten van twaalf monteurs in Excel."
+        }
+      }
+    },
+    {
+      "id": "webui.studio.backlog",
+      "area": "studio",
+      "status": "available",
+      "conditions": [],
+      "anchors": [
+        "?help_feature=webui.studio.backlog",
+        "[data-tour='studio-backlog']",
+        "[data-tour='studio-backlog-add']"
+      ],
+      "source_refs": [
+        "static/studio_library.js:106",
+        "api/studio_library.py:193"
+      ],
+      "related": [
+        "webui.studio.discover",
+        "webui.studio.usecases"
+      ],
+      "locales": {
+        "en": {
+          "title": "Backlog of ideas",
+          "purpose": "All ideas for AI in the organisation on one list, in order of priority. Ideas come from use cases or you add them yourself. Let the agent make it works an idea out in the background up to the dry run; a person decides about building.",
+          "when": "To collect ideas, put them in order and have the most important worked out first.",
+          "steps": [
+            "Add an idea with Add idea, optionally for a team.",
+            "Drag ideas into order, or use the arrows on a row.",
+            "Choose Let the agent make it, or Work out to do it yourself.",
+            "Status, arrows and remove appear when you hover a row."
+          ],
+          "permissions": "You see your own team's ideas and the general ones; you change your own ideas and those of teams you administer.",
+          "limits": "The agent never builds on its own: it stops at the dry run. Removing can be undone at once.",
+          "example": "Put Weekly draft reminders at the top and let the agent work it out."
+        },
+        "nl": {
+          "title": "Backlog van ideeën",
+          "purpose": "Alle ideeën voor AI in de organisatie op één lijst, op volgorde van prioriteit. Ideeën komen uit use cases of voeg je zelf toe. Laat de agent het maken werkt een idee op de achtergrond uit tot de droogrun; een mens beslist over bouwen.",
+          "when": "Om ideeën te verzamelen, te ordenen en de belangrijkste eerst te laten uitwerken.",
+          "steps": [
+            "Voeg een idee toe met Idee toevoegen, eventueel voor een team.",
+            "Sleep ideeën in de juiste volgorde, of gebruik de pijltjes bij een rij.",
+            "Kies Laat de agent het maken, of Uitwerken om het zelf te doen.",
+            "Status, pijltjes en verwijderen verschijnen als je over een rij gaat."
+          ],
+          "permissions": "Je ziet de ideeën van je eigen team en de algemene ideeën; je wijzigt je eigen ideeën en die van teams die je beheert.",
+          "limits": "De agent bouwt nooit zelf: hij stopt bij de droogrun. Verwijderen kun je direct ongedaan maken.",
+          "example": "Zet Wekelijkse concept-aanmaningen bovenaan en laat de agent het uitwerken."
+        }
+      }
+    },
+    {
+      "id": "webui.studio.playbooks",
+      "area": "studio",
+      "status": "available",
+      "conditions": [],
+      "anchors": [
+        "?help_feature=webui.studio.playbooks",
+        "[data-tour='studio-playbooks']",
+        "[data-tour='studio-playbook-new']"
+      ],
+      "source_refs": [
+        "static/studio_library.js:141",
+        "static/studio_library.js:122",
+        "api/studio_library.py:263"
+      ],
+      "related": [
+        "webui.studio.playbook_edit",
+        "webui.studio.playbook_run"
+      ],
+      "locales": {
+        "en": {
+          "title": "Playbooks: how we do it with the Super Agent",
+          "purpose": "The library of ways of working: how a process runs today with the Super Agent, step by step. Playbooks are grouped by category or team in collapsible groups, with search and filters.",
+          "when": "When you want to know how a colleague does something with the Super Agent, or want to record your own way of working.",
+          "steps": [
+            "Choose Playbooks in the Studio sidebar.",
+            "Group by Category, Team or None, and fold groups open or closed.",
+            "Search by title, summary or category, or filter by team and category.",
+            "Choose New playbook, or let the agent write one from a built use case."
+          ],
+          "permissions": "You see playbooks for the whole organisation, your team's and your own. Only the author, the team admin or an organisation admin changes a playbook.",
+          "limits": "A draft is visible only to you until you publish it.",
+          "example": "Open the Debtor management group and read how reminders work today."
+        },
+        "nl": {
+          "title": "Playbooks: hoe wij het met de Super Agent doen",
+          "purpose": "De bibliotheek van werkwijzen: hoe een proces nu met de Super Agent loopt, stap voor stap. Playbooks zijn gegroepeerd per categorie of team in uitklapbare groepen, met zoeken en filters.",
+          "when": "Als je wilt weten hoe een collega iets met de Super Agent doet, of je eigen werkwijze wilt vastleggen.",
+          "steps": [
+            "Kies Playbooks in de zijbalk van Studio.",
+            "Groepeer per Categorie, Team of Geen, en klap groepen in of uit.",
+            "Zoek op titel, samenvatting of categorie, of filter op team en categorie.",
+            "Kies Nieuw playbook, of laat de agent er een schrijven vanuit een gebouwde use case."
+          ],
+          "permissions": "Je ziet playbooks voor de hele organisatie, die van je team en je eigen. Alleen de auteur, de teambeheerder of een organisatiebeheerder wijzigt een playbook.",
+          "limits": "Een concept is alleen voor jou zichtbaar tot je het publiceert.",
+          "example": "Open de groep Debiteurenbeheer en lees hoe aanmaningen nu gaan."
+        }
+      }
+    },
+    {
+      "id": "webui.studio.playbook_edit",
+      "area": "studio",
+      "status": "available",
+      "conditions": [],
+      "anchors": [
+        "?help_feature=webui.studio.playbook_edit",
+        "[data-tour='studio-playbook-steps']"
+      ],
+      "source_refs": [
+        "static/studio_library.js:206",
+        "static/studio_library.js:235",
+        "api/studio_library.py:367"
+      ],
+      "related": [
+        "webui.studio.playbooks",
+        "webui.studio.playbook_run"
+      ],
+      "locales": {
+        "en": {
+          "title": "Writing a playbook",
+          "purpose": "For each step write what happens, who does it and which prompt you give the Super Agent. Add screenshots by pasting or uploading, record your screen or a voice note, and give the playbook a category and team.",
+          "when": "When a way of working works and others should be able to follow it.",
+          "steps": [
+            "Fill in title, summary, when to use it, category, team and visibility.",
+            "Write the action for each step and optionally the prompt.",
+            "Paste a screenshot, upload an image or choose Record screen or Voice note.",
+            "Choose Save, and Publish when it is ready."
+          ],
+          "permissions": "Only the author, the team admin or an organisation admin changes a playbook.",
+          "limits": "Images, screen recordings and audio up to 14 MB per file. Screen recording asks your browser for permission.",
+          "example": "Step 1: open the Debtors Bot chat and ask for today's drafts."
+        },
+        "nl": {
+          "title": "Een playbook schrijven",
+          "purpose": "Per stap schrijf je wat er gebeurt, wie het doet en welke prompt je de Super Agent geeft. Voeg screenshots toe door te plakken of te uploaden, neem je scherm of een spraaknotitie op, en geef het playbook een categorie en team.",
+          "when": "Als een werkwijze werkt en anderen hem moeten kunnen volgen.",
+          "steps": [
+            "Vul titel, samenvatting, wanneer je het gebruikt, categorie, team en zichtbaarheid in.",
+            "Schrijf per stap de handeling en eventueel de prompt.",
+            "Plak een screenshot, upload een afbeelding of kies Schermopname of Spraaknotitie.",
+            "Kies Opslaan, en Publiceren als het klaar is."
+          ],
+          "permissions": "Alleen de auteur, de teambeheerder of een organisatiebeheerder wijzigt een playbook.",
+          "limits": "Afbeeldingen, schermopnames en geluid samen maximaal 14 MB per bestand. Schermopname vraagt toestemming van je browser.",
+          "example": "Stap 1: open de chat van de Debiteuren Bot en vraag om de concepten van vandaag."
+        }
+      }
+    },
+    {
+      "id": "webui.studio.playbook_run",
+      "area": "studio",
+      "status": "available",
+      "conditions": [],
+      "anchors": [
+        "?help_feature=webui.studio.playbook_run",
+        "[data-pb-run]"
+      ],
+      "source_refs": [
+        "static/studio_library.js:163",
+        "static/studio_library.js:175",
+        "api/studio_library.py:342"
+      ],
+      "related": [
+        "webui.studio.playbook_edit",
+        "webui.value.task"
+      ],
+      "locales": {
+        "en": {
+          "title": "Running a playbook",
+          "purpose": "Running keeps a clock: you tick off steps and on Done the minutes the process takes today are recorded. Try in chat puts a step's prompt straight into a new conversation with the Super Agent.",
+          "when": "When you actually do the process and want to measure how long it takes.",
+          "steps": [
+            "Open a playbook and choose Run.",
+            "Tick off the steps as you do them.",
+            "Choose Try in chat on a step with a prompt.",
+            "Choose Done; the average time shows on the playbook card."
+          ],
+          "permissions": "Anyone who can see the playbook can run it.",
+          "limits": "The clock measures the time between start and Done; breaks count.",
+          "example": "Run the reminders playbook and see that it now takes twelve minutes."
+        },
+        "nl": {
+          "title": "Een playbook uitvoeren",
+          "purpose": "Uitvoeren loopt met een klok mee: je vinkt stappen af en bij Klaar wordt vastgelegd hoeveel minuten het proces nu kost. Met Probeer in de chat zet je de prompt van een stap direct in een nieuw gesprek met de Super Agent.",
+          "when": "Als je het proces echt doet en wilt meten hoe lang het duurt.",
+          "steps": [
+            "Open een playbook en kies Uitvoeren.",
+            "Vink de stappen af terwijl je ze doet.",
+            "Kies Probeer in de chat bij een stap met een prompt.",
+            "Kies Klaar; de gemiddelde tijd verschijnt op de kaart van het playbook."
+          ],
+          "permissions": "Iedereen die het playbook kan zien, kan het uitvoeren.",
+          "limits": "De klok meet de tijd tussen starten en Klaar; pauzes tellen mee.",
+          "example": "Voer het playbook aanmaningen uit en zie dat het nu twaalf minuten kost."
+        }
+      }
+    },
+    {
+      "id": "webui.org.chart",
+      "area": "organisation",
+      "status": "conditional",
+      "conditions": [
+        "team-membership-or-organisation-admin"
+      ],
+      "anchors": [
+        "?help_feature=webui.org.chart",
+        "[data-tour='org-totals']",
+        "[data-tour='org-chart']"
+      ],
+      "source_refs": [
+        "static/orgmgmt.js:487",
+        "static/orgmgmt.js:340",
+        "api/management.py:671"
+      ],
+      "related": [
+        "webui.org.numbers",
+        "webui.org.team",
+        "webui.org.teams"
+      ],
+      "locales": {
+        "en": {
+          "title": "Org chart",
+          "purpose": "The org chart shows departments, teams and sub-teams, with each team's lead, people and bots, including which bots work under another bot. At the top and on every department and team are six numbers: people, bots, scheduled tasks, connections, skills and time saved.",
+          "when": "When you want to see who and what works in each team and what it delivers.",
+          "steps": [
+            "Choose Org chart in the Studio sidebar.",
+            "Fold departments, teams and bots open or closed, or use Expand all and Collapse all.",
+            "Choose People, Bots or Both to decide what the hierarchy shows.",
+            "What you open or close is remembered in this browser."
+          ],
+          "permissions": "Team members see their own team, department admins their departments and organisation admins everything. Amounts are shown to admins only.",
+          "limits": "Bots without a bot manager sit under the team lead. Profile photos appear once people set one; otherwise you see initials.",
+          "example": "Open Tech and see which bots work under the Chief Technology Bot."
+        },
+        "nl": {
+          "title": "Organigram",
+          "purpose": "Het organigram toont afdelingen, teams en subteams, met per team de lead, de mensen en de bots, inclusief welke bots onder een andere bot werken. Bovenaan en bij elke afdeling en elk team staan zes cijfers: mensen, bots, geplande taken, koppelingen, skills en tijd bespaard.",
+          "when": "Als je wilt zien wie en wat er per team werkt en wat het oplevert.",
+          "steps": [
+            "Kies Organigram in de zijbalk van Studio.",
+            "Klap afdelingen, teams en bots in of uit, of gebruik Alles uitklappen en Alles inklappen.",
+            "Kies Mensen, Bots of Samen om te bepalen wat je in de hiërarchie ziet.",
+            "Wat je open of dicht zet blijft bewaard in deze browser."
+          ],
+          "permissions": "Teamleden zien hun eigen team, afdelingsbeheerders hun afdelingen en organisatiebeheerders alles. Bedragen zie je alleen als beheerder.",
+          "limits": "Bots zonder bot-manager staan onder de teamlead. Profielfoto's verschijnen zodra mensen er een instellen; anders zie je initialen.",
+          "example": "Klap Tech open en zie welke bots onder de Chief Technology Bot werken."
+        }
+      }
+    },
+    {
+      "id": "webui.org.numbers",
+      "area": "organisation",
+      "status": "conditional",
+      "conditions": [
+        "team-membership-or-organisation-admin"
+      ],
+      "anchors": [
+        "?help_feature=webui.org.numbers",
+        "[data-tour='org-detail']",
+        ".om-mini-stat"
+      ],
+      "source_refs": [
+        "static/orgmgmt.js:324",
+        "static/orgmgmt.js:262",
+        "api/management.py:600"
+      ],
+      "related": [
+        "webui.org.chart"
+      ],
+      "locales": {
+        "en": {
+          "title": "Drilling into the numbers",
+          "purpose": "Every number on the org chart opens what is behind it: which people, bots and scheduled tasks, which connections (bots' MCP servers and personal connections, with who uses them) and which skills (by category, with description and the bots that have them).",
+          "when": "When you want to know which connections or skills a team really uses.",
+          "steps": [
+            "Click a number at the top, on a department or on a team.",
+            "Search the list, and fold groups open or closed.",
+            "Open a task or bot straight from the list.",
+            "Close the panel with the cross or Escape."
+          ],
+          "permissions": "You never see more than the org chart itself shows you.",
+          "limits": "Skills count what is enabled per bot. Connections are configured MCP servers and personal connections, not usage figures. Right after a restart the numbers may take a moment.",
+          "example": "Click connections on Finance and see that attio_api runs through three bots."
+        },
+        "nl": {
+          "title": "Doorklikken op de cijfers",
+          "purpose": "Elk cijfer in het organigram opent wat erachter zit: welke mensen, bots en geplande taken, welke koppelingen (MCP-servers van bots en persoonlijke koppelingen, met wie ze gebruikt) en welke skills (per categorie, met beschrijving en de bots die ze hebben).",
+          "when": "Als je wilt weten welke koppelingen of skills een team echt gebruikt.",
+          "steps": [
+            "Klik op een cijfer bovenaan, bij een afdeling of bij een team.",
+            "Zoek in de lijst, en klap groepen in of uit.",
+            "Open een taak of bot direct vanuit de lijst.",
+            "Sluit het paneel met het kruisje of Escape."
+          ],
+          "permissions": "Je ziet nooit meer dan het organigram zelf je toont.",
+          "limits": "Skills tellen wat per bot aanstaat. Koppelingen zijn ingestelde MCP-servers en persoonlijke koppelingen, geen gebruikscijfers. Na een herstart kan het even duren voor de cijfers verschijnen.",
+          "example": "Klik bij Finance op de koppelingen en zie dat attio_api via drie bots loopt."
+        }
+      }
+    },
+    {
+      "id": "webui.org.team",
+      "area": "organisation",
+      "status": "conditional",
+      "conditions": [
+        "team-membership-or-organisation-admin"
+      ],
+      "anchors": [
+        "?help_feature=webui.org.team",
+        "[data-tour='org-team']"
+      ],
+      "source_refs": [
+        "static/orgmgmt.js:444",
+        "static/orgmgmt.js:437"
+      ],
+      "related": [
+        "webui.org.chart",
+        "webui.studio.usecases"
+      ],
+      "locales": {
+        "en": {
+          "title": "Team details",
+          "purpose": "Details on a team shows the saving in the period, what waits for action, which bots and tasks run, the team's Playbooks and its people. From here you start a new automation for the team in Studio.",
+          "when": "When you start working with one team.",
+          "steps": [
+            "Choose Details on a team.",
+            "See what waits for action, such as a task without value or one that keeps failing.",
+            "Open a task, bot or playbook directly.",
+            "Choose New automation for this team to start a use case."
+          ],
+          "permissions": "What you see follows your rights on the team.",
+          "limits": "The saving covers the last four weeks.",
+          "example": "Open Debtors and start a new automation."
+        },
+        "nl": {
+          "title": "Teamdetails",
+          "purpose": "Details bij een team toont de besparing in de periode, wat op actie wacht, welke bots en taken draaien, de Playbooks van het team en de mensen. Van hieruit start je een nieuwe automatisering voor het team in Studio.",
+          "when": "Als je met één team aan de slag gaat.",
+          "steps": [
+            "Kies Details bij een team.",
+            "Bekijk wat op actie wacht, zoals een taak zonder waarde of die steeds mislukt.",
+            "Open een taak, bot of playbook direct.",
+            "Kies Nieuwe automatisering voor dit team om een use case te starten."
+          ],
+          "permissions": "Wat je ziet volgt je rechten op het team.",
+          "limits": "De besparing gaat over de laatste vier weken.",
+          "example": "Open Debiteuren en start een nieuwe automatisering."
+        }
+      }
+    },
+    {
+      "id": "webui.org.teams",
+      "area": "organisation",
+      "status": "conditional",
+      "conditions": [
+        "organisation-or-department-admin"
+      ],
+      "anchors": [
+        "?help_feature=webui.org.teams",
+        "[data-tour='org-teams']"
+      ],
+      "source_refs": [
+        "static/orgmgmt.js:528",
+        "api/org_structure.py:514"
+      ],
+      "related": [
+        "webui.org.chart",
+        "webui.mgmt.pricing"
+      ],
+      "locales": {
+        "en": {
+          "title": "Manage teams",
+          "purpose": "Create departments and teams, choose the lead and members, put a team under another team (sub-team) and set hourly rates for the net value.",
+          "when": "When setting up the organisation or when someone changes team.",
+          "steps": [
+            "Choose Manage teams in the Studio sidebar.",
+            "Add a department, and a team under it with name, lead and members.",
+            "Choose a parent under Under team to make it a sub-team.",
+            "Fill in an hourly rate per department or team and choose Save."
+          ],
+          "permissions": "Organisation admins change everything, department admins the teams of their own departments.",
+          "limits": "A sub-team stays in its parent's department, and a team cannot sit under itself. Teams grant no rights; those stay in the policy.",
+          "example": "Put Collections as a sub-team under Debtors."
+        },
+        "nl": {
+          "title": "Teams beheren",
+          "purpose": "Maak afdelingen en teams, kies de lead en de leden, zet een team onder een ander team (subteam) en stel uurtarieven in voor de netto waarde.",
+          "when": "Bij het inrichten van de organisatie of als er iemand wisselt van team.",
+          "steps": [
+            "Kies Teams beheren in de zijbalk van Studio.",
+            "Voeg een afdeling toe, en daaronder een team met naam, lead en leden.",
+            "Kies bij Onder team een hoofdteam om er een subteam van te maken.",
+            "Vul een uurtarief in per afdeling of team en kies Opslaan."
+          ],
+          "permissions": "Organisatiebeheerders wijzigen alles, afdelingsbeheerders de teams van hun eigen afdelingen.",
+          "limits": "Een subteam blijft in de afdeling van zijn hoofdteam, en een team kan niet onder zichzelf vallen. Teams geven geen rechten; die blijven in het beleid.",
+          "example": "Zet Incasso als subteam onder Debiteuren."
+        }
+      }
+    },
+    {
+      "id": "webui.mgmt.overview",
+      "area": "organisation",
+      "status": "conditional",
+      "conditions": [
+        "organisation-or-department-admin"
+      ],
+      "anchors": [
+        "?help_feature=webui.mgmt.overview",
+        "[data-tour='mgmt-kpis']",
+        "[data-tour='mgmt-decisions']"
+      ],
+      "source_refs": [
+        "static/orgmgmt.js:654",
+        "static/orgmgmt.js:691",
+        "api/management.py:169"
+      ],
+      "related": [
+        "webui.mgmt.tables",
+        "webui.mgmt.pricing",
+        "webui.value.task"
+      ],
+      "locales": {
+        "en": {
+          "title": "Management: what it delivers",
+          "purpose": "Management shows per period the time saved (confirmed and estimated), net value, AI cost, return, what is active and which share of values is confirmed. Decision needed lists tasks that fail, have no value, carry an unconfirmed or high estimate, and teams without automation.",
+          "when": "Weekly, or before a management meeting about AI.",
+          "steps": [
+            "Choose Management in the Studio sidebar.",
+            "Choose the period at the top.",
+            "Work through Decision needed: fill in missing values directly or confirm an estimate.",
+            "Apply suggested team assignments in one go."
+          ],
+          "permissions": "Only organisation and department admins see Management; department admins only their own departments.",
+          "limits": "Values are estimates until the owner confirms them. Net value needs hourly rates, AI cost needs prices.",
+          "example": "Confirm Finance's three estimates and watch the coverage go up."
+        },
+        "nl": {
+          "title": "Management: wat het oplevert",
+          "purpose": "Management toont per periode de bespaarde tijd (bevestigd en geschat), de netto waarde, de AI-kosten, het rendement, wat actief is en welk deel van de waarden bevestigd is. Onder Beslissing nodig staan taken die falen, zonder waarde, met een onbevestigde of hoge schatting, en teams zonder automatisering.",
+          "when": "Wekelijks, of voor een MT-overleg over AI.",
+          "steps": [
+            "Kies Management in de zijbalk van Studio.",
+            "Kies de periode bovenaan.",
+            "Werk Beslissing nodig af: vul ontbrekende waarden direct in of bevestig een schatting.",
+            "Neem voorgestelde teamindelingen over in één keer."
+          ],
+          "permissions": "Alleen organisatie- en afdelingsbeheerders zien Management; afdelingsbeheerders alleen hun eigen afdelingen.",
+          "limits": "Waarden zijn schattingen tot de eigenaar ze bevestigt. Netto waarde verschijnt pas met uurtarieven, AI-kosten pas met prijzen.",
+          "example": "Bevestig de drie schattingen van Finance en zie de dekking stijgen."
+        }
+      }
+    },
+    {
+      "id": "webui.mgmt.tables",
+      "area": "organisation",
+      "status": "conditional",
+      "conditions": [
+        "organisation-or-department-admin"
+      ],
+      "anchors": [
+        "?help_feature=webui.mgmt.tables",
+        "[data-tour='mgmt-teams']",
+        "[data-tour='mgmt-bots']"
+      ],
+      "source_refs": [
+        "static/orgmgmt.js:737",
+        "static/orgmgmt.js:716"
+      ],
+      "related": [
+        "webui.mgmt.overview"
+      ],
+      "locales": {
+        "en": {
+          "title": "By team and by bot",
+          "purpose": "The team table shows hours, value, runs and success rate. The bots table groups by category, by team or not at all, with the number of bots, tasks and chats per group.",
+          "when": "When you want to compare which teams and bots deliver most.",
+          "steps": [
+            "Click a column header to sort.",
+            "Click a team to open it in the org chart.",
+            "Under Bots, group by Category, Team or None.",
+            "Choose Export CSV for a spreadsheet."
+          ],
+          "permissions": "Organisation and department admins only.",
+          "limits": "Chats only count once they are linked to one of the bot's responsibilities.",
+          "example": "Group bots by category and see how many tasks Engineering runs."
+        },
+        "nl": {
+          "title": "Per team en per bot",
+          "purpose": "De tabel per team toont uren, waarde, runs en hoe vaak het lukt. De tabel met bots groepeer je per categorie, per team of niet, met per groep het aantal bots, taken en gesprekken.",
+          "when": "Als je wilt vergelijken welke teams en bots het meeste opleveren.",
+          "steps": [
+            "Klik op een kolomkop om te sorteren.",
+            "Klik op een team om het in het organigram te openen.",
+            "Kies bij Bots groeperen op Categorie, Team of Geen.",
+            "Kies Exporteer CSV voor een spreadsheet."
+          ],
+          "permissions": "Alleen organisatie- en afdelingsbeheerders.",
+          "limits": "Gesprekken tellen pas mee als ze aan een verantwoordelijkheid van de bot zijn gekoppeld.",
+          "example": "Groepeer bots per categorie en zie hoeveel taken Engineering draait."
+        }
+      }
+    },
+    {
+      "id": "webui.mgmt.pricing",
+      "area": "organisation",
+      "status": "conditional",
+      "conditions": [
+        "organisation-or-department-admin"
+      ],
+      "anchors": [
+        "?help_feature=webui.mgmt.pricing",
+        "#omSettings"
+      ],
+      "source_refs": [
+        "static/orgmgmt.js:752",
+        "api/value_tracking.py:585"
+      ],
+      "related": [
+        "webui.mgmt.overview",
+        "webui.org.teams"
+      ],
+      "locales": {
+        "en": {
+          "title": "Prices and rates",
+          "purpose": "Set a price per million tokens for each model to calculate AI cost and return, and hourly rates per department or team for the net value.",
+          "when": "Once during setup, and when prices change.",
+          "steps": [
+            "Choose Prices and rates in the header.",
+            "Fill in input, output and cache prices per model; an asterisk applies to all other models.",
+            "Choose Save.",
+            "Choose Manage teams for the hourly rates."
+          ],
+          "permissions": "Organisation admins change prices.",
+          "limits": "AI cost is an API equivalent; without a price the token count stays visible.",
+          "example": "Set synthwave-auto to 3 euro input and 15 euro output per million tokens."
+        },
+        "nl": {
+          "title": "Prijzen en tarieven",
+          "purpose": "Stel per model de prijs per miljoen tokens in om AI-kosten en rendement te berekenen, en uurtarieven per afdeling of team voor de netto waarde.",
+          "when": "Eén keer bij het inrichten, en als prijzen veranderen.",
+          "steps": [
+            "Kies Prijzen en tarieven in de kop.",
+            "Vul per model de prijs voor invoer, uitvoer en cache in; een sterretje geldt voor alle andere modellen.",
+            "Kies Opslaan.",
+            "Kies Teams beheren voor de uurtarieven."
+          ],
+          "permissions": "Organisatiebeheerders wijzigen prijzen.",
+          "limits": "AI-kosten zijn een API-equivalent; zonder prijs blijft het aantal tokens zichtbaar.",
+          "example": "Zet synthwave-auto op 3 euro invoer en 15 euro uitvoer per miljoen tokens."
+        }
+      }
+    },
+    {
+      "id": "webui.value.task",
+      "area": "organisation",
+      "status": "available",
+      "conditions": [],
+      "anchors": [
+        "?help_feature=webui.value.task",
+        "#omValueCard"
+      ],
+      "source_refs": [
+        "static/orgmgmt.js:884",
+        "static/orgmgmt.js:1018",
+        "api/value_tracking.py:95"
+      ],
+      "related": [
+        "webui.mgmt.overview",
+        "webui.studio.build"
+      ],
+      "locales": {
+        "en": {
+          "title": "Value of a scheduled task",
+          "purpose": "Every scheduled task gets a value: how many minutes the work took before, how much review is left now, and per run, per day or per week. That is how Management counts time saved.",
+          "when": "When creating a task, or when you want to confirm or improve an estimate.",
+          "steps": [
+            "For a new task fill in Min. before and Min. now, and choose per run, day or week.",
+            "Open an existing task and see the Value card with the measured runs.",
+            "Choose Correct to confirm an estimate, or change the minutes.",
+            "If you do not know, choose unknown with a reason."
+          ],
+          "permissions": "The task's owner confirms or changes the value.",
+          "limits": "An agent estimate counts as estimated until someone confirms it. For tasks that run very often choose per day or week.",
+          "example": "Drafting reminders: 45 minutes before, 5 minutes review now, per run."
+        },
+        "nl": {
+          "title": "Waarde van een geplande taak",
+          "purpose": "Elke geplande taak krijgt een waarde: hoeveel minuten het werk eerst kostte, hoeveel controle nu overblijft, en per keer, per dag of per week. Zo telt Management de bespaarde tijd.",
+          "when": "Bij het maken van een taak, of als je een schatting wilt bevestigen of verbeteren.",
+          "steps": [
+            "Vul bij een nieuwe taak Min. eerst en Min. nu in, en kies per keer, dag of week.",
+            "Open een bestaande taak en bekijk de kaart Waarde met de gemeten runs.",
+            "Kies Klopt om een schatting te bevestigen, of pas de minuten aan.",
+            "Weet je het niet, kies dan onbekend met een reden."
+          ],
+          "permissions": "De eigenaar van de taak bevestigt of past de waarde aan.",
+          "limits": "Een schatting van de agent telt als geschat tot iemand hem bevestigt. Bij taken die heel vaak draaien kies je per dag of week.",
+          "example": "Aanmaningen opstellen: eerst 45 minuten, nu 5 minuten controle, per keer."
+        }
+      }
+    },
+    {
+      "id": "webui.value.bot_duty",
+      "area": "organisation",
+      "status": "conditional",
+      "conditions": [
+        "bot-edit-access"
+      ],
+      "anchors": [
+        "?help_feature=webui.value.bot_duty",
+        "[data-tour='bot-duty-value']",
+        "#botServes"
+      ],
+      "source_refs": [
+        "static/orgmgmt.js:971",
+        "static/orgmgmt.js:992",
+        "api/bot_metadata.py:12"
+      ],
+      "related": [
+        "webui.value.chat_chip",
+        "webui.org.chart"
+      ],
+      "locales": {
+        "en": {
+          "title": "Responsibilities and team of a bot",
+          "purpose": "For each responsibility of a bot state how many minutes the work took before, takes now and how often per week; the bot then shows its saving per week. Works for team places the bot in a team of the org chart.",
+          "when": "When creating or updating a bot.",
+          "steps": [
+            "Open a bot and go to its responsibilities.",
+            "Fill in minutes before, minutes now and times per week for each responsibility.",
+            "Under Works for team, choose the team the bot works for.",
+            "Save the bot; the org chart and Management pick it up."
+          ],
+          "permissions": "Only people who may edit the bot.",
+          "limits": "A bot sits in one team at a time on the org chart.",
+          "example": "Draft reminders: 25 minutes before, 5 now, four times a week."
+        },
+        "nl": {
+          "title": "Verantwoordelijkheden en team van een bot",
+          "purpose": "Geef bij elke verantwoordelijkheid van een bot aan hoeveel minuten het werk eerst kostte, nu kost en hoe vaak per week; de bot toont dan zijn besparing per week. Met Werkt voor team plaats je de bot in een team van het organigram.",
+          "when": "Bij het maken of bijwerken van een bot.",
+          "steps": [
+            "Open een bot en ga naar zijn verantwoordelijkheden.",
+            "Vul per verantwoordelijkheid minuten eerst, minuten nu en keren per week in.",
+            "Kies bij Werkt voor team het team waarvoor de bot werkt.",
+            "Sla de bot op; het organigram en Management nemen het over."
+          ],
+          "permissions": "Alleen wie de bot mag bewerken.",
+          "limits": "Een bot staat in één team tegelijk in het organigram.",
+          "example": "Concept-aanmaningen: eerst 25 minuten, nu 5, vier keer per week."
+        }
+      }
+    },
+    {
+      "id": "webui.value.chat_chip",
+      "area": "organisation",
+      "status": "conditional",
+      "conditions": [
+        "bot-access"
+      ],
+      "anchors": [
+        "?help_feature=webui.value.chat_chip",
+        "#omChatValue"
+      ],
+      "source_refs": [
+        "static/orgmgmt.js:1051",
+        "api/value_tracking.py:486"
+      ],
+      "related": [
+        "webui.value.bot_duty"
+      ],
+      "locales": {
+        "en": {
+          "title": "Saving under a bot chat",
+          "purpose": "Under a finished conversation with a bot it says which responsibility it was and how much time it saved. You confirm it or choose another responsibility.",
+          "when": "After a conversation with a bot that has responsibilities with minutes.",
+          "steps": [
+            "Finish a conversation with a bot.",
+            "Read the line under the conversation.",
+            "Choose Correct, or Not correct to choose another responsibility or none.",
+            "The saving counts in Management."
+          ],
+          "permissions": "Only the person in the conversation confirms or corrects it.",
+          "limits": "The link is an estimate until you confirm it.",
+          "example": "Drafting reminders, 20 minutes saved: Correct."
+        },
+        "nl": {
+          "title": "Besparing onder een botgesprek",
+          "purpose": "Onder een afgerond gesprek met een bot staat welke verantwoordelijkheid het was en hoeveel tijd het scheelde. Jij bevestigt het of kiest een andere verantwoordelijkheid.",
+          "when": "Na een gesprek met een bot die verantwoordelijkheden met minuten heeft.",
+          "steps": [
+            "Rond een gesprek met een bot af.",
+            "Lees de regel onder het gesprek.",
+            "Kies Klopt, of Klopt niet om een andere verantwoordelijkheid of geen te kiezen.",
+            "De besparing telt mee in Management."
+          ],
+          "permissions": "Alleen de persoon van het gesprek bevestigt of verbetert het.",
+          "limits": "De koppeling is een schatting tot jij hem bevestigt.",
+          "example": "Aanmaningen opstellen, 20 minuten bespaard: Klopt."
         }
       }
     }

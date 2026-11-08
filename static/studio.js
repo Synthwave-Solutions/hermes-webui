@@ -14,7 +14,7 @@
   const NL = {
     n_goal: 'Gewenst doel', n_pain: 'Knelpunt', n_opp: 'Kans', n_sol: 'Oplossing', untitled: 'Naamloze use case', cause: 'Oorzaak', test: 'Kleinste test',
     q_quick: 'Snelle winst', q_big: 'Grote inzet', q_fill: 'Opvulling', q_pit: 'Geldput',
-    tab_uc: 'Use cases', tab_backlog: 'Backlog', tab_pb: 'Playbooks', nav_work: 'Werk', nav_org: 'Organisatie', nav_chart: 'Organigram', nav_teams: 'Teams beheren', nav_mgmt: 'Management', nav_recent: 'Recent', conv_hide: 'Gesprek verbergen', conv_show: 'Gesprek tonen', view_matrix: 'Matrix', view_tree: 'Boom', to_backlog: 'Naar backlog', in_backlog: 'In backlog', all_to_backlog: 'Alle kansen naar de backlog', make_pb: 'Maak er een Playbook van', no_goal: 'Overig',
+    tab_uc: 'Use cases', tab_backlog: 'Backlog', tab_pb: 'Playbooks', nav_work: 'Werk', nav_org: 'Organisatie', nav_chart: 'Organigram', nav_teams: 'Teams beheren', nav_mgmt: 'Management', nav_recent: 'Recent', nav_help: 'Uitleg over dit scherm', conv_hide: 'Gesprek verbergen', conv_show: 'Gesprek tonen', view_matrix: 'Matrix', view_tree: 'Boom', to_backlog: 'Naar backlog', in_backlog: 'In backlog', all_to_backlog: 'Alle kansen naar de backlog', make_pb: 'Maak er een Playbook van', no_goal: 'Overig',
     studio: 'Studio', intro: 'Ontdek waar AI je werk overneemt, richt het proces in en laat de Super Agent het bouwen.',
     new_uc: 'Nieuwe use case', team: 'Team', none: 'Geen team', title_ph: 'Naam van deze use case', back: 'Use cases',
     p_discover: 'Ontdekken', p_design: 'Inrichten', p_playbook: 'Bouwplan', p_build: 'Bouwen', p_measure: 'Meten',
@@ -49,7 +49,7 @@
   const EN = {
     n_goal: 'Desired outcome', n_pain: 'Pain point', n_opp: 'Opportunity', n_sol: 'Solution', untitled: 'Untitled use case', cause: 'Cause', test: 'Smallest test',
     q_quick: 'Quick wins', q_big: 'Big bets', q_fill: 'Fill-ins', q_pit: 'Money pit',
-    tab_uc: 'Use cases', tab_backlog: 'Backlog', tab_pb: 'Playbooks', nav_work: 'Work', nav_org: 'Organisation', nav_chart: 'Org chart', nav_teams: 'Manage teams', nav_mgmt: 'Management', nav_recent: 'Recent', conv_hide: 'Hide conversation', conv_show: 'Show conversation', view_matrix: 'Matrix', view_tree: 'Tree', to_backlog: 'To backlog', in_backlog: 'In backlog', all_to_backlog: 'All opportunities to the backlog', make_pb: 'Turn it into a Playbook', no_goal: 'Other',
+    tab_uc: 'Use cases', tab_backlog: 'Backlog', tab_pb: 'Playbooks', nav_work: 'Work', nav_org: 'Organisation', nav_chart: 'Org chart', nav_teams: 'Manage teams', nav_mgmt: 'Management', nav_recent: 'Recent', nav_help: 'How this screen works', conv_hide: 'Hide conversation', conv_show: 'Show conversation', view_matrix: 'Matrix', view_tree: 'Tree', to_backlog: 'To backlog', in_backlog: 'In backlog', all_to_backlog: 'All opportunities to the backlog', make_pb: 'Turn it into a Playbook', no_goal: 'Other',
     studio: 'Studio', intro: 'Discover where AI takes work off your hands, design the process and let the Super Agent build it.',
     new_uc: 'New use case', team: 'Team', none: 'No team', title_ph: 'Name of this use case', back: 'Use cases',
     p_discover: 'Discover', p_design: 'Design', p_playbook: 'Build plan', p_build: 'Build', p_measure: 'Measure',
@@ -149,25 +149,25 @@
     const rows = St.list || [];
     const teamName = k => (St.teams.find(t => t.key === k) || {}).name || '';
     body.innerHTML = `<p class="om-intro">${H(w('intro'))}</p>
-      ${rows.length ? `<div class="st-cards">${rows.map(r => `<button type="button" class="st-card" data-st-open="${H(r.id)}">
+      ${rows.length ? `<div class="st-cards" data-tour="studio-usecases">${rows.map(r => `<button type="button" class="st-card" data-st-open="${H(r.id)}">
           <span class="st-card-title ${r.title ? '' : 'st-side-untitled'}">${H(r.title || w('untitled'))}</span>
           <span class="om-muted om-small">${H(teamName(r.team) || w('none'))} · ${H(w('p_' + (r.phase || 'discover')))}</span>
           <span class="st-card-meta"><span class="om-badge">${H(r.components || 0)} ${H(w('components'))}</span>${r.built ? `<span class="om-badge ok">${H(r.built)} ${H(w('built_n'))}</span>` : ''}</span>
         </button>`).join('')}</div>`
-      : `<div class="om-empty"><h3>${H(w('new_uc'))}</h3><p>${H(w('empty_list'))}</p><div class="om-actions"><button type="button" class="sm-btn primary" data-st-new>${H(w('new_uc'))}</button></div></div>`}`;
+      : `<div class="om-empty" data-tour="studio-usecases"><h3>${H(w('new_uc'))}</h3><p>${H(w('empty_list'))}</p><div class="om-actions"><button type="button" class="sm-btn primary" data-st-new>${H(w('new_uc'))}</button></div></div>`}`;
   }
 
   // ── Use case ───────────────────────────────────────────────────────────────
   function stepper(doc){
     const cur = PHASES.indexOf(doc.phase || 'discover');
-    return `<ol class="st-stepper">${PHASES.map((p, i) => `<li><button type="button" data-st-phase="${p}" aria-current="${i === cur ? 'step' : 'false'}" class="${i < cur ? 'done' : ''}" ${i > cur + 1 ? 'disabled' : ''}><span>${i + 1}</span>${H(w('p_' + p))}</button></li>`).join('')}</ol>`;
+    return `<ol class="st-stepper" data-tour="studio-steps">${PHASES.map((p, i) => `<li><button type="button" data-st-phase="${p}" aria-current="${i === cur ? 'step' : 'false'}" class="${i < cur ? 'done' : ''}" ${i > cur + 1 ? 'disabled' : ''}><span>${i + 1}</span>${H(w('p_' + p))}</button></li>`).join('')}</ol>`;
   }
   function convHtml(doc){
     const notes = doc.notes || [];
     const ph = doc.phase === 'design' ? 'ph_design' : doc.phase === 'playbook' ? 'ph_playbook' : 'ph_discover';
     const canSend = ['discover', 'design', 'playbook'].includes(doc.phase || 'discover');
     const hasSpeech = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
-    return `<section class="st-conv" aria-label="${H(w('conv'))}">
+    return `<section class="st-conv" data-tour="studio-conversation" aria-label="${H(w('conv'))}">
       <div class="st-notes" aria-live="polite">${notes.map(n => `<div class="st-note ${n.role}">${H(n.text)}</div>`).join('')}${St.busy ? `<div class="st-note agent st-thinking">${H(w('thinking'))}</div>` : ''}</div>
       ${St.live ? `<p class="om-small st-live-note">${H(w('live_on'))}</p>` : ''}
       ${St.live && St.live.tasks.length ? `<div class="st-live-tasks">${St.live.tasks.map(tk => `<div class="om-row"><span class="om-dot ${tk.status === 'done' ? 'ok' : tk.status === 'error' ? 'error' : 'new'}"></span><div class="om-row-main"><div class="om-row-title">${H(tk.title || '')}</div><div class="om-row-sub">${H(tk.status || '')}</div></div>${tk.session_id ? `<button type="button" class="sm-btn" data-st-open-session="${H(tk.session_id)}">${H(w('open_work'))}</button>` : ''}</div>`).join('')}</div>` : ''}
@@ -235,7 +235,7 @@
   function discoverHtml(doc){
     if (!(doc.opportunities || []).length) return guideHtml();
     return `<h3>${H(w('goals'))}</h3><div class="st-goals">${(doc.goals || []).map(g => `<div class="om-card st-goal"><span class="st-node-kind">${H(w('n_goal'))}</span><strong>${H(g.name)}</strong><span class="om-muted om-small">${H(g.kpi)}</span>${g.baseline || g.target ? `<span class="st-kpi"><b>${H(g.baseline || '?')}</b> → <b>${H(g.target || '?')}</b></span>` : ''}</div>`).join('')}</div>
-      <div class="om-section-head" style="margin-top:20px"><h3>${H(w('opps'))}</h3><div class="om-seg" style="margin-left:auto">${['matrix', 'tree'].map(v => `<button type="button" aria-pressed="${St.oppView === v}" data-st-oppview="${v}">${H(w('view_' + v))}</button>`).join('')}</div></div>
+      <div class="om-section-head" style="margin-top:20px" data-tour="studio-opportunities"><h3>${H(w('opps'))}</h3><div class="om-seg" style="margin-left:auto">${['matrix', 'tree'].map(v => `<button type="button" aria-pressed="${St.oppView === v}" data-st-oppview="${v}">${H(w('view_' + v))}</button>`).join('')}</div></div>
       ${St.oppView === 'tree' ? treeHtml(doc) : matrixHtml(doc)}
       <div class="om-value-actions" style="margin-top:8px"><button type="button" class="sm-btn" data-st-backlog-all>${H(w('all_to_backlog'))}</button></div>
       <div class="om-value-actions"><button type="button" class="sm-btn primary" data-st-goto="design" ${doc.selected ? '' : 'disabled'}>${H(w('next_design'))}</button></div>`;
@@ -255,7 +255,7 @@
     if (!b.minutes_before && !p.data_sensitivity) return '';
     const freq = f.count ? `${f.count} ${w('freq_' + (f.per || 'week'))}` : w('bl_freq_unknown');
     const cell = (label, before, after) => `<div class="om-card st-bl"><span class="st-node-kind">${H(label)}</span><span class="st-kpi"><b>${H(before)}</b>${after !== undefined ? ` → <b>${H(after)}</b>` : ''}</span></div>`;
-    return `<h3>${H(w('bl_title'))}</h3><div class="st-bl-row">
+    return `<h3>${H(w('bl_title'))}</h3><div class="st-bl-row" data-tour="studio-baseline">
       ${cell(w('bl_freq'), freq)}
       ${b.minutes_before ? cell(w('bl_min'), b.minutes_before + ' min', (b.minutes_after || 0) + ' min') : ''}
       ${b.hours_week_before != null ? cell(w('bl_hours'), num(b.hours_week_before) + ' u', num(b.hours_week_after) + ' u') : ''}
@@ -290,7 +290,7 @@
   function playbookHtml(doc){
     const comps = (doc.playbook || {}).components || [];
     if (!comps.length) return `<p class="om-muted">${H(w('ph_playbook'))}</p><div class="om-value-actions"><button type="button" class="sm-btn primary" data-st-make-playbook>${H(w('next_playbook'))}</button></div>`;
-    return `<p class="om-small om-muted">v${H((doc.playbook || {}).version)}</p><div class="st-comps">${comps.map(compHtml).join('')}</div>
+    return `<p class="om-small om-muted">v${H((doc.playbook || {}).version)}</p><div class="st-comps" data-tour="studio-plan">${comps.map(compHtml).join('')}</div>
       <div class="om-value-actions"><button type="button" class="sm-btn" data-st-save-playbook>${H(w('save'))}</button><button type="button" class="sm-btn" data-st-make-playbook>${H(w('regenerate'))}</button><button type="button" class="sm-btn primary" data-st-goto="build">${H(w('next_build'))}</button></div>`;
   }
   function buildHtml(doc){
@@ -305,7 +305,7 @@
         <div class="om-row-actions">${b ? `<span class="om-badge ${b.status === 'ok' ? 'ok' : b.status === 'failed' ? 'error' : ''}">${H(w(b.status === 'ok' ? 'built' : b.status))}</span>${b.error ? `<span class="om-small om-muted">${H(b.error)}</span>` : ''}` : ''}</div></div>`; }).join('')}</div>
       ${St.building ? `<p class="om-small">${H(w('building'))}</p>` : done
         ? `<div class="om-value-actions"><button type="button" class="sm-btn" data-st-nav="tasks">${H(w('open_task'))}</button><button type="button" class="sm-btn" data-st-nav="skills">${H(w('open_skills'))}</button><button type="button" class="sm-btn" data-st-nav="kanban">${H(w('open_kanban'))}</button>${comps.some(c => c.type === 'connection') ? `<button type="button" class="sm-btn" data-st-nav="integrations">${H(w('open_conn'))}</button>` : ''}<button type="button" class="sm-btn primary" data-st-goto="measure">${H(w('p_measure'))}</button></div>`
-        : `<div class="st-confirm"><span>${H(w('confirm_build'))}</span><button type="button" class="sm-btn primary" data-st-build>${H(w('build'))}</button></div>`}`;
+        : `<div class="st-confirm" data-tour="studio-build"><span>${H(w('confirm_build'))}</span><button type="button" class="sm-btn primary" data-st-build>${H(w('build'))}</button></div>`}`;
   }
   function measureHtml(doc){
     const ok = (doc.build_log || []).filter(b => b.status === 'ok');
@@ -337,7 +337,7 @@
     if (!panel) return;
     let box = panel.querySelector('.om-side');
     if (!box) {
-      box = document.createElement('nav'); box.className = 'om-side st-hub-nav'; panel.append(box);
+      box = document.createElement('nav'); box.className = 'om-side st-hub-nav'; box.id = 'studioHubNav'; panel.append(box);
       box.addEventListener('click', async ev => {
         const b = ev.target.closest('button');
         if (!b) return;
@@ -369,7 +369,8 @@
       <div class="om-side-label">${H(w('nav_work'))}</div>
       ${item('usecases', w('tab_uc'), (St.list || []).length || null)}${item('backlog', w('tab_backlog'), St.counts.backlog || null)}${item('playbooks', w('tab_pb'), St.counts.playbooks || null)}
       ${me.can_view ? `<div class="om-side-label">${H(w('nav_org'))}</div>${item('chart', w('nav_chart'))}${me.can_manage ? item('teams', w('nav_teams')) + item('mgmt', w('nav_mgmt')) : ''}` : ''}
-      ${rows.length ? `<div class="om-side-label">${H(w('nav_recent'))}</div>` + rows.map(r => `<button type="button" class="st-side-recent" data-st-side-open="${H(r.id)}" aria-current="${!!(St.doc && St.doc.id === r.id && sec === 'usecases')}"><span class="st-side-recent-title ${r.title ? '' : 'st-side-untitled'}">${H(r.title || w('untitled'))}</span><span class="om-side-count">${H(w('p_' + (r.phase || 'discover')))}</span></button>`).join('') : ''}`;
+      ${rows.length ? `<div class="om-side-label">${H(w('nav_recent'))}</div>` + rows.map(r => `<button type="button" class="st-side-recent" data-st-side-open="${H(r.id)}" aria-current="${!!(St.doc && St.doc.id === r.id && sec === 'usecases')}"><span class="st-side-recent-title ${r.title ? '' : 'st-side-untitled'}">${H(r.title || w('untitled'))}</span><span class="om-side-count">${H(w('p_' + (r.phase || 'discover')))}</span></button>`).join('') : ''}
+      <button type="button" class="st-side-help" data-help-guide="${sec === 'mgmt' ? 'management' : (sec === 'chart' || sec === 'teams') ? 'organisation' : 'studio'}">${H(w('nav_help'))}</button>`;
   }
   function render(){ if (St.doc) renderDoc(); else renderList(); renderSide(); }
 
