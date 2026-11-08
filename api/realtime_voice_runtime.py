@@ -32,6 +32,30 @@ TOOLS = [
 ]
 
 
+# Studio (api/studio.py): only offered in a use case's own live conversation
+# (api/realtime_voice._studio_tools). Calls go through the bridge with the
+# person's own cookie, so Studio applies its own ownership checks.
+STUDIO_TOOLS = [
+    {"type": "function", "name": "studio_capture",
+     "description": "Run a Studio step with what the person said: discover (goals, pain points, opportunities), design (the process as it is now and as it will be) or build_plan (the plan of parts to build). The Studio canvas updates on screen.",
+     "parameters": {"type": "object", "properties": {
+         "step": {"type": "string", "enum": ["discover", "design", "build_plan"]},
+         "input": {"type": "string", "description": "The person's own words for this step."}},
+         "required": ["step", "input"], "additionalProperties": False}},
+    {"type": "function", "name": "studio_choose",
+     "description": "Choose one opportunity of the use case (by its id, e.g. o2) to work out next.",
+     "parameters": {"type": "object", "properties": {"opportunity_id": {"type": "string"}},
+                    "required": ["opportunity_id"], "additionalProperties": False}},
+    {"type": "function", "name": "studio_show",
+     "description": "Show a Studio phase on screen, or switch the opportunities between matrix and tree.",
+     "parameters": {"type": "object", "properties": {
+         "phase": {"type": "string", "enum": ["discover", "design", "playbook", "build", "measure"]},
+         "view": {"type": "string", "enum": ["matrix", "tree"]}},
+         "additionalProperties": False}},
+]
+STUDIO_TOOL_NAMES = {tool["name"] for tool in STUDIO_TOOLS}
+
+
 def actor_for(handler):
     from api.governance.enforce import _request_identity
     identity = _request_identity(handler) or {}
@@ -118,6 +142,30 @@ class LoopbackBridge:
         if not isinstance(result, dict) or result.get("error") or result.get("ok") is False:
             raise RuntimeError("The requested work could not be started or inspected")
         return result
+
+    def studio(self, method, path, body=None, timeout=240):
+        """Studio calls for the live voice tools; model steps can take minutes."""
+        if not path.startswith("/api/studio/"):
+            raise ValueError("Invalid studio route")
+        with requests.Session() as client:
+            client.trust_env = False
+            if self.tls_cert:
+                client.mount(self.base + "/", _PinnedLoopbackTLSAdapter(self.tls_context, self.tls_fingerprint))
+            response = client.request(method, self.base + path, headers=self.headers, json=body, timeout=timeout,
+                                      allow_redirects=False, verify=self.tls_cert or True)
+        if response.status_code in {401, 403, 404}:
+            raise PermissionError("Studio is not accessible")
+        result = response.json() if response.content else {}
+        if response.status_code != 200 or not isinstance(result, dict) or result.get("error"):
+            raise RuntimeError(str((result or {}).get("error") or "Studio step failed")[:200])
+        return result
+
+    def studio_use_case(self):
+        rows = self.studio("GET", "/api/studio/usecases").get("usecases") or []
+        match = next((r for r in rows if r.get("voice_session") == self.session_id and r.get("owner") == self.actor), None)
+        if not match:
+            raise PermissionError("This conversation has no Studio use case")
+        return match["id"]
 
     def check(self):
         if actor_for(self.identity_handler) != self.actor or not voice_access(self.identity_handler):
@@ -353,6 +401,44 @@ class VoiceController:
                 self.persist()
         self.respond_when_idle()
 
+    def _studio_tool(self, name, args):
+        uc_id = self.bridge.studio_use_case()
+        if name == "studio_capture":
+            if set(args) != {"step", "input"} or args["step"] not in {"discover", "design", "build_plan"}:
+                raise ValueError("Invalid studio request")
+            text = args["input"]
+            if not isinstance(text, str) or not text.strip() or len(text) > 6000:
+                raise ValueError("Say what to capture in 1 to 6000 characters")
+            step = "playbook" if args["step"] == "build_plan" else args["step"]
+            if step != "discover":
+                self.bridge.studio("POST", "/api/studio/usecase", {"id": uc_id, "phase": "design" if step == "design" else "playbook"}, timeout=20)
+            doc = self.bridge.studio("POST", "/api/studio/step", {"id": uc_id, "step": step, "input": text.strip()})
+            if step == "discover":
+                return {"shown": "opportunities", "goals": [g.get("name") for g in doc.get("goals") or []],
+                        "opportunities": [{"id": o.get("id"), "title": o.get("title"), "impact": o.get("impact"),
+                                           "effort": o.get("effort")} for o in doc.get("opportunities") or []]}
+            if step == "design":
+                return {"shown": "process", "to_be": [s.get("step") for s in (doc.get("process") or {}).get("to_be") or []]}
+            return {"shown": "build plan", "components": [c.get("name") for c in (doc.get("playbook") or {}).get("components") or []],
+                    "note": "Building happens when the person clicks Build on the screen."}
+        if name == "studio_choose":
+            if set(args) != {"opportunity_id"} or not isinstance(args["opportunity_id"], str):
+                raise ValueError("Invalid choice")
+            doc = self.bridge.studio("POST", "/api/studio/usecase", {"id": uc_id, "selected": args["opportunity_id"][:20], "phase": "design"}, timeout=20)
+            chosen = next((o for o in doc.get("opportunities") or [] if o.get("id") == doc.get("selected")), None)
+            if not chosen:
+                raise ValueError("Unknown opportunity")
+            return {"chosen": chosen.get("title"), "next": "Ask how the process runs now."}
+        if set(args) - {"phase", "view"}:
+            raise ValueError("Invalid show request")
+        body = {"id": uc_id}
+        if args.get("phase") in {"discover", "design", "playbook", "build", "measure"}:
+            body["phase"] = args["phase"]
+        if args.get("view") in {"matrix", "tree"}:
+            body["ui_view"] = args["view"]
+        doc = self.bridge.studio("POST", "/api/studio/usecase", body, timeout=20)
+        return {"phase": doc.get("phase"), "view": doc.get("ui_view") or "matrix"}
+
     def _tool(self, output):
         try:
             self.check()
@@ -382,6 +468,8 @@ class VoiceController:
                     with self.lock:
                         self.tasks[task_id].update(status="error", error="Work could not be started")
                     raise
+            elif output.get("name") in STUDIO_TOOL_NAMES:
+                result = self._studio_tool(output["name"], args)
             elif output.get("name") == "get_work_status":
                 if set(args) - {"session_id"}:
                     raise ValueError("Invalid status request")

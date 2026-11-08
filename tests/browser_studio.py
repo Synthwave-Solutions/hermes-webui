@@ -158,7 +158,7 @@ def main() -> int:
             # 1b. live talking through the realtime voice agent (stubbed: no microphone in headless)
             page.evaluate("""() => {
               window.__voice = {sid: null, stopped: false};
-              window.synPulseVoice = {d: {transcript: e => { window.__voice.orig = (window.__voice.orig || 0) + 1; }},
+              window.synPulseVoice = {d: {transcript: e => { window.__voice.orig = (window.__voice.orig || 0) + 1; }, tasks: () => {}},
                 async start(sid) { window.__voice.sid = sid; this.d.transcript([{role: 'user', text: 'Elke maandag bel ik facturen na'}, {role: 'assistant', text: 'Vertel meer'}]); },
                 stop() { window.__voice.stopped = true; }};
             }""")
@@ -167,16 +167,28 @@ def main() -> int:
             page.locator("[data-st-live]").click()
             page.wait_for_function("() => window.__voice.sid && /bel ik facturen/.test(document.querySelector('[data-st-send] textarea').value)", timeout=10000)
             assert page.evaluate("() => window.__voice.orig") == 1
+            # The voice agent's Studio tool changes the use case on the server: the canvas follows by itself.
+            uc_id = ctx.request.get("/api/studio/usecases").json()["usecases"][0]["id"]
+            assert ctx.request.post("/api/studio/step", data={"id": uc_id, "step": "discover", "input": "Elke maandag bel ik facturen na"}).ok
+            page.wait_for_selector(".st-matrix .st-dot", timeout=10000)
+            assert ctx.request.post("/api/studio/usecase", data={"id": uc_id, "ui_view": "tree"}).ok
+            page.wait_for_selector(".st-tree .st-tree-branch", timeout=10000)
+            page.evaluate("() => window.synPulseVoice.d.tasks([{task_id: 't1', title: 'Zoek voorbeelden van aanmaningen', status: 'running', session_id: 'abc123'}])")
+            page.wait_for_selector('.st-live-tasks [data-st-open-session="abc123"]', timeout=5000)
+            page.screenshot(path=str(art / "01c-live-canvas.png"), full_page=True)
             page.locator("[data-st-live]").click()
             assert page.evaluate("() => window.__voice.stopped") is True
+            page.locator('[data-st-oppview="matrix"]').click()
+            page.wait_for_selector(".st-matrix", timeout=5000)
             sid = page.evaluate("() => window.__voice.sid")
             sess = ctx.request.get("/api/session?session_id=" + sid).json()
             assert "Studio" in json.dumps(sess.get("session", sess))[:4000], str(sess)[:300]
-            ok("Live praten runs the realtime voice agent in a session of its own; what is said lands in the Studio")
+            ok("Live praten: what is said lands in the Studio; the voice agent's Studio tools fill the canvas live; started work shows with a link")
 
             # 2. discover
             page.locator("[data-st-send] textarea").fill("")
-            page.locator("[data-st-topic]").first.click()
+            if page.locator("[data-st-topic]").count():
+                page.locator("[data-st-topic]").first.click()
             page.locator("[data-st-send] textarea").fill("Elke maandag bel ik facturen na en schrijf ik aanmaningen, dat kost me twee uur.")
             page.locator("[data-st-send] button[type=submit]").click()
             page.wait_for_selector(".st-matrix .st-dot", timeout=20000)
@@ -342,7 +354,7 @@ def main() -> int:
             overflow = page.evaluate("() => document.querySelector('#mainStudio .om-wrap').scrollWidth - document.querySelector('#mainStudio .om-wrap').clientWidth")
             assert overflow <= 2, overflow
             ok("narrow layout without horizontal overflow")
-            assert fake.calls.count("AI-consultant") == 1 and fake.calls.count("uitvoerbaar Playbook") == 2, fake.calls
+            assert fake.calls.count("AI-consultant") == 2 and fake.calls.count("uitvoerbaar Playbook") == 2, fake.calls
             ours = [e for e in console_errors if "studio" in e.lower() or "SPStudio" in e]
             assert not ours, ours
             ok("no console errors from Studio")

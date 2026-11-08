@@ -88,3 +88,39 @@ def test_invalid_input_is_refused(env):
     doc = studio.update(owner, {})
     with pytest.raises(ValueError):
         studio.run_step(owner, {"id": doc["id"], "step": "launch"})
+
+
+def test_voice_gets_studio_tools_only_in_its_own_use_case(env):
+    from api import realtime_voice as rv
+    from api.realtime_voice_runtime import STUDIO_TOOL_NAMES, VoiceController
+
+    owner = _view(OWNER, env)
+    doc = studio.update(owner, {"title": "Debiteuren", "voice_session": "sess_voice_1"})
+    names = {t["name"] for t in rv.session_config(OWNER, "sess_voice_1")["tools"]}
+    assert STUDIO_TOOL_NAMES <= names
+    assert "Studio" in rv.session_config(OWNER, "sess_voice_1")["instructions"]
+    assert not (STUDIO_TOOL_NAMES & {t["name"] for t in rv.session_config(OTHER, "sess_voice_1")["tools"]})
+    assert not (STUDIO_TOOL_NAMES & {t["name"] for t in rv.session_config(OWNER, "other_session")["tools"]})
+
+    class Bridge:
+        actor, session_id = OWNER, "sess_voice_1"
+        def __init__(self):
+            self.calls = []
+        def studio_use_case(self):
+            return doc["id"]
+        def studio(self, method, path, body=None, timeout=240):
+            self.calls.append((path, body))
+            if path == "/api/studio/step":
+                return studio.run_step(owner, body)
+            return studio.update(owner, body)
+
+    ctl = VoiceController.__new__(VoiceController)
+    ctl.bridge = Bridge()
+    out = ctl._studio_tool("studio_capture", {"step": "discover", "input": "Ik bel facturen na"})
+    assert [o["id"] for o in out["opportunities"]] == ["o1", "o2"]
+    assert ctl._studio_tool("studio_choose", {"opportunity_id": "o1"})["chosen"] == "Wekelijkse aanmaningen"
+    assert ctl._studio_tool("studio_show", {"view": "tree"})["view"] == "tree"
+    out = ctl._studio_tool("studio_capture", {"step": "build_plan", "input": "maandag"})
+    assert "Taak" in " ".join(out["components"]) or out["components"]
+    with pytest.raises(ValueError):
+        ctl._studio_tool("studio_capture", {"step": "build", "input": "x"})

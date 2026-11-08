@@ -90,7 +90,7 @@ def list_for(view) -> list[dict]:
         except (OSError, ValueError):
             continue
         if _visible(view, doc):
-            rows.append({k: doc.get(k) for k in ("id", "title", "owner", "team", "phase", "updated_at", "created_at")}
+            rows.append({k: doc.get(k) for k in ("id", "title", "owner", "team", "phase", "updated_at", "created_at", "voice_session")}
                         | {"components": len(((doc.get("playbook") or {}).get("components") or [])),
                            "built": sum(1 for b in doc.get("build_log") or [] if b.get("status") == "ok")})
     return sorted(rows, key=lambda r: -(r.get("updated_at") or 0))
@@ -217,6 +217,8 @@ def update(view, body: dict) -> dict:
             if sid and not re.fullmatch(r"[A-Za-z0-9_-]{4,64}", sid):
                 raise ValueError("Invalid session")
             doc["voice_session"] = sid
+        if "ui_view" in body and body.get("ui_view") in ("matrix", "tree"):
+            doc["ui_view"] = body["ui_view"]
         if "selected" in body:
             doc["selected"] = _txt(body.get("selected"), 20)
         if "process" in body:
@@ -452,3 +454,17 @@ def handle_post(handler, parsed, body) -> bool:
         logger.exception("POST %s failed", path)
         j(handler, {"error": "internal_error"}, status=500)
     return True
+
+
+def for_voice_session(email: str, session_id: str) -> dict | None:
+    """The caller's own use case whose live conversation is ``session_id``."""
+    if not email or not session_id:
+        return None
+    for path in _dir().glob("uc_*.json"):
+        try:
+            doc = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if doc.get("voice_session") == session_id and doc.get("owner") == email:
+            return doc
+    return None

@@ -148,3 +148,9 @@ main.main.showing-studio>#mainStudio{display:flex;flex-direction:column;overflow
 
 .pb-file input[type=file]{display:none!important}
 .st-side-untitled{font-style:italic;color:var(--muted)}
+
+.st-live-tasks{border-top:1px solid var(--border);padding:4px 10px}
+.st-live-tasks .om-row{padding:6px 0}
+@keyframes stflash{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 45%,transparent)}100%{box-shadow:0 0 0 14px transparent}}
+.st-canvas.st-flash{animation:stflash .9s ease-out;border-radius:var(--sp-radius-lg)}
+@media (prefers-reduced-motion:reduce){.st-canvas.st-flash{animation:none}}

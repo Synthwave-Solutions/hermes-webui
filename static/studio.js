@@ -29,7 +29,7 @@
     goals: 'Doelen', opps: 'Kansen', impact: 'Impact', effort: 'Moeite', choose: 'Kies', chosen: 'Gekozen',
     quick_win: 'Snel resultaat', next_design: 'Verder naar inrichten', next_playbook: 'Maak het bouwplan', next_build: 'Droogrun',
     as_is: 'Zoals het nu gaat', to_be: 'Zoals het wordt', metrics: 'Succesmetingen', reuse: 'Bestaat al',
-    a_bot: 'Nieuwe bot, alleen voor jou zichtbaar, werkt voor het team', instructions: 'Instructies', live: 'Live praten', live_stop: 'Stop live', live_on: 'Live gesprek met de Super Agent: wat je zegt komt hieronder in het tekstvak.', conn_ok: 'Al verbonden', conn_req: 'Aangevraagd bij beheer', conn_none: 'Niet in de catalogus; vraag het aan via Verbindingen',
+    a_bot: 'Nieuwe bot, alleen voor jou zichtbaar, werkt voor het team', instructions: 'Instructies', live: 'Live praten', live_stop: 'Stop live', live_on: 'Live gesprek met de Super Agent: hij vult het werkvlak terwijl je praat. Wat je zegt komt ook in het tekstvak.', open_work: 'Open werk', conn_ok: 'Al verbonden', conn_req: 'Aangevraagd bij beheer', conn_none: 'Niet in de catalogus; vraag het aan via Verbindingen',
     b_task: 'Geplande taak', b_skill: 'Skill', b_bot: 'Bot', b_human: 'Blijft mens', b_connection: 'Koppeling', b_custom: 'Maatwerk',
     include: 'Meenemen', name: 'Naam', schedule: 'Ritme (cron)', prompt: 'Opdracht', before: 'Min. eerst', now: 'Min. nu', per: 'Per',
     per_run: 'keer', per_day: 'dag', per_week: 'week', description: 'Beschrijving', content: 'Werkwijze', who: 'Wie', what: 'Wat',
@@ -63,7 +63,7 @@
     goals: 'Goals', opps: 'Opportunities', impact: 'Impact', effort: 'Effort', choose: 'Choose', chosen: 'Chosen',
     quick_win: 'Quick win', next_design: 'Continue to design', next_playbook: 'Make the build plan', next_build: 'Dry run',
     as_is: 'As it is', to_be: 'As it will be', metrics: 'Success measures', reuse: 'Already exists',
-    a_bot: 'New bot, visible to you only, works for the team', instructions: 'Instructions', live: 'Talk live', live_stop: 'Stop live', live_on: 'Live conversation with the Super Agent: what you say lands in the text box below.', conn_ok: 'Already connected', conn_req: 'Requested from admins', conn_none: 'Not in the catalogue; request it in Connections',
+    a_bot: 'New bot, visible to you only, works for the team', instructions: 'Instructions', live: 'Talk live', live_stop: 'Stop live', live_on: 'Live conversation with the Super Agent: it fills the canvas while you talk. What you say also lands in the text box.', open_work: 'Open work', conn_ok: 'Already connected', conn_req: 'Requested from admins', conn_none: 'Not in the catalogue; request it in Connections',
     b_task: 'Scheduled task', b_skill: 'Skill', b_bot: 'Bot', b_human: 'Stays human', b_connection: 'Connection', b_custom: 'Custom',
     include: 'Include', name: 'Name', schedule: 'Rhythm (cron)', prompt: 'Instruction', before: 'Min. before', now: 'Min. now', per: 'Per',
     per_run: 'run', per_day: 'day', per_week: 'week', description: 'Description', content: 'Way of working', who: 'Who', what: 'What',
@@ -105,7 +105,7 @@
     catch (e) { St.list = []; toast(errMsg(e)); }
   }
   async function open(id){
-    try { St.doc = await call('/api/studio/usecase?id=' + encodeURIComponent(id)); St.draft = ''; }
+    try { St.doc = await call('/api/studio/usecase?id=' + encodeURIComponent(id)); St.draft = ''; if (St.doc.ui_view) St.oppView = St.doc.ui_view; }
     catch (e) { toast(errMsg(e)); St.doc = null; }
     render();
   }
@@ -117,9 +117,10 @@
   async function step(name, input){
     if (St.busy) return;
     St.busy = true; render();
-    try { St.doc = await post('/api/studio/step', { id: St.doc.id, step: name, input: input || '' }); St.draft = ''; }
+    try { St.doc = await post('/api/studio/step', { id: St.doc.id, step: name, input: input || '' }); St.draft = ''; if (St.doc.ui_view) St.oppView = St.doc.ui_view; }
     catch (e) { toast(errMsg(e)); }
     finally { St.busy = false; render(); }
+    await loadList(); renderSide();
   }
 
   // ── Landing ────────────────────────────────────────────────────────────────
@@ -158,6 +159,7 @@
     return `<section class="st-conv" aria-label="${H(w('conv'))}">
       <div class="st-notes" aria-live="polite">${notes.map(n => `<div class="st-note ${n.role}">${H(n.text)}</div>`).join('')}${St.busy ? `<div class="st-note agent st-thinking">${H(w('thinking'))}</div>` : ''}</div>
       ${St.live ? `<p class="om-small st-live-note">${H(w('live_on'))}</p>` : ''}
+      ${St.live && St.live.tasks.length ? `<div class="st-live-tasks">${St.live.tasks.map(tk => `<div class="om-row"><span class="om-dot ${tk.status === 'done' ? 'ok' : tk.status === 'error' ? 'error' : 'new'}"></span><div class="om-row-main"><div class="om-row-title">${H(tk.title || '')}</div><div class="om-row-sub">${H(tk.status || '')}</div></div>${tk.session_id ? `<button type="button" class="sm-btn" data-st-open-session="${H(tk.session_id)}">${H(w('open_work'))}</button>` : ''}</div>`).join('')}</div>` : ''}
       ${canSend ? `<form class="st-compose" data-st-send>
         <textarea name="input" rows="4" placeholder="${H(w(ph))}" aria-label="${H(w(ph))}">${H(St.draft)}</textarea>
         <div class="st-compose-actions">
@@ -411,7 +413,29 @@
       if (typeof switchPanel === 'function') await switchPanel('studio');
     }
     const original = voice.d.transcript;
-    St.live = { original, base, previous };
+    const originalTasks = voice.d.tasks;
+    St.live = { original, originalTasks, base, previous, tasks: [], seen: St.doc.updated_at };
+    voice.d.tasks = (tasks, controller) => {
+      try { if (originalTasks) originalTasks(tasks, controller); } catch (_e) {}
+      if (St.live) { St.live.tasks = (tasks || []).slice(-6); render(); }
+    };
+    // The voice agent's Studio tools change the use case on the server; follow along.
+    St.live.poll = setInterval(async () => {
+      if (!St.live || !St.doc) return;
+      try {
+        const fresh = await call('/api/studio/usecase?id=' + encodeURIComponent(St.doc.id));
+        if (fresh.updated_at !== St.live.seen) {
+          St.live.seen = fresh.updated_at;
+          if (fresh.title !== St.doc.title) loadList().then(renderSide).catch(() => {});
+          const draft = St.draft;
+          St.doc = fresh; St.draft = draft;
+          if (fresh.ui_view) St.oppView = fresh.ui_view;
+          render();
+          const canvas = root() && root().querySelector('.st-canvas');
+          if (canvas) { canvas.classList.remove('st-flash'); void canvas.offsetWidth; canvas.classList.add('st-flash'); }
+        }
+      } catch (_e) {}
+    }, 2500);
     voice.d.transcript = entries => {
       try { if (original) original(entries); } catch (_e) {}
       const said = (entries || []).filter(e => e.role === 'user').map(e => e.text).join(' ').trim();
@@ -425,7 +449,8 @@
   async function stopLive(){
     const voice = window.synPulseVoice;
     const previous = St.live && St.live.previous;
-    if (voice && St.live) { voice.d.transcript = St.live.original; try { voice.stop(); } catch (_e) {} }
+    if (St.live) clearInterval(St.live.poll);
+    if (voice && St.live) { voice.d.transcript = St.live.original; voice.d.tasks = St.live.originalTasks; try { voice.stop(); } catch (_e) {} }
     St.live = null; render();
     if (previous && typeof loadSession === 'function') {
       try { await loadSession(previous); } catch (_e) {}
@@ -467,7 +492,7 @@
       const b = ev.target.closest('button');
       if (!b) return;
       if (b.dataset.stTab) { St.tab = b.dataset.stTab; St.doc = null; if (St.tab === 'usecases') await loadList(); render(); return; }
-      if (b.dataset.stOppview) { St.oppView = b.dataset.stOppview; render(); return; }
+      if (b.dataset.stOppview) { St.oppView = b.dataset.stOppview; render(); if (St.doc) await save({ ui_view: St.oppView }, true); return; }
       if (b.dataset.stBacklog || b.hasAttribute('data-st-backlog-all')) {
         const opps = (St.doc.opportunities || []).filter(o => b.dataset.stBacklog ? o.id === b.dataset.stBacklog : !St.backlogged.has(St.doc.id + ':' + o.id));
         for (const o of opps) {
@@ -501,6 +526,7 @@
       if (b.hasAttribute('data-st-build')) { if (!St.building) await runBuild(); return; }
       if (b.hasAttribute('data-st-mic')) { dictate(); return; }
       if (b.hasAttribute('data-st-live')) { await toggleLive(); return; }
+      if (b.dataset.stOpenSession) { if (typeof switchPanel === 'function') await switchPanel('chat'); if (typeof loadSession === 'function') await loadSession(b.dataset.stOpenSession); return; }
       if (b.hasAttribute('data-st-chat')) {
         const summary = (St.doc.notes || []).filter(n => n.role === 'user').map(n => n.text).join(' ').slice(0, 600);
         if (typeof switchPanel === 'function') await switchPanel('chat');
