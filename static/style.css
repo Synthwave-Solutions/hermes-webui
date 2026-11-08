@@ -8919,3 +8919,9 @@ html:not([data-nav-audience="admin"]) #staleClientVersions{display:none!importan
   #hwxExportBtn{min-width:44px;min-height:44px}
   #profileChip{display:none!important}
 }
+/* Mobile settings: token, threshold and cost lines are for admins. */
+html:not([data-nav-audience="admin"]) #composerMobileContextTokens,
+html:not([data-nav-audience="admin"]) #composerMobileContextThreshold,
+html:not([data-nav-audience="admin"]) #composerMobileContextCost{display:none!important}
+#chatBotRoster[hidden]{display:none!important}
+@media (max-width:640px){.chat-mode-header button{min-height:44px}}

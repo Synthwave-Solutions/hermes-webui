@@ -602,7 +602,7 @@
       missing.forEach(function(x){
         var li = h('li');
         li.appendChild(h('span', 'k-item-name', x.p.n + '. ' + x.p.name));
-        var meta = [x.p.address, x.later ? T('later') : ''].filter(Boolean).join(' · ');
+        var meta = [addrAfterName(x.p.name, x.p.address), x.later ? T('later') : ''].filter(Boolean).join(' · ');
         if(meta) li.appendChild(h('span', 'k-item-meta', meta));
         ul.appendChild(li);
       });
@@ -724,7 +724,7 @@
         // Pins stand above their point: leave room for them at the top.
         var fit = function(){
           if(onMap.length === 1) map.setView(onMap[0].ll, 15, {animate:false});
-          else map.fitBounds(L.latLngBounds(onMap.map(function(x){ return x.ll; })), {paddingTopLeft:[28, 46], paddingBottomRight:[28, 18], maxZoom:15, animate:false});
+          else map.fitBounds(L.latLngBounds(onMap.map(function(x){ return x.ll; })), {paddingTopLeft:[48, 64], paddingBottomRight:[48, 36], maxZoom:15, animate:false});
         };
         fit();
         var userMoved = false, refit = 0;
@@ -778,7 +778,7 @@
         pill.append(arrow, document.createTextNode(K.kpiDeltaText(it, LANG)), h('span', 'k-sr', ', ' + T(tone === 'good' ? 'good' : tone === 'bad' ? 'bad' : 'flat')));
         meta.appendChild(pill);
       }
-      if(it.note && !noteRepeatsTarget(it.note, it.target, it.value)) meta.appendChild(h('span', 'k-kpi-note', LANG === 'nl' ? String(it.note).replace(/(\d[\d.,]*)\s*(euro|eur)\b/gi, '€ $1') : it.note));
+      if(it.note && !noteRepeatsTarget(it.note, it.target, it.value)) meta.appendChild(h('span', 'k-kpi-note', LANG === 'nl' ? String(it.note).replace(/(\d[\d.,]*)\s*(euro|eur)\b/gi, '€ $1').replace(/€\s*(?=[-\d])/g, '€\u00a0') : it.note));
       if(meta.childNodes.length) tile.appendChild(meta);
       if(it.target !== null){
         var target = h('div', 'k-target' + (it.over ? ' is-over' : it.met ? ' is-met' : ''));
@@ -820,6 +820,12 @@
       s.append(sw, document.createTextNode(K.statusWord(st, LANG)));
       legend.appendChild(s);
     });
+    // On a phone the today line has no label of its own: name it once.
+    if(axis.todayX !== null){
+      var nowKey = h('span', 'k-tl-key k-tl-now-key'), nowSw = h('span', 'k-tl-swatch is-today');
+      nowKey.append(nowSw, document.createTextNode(T('today')));
+      legend.appendChild(nowKey);
+    }
     if(legend.childNodes.length) wrap.appendChild(legend);
 
     var chart = h('div', 'k-tl-chart');

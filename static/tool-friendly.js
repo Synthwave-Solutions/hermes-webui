@@ -25,7 +25,7 @@
   const COPY={
     nl:{
       steps:'Werkstappen', running:'Bezig', done:'Klaar', failed:'Mislukt', stopped:'Gestopt', details:'Details',
-      last_seen:'Laatst gezien: bezig', queued:'In de wachtrij', subagent:'Helper', subagents:'Teamwerk',
+      last_seen:'Laatst gezien: bezig', queued:'In de wachtrij', subagent:'Collega', subagents:'Teamwerk',
       tools_one:'1 stap', tools_many:'{n} stappen', subagents_title:'Teamwerk', subagents_empty:'Nog geen activiteit',
       subagents_more:'Toon alle stappen', step_more:'{n} eerdere stappen niet bewaard',
       processed:'Verwerkt', processed_in:'Verwerkt in {d}', working:'Bezig', now:'nu', open_thread:'Bekijk het volledige gesprek',
@@ -79,7 +79,7 @@
     handoff:   ['↪','Doorgeven','Doorgegeven','Niet doorgegeven','Handing over','Handed over','Not handed over'],
     opencode:  ['🧑‍💻','Programmeerklus loopt','Programmeerklus klaar','Programmeerklus mislukt','Coding job running','Coding job done','Coding job failed'],
     mail:      ['✉️','Mail bezig','Mail afgehandeld','Mailactie mislukt','Working on mail','Mail handled','Mail action failed'],
-    calendar:  ['📅','Agenda bekijken','Agenda bekeken','Agendaactie mislukt','Checking the calendar','Checked the calendar','Calendar action failed'],
+    calendar:  ['📅','Agenda bekijken','Agenda bekeken','Agenda-actie mislukt','Checking the calendar','Checked the calendar','Calendar action failed'],
     drive:     ['📁','Documenten openen','Documenten bekeken','Documentactie mislukt','Opening documents','Checked documents','Document action failed'],
     notion:    ['📝','Notion bekijken','Notion gebruikt','Notion-actie mislukt','Working in Notion','Used Notion','Notion action failed'],
     crm:       ['📇','Klantgegevens bekijken','Klantgegevens bekeken','Klantgegevens niet gelukt','Checking customer data','Checked customer data','Customer data failed'],
@@ -202,8 +202,19 @@
     if(worker) return (l==='nl'?'Werk uitbesteed aan ':'Handed work to ')+worker;
     for(const [re,label] of SHELL_RULES){ if(re.test(cmd)) return label[l]||label.en; }
     const prog=basename(String(cmd).trim().replace(/^(sudo|env|time|nohup)\s+/,'').split(/\s+/)[0]||'');
-    if(!prog||/[=$`"'(]/.test(prog)) return '';
-    return (l==='nl'?'Met ':'With ')+clip(prog,24);
+    // Program names mean nothing to most users: no target then.
+    return '';
+  }
+
+  // API verbs ("list_events", "search_threads") as one plain word, or nothing.
+  const VERBS=[[/search|find|query|lookup/,'Gezocht','Searched'],[/list|get_all|browse/,'Overzicht bekeken','Listed'],
+    [/get|read|fetch|retrieve|download|view|show/,'Bekeken','Looked up'],[/create|add|insert|new|upload/,'Aangemaakt','Created'],
+    [/update|patch|edit|modify|move|rename|label/,'Bijgewerkt','Updated'],[/delete|remove|trash|archive/,'Verwijderd','Removed'],
+    [/send|reply|forward|post/,'Verstuurd','Sent'],[/draft/,'Concept gemaakt','Drafted'],[/schedule|book/,'Ingepland','Scheduled']];
+  function plainVerb(word){
+    const w=String(word||'').toLowerCase();
+    const hit=VERBS.find(([re])=>re.test(w));
+    return hit?hit[lang()==='nl'?1:2]:'';
   }
 
   function target(tc, fam){
@@ -233,7 +244,7 @@
         const action=String(tc&&tc.name||'').replace(/^browser_?/i,'');
         const map={navigate:['Pagina geopend','Opened a page'],click:['Geklikt','Clicked'],type:['Tekst getypt','Typed text'],snapshot:['Pagina bekeken','Looked at the page'],screenshot:['Schermafbeelding gemaakt','Took a screenshot'],scroll:['Gescrold','Scrolled'],back:['Terug gegaan','Went back'],press:['Toets ingedrukt','Pressed a key']};
         const hit=Object.keys(map).find(k=>action.toLowerCase().includes(k));
-        return hit?map[hit][l==='nl'?0:1]:clip(words(action),32);
+        return hit?map[hit][l==='nl'?0:1]:'';
       }
       case 'delegate': {
         let n=0;
@@ -241,9 +252,9 @@
         else if(typeof a.tasks==='string'){ const m=a.tasks.match(/['"]goal['"]\s*:/g); n=m?m.length:0; }
         if(!n&&(a.goal||a.task)) n=1;
         if(a.action==='steer') return l==='nl'?'Bijsturing gestuurd':'Sent guidance';
-        if(a.action==='stop') return l==='nl'?'Subagent gestopt':'Stopped a subagent';
-        if(a.action==='list') return l==='nl'?'Subagents bekeken':'Checked subagents';
-        return n?(n===1?(l==='nl'?'1 subagent':'1 subagent'):n+' subagents'):'';
+        if(a.action==='stop') return l==='nl'?'Collega gestopt':'Stopped a helper';
+        if(a.action==='list') return l==='nl'?'Collega\'s bekeken':'Checked helpers';
+        return n?(n===1?(l==='nl'?'1 collega':'1 helper'):(l==='nl'?n+' collega\'s':n+' helpers')):'';
       }
       case 'subagent': {
         const idx=Number(a.task_index)||0, cnt=Number(a.task_count)||0;
@@ -253,19 +264,18 @@
       }
       case 'handoff': { const h=handoffInfo(tc); return h.kind==='queued'?clip(h.task,72):''; }
       case 'opencode': return clip(firstString(a,['title','task','goal','prompt']),56);
-      case 'skill': return clip(firstString(a,['name','skill']),40);
+      case 'skill': return '';
       case 'memory': {
         const act=String(a.action||'').toLowerCase();
         if(act==='add'||act==='replace') return l==='nl'?'Opgeslagen':'Saved';
         if(act==='remove') return l==='nl'?'Verwijderd':'Removed';
         return '';
       }
-      case 'process': return clip(words(a.action||''),24);
+      case 'process': return plainVerb(a.action||'');
       case 'schedule': return clip(firstString(a,['name','schedule']),40);
       case 'mail': case 'calendar': case 'drive': case 'notion': case 'crm': case 'tools': case 'unknown': {
         const mcp=mcpParts(tc&&tc.name);
-        if(mcp) return clip(words(mcp.tool||mcp.server),40);
-        return fam==='unknown'?clip(words(tc&&tc.name),40):'';
+        return plainVerb(mcp?(mcp.tool||''):(tc&&tc.name||''));
       }
       default: return '';
     }
@@ -291,7 +301,7 @@
     const nl=lang()==='nl';
     const titleIdx=st==='failed'?3:(st==='running'||st==='queued'||st==='last_seen'?1:2);
     let title=row[titleIdx+(nl?0:3)];
-    if(fam==='subagent'&&st==='stopped') title=nl?'Helper gestopt':'Helper stopped';
+    if(fam==='subagent'&&st==='stopped') title=nl?'Collega gestopt':'Helper stopped';
     const mcp=mcpParts(tc&&tc.name);
     const out={
       family:fam, emoji:row[0], title, target:target(tc,fam), state:st,

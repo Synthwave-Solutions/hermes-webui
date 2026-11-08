@@ -39,7 +39,10 @@ for(const lang of ['nl','en']){
   }
   assert.equal(ft.describe(rows[1]).target,'README.md');
   assert.equal(ft.describe(rows[5]).target,'example.com');
-  assert.equal(ft.describe(rows[6]).target,'2 subagents');
+  assert.equal(ft.describe(rows[6]).target,lang==='nl'?"2 collega's":'2 helpers');
+  // API verbs become one plain word, never the raw tool name.
+  assert.equal(ft.describe(rows[8]).target,lang==='nl'?'Gezocht':'Searched');
+  assert.equal(ft.describe(rows[9]).target,lang==='nl'?'Overzicht bekeken':'Listed');
 }
 
 ft.setLanguage('nl');

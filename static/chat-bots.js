@@ -510,6 +510,9 @@
     const items = document.createElement('div'); items.id = 'chatBotRosterItems'; items.className = 'chat-bot-roster-items'; items.hidden = !!collapsed(); bar.appendChild(items);
     const session = S.session || {}, group = (session.bot_participants || []).length > 0;
     const rows = available(profiles, session);
+    // On a phone a one-to-one chat has no row at all: the titlebar switches bots.
+    const phone = !!(window.matchMedia && window.matchMedia('(max-width:640px)').matches);
+    bar.hidden = phone && (session.bot_participants || []).length < 2;
     const route = group ? currentRoute() : null;
     const busyBot = group ? (workingState(session.session_id) || {}).bot : null;
     const manage = group && (session.bot_participants || []).length > 1 && canManageDefault(session);
