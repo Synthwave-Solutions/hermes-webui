@@ -159,12 +159,20 @@
   function table(spec){
     var en = spec.lang === 'en';
     var what = spec.format === 'currency' ? (en ? 'Value' : 'Waarde') : spec.format === 'percent' ? (en ? 'Share' : 'Aandeel') : (en ? 'Count' : 'Aantal');
-    var header = en ? [what, 'From previous', 'From start'] : [what, 'Conversie vanaf vorige', 'Conversie vanaf begin'];
+    // Exported as the block shows it: percentages rounded, estimates marked.
+    var header = en ? [what, 'From previous (%)', 'From start (%)'] : [what, 'Conversie vanaf vorige (%)', 'Conversie vanaf begin (%)'];
     header.unshift(en ? 'Stage' : 'Fase');
-    var types = ['text', spec.format, 'percent', 'percent'];
+    var types = ['text', spec.format, 'number', 'number'];
+    var anyRough = spec.stages.some(function(s){ return s.rough; });
+    var ROUGHW = en ? {ca:'about', gt:'more than', lt:'less than'} : {ca:'ca.', gt:'meer dan', lt:'minder dan'};
+    if(anyRough){ header.push(en ? 'Estimate' : 'Schatting'); types.push('text'); }
     if(spec.compare){ header.push(en ? 'Previous period' : 'Vorige periode'); types.push(spec.format); }
-    return {header:header, types:types, rows:spec.stages.map(function(s){
-      var r = [s.label, s.value, s.conv, s.fromStart];
+    // Whole percents from estimates; otherwise one decimal, and two significant digits below 1%.
+    var r1 = function(v, rough){ if(v === null || v === undefined) return null; if(rough) return Math.round(v); return v > 0 && v < 1 ? Number(v.toPrecision(2)) : Math.round(v * 10) / 10; };
+    return {header:header, types:types, rows:spec.stages.map(function(s, i){
+      var rp = !!(s.rough || (i && spec.stages[i - 1].rough)), rs = !!(s.rough || spec.stages[0].rough);
+      var r = [s.label, s.value, r1(s.conv, rp), r1(s.fromStart, rs)];
+      if(anyRough) r.push(s.rough ? ROUGHW[s.rough] : '');
       if(spec.compare) r.push(s.prev);
       return r;
     })};

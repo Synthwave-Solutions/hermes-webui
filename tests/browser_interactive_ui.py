@@ -970,11 +970,20 @@ def main() -> int:
             assert visible_buttons == 2, visible_buttons
             assert page.locator(".iui-card:visible .iui-foot").count() == 0
             assert page.locator(".iui-card:visible .iui-status:visible").count() == 0, "no status label once ready"
+            # The code view is for admins: members do not see the developer part of the menu.
+            aud = page.evaluate("() => document.documentElement.getAttribute('data-nav-audience')")
+            if aud != "admin":
+                page.locator(".iui-card:visible .iui-actions button[aria-haspopup=menu]").first.click()
+                assert page.locator(".iui-card:visible .iui-menu:not([hidden]) .iui-menu-dev:visible").count() == 0, "developer items are for admins"
+                page.keyboard.press("Escape")
+                page.evaluate("() => document.documentElement.setAttribute('data-nav-audience', 'admin')")
             menu_action(page, "Code bekijken", "View code")
             assert page.is_visible(".iui-card:visible .iui-source"), "source view did not open"
             assert "<style>" in page.inner_text(".iui-card:visible .iui-source")
             menu_action(page, "Code verbergen", "Hide code")
             assert not page.is_visible(".iui-card:visible .iui-source")
+            if aud != "admin":
+                page.evaluate(f"() => document.documentElement.setAttribute('data-nav-audience', {json.dumps(aud or '')})")
             ok("calm header (title, full screen, menu); source view lives in the menu")
             # 3b. full screen, closed with Escape pressed inside the frame
             page.locator(".iui-card:visible .iui-actions > button:not([aria-haspopup])").first.click()
@@ -1123,8 +1132,15 @@ def main() -> int:
                 print("reload state:", info, flush=True)
             page.wait_for_selector(".iui-card", timeout=45000)
             page.wait_for_function("() => document.querySelectorAll('.iui-card').length >= 2", timeout=45000)
-            page.locator(".iui-card:visible").first.scroll_into_view_if_needed()
-            page.wait_for_selector(".iui-card[data-state=ready]:visible", timeout=45000)
+            # Cards mount when they come into view: bring each one in until one has drawn.
+            deadline = time.time() + 60
+            while time.time() < deadline and page.locator(".iui-card[data-state=ready]:visible").count() == 0:
+                for i in range(page.locator(".iui-card:visible").count()):
+                    page.locator(".iui-card:visible").nth(i).scroll_into_view_if_needed()
+                    time.sleep(0.8)
+                    if page.locator(".iui-card[data-state=ready]:visible").count():
+                        break
+            page.wait_for_selector(".iui-card[data-state=ready]:visible", timeout=10000)
             ok(f"after reload {page.locator('.iui-card').count()} cards render again from the transcript")
 
             # 9. narrow layout

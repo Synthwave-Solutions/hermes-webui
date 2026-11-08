@@ -913,7 +913,7 @@
       var parts = [nd.label, nd.type === 'step' ? '' : typeWord(nd.type, LANG), nd.owner, nd.note, next.length ? T.next + ': ' + next.join('; ') : ''];
       detail.textContent = parts.filter(Boolean).join(' · ');
       detail.classList.add('is-set');
-      if(ctx.reveal && !quiet) ctx.reveal(detail);
+      if(ctx.reveal && !quiet) ctx.reveal(detail, nodeEls[i]);
       if(!quiet) ctx.save({a:i});
       ctx.resize();
     }

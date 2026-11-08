@@ -180,15 +180,19 @@
     resize: function(){ scheduleHeight(true); },
     copy: function(text){ api.copy(text); },
     // On a phone, ask the chat to scroll so this element (a details line) is in view.
-    reveal: function(el){ revealEl(el); }
+    reveal: function(el, from){ revealEl(el, from); }
   };
-  function revealEl(el){
+  // from: the tapped element; it must stay in view while the details come up.
+  function revealEl(el, from){
     if(standalone || !el || (window.innerWidth || 0) >= 640) return;
     setTimeout(function(){
       // A frame taller than the chat allows scrolls inside itself first (only the frame, never the chat).
       var r = el.getBoundingClientRect(), vh = window.innerHeight || 0;
-      if(vh && r.bottom > vh){ window.scrollBy(0, r.bottom - vh + 8); r = el.getBoundingClientRect(); }
-      post({type:'reveal', y:Math.round(r.bottom + 8)});
+      var ft = from && from.getBoundingClientRect ? from.getBoundingClientRect().top : null;
+      if(vh && r.bottom > vh){ var by = r.bottom - vh + 8; if(ft !== null) by = Math.min(by, Math.max(0, ft - 8)); window.scrollBy(0, by); r = el.getBoundingClientRect(); if(ft !== null) ft = from.getBoundingClientRect().top; }
+      var msg = {type:'reveal', y:Math.round(r.bottom + 8)};
+      if(ft !== null) msg.from = Math.round(ft);
+      post(msg);
     }, 60);
   }
 
@@ -376,7 +380,7 @@
     var canvasBox = h('div', 'k-canvas');
     canvasBox.style.height = spec.height + 'px';
     // Lying bars on a phone need room per name.
-    if(spec.type === 'bar' && (box.clientWidth || window.innerWidth) < 480 && spec.labels.length > 4) canvasBox.style.height = Math.max(spec.height, 60 + spec.labels.length * 40) + 'px';
+    if((spec.type === 'bar' || spec.type === 'stacked' || spec.type === 'hbar') && (box.clientWidth || window.innerWidth) < 480 && spec.labels.length > 4) canvasBox.style.height = Math.max(spec.height, 60 + spec.labels.length * 40) + 'px';
     // A radar on a phone follows the width, so the shape is not lost in empty space.
     if(spec.type === 'radar'){ var bw = box.clientWidth || window.innerWidth; if(bw < 480) canvasBox.style.height = Math.max(260, Math.round(bw * 0.86)) + 'px'; }
     var canvas = h('canvas');
@@ -407,7 +411,8 @@
       // On a phone, many or long category names read better as lying bars.
       var narrowC = (box.clientWidth || window.innerWidth) < 480;
       var timeLike = spec.labels.every(function(l){ return /^(\d{4}([-\/]\d{1,2})?|q[1-4]|[a-z]{3}\.?|week \d+|wk \d+|\d{1,2}[-\/]\d{1,2})$/i.test(String(l).trim()); });
-      var autoH = narrowC && spec.type === 'bar' && !timeLike && (spec.labels.length > 4 || spec.labels.some(function(l){ return String(l).length > 10; }));
+      var autoH = narrowC && (spec.type === 'bar' || spec.type === 'stacked') && !timeLike && (spec.labels.length > 4 || spec.labels.some(function(l){ return String(l).length > 10; }));
+      var lineLike = spec.type === 'line' || spec.type === 'area';
       var radar = kind === 'radar';
       var datasets = spec.series.map(function(s, i){
         var color = hl ? (hlSeries ? (s.name === hl ? c.accent : c.muted) : c.pal[i % 8]) : c.pal[i % 8];
@@ -438,8 +443,9 @@
       // The goal line always falls inside the chart.
       if(spec.target && Number.isFinite(spec.target.value)) valueAxis.suggestedMax = spec.target.value * 1.06;
       // Named categories are never skipped on a phone: they wrap instead (dates and months may skip).
-      var catTicks = {color:t.muted, autoSkip:timeLike, maxRotation:0, font:{size:narrowC ? 10.5 : 12}};
-      if(!timeLike) catTicks.callback = function(v, i){ var l = this.getLabelForValue ? this.getLabelForValue(v) : spec.labels[i]; return wrapLabel(l, narrowC ? (horizontal ? 14 : 9) : 16); };
+      // A line keeps skipping names on a phone (its points are what matter); bars never skip.
+      var catTicks = {color:t.muted, autoSkip:timeLike || (lineLike && narrowC), maxRotation:0, font:{size:narrowC ? 10.5 : 12}};
+      if(!timeLike && !(lineLike && narrowC)) catTicks.callback = function(v, i){ var l = this.getLabelForValue ? this.getLabelForValue(v) : spec.labels[i]; return wrapLabel(l, narrowC ? (horizontal ? 14 : 9) : 16); };
       var catAxis = {stacked:stacked, grid:{display:false}, border:{color:t.border}, ticks:catTicks};
       // A horizontal bar's name column takes at most 45% of the width.
       if(horizontal) catAxis.afterFit = function(sc){ var cap = Math.round((box.clientWidth || window.innerWidth) * 0.45); if(sc.width > cap) sc.width = cap; };
@@ -467,13 +473,17 @@
           // A label that already names the amount is shown as it is.
           // Always the chart's own number format: 'Doel 130.000' becomes 'Doel € 130.000'.
           // Strip an amount the label already names ("Doel 130k", "Doel € 130.000"); a year like 2026 stays.
-          var raw = String(target.label || ''), mm = /(^|\s)([€$]?)\s*([\d.,]+)\s*(k|mln\.?|mld\.?|miljoen|duizend)?\s*(%|euro|eur)?\s*$/i.exec(raw), base = raw;
-          if(mm){
-            var amount = K.parseNumber(mm[3]).n, mult = !mm[4] ? 1 : /^k|duizend/i.test(mm[4]) ? 1e3 : /^mld/i.test(mm[4]) ? 1e9 : 1e6;
-            var near = Number.isFinite(amount) && target.value && Math.abs(amount * mult - target.value) <= Math.abs(target.value) * 0.25;
-            if(mm[2] || mm[4] || mm[5] || near) base = raw.slice(0, mm.index);
-          }
-          base = base.replace(/[:\s]+$/, '').trim();
+          var raw = String(target.label || ''), base = raw;
+          var amountRe = /\(?\s*([€$]?)\s*(\d[\d.,]*)\s*(k|duizend|thousand|mln\.?|mio|miljoen|million|m|mld\.?|miljard|bn|b|billion)?\b\.?\s*(%|euro|eur|k€)?\s*\)?/gi;
+          base = raw.replace(amountRe, function(all, cur, num, unit, tail){
+            var n = K.parseNumber(num).n;
+            if(!Number.isFinite(n)) return all;
+            var u = String(unit || '').toLowerCase().replace('.', ''), mult = !u ? 1 : /^(k|duizend|thousand)$/.test(u) ? 1e3 : /^(mld|miljard|bn|b|billion)$/.test(u) ? 1e9 : 1e6;
+            var near = target.value && Math.abs(n * mult - target.value) <= Math.abs(target.value) * 0.25;
+            // A year (2026) or another number stays; the goal's own amount goes.
+            return near || ((cur || unit || tail) && !/^\d{4}$/.test(num)) ? ' ' : all;
+          });
+          base = base.replace(/\s+/g, ' ').replace(/[:\s(]+$/, '').trim();
           var label = (base ? base + ' ' : '') + f(target.value);
           ctx.save();
           ctx.font = '500 11px ' + (getComputedStyle(document.body).fontFamily || 'sans-serif');
@@ -551,7 +561,9 @@
       var lines = [], cur = '';
       words.forEach(function(w){ var glue = /-$/.test(cur) ? '' : ' '; if(cur && (cur + glue + w).length > max){ lines.push(cur); cur = w; } else cur = cur ? cur + glue + w : w; });
       if(cur) lines.push(cur);
-      return lines.length > 1 ? lines.slice(0, 3) : lines[0] || '';
+      // More than three lines: the third ends with an ellipsis (the full name is in the tooltip and table).
+      if(lines.length > 3){ lines = lines.slice(0, 3); lines[2] = lines[2].replace(/[-\s]*$/, '') + '…'; }
+      return lines.length > 1 ? lines : lines[0] || '';
     }
     // The middle of a donut names the total, so the slices read as parts of it.
     function centerPlugin(t){
@@ -839,6 +851,8 @@
       // On a phone the map sits above the list: a tap in the list brings the map into view.
       if(!fromMap && !restore && !standalone && (window.innerWidth || 0) < 640 && mapBox){
         var mt = mapBox.getBoundingClientRect().top;
+        // A frame taller than the chat allows has scrolled inside itself: bring the map back there first.
+        if(mt < 0){ window.scrollBy(0, mt - 8); mt = mapBox.getBoundingClientRect().top; }
         post({type:'reveal', top:Math.round(mt - 8)});
       }
       if(!restore) saveState({a:i});
@@ -905,7 +919,8 @@
       setTimeout(function(){ setActive(keep, false, true); }, 50);
     }
     return {
-      onFull:function(){ setTimeout(function(){ if(map) try{ map.invalidateSize(); }catch(_){} scheduleHeight(true); }, 60); }
+      // Full screen is for exploring: one finger moves the map there; inline it scrolls the chat.
+      onFull:function(on){ if(map && typeof coarse !== 'undefined' && coarse){ try{ if(on) map.dragging.enable(); else map.dragging.disable(); }catch(_){} } setTimeout(function(){ if(map) try{ map.invalidateSize(); }catch(_){} scheduleHeight(true); }, 60); }
     };
   }
 
@@ -941,7 +956,10 @@
         bar.setAttribute('aria-valuemin', '0'); bar.setAttribute('aria-valuemax', '100');
         bar.setAttribute('aria-valuenow', String(Math.round(it.progress * 100)));
         var pct = fmt(Math.round(it.value / it.target * 100), 'percent', 0);
-        var text = h('span', 'k-target-text', (it.over ? T('over', fmt(it.value - it.target, it.format, it.decimals), fmt(it.target, it.format, it.decimals)) : T(it.good === 'down' ? 'limit' : 'target', pct, fmt(it.target, it.format, it.decimals))));
+        // When the value is written short (millions), the target and the overrun are too.
+        var short = Math.abs(it.value) >= 1e6 && it.decimals == null && it.format !== 'percent';
+        var tf = function(v){ return short ? K.kpiValueText({value:v, format:it.format, decimals:null}, LANG) : fmt(v, it.format, it.decimals); };
+        var text = h('span', 'k-target-text', (it.over ? T('over', tf(it.value - it.target), tf(it.target)) : T(it.good === 'down' ? 'limit' : 'target', pct, tf(it.target))));
         bar.setAttribute('aria-label', text.textContent);
         target.append(bar, text);
         tile.appendChild(target);
@@ -964,7 +982,7 @@
     // Every row already names its status and the today line carries its own
     // label: a legend only helps when some rows have no status word.
     var allNamed = spec.items.every(function(it){ return !!it.status || it.milestone; });
-    var wrap = h('div', 'k-tl');
+    var wrap = h('div', 'k-tl' + (Object.keys(used).length ? ' has-status' : ''));
     var legend = h('div', 'k-tl-legend');
     ['done', 'doing', 'todo', 'risk'].forEach(function(st){
       if(!used[st] || allNamed) return;

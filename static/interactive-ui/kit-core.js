@@ -659,7 +659,8 @@ function base(spec,lang,kind,m,warnings,limits){
   function kpiValueText(item,lang){
     const v=item.value;
     if(Math.abs(v)>=1e6&&item.decimals==null&&item.format!=='percent'){
-      const o={notation:'compact',compactDisplay:'short',maximumFractionDigits:1};
+      // Two decimals so value, percentage and target agree ("1,25 mln." against "1,5 mln.").
+      const o={notation:'compact',compactDisplay:'short',minimumFractionDigits:0,maximumFractionDigits:2};
       if(item.format==='currency'){o.style='currency';o.currency='EUR';}
       return kpiFormatter(lang,'c|'+item.format,o).format(v);
     }
@@ -1039,7 +1040,7 @@ function base(spec,lang,kind,m,warnings,limits){
     }
     if(kind==='kpi'){
       const en=spec.lang==='en';
-      return {header:en?['Label','Value','Change','Target']:['Label','Waarde','Verandering','Doel'],
+      return {header:en?['Figure','Value','Change','Target']:['Cijfer','Waarde','Verandering','Doel'],
         rows:spec.items.map(i=>[i.label,i.value,i.delta,i.target]),
         types:['text','number','number','number']};
     }
