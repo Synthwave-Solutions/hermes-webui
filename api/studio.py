@@ -190,7 +190,7 @@ def clean_process(raw) -> dict:
             out.append(row)
         return out
 
-    metrics = [{"name": _txt(m.get("name"), 80), "baseline": _txt(m.get("baseline"), 60), "target": _txt(m.get("target"), 60)}
+    metrics = [{"name": _txt(m.get("name"), 80), "baseline": _txt(m.get("baseline"), 100), "target": _txt(m.get("target"), 100)}
                for m in (raw.get("metrics") or [])[:3] if isinstance(m, dict) and _txt(m.get("name"))]
     freq = raw.get("frequency") if isinstance(raw.get("frequency"), dict) else {}
     frequency = {"count": _int(freq.get("count"), 0, 10000),
@@ -346,8 +346,8 @@ Je krijgt het doel, de kans, de gekozen oplossing en wat de persoon vertelt over
    decision in as_is komt terug als stap voor een mens (human). De agent maakt concepten en verstuurt nooit zelf.
 4. DATA: data_sensitivity is public, internal, confidential of personal (persoonsgegevens) met data_note (waarom,
    een zin). Bij personal: noem in de note welke gegevens het zijn.
-5. METRICS (1 tot 3): sluit aan op de KPI van het doel; baseline en target kort, een getal met eenheid, of
-   "nog bepalen".
+5. METRICS (1 tot 3): sluit aan op de KPI van het doel; baseline en target kort, een getal met eenheid
+   ("50 min", "3 dagen") of "nog bepalen", geen zin.
 6. QUESTIONS (0 tot 3): wat je nog moet weten om het ontwerp te kunnen bouwen.
 
 Nederlands, eenvoudige woorden. Alleen JSON:
@@ -480,6 +480,7 @@ def run_step(view, body: dict) -> dict:
         answer = _ask_json(DESIGN, f"Doel: {goal.get('name') or opp.get('goal') or '-'} (KPI: {goal.get('kpi') or '-'})\n"
                                    f"Kans: {opp['title']} (oorzaak: {opp.get('cause') or '-'})\n"
                                    f"Gekozen oplossing: {sol['title']} [{sol['building_block']}]. Hoe: {sol.get('how') or '-'}\n"
+                                   f"Eerder verteld (ook gebruiken voor de nulmeting):\n{history or '-'}\n"
                                    f"Huidig proces volgens de persoon:\n{text or history}")
         for s in answer.get("to_be") or []:
             if isinstance(s, dict) and s.get("building_block") in ("task", "skill", "bot"):
