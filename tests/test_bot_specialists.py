@@ -295,3 +295,68 @@ def test_snapshot_names_bots_and_scopes_parent_without_authority(team, monkeypat
         row = specialists.snapshot(team.session.session_id)[0]
         assert row['status'] == status
         assert row['child_session_id'] == result['session_id']
+
+
+def _insert_handoff(job_id, state, created, source='default', target='research', session_id=None):
+    with bots._db() as db:
+        db.execute('INSERT INTO jobs VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                   (job_id, session_id, 'stream-' + job_id, source, target, 'Check the sources',
+                    'authority-secret', 'ceiling-secret', 1, state, None, None, None, created, created + 5))
+
+
+def test_snapshot_includes_handoff_jobs_with_plain_statuses(team, monkeypatch):
+    from api import bot_metadata
+    names = {'default': 'Sanne', 'research': 'Linus', 'reviewer': 'Grace'}
+    monkeypatch.setattr(bot_metadata, 'read_profile', lambda bot: {'bot': {'title': names[bot]}})
+    sid = team.session.session_id
+    enqueue()
+    _insert_handoff('h1', 'pending', 1.0, session_id=sid)
+    _insert_handoff('other', 'started', 2.0, session_id='another-parent')
+    rows = specialists.snapshot(sid)
+    kinds = sorted(row['kind'] for row in rows)
+    assert kinds == ['handoff', 'specialist']
+    handoff = next(row for row in rows if row['kind'] == 'handoff')
+    assert handoff['id'] == 'handoff:h1'
+    assert handoff['bot_profile'] == 'research' and handoff['bot_title'] == 'Linus'
+    assert handoff['from_profile'] == 'default' and handoff['from_title'] == 'Sanne'
+    assert handoff['child_session_id'] == ''
+    assert handoff['queue_authoritative'] is True
+    assert not {'authority', 'ceiling', 'target_authority', 'origin_stream'} & handoff.keys()
+    assert 'secret' not in json.dumps(rows)
+    # Oldest first: the handoff (created 1.0) precedes the fresh specialist.
+    assert rows[0]['kind'] == 'handoff'
+    for state, status in [('pending', 'queued'), ('ready', 'queued'), ('starting', 'running'),
+                          ('started', 'running'), ('completed', 'completed'), ('failed', 'failed'),
+                          ('interrupted', 'failed'), ('cancelled', 'cancelled')]:
+        with bots._db() as db:
+            db.execute('UPDATE jobs SET state=? WHERE id=?', (state, 'h1'))
+        row = next(r for r in specialists.snapshot(sid) if r['kind'] == 'handoff')
+        assert row['status'] == status, state
+        assert ('duration_seconds' in row) == (status in ('completed', 'failed', 'cancelled'))
+
+
+def test_snapshot_falls_back_to_specialists_when_handoff_store_fails(team, monkeypatch):
+    import sqlite3
+    from contextlib import contextmanager
+    sid = team.session.session_id
+    enqueue()
+    _insert_handoff('h2', 'started', 1.0, session_id=sid)
+    real = bots._db
+
+    class Broken:
+        def __init__(self, db):
+            self.db = db
+
+        def execute(self, sql, *args):
+            if 'FROM jobs' in sql:
+                raise sqlite3.OperationalError('database is locked')
+            return self.db.execute(sql, *args)
+
+    @contextmanager
+    def broken():
+        with real() as db:
+            yield Broken(db)
+
+    monkeypatch.setattr(bots, '_db', broken)
+    rows = specialists.snapshot(sid)
+    assert [row['kind'] for row in rows] == ['specialist']

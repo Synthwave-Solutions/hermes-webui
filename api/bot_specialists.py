@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 import json
+import sqlite3
 import time
 import uuid
 
@@ -223,32 +224,65 @@ def recover():
         db.execute("UPDATE specialists SET state='failed',detail='Server restarted; work was not replayed',updated=? WHERE state IN ('pending','starting','started','delivering','reporting')", (time.time(),))
 
 
+# Handoff jobs (api/bot_delegation.py ``jobs``) as display states. A handoff
+# runs in this same chat, so it has no sub-conversation to open.
+_HANDOFF_STATUS = {'pending': 'queued', 'ready': 'queued', 'starting': 'running',
+                   'started': 'running', 'completed': 'completed', 'failed': 'failed',
+                   'interrupted': 'failed', 'cancelled': 'cancelled'}
+
+
+def _handoff_rows(db, session_id):
+    """Read-only handoff records; any problem leaves the specialist list alone."""
+    try:
+        return db.execute(
+            "SELECT id,source_bot,target_bot,task,state,created,updated FROM jobs "
+            "WHERE session_id=? ORDER BY created DESC LIMIT 100", (session_id,)).fetchall()
+    except sqlite3.Error:
+        return []
+
+
 def snapshot(session_id):
     """Display records only; caller must authorize access to the parent chat."""
     from api.bot_metadata import read_profile
     with _db() as db:
         rows = db.execute(
-            "SELECT id,target_bot,task,state,child_id,created,updated FROM specialists "
+            "SELECT id,source_bot,target_bot,task,state,child_id,created,updated FROM specialists "
             "WHERE session_id=? ORDER BY created DESC LIMIT 100", (session_id,)).fetchall()
-    result = []
+        handoffs = _handoff_rows(db, session_id)
     titles = {}
-    for row in reversed(rows):
-        bot = row['target_bot']
+
+    def title(bot):
         if bot not in titles:
             try:
                 titles[bot] = read_profile(bot).get('bot', {}).get('title') or bot
             except (OSError, ValueError, KeyError):
                 titles[bot] = bot
+        return titles[bot]
+
+    def record(row, kind, status, child=''):
+        bot, source = row['target_bot'], row['source_bot']
+        return dict(id=('handoff:' if kind == 'handoff' else 'bot:')+row['id'], kind=kind,
+                    bot_profile=bot, bot_title=title(bot), from_profile=source, from_title=title(source),
+                    task=row['task'], status=status, child_session_id=child,
+                    started_at=row['created'], updated_at=row['updated'],
+                    queue_authoritative=True, steps=[], tool_count=0,
+                    **({'duration_seconds': max(0, row['updated']-row['created'])}
+                       if status in ('completed', 'failed', 'cancelled') else {}))
+
+    result = []
+    for row in rows:
         state = row['state']
         status = ('queued' if state in ('pending', 'ready') else
                   'running' if state in ('starting', 'started', 'completed', 'delivering', 'reporting') else
                   'completed' if state == 'delivered' else
                   'cancelled' if state == 'cancelled' else 'failed')
-        result.append(dict(id='bot:'+row['id'], bot_profile=bot, bot_title=titles[bot],
-                           task=row['task'], status=status, child_session_id=row['child_id']
-                           if state not in ('pending', 'ready') else '',
-                           started_at=row['created'], updated_at=row['updated'],
-                           queue_authoritative=True, steps=[], tool_count=0,
-                           **({'duration_seconds': max(0, row['updated']-row['created'])}
-                              if status in ('completed', 'failed', 'cancelled') else {})))
+        result.append(record(row, 'specialist', status,
+                             row['child_id'] if state not in ('pending', 'ready') else ''))
+    for row in handoffs:
+        try:
+            result.append(record(row, 'handoff', _HANDOFF_STATUS.get(row['state'], 'failed')))
+        except (KeyError, IndexError, TypeError):
+            continue
+    # Oldest first, as before; the dock shows the newest on top.
+    result.sort(key=lambda item: item['started_at'] or 0)
     return result
