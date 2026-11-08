@@ -180,3 +180,22 @@ def test_research_proposes_fields_without_saving(env, monkeypatch):
     assert out["proposal"]["name"] == "Acme" and out["proposal"]["systems"] == ["Exact"]
     assert out["sources"] == ["https://acme.example/", "https://acme.example/over-ons"]
     assert lib.load_profile() == {}, "research proposes, it does not save"
+
+
+def test_page_text_keeps_title_meta_and_structured_data(monkeypatch):
+    html = (b'<html><head><title>Acme | Warmtepompen</title><meta name="description" content="Acme installeert warmtepompen voor bedrijven.">'
+            b'<meta property="og:site_name" content="Acme"><script type="application/ld+json">{"@type":"Organization","numberOfEmployees":40}</script>'
+            b'<script>var x=1</script></head><body><div id="root"></div></body></html>')
+
+    class Resp:
+        headers = type("H", (), {"get_content_charset": lambda self: "utf-8"})()
+        def read(self, n): return html
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+    monkeypatch.setattr(lib, "_public_host", lambda host: True)
+    import urllib.request
+    monkeypatch.setattr(urllib.request.OpenerDirector, "open", lambda self, req, timeout=None: Resp())
+    url, text = lib.fetch_public_page("https://acme.example/")
+    assert "Titel: Acme | Warmtepompen" in text and "description: Acme installeert warmtepompen" in text
+    assert "numberOfEmployees" in text and "var x" not in text

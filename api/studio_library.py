@@ -627,11 +627,25 @@ def fetch_public_page(url: str, limit: int = 400_000) -> tuple[str, str]:
             raw = resp.read(limit)
             charset = resp.headers.get_content_charset() or "utf-8"
         text = raw.decode(charset, errors="replace")
+        # What a page says about itself, also when its body is built by JavaScript.
+        meta = []
+        title = re.search(r"(?is)<title[^>]*>(.*?)</title>", text)
+        if title:
+            meta.append("Titel: " + title.group(1).strip())
+        for m in re.finditer(r'(?is)<meta\s+[^>]*>', text):
+            tag = m.group(0)
+            name = re.search(r'(?i)(?:name|property)=["\']([^"\']+)["\']', tag)
+            content = re.search(r'(?i)content=["\']([^"\']*)["\']', tag)
+            if name and content and name.group(1).lower() in ("description", "og:title", "og:description", "og:site_name", "keywords", "twitter:description"):
+                meta.append(f"{name.group(1)}: {content.group(1).strip()}")
+        for m in re.finditer(r'(?is)<script[^>]+application/ld\+json[^>]*>(.*?)</script>', text):
+            meta.append("Gestructureerde gegevens: " + re.sub(r"\s+", " ", m.group(1))[:2500])
         text = re.sub(r"(?is)<(script|style|noscript|svg)[^>]*>.*?</\1>", " ", text)
         links = re.findall(r'(?i)href=["\']([^"\']+)["\']', text)
         body = _html.unescape(re.sub(r"<[^>]+>", " ", text))
         body = re.sub(r"\s+", " ", body).strip()
-        return url, body + "\n\nLINKS: " + " ".join(links[:200])
+        head = _html.unescape("\n".join(dict.fromkeys(meta)))
+        return url, (head + "\n\n" if head else "") + body + "\n\nLINKS: " + " ".join(links[:200])
     raise ValueError("Too many redirects")
 
 
