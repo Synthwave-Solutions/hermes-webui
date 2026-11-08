@@ -12432,6 +12432,10 @@ def handle_get(handler, parsed) -> bool:
         from api import org_structure
         return org_structure.handle_get(handler, parsed)
 
+    if parsed.path in ("/api/studio/usecases", "/api/studio/usecase"):
+        from api import studio
+        return studio.handle_get(handler, parsed)
+
     if parsed.path in ("/api/org/chart", "/api/management/overview", "/api/management/job",
                        "/api/management/pricing"):
         from api import management
@@ -14790,6 +14794,10 @@ def handle_post(handler, parsed) -> bool:
     if parsed.path == "/api/org/structure":
         from api import org_structure
         return org_structure.handle_post(handler, parsed, body)
+
+    if parsed.path in ("/api/studio/usecase", "/api/studio/step", "/api/studio/delete"):
+        from api import studio
+        return studio.handle_post(handler, parsed, body)
 
     if parsed.path in ("/api/management/pricing", "/api/value/job", "/api/value/chat", "/api/value/collect"):
         _ensure_agent_cron_import_path()

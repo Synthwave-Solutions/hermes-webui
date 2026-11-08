@@ -56,7 +56,7 @@ const APP_TITLEBAR_KEYS = {
   memory: 'tab_memory', workspaces: 'tab_workspaces',
   profiles: 'tab_profiles', todos: 'tab_todos', insights: 'tab_insights', logs: 'tab_logs', governance: 'tab_governance', integrations: 'tab_integrations', projects: 'tab_projects', settings: 'tab_settings',
 };
-const MAIN_VIEW_PANELS = ['organisation','management','msp','apps','modules','approvals','settings','skills','memory','tasks','kanban','workspaces','profiles','insights','logs','governance','integrations','projects','plugin'];
+const MAIN_VIEW_PANELS = ['studio','organisation','management','msp','apps','modules','approvals','settings','skills','memory','tasks','kanban','workspaces','profiles','insights','logs','governance','integrations','projects','plugin'];
 const MAIN_VIEW_SIDEBAR_PANEL_FALLBACKS = { plugin: 'settings' };
 
 /**
@@ -78,7 +78,7 @@ function syncAppTitlebar() {
     if (/^webui$/i.test(sourceLabel)) sourceLabel = '';
   } else {
     const key = APP_TITLEBAR_KEYS[panel];
-    mainText = panel === 'organisation' ? (document.documentElement.lang.startsWith('en') ? 'Organisation' : 'Organisatie') : panel === 'management' ? 'Management' : panel === 'msp' ? 'Support' : key && typeof t === 'function' ? t(key) : (panel.charAt(0).toUpperCase() + panel.slice(1));
+    mainText = panel === 'studio' ? 'Studio' : panel === 'organisation' ? (document.documentElement.lang.startsWith('en') ? 'Organisation' : 'Organisatie') : panel === 'management' ? 'Management' : panel === 'msp' ? 'Support' : key && typeof t === 'function' ? t(key) : (panel.charAt(0).toUpperCase() + panel.slice(1));
   }
 
   // Don't touch the element while an inline rename is in progress — replacing
@@ -424,6 +424,7 @@ async function switchPanel(name, opts = {}) {
     });
   }
   if (nextPanel === 'msp' && window.SynthPulseMSP) await window.SynthPulseMSP.load();
+  if (nextPanel === 'studio' && window.SPStudio) await window.SPStudio.load();
   if (nextPanel === 'organisation' && window.SPOrg) await window.SPOrg.load();
   if (nextPanel === 'management' && window.SPManagement) await window.SPManagement.load();
   if (nextPanel === 'apps' && window.SynthPulseApps) await window.SynthPulseApps.load();
@@ -9850,7 +9851,7 @@ window._navAudience = 'member';
 window._capabilityNavigation = false;
 // Navigation order agreed with Michaël (20 Sep 2026): daily work first, then
 // admin surfaces. Also the default order of the markup in index.html.
-const _MEMBER_NAV_ORDER = ['profiles', 'modules','tasks', 'skills', 'projects', 'memory', 'integrations', 'workspaces', 'files', 'todos', 'organisation', 'management', 'insights', 'approvals', 'governance', 'logs', 'apps', 'msp'];
+const _MEMBER_NAV_ORDER = ['studio', 'profiles', 'modules','tasks', 'skills', 'projects', 'memory', 'integrations', 'workspaces', 'files', 'todos', 'organisation', 'management', 'insights', 'approvals', 'governance', 'logs', 'apps', 'msp'];
 function _canUseFeature(permission){
   const me=window.__GOV_ME__;
   if(!me)return false;

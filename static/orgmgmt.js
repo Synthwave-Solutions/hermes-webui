@@ -429,7 +429,7 @@
       if (t.dataset.omTeam) { O.selected = O.selected === t.dataset.omTeam ? '' : t.dataset.omTeam; renderOrg(); return; }
       if (t.hasAttribute('data-om-close')) { O.selected = ''; renderOrg(); return; }
       if (t.hasAttribute('data-om-template')) { await applyTemplate(); return; }
-      if (t.dataset.omNewAutomation) { const team = findTeam(t.dataset.omNewAutomation); await startChat(w('chat_prompt_team', { team: team ? team.name : t.dataset.omNewAutomation })); return; }
+      if (t.dataset.omNewAutomation) { if (window.SPStudio) { await window.SPStudio.newForTeam(t.dataset.omNewAutomation); return; } const team = findTeam(t.dataset.omNewAutomation); await startChat(w('chat_prompt_team', { team: team ? team.name : t.dataset.omNewAutomation })); return; }
       if (t.hasAttribute('data-om-goto-mgmt')) { if (typeof switchPanel === 'function') await switchPanel('management'); return; }
       if (t.dataset.omDeleteTeam) { if (confirm(w('confirm_delete'))) await orgMutate({ op: 'team.delete', key: t.dataset.omDeleteTeam }, w('removed')); return; }
       const row = t.closest('[data-job],[data-bot]');
@@ -519,7 +519,7 @@
   const SEV = { failing: 'high', negative: 'high', check_high: 'mid', missing_value: 'mid', unconfirmed: 'mid', unassigned: 'mid', old_approvals: 'mid', idle_teams: 'low' };
 
   function decisionItemHtml(kind, item){
-    if (kind === 'idle_teams') return `<div class="om-row"><div class="om-row-main"><div class="om-row-title">${H(item.name)}</div></div><div class="om-row-actions"><button type="button" class="sm-btn" data-om-usecase="${H(item.name)}">${H(w('find_use_case'))}</button></div></div>`;
+    if (kind === 'idle_teams') return `<div class="om-row"><div class="om-row-main"><div class="om-row-title">${H(item.name)}</div></div><div class="om-row-actions"><button type="button" class="sm-btn" data-om-usecase="${H(item.name)}" data-om-usecase-key="${H(item.key)}">${H(w('find_use_case'))}</button></div></div>`;
     const teamName = item.team && item.team !== '_unassigned' ? ((M.data.team_names || {})[item.team] || item.team) : w('unassigned');
     let extra = '';
     if (kind === 'missing_value') extra = `<form class="om-inline-form" data-om-quick-value><input type="number" min="1" max="6000" name="before" placeholder="${H(w('duty_minutes_before'))}" aria-label="${H(w('minutes_before'))}" required><input type="number" min="0" max="6000" name="now" placeholder="${H(w('duty_minutes_now'))}" aria-label="${H(w('minutes_now'))}"><select class="om-select" name="per" aria-label="${H(w('per_label'))}">${['run', 'day', 'week'].map(p => `<option value="${p}">${H(w('per_' + p + '_opt'))}</option>`).join('')}</select><button type="submit" class="sm-btn primary">${H(w('save'))}</button></form>`;
@@ -664,7 +664,7 @@
       if (t.hasAttribute('data-om-add-price')) { const tb = root.querySelector('[data-om-pricing] tbody'); const tr = tb && tb.querySelector('tr'); if (tr) { const c = tr.cloneNode(true); c.querySelectorAll('input').forEach(i => { i.value = ''; }); tb.append(c); } return; }
       if (t.hasAttribute('data-om-goto-rates')) { O.view = 'manage'; if (typeof switchPanel === 'function') await switchPanel('organisation'); return; }
       if (t.hasAttribute('data-om-goto-gov')) { if (typeof switchPanel === 'function') await switchPanel('governance'); return; }
-      if (t.dataset.omUsecase) { await startChat(w('chat_prompt_team', { team: t.dataset.omUsecase })); return; }
+      if (t.dataset.omUsecase) { if (window.SPStudio && t.dataset.omUsecaseKey) { await window.SPStudio.newForTeam(t.dataset.omUsecaseKey); return; } await startChat(w('chat_prompt_team', { team: t.dataset.omUsecase })); return; }
       if (t.dataset.omSort) { const k = t.dataset.omSort; M.dir = M.sort === k ? -M.dir : -1; M.sort = k; renderMgmt(); return; }
       if (t.dataset.omTeamRow) { O.selected = t.dataset.omTeamRow === '_unassigned' ? '' : t.dataset.omTeamRow; O.view = 'chart'; if (typeof switchPanel === 'function') await switchPanel('organisation'); return; }
       if (t.dataset.omBotRow) { if (typeof switchPanel === 'function') await switchPanel('profiles'); if (typeof openProfileDetail === 'function') openProfileDetail(t.dataset.omBotRow); return; }
