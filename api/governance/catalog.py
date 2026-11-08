@@ -73,6 +73,8 @@ _SELF_ROUTES: frozenset[str] = frozenset({
     "/api/management/overview", "/api/management/job", "/api/management/pricing",
     "/api/value/job", "/api/value/chat", "/api/value/collect",
     "/api/studio/usecases", "/api/studio/usecase", "/api/studio/step", "/api/studio/delete",
+    "/api/studio/backlog", "/api/studio/backlog/order", "/api/studio/autopilot", "/api/studio/playbooks",
+    "/api/studio/playbook", "/api/studio/playbook/delete", "/api/studio/playbook/draft", "/api/studio/playbook/run", "/api/studio/media",
     "/api/org/modules",
     "/api/org/modules/request",
     "/api/org/overview",

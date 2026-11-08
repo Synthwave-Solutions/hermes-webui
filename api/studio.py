@@ -120,7 +120,7 @@ def clean_opportunities(items) -> list:
         if not isinstance(o, dict) or not _txt(o.get("title")):
             continue
         block = o.get("building_block") if o.get("building_block") in BLOCKS else "task"
-        out.append({"id": _txt(o.get("id"), 20) or f"o{i + 1}", "title": _txt(o.get("title"), 140),
+        out.append({"id": _txt(o.get("id"), 20) or f"o{i + 1}", "title": _txt(o.get("title"), 140), "goal": _txt(o.get("goal"), 120),
                     "why": _txt(o.get("why"), 300), "pain": _txt(o.get("pain"), 200),
                     "impact": _int(o.get("impact"), 1, 5), "effort": _int(o.get("effort"), 1, 5),
                     "building_block": block})
@@ -241,7 +241,7 @@ overnemen of ondersteunen. Per kans: impact 1-5, moeite 1-5, het knelpunt dat he
 bouwsteen: task (geplande taak), skill (werkwijze/kennis), bot (vaste AI-collega), human (blijft mens),
 connection (koppeling met een systeem), custom (maatwerksoftware). Antwoord in het Nederlands, alleen JSON:
 {"title": "korte titel", "goals": [{"name": "...", "kpi": "..."}],
- "opportunities": [{"id": "o1", "title": "...", "pain": "...", "why": "...", "impact": 4, "effort": 2, "building_block": "task"}]}"""
+ "opportunities": [{"id": "o1", "goal": "<name van het doel>", "title": "...", "pain": "...", "why": "...", "impact": 4, "effort": 2, "building_block": "task"}]}"""
 
 DESIGN = """Je ontwerpt een werkproces opnieuw met AI. Gegeven de gekozen kans en de beschrijving van het huidige
 proces: maak het proces zoals het nu is (as_is: stap, actor mens/systeem, minuten per keer) en zoals het wordt
@@ -369,7 +369,7 @@ def run_step(view, body: dict) -> dict:
                 s["reuse"] = _reuse_candidates(s.get("step", "") + " " + opp["title"])
         answer["description"] = text
         update(view, {"id": doc["id"], "process": answer, "phase": "design", "notes": notes + [
-            {"role": "agent", "text": "Proces as-is en to-be staan klaar. Pas aan en ga door naar het Playbook.", "at": time.time()}]})
+            {"role": "agent", "text": "Proces as-is en to-be staan klaar. Pas aan en ga door naar het bouwplan.", "at": time.time()}]})
     elif step == "playbook":
         process = doc.get("process") or {}
         opp = next((o for o in doc.get("opportunities") or [] if o.get("id") == doc.get("selected")), {})
@@ -382,7 +382,7 @@ def run_step(view, body: dict) -> dict:
             if isinstance(c, dict) and c.get("type") in ("task", "skill"):
                 c["reuse"] = (_reuse_candidates(str(c.get("name") or "")) or [""])[0]
         update(view, {"id": doc["id"], "components": components, "phase": "playbook", "notes": notes + [
-            {"role": "agent", "text": f"Playbook met {len(components)} onderdelen. Controleer en kies Droogrun.", "at": time.time()}]})
+            {"role": "agent", "text": f"Bouwplan met {len(components)} onderdelen. Controleer en kies Droogrun.", "at": time.time()}]})
     else:
         raise ValueError("Unknown step")
     return _load(doc["id"])
@@ -392,6 +392,9 @@ def run_step(view, body: dict) -> dict:
 
 def handle_get(handler, parsed) -> bool:
     path = parsed.path
+    if path in ("/api/studio/backlog", "/api/studio/playbooks", "/api/studio/playbook", "/api/studio/media"):
+        from api import studio_library
+        return studio_library.handle_get(handler, parsed)
     if path not in ("/api/studio/usecases", "/api/studio/usecase"):
         return False
     view = org_structure.request_scope(handler)
@@ -415,6 +418,10 @@ def handle_get(handler, parsed) -> bool:
 
 def handle_post(handler, parsed, body) -> bool:
     path = parsed.path
+    if path in ("/api/studio/backlog", "/api/studio/backlog/order", "/api/studio/autopilot", "/api/studio/playbook",
+                "/api/studio/playbook/delete", "/api/studio/playbook/draft", "/api/studio/playbook/run", "/api/studio/media"):
+        from api import studio_library
+        return studio_library.handle_post(handler, parsed, body)
     if path not in ("/api/studio/usecase", "/api/studio/step", "/api/studio/delete"):
         return False
     view = org_structure.request_scope(handler)

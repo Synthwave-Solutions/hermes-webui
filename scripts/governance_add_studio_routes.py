@@ -24,6 +24,8 @@ import yaml
 
 POLICY = os.environ.get("HERMES_WEBUI_GOVERNANCE_POLICY", os.path.expanduser("~/.hermes/dashboard-governance.yaml"))
 ROUTES = ["/api/studio/usecases", "/api/studio/usecase", "/api/studio/step", "/api/studio/delete",
+          "/api/studio/backlog", "/api/studio/backlog/order", "/api/studio/autopilot", "/api/studio/playbooks",
+          "/api/studio/playbook", "/api/studio/playbook/delete", "/api/studio/playbook/draft", "/api/studio/playbook/run", "/api/studio/media",
           "/api/org/structure/me", "/api/org/structure", "/api/org/chart",
           "/api/management/overview", "/api/management/job", "/api/management/pricing",
           "/api/value/job", "/api/value/chat", "/api/value/collect"]

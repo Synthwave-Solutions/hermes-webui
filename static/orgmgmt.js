@@ -295,6 +295,7 @@
       ${waiting.length ? `<h4>${H(w('waiting'))} (${waiting.length})</h4><div class="om-list">${waiting.map(j => jobRowHtml(j)).join('')}</div>` : ''}
       <h4>${H(w('running_now'))}</h4>
       ${bots.length || jobs.length ? `<div class="om-list">${bots.map(b => botRowHtml(b)).join('')}${jobs.filter(j => !waiting.includes(j)).map(j => jobRowHtml(j)).join('')}</div>` : `<p class="om-muted om-small">${H(w('nothing_runs'))}</p>`}
+      <h4>Playbooks</h4><div class="om-list" data-om-team-pbs="${H(team.key)}"><p class="om-muted om-small">…</p></div>
       <h4>${H(w('people'))} (${(team.people || []).length})</h4>
       <div class="om-list">${(team.people || []).map(p => `<div class="om-row"><span class="om-person">${H(initials(p.email))}</span><div class="om-row-main"><div class="om-row-title">${H(p.email)}${p.email === team.lead ? ' · ' + H(w('lead')) : ''}</div><div class="om-row-sub">${H(p.title || '')}${p.reports_to ? ' → ' + H(p.reports_to) : ''}</div></div></div>`).join('')}</div>
       <div class="om-value-actions" style="margin-top:16px">
@@ -364,6 +365,15 @@
           ${unassignedHtml()}</div>
         ${drawerHtml(selected)}
       </div>`;
+    if (selected) loadTeamPlaybooks(selected.key);
+  }
+  async function loadTeamPlaybooks(key){
+    let rows = [];
+    try { rows = ((await call('/api/studio/playbooks')).playbooks || []).filter(p => p.team === key); } catch (_e) {}
+    const box = document.querySelector(`[data-om-team-pbs="${CSS.escape(key)}"]`);
+    if (!box) return;
+    box.innerHTML = rows.length ? rows.map(p => `<div class="om-row"><span aria-hidden="true">📘</span><div class="om-row-main"><div class="om-row-title">${H(p.title)}</div><div class="om-row-sub">${p.steps} stappen${p.media ? ' · ' + p.media + ' media' : ''}</div></div><div class="om-row-actions"><button type="button" class="sm-btn" data-om-open-pb="${H(p.id)}">${H(w('open'))}</button></div></div>`).join('')
+      : `<p class="om-muted om-small">${H(lang() === 'en' ? 'No playbooks for this team yet.' : 'Nog geen playbooks voor dit team.')}</p>`;
   }
 
   function unassignedHtml(){
@@ -432,6 +442,7 @@
       if (t.hasAttribute('data-om-close')) { O.selected = ''; renderOrg(); return; }
       if (t.hasAttribute('data-om-template')) { await applyTemplate(); return; }
       if (t.dataset.omNewAutomation) { if (window.SPStudio) { await window.SPStudio.newForTeam(t.dataset.omNewAutomation); return; } const team = findTeam(t.dataset.omNewAutomation); await startChat(w('chat_prompt_team', { team: team ? team.name : t.dataset.omNewAutomation })); return; }
+      if (t.dataset.omOpenPb) { if (typeof switchPanel === 'function') await switchPanel('studio'); if (window.SPLibrary) await window.SPLibrary.openPlaybook(t.dataset.omOpenPb); return; }
       if (t.hasAttribute('data-om-goto-mgmt')) { if (typeof switchPanel === 'function') await switchPanel('management'); return; }
       if (t.dataset.omDeleteTeam) { if (confirm(w('confirm_delete'))) await orgMutate({ op: 'team.delete', key: t.dataset.omDeleteTeam }, w('removed')); return; }
       const row = t.closest('[data-job],[data-bot]');

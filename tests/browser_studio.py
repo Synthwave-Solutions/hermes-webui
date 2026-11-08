@@ -61,6 +61,12 @@ ANSWERS = {
 }
 
 
+ANSWERS["Schrijf een Playbook voor collega"] = {
+    "title": "Zo verwerk je aanmaningen met de Super Agent", "summary": "Elke maandag in tien minuten", "trigger": "Maandagochtend",
+    "steps": [{"title": "Open de concepten", "actor": "jij", "text": "Open de chat van de Debiteuren Bot.", "prompt": "Laat de concept-aanmaningen van vandaag zien"},
+              {"title": "Kijk na en verstuur", "actor": "jij", "text": "Controleer bedragen en verstuur."}]}
+
+
 class FakeOmniRoute:
     def __init__(self):
         self.calls = []
@@ -124,8 +130,9 @@ def main() -> int:
     try:
         proc, log, base_url = start_server(env, art)
         with sync_playwright() as pw:
-            browser = pw.chromium.launch(headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
-            ctx = browser.new_context(base_url=base_url, viewport={"width": 1440, "height": 960}, locale="nl-NL")
+            browser = pw.chromium.launch(headless=True, args=["--no-sandbox", "--disable-dev-shm-usage",
+                                                             "--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"])
+            ctx = browser.new_context(base_url=base_url, viewport={"width": 1440, "height": 960}, locale="nl-NL", permissions=["microphone"])
             assert ctx.request.post("/api/auth/login", data={"password": PASSWORD}).ok
             for body in ({"op": "department.save", "key": "finance", "name": "Finance", "hourly_rate": 60},
                          {"op": "team.save", "department": "finance", "name": "Debiteuren", "lead": LEAD, "members": [MEMBER]}):
@@ -178,7 +185,19 @@ def main() -> int:
             page.locator('.om-row [data-st-select="o1"]').click()
             page.wait_for_selector('.st-dot.sel[data-st-select="o1"]', timeout=10000)
             page.screenshot(path=str(art / "02-discover.png"), full_page=True)
-            ok("discover gives goals and an impact/effort matrix; an opportunity is chosen")
+            assert "Snelle winst" in page.locator(".st-matrix").inner_text()
+            ok("discover gives goals and an impact/effort matrix with quadrants; an opportunity is chosen")
+            page.locator('[data-st-oppview="tree"]').click()
+            page.wait_for_selector(".st-tree .st-tree-branch", timeout=5000)
+            assert page.locator(".st-tree-branch").count() == 3 and page.locator(".st-node.goal").count() >= 1
+            page.screenshot(path=str(art / "02b-tree.png"), full_page=True)
+            page.locator('[data-st-backlog="o3"]').click()
+            page.wait_for_selector('[data-st-backlog="o3"][disabled]', timeout=5000)
+            page.locator("[data-st-backlog-all]").click()
+            page.wait_for_timeout(800)
+            backlog = ctx.request.get("/api/studio/backlog").json()["items"]
+            assert sorted(i["title"] for i in backlog) == sorted(["Huisstijl aanmaning als werkwijze", "Wekelijkse concept-aanmaningen", "Klantportaal voor betalingen"]), [i["title"] for i in backlog]
+            ok("opportunity solution tree (goal, pain point, opportunity, solution); opportunities go to the backlog without duplicates")
 
             # 3. design
             page.locator('[data-st-goto="design"]').click()
@@ -239,24 +258,91 @@ def main() -> int:
             assert "Concept-aanmaningen maandag" in names, names
             ok("the built task shows in Management under its team")
 
+            # Playbook from the use case
+            page.locator('.rail [data-panel="studio"]').click()
+            page.wait_for_selector("[data-st-side-open]", timeout=10000)
+            page.locator("[data-st-side-open]").first.click()
+            page.wait_for_selector("[data-st-make-pb]", timeout=10000)
+            page.locator("[data-st-make-pb]").click()
+            page.wait_for_selector(".pb-step-title", timeout=20000)
+            assert page.locator('[data-pb-f="title"]').input_value() == "Zo verwerk je aanmaningen met de Super Agent"
+            png = state / "shot.png"
+            import base64 as _b64
+            png.write_bytes(_b64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg=="))
+            page.locator('[data-pb-file="0"]').set_input_files(str(png))
+            page.wait_for_selector(".pb-step[data-pb-step='0'] .pb-media img", timeout=15000)
+            page.locator('[data-pb-rec="voice:1"]').click()
+            page.wait_for_selector(".pb-rec-note", timeout=5000)
+            page.wait_for_timeout(2500)
+            page.locator('[data-pb-rec="voice:1"]').click()
+            page.wait_for_selector(".pb-step[data-pb-step='1'] .pb-media audio", timeout=15000)
+            page.locator("[data-pb-publish]").click()
+            page.wait_for_timeout(800)
+            pbs = ctx.request.get("/api/studio/playbooks").json()["playbooks"]
+            pbrow = next(x for x in pbs if x["title"].startswith("Zo verwerk"))
+            assert pbrow["status"] == "published" and pbrow["media"] == 2 and pbrow["team"] == "finance/debiteuren", pbrow
+            media_ok = ctx.request.get(f"/api/studio/media?pb={pbrow['id']}&f={pbrow['cover']}")
+            assert media_ok.ok and media_ok.headers.get("content-type", "").startswith("image/"), media_ok.status
+            page.screenshot(path=str(art / "09-playbook-editor.png"), full_page=True)
+            ok("Playbook written by the agent from the use case; screenshot and voice note added; published for the team")
+
+            # run it, with the clock, and try a step's prompt in the chat
+            page.locator("[data-pb-run]").click()
+            page.wait_for_selector("[data-pb-done]", timeout=5000)
+            page.locator('[data-pb-done="0"]').check(); page.locator('[data-pb-done="1"]').check()
+            page.locator("[data-pb-run-finish]").click()
+            page.wait_for_timeout(800)
+            stats = ctx.request.get("/api/studio/playbook?id=" + pbrow["id"]).json()["stats"]
+            assert stats["complete"] == 1 and stats["avg_minutes"] >= 1, stats
+            page.locator('[data-pb-try="0"]').first.click()
+            page.wait_for_function("() => (document.getElementById('msg')||{}).value === 'Laat de concept-aanmaningen van vandaag zien'", timeout=15000)
+            ok("Playbook run recorded with time and steps; a step's prompt opens in the Super Agent chat")
+
+            # backlog: reorder and let the agent make an idea
+            page.locator('.rail [data-panel="studio"]').click()
+            page.wait_for_selector('[data-st-tab="backlog"]', timeout=10000)
+            page.locator('[data-st-tab="backlog"]').click()
+            page.wait_for_selector(".bl-item", timeout=10000)
+            first = page.locator(".bl-item").first.get_attribute("data-bl")
+            page.locator(".bl-item").first.locator('[data-bl-move="1"]').click()
+            page.wait_for_timeout(600)
+            assert page.locator(".bl-item").nth(1).get_attribute("data-bl") == first
+            target = page.locator('.bl-item:has-text("Huisstijl aanmaning")')
+            target.locator("[data-bl-agent]").click()
+            page.wait_for_selector('.bl-item:has-text("Huisstijl aanmaning") .om-badge.ok', timeout=60000)
+            page.screenshot(path=str(art / "10-backlog.png"), full_page=True)
+            page.locator('.bl-item:has-text("Huisstijl aanmaning") [data-bl-open]').click()
+            page.wait_for_selector(".st-confirm [data-st-build]", timeout=15000)
+            ok("backlog reorders; the agent works an idea out to the dry run, ready for a person to build")
+
+            # the team's playbooks in the organisation chart
+            page.locator('.rail [data-panel="organisation"]').click()
+            page.wait_for_selector('.om-team-card[data-om-team="finance/debiteuren"]', timeout=10000)
+            if not page.locator(".om-drawer").count():
+                page.locator('.om-team-card[data-om-team="finance/debiteuren"]').click()
+            page.wait_for_selector(f'[data-om-open-pb="{pbrow["id"]}"]', timeout=10000)
+            page.locator(f'[data-om-open-pb="{pbrow["id"]}"]').click()
+            page.wait_for_selector(".pb-step-title, .pb-read", timeout=10000)
+            ok("the team's playbooks show in the organisation chart and open in Studio")
+
             # list view
             page.locator('.rail [data-panel="studio"]').click()
-            page.locator("[data-st-back]").click()
+            page.locator('[data-st-tab="usecases"]').click()
             page.wait_for_selector(".st-card", timeout=10000)
-            card = page.locator(".st-card").first.inner_text()
-            assert "Debiteurenopvolging" in card and "4 gebouwd" in card, card
+            cards = page.locator(".st-card").all_inner_texts()
+            assert any("Debiteurenopvolging" in c and "4 gebouwd" in c for c in cards), cards
             page.screenshot(path=str(art / "07-list.png"))
             ok("use case list shows the use case with built parts")
 
             # 7. narrow
             page.set_viewport_size({"width": 390, "height": 844})
-            page.locator(".st-card").first.click()
+            page.locator('.st-card:has-text("Debiteurenopvolging")').first.click()
             page.wait_for_selector(".st-stepper", timeout=10000)
             page.screenshot(path=str(art / "08-mobile.png"), full_page=True)
             overflow = page.evaluate("() => document.querySelector('#mainStudio .om-wrap').scrollWidth - document.querySelector('#mainStudio .om-wrap').clientWidth")
             assert overflow <= 2, overflow
             ok("narrow layout without horizontal overflow")
-            assert fake.calls.count("AI-consultant") == 1 and "uitvoerbaar Playbook" in fake.calls, fake.calls
+            assert fake.calls.count("AI-consultant") == 1 and fake.calls.count("uitvoerbaar Playbook") == 2, fake.calls
             ours = [e for e in console_errors if "studio" in e.lower() or "SPStudio" in e]
             assert not ours, ours
             ok("no console errors from Studio")
