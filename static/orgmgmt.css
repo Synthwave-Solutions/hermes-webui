@@ -405,3 +405,6 @@ button.om-mini-stat:focus-visible,button.om-saved:focus-visible,button.om-strip-
 .oc-node .om-mini{flex-wrap:nowrap}
 .oc-node .om-mini-stat{padding:3px 6px}
 .oc-node.team .om-flag-dot{position:static;margin-left:2px}
+.oc-text strong{overflow-wrap:normal;word-break:normal;hyphens:auto}
+.oc-node.org .oc-text strong{white-space:nowrap}
+.oc-node.oc-merged,.oc-merged>.oc-node{border-width:1.5px}
