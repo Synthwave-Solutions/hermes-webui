@@ -24,7 +24,7 @@
       person: 'Persoon',
       other: 'Overig', fails: 'faalt', no_value: 'zonder waarde', suggested: 'voorstel',
       suggest_intro: '{n} voorstellen op basis van de bestaande categorie.', apply_suggestions: 'Neem alle voorstellen over', applied_n: '{n} ingedeeld',
-      org: 'Organisatie', mgmt: 'Management', chart: 'Organigram', manage: 'Teams beheren', parent: 'Onder team', parent_none: 'Geen, hoofdteam', subteams: 'Subteams', expand_all: 'Alles uitklappen', collapse_all: 'Alles inklappen', s_people: 'Mensen', s_bots: 'Bots', s_tasks: 'Geplande taken', s_conn: 'Koppelingen', s_skills: 'Skills', s_saved: 'Tijd bespaard', s_saved_sub: 'laatste 4 weken', s_conn_hint: 'MCP-servers van de bots plus persoonlijke koppelingen van de mensen', details: 'Details', collapse: 'Inklappen', expand: 'Uitklappen', departments: 'Afdelingen', department_one: 'Afdeling', zoom_in: 'Inzoomen', zoom_out: 'Uitzoomen', zoom_fit: 'Passend maken', show_which: 'klik om te zien welke', whole_org: 'Hele organisatie', search_in: 'Zoek in {what}', no_match: 'Niets gevonden.', nothing_here: 'Niets om te tonen.', conn_mcp: 'MCP-servers van bots', conn_app: 'Persoonlijke koppelingen', via_bots: 'via {n} bot(s)', via_people: 'van {n} persoon/personen', hierarchy: 'Hiërarchie', h_note: 'Bots zonder bot-manager staan onder de teamlead.', no_lead: 'Geen teamlead', reports: 'rapporteert aan',
+      org: 'Organisatie', mgmt: 'Management', chart: 'Organigram', manage: 'Teams beheren', parent: 'Onder team', parent_none: 'Geen, hoofdteam', subteams: 'Subteams', expand_all: 'Alles uitklappen', collapse_all: 'Alles inklappen', s_people: 'Mensen', s_bots: 'Bots', s_tasks: 'Geplande taken', s_conn: 'Koppelingen', s_skills: 'Skills', s_saved: 'Tijd bespaard', s_saved_sub: 'laatste 4 weken', s_conn_hint: 'MCP-servers van de bots plus persoonlijke koppelingen van de mensen', details: 'Details', collapse: 'Inklappen', expand: 'Uitklappen', departments: 'Afdelingen', department_one: 'Afdeling', zoom_in: 'Inzoomen', zoom_out: 'Uitzoomen', zoom_fit: 'Passend maken', pan_hint: 'Sleep om te verschuiven, Ctrl en scrollen om te zoomen', show_which: 'klik om te zien welke', whole_org: 'Hele organisatie', search_in: 'Zoek in {what}', no_match: 'Niets gevonden.', nothing_here: 'Niets om te tonen.', conn_mcp: 'MCP-servers van bots', conn_app: 'Persoonlijke koppelingen', via_bots: 'via {n} bot(s)', via_people: 'van {n} persoon/personen', hierarchy: 'Hiërarchie', h_note: 'Bots zonder bot-manager staan onder de teamlead.', no_lead: 'Geen teamlead', reports: 'rapporteert aan',
       people: 'Mensen', bots: 'Bots', both: 'Samen', tasks: 'Taken', team: 'Team', teams: 'Teams',
       department: 'Afdeling', departments: 'Afdelingen', lead: 'Lead', members: 'Leden', rate: 'Uurtarief',
       org_intro: 'Wie in welk team zit, welke bots en geplande taken voor dat team werken, en hoeveel tijd dat bespaart.',
@@ -95,7 +95,7 @@
       person: 'Person',
       other: 'Other', fails: 'failing', no_value: 'without value', suggested: 'suggested',
       suggest_intro: '{n} suggestions based on the existing category.', apply_suggestions: 'Apply all suggestions', applied_n: '{n} placed',
-      org: 'Organisation', mgmt: 'Management', chart: 'Org chart', manage: 'Manage teams', parent: 'Under team', parent_none: 'None, top-level team', subteams: 'Sub-teams', expand_all: 'Expand all', collapse_all: 'Collapse all', s_people: 'People', s_bots: 'Bots', s_tasks: 'Scheduled tasks', s_conn: 'Connections', s_skills: 'Skills', s_saved: 'Time saved', s_saved_sub: 'last 4 weeks', s_conn_hint: 'MCP servers of the bots plus personal connections of the people', details: 'Details', collapse: 'Collapse', expand: 'Expand', departments: 'Departments', department_one: 'Department', zoom_in: 'Zoom in', zoom_out: 'Zoom out', zoom_fit: 'Fit to width', show_which: 'click to see which', whole_org: 'Whole organisation', search_in: 'Search {what}', no_match: 'Nothing found.', nothing_here: 'Nothing to show.', conn_mcp: 'MCP servers of bots', conn_app: 'Personal connections', via_bots: 'through {n} bot(s)', via_people: 'from {n} person(s)', hierarchy: 'Hierarchy', h_note: 'Bots without a bot manager sit under the team lead.', no_lead: 'No team lead', reports: 'reports to',
+      org: 'Organisation', mgmt: 'Management', chart: 'Org chart', manage: 'Manage teams', parent: 'Under team', parent_none: 'None, top-level team', subteams: 'Sub-teams', expand_all: 'Expand all', collapse_all: 'Collapse all', s_people: 'People', s_bots: 'Bots', s_tasks: 'Scheduled tasks', s_conn: 'Connections', s_skills: 'Skills', s_saved: 'Time saved', s_saved_sub: 'last 4 weeks', s_conn_hint: 'MCP servers of the bots plus personal connections of the people', details: 'Details', collapse: 'Collapse', expand: 'Expand', departments: 'Departments', department_one: 'Department', zoom_in: 'Zoom in', zoom_out: 'Zoom out', zoom_fit: 'Fit to width', pan_hint: 'Drag to move, Ctrl and scroll to zoom', show_which: 'click to see which', whole_org: 'Whole organisation', search_in: 'Search {what}', no_match: 'Nothing found.', nothing_here: 'Nothing to show.', conn_mcp: 'MCP servers of bots', conn_app: 'Personal connections', via_bots: 'through {n} bot(s)', via_people: 'from {n} person(s)', hierarchy: 'Hierarchy', h_note: 'Bots without a bot manager sit under the team lead.', no_lead: 'No team lead', reports: 'reports to',
       people: 'People', bots: 'Bots', both: 'Both', tasks: 'Tasks', team: 'Team', teams: 'Teams',
       department: 'Department', departments: 'Departments', lead: 'Lead', members: 'Members', rate: 'Hourly rate',
       org_intro: 'Who is in which team, which bots and scheduled tasks work for that team, and how much time that saves.',
@@ -408,7 +408,7 @@
     const root = `<div class="oc-node org"><div class="oc-head"><span class="om-face org">${icon('skills', 16)}</span><span class="oc-text"><strong>${H(lang() === 'en' ? 'Organisation' : 'Organisatie')}</strong><span>${depts.length} ${H((depts.length === 1 ? w('department_one') : w('departments')).toLowerCase())}</span></span>${savedHtml(sum, 'org', '')}</div><!--toggle--></div>`;
     const z = O.zoom || 1;
     return `<div class="oc-wrap" data-tour="org-chart">
-      <div class="oc-tools" role="group" aria-label="Zoom"><button type="button" class="sm-btn" data-oc-zoom="-1" aria-label="${H(w('zoom_out'))}">−</button><span class="oc-zoom-val">${Math.round(z * 100)}%</span><button type="button" class="sm-btn" data-oc-zoom="1" aria-label="${H(w('zoom_in'))}">+</button><button type="button" class="sm-btn" data-oc-zoom="fit">${H(w('zoom_fit'))}</button></div>
+      <div class="oc-tools" role="group" aria-label="Zoom" data-hint="${H(w('pan_hint'))}"><button type="button" class="sm-btn" data-oc-zoom="-1" aria-label="${H(w('zoom_out'))}">−</button><span class="oc-zoom-val">${Math.round(z * 100)}%</span><button type="button" class="sm-btn" data-oc-zoom="1" aria-label="${H(w('zoom_in'))}">+</button><button type="button" class="sm-btn" data-oc-zoom="fit">${H(w('zoom_fit'))}</button></div>
       <div class="oc-scroll"><div class="oc" style="zoom:${z}"><ul>${ocLi('org', 'oc-org', root, depts.map(deptLi), true)}</ul></div></div></div>`;
   }
 
@@ -578,6 +578,34 @@
     if (!root || root.dataset.omBound) return;
     root.dataset.omBound = '1';
     root.addEventListener('toggle', ev => { const d = ev.target; if (d && d.dataset && d.dataset.omOpen) setOpen(d.dataset.omOpen, d.open); }, true);
+    // Drag the org chart around like a canvas; Ctrl or Cmd with the wheel zooms.
+    let pan = null;
+    root.addEventListener('pointerdown', ev => {
+      const sc = ev.target.closest && ev.target.closest('.oc-scroll');
+      if (!sc || ev.button !== 0 || ev.target.closest('button,a,input,select,textarea')) return;
+      pan = { sc, x: ev.clientX, y: ev.clientY, left: sc.scrollLeft, top: sc.scrollTop, id: ev.pointerId, moved: false };
+    });
+    root.addEventListener('pointermove', ev => {
+      if (!pan || ev.pointerId !== pan.id) return;
+      const dx = ev.clientX - pan.x, dy = ev.clientY - pan.y;
+      if (!pan.moved && Math.abs(dx) + Math.abs(dy) < 4) return;
+      if (!pan.moved) { pan.moved = true; pan.sc.classList.add('panning'); try { pan.sc.setPointerCapture(ev.pointerId); } catch (_e) {} }
+      pan.sc.scrollLeft = pan.left - dx; pan.sc.scrollTop = pan.top - dy;
+      ev.preventDefault();
+    });
+    const endPan = () => { if (pan) { pan.sc.classList.remove('panning'); pan = null; } };
+    root.addEventListener('pointerup', endPan);
+    root.addEventListener('pointercancel', endPan);
+    root.addEventListener('wheel', ev => {
+      const sc = ev.target.closest && ev.target.closest('.oc-scroll');
+      if (!sc || !(ev.ctrlKey || ev.metaKey)) return;
+      ev.preventDefault();
+      const oc = sc.querySelector('.oc');
+      O.zoom = Math.max(0.4, Math.min(1.5, Math.round(((O.zoom || 1) + (ev.deltaY < 0 ? 0.05 : -0.05)) * 100) / 100));
+      if (oc) oc.style.zoom = O.zoom;
+      try { localStorage.setItem('sp-org-zoom', String(O.zoom)); } catch (_e) {}
+      const v = root.querySelector('.oc-zoom-val'); if (v) v.textContent = Math.round(O.zoom * 100) + '%';
+    }, { passive: false });
     root.addEventListener('input', ev => { if (ev.target.hasAttribute('data-om-detail-q') && O.detail) { O.detail.q = ev.target.value; paintDetail(); } });
     document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && O.detail && typeof _currentPanel !== 'undefined' && _currentPanel === 'organisation') { O.detail = null; renderOrg(); } });
     root.addEventListener('click', async ev => {

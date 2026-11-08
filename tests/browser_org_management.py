@@ -306,6 +306,15 @@ def main() -> int:
             page.locator('[data-oc-zoom="-1"]').click()
             assert page.locator('.oc').evaluate("e => e.style.zoom") == "0.9"
             page.locator('[data-oc-zoom="1"]').click()
+            for _ in range(6):
+                page.locator('[data-oc-zoom="1"]').click()
+            page.evaluate("() => { const sc = document.querySelector('.oc-scroll'); sc.style.maxHeight = '260px'; sc.scrollLeft = 0; sc.scrollTop = 0; }")
+            box = page.locator(".oc-scroll").bounding_box()
+            page.mouse.move(box["x"] + box["width"] - 12, box["y"] + box["height"] - 12)
+            page.mouse.down(); page.mouse.move(box["x"] + box["width"] - 160, box["y"] + box["height"] - 120, steps=8); page.mouse.up()
+            moved = page.evaluate("() => { const sc = document.querySelector('.oc-scroll'); return sc.scrollLeft + sc.scrollTop; }")
+            assert moved > 0, "dragging the empty canvas must move the chart"
+            page.locator('[data-oc-zoom="fit"]').click()
             page.screenshot(path=str(art / "03b-org-subteam.png"), full_page=True)
             ok("sub-teams sit under their team, a loop is refused, and collapsed state is remembered")
 
