@@ -110,8 +110,8 @@ def _int(value, lo=0, hi=6000) -> int:
 
 
 def clean_goals(items) -> list:
-    return [{"name": _txt(g.get("name"), 120), "kpi": _txt(g.get("kpi"), 160), "baseline": _txt(g.get("baseline"), 60),
-             "target": _txt(g.get("target"), 60), "chosen": bool(g.get("chosen", True))}
+    return [{"name": _txt(g.get("name"), 120), "kpi": _txt(g.get("kpi"), 160), "baseline": _txt(g.get("baseline"), 100),
+             "target": _txt(g.get("target"), 100), "chosen": bool(g.get("chosen", True))}
             for g in (items or [])[:5] if isinstance(g, dict) and _txt(g.get("name"))]
 
 
@@ -280,7 +280,8 @@ Iemand vertelt over zijn werk. Bouw drie lagen, strikt gescheiden:
 1. GEWENST DOEL (1 tot 3): de uitkomst die het team wil bereiken, in hun eigen taal. Meetbaar: een KPI met
    nulmeting en doelwaarde. Gebruik alleen getallen die de persoon noemt; anders "nulmeting nog bepalen"
    of "doelwaarde nog bepalen". De naam van het doel geeft de richting ("offertes sneller de deur uit"),
-   zonder een getal of termijn die de persoon niet zelf noemde.
+   zonder een getal of termijn die de persoon niet zelf noemde. Nulmeting en doelwaarde zijn kort: een getal
+   met eenheid ("3 dagen", "15 per week"), geen zin.
    Een doel is nooit een oplossing ("minder openstaande facturen", niet "een bot die aanmaant").
 2. KANSEN (2 tot 5): behoeften, knelpunten of wensen die het doel in de weg staan, geformuleerd vanuit de
    medewerker of klant ("ik verlies elke maandag twee uur aan nabellen"). Nog GEEN oplossing. Elke kans hoort
