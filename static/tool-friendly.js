@@ -25,25 +25,42 @@
   const COPY={
     nl:{
       steps:'Werkstappen', running:'Bezig', done:'Klaar', failed:'Mislukt', stopped:'Gestopt', details:'Details',
-      last_seen:'Laatst gezien: bezig', queued:'In de wachtrij', subagent:'Subagent', subagents:'Subagents',
-      tools_one:'1 stap', tools_many:'{n} stappen', subagents_title:'Subagents', subagents_empty:'Nog geen activiteit',
+      last_seen:'Laatst gezien: bezig', queued:'In de wachtrij', subagent:'Helper', subagents:'Teamwerk',
+      tools_one:'1 stap', tools_many:'{n} stappen', subagents_title:'Teamwerk', subagents_empty:'Nog geen activiteit',
       subagents_more:'Toon alle stappen', step_more:'{n} eerdere stappen niet bewaard',
       processed:'Verwerkt', processed_in:'Verwerkt in {d}', working:'Bezig', now:'nu', open_thread:'Bekijk het volledige gesprek',
       error_title:'Er ging iets mis', error_hint:'Probeer het opnieuw. Blijft dit gebeuren, geef het dan door aan support.',
+      handoff_running:'{from} geeft dit door aan {to}…', handoff_asked:'{from} heeft {to} gevraagd',
+      handoff_takeover:'{to} neemt het hierna over in dit gesprek', handoff_list_running:'{from} kijkt wie kan helpen…',
+      handoff_list:'{from} keek wie kan helpen', handoff_join:'{from} stelt voor om {to} aan dit gesprek toe te voegen',
+      handoff_not_available:'Niet doorgegeven: {to} is niet beschikbaar voor jou', handoff_limit:'Maximaal vier keer doorgeven bereikt',
+      handoff_failed:'Niet doorgegeven aan {to}', handoff_view_task:'Bekijk de opdracht', another_bot:'een andere bot', and:'en',
+      team_status_queued:'Wacht op zijn beurt', team_status_queued_handoff:'Neemt het over na {from}', team_status_running:'Aan het werk',
+      team_status_done:'Klaar', team_status_failed:'Niet afgerond', team_status_stopped:'Gestopt', team_status_last_seen:'Laatst gezien: aan het werk',
+      team_count_running:'{n} aan het werk', team_count_queued:'{n} wacht', team_count_done:'{n} klaar', team_count_failed:'{n} niet afgerond', open_work:'Bekijk het werk van {name}',
     },
     en:{
       steps:'Work steps', running:'Running', done:'Done', failed:'Failed', stopped:'Stopped', details:'Details',
-      last_seen:'Last seen: running', queued:'Queued', subagent:'Subagent', subagents:'Subagents',
-      tools_one:'1 step', tools_many:'{n} steps', subagents_title:'Subagents', subagents_empty:'No activity yet',
+      last_seen:'Last seen: running', queued:'Queued', subagent:'Helper', subagents:'Teamwork',
+      tools_one:'1 step', tools_many:'{n} steps', subagents_title:'Teamwork', subagents_empty:'No activity yet',
       subagents_more:'Show all steps', step_more:'{n} earlier steps not kept',
       processed:'Processed', processed_in:'Processed in {d}', working:'Working', now:'now', open_thread:'Open the full conversation',
       error_title:'Something went wrong', error_hint:'Please try again. If it keeps happening, let support know.',
+      handoff_running:'{from} is handing this to {to}…', handoff_asked:'{from} asked {to}',
+      handoff_takeover:'{to} takes over next in this chat', handoff_list_running:'{from} is checking who can help…',
+      handoff_list:'{from} checked who can help', handoff_join:'{from} suggests adding {to} to this chat',
+      handoff_not_available:'Not handed over: {to} is not available to you', handoff_limit:'Maximum of four handoffs reached',
+      handoff_failed:'Not handed over to {to}', handoff_view_task:'View the task', another_bot:'another bot', and:'and',
+      team_status_queued:'Waiting for its turn', team_status_queued_handoff:'Takes over after {from}', team_status_running:'Working on it',
+      team_status_done:'Done', team_status_failed:'Did not finish', team_status_stopped:'Stopped', team_status_last_seen:'Last seen: working',
+      team_count_running:'{n} working', team_count_queued:'{n} waiting', team_count_done:'{n} done', team_count_failed:'{n} did not finish', open_work:'See the work of {name}',
     },
   };
   function text(key, vars){
     const table=COPY[lang()]||COPY.en;
     let out=table[key]!=null?table[key]:(COPY.en[key]||key);
-    if(vars) Object.keys(vars).forEach(k=>{ out=out.replace('{'+k+'}',String(vars[k])); });
+    // One pass, so a bot name that happens to contain "{to}" is never re-expanded.
+    if(vars) out=out.replace(/\{(\w+)\}/g,(m,k)=>Object.prototype.hasOwnProperty.call(vars,k)?String(vars[k]):m);
     return out;
   }
 
@@ -58,7 +75,8 @@
     web:       ['🌐','Op het web zoeken','Op het web gezocht','Webzoektocht mislukt','Searching the web','Searched the web','Web search failed'],
     browser:   ['🧭','Browser bezig','Browser gebruikt','Browserstap mislukt','Using the browser','Used the browser','Browser step failed'],
     delegate:  ['🤝','Subagents starten','Subagent(s) gestart','Subagent starten mislukt','Starting subagents','Started subagent(s)','Could not start subagents'],
-    subagent:  ['🤖','Subagent werkt','Subagent klaar','Subagent mislukt','Subagent working','Subagent finished','Subagent failed'],
+    subagent:  ['👥','Helper werkt','Helper klaar','Helper mislukt','Helper working','Helper finished','Helper failed'],
+    handoff:   ['↪','Doorgeven','Doorgegeven','Niet doorgegeven','Handing over','Handed over','Not handed over'],
     opencode:  ['🧑‍💻','OpenCode-klus loopt','OpenCode-klus','OpenCode-klus mislukt','OpenCode job running','OpenCode job','OpenCode job failed'],
     mail:      ['✉️','Mail bezig','Mail afgehandeld','Mailactie mislukt','Working on mail','Mail handled','Mail action failed'],
     calendar:  ['📅','Agenda bekijken','Agenda bekeken','Agendaactie mislukt','Checking the calendar','Checked the calendar','Calendar action failed'],
@@ -93,6 +111,7 @@
     const mcp=mcpParts(tc&&tc.name);
     const n=mcp?norm(mcp.server+'_'+mcp.tool):raw;
     if(raw==='subagent_progress') return 'subagent';
+    if(raw==='delegate_to_bot') return 'handoff';
     if(raw==='delegate_task') return 'delegate';
     if(raw.includes('opencode')) return 'opencode';
     if(/gmail|(^|_)mail|email|outlook|inbox/.test(n)) return 'mail';
@@ -232,6 +251,7 @@
         const task=clip(a.task||tc.preview||'',72);
         return [who,task].filter(Boolean).join(': ');
       }
+      case 'handoff': { const h=handoffInfo(tc); return h.kind==='queued'?clip(h.task,72):''; }
       case 'opencode': return clip(firstString(a,['title','task','goal','prompt']),56);
       case 'skill': return clip(firstString(a,['name','skill']),40);
       case 'memory': {
@@ -271,12 +291,22 @@
     const nl=lang()==='nl';
     const titleIdx=st==='failed'?3:(st==='running'||st==='queued'||st==='last_seen'?1:2);
     let title=row[titleIdx+(nl?0:3)];
-    if(fam==='subagent'&&st==='stopped') title=nl?'Subagent gestopt':'Subagent stopped';
+    if(fam==='subagent'&&st==='stopped') title=nl?'Helper gestopt':'Helper stopped';
     const mcp=mcpParts(tc&&tc.name);
-    return {
+    const out={
       family:fam, emoji:row[0], title, target:target(tc,fam), state:st,
       duration:duration(tc), source:mcp?words(mcp.server):'',
     };
+    if(fam==='handoff'){
+      const h=handoffInfo(tc);
+      out.title=h.sentence;
+      out.state=h.kind==='error'?'failed':st;
+      out.handoff=h;
+      out.task=h.task;
+      out.detailsLabel=text('handoff_view_task');
+      out.iconHtml=avatarPairHtml(h.from,h.fromName,h.to,h.toName,h.kind);
+    }
+    return out;
   }
 
   function duration(tc){
@@ -323,7 +353,7 @@
   }
 
   // One-line group summary: "🛠️ Werkstappen (12)" plus "💻 5 · 📄 3 · ⚠️ 1".
-  const ORDER=['subagent','delegate','opencode','shell','read','write','search','list','web','browser','mail','calendar','drive','notion','crm','code','process','todo','memory','skill','image','vision','schedule','message','clarify','voice','tools','unknown'];
+  const ORDER=['handoff','subagent','delegate','opencode','shell','read','write','search','list','web','browser','mail','calendar','drive','notion','crm','code','process','todo','memory','skill','image','vision','schedule','message','clarify','voice','tools','unknown'];
   function groupSummary(items){
     const list=Array.from(items||[]).filter(Boolean);
     const counts=Object.create(null);
@@ -371,7 +401,179 @@
     return {emoji:hit[0],tone:hit[1],title:hit[2][i],hint:hit[3][i]};
   }
 
-  const api={lang,errorCard,processedLine,setLanguage:v=>{forced=(v==='nl'||v==='en')?v:null;},text,family,describe,state,target,shellSummary,formatDuration,statusChipHtml,groupSummary,emojiFor:fam=>(F[fam]||F.unknown)[0],FAMILIES:Object.keys(F)};
+
+  // ── Bot teamwork (delegate_to_bot, specialists, handoffs) ──
+  // Display only. Names come from the signed-in person's bot catalog
+  // (static/chat-bots.js), then from the bot name the server stamped on a
+  // message, and only then from a readable form of the profile name. Profile
+  // names never appear as visible text when a title is known.
+  const BOT_ID=/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+  function session(){ try{ return (typeof S!=='undefined')?S:root.S; }catch(_){ return root.S; } }
+  let titleCache={src:null,len:-1,map:null};
+  function titlesFromMessages(){
+    const st=session();
+    const list=st&&Array.isArray(st.messages)?st.messages:null;
+    if(!list) return null;
+    if(titleCache.src!==list||titleCache.len!==list.length){
+      const map=Object.create(null);
+      for(const m of list){
+        if(m&&m.role==='assistant'&&typeof m.bot_profile==='string'&&typeof m.bot_name==='string'){
+          const name=m.bot_name.trim();
+          if(name&&name!==m.bot_profile) map[m.bot_profile]=name;
+        }
+      }
+      titleCache={src:list,len:list.length,map};
+    }
+    return titleCache.map;
+  }
+  function catalogInfo(id){
+    try{
+      const gr=root.groupRouting;
+      if(gr&&typeof gr.botInfo==='function') return gr.botInfo(id)||null;
+    }catch(_){}
+    return null;
+  }
+  function humanize(id){
+    const raw=String(id||'').trim();
+    if(!raw) return text('another_bot');
+    if(raw==='default'&&typeof root.spProfileLabel==='function'){ try{ return String(root.spProfileLabel(raw)); }catch(_){} }
+    const w=raw.replace(/[-_.]+/g,' ').replace(/\s+/g,' ').trim();
+    return w.charAt(0).toUpperCase()+w.slice(1);
+  }
+  // Set when a name was guessed before the catalog arrived, so the chat can
+  // repaint once with the real names (static/subagent-threads.js).
+  let pendingNames=false;
+  function catalogLoaded(){
+    try{ const gr=root.groupRouting; return !!(gr&&typeof gr.catalogReady==='function'&&gr.catalogReady()); }catch(_){ return false; }
+  }
+  function botName(id, hint){
+    const key=String(id||'').trim();
+    const info=key?catalogInfo(key):null;
+    if(info&&info.title) return String(info.title);
+    if(key&&!info&&!catalogLoaded()) pendingNames=true;
+    const h=String(hint||'').trim();
+    if(h&&h!==key) return h;
+    const map=key?titlesFromMessages():null;
+    if(map&&map[key]) return map[key];
+    return humanize(key);
+  }
+  function botAvatarUrl(id){
+    const key=String(id||'').trim();
+    if(!BOT_ID.test(key)) return '';
+    const info=catalogInfo(key);
+    // A known profile without a photo keeps its initial; no request needed.
+    if(info&&info.known) return String(info.avatar_url||'').startsWith('/api/profile/avatar?')?info.avatar_url:'';
+    return '/api/profile/avatar?profile='+encodeURIComponent(key);
+  }
+  function avatarHtml(id, name, extra){
+    const label=String(name||botName(id));
+    const initial=(label.trim().charAt(0)||'?').toUpperCase();
+    const url=botAvatarUrl(id);
+    const cls='sp-bot-avatar'+(extra?' '+extra:'');
+    return `<span class="${esc(cls)}" aria-hidden="true"><span class="sp-bot-avatar-initial">${esc(initial)}</span>${url?`<img src="${esc(url)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">`:''}</span>`;
+  }
+  function avatarPairHtml(from, fromName, to, toName, kind){
+    const lead=avatarHtml(from,fromName,'sp-bot-avatar-from');
+    if(kind==='list'||kind==='list_running') return `<span class="sp-handoff-avatars">${lead}</span>`;
+    return `<span class="sp-handoff-avatars">${lead}<span class="sp-handoff-arrow" aria-hidden="true">↪</span>${avatarHtml(to,toName,'sp-bot-avatar-to')}</span>`;
+  }
+  function joinNames(names){
+    const list=Array.from(names||[]).map(n=>String(n||'').trim()).filter(Boolean);
+    if(list.length<2) return list[0]||'';
+    return list.slice(0,-1).join(', ')+' '+text('and')+' '+list[list.length-1];
+  }
+  function capitalize(value){ const s=String(value||''); return s.charAt(0).toUpperCase()+s.slice(1); }
+  // The bot that made the tool call: the stamped speaker of its message, the
+  // bot working on the live turn, or the conversation's own bot.
+  function speakerOf(tc){
+    if(tc&&typeof tc.bot_profile==='string'&&tc.bot_profile) return {id:tc.bot_profile,name:tc.bot_name||''};
+    const st=session();
+    const idx=Number(tc&&tc.assistant_msg_idx);
+    const list=st&&Array.isArray(st.messages)?st.messages:[];
+    if(Number.isInteger(idx)&&idx>=0&&idx<list.length){
+      const m=list[idx];
+      if(m&&typeof m.bot_profile==='string'&&m.bot_profile) return {id:m.bot_profile,name:m.bot_name||''};
+    }
+    const sid=st&&st.session&&st.session.session_id;
+    try{
+      const w=sid&&root.groupRouting&&typeof root.groupRouting.workingState==='function'?root.groupRouting.workingState(sid):null;
+      if(w&&w.bot) return {id:w.bot,name:''};
+    }catch(_){}
+    const own=String((st&&st.session&&st.session.profile)||(st&&st.activeProfile)||'');
+    return {id:own,name:''};
+  }
+  function parseResult(tc){
+    const raw=tc&&(tc.result!==undefined&&tc.result!==null?tc.result:tc.snippet);
+    if(raw&&typeof raw==='object') return raw;
+    const s=String(raw||'').trim();
+    if(!s||s.charAt(0)!=='{') return null;
+    try{ const v=JSON.parse(s); return v&&typeof v==='object'?v:null; }catch(_){}
+    // A shortened result keeps its leading fields; recover only the error text.
+    const m=s.match(/^\{\s*"error"\s*:\s*"((?:[^"\\]|\\.)*)/);
+    return m?{error:m[1]}:null;
+  }
+  function handoffError(message, toName){
+    const msg=String(message||'');
+    if(/four handoffs|chain is too deep/i.test(msg)) return text('handoff_limit');
+    if(/authorized bot|not available|revoked|no longer in this conversation/i.test(msg)) return text('handoff_not_available',{to:toName});
+    return text('handoff_failed',{to:toName});
+  }
+  function handoffInfo(tc){
+    const a=args(tc);
+    const action=['list','request_join'].includes(a.action)?a.action:'delegate';
+    const mode=a.mode==='handoff'?'handoff':'background';
+    const res=parseResult(tc);
+    const sp=speakerOf(tc);
+    const to=String(a.bot||(res&&typeof res.bot==='string'?res.bot:'')||'');
+    const fromName=botName(sp.id,sp.name), toName=botName(to);
+    const running=!!(tc&&tc.done===false);
+    const task=typeof a.task==='string'?a.task.replace(/\s+/g,' ').trim():'';
+    let kind, sentence;
+    if(running){
+      kind=action==='list'?'list_running':'running';
+      sentence=action==='list'?text('handoff_list_running',{from:fromName}):text('handoff_running',{from:fromName,to:toName});
+    }else if((res&&typeof res.error==='string')||(tc&&tc.is_error)){
+      kind='error';
+      sentence=handoffError(res&&res.error,toName);
+    }else if(action==='list'){
+      kind='list'; sentence=text('handoff_list',{from:fromName});
+    }else if(action==='request_join'){
+      kind='join'; sentence=text('handoff_join',{from:fromName,to:toName});
+    }else if(mode==='handoff'){
+      kind='handoff'; sentence=text('handoff_takeover',{to:toName});
+    }else{
+      kind='queued'; sentence=text('handoff_asked',{from:fromName,to:toName});
+    }
+    return {kind, action, mode, from:sp.id, fromName, to, toName, task, sentence:capitalize(sentence)};
+  }
+  // One calm line inside the asking bot's turn: both avatars, one sentence,
+  // the task behind "Bekijk de opdracht". Plain text only.
+  function handoffLineHtml(tc){
+    const h=handoffInfo(tc);
+    const short=h.kind==='queued'&&h.task?': '+clip(h.task,72):'';
+    const line=`${avatarPairHtml(h.from,h.fromName,h.to,h.toName,h.kind)}<span class="sp-handoff-text">${esc(h.sentence+short)}</span>`;
+    const tip=h.to?` title="${esc('@'+h.from+' ↪ @'+h.to)}"`:'';
+    if(!h.task) return `<div class="sp-handoff-line" data-kind="${esc(h.kind)}"${tip}><div class="sp-handoff-summary">${line}</div></div>`;
+    return `<details class="sp-handoff-line" data-kind="${esc(h.kind)}"${tip}><summary class="sp-handoff-summary">${line}<span class="sp-handoff-more">${esc(text('handoff_view_task'))}</span></summary><div class="sp-handoff-brief">${esc(h.task)}</div></details>`;
+  }
+  // Helpers credited on a reply: only the structured bot_delegation result
+  // records directly before it, never anything inferred from text.
+  function assistedBy(messages, idx){
+    const list=Array.isArray(messages)?messages:[];
+    const seen=[];
+    for(let i=Number(idx)-1;i>=0;i--){
+      const m=list[i];
+      const d=m&&m.role==='user'&&m.bot_delegation;
+      if(!d||d.result!==true) break;
+      const from=String(d.from||'');
+      if(from&&!seen.includes(from)) seen.unshift(from);
+    }
+    return seen;
+  }
+  function takePendingNames(){ const was=pendingNames; pendingNames=false; return was; }
+  const bots={takePendingNames, name:botName, avatarUrl:botAvatarUrl, avatarHtml, joinNames, assistedBy, handoffInfo, handoffLineHtml, speakerOf};
+
+  const api={bots,lang,errorCard,processedLine,setLanguage:v=>{forced=(v==='nl'||v==='en')?v:null;},text,family,describe,state,target,shellSummary,formatDuration,statusChipHtml,groupSummary,emojiFor:fam=>(F[fam]||F.unknown)[0],FAMILIES:Object.keys(F)};
   if(typeof module!=='undefined'&&module.exports) module.exports=api;
   root.SynPulseFriendlyTools=api;
 })(typeof window!=='undefined'?window:globalThis);
