@@ -744,7 +744,7 @@
       if(it.note) meta.appendChild(h('span', 'k-kpi-note', it.note));
       if(meta.childNodes.length) tile.appendChild(meta);
       if(it.target !== null){
-        var target = h('div', 'k-target' + (it.met ? ' is-met' : ''));
+        var target = h('div', 'k-target' + (it.over ? ' is-over' : it.met ? ' is-met' : ''));
         var bar = h('div', 'k-target-bar'), fill = h('span', 'k-target-fill');
         fill.style.width = Math.round(it.progress * 1000) / 10 + '%';
         bar.appendChild(fill);
@@ -825,9 +825,11 @@
       b.dataset.k = it.k;
       b.setAttribute('aria-label', [it.label, period, it.milestone ? T('milestone') : '', word].filter(Boolean).join(', '));
       b.setAttribute('aria-pressed', 'false');
-      var x0 = (it.s - axis.min) / span;
+      // Very long plans: keep every bar inside its track.
+      var x0 = Math.max(0, Math.min(1, (it.s - axis.min) / span));
+      var x1 = Math.max(x0, Math.min(1, (it.e - axis.min) / span));
       b.style.left = pct(x0);
-      if(!it.milestone) b.style.width = 'max(6px, ' + pct((it.e - it.s) / span) + ')';
+      if(!it.milestone) b.style.width = 'max(6px, ' + pct(x1 - x0) + ')';
       b.addEventListener('click', function(){ select(i, false); });
       b.addEventListener('keydown', function(e){
         var to = e.key === 'ArrowDown' || e.key === 'ArrowRight' ? i + 1 : e.key === 'ArrowUp' || e.key === 'ArrowLeft' ? i - 1 : e.key === 'Home' ? 0 : e.key === 'End' ? n - 1 : -2;

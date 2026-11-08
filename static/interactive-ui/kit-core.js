@@ -623,6 +623,8 @@
       if(target!==null){
         item.progress=Math.max(0,Math.min(1,v.n/target));
         item.met=good==='down'?v.n<=target:v.n>=target;
+        // A cost or churn figure above its target is an overrun, not a goal reached.
+        item.over=good==='down'&&v.n>target;
       }
       outItems.push(item);
     });

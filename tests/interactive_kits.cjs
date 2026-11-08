@@ -346,4 +346,12 @@ assert.strictEqual(accepts('planning', '- Week 1: kick-off\n- Week 2: bouw'), fa
 sandbox.SWKit = undefined;
 assert.strictEqual(accepts('table', '{"title":"x"}'), false, 'without the kit helpers a data block stays code');
 
+// A cost above its target is an overrun, not a reached goal.
+{
+  const r = K.build('kpi', JSON.stringify({title:'Kosten', lang:'nl', items:[{label:'Kosten', value:9100, format:'currency', good:'down', target:8000},
+    {label:'Omzet', value:9100, format:'currency', target:8000}]}), {lang:'nl'});
+  assert.strictEqual(r.errors.length, 0, JSON.stringify(r.errors));
+  assert.strictEqual(r.spec.items[0].over, true); assert.strictEqual(r.spec.items[0].met, false);
+  assert.strictEqual(r.spec.items[1].over, false); assert.strictEqual(r.spec.items[1].met, true);
+}
 console.log('all kit checks passed');
