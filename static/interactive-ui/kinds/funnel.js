@@ -1,7 +1,7 @@
 // Data block "funnel" (```funnel, ```trechter): a conversion funnel such as a
 // sales pipeline, website visitors to customers or a recruitment process.
 //
-// {"title", "stages":[{"label", "value", "note"?}], "format"?:"number|currency",
+// {"title", "stages":[{"label", "value", "note"?}], "format"?:"number|currency|percent",
 //  "compare"?:[values of a previous period]}  ("steps" also works)
 //
 // The checks run in the chat (SWKit only); the renderer only registers inside
@@ -13,7 +13,8 @@
   if(!K) return;
 
   var LIM = {stages:8, label:40, note:80, minStages:2};
-  var FORMATS = {number:'number', count:'number', aantal:'number', stuks:'number', integer:'number', currency:'currency', euro:'currency', eur:'currency', bedrag:'currency'};
+  var FORMATS = {number:'number', count:'number', aantal:'number', stuks:'number', integer:'number', currency:'currency', euro:'currency', eur:'currency', bedrag:'currency',
+    percent:'percent', percentage:'percent', procent:'percent', '%':'percent'};
 
   var MSG = {
     nl:{
@@ -28,8 +29,9 @@
       value:function(l){ return '"' + l + '" heeft geen getal als waarde (value) en is weggelaten.'; },
       negative:function(l){ return '"' + l + '" had een negatieve waarde; die is op 0 gezet.'; },
       grows:function(l, prev){ return '"' + l + '" is groter dan de fase ervoor ("' + prev + '"); controleer de volgorde.'; },
-      format:function(f){ return 'Onbekend format "' + f + '"; gebruik number of currency. Nu geldt number.'; },
-      compareLength:function(got, want){ return 'De vergelijking (compare) heeft ' + got + ' waarden, verwacht ' + want + '.'; },
+      format:function(f){ return 'Onbekend format "' + f + '"; gebruik number, currency of percent. Nu geldt number.'; },
+      firstZero:function(l){ return 'De eerste fase ("' + l + '") is 0; de conversie vanaf het begin is niet te berekenen.'; },
+      compareLength:function(got, want){ return 'De vergelijking (compare) heeft ' + got + ' waarden, verwacht ' + want + '; ze is weggelaten.'; },
       compareValue:function(i){ return 'Vergelijkingswaarde ' + i + ' is geen getal en is weggelaten.'; },
       compareType:function(){ return 'De vergelijking (compare) is geen lijst met getallen en is weggelaten.'; },
       labelField:function(i){ return 'De naam van fase ' + i; },
@@ -47,8 +49,9 @@
       value:function(l){ return '"' + l + '" has no number as its value and was left out.'; },
       negative:function(l){ return '"' + l + '" had a negative value; it was set to 0.'; },
       grows:function(l, prev){ return '"' + l + '" is larger than the stage before it ("' + prev + '"); check the order.'; },
-      format:function(f){ return 'Unknown format "' + f + '"; use number or currency. Now number is used.'; },
-      compareLength:function(got, want){ return 'The comparison (compare) has ' + got + ' values, expected ' + want + '.'; },
+      format:function(f){ return 'Unknown format "' + f + '"; use number, currency or percent. Now number is used.'; },
+      firstZero:function(l){ return 'The first stage ("' + l + '") is 0; the conversion from the start cannot be worked out.'; },
+      compareLength:function(got, want){ return 'The comparison (compare) has ' + got + ' values, expected ' + want + '; it was left out.'; },
       compareValue:function(i){ return 'Comparison value ' + i + ' is not a number and was left out.'; },
       compareType:function(){ return 'The comparison (compare) is not a list of numbers and was left out.'; },
       labelField:function(i){ return 'The name of stage ' + i; },
@@ -59,8 +62,9 @@
     var t = MSG[lang === 'en' ? 'en' : 'nl'];
     return function(key){ var f = t[key]; return f ? f.apply(null, Array.prototype.slice.call(arguments, 1)) : String(key); };
   }
-  // A share as a number from 0 to 100, one decimal: the export and the chips read the same value.
-  function share(a, b){ return b > 0 ? Math.round(a / b * 1000) / 10 : null; }
+  // A share from 0 to 100 with four significant digits: 37 of 250.000 stays
+  // 0,0148 and never becomes 0. Only the text (pctText) rounds further.
+  function share(a, b){ return b > 0 ? Number((a / b * 100).toPrecision(4)) : null; }
 
   function validate(raw, lang, H){
     var m = messenger(lang), warnings = [], errors = [];
@@ -75,13 +79,14 @@
     if(!Array.isArray(list) || !list.length){ errors.push(m('noStages')); return {errors:errors, warnings:warnings}; }
     var compareIn = raw.compare != null ? raw.compare : raw.previous;
     if(compareIn != null && !Array.isArray(compareIn)){ warn('compareType'); compareIn = null; }
-    if(compareIn && compareIn.length !== list.length) warn('compareLength', compareIn.length, list.length);
+    // A list of the wrong length would put numbers next to the wrong stages.
+    if(compareIn && compareIn.length !== list.length){ warn('compareLength', compareIn.length, list.length); compareIn = null; }
     if(list.length > LIM.stages){ warn('many', list.length, LIM.stages); list = list.slice(0, LIM.stages); }
 
     var fmtRaw = typeof raw.format === 'string' ? raw.format.trim().toLowerCase() : '';
     var format = '';
     if(fmtRaw){ format = FORMATS[fmtRaw] || ''; if(!format) warn('format', H.str(raw.format, 20)); }
-    var sawCurrency = false;
+    var sawCurrency = false, sawPercent = false;
     var stages = [], anyCompare = false;
     list.forEach(function(it, i){
       if(Array.isArray(it) && it.length >= 2) it = {label:it[0], value:it[1], note:it[2]};
@@ -92,6 +97,7 @@
       var v = H.kpiNumber(vRaw);
       if(!v){ warn('value', label); return; }
       if(v.kind === 'currency') sawCurrency = true;
+      if(v.kind === 'percent') sawPercent = true;
       var value = v.n;
       if(value < 0){ warn('negative', label); value = 0; }
       var prev = null;
@@ -105,7 +111,8 @@
     });
     if(stages.length < LIM.minStages){ errors.push(m('tooFew', stages.length)); return {errors:errors, warnings:warnings}; }
     if(stages.every(function(s){ return s.value === 0; })){ errors.push(m('allZero')); return {errors:errors, warnings:warnings}; }
-    if(!format) format = sawCurrency ? 'currency' : 'number';
+    if(!format) format = sawCurrency ? 'currency' : sawPercent ? 'percent' : 'number';
+    if(stages[0].value === 0) warn('firstZero', stages[0].label);
 
     var first = stages[0].value, max = 0, drop = -1, dropConv = Infinity;
     stages.forEach(function(s, i){
@@ -118,7 +125,7 @@
       if(i && s.conv !== null && s.conv < 100 && s.conv < dropConv){ dropConv = s.conv; drop = i; }
       if(!anyCompare) s.prev = null;
     });
-    stages.forEach(function(s){ s.w = max > 0 ? Math.round(s.value / max * 1000) / 10 : 0; });
+    stages.forEach(function(s){ s.w = max > 0 ? Number((s.value / max * 100).toPrecision(4)) : 0; });
     var last = stages[stages.length - 1];
     var overall = share(last.value, first);
     var overallPrev = anyCompare && stages[0].prev !== null && last.prev !== null ? share(last.prev, stages[0].prev) : null;
@@ -137,7 +144,8 @@
 
   function table(spec){
     var en = spec.lang === 'en';
-    var header = en ? [spec.format === 'currency' ? 'Value' : 'Count', 'From previous', 'From start'] : [spec.format === 'currency' ? 'Waarde' : 'Aantal', 'Conversie vanaf vorige', 'Conversie vanaf begin'];
+    var what = spec.format === 'currency' ? (en ? 'Value' : 'Waarde') : spec.format === 'percent' ? (en ? 'Share' : 'Aandeel') : (en ? 'Count' : 'Aantal');
+    var header = en ? [what, 'From previous', 'From start'] : [what, 'Conversie vanaf vorige', 'Conversie vanaf begin'];
     header.unshift(en ? 'Stage' : 'Fase');
     var types = ['text', spec.format, 'percent', 'percent'];
     if(spec.compare){ header.push(en ? 'Previous period' : 'Vorige periode'); types.push(spec.format); }
@@ -148,19 +156,7 @@
     })};
   }
 
-  K.register('funnel', {
-    fences:['funnel', 'trechter'],
-    name:{nl:'Trechter', en:'Funnel'},
-    noun:{nl:'trechter', en:'funnel'},
-    icon:'funnel',
-    streamHeight:320,
-    validate:validate, estHeight:estHeight, table:table
-  });
-  if(typeof module !== 'undefined' && module.exports) module.exports = {validate:validate, table:table, estHeight:estHeight, LIMITS:LIM};
-
-  // ── Renderer (kit frame only) ──────────────────────────────────────────────
-  var R = root.SWKitRender;
-  if(!R) return;
+  // ── Texts (pure, so the Node test reads the same strings the frame shows) ──
   var TEXT = {
     nl:{overall:function(a, b, p){ return 'Van ' + a + ' naar ' + b + ': ' + p; },
       overallPrev:function(p){ return 'vorige periode ' + p; },
@@ -175,21 +171,75 @@
       fromPrev:function(p, l){ return p + ' of ' + l; }, fromStart:function(p){ return p + ' of the start'; },
       label:'Funnel', pick:'Choose a stage for the details.'}
   };
+  // fmt(value, type, decimals) is ctx.fmt in the frame and K.formatValue in Node.
+  function texts(spec, fmt){
+    var lang = spec.lang === 'en' ? 'en' : 'nl';
+    var t = function(key){ var v = TEXT[lang][key]; return typeof v === 'function' ? v.apply(null, Array.prototype.slice.call(arguments, 1)) : v; };
+    var num = function(v){ return fmt(v, spec.format, null); };
+    // 0% only for a real 0. From 10% whole numbers (38%), from 0,1% one decimal
+    // (4,2%, 0,4%), below that two significant digits (0,015%), and never a
+    // rounded 100% for a share that is not quite all.
+    var pct = function(p){
+      if(p === null || p === undefined) return '';
+      if(p === 0) return fmt(0, 'percent', 0);
+      if(p < 0.001) return '<' + fmt(0.001, 'percent', 3);
+      if(p < 0.1){ var r = Number(p.toPrecision(2)); return fmt(r, 'percent', Math.min(4, (String(r).split('.')[1] || '').length)); }
+      if(p < 10) return fmt(p, 'percent', 1);
+      if(p >= 99.5 && p < 100) return fmt(p, 'percent', p >= 99.95 ? 2 : 1);
+      return fmt(p, 'percent', 0);
+    };
+    var stages = spec.stages;
+    // Each part only when its number exists: no " van Oud" after a stage of 0.
+    function shares(i){
+      var s = stages[i], out = [];
+      if(i && s.conv !== null) out.push(t('fromPrev', pct(s.conv), stages[i - 1].label));
+      if(i && s.fromStart !== null) out.push(t('fromStart', pct(s.fromStart)));
+      return out;
+    }
+    return {
+      t:t, num:num, pct:pct,
+      overall:function(){ return spec.overall === null ? '' : t('overall', stages[0].label, stages[stages.length - 1].label, pct(spec.overall)); },
+      overallPrev:function(){ return spec.overallPrev === null ? '' : t('overallPrev', pct(spec.overallPrev)); },
+      drop:function(){ return spec.drop < 0 ? '' : t('drop', stages[spec.drop - 1].label, stages[spec.drop].label, pct(stages[spec.drop].conv)); },
+      chip:function(i){ return pct(stages[i].conv); },
+      aria:function(i){ var s = stages[i], p = [s.label, num(s.value)]; if(i && s.conv !== null) p.push(t('fromPrev', pct(s.conv), stages[i - 1].label)); return p.join(', '); },
+      detail:function(i){
+        var s = stages[i], parts = [s.label, num(s.value)].concat(shares(i));
+        if(spec.compare && s.prev !== null) parts.push(t('prev', num(s.prev)));
+        if(s.note) parts.push(s.note);
+        return parts.filter(Boolean).join(' · ');
+      }
+    };
+  }
+
+  K.register('funnel', {
+    fences:['funnel', 'trechter'],
+    name:{nl:'Trechter', en:'Funnel'},
+    noun:{nl:'trechter', en:'funnel'},
+    icon:'funnel',
+    streamHeight:320,
+    validate:validate, estHeight:estHeight, table:table
+  });
+  if(typeof module !== 'undefined' && module.exports) module.exports = {validate:validate, table:table, estHeight:estHeight, texts:texts, LIMITS:LIM};
+
+  // ── Renderer (kit frame only) ──────────────────────────────────────────────
+  var R = root.SWKitRender;
+  if(!R) return;
 
   R.register('funnel', function(box, spec, restore, ctx){
-    var lang = ctx.lang() === 'en' ? 'en' : 'nl';
-    var t = function(key){ var v = TEXT[lang][key]; return typeof v === 'function' ? v.apply(null, Array.prototype.slice.call(arguments, 1)) : v; };
+    var X = texts(Object.assign({}, spec, {lang:ctx.lang() === 'en' ? 'en' : 'nl'}), ctx.fmt);
+    var t = X.t, num = X.num;
     var h = ctx.h;
-    var num = function(v){ return ctx.fmt(v, spec.format, null); };
-    // Under 10% one decimal counts (4,2%, 3,0%); 38% does not need one.
-    var pct = function(p){ return p === null ? '' : ctx.fmt(p, 'percent', p < 10 ? 1 : 0); };
-    var stages = spec.stages, n = stages.length, first = stages[0], last = stages[n - 1];
+    var stages = spec.stages, n = stages.length;
+    // The grow-in plays once: any saved state (a choice, or -1 for "drawn
+    // before") draws the bars in place.
+    var seen = !!(restore && typeof restore.a === 'number');
 
-    var wrap = h('div', 'k-fn' + (restore && typeof restore.a === 'number' ? ' is-settled' : ''));
+    var wrap = h('div', 'k-fn' + (seen ? ' is-settled' : ''));
     if(spec.overall !== null){
       var sum = h('p', 'k-fn-overall');
-      sum.appendChild(h('span', 'k-fn-overall-main', t('overall', first.label, last.label, pct(spec.overall))));
-      if(spec.overallPrev !== null) sum.appendChild(h('span', 'k-fn-overall-prev', t('overallPrev', pct(spec.overallPrev))));
+      sum.appendChild(h('span', 'k-fn-overall-main', X.overall()));
+      if(spec.overallPrev !== null) sum.appendChild(h('span', 'k-fn-overall-prev', X.overallPrev()));
       wrap.appendChild(sum);
     }
     var list = h('div', 'k-fn-list');
@@ -199,6 +249,10 @@
     detail.setAttribute('role', 'status');
     detail.setAttribute('aria-live', 'polite');
     var buttons = [], rows = [];
+    // Every bar starts at the width of the longest number in the block and adds
+    // its share of the rest, so a larger value always gets a wider bar.
+    var valueTexts = stages.map(function(s){ return num(s.value); });
+    var minEm = (1.8 + Math.max.apply(null, valueTexts.map(function(x){ return x.length; })) * 0.62).toFixed(2);
 
     stages.forEach(function(s, i){
       if(i > 0){
@@ -207,7 +261,7 @@
         var chip = h('span', 'k-fn-chip');
         var arrow = h('span', 'k-fn-arrow', s.grows ? '↑' : '↓');
         arrow.setAttribute('aria-hidden', 'true');
-        chip.append(arrow, document.createTextNode(pct(s.conv)), h('span', 'k-sr', ' ' + (s.grows ? t('grows') : t('moveOn'))));
+        chip.append(arrow, document.createTextNode(X.chip(i)), h('span', 'k-sr', ' ' + (s.grows ? t('grows') : t('moveOn'))));
         // After a stage of 0 there is no share to show: the arrow alone keeps the rhythm.
         if(s.conv === null) chip.classList.add('is-empty');
         step.appendChild(chip);
@@ -224,11 +278,9 @@
       var track = h('div', 'k-fn-track');
       var b = h('button', 'k-fn-bar');
       b.type = 'button';
-      var text = num(s.value);
-      // Just wide enough for its own number, so small stages still differ in width.
-      b.style.width = 'max(' + (1.8 + text.length * 0.62).toFixed(2) + 'em, ' + s.w + '%)';
-      b.appendChild(h('span', 'k-fn-value', text));
-      b.setAttribute('aria-label', [s.label, num(s.value), i ? t('fromPrev', pct(s.conv), stages[i - 1].label) : ''].filter(Boolean).join(', '));
+      b.style.width = 'calc(' + minEm + 'em + (100% - ' + minEm + 'em) * ' + (s.w / 100) + ')';
+      b.appendChild(h('span', 'k-fn-value', valueTexts[i]));
+      b.setAttribute('aria-label', X.aria(i));
       b.setAttribute('aria-pressed', 'false');
       b.tabIndex = i === 0 ? 0 : -1;
       b.addEventListener('click', function(){ select(i, false); });
@@ -247,28 +299,21 @@
       buttons.push(b); rows.push(row);
     });
     wrap.appendChild(list);
-    if(spec.drop >= 0){
-      var d = stages[spec.drop];
-      wrap.appendChild(h('p', 'k-fn-drop', t('drop', stages[spec.drop - 1].label, d.label, pct(d.conv))));
-    }
+    if(spec.drop >= 0) wrap.appendChild(h('p', 'k-fn-drop', X.drop()));
     wrap.appendChild(detail);
     if(spec.source) wrap.appendChild(h('p', 'k-source', spec.source));
     box.appendChild(wrap);
 
     function select(i, isRestore){
-      var s = stages[i];
-      if(!s) return;
+      if(!stages[i]) return;
       buttons.forEach(function(x, j){ x.setAttribute('aria-pressed', String(j === i)); x.tabIndex = j === i ? 0 : -1; rows[j].classList.toggle('is-active', j === i); });
-      var parts = [s.label, num(s.value)];
-      if(i){ parts.push(t('fromPrev', pct(s.conv), stages[i - 1].label)); parts.push(t('fromStart', pct(s.fromStart))); }
-      if(spec.compare && s.prev !== null) parts.push(t('prev', num(s.prev)));
-      if(s.note) parts.push(s.note);
-      detail.textContent = parts.filter(Boolean).join(' · ');
+      detail.textContent = X.detail(i);
       detail.classList.add('is-set');
       if(!isRestore) ctx.save({a:i});
       ctx.resize();
     }
-    if(restore && typeof restore.a === 'number' && restore.a >= 0 && restore.a < n) select(restore.a, true);
+    if(seen && restore.a >= 0 && restore.a < n) select(restore.a, true);
+    else if(!seen) ctx.save({a:-1});
     return {};
   });
 })(typeof globalThis !== 'undefined' ? globalThis : this);
