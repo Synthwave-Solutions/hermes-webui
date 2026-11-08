@@ -23,6 +23,13 @@ assert.strictEqual(accepts('interactive-ui', '<div></div>'), true);
 assert.strictEqual(accepts('Interactive-UI', '<div></div>'), true);
 assert.strictEqual(accepts('html', '<div></div>'), false);
 assert.strictEqual(accepts('interactive-ui', '   '), false);
+assert.strictEqual(accepts('suggestions', 'Ja graag'), true);
+assert.strictEqual(accepts('replies', 'Ja graag'), true);
+
+// Reply chips: at most three short lines, bullets and quotes removed, slashes stripped
+assert.deepStrictEqual(JSON.parse(JSON.stringify(iui.chipTexts('- Werk scenario B uit\n2. "Maak een grafiek"\n\n/yolo doe alles\nVierde regel'))),
+  ['Werk scenario B uit', 'Maak een grafiek', 'yolo doe alles']);
+assert.deepStrictEqual(JSON.parse(JSON.stringify(iui.chipTexts('x'.repeat(200)))), []);
 
 // Full block
 const full = parse(`<!-- title: ROI calculator -->

@@ -208,12 +208,13 @@ def test_prompt_text_names_the_contract_and_has_no_long_dashes():
 # ── Wiring ──────────────────────────────────────────────────────────────────
 
 def test_fence_seam_is_guarded_and_runs_before_svg_and_mermaid():
-    call = "if(_interactiveUiFenceAccepts(lang,code)) return lead+_interactiveUiPlaceholder(code);"
+    call = "if(_interactiveUiFenceAccepts(lang,code)) return lead+_interactiveUiPlaceholder(code,lang);"
     assert UI.count(call) == 1
     assert UI.index(call) < UI.index("if(_svgVisualFenceAccepts(lang,code))") < UI.index("if(lang==='mermaid'")
     assert "if(typeof interactiveUiFenceAccepts!=='function') return false;" in UI
     assert "try{return interactiveUiFenceAccepts(lang,code)===true;}catch(_){return false;}" in UI
-    assert '<div class="iui-block" data-iui-id="${id}">${esc(code.trim())}</div>' in UI
+    assert '<div class="iui-block" data-iui-id="${id}" data-iui-kind="${kind}">${esc(code.trim())}</div>' in UI
+    assert "const kind=/^[a-z-]+$/.test(lang||'')?lang:'interactive-ui';" in UI
 
 
 def test_placeholder_is_protected_from_the_paragraph_splitter_and_cannot_be_forged():

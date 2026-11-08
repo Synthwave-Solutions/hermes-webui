@@ -97,6 +97,8 @@ class Gateway:
             return chunks, int(len(chunks) * 0.55)
         if index == 2:
             return ["Deze is kapot:\n\n```interactive-ui\n", BROKEN, "\n```\n\nEinde."], None
+        if index == 3:
+            return [f"Antwoord op vervolgvraag {index}.\n\n```suggestions\n", "Toon het in een grafiek\nMaak het compacter\n```"], None
         return [f"Antwoord op vervolgvraag {index}."], None
 
     @staticmethod
@@ -506,6 +508,21 @@ def main() -> int:
             assert ("herstel" in body.lower() or "can you fix" in body.lower()) and "nietBestaandeFunctie" in body, body
             wait_idle(page)
             ok(f"broken widget: plain sentence {lead!r}, details on demand, repair asks the agent")
+
+            # 7b. reply chips under the latest reply; a click sends the text, older unused chips disappear
+            page.wait_for_selector(".iui-chips:visible", timeout=20000)
+            chips = page.locator(".iui-chips:visible .iui-chip")
+            assert chips.count() == 2, chips.count()
+            assert page.locator("pre code.language-suggestions:visible, pre code.suggestions:visible").count() == 0
+            page.locator(".iui-chips:visible").last.screenshot(path=str(art / "06b-reply-chips.png"))
+            chips.first.click()
+            body = wait_runs(gateway, 5)
+            assert "Toon het in een grafiek" in body, body
+            wait_idle(page)
+            page.wait_for_function("() => document.getElementById('messages').innerText.includes('Antwoord op vervolgvraag 4')", timeout=20000)
+            time.sleep(1.0)
+            assert page.locator(".iui-chips:not(.is-used):visible").count() == 0, "old unused chips must hide"
+            ok("reply chips show under the latest reply, a click sends that reply, unused chips hide afterwards")
 
             # 8. hard reload renders the cards again from the transcript
             page.reload(wait_until="domcontentloaded")

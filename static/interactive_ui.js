@@ -23,6 +23,7 @@
 const _iui=(function(){
   const FRAME_URL='static/interactive-ui/frame.html';
   const FENCE_LANGS=new Set(['interactive-ui','interactive','iui']);
+  const CHIP_LANGS=new Set(['suggestions','replies']);
   const CDN_ORIGINS=new Set(['https://cdn.jsdelivr.net','https://unpkg.com','https://cdnjs.cloudflare.com','https://esm.sh']);
   const STYLE_ORIGINS=new Set([...CDN_ORIGINS,'https://fonts.googleapis.com']);
   const MAX_SOURCE=200*1024;
@@ -72,7 +73,7 @@ const _iui=(function(){
       removed:'Overgeslagen bron',ask:'Vraag uit deze weergave',send:'Versturen',cancel:'Annuleren',
       draftBusy:'Je concept staat nog in het invoerveld. Verstuur of wis dat eerst.',
       repairPrompt:(title,msg)=>`Kun je de weergave "${title}" herstellen? Die werkt niet helemaal (${msg}). Stuur het volledige interactive-ui-blok opnieuw.`,
-      sandboxNote:'Draait los van je account en de chat'},
+      sandboxNote:'Draait los van je account en de chat',chipsLabel:'Voorgestelde antwoorden'},
     en:{title:'Interactive view',building:'Building',
       restart:'Restart',viewCode:'View code',hideCode:'Hide code',copyCode:'Copy code',download:'Download',
       devGroup:'For developers',full:'Full screen',exitFull:'Close',more:'More options',repair:'Fix it',
@@ -81,7 +82,7 @@ const _iui=(function(){
       removed:'Skipped source',ask:'Question from this view',send:'Send',cancel:'Cancel',
       draftBusy:'Your draft is still in the message box. Send or clear it first.',
       repairPrompt:(title,msg)=>`Can you fix the view "${title}"? It is not fully working (${msg}). Send the complete interactive-ui block again.`,
-      sandboxNote:'Runs separately from your account and the chat'},
+      sandboxNote:'Runs separately from your account and the chat',chipsLabel:'Suggested replies'},
   };
   function lang(){
     const l=String((typeof _currentLang!=='undefined'&&_currentLang)||document.documentElement.lang||navigator.language||'en').toLowerCase();
@@ -577,6 +578,7 @@ const _iui=(function(){
     }
     if(ctrl.state!=='error') setState(ctrl,ctrl.final?(ctrl.rendered?'ready':'loading'):'building');
     if(ctrl.mounted) pushRender(ctrl);
+    revealIfReady(ctrl);
   }
   function mount(ctrl){
     if(ctrl.mounted) return;
@@ -587,13 +589,17 @@ const _iui=(function(){
     iframe.setAttribute('referrerpolicy','no-referrer');
     iframe.setAttribute('title',ctrl.parsed&&ctrl.parsed.title||tx('title'));
     iframe.src=FRAME_URL+'?v='+encodeURIComponent(String((typeof WEBUI_VERSION!=='undefined'&&WEBUI_VERSION)||'1'));
-    iframe.addEventListener('load',()=>{ctrl.skeleton.classList.add('is-gone');});
+    iframe.addEventListener('load',()=>{ctrl.frameLoaded=true;revealIfReady(ctrl);});
     ctrl.iframe=iframe;
     ctrl.mountedAt=Date.now();
     controllers.add(ctrl);
     ctrl.stage.appendChild(iframe);
     if(iframe.contentWindow) byWindow.set(iframe.contentWindow,ctrl);
     watchTheme();
+  }
+  // Keep the placeholder until the app has something to show.
+  function revealIfReady(ctrl){
+    if(ctrl.frameLoaded&&(ctrl.final||(ctrl.parsed&&ctrl.parsed.html.trim()))) ctrl.skeleton.classList.add('is-gone');
   }
   function lazyMount(ctrl){
     if(typeof IntersectionObserver!=='function'){mount(ctrl);return;}
@@ -614,7 +620,7 @@ const _iui=(function(){
     if(!ctrl.iframe) return;
     byWindow.delete(ctrl.iframe.contentWindow);
     ctrl.iframe.remove();
-    Object.assign(ctrl,{iframe:null,mounted:false,ready:false,sentFinal:false,rendered:false,errors:[]});
+    Object.assign(ctrl,{iframe:null,mounted:false,ready:false,sentFinal:false,rendered:false,frameLoaded:false,errors:[]});
     ctrl.errorBar.hidden=true;ctrl.errorDetails.hidden=true;hideAsk(ctrl);
     ctrl.skeleton.classList.remove('is-gone');
     setState(ctrl,'loading');
@@ -698,6 +704,28 @@ const _iui=(function(){
     fetch(FRAME_URL,{credentials:'same-origin'}).then(r=>r.ok?r.text():'').then(finish,()=>finish(''));
   }
 
+  // ── Reply chips (suggested answers under the latest reply) ──────────────
+  function chipTexts(source){
+    return String(source||'').split(/\n/).map(l=>l.replace(/^\s*(?:[-*\u2022]|\d+[.)])\s*/,'').replace(/^["']|["']$/g,'').trim())
+      .map(cleanPrompt).filter(Boolean).filter(t=>t.length<=140).slice(0,3);
+  }
+  function renderChips(block){
+    const texts=chipTexts(block.textContent||'');
+    block.textContent='';
+    if(!texts.length){block.remove();return;}
+    const wrap=document.createElement('div');wrap.className='iui-chips';wrap.setAttribute('role','group');wrap.setAttribute('aria-label',tx('chipsLabel'));
+    texts.forEach(t=>{
+      const b=document.createElement('button');b.type='button';b.className='iui-chip';b.textContent=t;
+      b.addEventListener('click',ev=>{
+        if(!ev.isTrusted||wrap.classList.contains('is-used')) return;
+        if(sendPrompt(t)){wrap.classList.add('is-used');b.classList.add('is-chosen');wrap.querySelectorAll('.iui-chip').forEach(x=>{x.disabled=true;});}
+      });
+      wrap.appendChild(b);
+    });
+    block.classList.add('iui-chips-host');
+    block.appendChild(wrap);
+  }
+
   // ── Settled render (after the reply is complete) ────────────────────────
   function renderBlocks(container){
     const root=container||document;
@@ -707,6 +735,7 @@ const _iui=(function(){
     liveCards.forEach((c,k)=>{if(!c.card.isConnected||c.card.offsetParent===null){if(c.card.isConnected&&!c.mounted)c.card.remove();liveCards.delete(k);}});
     root.querySelectorAll('.iui-block:not([data-iui-mounted])').forEach(block=>{
       block.setAttribute('data-iui-mounted','1');
+      if(CHIP_LANGS.has(block.getAttribute('data-iui-kind')||'')){renderChips(block);return;}
       const source=block.textContent||'';
       const ctrl=createController(source,{final:true});
       block.textContent='';
@@ -721,6 +750,7 @@ const _iui=(function(){
     if(!root||!root.querySelectorAll) return;
     root.querySelectorAll('pre > code').forEach(code=>{
       const cls=' '+(code.className||'')+' ';
+      if(/ (language-)?(suggestions|replies) /.test(cls)){code.parentElement.classList.add('iui-raw-hidden');return;}
       if(!/ (language-)?(interactive-ui|interactive|iui) /.test(cls)) return;
       const pre=code.parentElement;
       let ctrl=pre.__iuiLive;
@@ -759,11 +789,12 @@ const _iui=(function(){
     if(ev.target&&ev.target.closest&&(ev.target.closest('.iui-menu')||ev.target.closest('.iui-actions')))return;
     closeMenu(false);
   },true);
-  return {parse,renderBlocks,streamTick,allowedUrl,rewriteUrl,themeMessage,FENCE_LANGS,_byWindow:byWindow,_controllers:controllers};
+  return {parse,renderBlocks,streamTick,allowedUrl,rewriteUrl,themeMessage,chipTexts,FENCE_LANGS,CHIP_LANGS,_byWindow:byWindow,_controllers:controllers};
 })();
 
 function interactiveUiFenceAccepts(lang,code){
-  return _iui.FENCE_LANGS.has(String(lang||'').toLowerCase())&&String(code||'').trim().length>0;
+  const l=String(lang||'').toLowerCase();
+  return (_iui.FENCE_LANGS.has(l)||_iui.CHIP_LANGS.has(l))&&String(code||'').trim().length>0;
 }
 function renderInteractiveUiBlocks(container){_iui.renderBlocks(container);}
 function interactiveUiStreamTick(root){_iui.streamTick(root);}

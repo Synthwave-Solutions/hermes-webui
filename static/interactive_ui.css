@@ -124,3 +124,19 @@ html.iui-has-full .messages,html.iui-has-full #messages{z-index:auto!important}
   .iui-stage,.iui-skeleton,.iui-frame,.iui-card{transition:none}
   .iui-skeleton span,.iui-card[data-state=building] .iui-head::after,.iui-card[data-state=building] .iui-status::after,.iui-menu,.iui-card.iui-full{animation:none}
 }
+
+/* Reply chips: up to three suggested answers under the latest reply only. */
+.iui-block.iui-chips-host{margin:10px 0 2px}
+.iui-chips{display:flex;flex-wrap:wrap;gap:8px}
+.iui-chip{display:inline-flex;align-items:center;min-height:34px;max-width:100%;padding:6px 14px;border-radius:999px;cursor:pointer;
+  border:1px solid var(--border);background:var(--surface,transparent);color:var(--text);font:inherit;font-size:13.5px;line-height:1.3;text-align:left;
+  transition:border-color .15s,background .15s,transform .05s;animation:iui-pop .2s ease-out both}
+.iui-chip:nth-child(2){animation-delay:.04s}.iui-chip:nth-child(3){animation-delay:.08s}
+.iui-chip:hover:not(:disabled){border-color:var(--accent);background:var(--accent-bg)}
+.iui-chip:active:not(:disabled){transform:translateY(1px)}
+.iui-chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.iui-chips.is-used .iui-chip{cursor:default;opacity:.45}
+.iui-chips.is-used .iui-chip.is-chosen{opacity:1;border-color:var(--accent);background:var(--accent-bg)}
+.assistant-turn:not([data-latest-assistant-response="true"]) .iui-chips:not(.is-used){display:none}
+@media (max-width:640px){.iui-chip{min-height:40px;font-size:14px}}
+@media (prefers-reduced-motion:reduce){.iui-chip{animation:none}}

@@ -8152,7 +8152,7 @@ function renderMd(raw){
     const firstMermaidLine=codeLines.map(line=>line.trim()).find(line=>line&&!line.startsWith('%%'))||'';
     const looksLikeLineNumberedToolOutput=/^\s*\d+\|/.test(firstCodeLine);
     const looksLikeMermaidStart=firstMermaidLine==='---'||/^(graph|flowchart|sequenceDiagram|classDiagram|classDiagram-v2|stateDiagram|stateDiagram-v2|erDiagram|journey|gantt|pie|gitGraph|mindmap|timeline|quadrantChart|requirementDiagram|C4Context|C4Container|C4Component|C4Dynamic|c4Context|c4Container|c4Component|c4Dynamic|sankey-beta|block-beta|packet-beta|xychart-beta|kanban|architecture-beta)\b/.test(firstMermaidLine);
-    if(_interactiveUiFenceAccepts(lang,code)) return lead+_interactiveUiPlaceholder(code);
+    if(_interactiveUiFenceAccepts(lang,code)) return lead+_interactiveUiPlaceholder(code,lang);
     if(_svgVisualFenceAccepts(lang,code)) return lead+_svgVisualPlaceholder(code);
     if(lang==='mermaid'&&!looksLikeLineNumberedToolOutput&&looksLikeMermaidStart){
       const id='mermaid-'+Math.random().toString(36).slice(2,10);
@@ -8650,9 +8650,10 @@ function renderMd(raw){
     if(typeof interactiveUiFenceAccepts!=='function') return false;
     try{return interactiveUiFenceAccepts(lang,code)===true;}catch(_){return false;}
   }
-  function _interactiveUiPlaceholder(code){
+  function _interactiveUiPlaceholder(code,lang){
     const id='iui-'+Math.random().toString(36).slice(2,10);
-    _preBlock_stash.push(`<div class="iui-block" data-iui-id="${id}">${esc(code.trim())}</div>`);
+    const kind=/^[a-z-]+$/.test(lang||'')?lang:'interactive-ui';
+    _preBlock_stash.push(`<div class="iui-block" data-iui-id="${id}" data-iui-kind="${kind}">${esc(code.trim())}</div>`);
     return '\x00P'+(_preBlock_stash.length-1)+'\x00';
   }
   // ── Inline SVG visuals seams (plan addendum AE-1, AE-2) ──────────────────
