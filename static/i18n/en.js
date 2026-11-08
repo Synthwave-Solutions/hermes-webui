@@ -861,6 +861,7 @@ window.__registerHermesLocale('en', {
     stream_stopped: 'Stopped',
     undo_exchange: 'Undo this exchange',
     update_hard_refresh_now: 'Reload now',
+    access_denied_plain: 'You do not have access to this. Ask your admin for access.',
     chat_getting_long: 'conversation is getting long',
     stale_client_message: 'A new version of SynthPulse is ready.',
     group_people_owner_only: 'Only the person who started this conversation can change who is in it.',
