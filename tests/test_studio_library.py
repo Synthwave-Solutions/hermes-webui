@@ -253,3 +253,13 @@ def test_tasks_are_extracted_from_a_description_of_the_week(env, monkeypatch):
     assert tasks[1]["cadence"] == "weekly" and tasks[1]["minutes"] == 0
     with pytest.raises(ValueError):
         lib.extract_tasks("kort")
+
+
+def test_full_user_notes_are_left_alone_and_the_intake_is_kept(env):
+    from api import personal_context
+    ident = {"email": ADMIN}
+    personal_context.write(ident, "user", "y" * 1370)
+    out = lib.save_person(V(ADMIN, env), ident, {"role": {"title": "Directeur"}})
+    assert out["note_written"] is False and out["notes_room"] < 160
+    assert personal_context.read_file(personal_context.paths(ident)["user"]) == "y" * 1370
+    assert lib.load_person(ADMIN)["role"]["title"] == "Directeur", "the intake itself is still kept for Studio"

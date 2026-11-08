@@ -48,7 +48,8 @@
     done_intro: 'Zo leest de agent jullie organisatie. Kies Opslaan om het profiel te bewaren.', saved_org: 'Organisatieprofiel opgeslagen',
     redo_org: 'Intake opnieuw doen', view_profile: 'Profiel bekijken', draft_kept: 'Je concept blijft in deze browser bewaard tot je opslaat.',
     hint_me: 'Vertel de Super Agent in drie minuten wie je bent en wat je doet: dan passen antwoorden en voorstellen beter bij jou.', open_me: 'Start de intake',
-    r_private: 'Alleen openbare websites kunnen worden onderzocht.', r_unreachable: 'De website was niet bereikbaar.', r_no_site: 'Vul eerst de website in.'
+    r_private: 'Alleen openbare websites kunnen worden onderzocht.', r_unreachable: 'De website was niet bereikbaar.', r_no_site: 'Vul eerst de website in.',
+    full_title: 'Je gebruikersprofiel is bijna vol', full_body: '{used} van {limit} tekens gebruikt. Ruim het op, dan kan de agent de intake én nieuwe notities onthouden. Je intake wordt hoe dan ook bewaard en gebruikt in Studio.', open_notes: 'Gebruikersprofiel openen', not_written: 'Intake bewaard, maar niet in je gebruikersprofiel gezet: daar is geen ruimte meer.'
   };
   const EN = {
     back: 'Back', next: 'Next', skip: 'Skip', save_me: 'Save to my profile', save_org: 'Save organisation profile',
@@ -86,10 +87,11 @@
     done_intro: 'This is how the agent reads your organisation. Choose Save to keep the profile.', saved_org: 'Organisation profile saved',
     redo_org: 'Do the intake again', view_profile: 'View profile', draft_kept: 'Your draft is kept in this browser until you save.',
     hint_me: 'Tell the Super Agent in three minutes who you are and what you do, so answers and proposals fit you better.', open_me: 'Start the intake',
-    r_private: 'Only public websites can be researched.', r_unreachable: 'The website could not be reached.', r_no_site: 'Fill in the website first.'
+    r_private: 'Only public websites can be researched.', r_unreachable: 'The website could not be reached.', r_no_site: 'Fill in the website first.',
+    full_title: 'Your user profile is almost full', full_body: '{used} of {limit} characters used. Clean it up so the agent can keep the intake and new notes. Your intake is kept and used in Studio either way.', open_notes: 'Open user profile', not_written: 'Intake kept, but not added to your user profile: there is no room left.'
   };
   const lang = () => ((document.documentElement.lang || 'nl').toLowerCase().startsWith('en') ? 'en' : 'nl');
-  const w = k => (lang() === 'en' ? EN : NL)[k] || NL[k] || k;
+  const w = (k, v) => { let t = (lang() === 'en' ? EN : NL)[k] || NL[k] || k; if (v) for (const [a, b] of Object.entries(v)) t = t.replace('{' + a + '}', b); return t; };
   const H = v => (typeof esc === 'function' ? esc(String(v ?? '')) : String(v ?? ''));
   const toast = m => { if (typeof showToast === 'function') showToast(m); };
   const call = (p, o) => api(p, Object.assign({ timeoutToast: false }, o || {}));
@@ -166,10 +168,15 @@
                   [w('focus'), (d.role.focus || []).join('; ')], [w('s_work'), (d.tasks || []).map(t => `${t.name} (${w('c_' + t.cadence)}${t.kind ? ', ' + w('k_' + t.kind) : ''})`).join('; ')],
                   [w('s_tools'), (d.tools || []).join(', ')], [w('s_prefs'), [p.language && w('l_' + p.language), p.tone && w('t_' + p.tone), p.length && w('len_' + p.length), p.format && w('f_' + p.format)].filter(Boolean).join(', ')],
                   [w('never'), p.never], [w('ai_self'), [d.literacy.self && w('ai_' + d.literacy.self), d.literacy.answered ? w('score') + ' ' + d.literacy.score + '/3' : ''].filter(Boolean).join(' · ')]].filter(r => r[1]);
+    const used = I.saved ? I.saved.notes_used : I.ctx.notes_used, limit = (I.saved ? I.saved.notes_limit : I.ctx.notes_limit) || 1375;
+    const nearlyFull = !I.saved && used != null && limit - used < 200;
     return `<div class="pf-read in-summary">${rows.map(([k, v]) => `<div class="pf-row"><span class="om-small om-muted">${H(k)}</span><span>${H(v)}</span></div>`).join('')}</div>
-      ${I.saved ? `<div class="om-card in-saved" data-tour="studio-intake-note"><strong>${H(w('saved_me'))}</strong><p>${H(I.saved.note)}</p>
+      ${nearlyFull ? `<div class="om-card in-warn"><strong>${H(w('full_title'))}</strong><span>${H(w('full_body', { used, limit }))}</span><button type="button" class="sm-btn" data-in-open-notes>${H(w('open_notes'))}</button></div>` : ''}
+      ${I.saved && I.saved.note_written === false ? `<div class="om-card in-warn"><strong>${H(w('not_written'))}</strong><span>${H(w('full_body', { used, limit }))}</span><button type="button" class="sm-btn" data-in-open-notes>${H(w('open_notes'))}</button></div>` : ''}
+      ${I.saved && I.saved.note_written !== false ? `<div class="om-card in-saved" data-tour="studio-intake-note"><strong>${H(w('saved_me'))}</strong><p>${H(I.saved.note)}</p>
         <div class="om-bar" title="${H(w('notes_room'))}"><span style="width:${Math.min(100, Math.round(100 * I.saved.notes_used / I.saved.notes_limit))}%"></span></div><span class="om-small om-muted">${H(w('notes_room'))}: ${I.saved.notes_used} / ${I.saved.notes_limit}</span>
-        ${(d.tasks || []).some(t => t.kind === 'automate' || t.kind === 'assist') ? `<div class="om-value-actions"><button type="button" class="sm-btn" data-in-backlog>${H(w('to_backlog'))}</button></div>` : ''}</div>` : ''}`;
+        ${(d.tasks || []).some(t => t.kind === 'automate' || t.kind === 'assist') ? `<div class="om-value-actions"><button type="button" class="sm-btn" data-in-backlog>${H(w('to_backlog'))}</button></div>` : ''}</div>` : ''}
+      ${I.saved && I.saved.note_written === false && (d.tasks || []).some(t => t.kind === 'automate' || t.kind === 'assist') ? `<div class="om-value-actions"><button type="button" class="sm-btn" data-in-backlog>${H(w('to_backlog'))}</button></div>` : ''}`;
   }
 
   // ── Organisation ──────────────────────────────────────────────────────────
@@ -235,7 +242,7 @@
     I.busy = true; paint();
     try {
       I.saved = await post('/api/studio/profile', Object.assign({ op: 'me' }, { role: d.role, tasks: d.tasks, tools: d.tools, prefs: d.prefs, literacy: d.literacy }));
-      dropDraft(); toast(w('saved_me').split('.')[0] + '.');
+      dropDraft(); toast(I.saved.note_written === false ? w('not_written') : w('saved_me').split('.')[0] + '.');
       if (window.SPStudio && window.SPStudio.refreshCounts) window.SPStudio.refreshCounts();
     } catch (e) { toast(errMsg(e)); }
     I.busy = false; paint();
@@ -296,6 +303,7 @@
         I.busy = false; keepDraft(); paint(); return;
       }
       if (b.hasAttribute('data-in-teams')) { collect(); if (window.SPOrg && window.SPOrg.show) await window.SPOrg.show('manage'); return; }
+      if (b.hasAttribute('data-in-open-notes')) { if (typeof switchPanel === 'function') await switchPanel('memory'); return; }
       if (b.hasAttribute('data-in-save')) { collect(); return I.kind === 'me' ? saveMe() : saveOrg(); }
       if (b.hasAttribute('data-in-backlog')) {
         const team = I.d.role.team || '';

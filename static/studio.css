@@ -320,3 +320,4 @@ main.main.showing-studio>#mainStudio{display:flex;flex-direction:column;overflow
 .in-context{white-space:pre-wrap;font-size:13px;background:var(--surface);border:1px solid var(--border);border-radius:var(--sp-radius);padding:16px;margin:0}
 .in-redo{margin:0 0 14px}
 @media (max-width:760px){.in-grid,.in-goal{grid-template-columns:1fr}.in-task{grid-template-columns:1fr 1fr}}
+.in-warn{margin-top:16px;border-color:var(--warning,#b7791f);background:color-mix(in srgb,var(--warning,#b7791f) 7%,transparent);display:flex;flex-direction:column;gap:8px;align-items:flex-start;font-size:13px;line-height:1.5}

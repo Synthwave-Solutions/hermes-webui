@@ -785,18 +785,23 @@ def save_person(view, identity, body: dict) -> dict:
     note = person_note(intake, team_name)
     current = personal_context.read_file(personal_context.paths(identity)["user"])
     entries = [e for e in current.split("\n§\n") if e.strip()] if current.strip() else []
-    entries = [e for e in entries if not e.strip().startswith(INTAKE_MARK)]
-    own = sum(len(e) for e in entries) + max(0, len(entries)) * 3
-    if own + len(note) > USER_NOTE_LIMIT:
-        note = note[: max(160, USER_NOTE_LIMIT - own - 3)].rstrip()
-    entries.append(note)
-    personal_context.write(identity, "user", "\n§\n".join(entries))
-    intake.update(updated_at=time.time(), email=view.email, note=note)
+    kept = [e for e in entries if not e.strip().startswith(INTAKE_MARK)]
+    own = sum(len(e) for e in kept) + max(0, len(kept) - 1) * 3
+    room = USER_NOTE_LIMIT - own - (3 if kept else 0)
+    written = room >= 160
+    if written:
+        # Never push the user notes over the agent's limit: above it the agent can no longer add notes itself.
+        note = note[:room].rstrip()
+        entries = kept + [note]
+        personal_context.write(identity, "user", "\n§\n".join(entries))
+    else:
+        entries = entries if any(e.strip().startswith(INTAKE_MARK) for e in entries) else kept
+    intake.update(updated_at=time.time(), email=view.email, note=note, note_written=written)
     with _LOCK:
         (_dir() / "people").mkdir(parents=True, exist_ok=True)
         _write(_person_file(view.email), intake)
     used = sum(len(e) for e in entries) + max(0, len(entries) - 1) * 3
-    return dict(intake, notes_used=used, notes_limit=USER_NOTE_LIMIT)
+    return dict(intake, notes_used=used, notes_limit=USER_NOTE_LIMIT, note_written=written, notes_room=max(0, room))
 
 
 def person_context_text(email: str) -> str:
