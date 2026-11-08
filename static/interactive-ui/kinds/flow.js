@@ -704,8 +704,8 @@
     var scroll = ctx.h('div', 'k-flow-scroll');
     var canvas = ctx.h('div', 'k-flow-canvas');
     canvas.setAttribute('role', 'group');
-    canvas.setAttribute('aria-label', T.label + ': ' + spec.title);
-    var detail = ctx.h('p', 'k-flow-detail', T.pick);
+    canvas.setAttribute('aria-label', T.label + ': ' + spec.title + '. ' + T.pick);
+    var detail = ctx.h('p', 'k-flow-detail', '');
     detail.setAttribute('role', 'status');
     detail.setAttribute('aria-live', 'polite');
     var sizer = ctx.h('div', 'k-flow-sizer');
@@ -913,6 +913,7 @@
       var parts = [nd.label, nd.type === 'step' ? '' : typeWord(nd.type, LANG), nd.owner, nd.note, next.length ? T.next + ': ' + next.join('; ') : ''];
       detail.textContent = parts.filter(Boolean).join(' · ');
       detail.classList.add('is-set');
+      if(ctx.reveal && !quiet) ctx.reveal(detail);
       if(!quiet) ctx.save({a:i});
       ctx.resize();
     }

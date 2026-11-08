@@ -1075,8 +1075,15 @@ def main() -> int:
             page.wait_for_selector(".iui-card[data-state=error]:visible .iui-error:not([hidden])", timeout=20000)
             lead = page.locator(".iui-card[data-state=error]:visible .iui-error-text").last.inner_text()
             assert "Uncaught" not in lead and "Error" not in lead, f"lead sentence must be plain: {lead!r}"
+            # Members see the plain line and "Laat repareren"; the raw details are for admins.
+            audience = page.evaluate("() => document.documentElement.getAttribute('data-nav-audience')")
+            if audience != "admin":
+                assert page.locator(".iui-card[data-state=error]:visible .iui-error .iui-btn--details").last.is_hidden(), "Details is for admins"
+                page.evaluate("() => document.documentElement.setAttribute('data-nav-audience', 'admin')")
             page.locator(".iui-card[data-state=error]:visible .iui-error .iui-btn--quiet").last.click()
             err_text = page.locator(".iui-card[data-state=error]:visible .iui-error-details").last.inner_text()
+            if audience != "admin":
+                page.evaluate(f"() => document.documentElement.setAttribute('data-nav-audience', {json.dumps(audience or '')})")
             assert "nietBestaandeFunctie" in err_text and "evil.example" in err_text, err_text
             page.locator(".iui-card[data-state=error]:visible").last.screenshot(path=str(art / "06-error-bar.png"))
             page.locator(".iui-card[data-state=error]:visible .iui-error .iui-btn--text:not(.iui-btn--quiet)").last.click()

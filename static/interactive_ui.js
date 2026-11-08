@@ -116,9 +116,9 @@ const _iui=(function(){
       sandboxNote:'Runs separately from your account and the chat',chipsLabel:'Suggested replies',chipsBusy:'Wait until the current reply is finished.',
       kitNoun:{table:'table',chart:'chart',map:'map',kpi:'key figures',timeline:'timeline'},
       kitName:{table:'Table',chart:'Chart',map:'Map',kpi:'Key figures',timeline:'Timeline'},
-      kitFail:noun=>`This ${noun} could not be made.`,downloadCsv:'Download as CSV',copyTable:'Copy as table',
+      kitFail:noun=>noun==='key figures'?'These key figures could not be made.':`This ${noun} could not be made.`,downloadCsv:'Download as CSV',copyTable:'Copy as table',
       viewData:'View data',hideData:'Hide data',copyData:'Copy data',example:'Example',
-      kitRepairPrompt:(noun,title)=>`Can you fix the ${noun} "${title}"? It is not right yet.`},
+      kitRepairPrompt:(noun,title)=>noun==='key figures'?`Can you fix the key figures "${title}"? They are not right yet.`:`Can you fix the ${noun} "${title}"? It is not right yet.`},
   };
   function lang(){
     const l=String((typeof _currentLang!=='undefined'&&_currentLang)||document.documentElement.lang||navigator.language||'en').toLowerCase();
@@ -377,6 +377,16 @@ const _iui=(function(){
       case 'copy':
         copyFromWidget(String(data.text||''));
         break;
+      case 'reveal':{
+        // A tapped step's details sit below the diagram: bring them into view.
+        if(ctrl.card.classList.contains('iui-full')||!ctrl.iframe) break;
+        const y=Math.max(0,Math.min(Number(data.y)||0,ctrl.iframe.offsetHeight||0));
+        const sc=scroller(), fr=ctrl.iframe.getBoundingClientRect();
+        if(!sc) break;
+        const limit=sc.getBoundingClientRect().bottom-96, at=fr.top+y;
+        if(at>limit) sc.scrollBy({top:at-limit,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
+        break;
+      }
       case 'open':
         openLink(String(data.url||''));
         break;
@@ -641,7 +651,7 @@ const _iui=(function(){
       errorDetails.hidden=!errorDetails.hidden;
       b.querySelector('.iui-btn-label').textContent=errorDetails.hidden?tx('details'):tx('hideDetails');
       b.setAttribute('aria-expanded',String(!errorDetails.hidden));
-    },'iui-btn--text iui-btn--quiet');
+    },'iui-btn--text iui-btn--quiet iui-btn--details');
     detailsBtn.setAttribute('aria-expanded','false');
     const dismiss=button('close',tx('dismiss'),()=>{errorBar.hidden=true;errorDetails.hidden=true;},'iui-btn--icon');
     errorBar.append(repair,detailsBtn,dismiss);
@@ -805,6 +815,12 @@ const _iui=(function(){
         }
       };
       document.addEventListener('keydown',ctrl._esc,true);
+      // Everything outside the card is out of reach while it covers the chat,
+      // also for Tab presses that start inside the frame.
+      ctrl._inert=[];
+      for(let n=ctrl.card;n&&n.parentElement&&n!==document.body;n=n.parentElement){
+        [...n.parentElement.children].forEach(sib=>{if(sib!==n&&!sib.inert&&sib.tagName!=='SCRIPT'){sib.inert=true;ctrl._inert.push(sib);}});
+      }
       b.focus();
     } else {
       if(ctrl._fullRow) ctrl._fullRow.classList.remove('iui-row-full');
@@ -812,6 +828,7 @@ const _iui=(function(){
       ctrl.card.setAttribute('role','group');ctrl.card.removeAttribute('aria-modal');
       if(ctrl._esc) document.removeEventListener('keydown',ctrl._esc,true);
       ctrl._esc=null;
+      (ctrl._inert||[]).forEach(n=>{n.inert=false;});ctrl._inert=null;
       if(ctrl.height) setHeight(ctrl,ctrl.height);
       const back=ctrl._returnFocus;ctrl._returnFocus=null;
       try{(back&&back.isConnected?back:b).focus({preventScroll:true});}catch(_){}

@@ -284,3 +284,6 @@ html.dark .iui-date-native{color-scheme:dark}
   .iui-num{max-width:100%}
 }
 @media (prefers-reduced-motion:reduce){.iui-form,.iui-opt,.iui-opt .iui-form-ico{animation:none;transition:none}.iui-form-wait::after{animation:none;content:"..."}}
+/* Error details (raw messages) are for admins; members get the plain line and "Laat repareren". */
+html:not([data-nav-audience="admin"]) .iui-error .iui-btn--details,
+html:not([data-nav-audience="admin"]) .iui-error-details{display:none!important}

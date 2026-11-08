@@ -13,11 +13,12 @@
   function approx(v, H){
     var n = H.kpiNumber(v);
     if(n || typeof v !== 'string') return n;
-    var s = v.trim().replace(/^(ca\.?|circa|ongeveer|about|approx\.?|around|±|~|≈|>|<|>=|<=)\s*/i, '').replace(/\s*\+$/, '');
+    var t0 = v.trim(), rough = /^(>|>=)/.test(t0) || /\+$/.test(t0) ? 'gt' : /^(<|<=)/.test(t0) ? 'lt' : 'ca';
+    var s = t0.replace(/^(ca\.?|circa|ongeveer|about|approx\.?|around|±|~|≈|>=|<=|>|<)\s*/i, '').replace(/\s*\+$/, '');
     var mult = 1, mm = /^(.*?)\s*(k|duizend|thousand|mln|mio|miljoen|million|m)\.?$/i.exec(s);
     if(mm){ s = mm[1]; mult = /^(k|duizend|thousand)$/i.test(mm[2]) ? 1e3 : 1e6; }
     n = H.kpiNumber(s);
-    return n ? {n:Math.round(n.n * mult * 100) / 100, kind:n.kind} : null;
+    return n ? {n:Math.round(n.n * mult * 100) / 100, kind:n.kind, rough:rough} : null;
   }
   var K = root.SWKit;
   if(!K) return;
@@ -30,13 +31,13 @@
     nl:{
       noStages:function(){ return 'Er zijn geen fasen (stages).'; },
       cut:function(field, max){ return field + ' is ingekort tot ' + max + ' tekens.'; },
-      tooFew:function(n){ return 'Een trechter heeft minstens twee fasen met een naam en een getal; er ' + (n === 1 ? 'is er 1' : 'zijn er ' + n) + '. Stuur het volledige trechter-blok opnieuw.'; },
+      tooFew:function(n){ return 'Een trechter heeft minstens twee fasen met een naam en een getal; er ' + (n === 1 ? 'is er 1' : 'zijn er ' + n) + '.'; },
       allZero:function(){ return 'Alle fasen hebben de waarde 0; er is geen trechter te tonen.'; },
       many:function(n, max){ return 'Er zijn ' + n + ' fasen; alleen de eerste ' + max + ' worden getoond.'; },
       asMap:function(){ return 'De fasen stonden als lijst van namen met getallen; ze zijn in die volgorde getoond.'; },
       item:function(i){ return 'Fase ' + i + ' is geen object met label en value en is weggelaten.'; },
       label:function(i){ return 'Fase ' + i + ' heeft geen naam (label) en is weggelaten.'; },
-      value:function(l){ return 'Fase "' + l + '" heeft geen getal. Geef elke fase een aantal.'; },
+      value:function(l){ return 'Bij "' + l + '" staat geen getal.'; },
       negative:function(l){ return '"' + l + '" had een negatieve waarde; die is op 0 gezet.'; },
       grows:function(l, prev){ return '"' + l + '" is groter dan de fase ervoor ("' + prev + '"); controleer de volgorde.'; },
       format:function(f){ return 'Onbekend format "' + f + '"; gebruik number, currency of percent. Nu geldt number.'; },
@@ -50,13 +51,13 @@
     en:{
       noStages:function(){ return 'There are no stages.'; },
       cut:function(field, max){ return field + ' was shortened to ' + max + ' characters.'; },
-      tooFew:function(n){ return 'A funnel needs at least two stages with a name and a number; there ' + (n === 1 ? 'is 1' : 'are ' + n) + '. Send the complete funnel block again.'; },
+      tooFew:function(n){ return 'A funnel needs at least two stages with a name and a number; there ' + (n === 1 ? 'is 1' : 'are ' + n) + '.'; },
       allZero:function(){ return 'Every stage has the value 0; there is no funnel to show.'; },
       many:function(n, max){ return 'There are ' + n + ' stages; only the first ' + max + ' are shown.'; },
       asMap:function(){ return 'The stages came as names with numbers; they are shown in that order.'; },
       item:function(i){ return 'Stage ' + i + ' is not an object with label and value and was left out.'; },
       label:function(i){ return 'Stage ' + i + ' has no name (label) and was left out.'; },
-      value:function(l){ return 'Stage "' + l + '" has no number. Give every stage a count.'; },
+      value:function(l){ return 'Stage "' + l + '" has no number.'; },
       negative:function(l){ return '"' + l + '" had a negative value; it was set to 0.'; },
       grows:function(l, prev){ return '"' + l + '" is larger than the stage before it ("' + prev + '"); check the order.'; },
       format:function(f){ return 'Unknown format "' + f + '"; use number, currency or percent. Now number is used.'; },
@@ -119,7 +120,7 @@
         if(c && c.n >= 0){ prev = c.n; anyCompare = true; }
         else warn('compareValue', i + 1);
       }
-      stages.push({label:label, value:value, prev:prev, note:H.str(it.note, LIM.note, warn, m('noteField', label))});
+      stages.push({label:label, value:value, prev:prev, rough:v.rough || '', note:H.str(it.note, LIM.note, warn, m('noteField', label))});
     });
     if(errors.length) return {errors:errors.slice(0, 1), warnings:warnings};
     if(stages.length < LIM.minStages){ errors.push(m('tooFew', stages.length)); return {errors:errors, warnings:warnings}; }
@@ -189,6 +190,10 @@
     var lang = spec.lang === 'en' ? 'en' : 'nl';
     var t = function(key){ var v = TEXT[lang][key]; return typeof v === 'function' ? v.apply(null, Array.prototype.slice.call(arguments, 1)) : v; };
     var num = function(v){ return fmt(v, spec.format, null); };
+    // An estimate stays an estimate: "ca. 900", and shares from it in whole percents.
+    var ROUGH = {nl:{ca:'ca.', gt:'meer dan', lt:'minder dan'}, en:{ca:'about', gt:'more than', lt:'less than'}}[lang];
+    var numS = function(s){ return (s.rough ? ROUGH[s.rough] + ' ' : '') + num(s.value); };
+    var anyRough = spec.stages.some(function(s){ return s.rough; });
     // 0% only for a real 0. From 10% whole numbers (38%), from 0,1% one decimal
     // (4,2%, 0,4%), below that two significant digits (0,015%), and never a
     // rounded 100% for a share that is not quite all.
@@ -210,14 +215,14 @@
       return out;
     }
     return {
-      t:t, num:num, pct:pct,
-      overall:function(){ return spec.overall === null ? '' : t('overall', stages[0].label, stages[stages.length - 1].label, pct(spec.overall)); },
+      t:t, num:num, numS:numS, pct:pct,
+      overall:function(){ return spec.overall === null ? '' : t('overall', stages[0].label, stages[stages.length - 1].label, anyRough ? ROUGH.ca + ' ' + fmt(Math.round(spec.overall * 10) / 10, 'percent', 1) : pct(spec.overall)); },
       overallPrev:function(){ return spec.overallPrev === null ? '' : t('overallPrev', pct(spec.overallPrev)); },
       drop:function(){ return spec.drop < 0 ? '' : t('drop', stages[spec.drop - 1].label, stages[spec.drop].label, pct(stages[spec.drop].conv)); },
-      chip:function(i){ return pct(stages[i].conv); },
-      aria:function(i){ var s = stages[i], p = [s.label, num(s.value)]; if(i && s.conv !== null) p.push(t('fromPrev', pct(s.conv), stages[i - 1].label)); return p.join(', '); },
+      chip:function(i){ var c = stages[i].conv; return c !== null && (stages[i].rough || stages[i - 1].rough) ? ROUGH.ca + ' ' + fmt(Math.round(c), 'percent', 0) : pct(c); },
+      aria:function(i){ var s = stages[i], p = [s.label, numS(s)]; if(i && s.conv !== null) p.push(t('fromPrev', pct(s.conv), stages[i - 1].label)); return p.join(', '); },
       detail:function(i){
-        var s = stages[i], parts = [s.label, num(s.value)].concat(shares(i));
+        var s = stages[i], parts = [s.label, numS(s)].concat(shares(i));
         if(spec.compare && s.prev !== null) parts.push(t('prev', num(s.prev)));
         if(s.note) parts.push(s.note);
         return parts.filter(Boolean).join(' · ');
@@ -264,7 +269,7 @@
     var buttons = [], rows = [];
     // Every bar starts at the width of the longest number in the block and adds
     // its share of the rest, so a larger value always gets a wider bar.
-    var valueTexts = stages.map(function(s){ return num(s.value); });
+    var valueTexts = stages.map(function(s){ return X.numS ? X.numS(s) : num(s.value); });
     var minEm = (1.8 + Math.max.apply(null, valueTexts.map(function(x){ return x.length; })) * 0.62).toFixed(2);
 
     stages.forEach(function(s, i){
@@ -313,7 +318,8 @@
       buttons.push(b); rows.push(row);
     });
     wrap.appendChild(list);
-    if(spec.drop >= 0) wrap.appendChild(h('p', 'k-fn-drop', X.drop()));
+    // The amber chip already marks the biggest drop; the sentence is for screen readers.
+    if(spec.drop >= 0) wrap.appendChild(h('p', 'k-sr', X.drop()));
     wrap.appendChild(detail);
     if(spec.source) wrap.appendChild(h('p', 'k-source', spec.source));
     box.appendChild(wrap);
