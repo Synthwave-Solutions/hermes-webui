@@ -2758,10 +2758,16 @@ def _sanitize_generated_title(text: str) -> str:
     s = re.sub(r'^\s*title\s*:\s*', '', s, flags=re.IGNORECASE)
     s = s.strip(" \t\r\n\"'`*_~")
     s = re.sub(r'\s+', ' ', s).strip()
+    # A title is a plain label: no Markdown marks, headings or list numbers.
+    s = re.sub(r'(\*\*|__|`+|~~)', '', s)
+    s = re.sub(r'^\s*(?:#{1,6}\s+|[-*+]\s+|\d{1,2}[.)]\s+)', '', s).strip(" \t\"'*_~:")
     # Guard against chain-of-thought leakage and meta-reasoning patterns.
     if _looks_invalid_generated_title(s):
         return ''
-    return s[:80]
+    if len(s) > 80:
+        cut = s[:80].rsplit(' ', 1)[0].rstrip(' ,;:.-')
+        s = (cut or s[:80]) + '\u2026'
+    return s
 
 
 def _looks_invalid_generated_title(text: str) -> bool:

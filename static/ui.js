@@ -7443,7 +7443,7 @@ function _syncMobileCtxDisplay(state){
   }
   if(row){
     row.style.display='';
-    row.setAttribute('aria-label',state.label);
+    row.setAttribute('aria-label',document.documentElement.getAttribute('data-nav-audience')==='admin'?state.label:_mobileConfigLabel(state));
     row.classList.toggle('ctx-mid',state.pct>50&&state.pct<=75);
     row.classList.toggle('ctx-high',state.pct>75);
   }
@@ -8725,6 +8725,7 @@ function setStatus(t){
 }
 
 function setComposerStatus(t){
+  if(typeof t==='string'&&typeof _plainUiWord==='function') t=_plainUiWord(t);
   const el=$('composerStatus');
   if(!el)return;
   const statusHidden=!!(window._composerControlVisibility&&window._composerControlVisibility.hide_composer_status);
@@ -19246,10 +19247,17 @@ function _toolCardAllowsDetail(kind, tc){
   if(infoKinds[kind]&&!(tc&&tc.is_error)) return false;
   return true;
 }
+// A few fixed English labels in step details and the composer, in Dutch when the UI is Dutch.
+const _PLAIN_NL={'Shell':'Opdracht','Target':'Doel','Input':'Invoer','Show diff':'Toon wijzigingen','Hide diff':'Verberg wijzigingen',
+  'Show more':'Toon meer','Show less':'Toon minder','Uploading…':'Bezig met uploaden…','Nothing to send':'Er is niets om te versturen'};
+function _plainUiWord(s){
+  const nl=/^nl\b/i.test(String(document.documentElement.lang||''));
+  return nl&&Object.prototype.hasOwnProperty.call(_PLAIN_NL,s)?_PLAIN_NL[s]:s;
+}
 function _toolDetailLeadLabel(kind){
-  if(kind==='shell') return 'Shell';
-  if(kind==='write') return 'Target';
-  return 'Input';
+  if(kind==='shell') return _plainUiWord('Shell');
+  if(kind==='write') return _plainUiWord('Target');
+  return _plainUiWord('Input');
 }
 function _toolDetailLeadText(kind, tc){
   const target=_toolTargetLabel(tc);
@@ -19383,7 +19391,7 @@ function buildToolCard(tc){
         }</div>`:''}
         ${displaySnippet&&handoffTask===null?`<div class="tool-card-result">
           <pre>${tc.is_diff||_snippetLooksLikeDiff(displaySnippet)?`<code class="diff-block" data-highlighted="1">${_colorDiffLines(displaySnippet)}</code>`:esc(displaySnippet)}</pre>
-          ${hasMore?`<button class="tool-card-more" data-full="${esc(tc.snippet||'').replace(/"/g,'&quot;')}" data-short="${esc(displaySnippet||'').replace(/"/g,'&quot;')}" data-is-diff="${tc.is_diff||_snippetLooksLikeDiff(displaySnippet)?1:0}" data-more-label="${esc(moreLabel)}" data-less-label="${esc(lessLabel)}" onclick="event.stopPropagation();_toggleToolDiff(this)">${esc(moreLabel)}</button>`:''}
+          ${hasMore?`<button class="tool-card-more" data-full="${esc(tc.snippet||'').replace(/"/g,'&quot;')}" data-short="${esc(displaySnippet||'').replace(/"/g,'&quot;')}" data-is-diff="${tc.is_diff||_snippetLooksLikeDiff(displaySnippet)?1:0}" data-more-label="${esc(moreLabel)}" data-less-label="${esc(lessLabel)}" onclick="event.stopPropagation();_toggleToolDiff(this)">${esc(typeof _plainUiWord==='function'?_plainUiWord(moreLabel):moreLabel)}</button>`:''}
         </div>`:''}
       </div>`:''}
     </div>`;
@@ -19426,7 +19434,8 @@ function _toggleToolDiff(btn){
   const pre=btn.closest('.tool-card-result')?.querySelector('pre');
   if(!pre) return;
   const isDiff=btn.dataset.isDiff==='1';
-  const expanded=btn.textContent===btn.dataset.moreLabel;
+  const _w=s=>typeof _plainUiWord==='function'?_plainUiWord(s):s;
+  const expanded=btn.textContent===btn.dataset.moreLabel||btn.textContent===_w(btn.dataset.moreLabel);
   const raw=expanded?btn.dataset.full:btn.dataset.short;
   if(isDiff){
     let code=pre.querySelector('code');
@@ -19435,7 +19444,7 @@ function _toggleToolDiff(btn){
   }else{
     pre.textContent=raw;
   }
-  btn.textContent=expanded?btn.dataset.lessLabel:btn.dataset.moreLabel;
+  btn.textContent=_w(expanded?btn.dataset.lessLabel:btn.dataset.moreLabel);
 }
 
 function _syncToolCallGroupSummary(group){

@@ -803,6 +803,7 @@ window.__registerHermesLocale('nl', {
   stop_sharing_session_confirm: 'Stoppen met delen? De bestaande link werkt meteen niet meer.',
   stop_sharing_session_tooltip: 'De link intrekken zodat hij niet meer opent',
   update_hard_refresh_now: 'Nu opnieuw laden',
+  access_denied_plain: 'Je hebt hier geen toegang toe. Vraag je beheerder om toegang.',
   chat_getting_long: 'gesprek wordt lang',
   stale_client_message: 'Er staat een nieuwe versie van SynthPulse klaar.',
   group_people_owner_only: 'Alleen de persoon die dit gesprek is gestart kan wijzigen wie erin zit.',

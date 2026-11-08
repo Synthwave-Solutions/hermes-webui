@@ -3812,7 +3812,9 @@ function _showStaleWebUIClientBanner(clientVersion,serverVersion){
   const plain=(typeof t==='function'&&t('stale_client_message')!=='stale_client_message')?t('stale_client_message'):'A new version of SynthPulse is ready.';
   if(msg) msg.textContent=plain;
   if(versions) versions.textContent='Running: '+clientVersion+' → Server: '+serverVersion;
-  banner.title=clientVersion+' → '+serverVersion;
+  let admin=false;
+  try{admin=document.documentElement.getAttribute('data-nav-audience')==='admin';}catch(_){}
+  try{ if(admin) banner.title=clientVersion+' → '+serverVersion; else if(banner.removeAttribute) banner.removeAttribute('title'); }catch(_){}
   banner.style.display='flex';
 }
 

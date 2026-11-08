@@ -601,16 +601,21 @@ const _iui=(function(){
 
     const repair=button('wrench',tx('repair'),(b,ev)=>{
       if(!ev||!ev.isTrusted) return;
+      // While an answer runs the request would be queued or used to steer, where the
+      // hidden report is not stripped; and one request per error is enough.
+      if(chatBusy()){toast(tx('chipsBusy'));return;}
+      if(b.dataset.sent==='1') return;
+      b.dataset.sent='1';b.disabled=true;
       const first=ctrl.errors[0]?friendly(ctrl.errors[0].message).slice(0,240):'';
       // The user sees one plain sentence; the error and the block type go to the
       // agent in a report the chat hides from the bubble.
       const report=(fence,msg)=>`\n\n[View report]\nBlock: ${fence}\nProblem: ${String(msg||'unknown').replace(/\[\/?View report\]/g,'')}\nFix the cause and send the complete ${fence} block again.\n[/View report]`;
       if(ctrl.kit){
         const msg=first||((ctrl.parsed&&ctrl.parsed.warnings||[])[0]||'');
-        sendPrompt(tx('kitRepairPrompt',kitWord('kitNoun',ctrl.kit),ctrl.parsed&&ctrl.parsed.title||kitWord('kitName',ctrl.kit))+report(ctrl.fence||ctrl.kit,msg));
+        if(!sendPrompt(tx('kitRepairPrompt',kitWord('kitNoun',ctrl.kit),ctrl.parsed&&ctrl.parsed.title||kitWord('kitName',ctrl.kit))+report(ctrl.fence||ctrl.kit,msg))){b.dataset.sent='';b.disabled=false;}
         return;
       }
-      sendPrompt(tx('repairPrompt',ctrl.parsed&&ctrl.parsed.title||tx('title'))+report('interactive-ui',first));
+      if(!sendPrompt(tx('repairPrompt',ctrl.parsed&&ctrl.parsed.title||tx('title'))+report('interactive-ui',first))){b.dataset.sent='';b.disabled=false;}
     },'iui-btn--text');
     const detailsBtn=button('code',tx('details'),b=>{
       errorDetails.hidden=!errorDetails.hidden;

@@ -2,12 +2,14 @@
 // resource+reason for the lifetime of the tab, so a denied poller cannot
 // spam the user (or re-surface the same restriction on every retry).
 const _forbiddenNoticeShown=new Set();
-function _notifyForbidden(resource,reason){
+function _notifyForbidden(resource,reason,userAction){
+  // Background reads that are denied stay quiet; the screen that needs them shows it.
+  if(!userAction) return;
   const key=String(resource||'')+'|'+String(reason||'');
   if(_forbiddenNoticeShown.has(key)) return;
   _forbiddenNoticeShown.add(key);
-  const what=resource||reason||'this feature';
-  if(typeof showToast==='function') showToast('Access restricted: '+what+' - ask your admin',6000);
+  const msg=(typeof t==='function'&&t('access_denied_plain')!=='access_denied_plain')?t('access_denied_plain'):'You do not have access to this. Ask your admin for access.';
+  if(typeof showToast==='function') showToast(msg,6000);
 }
 
 // ── Shared read layer for api() ──────────────────────────────────────────────
@@ -202,7 +204,7 @@ async function api(path,opts={}){
           if(res.status===403){
             err.reason=(errBody&&errBody.reason)||null;
             err.resource=(errBody&&errBody.resource)||null;
-            _notifyForbidden(err.resource,err.reason);
+            _notifyForbidden(err.resource,err.reason,String(opts&&opts.method||'GET').toUpperCase()!=='GET');
           }
           throw err;
         }
