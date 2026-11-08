@@ -12428,6 +12428,15 @@ def handle_get(handler, parsed) -> bool:
         from api import msp_service
         return msp_service.handle_get(handler, parsed)
 
+    if parsed.path in ("/api/org/structure", "/api/org/structure/me"):
+        from api import org_structure
+        return org_structure.handle_get(handler, parsed)
+
+    if parsed.path in ("/api/org/chart", "/api/management/overview", "/api/management/job",
+                       "/api/management/pricing"):
+        from api import management
+        return management.handle_get(handler, parsed)
+
     if parsed.path == "/api/org/modules":
         from api import org_modules
         return org_modules.handle_get(handler, parsed)
@@ -14776,6 +14785,15 @@ def handle_post(handler, parsed) -> bool:
     if parsed.path in ("/api/msp/invoice", "/api/msp/order", "/api/msp/job-cost", "/api/msp/package", "/api/msp/tickets", "/api/msp/comment", "/api/msp/app-state", "/api/msp/app-request", "/api/msp/app-support"):
         from api import msp_service
         return msp_service.handle_post(handler, parsed.path, body)
+
+    if parsed.path == "/api/org/structure":
+        from api import org_structure
+        return org_structure.handle_post(handler, parsed, body)
+
+    if parsed.path in ("/api/management/pricing", "/api/value/job", "/api/value/chat", "/api/value/collect"):
+        _ensure_agent_cron_import_path()
+        from api import management
+        return management.handle_post(handler, parsed, body)
 
     if parsed.path == "/api/org/modules/request":
         from api import org_modules
