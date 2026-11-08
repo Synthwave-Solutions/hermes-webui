@@ -347,7 +347,8 @@ Je krijgt het doel, de kans, de gekozen oplossing en wat de persoon vertelt over
 4. DATA: data_sensitivity is public, internal, confidential of personal (persoonsgegevens) met data_note (waarom,
    een zin). Bij personal: noem in de note welke gegevens het zijn.
 5. METRICS (1 tot 3): sluit aan op de KPI van het doel; baseline en target kort, een getal met eenheid
-   ("50 min", "3 dagen") of "nog bepalen", geen zin.
+   ("50 min", "3 dagen") of "nog bepalen", geen zin. Een target alleen als de persoon het noemde of als het
+   volgt uit de minuten van to_be; anders "nog bepalen".
 6. QUESTIONS (0 tot 3): wat je nog moet weten om het ontwerp te kunnen bouwen.
 
 Nederlands, eenvoudige woorden. Alleen JSON:
