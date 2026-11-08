@@ -328,6 +328,16 @@
 
   // ── Small helpers ────────────────────────────────────────────────────────
   function isObj(v){return !!v&&typeof v==='object'&&!Array.isArray(v);}
+  // The decimals a set of numbers needs together: money 0 or 2, others up to 2.
+  function sharedDecimals(values,type){
+    let d=0;
+    values.forEach(v=>{
+      if(typeof v!=='number'||!Number.isFinite(v)||Number.isInteger(v)) return;
+      const frac=(String(Math.round(v*100)/100).split('.')[1]||'').length;
+      d=Math.max(d,type==='currency'?2:Math.min(2,frac));
+    });
+    return d;
+  }
   function str(v,max,warn,field){
     if(v==null) return '';
     let s=typeof v==='string'?v:(typeof v==='number'||typeof v==='boolean')?String(v):'';
@@ -439,6 +449,12 @@ function base(spec,lang,kind,m,warnings,limits){
         if(TONES.has(t)) tones[str(k,LIMITS.cell).toLowerCase()]=t;
       });
     }
+    // One precision per column: if one amount has cents, every amount shows ,00.
+    columns.forEach((c,ci)=>{
+      if(c.decimals!=null||!['currency','percent','number'].includes(c.type)) return;
+      const d=sharedDecimals(outRows.map(r=>r[ci]),c.type);
+      if(d>0) c.decimals=d;
+    });
     return {errors,warnings,spec:Object.assign(out,{
       columns,rows:outRows,sort,
       total:spec.total===true,
@@ -527,7 +543,7 @@ function base(spec,lang,kind,m,warnings,limits){
     const height=spec.height==null?(type==='hbar'?Math.max(220,Math.min(480,60+labels.length*28*Math.max(1,series.length*0.6))):type==='radar'?340:300):clampInt(spec.height,180,480,300);
     return {errors,warnings,spec:Object.assign(out,{
       type,labels,series,format,
-      decimals:spec.decimals==null?null:clampInt(spec.decimals,0,2,null),
+      decimals:spec.decimals==null?(sharedDecimals([].concat(...series.map(s=>s.data)),format)||null):clampInt(spec.decimals,0,2,null),
       highlight,target,
       xLabel:str(spec.xLabel,40),yLabel:str(spec.yLabel,40),
       max:type==='radar'&&Number.isFinite(Number(spec.max))&&Number(spec.max)>0?Number(spec.max):null,
@@ -674,7 +690,12 @@ function base(spec,lang,kind,m,warnings,limits){
     const dec=autoDecimals(d,item.deltaDecimals!=null?item.deltaDecimals:null);
     const o={signDisplay:'exceptZero',minimumFractionDigits:dec,maximumFractionDigits:dec};
     if(item.deltaFormat==='percent') return kpiFormatter(lang,'dp'+dec,Object.assign({style:'percent'},o)).format(d/100);
-    if(item.format==='currency') return kpiFormatter(lang,'dc'+dec,Object.assign({style:'currency',currency:'EUR'},o)).format(d);
+    // Money changes: cents always as two digits, the sign before the euro sign ("+€ 1.200,50").
+    if(item.format==='currency'){
+      const cents=Math.round(Math.abs(d)*100)%100!==0, cd=cents?2:0;
+      const amt=kpiFormatter(lang,'dca'+cd,{style:'currency',currency:'EUR',minimumFractionDigits:cd,maximumFractionDigits:cd}).format(Math.abs(d));
+      return d===0?amt:(d>0?'+':'-')+amt;
+    }
     const text=kpiFormatter(lang,'dn'+dec,o).format(d);
     return item.format==='percent'?text+(pickLang(lang)==='nl'?' procentpunt':' pts'):text;
   }
@@ -1041,13 +1062,18 @@ function base(spec,lang,kind,m,warnings,limits){
     }
     if(kind==='kpi'){
       const en=spec.lang==='en';
-      return {header:en?['Figure','Value','Change','Change unit','Target']:['Cijfer','Waarde','Verandering','Eenheid verandering','Doel'],
+      // Each row says its own unit (tiles mix euros, percentages and counts).
+      const unitOf=i=>i.format==='currency'?'€':i.format==='percent'?'%':'';
+      return {header:en?['Figure','Value','Unit','Change','Change unit','Target']:['Cijfer','Waarde','Eenheid','Verandering','Eenheid verandering','Doel'],
         // The change stays a number (a text "+12,5%" would get a formula guard); its unit has a column.
-        rows:spec.items.map(i=>[i.label,i.value,i.delta,i.delta===null?'':(i.deltaFormat==='percent'?'%':i.format==='percent'?(en?'points':'procentpunt'):i.format==='currency'?'€':''),i.target]),
-        types:['text','number','number','text','number']};
+        rows:spec.items.map(i=>[i.label,i.value,unitOf(i),i.delta,i.delta===null?'':(i.deltaFormat==='percent'?'%':i.format==='percent'?(en?'points':'procentpunt'):i.format==='currency'?'€':''),i.target]),
+        types:['text','number','text','number','text','number']};
     }
     const x=extra(kind);
-    if(x){try{const t=x.table?x.table(spec,view,data):null;if(t&&Array.isArray(t.header)&&Array.isArray(t.rows))return t;}catch(_){}return {header:[],rows:[]};}
+    if(x){try{const t=x.table?x.table(spec,view,data):null;if(t&&Array.isArray(t.header)&&Array.isArray(t.rows)){
+      // Money and percentage columns of every kind name their unit too.
+      if(Array.isArray(t.types)) t.header=t.header.map((h,i)=>String(h)+unitTag(t.types[i],h));
+      return t;}}catch(_){}return {header:[],rows:[]};}
     if(kind==='timeline'){
       const en=spec.lang==='en', lang=en?'en':'nl', pos=spec.mode==='date'?'date':'number';
       return {header:en?['Item','Start','End','Owner','Status','Milestone','Note']:['Onderdeel','Start','Einde','Eigenaar','Status','Mijlpaal','Notitie'],

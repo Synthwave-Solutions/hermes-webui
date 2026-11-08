@@ -208,13 +208,13 @@ assert.strictEqual(kpi.spec.items[0].progress, 0.92);
 assert.strictEqual(kpi.spec.items[0].met, false);
 assert.strictEqual(kpi.spec.items[3].met, true, 'under budget meets a target when down is good');
 assert.deepStrictEqual(kpi.spec.items.map(i => K.kpiValueText(i, 'nl')), ['€ 18.400', '2,1%', '1.234', '€ 9.100', '€ 1,25 mln.']);
-assert.deepStrictEqual(kpi.spec.items.map(i => K.kpiDeltaText(i, 'nl')), ['+12,5%', '+0,4 procentpunt', '-3%', '€ -800', '0%']);
+assert.deepStrictEqual(kpi.spec.items.map(i => K.kpiDeltaText(i, 'nl')), ['+12,5%', '+0,4 procentpunt', '-3%', '-€ 800', '0%']);
 assert.deepStrictEqual(kpi.spec.items.slice(0, 2).map(i => K.kpiDeltaText(i, 'en')), ['+12.5%', '+0.4 pts']);
 assert.ok(kpi.estHeight > 100 && kpi.estHeight < 400, kpi.estHeight);
-assert.deepStrictEqual(plain(K.kitTable('kpi', kpi.spec)).header, ['Cijfer', 'Waarde', 'Verandering', 'Eenheid verandering', 'Doel']);
+assert.deepStrictEqual(plain(K.kitTable('kpi', kpi.spec)).header, ['Cijfer', 'Waarde', 'Eenheid', 'Verandering', 'Eenheid verandering', 'Doel']);
 assert.strictEqual(K.toCsv(K.kitTable('kpi', kpi.spec), {delimiter: ';', decimalComma: true}),
-  '﻿Cijfer;Waarde;Verandering;Eenheid verandering;Doel\r\nMRR;18400;12,5;%;20000\r\nChurn;2,1;0,4;procentpunt;\r\nKlanten;1234;-3;%;\r\nKosten;9100;-800;€;10000\r\nPijplijn;1250000;0;%;\r\n');
-assert.deepStrictEqual(plain(K.kitTable('kpi', build('kpi', {title: 'x', lang: 'en', items: [{label: 'a', value: 1}]}).spec)).header, ['Figure', 'Value', 'Change', 'Change unit', 'Target']);
+  '﻿Cijfer;Waarde;Eenheid;Verandering;Eenheid verandering;Doel\r\nMRR;18400;€;12,5;%;20000\r\nChurn;2,1;%;0,4;procentpunt;\r\nKlanten;1234;;-3;%;\r\nKosten;9100;€;-800;€;10000\r\nPijplijn;1250000;€;0;%;\r\n');
+assert.deepStrictEqual(plain(K.kitTable('kpi', build('kpi', {title: 'x', lang: 'en', items: [{label: 'a', value: 1}]}).spec)).header, ['Figure', 'Value', 'Unit', 'Change', 'Change unit', 'Target']);
 // Fixable: bad fields are dropped with a warning that names the figure.
 const kpiFix = build('kpi', {items: [
   {label: 'Omzet', value: '€ 1.200', format: 'money', delta: 'veel', good: 'sideways', target: -5, deltaFormat: 'ratio', note: 'n'.repeat(100)},

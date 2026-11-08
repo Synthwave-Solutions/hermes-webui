@@ -144,20 +144,20 @@ assert.ok(/geen geldige JSON/.test(r.errors[0]));
 
 // ── Export ──────────────────────────────────────────────────────────────────
 const t = K.kitTable('compare', build(good).spec);
-assert.deepStrictEqual(t.header, ['Optie', 'Aanrader', 'Prijs', 'Eenheid', 'Score (van 10)', 'Pluspunten', 'Minpunten', 'Levertijd', 'Support', 'Proefperiode']);
+assert.deepStrictEqual(t.header, ['Optie', 'Aanrader', 'Prijs (€)', 'Eenheid', 'Score (van 10)', 'Pluspunten', 'Minpunten', 'Levertijd', 'Support', 'Proefperiode']);
 assert.deepStrictEqual(plain(t.rows[1]), ['Moneybird', 'Ja', 32.5, 'per maand', 8.5, 'Snel te leren; Goede app', '', 'Direct', 'Chat', null]);
 assert.deepStrictEqual(plain(t.rows[2]).slice(0, 5), ['SnelStart', null, 45, 'per maand', 7]);
 assert.strictEqual(t.types[2], 'currency');
 assert.strictEqual(t.types.length, t.header.length);
 const csv = K.toCsv(t);
-assert.ok(csv.startsWith('\ufeffOptie;Aanrader;Prijs;Eenheid;Score (van 10);Pluspunten;Minpunten;Levertijd;Support;Proefperiode\r\n'), csv.split('\n')[0]);
+assert.ok(csv.startsWith('\ufeffOptie;Aanrader;Prijs (€);Eenheid;Score (van 10);Pluspunten;Minpunten;Levertijd;Support;Proefperiode\r\n'), csv.split('\n')[0]);
 assert.ok(csv.includes('Moneybird;Ja;32,5;per maand;8,5;"Snel te leren; Goede app"'), 'decimal comma and quoting');
 const te = K.kitTable('compare', build(Object.assign({}, good, {lang: 'en'})).spec);
-assert.deepStrictEqual(te.header.slice(0, 7), ['Option', 'Recommended', 'Price', 'Unit', 'Score (of 10)', 'Pros', 'Cons']);
+assert.deepStrictEqual(te.header.slice(0, 7), ['Option', 'Recommended', 'Price (€)', 'Unit', 'Score (of 10)', 'Pros', 'Cons']);
 assert.strictEqual(K.kitTable('compare', ms).rows[3][2], 'Op aanvraag', 'a text price is exported as text');
 // Without a recommendation, units or scores the extra columns stay out.
 const bare = K.kitTable('compare', build({title: 'x', options: [{name: 'A', price: 4}, {name: 'B'}]}).spec);
-assert.deepStrictEqual(bare.header, ['Optie', 'Prijs', 'Score', 'Pluspunten', 'Minpunten']);
+assert.deepStrictEqual(bare.header, ['Optie', 'Prijs (€)', 'Score', 'Pluspunten', 'Minpunten']);
 
 // ── Limits ──────────────────────────────────────────────────────────────────
 const long = 'x'.repeat(400);
