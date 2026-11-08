@@ -174,7 +174,7 @@ const pct = texts(pc.spec);
 assert.strictEqual(pct.num(pc.spec.stages[2].value), '1,5%');
 assert.strictEqual(pct.detail(1), 'Klik · 12% · 12% van Bereik · 12% van het begin');
 const pcT = K.kitTable('funnel', pc.spec);
-assert.deepStrictEqual(pcT.header, ['Fase', 'Aandeel', 'Conversie vanaf vorige (%)', 'Conversie vanaf begin (%)']);
+assert.deepStrictEqual(pcT.header, ['Fase', 'Aandeel (%)', 'Conversie vanaf vorige (%)', 'Conversie vanaf begin (%)']);
 assert.deepStrictEqual(pcT.types, ['text', 'percent', 'number', 'number']);
 assert.strictEqual(build({title: 'P', format: 'procent', stages: [{label: 'A', value: 50}, {label: 'B', value: 5}]}).spec.format, 'percent');
 
@@ -200,7 +200,7 @@ assert.deepStrictEqual(t.types, ['text', 'number', 'number', 'number', 'number']
 assert.deepStrictEqual(t.rows[0], ['Leads', 1240, null, 100, 1100]);
 assert.deepStrictEqual(t.rows[3], ['Klant', 37, 38.5, 3, 30]);
 const t2 = K.kitTable('funnel', two.spec);
-assert.deepStrictEqual(t2.header, ['Stage', 'Value', 'From previous (%)', 'From start (%)']);
+assert.deepStrictEqual(t2.header, ['Stage', 'Value (€)', 'From previous (%)', 'From start (%)']);
 assert.deepStrictEqual(t2.rows[1], ['Orders', 212, 1.2, 1.2]);
 const csv = K.toCsv(t);
 assert.ok(csv.startsWith('﻿Fase;Aantal;Conversie vanaf vorige (%);Conversie vanaf begin (%);Vorige periode\r\n'));

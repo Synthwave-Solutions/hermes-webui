@@ -235,7 +235,7 @@ th.num .k-sort{flex-direction:row-reverse;justify-content:flex-start}
 th .k-sort{white-space:normal}
 .k-tl-now-key{display:none}
 .k-tl-legend:not(:has(.k-tl-key:not(.k-tl-now-key))){display:none}
-@media (max-width:479px){.k-tl-now-key{display:inline-flex}.k-tl-legend:has(.k-tl-now-key){display:flex}}
+@media (max-width:479px){.k-tl-now-key{display:inline-flex}.k-tl-legend.k-tl-legend:has(.k-tl-now-key){display:flex}}
 .k-legend{column-gap:28px}
 .k-legend .k-legend-label{flex:0 1 auto}
 .k-legend .k-legend-value{margin-left:6px}

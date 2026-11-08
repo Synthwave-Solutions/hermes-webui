@@ -607,6 +607,7 @@ const _iui=(function(){
     if(!openMenu) return;
     const {menu,trigger}=openMenu;
     if(openMenu.card&&!openMenu.card.classList.contains('iui-full')) escapeRows(openMenu.card,false);
+    document.documentElement.classList.remove('iui-has-menu');
     menu.hidden=true;trigger.setAttribute('aria-expanded','false');
     openMenu=null;
     window.removeEventListener('blur',onMenuBlur);
@@ -618,7 +619,7 @@ const _iui=(function(){
     if(openMenu&&openMenu.menu===ctrl.menu){closeMenu(true);return;}
     closeMenu(false);
     ctrl.codeItem.querySelector('span').textContent=ctrl.kit?(ctrl.sourceBox.hidden?tx('viewData'):tx('hideData')):(ctrl.sourceBox.hidden?tx('viewCode'):tx('hideCode'));
-    if(matchMedia('(max-width:640px)').matches) escapeRows(ctrl.card,true);
+    if(matchMedia('(max-width:640px)').matches){escapeRows(ctrl.card,true);document.documentElement.classList.add('iui-has-menu');}
     ctrl.menu.hidden=false;
     ctrl.moreBtn.setAttribute('aria-expanded','true');
     openMenu={menu:ctrl.menu,trigger:ctrl.moreBtn,card:ctrl.card};

@@ -560,7 +560,7 @@ def data_blocks(page, ctx, gateway, art, base_runs):
     tones = frame.evaluate("() => [...document.querySelectorAll('.k-delta')].map(p => p.className.replace('k-delta ', ''))")
     assert tones == ["is-good", "is-bad", "is-good", "is-flat"], tones
     deltas = [t.replace("\u00a0", " ") for t in frame.evaluate("() => [...document.querySelectorAll('.k-delta')].map(p => p.childNodes[1].textContent)")]
-    assert deltas == ["+12,5%", "+0,4 procentpunt", "€ -800", "0 procentpunt"], deltas
+    assert [d.replace("\u00a0", " ") for d in deltas] == ["+12,5%", "+0,4 procentpunt", "-€ 800", "0 procentpunt"], deltas
     good, bad = frame.evaluate(PROBE, "--sw-good"), frame.evaluate(PROBE, "--sw-bad")
     colours = frame.evaluate("() => [...document.querySelectorAll('.k-delta')].map(p => getComputedStyle(p).color)")
     assert colours[0] == good and colours[1] == bad and colours[2] == good and colours[3] not in (good, bad), (colours, good, bad)

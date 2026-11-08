@@ -439,7 +439,7 @@
       var stacked = spec.type === 'stacked' || (spec.type === 'area' && spec.series.length > 1);
       var horizontal = spec.type === 'hbar' || autoH;
       var valueAxis = {stacked:stacked, beginAtZero:true, grid:{color:alpha(t.border || '#2a2f3d', 0.9), drawTicks:false}, border:{display:false},
-        ticks:{color:t.muted, padding:6, maxRotation:0, maxTicksLimit:horizontal && narrowC ? 4 : 8, callback:function(v){ return f(v); }}};
+        ticks:{color:t.muted, padding:6, maxRotation:0, maxTicksLimit:horizontal && narrowC ? 4 : 8, callback:function(v){ return fmt(v, spec.format, Number.isInteger(v) ? 0 : spec.decimals); }}};
       // The goal line always falls inside the chart.
       if(spec.target && Number.isFinite(spec.target.value)) valueAxis.suggestedMax = spec.target.value * 1.06;
       // Named categories are never skipped on a phone: they wrap instead (dates and months may skip).
@@ -474,9 +474,11 @@
           // Always the chart's own number format: 'Doel 130.000' becomes 'Doel € 130.000'.
           // Strip an amount the label already names ("Doel 130k", "Doel € 130.000"); a year like 2026 stays.
           var raw = String(target.label || ''), base = raw;
-          var amountRe = /\(?\s*([€$]?)\s*(\d[\d.,]*)\s*(k|duizend|thousand|mln\.?|mio|miljoen|million|m|mld\.?|miljard|bn|b|billion)?\b\.?\s*(%|euro|eur|k€)?\s*\)?/gi;
+          var amountRe = /\(?\s*(k€|[€$£]?)\s*(\d[\d.,]*)\s*(k|duizend|thousand|mln\.?|mio|miljoen|million|m|mld\.?|miljard|bn|b|billion)?\b\.?\s*(%|euro|eur|k€)?\s*\)?/gi;
           base = raw.replace(amountRe, function(all, cur, num, unit, tail){
-            var n = K.parseNumber(num).n;
+            // "130,000" is English thousands; the parser reads Dutch first.
+            var n = /^\d{1,3}(,\d{3})+(\.\d+)?$/.test(num) ? Number(num.replace(/,/g, '')) : K.parseNumber(num).n;
+            if(cur === 'k€') unit = unit || 'k';
             if(!Number.isFinite(n)) return all;
             var u = String(unit || '').toLowerCase().replace('.', ''), mult = !u ? 1 : /^(k|duizend|thousand)$/.test(u) ? 1e3 : /^(mld|miljard|bn|b|billion)$/.test(u) ? 1e9 : 1e6;
             var near = target.value && Math.abs(n * mult - target.value) <= Math.abs(target.value) * 0.25;
@@ -484,7 +486,7 @@
             return near || ((cur || unit || tail) && !/^\d{4}$/.test(num)) ? ' ' : all;
           });
           // Leftovers of a written amount (",-", "~", "±", "/jaar", "USD", brackets) go too.
-          base = base.replace(/\/\s*[\p{L}]+/gu, ' ').replace(/\b(usd|eur|euro|gbp)\b/gi, ' ').replace(/[,.]-|[~±≈()€$]/g, ' ');
+          base = base.replace(/\/\s*[\p{L}]+/gu, ' ').replace(/\b(usd|eur|euro|gbp|per year|per jaar|a year)\b/gi, ' ').replace(/[,.]-|[~±≈()€$£]/g, ' ');
           base = base.replace(/\s+/g, ' ').replace(/[:,.\s]+$/, '').trim();
           var label = (base ? base + ' ' : '') + f(target.value);
           ctx.save();
@@ -1094,7 +1096,7 @@
       var parts = [it.label, K.timelinePeriod(spec, it, LANG), it.milestone ? T('milestone') : '', it.owner, K.statusWord(it.status, LANG), it.note];
       detail.textContent = parts.filter(Boolean).join(' · ');
       detail.classList.add('is-set');
-      if(!restore){ saveState({a:i}); revealEl(detail); }
+      if(!restore){ saveState({a:i}); revealEl(detail, bars[i]); }
       scheduleHeight(false);
     }
     if(typeof view.a === 'number' && view.a >= 0 && view.a < n) select(view.a, true);

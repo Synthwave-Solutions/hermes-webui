@@ -340,7 +340,7 @@
       buttons.forEach(function(x, j){ x.setAttribute('aria-pressed', String(j === i)); x.tabIndex = j === i ? 0 : -1; rows[j].classList.toggle('is-active', j === i); });
       detail.textContent = X.detail(i);
       detail.classList.add('is-set');
-      if(!isRestore){ ctx.save({a:i}); if(ctx.reveal) ctx.reveal(detail); }
+      if(!isRestore){ ctx.save({a:i}); if(ctx.reveal) ctx.reveal(detail, rows[i]); }
       ctx.resize();
     }
     if(seen && restore.a >= 0 && restore.a < n) select(restore.a, true);

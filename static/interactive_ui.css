@@ -292,3 +292,6 @@ html:not([data-nav-audience="admin"]) .iui-menu .iui-menu-dev,
 html:not([data-nav-audience="admin"]) .iui-menu .iui-menu-group,
 html:not([data-nav-audience="admin"]) .iui-menu .iui-menu-sep,
 html:not([data-nav-audience="admin"]) .iui-menu .iui-menu-note{display:none!important}
+/* The phone menu sheet sits above the composer: the message list drops its own layer while it is open. */
+html.iui-has-menu .messages,html.iui-has-menu #messages{z-index:auto!important}
+html.iui-has-menu #scrollToBottomBtn{display:none!important}
