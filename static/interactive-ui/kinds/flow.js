@@ -3,8 +3,9 @@
 //
 // Shape: {"title", "direction":"down|right", "nodes":[{"id", "label",
 // "type":"start|step|decision|end|wait", "owner"?, "note"?}],
-// "edges":[{"from", "to", "label"?}]}. "steps" and "links" work too; without
-// edges the steps are linked in order. Cycles are allowed: a step that goes
+// "edges":[{"from", "to", "label"?}]}. "steps" and "links" work too, and a
+// link may be a string ("A -> B -> C", "A -> B: Ja"); without edges the
+// steps are linked in order. Cycles are allowed: a step that goes
 // back is drawn around the side.
 //
 // Loaded twice: in the chat (checks only, SWKit) and in the kit frame (SWKit
@@ -25,6 +26,7 @@
     right:'right', horizontal:'right', horizontaal:'right', lr:'right', rechts:'right', left:'right'};
   var YES = /^(ja|yes|ok|oké|okay|akkoord|goed|goedgekeurd|approved|accepted|klopt|wel|true|y)(?![a-z])/;
   var NO = /^(nee|no|niet|geen|afgekeurd|afgewezen|rejected|declined|false|n)(?![a-z])/;
+  var own = function(o, k){ return Object.prototype.hasOwnProperty.call(o, k); };
   var TYPE_WORDS = {nl:{start:'Start', step:'Stap', decision:'Keuze', end:'Einde', wait:'Wachten'},
     en:{start:'Start', step:'Step', decision:'Decision', end:'End', wait:'Wait'}};
 
@@ -36,7 +38,7 @@
       manyEdges:function(n, max){ return 'Er zijn ' + n + ' verbindingen; alleen de eerste ' + max + ' worden getoond.'; },
       node:function(i){ return 'Stap ' + i + ' is geen object met een label en is weggelaten.'; },
       noLabel:function(i, id){ return id ? 'Stap ' + i + ' heeft geen label; de id "' + id + '" is als naam gebruikt.' : 'Stap ' + i + ' heeft geen label en is weggelaten.'; },
-      dupId:function(id){ return 'De id "' + id + '" komt vaker voor; de volgende stap heeft een eigen id gekregen.'; },
+      dupId:function(id, l, nid){ return 'De id "' + id + '" komt vaker voor; "' + l + '" heet nu "' + nid + '". Verbindingen met "' + id + '" gaan naar de eerste stap.'; },
       type:function(l, t){ return '"' + l + '" heeft een onbekend type "' + t + '"; gebruik start, step, decision, end of wait. Nu geldt step.'; },
       dir:function(d){ return 'Onbekende richting (direction) "' + d + '"; gebruik down of right. Nu geldt down.'; },
       edge:function(i){ return 'Verbinding ' + i + ' heeft geen from en to en is weggelaten.'; },
@@ -49,7 +51,8 @@
       cutLabel:function(i){ return 'Het label van stap ' + i; },
       cutOwner:function(l){ return 'De eigenaar van "' + l + '"'; },
       cutNote:function(l){ return 'De notitie van "' + l + '"'; },
-      cutEdge:function(i){ return 'Het label van verbinding ' + i; }
+      cutEdge:function(i){ return 'Het label van verbinding ' + i; },
+      moreCuts:function(n){ return 'Nog ' + n + (n === 1 ? ' label van een verbinding is' : ' labels van verbindingen zijn') + ' ingekort.'; }
     },
     en:{
       noNodes:function(){ return 'There are no steps (nodes).'; },
@@ -58,7 +61,7 @@
       manyEdges:function(n, max){ return 'There are ' + n + ' links; only the first ' + max + ' are shown.'; },
       node:function(i){ return 'Step ' + i + ' is not an object with a label and was left out.'; },
       noLabel:function(i, id){ return id ? 'Step ' + i + ' has no label; its id "' + id + '" is used as its name.' : 'Step ' + i + ' has no label and was left out.'; },
-      dupId:function(id){ return 'The id "' + id + '" is used more than once; the next step got an id of its own.'; },
+      dupId:function(id, l, nid){ return 'The id "' + id + '" is used more than once; "' + l + '" is now "' + nid + '". Links with "' + id + '" go to the first step.'; },
       type:function(l, t){ return '"' + l + '" has an unknown type "' + t + '"; use start, step, decision, end or wait. Step is used now.'; },
       dir:function(d){ return 'Unknown direction "' + d + '"; use down or right. Down is used now.'; },
       edge:function(i){ return 'Link ' + i + ' has no from and to and was left out.'; },
@@ -71,9 +74,45 @@
       cutLabel:function(i){ return 'The label of step ' + i; },
       cutOwner:function(l){ return 'The owner of "' + l + '"'; },
       cutNote:function(l){ return 'The note of "' + l + '"'; },
-      cutEdge:function(i){ return 'The label of link ' + i; }
+      cutEdge:function(i){ return 'The label of link ' + i; },
+      moreCuts:function(n){ return n + ' more link ' + (n === 1 ? 'label was' : 'labels were') + ' shortened.'; }
     }
   };
+
+  // "A -> B", "A --> B -> C", "A -->|Ja| B", "A -> B: Ja", "A -> B (Ja)" and,
+  // without a real arrow, "A > B". A ">" inside a label ("Bedrag > 5000?")
+  // only splits when nothing better is there. Returns readings in order of
+  // preference: [[{ref, label, alt:[{ref, label}]}...]...]; validate picks the
+  // first in which every step exists.
+  function splits(s){
+    s = String(s).trim();
+    var out = [];
+    function reading(parts){
+      if(parts.length < 2 || parts.some(function(x){ return !x.trim(); })) return;
+      out.push(parts.map(function(x, k){
+        var q = {ref:x.trim(), label:''}, m;
+        if(k && (m = /^\|([^|]*)\|\s*([\s\S]+)$/.exec(q.ref))){ q.label = m[1].trim(); q.ref = m[2].trim(); }
+        if(k && (m = /^(.+?)\s*:\s*([^:]+)$/.exec(q.ref))) (q.alt = q.alt || []).push({ref:m[1], label:m[2].trim()});
+        if(k && (m = /^(.+?)\s*\(([^()]+)\)$/.exec(q.ref))) (q.alt = q.alt || []).push({ref:m[1], label:m[2].trim()});
+        return q;
+      }));
+    }
+    var strong = s.split(/\s*(?:-+>|=+>|→)\s*/);
+    if(strong.length > 1){
+      reading(strong);
+      if(strong.length > 2) reading([strong.slice(0, -1).join(' -> '), strong[strong.length - 1]]);
+      return out;
+    }
+    var spaced = s.split(/\s+>\s+/);
+    if(spaced.length > 1){
+      reading([spaced.slice(0, -1).join(' > '), spaced[spaced.length - 1]]);
+      if(spaced.length > 2){ reading(spaced); reading([spaced[0], spaced.slice(1).join(' > ')]); }
+      return out;
+    }
+    var bare = s.split('>');
+    if(bare.length === 2) reading(bare);
+    return out;
+  }
 
   // ── Checks ──────────────────────────────────────────────────────────────
   function validate(raw, lang, H){
@@ -83,12 +122,12 @@
     var out = H.base(raw, 'flow', warnings);
     var direction = 'down';
     if(raw.direction != null && raw.direction !== ''){
-      var d = DIRS[String(raw.direction).trim().toLowerCase()];
-      if(d) direction = d; else warn(M.dir(H.str(raw.direction, 20)));
+      var dk = String(raw.direction).trim().toLowerCase();
+      if(own(DIRS, dk)) direction = DIRS[dk]; else warn(M.dir(H.str(raw.direction, 20)));
     }
     var list = Array.isArray(raw.nodes) ? raw.nodes : Array.isArray(raw.steps) ? raw.steps : null;
     if(!list || !list.length){ errors.push(M.noNodes()); return {errors:errors, warnings:warnings}; }
-    var cutRefs = {};
+    var cutRefs = Object.create(null);
     if(list.length > LIM.nodes){
       warn(M.many(list.length, LIM.nodes));
       list.slice(LIM.nodes).forEach(function(it){
@@ -98,6 +137,9 @@
       list = list.slice(0, LIM.nodes);
     }
     var nodes = [], byId = {}, byLower = {}, byLabel = {}, anyId = false, nexts = [];
+    // Ids given anywhere in the list, so a made-up id never takes one of them.
+    var taken = Object.create(null);
+    list.forEach(function(it){ if(H.isObj(it)){ var x = H.str(it.id != null ? it.id : it.key, LIM.id); if(x) taken[x] = true; } });
     list.forEach(function(it, i){
       if(typeof it === 'string') it = {label:it};
       if(!H.isObj(it)){ warn(M.node(i + 1)); return; }
@@ -108,11 +150,16 @@
         else { warn(M.noLabel(i + 1, '')); return; }
       }
       if(id) anyId = true;
-      if(id && Object.prototype.hasOwnProperty.call(byId, id)){ warn(M.dupId(id)); id = ''; }
+      if(id && own(byId, id)){
+        // The second one gets an id of its own; links with the old id keep going to the first.
+        var nid, q2 = 2;
+        do { nid = id.slice(0, LIM.id - 3) + '-' + q2++; } while(own(byId, nid) || taken[nid]);
+        warn(M.dupId(id, label, nid)); id = nid;
+      }
       var type = 'step';
       if(it.type != null && it.type !== '' || it.shape != null && it.shape !== ''){
         var t = String(it.type != null && it.type !== '' ? it.type : it.shape).trim().toLowerCase();
-        if(TYPES[t]) type = TYPES[t]; else warn(M.type(label, H.str(t, 20)));
+        if(own(TYPES, t)) type = TYPES[t]; else warn(M.type(label, H.str(t, 20)));
       }
       var k = nodes.length;
       var node = {k:k, label:label, type:type,
@@ -145,7 +192,7 @@
     var rawEdges = Array.isArray(raw.edges) ? raw.edges : Array.isArray(raw.links) ? raw.links : Array.isArray(raw.connections) ? raw.connections : [];
     rawEdges = rawEdges.map(function(e){
       if(Array.isArray(e)) return {from:e[0], to:e[1], label:e[2]};
-      if(typeof e === 'string'){ var m = /^(.+?)\s*(?:->|=>|→|>)\s*(.+)$/.exec(e); return m ? {from:m[1], to:m[2]} : e; }
+      if(typeof e === 'string'){ var sp = splits(e); return sp.length ? {splits:sp} : e; }
       return e;
     });
     nexts.forEach(function(p){
@@ -154,27 +201,52 @@
         else rawEdges.push({from:p[0], fromIndex:true, to:x});
       });
     });
-    if(!anyId) zeroBased = rawEdges.some(function(e){ return H.isObj(e) && !e.fromIndex && (e.from === 0 || e.to === 0 || e.from === '0' || e.to === '0'); });
+    if(!anyId) zeroBased = rawEdges.some(function(e){
+      if(!H.isObj(e) || e.fromIndex) return false;
+      if(e.splits) return e.splits[0].some(function(q){ return q.ref === '0'; });
+      return e.from === 0 || e.to === 0 || e.from === '0' || e.to === '0';
+    });
     var given = rawEdges.length;
     if(rawEdges.length > LIM.edges){ warn(M.manyEdges(rawEdges.length, LIM.edges)); rawEdges = rawEdges.slice(0, LIM.edges); }
-    var edges = [], seen = {}, unknown = 0, toCut = 0;
+    var edges = [], seen = {}, unknown = 0, toCut = 0, labelCuts = 0;
+    var edgeCut = function(k, field, max){ if(++labelCuts <= 3) cutWarn(k, field, max); };
+    function bad(i, ref){
+      if(cutRefs[String(ref).trim().toLowerCase()]) toCut++;
+      else if(++unknown <= 5) warn(M.edgeRef(i + 1, H.str(ref, 40)));
+    }
+    function add(i, f, t, label){
+      if(edges.length >= LIM.edges) return;
+      var key = f + '>' + t;
+      if(seen[key]){ warn(M.edgeDup(nodes[f].label, nodes[t].label)); return; }
+      seen[key] = true;
+      edges.push({f:f, t:t, label:H.str(label, LIM.edgeLabel, edgeCut, M.cutEdge(i + 1))});
+    }
     rawEdges.forEach(function(e, i){
       if(!H.isObj(e)){ warn(M.edge(i + 1)); return; }
+      if(e.splits){
+        // The first reading in which every step exists wins; otherwise the first.
+        var pick = null;
+        e.splits.some(function(sp){
+          var got = sp.map(function(q){
+            var k = resolve(q.ref);
+            if(k < 0 && q.alt) for(var a = 0; a < q.alt.length && k < 0; a++){ k = resolve(q.alt[a].ref); if(k >= 0) return {k:k, label:q.alt[a].label || q.label}; }
+            return {k:k, label:q.label};
+          });
+          if(got.every(function(g){ return g.k >= 0; })){ pick = got; return true; }
+          return false;
+        });
+        if(!pick){ var miss = e.splits[0].filter(function(q){ return resolve(q.ref) < 0; })[0]; bad(i, miss ? miss.ref : ''); return; }
+        for(var c = 0; c + 1 < pick.length; c++) add(i, pick[c].k, pick[c + 1].k, pick[c + 1].label);
+        return;
+      }
       var fr = e.from != null ? e.from : e.source != null ? e.source : e.van;
       var to = e.to != null ? e.to : e.target != null ? e.target : e.naar;
       if(fr == null || fr === '' || to == null || to === ''){ warn(M.edge(i + 1)); return; }
       var f = e.fromIndex ? fr : resolve(fr), t = resolve(to);
-      if(f < 0 || t < 0){
-        var bad = f < 0 ? fr : to;
-        if(cutRefs[String(bad).trim().toLowerCase()]) toCut++;
-        else if(++unknown <= 5) warn(M.edgeRef(i + 1, H.str(bad, 40)));
-        return;
-      }
-      var key = f + '>' + t;
-      if(seen[key]){ warn(M.edgeDup(nodes[f].label, nodes[t].label)); return; }
-      seen[key] = true;
-      edges.push({f:f, t:t, label:H.str(e.label != null ? e.label : e.text != null ? e.text : e.condition, LIM.edgeLabel, cutWarn, M.cutEdge(i + 1))});
+      if(f < 0 || t < 0){ bad(i, f < 0 ? fr : to); return; }
+      add(i, f, t, e.label != null ? e.label : e.text != null ? e.text : e.condition);
     });
+    if(labelCuts > 3) warn(M.moreCuts(labelCuts - 3));
     if(unknown > 5) warn(M.moreRefs(unknown - 5));
     if(toCut) warn(M.cutEdges(toCut));
     if(!edges.length && nodes.length > 1){
@@ -241,7 +313,9 @@
   // mapped to x and y at the end, so down and right share one algorithm.
   function layout(spec, opt){
     var dir = opt.dir === 'right' ? 'right' : 'down';
-    var gapMain = opt.gapMain || 44, gapCross = opt.gapCross || 28, DUMMY = 8, LANE = 18, LANE_STEP = 12, LH = 16;
+    var gapMain = opt.gapMain || 44, gapCross = opt.gapCross || 28, DUMMY = 8, LANE = opt.lane || 18, LANE_STEP = opt.laneStep || 12, LH = 16;
+    // Upright lane labels (phones): turned along the lane, so they add no width.
+    var upright = !!opt.uprightLanes && dir === 'down';
     var r = rank(spec), n = spec.nodes.length;
     var cs = [], ms = [], layerOf = [], isReal = [], dfs = [];
     spec.nodes.forEach(function(nd, i){
@@ -438,7 +512,7 @@
       function cost(sd){
         var edge = sd > 0 ? hi : lo, c2 = Math.abs(edge - cc[f] - sd * cs[f] / 2) + Math.abs(edge - cc[t] - sd * cs[t] / 2);
         if(!clear(f, sd) || used[f + ':' + sd]) c2 += 400;
-        if(!clear(t, sd)) c2 += 400;
+        if(!clear(t, sd) || used[t + ':' + sd]) c2 += 400;
         return c2;
       }
       var side = cost(1) <= cost(-1) ? 1 : -1;
@@ -448,7 +522,8 @@
       lanes.push({c:lane, m0:m0b, m1:m1b});
       if(clear(f, side) && !used[f + ':' + side]){ pts.push([cc[f] + side * cs[f] / 2, mMid(f)]); pts.push([lane, mMid(f)]); }
       else { var yo = gapAfter(layerOf[f]) + 6; pts.push([cc[f], mEnd(f)]); pts.push([cc[f], yo]); pts.push([lane, yo]); }
-      if(clear(t, side)){ pts.push([lane, mMid(t)]); pts.push([cc[t] + side * sideAt(t, 0), mMid(t)]); }
+      // A side point a decision's branch already leaves from is not an entry.
+      if(clear(t, side) && !used[t + ':' + side]){ pts.push([lane, mMid(t)]); pts.push([cc[t] + side * sideAt(t, 0), mMid(t)]); }
       else {
         var yi = layerOf[t] ? gapAfter(layerOf[t] - 1) - 6 : ls[0] - 12;
         pts.push([lane, yi]); pts.push([cc[t], yi]); pts.push([cc[t], mStart(t)]);
@@ -468,7 +543,11 @@
       var pts2 = simplify(rr.pts).map(xy), label = null;
       if(rr.lab){
         var lw2 = opt.labelW[j], q = xy([rr.lab.c, rr.lab.m]), lx, ly;
-        if(rr.lab.kind === 'lane'){
+        if(rr.lab.kind === 'lane' && upright){
+          // Centred on the lane line, reading upwards; the box is turned too.
+          lx = q[0] - rr.lab.side * 5 - LH / 2; ly = q[1] - lw2 / 2;
+          label = {x:lx, y:ly, w:LH, h:lw2, upright:true};
+        } else if(rr.lab.kind === 'lane'){
           if(dir === 'down'){ lx = rr.lab.side > 0 ? q[0] : q[0] - lw2; ly = q[1] - LH / 2; }
           else { lx = q[0] - lw2 / 2; ly = rr.lab.side > 0 ? q[1] : q[1] - LH; }
         } else if(rr.lab.kind === 'port'){
@@ -478,11 +557,13 @@
           if(dir === 'down'){ lx = rr.lab.side > 0 ? q[0] : q[0] - lw2; ly = q[1]; }
           else { lx = q[0] + 1; ly = q[1] - LH - 3 - 5; }
         }
-        label = {x:lx, y:ly, w:lw2, h:LH};
+        if(!label) label = {x:lx, y:ly, w:lw2, h:LH};
+        if(rr.lab.kind === 'gap') label.gap = true;
       }
       var a = pts2[pts2.length - 2], z = pts2[pts2.length - 1], len = Math.hypot(z[0] - a[0], z[1] - a[1]) || 1;
       return {f:spec.edges[j].f, t:spec.edges[j].t, pts:pts2, end:[(z[0] - a[0]) / len, (z[1] - a[1]) / len], label:label, back:rr.back};
     });
+    placeGapLabels(edgesOut, boxes, dir, LH);
     var x0b = Infinity, y0b = Infinity, x1b = -Infinity, y1b = -Infinity;
     function grow(x, y, w, h){ x0b = Math.min(x0b, x); y0b = Math.min(y0b, y); x1b = Math.max(x1b, x + w); y1b = Math.max(y1b, y + h); }
     boxes.forEach(function(b){ grow(b.x, b.y, b.w, b.h); });
@@ -491,6 +572,62 @@
     boxes.forEach(function(b){ b.x += sx; b.y += sy; });
     edgesOut.forEach(function(e){ e.pts = e.pts.map(function(p){ return [p[0] + sx, p[1] + sy]; }); if(e.label){ e.label.x += sx; e.label.y += sy; } });
     return {w:Math.ceil(x1b - x0b + 2 * pad), h:Math.ceil(y1b - y0b + 2 * pad), dir:dir, nodes:boxes, edges:edgesOut, layers:nl, crossings:bestC};
+  }
+  // A label of a link that bends sits on its own run through the gap (between
+  // the two columns), not next to another arrow into the same step. Each spot
+  // is tried in turn and taken when it touches no step, line or other label.
+  function placeGapLabels(edges, boxes, dir, LH){
+    function hit(a, b){ return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h; }
+    var segs = [], placed = [];
+    edges.forEach(function(e){
+      for(var k = 0; k + 1 < e.pts.length; k++){
+        var a = e.pts[k], b = e.pts[k + 1];
+        segs.push({x:Math.min(a[0], b[0]) - 1, y:Math.min(a[1], b[1]) - 1, w:Math.abs(b[0] - a[0]) + 2, h:Math.abs(b[1] - a[1]) + 2});
+      }
+      if(e.label && !e.label.gap) placed.push(e.label);
+    });
+    function free(r){
+      return !boxes.some(function(b){ return hit(r, b); }) && !segs.some(function(g){ return hit(r, g); }) && !placed.some(function(l){ return hit(r, l); });
+    }
+    edges.forEach(function(e){
+      var lb = e.label;
+      if(!lb || !lb.gap) return;
+      var w = lb.w, cand = [], run = null, k;
+      for(k = 0; k + 1 < e.pts.length && !run; k++){
+        var a = e.pts[k], b = e.pts[k + 1];
+        var across = dir === 'down' ? Math.abs(a[1] - b[1]) < 0.5 && Math.abs(a[0] - b[0]) > 0.5 : Math.abs(a[0] - b[0]) < 0.5 && Math.abs(a[1] - b[1]) > 0.5;
+        if(across) run = [a, b];
+      }
+      // A run several links share (a fan out of one step) is no place for a
+      // label: then it goes by the column of the step it leads to.
+      var shared = run && edges.some(function(o){
+        if(o === e) return false;
+        for(var q = 0; q + 1 < o.pts.length; q++){
+          var c = o.pts[q], d = o.pts[q + 1], ax = dir === 'down' ? 1 : 0, bx = 1 - ax;
+          if(Math.abs(c[ax] - run[0][ax]) < 0.5 && Math.abs(d[ax] - run[0][ax]) < 0.5 &&
+            Math.min(Math.max(c[bx], d[bx]), Math.max(run[0][bx], run[1][bx])) - Math.max(Math.min(c[bx], d[bx]), Math.min(run[0][bx], run[1][bx])) > 2) return true;
+        }
+        return false;
+      });
+      if(run && dir === 'down'){
+        var y = run[0][1], x1 = run[0][0], x2 = run[1][0], mid = (x1 + x2) / 2, sd = x2 > x1 ? 1 : -1;
+        var byTarget = [{x:sd > 0 ? x2 - 5 - w : x2 + 5, y:y + 3}, {x:sd > 0 ? x2 + 5 : x2 - 5 - w, y:y + 3}];
+        if(shared) cand = cand.concat(byTarget);
+        if(Math.abs(x2 - x1) >= w + 10){ cand.push({x:mid - w / 2, y:y - LH - 2}); cand.push({x:mid - w / 2, y:y + 2}); }
+        cand.push({x:sd > 0 ? x1 + 5 : x1 - 5 - w, y:y - LH - 3});
+        if(!shared) cand = cand.concat(byTarget);
+      } else if(run){
+        var x = run[0][0], my = (run[0][1] + run[1][1]) / 2;
+        if(shared) cand.push({x:lb.x, y:lb.y});
+        cand.push({x:x + 4, y:my - LH / 2}); cand.push({x:x - 4 - w, y:my - LH / 2});
+      }
+      cand.push({x:lb.x, y:lb.y});
+      for(k = 0; k < cand.length; k++){
+        var r = {x:cand[k].x, y:cand[k].y, w:w, h:LH};
+        if(free(r)){ lb.x = r.x; lb.y = r.y; break; }
+      }
+      placed.push(lb);
+    });
   }
   function simplify(pts){
     var out = [];
@@ -665,20 +802,29 @@
       lastW = avail;
       var phone = avail < 480;
       canvas.style.width = '2000px'; canvas.style.transform = '';
-      var labelW = labelEls.map(function(s){ return s ? Math.ceil(s.offsetWidth) + 1 : 0; });
+      labelEls.forEach(function(sp){ if(sp) sp.classList.remove('is-up'); });
+      var labelW = labelEls.map(function(sp){ return sp ? Math.ceil(sp.offsetWidth) + 1 : 0; });
       var hasLabels = labelW.some(Boolean);
-      var widths = phone ? [220, 184, 156, 132, 116] : [184, 164, 144, 124], rightWidths = [168, 148, 132];
+      // Each try: a step width and, on phones, tighter gaps and lanes for the
+      // narrow ones. A try wins when it fits at the scale it may shrink to.
+      var tries = phone
+        ? [[220, 16, 1], [184, 16, 1], [156, 16, 1], [132, 16, 1], [116, 16, 1], [116, 12, 0.92, 14], [100, 10, 0.9, 13], [92, 10, 0.84, 13]]
+        : [[184, 30, 1], [164, 30, 1], [144, 30, 1], [124, 30, 0.84]];
+      var rightTries = [[168, 22, 1], [148, 22, 1], [132, 22, 0.84]];
       var dirs = spec.direction === 'right' && !phone ? ['right', 'down'] : ['down'];
       var pick = null;
       for(var d = 0; d < dirs.length && !pick; d++){
-        var ws = dirs[d] === 'right' ? rightWidths : widths;
+        var ws = dirs[d] === 'right' ? rightTries : tries;
         for(var k = 0; k < ws.length; k++){
-          var W = ws[k];
-          var sizes = measure(W, phone, dirs[d] === 'right');
+          var tr = ws[k], sizes = measure(tr[0], phone, dirs[d] === 'right');
           var g = layout(spec, {dir:dirs[d], sizes:sizes, labelW:labelW,
-            gapMain:dirs[d] === 'right' ? (hasLabels ? 52 : 44) : (hasLabels ? 50 : 40), gapCross:phone ? 16 : (dirs[d] === 'right' ? 22 : 30)});
-          if(g.w <= avail){ pick = g; break; }
-          if(d === dirs.length - 1 && k === ws.length - 1) pick = g;
+            gapMain:dirs[d] === 'right' ? (hasLabels ? 52 : 44) : (hasLabels ? 50 : 40), gapCross:tr[1],
+            lane:tr[3], laneStep:tr[3] ? 10 : 0, uprightLanes:phone});
+          g.minScale = tr[2];
+          // Right first: only when it fits as it is, else the page runs down.
+          var lastDir = d === dirs.length - 1;
+          if(g.w <= avail || (lastDir && g.w * tr[2] <= avail)){ pick = g; break; }
+          if(lastDir && k === ws.length - 1) pick = g;
         }
       }
       geo = pick;
@@ -691,6 +837,7 @@
       sizer.style.height = Math.ceil(geo.h * scale) + 'px';
       var wide = geo.w * scale > avail + 1;
       scroll.classList.toggle('is-wide', wide);
+      fades();
       if(wide) scroll.tabIndex = 0; else scroll.removeAttribute('tabindex');
       canvas.classList.toggle('is-right', geo.dir === 'right');
       // Sizes of the chosen width were measured last only for the last try: set them now.
@@ -718,7 +865,10 @@
         edgeSvg.appendChild(g3);
         pathEls.push(g3);
         var s = labelEls[j];
-        if(s && e.label){ s.style.left = r1(e.label.x) + 'px'; s.style.top = r1(e.label.y) + 'px'; }
+        if(s && e.label){
+          s.classList.toggle('is-up', !!e.label.upright);
+          s.style.left = r1(e.label.x) + 'px'; s.style.top = r1(e.label.y) + 'px';
+        }
       });
       // Reading order for the arrow keys: top to bottom, then left to right.
       readOrder = spec.nodes.map(function(_, i){ return i; }).sort(function(a, b){
@@ -734,6 +884,13 @@
       else nodeEls.forEach(function(x, j){ x.tabIndex = j === readOrder[0] ? 0 : -1; });
       ctx.resize();
     }
+    // Where the drawing scrolls sideways, the edge that hides more fades out.
+    function fades(){
+      var max = scroll.scrollWidth - scroll.clientWidth;
+      scroll.classList.toggle('has-left', max > 1 && scroll.scrollLeft > 1);
+      scroll.classList.toggle('has-right', max > 1 && scroll.scrollLeft < max - 1);
+    }
+    scroll.addEventListener('scroll', fades, {passive:true});
     function mark(i){
       canvas.classList.toggle('has-active', i >= 0);
       nodeEls.forEach(function(b, j){
