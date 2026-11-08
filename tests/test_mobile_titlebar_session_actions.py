@@ -12,7 +12,7 @@ def test_titlebar_title_element_exists():
 
 
 def test_syncappTitlebar_compact_metadata():
-    assert 'subText = String(vis.length)' in PANELS_JS
+    assert 'subText = String(vis.length)' not in PANELS_JS
     assert "t('n_messages', vis.length)" not in PANELS_JS
 
 

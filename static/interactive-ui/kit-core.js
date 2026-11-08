@@ -658,7 +658,7 @@
     if(item.deltaFormat==='percent') return kpiFormatter(lang,'dp'+dec,Object.assign({style:'percent'},o)).format(d/100);
     if(item.format==='currency') return kpiFormatter(lang,'dc'+dec,Object.assign({style:'currency',currency:'EUR'},o)).format(d);
     const text=kpiFormatter(lang,'dn'+dec,o).format(d);
-    return item.format==='percent'?text+' pp':text;
+    return item.format==='percent'?text+(pickLang(lang)==='nl'?' procentpunt':' pts'):text;
   }
 
   // ── timeline ─────────────────────────────────────────────────────────────

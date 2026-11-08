@@ -167,7 +167,7 @@ def _wait_rendered(page):
 def _assert_story(page, where):
     text = _chat_text(page)
     for want in ("Bekijk de opdracht",
-                 "Linus is klaar", "Antwoord gaat naar Sanne", "Bekijk het werk van Linus",
+                 "Linus is klaar", "Bekijk het werk van Linus",
                  "Grace neemt het hierna over in dit gesprek", "Opdracht van Sanne aan Grace", FINAL, GRACE_REPLY):
         assert want in text, f"{where}: missing {want!r}"
     # The list call alone is a work step, not a line in the conversation.

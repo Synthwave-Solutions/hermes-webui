@@ -17,8 +17,9 @@ def test_app_titlebar_returns_to_centered_desktop_layout():
     assert ".app-titlebar-inner{display:flex;align-items:center;gap:8px;min-width:0;max-width:100%;justify-content:center;}" in STYLE_CSS
 
 
-def test_app_titlebar_subtitle_shows_message_count_again():
-    assert "subText = String(vis.length);" in PANELS_JS
+def test_app_titlebar_subtitle_has_no_bare_message_count():
+    # A raw message count next to the title read like a notification badge.
+    assert "subText = String(vis.length);" not in PANELS_JS
 
 
 def test_queue_updates_do_not_hijack_app_titlebar_subtitle():

@@ -8886,3 +8886,16 @@ button.bg-badge{border:0;cursor:pointer;min-width:28px;min-height:28px;}
 /* Thinking level: icon only at the usual level; the tooltip names it. */
 #composerReasoningChip.is-default #composerReasoningLabel{display:none}
 #composerReasoningChip.is-default{gap:0;padding-inline:8px}
+/* Final calm-down for members: no engine numbers, one duration, no spinner-like ring. */
+html:not([data-nav-audience="admin"]) .msg-usage-inline{display:none!important}
+.assistant-turn:has(.tool-call-group[data-run-activity-group="1"]) .msg-duration-inline,
+.assistant-turn:has(.tool-worklog-group) .msg-duration-inline{display:none}
+#ctxIndicatorWrap:not(:has(.ctx-indicator.ctx-high)){display:none!important}
+.app-titlebar-sub.has-source{background:none;padding:0}
+@media (max-width:640px){
+  .messages-shell .mobile-conversations-fab.hwx-mobile-conversations-fab:not(.mobile-conversations-fab--drawer-open){display:none!important}
+  .scroll-to-bottom-btn{width:44px;height:44px;min-width:44px;right:12px;bottom:12px}
+}
+/* Mobile settings button: a plain settings icon; the length ring only when the chat is long. */
+#composerMobileConfigBtn:not(.ctx-high) #composerMobileCtxRing{display:none!important}
+#composerMobileConfigBtn.ctx-high .composer-mobile-config-icon{display:none}

@@ -283,6 +283,7 @@ window.__registerHermesLocale('nl', {
   chat_roster_hide: 'Bots verbergen',
   chat_mentions_preparing: 'Ontvangers voorbereiden…',
   chat_mentions_hint: 'Typ @ om een collega of andere bot erbij te halen.',
+  done_in: 'Klaar in {0}',
   chat_mentions_busy: 'Wacht tot deze beurt klaar is voordat je iemand noemt. Je concept blijft bewaard.',
   chat_mentions_loading: 'Personen en bots worden nog geladen. Probeer het zo opnieuw.',
   chat_mentions_attachments: 'Verwijder eerst privébijlagen of selecties. In de groep kun je bestanden wel apart bijvoegen.',

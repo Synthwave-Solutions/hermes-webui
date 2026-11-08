@@ -73,8 +73,6 @@ function syncAppTitlebar() {
   let sourceLabel = '';
   if (panel === 'chat' && typeof S !== 'undefined' && S && S.session) {
     mainText = S.session.title || (typeof t === 'function' ? t('untitled') : 'Untitled');
-    const vis = Array.isArray(S.messages) ? S.messages.filter(m => m && m.role && m.role !== 'tool') : [];
-    subText = String(vis.length);
     sourceLabel = S.session.source_label || S.session.source_tag || S.session.raw_source || '';
     // Recovered sidecars stamp source_label 'WebUI' (api/session_recovery.py); don't badge a native session as its own source (#3338).
     if (/^webui$/i.test(sourceLabel)) sourceLabel = '';
@@ -94,18 +92,16 @@ function syncAppTitlebar() {
     document.title = bot ? mainText + ' \u2014 ' + bot : mainText;
   }
   if (subEl) {
-    if (subText) {
-      subEl.textContent = subText;
-      if (sourceLabel) {
-        const badge = document.createElement('span');
-        badge.className = 'topbar-source-badge';
-        badge.textContent = sourceLabel + (S.session && S.session.read_only ? ' · read-only' : '');
-        subEl.appendChild(document.createTextNode(' '));
-        subEl.appendChild(badge);
-      }
-      subEl.hidden = false;
+    // No bare message count: only where a conversation comes from, if anywhere else.
+    subEl.textContent = subText || '';
+    if (sourceLabel) {
+      const badge = document.createElement('span');
+      badge.className = 'topbar-source-badge';
+      badge.textContent = sourceLabel + (S.session && S.session.read_only ? ' · read-only' : '');
+      subEl.appendChild(badge);
     }
-    else { subEl.textContent = ''; subEl.hidden = true; }
+    subEl.classList.toggle('has-source', !!sourceLabel && !subText);
+    subEl.hidden = !(subText || sourceLabel);
   }
 
   // Double-click on the titlebar title → rename the active session (same behaviour

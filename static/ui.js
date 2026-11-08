@@ -7392,6 +7392,7 @@ function _setCtxCompressButton(btn,text){
 
 function _syncMobileCtxDisplay(state){
   const mobileConfigBtn=$('composerMobileConfigBtn');
+  if(mobileConfigBtn) mobileConfigBtn.classList.toggle('ctx-high',!!(state&&state.visible&&state.pct>75));
   const row=$('composerMobileContextAction');
   const usageLine=$('composerMobileContextUsage');
   const tokensLine=$('composerMobileContextTokens');
@@ -16870,7 +16871,7 @@ function _processWakeupCardHtml(info, rawText, extras){
     const helperName=_bt.name(helper), leadName=_bt.name(lead);
     const open=/^[a-f0-9]{12}$/.test(_delegation.session_id||'')
       ?`<button type="button" class="sp-bot-result-open" data-sp-specialist-open="${esc(_delegation.session_id)}" data-sp-specialist-profile="${esc(helper)}">${esc(t('bot_team_result_open',helperName))} <span aria-hidden="true">↗</span></button>`:'';
-    return `<div class="sp-bot-result" data-state="${uncertain?'partial':'done'}" title="${esc(helperName)}">${_bt.avatarHtml(helper,helperName,'sp-bot-result-avatar')}<div class="sp-bot-result-main"><div class="sp-bot-result-title">${esc(t(uncertain?'bot_team_result_partial':'bot_team_result_done',helperName))}</div><div class="sp-bot-result-sub">${esc(t('bot_team_result_to',leadName))}${extras.timeHtml||''}</div></div>${open}</div>`;
+    return `<div class="sp-bot-result" data-state="${uncertain?'partial':'done'}" title="${esc(helperName)}">${_bt.avatarHtml(helper,helperName,'sp-bot-result-avatar')}<div class="sp-bot-result-main"><div class="sp-bot-result-title">${esc(t(uncertain?'bot_team_result_partial':'bot_team_result_done',helperName))}</div><div class="sp-bot-result-sub">${extras.timeHtml||''}</div></div>${open}</div>`;
   }
   if(info.type==='delegation'||info.type==='async_delegation'){
     // Agent instructions and subagent transcripts stay in model history, not
@@ -18379,7 +18380,7 @@ function renderMessages(options){
       if(durationText){
         const duration=document.createElement('span');
         duration.className='msg-duration-inline';
-        duration.textContent=`Done in ${durationText}`;
+        duration.textContent=(typeof t==='function'&&t('done_in')!=='done_in')?t('done_in',durationText):`Done in ${durationText}`;
         fragments.push(duration);
       }
       // The transparent turn footer owns the model label (.lf-model) whenever

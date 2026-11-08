@@ -43,7 +43,7 @@
       unresolved:'Niet op de kaart gevonden', later:'Wordt nog opgezocht', tilesFail:'De kaart laadt nu niet. De lijst klopt wel.',
       google:'Open in Google Maps', copyAddr:'Kopieer adressen', photo:function(a,l){ return 'Foto: ' + a + ', ' + l; },
       more:'Meer info', approxPin:'bij benadering', mapLabel:'Kaart', listLabel:'Locaties',
-      good:'gunstig', bad:'ongunstig', flat:'gelijk', target:function(p, t){ return p + ' van doel ' + t; },
+      good:'gunstig', bad:'ongunstig', flat:'gelijk', target:function(p, t){ return p + ' van doel ' + t; }, limit:function(p, t){ return p + ' van budget ' + t; }, over:function(d, t){ return d + ' boven budget ' + t; },
       today:'Vandaag', milestone:'Mijlpaal', tlLabel:'Planning', pick:'Kies een balk voor de details.'},
     en:{search:'Search table', showAll:function(n){ return 'Show all ' + n + ' rows'; }, total:'Total',
       count:function(a,b){ return a + ' of ' + b + ' rows'; }, empty:'No rows', noMatch:'No rows found',
@@ -54,7 +54,7 @@
       unresolved:'Not found on the map', later:'Still being looked up', tilesFail:'The map does not load right now. The list is correct.',
       google:'Open in Google Maps', copyAddr:'Copy addresses', photo:function(a,l){ return 'Photo: ' + a + ', ' + l; },
       more:'More info', approxPin:'approximate', mapLabel:'Map', listLabel:'Places',
-      good:'favourable', bad:'unfavourable', flat:'unchanged', target:function(p, t){ return p + ' of target ' + t; },
+      good:'favourable', bad:'unfavourable', flat:'unchanged', target:function(p, t){ return p + ' of target ' + t; }, limit:function(p, t){ return p + ' of budget ' + t; }, over:function(d, t){ return d + ' over budget ' + t; },
       today:'Today', milestone:'Milestone', tlLabel:'Timeline', pick:'Choose a bar for the details.'}
   };
   function T(key){ var v = (TEXT[LANG] || TEXT.nl)[key]; var args = Array.prototype.slice.call(arguments, 1); return typeof v === 'function' ? v.apply(null, args) : v; }
@@ -375,7 +375,9 @@
           var area = ch.chartArea, ctx = ch.ctx;
           if(!area) return;
           // A label that already names the amount is shown as it is.
-          var label = target.label && /\d/.test(target.label) ? target.label : (target.label ? target.label + ': ' : '') + f(target.value);
+          // Always the chart's own number format: 'Doel 130.000' becomes 'Doel € 130.000'.
+          var base = String(target.label || '').replace(/(^|\s)[€$]?\s*[\d.,]+\s*(%|euro|eur)?\s*$/i, '').replace(/[:\s]+$/, '').trim();
+          var label = (base ? base + ' ' : '') + f(target.value);
           ctx.save();
           ctx.font = '500 11px ' + (getComputedStyle(document.body).fontFamily || 'sans-serif');
           var tw = ctx.measureText(label).width, y = area.top - 10, xr = area.right;
@@ -485,9 +487,6 @@
 
     var wrap = h('div', 'k-map' + (route ? ' is-route' : ''));
     var head = h('div', 'k-tools');
-    var chips = h('div', 'k-chips');
-    chips.appendChild(h('span', 'k-chip', T('places', spec.places.length)));
-    head.appendChild(chips);
     if(cats.length){
       var legendEl = h('div', 'k-cats');
       cats.forEach(function(c, i){ var s = h('span', 'k-cat'); var dot = h('span', 'k-dot'); dot.style.background = 'var(--sw-c' + (i + 2) + ')'; s.append(dot, document.createTextNode(c)); legendEl.appendChild(s); });
@@ -529,7 +528,8 @@
     });
     actions.appendChild(bCopy);
     foot.append(notes, actions);
-    wrap.append(head, bodyEl, status, foot);
+    if(head.childNodes.length) wrap.appendChild(head);
+    wrap.append(bodyEl, status, foot);
     box.appendChild(wrap);
 
     // List
@@ -741,7 +741,7 @@
         pill.append(arrow, document.createTextNode(K.kpiDeltaText(it, LANG)), h('span', 'k-sr', ', ' + T(tone === 'good' ? 'good' : tone === 'bad' ? 'bad' : 'flat')));
         meta.appendChild(pill);
       }
-      if(it.note) meta.appendChild(h('span', 'k-kpi-note', it.note));
+      if(it.note) meta.appendChild(h('span', 'k-kpi-note', LANG === 'nl' ? String(it.note).replace(/(\d[\d.,]*)\s*(euro|eur)\b/gi, '€ $1') : it.note));
       if(meta.childNodes.length) tile.appendChild(meta);
       if(it.target !== null){
         var target = h('div', 'k-target' + (it.over ? ' is-over' : it.met ? ' is-met' : ''));
@@ -752,7 +752,7 @@
         bar.setAttribute('aria-valuemin', '0'); bar.setAttribute('aria-valuemax', '100');
         bar.setAttribute('aria-valuenow', String(Math.round(it.progress * 100)));
         var pct = fmt(Math.round(it.value / it.target * 100), 'percent', 0);
-        var text = h('span', 'k-target-text', T('target', pct, fmt(it.target, it.format, it.decimals)));
+        var text = h('span', 'k-target-text', (it.over ? T('over', fmt(it.value - it.target, it.format, it.decimals), fmt(it.target, it.format, it.decimals)) : T(it.good === 'down' ? 'limit' : 'target', pct, fmt(it.target, it.format, it.decimals))));
         bar.setAttribute('aria-label', text.textContent);
         target.append(bar, text);
         tile.appendChild(target);
@@ -805,7 +805,7 @@
       axisEl.appendChild(tick);
     });
     chart.appendChild(axisEl);
-    var detail = h('p', 'k-tl-detail', T('pick'));
+    var detail = h('p', 'k-tl-detail');
     detail.setAttribute('role', 'status');
     detail.setAttribute('aria-live', 'polite');
     var bars = [];

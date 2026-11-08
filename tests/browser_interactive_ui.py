@@ -492,8 +492,7 @@ def data_blocks(page, ctx, gateway, art, base_runs):
     assert "Niet op de kaart gevonden" in missing and "Kantoor Haarlem" in missing, missing
     assert frame.locator(".k-items li").count() == 3
     assert "De lijn toont alleen de volgorde" in frame.locator(".k-notes").inner_text()
-    chips = frame.locator(".k-chip").all_inner_texts()
-    assert chips == ["4 locaties"], chips
+    assert frame.locator(".k-chip").count() == 0, "the numbered list already shows how many places there are"
     assert frame.locator(".k-action", has_text="Opnieuw afspelen").count() == 0
     card.scroll_into_view_if_needed()
     time.sleep(2.8)  # the drop-in and the route draw once, then stand still
@@ -535,7 +534,7 @@ def data_blocks(page, ctx, gateway, art, base_runs):
     tones = frame.evaluate("() => [...document.querySelectorAll('.k-delta')].map(p => p.className.replace('k-delta ', ''))")
     assert tones == ["is-good", "is-bad", "is-good", "is-flat"], tones
     deltas = [t.replace("\u00a0", " ") for t in frame.evaluate("() => [...document.querySelectorAll('.k-delta')].map(p => p.childNodes[1].textContent)")]
-    assert deltas == ["+12,5%", "+0,4 pp", "€ -800", "0 pp"], deltas
+    assert deltas == ["+12,5%", "+0,4 procentpunt", "€ -800", "0 procentpunt"], deltas
     good, bad = frame.evaluate(PROBE, "--sw-good"), frame.evaluate(PROBE, "--sw-bad")
     colours = frame.evaluate("() => [...document.querySelectorAll('.k-delta')].map(p => getComputedStyle(p).color)")
     assert colours[0] == good and colours[1] == bad and colours[2] == good and colours[3] not in (good, bad), (colours, good, bad)
@@ -572,7 +571,7 @@ def data_blocks(page, ctx, gateway, art, base_runs):
     ms = frame.evaluate("() => getComputedStyle(document.querySelector('.k-tl-ms')).transform")
     assert ms not in ("none", ""), "a milestone is a diamond"
     detail = frame.locator(".k-tl-detail")
-    assert detail.get_attribute("role") == "status" and detail.inner_text() == "Kies een balk voor de details."
+    assert detail.get_attribute("role") == "status" and detail.inner_text().strip() == ""
     frame.locator(".k-tl-bar.is-doing").click()
     text = detail.inner_text()
     assert all(part in text for part in ("Bouw", "16 nov t/m 13 dec 2026", "Senna", "Bezig", "Twee sprints")), text

@@ -47,7 +47,7 @@ const card=_processWakeupCardHtml(info,raw,{timeHtml:'<span class="msg-time">10:
   botDelegation:{from:'linus-research',to:'sanne-sales',session_id:'abcdef123456',mode:'background',result:true}});
 assert(card.includes('class="sp-bot-result"'),card);
 assert(card.includes('bot_team_result_done:Linus'),card);
-assert(card.includes('bot_team_result_to:Sanne'),card);
+assert(!card.includes('bot_team_result_to'),card);
 assert(card.includes('data-sp-specialist-open="abcdef123456"'),card);
 assert(card.includes('bot_team_result_open:Linus'),card);
 for(const hidden of ['Private findings','secret task','Specialist:','ASYNC DELEGATION']) assert(!card.includes(hidden),hidden);

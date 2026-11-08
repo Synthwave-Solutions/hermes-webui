@@ -32,7 +32,8 @@ html.is-full .k-scroll{max-height:calc(100vh - 150px)}
 .k-sort:hover{color:var(--sw-strong)}
 .k-sort:focus-visible{outline:2px solid var(--sw-accent);outline-offset:-2px;border-radius:4px}
 th.num .k-sort{justify-content:flex-end}
-.k-sort-ico::after{content:"\2195";opacity:.35;font-size:.9em}
+.k-sort-ico::after{content:"\2195";opacity:0;font-size:.9em;transition:opacity .12s}
+.k-sort:hover .k-sort-ico::after,.k-sort:focus-visible .k-sort-ico::after{opacity:.35}
 th[aria-sort=ascending] .k-sort-ico::after{content:"\2191";opacity:1;color:var(--sw-accent)}
 th[aria-sort=descending] .k-sort-ico::after{content:"\2193";opacity:1;color:var(--sw-accent)}
 th[aria-sort=ascending] .k-sort,th[aria-sort=descending] .k-sort{color:var(--sw-strong)}
@@ -223,6 +224,6 @@ html[data-theme=dark] .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) bri
   .k-tl-track{min-height:0;height:12px;margin-bottom:6px;border-bottom:0;border-radius:6px;background:var(--sw-surface-2)}
   .k-tl-bar{height:12px;margin-top:-6px}
   .k-tl-ms{width:11px;height:11px;margin:-5.5px 0 0 -5.5px}
-  .k-tl-now{display:block;position:absolute;top:-3px;bottom:-3px;width:2px;margin-left:-1px;background:var(--sw-bad);border-radius:1px}
+  .k-tl-now{display:block;position:absolute;top:-3px;bottom:-3px;width:2px;margin-left:-1px;background:var(--sw-strong);opacity:.55;border-radius:1px;z-index:2}
 }
 @media (pointer:coarse) and (min-width:480px){.k-tl-bar{height:20px;margin-top:-10px}}

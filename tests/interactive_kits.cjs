@@ -203,8 +203,8 @@ assert.strictEqual(kpi.spec.items[0].progress, 0.92);
 assert.strictEqual(kpi.spec.items[0].met, false);
 assert.strictEqual(kpi.spec.items[3].met, true, 'under budget meets a target when down is good');
 assert.deepStrictEqual(kpi.spec.items.map(i => K.kpiValueText(i, 'nl')), ['€ 18.400', '2,1%', '1.234', '€ 9.100', '€ 1,3 mln.']);
-assert.deepStrictEqual(kpi.spec.items.map(i => K.kpiDeltaText(i, 'nl')), ['+12,5%', '+0,4 pp', '-3%', '€ -800', '0%']);
-assert.deepStrictEqual(kpi.spec.items.slice(0, 2).map(i => K.kpiDeltaText(i, 'en')), ['+12.5%', '+0.4 pp']);
+assert.deepStrictEqual(kpi.spec.items.map(i => K.kpiDeltaText(i, 'nl')), ['+12,5%', '+0,4 procentpunt', '-3%', '€ -800', '0%']);
+assert.deepStrictEqual(kpi.spec.items.slice(0, 2).map(i => K.kpiDeltaText(i, 'en')), ['+12.5%', '+0.4 pts']);
 assert.ok(kpi.estHeight > 100 && kpi.estHeight < 400, kpi.estHeight);
 assert.deepStrictEqual(plain(K.kitTable('kpi', kpi.spec)).header, ['Label', 'Waarde', 'Verandering', 'Doel']);
 assert.strictEqual(K.toCsv(K.kitTable('kpi', kpi.spec), {delimiter: ';', decimalComma: true}),

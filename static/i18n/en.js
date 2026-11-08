@@ -278,6 +278,7 @@ window.__registerHermesLocale('en', {
   "chat_roster_hide": "Hide bots",
   "chat_mentions_preparing": "Preparing recipients\u2026",
   "chat_mentions_hint": "Type @ to bring in a colleague or another bot.",
+  "done_in": "Done in {0}",
   "chat_mentions_busy": "Wait for this turn to finish before sending mentions. Your draft is kept.",
   "chat_mentions_loading": "People and bots are still loading. Please try again.",
   "chat_mentions_attachments": "Remove private attachments or selections first. You can attach files explicitly in the group.",
