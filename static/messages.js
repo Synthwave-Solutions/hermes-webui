@@ -818,6 +818,57 @@ async function _loadSavedPrompts(){
   return _savedPromptsCache;
 }
 
+// Shared prompts of the person's team, department and organisation (Studio).
+// Personal prompts above stay as they were; a failed or forbidden read leaves
+// the popup exactly as before.
+async function _appendSharedPromptRows(popup, btn, personalEmpty){
+  let data=null;
+  try{data=await api('/api/studio/prompts',{timeoutToast:false});}catch(_e){return;}
+  const rows=(data&&Array.isArray(data.prompts))?data.prompts:[];
+  if(!rows.length)return;
+  if(personalEmpty){const empty=popup.querySelector('.saved-prompts-empty');if(empty)empty.remove();}
+  const en=(document.documentElement.lang||'nl').toLowerCase().startsWith('en');
+  const teamName=k=>((data.teams||[]).find(t=>t.key===k)||{}).name||k;
+  const deptName=k=>((data.departments||[]).find(d=>d.key===k)||{}).name||k;
+  const where=p=>p.scope==='team'?(en?'Team ':'Team ')+teamName(p.team):p.scope==='department'?(en?'Department ':'Afdeling ')+deptName(p.department):(en?'Organisation':'Organisatie');
+  const groups=new Map();
+  for(const p of rows){const k=where(p);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(p);}
+  for(const [label,list] of groups){
+    const head=document.createElement('div');
+    head.className='saved-prompts-group';
+    head.textContent=label;
+    popup.appendChild(head);
+    for(const p of list.slice(0,12)){
+      const row=document.createElement('div');
+      row.className='saved-prompt-row shared';
+      row.setAttribute('role','menuitem');
+      const lab=document.createElement('span');
+      lab.className='saved-prompt-label';
+      lab.textContent=p.label||p.text;
+      lab.title=(p.category?p.category+': ':'')+p.text;
+      row.onclick=()=>{
+        insertSavedPromptIntoComposer(p.text);
+        api('/api/studio/prompts',{method:'POST',body:JSON.stringify({op:'use',id:p.id}),timeoutToast:false}).catch(()=>{});
+        popup.style.display='none';
+        if(btn)btn.setAttribute('aria-expanded','false');
+      };
+      row.appendChild(lab);
+      if(p.category){const cat=document.createElement('span');cat.className='saved-prompt-cat';cat.textContent=p.category;row.appendChild(cat);}
+      popup.appendChild(row);
+    }
+  }
+  const manage=document.createElement('button');
+  manage.type='button';
+  manage.className='saved-prompt-manage';
+  manage.textContent=en?'All prompts in Studio':'Alle prompts in Studio';
+  manage.onclick=async()=>{
+    popup.style.display='none';
+    if(btn)btn.setAttribute('aria-expanded','false');
+    if(window.SPStudio&&typeof switchPanel==='function'){await switchPanel('studio');window.SPStudio.setTab('prompts');}
+  };
+  popup.appendChild(manage);
+}
+
 async function toggleSavedPromptsPopup(){
   const popup=(typeof $==='function'&&$('savedPromptsPopup'))||document.getElementById('savedPromptsPopup');
   const btn=(typeof $==='function'&&$('btnSavedPrompts'))||document.getElementById('btnSavedPrompts');
@@ -868,6 +919,7 @@ async function toggleSavedPromptsPopup(){
       popup.appendChild(row);
     }
   }
+  await _appendSharedPromptRows(popup, btn, !prompts.length);
   const addRow=document.createElement('div');
   addRow.className='saved-prompt-add-row';
   const saveBtn=document.createElement('button');

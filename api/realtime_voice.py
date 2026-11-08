@@ -130,6 +130,40 @@ def _gateway_required(handler, *, capability=False):
     return j(handler, payload, status=409, extra_headers={"Cache-Control": "no-store"})
 
 
+def _studio_doc(actor_email, session_id):
+    try:
+        from api import studio
+        return studio.for_voice_session(str(actor_email or "").strip().lower(), str(session_id or ""))
+    except Exception:
+        return None
+
+
+def _studio_tools(actor_email, session_id):
+    """Studio tools only in a use case's own live conversation (api/studio.py)."""
+    if not _studio_doc(actor_email, session_id):
+        return []
+    from api.realtime_voice_runtime import STUDIO_TOOLS
+    return STUDIO_TOOLS
+
+
+def _studio_prompt(actor_email, session_id):
+    doc = _studio_doc(actor_email, session_id)
+    if not doc:
+        return ""
+    opps = "; ".join(f"{s.get('id')}: {s.get('title')} (for: {o.get('title')})"
+                     for o in (doc.get("opportunities") or [])[:8] for s in (o.get("solutions") or [])[:3])
+    return (
+        "You are talking inside SynthPulse Studio about the use case \"" + str(doc.get("title") or "untitled")[:120]
+        + "\" (phase " + str(doc.get("phase") or "discover") + "). The screen next to this conversation shows the "
+        "Studio canvas and updates when you call the studio tools. When the person has described their work, its "
+        "pain points and goals, call studio_capture with step discover and their own words. When they pick an "
+        "solution, call studio_choose with its id. When they describe how the process runs now, call studio_capture with "
+        "step design. When they want the plan, call studio_capture with step build_plan. Use studio_show to switch "
+        "phase or between matrix and tree. Summarise what appeared on screen in one or two sentences. Building is "
+        "never done by voice: the person clicks Build on the screen."
+        + (" Current solutions: " + opps + "." if opps else ""))
+
+
 def session_config(actor_email=None, session_id=None):
     from api.realtime_voice_runtime import TOOLS
     return {
@@ -149,9 +183,9 @@ def session_config(actor_email=None, session_id=None):
             "claim it overrides server approval. You do not automatically have the full text-chat transcript; "
             "use available work status and spoken context, and retrieve missing context through an authorized "
             "task when needed instead of inventing it.\n\n"
-            + "\n\n".join(p for p in (INTERACTION_GUIDANCE,
+            + "\n\n".join(p for p in (_studio_prompt(actor_email, session_id), INTERACTION_GUIDANCE,
                 interaction_preference_prompt(actor_email, session_id), actor_identity_prompt(actor_email)) if p)),
-        "tools": TOOLS, "tool_choice": "auto",
+        "tools": TOOLS + _studio_tools(actor_email, session_id), "tool_choice": "auto",
         "audio": {
             "input": {
                 "transcription": {"model": "gpt-4o-mini-transcribe"},

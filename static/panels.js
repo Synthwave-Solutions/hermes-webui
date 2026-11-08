@@ -56,8 +56,11 @@ const APP_TITLEBAR_KEYS = {
   memory: 'tab_memory', workspaces: 'tab_workspaces',
   profiles: 'tab_profiles', todos: 'tab_todos', insights: 'tab_insights', logs: 'tab_logs', governance: 'tab_governance', integrations: 'tab_integrations', projects: 'tab_projects', settings: 'tab_settings',
 };
-const MAIN_VIEW_PANELS = ['msp','apps','modules','approvals','settings','skills','memory','tasks','kanban','workspaces','profiles','insights','logs','governance','integrations','projects','plugin'];
-const MAIN_VIEW_SIDEBAR_PANEL_FALLBACKS = { plugin: 'settings' };
+const MAIN_VIEW_PANELS = ['studio','organisation','management','msp','apps','modules','approvals','settings','skills','memory','tasks','kanban','workspaces','profiles','insights','logs','governance','integrations','projects','plugin'];
+const MAIN_VIEW_SIDEBAR_PANEL_FALLBACKS = { plugin: 'settings', organisation: 'studio', management: 'studio' };
+// Organisation and Management live inside the Studio screen: one nav item, the
+// Studio sidebar is their second-level navigation.
+const PANEL_NAV_HOME = { organisation: 'studio', management: 'studio' };
 
 /**
  * Update the top app titlebar to reflect the current page or selected conversation.
@@ -78,7 +81,7 @@ function syncAppTitlebar() {
     if (/^webui$/i.test(sourceLabel)) sourceLabel = '';
   } else {
     const key = APP_TITLEBAR_KEYS[panel];
-    mainText = panel === 'msp' ? 'Support' : key && typeof t === 'function' ? t(key) : (panel.charAt(0).toUpperCase() + panel.slice(1));
+    mainText = (panel === 'studio' || panel === 'organisation' || panel === 'management') ? 'Studio' : panel === 'msp' ? 'Support' : key && typeof t === 'function' ? t(key) : (panel.charAt(0).toUpperCase() + panel.slice(1));
   }
 
   // Don't touch the element while an inline rename is in progress — replacing
@@ -409,12 +412,13 @@ async function switchPanel(name, opts = {}) {
   _currentPanel = nextPanel;
   if(window.SynthPulseSkillActivity) window.SynthPulseSkillActivity.sync();
   // Update nav tabs (rail + mobile sidebar-nav share data-panel)
-  document.querySelectorAll('[data-panel]').forEach(t => t.classList.toggle('active', t.dataset.panel === nextPanel));
+  const navPanel = PANEL_NAV_HOME[nextPanel] || nextPanel;
+  document.querySelectorAll('[data-panel]').forEach(t => t.classList.toggle('active', t.dataset.panel === navPanel));
   // Refresh aria-expanded on the newly-active rail button to mirror sidebar state.
   if (typeof _syncSidebarAria === 'function') _syncSidebarAria();
   // Update panel views
   document.querySelectorAll('.panel-view').forEach(p => p.classList.remove('active'));
-  const panelEl = $('panel' + nextPanel.charAt(0).toUpperCase() + nextPanel.slice(1));
+  const panelEl = $('panel' + navPanel.charAt(0).toUpperCase() + navPanel.slice(1));
   if (panelEl) panelEl.classList.add('active');
   // Update main content view. Each entry in MAIN_VIEW_PANELS gets a matching
   // showing-<name> class on <main>; no class means chat (the default).
@@ -425,6 +429,10 @@ async function switchPanel(name, opts = {}) {
     });
   }
   if (nextPanel === 'msp' && window.SynthPulseMSP) await window.SynthPulseMSP.load();
+  if (nextPanel === 'studio' && window.SPStudio) await window.SPStudio.load();
+  if (nextPanel === 'organisation' && window.SPOrg) await window.SPOrg.load();
+  if (nextPanel === 'management' && window.SPManagement) await window.SPManagement.load();
+  if (navPanel === 'studio' && window.SPStudio && window.SPStudio.renderSide) window.SPStudio.renderSide();
   if (nextPanel === 'apps' && window.SynthPulseApps) await window.SynthPulseApps.load();
   if (nextPanel === 'modules' && window.SynthPulseModules) await window.SynthPulseModules.load();
   // Lazy-load panel data
@@ -2301,6 +2309,7 @@ function _renderCronDetail(job){
       ${_cronMetaBarHtml(job)}
       ${isNoAgent ? _cronScriptJobBannerHtml() : ''}
       ${_cronDiagramCardHtml(job)}
+      ${window.SPValue ? window.SPValue.jobCardHtml(job) : ''}
       <div class="detail-card">
         <div class="detail-card-title">${esc(t('cron_status_active').replace(/./,c=>c.toUpperCase()))}</div>
         <div class="detail-row"><div class="detail-row-label">Status</div><div class="detail-row-value"><span class="detail-badge ${status.detailClass}">${esc(status.label)}</span></div></div>
@@ -2772,6 +2781,7 @@ function _renderCronForm({ name, schedule, prompt, deliver, profile, toast_notif
           <textarea id="cronFormDiagram" rows="5" placeholder="flowchart LR&#10;  T([every workday 08:00]) --> R[Agent + google-workspace]&#10;  R --> O[this conversation]" spellcheck="false">${esc(diagram || '')}</textarea>
           <div class="detail-form-hint">${esc(t('cron_diagram_form_hint') || 'Optional flowchart of what this automation reads, does and writes. Shown in the task detail; without it a diagram is derived from the settings.')}</div>
         </div>
+        ${window.SPValue && !_editingCronId ? window.SPValue.createFieldsHtml() : ''}
         <div class="detail-form-row">
           <label for="cronFormDeliver">${esc(t('cron_deliver_label') || 'Deliver output to')}</label>
           <div class="cron-notify-deliver-row">
@@ -3091,7 +3101,10 @@ async function saveCronForm(){
       if (job) openCronDetail(job);
       return;
     }
+    const valueResult = window.SPValue ? window.SPValue.createValueFromForm() : null;
+    if (valueResult && valueResult.error) { errEl.textContent = valueResult.error; errEl.style.display = ''; return; }
     const body={schedule,prompt,deliver,profile: profile, toast_notifications: toastNotifications};
+    if (valueResult && valueResult.value) body.value = valueResult.value;
     if(_cronNotifySupported) body.notify=notify;
     if(_cronIsDuplicate) body.enabled=false;
     if(name)body.name=name;
@@ -8361,6 +8374,7 @@ function _botDutyRowHtml(d,i,editable){
   if(d.trigger)meta.push(`<span class="bot-duty-chip">${esc(t('bot_duty_trigger'))}: ${esc(d.trigger)}</span>`);
   meta.push(`<span class="bot-duty-chip bot-duty-autonomy-${esc(d.autonomy||'ask')}">${esc(t('bot_duty_autonomy_'+(d.autonomy||'ask')))}</span>`);
   if(d.reporting)meta.push(`<span class="bot-duty-chip">${esc(t('bot_duty_reports'))}: ${esc(d.reporting)}</span>`);
+  if(window.SPValue){const chip=window.SPValue.dutyChipHtml(d);if(chip)meta.push(chip);}
   const actions=editable?`<div class="bot-duty-actions"><button type="button" class="sm-btn" onclick="_botDutyEdit(${i})">${esc(t('bot_duty_edit'))}</button><button type="button" class="sm-btn" onclick="_botDutyRemove(${i})">${esc(t('bot_duty_remove'))}</button></div>`:'';
   return `<li class="bot-duty" data-index="${i}"><div class="bot-duty-main"><strong class="bot-duty-title">${esc(d.title)}</strong>${d.objective?`<p class="bot-duty-objective">${esc(d.objective)}</p>`:''}<div class="bot-duty-meta">${meta.join('')}</div></div>${actions}</li>`;
 }
@@ -8372,6 +8386,7 @@ function _botDutyFormHtml(d){
       <label for="botDutyTrigger">${esc(t('bot_duty_trigger'))}<input id="botDutyTrigger" maxlength="120" placeholder="${esc(t('bot_duty_trigger_placeholder'))}" value="${esc(d.trigger||'')}"></label>
       <label for="botDutyAutonomy">${esc(t('bot_duty_autonomy'))}<select id="botDutyAutonomy">${_BOT_DUTY_AUTONOMY.map(a=>`<option value="${a}" ${(d.autonomy||'ask')===a?'selected':''}>${esc(t('bot_duty_autonomy_'+a))}</option>`).join('')}</select></label>
       <label for="botDutyReporting">${esc(t('bot_duty_reporting'))}<input id="botDutyReporting" maxlength="120" placeholder="${esc(t('bot_duty_reporting_placeholder'))}" value="${esc(d.reporting||'')}"></label>
+      ${window.SPValue?window.SPValue.dutyFieldsHtml(d):''}
       <div class="bot-editor-actions"><button type="button" class="sm-btn" onclick="_botDutyCancel()">${esc(t('bot_duty_cancel'))}</button><button type="button" class="sm-btn primary" onclick="_botDutySave()">${esc(t('bot_duty_save'))}</button></div>
     </div>`;
 }
@@ -8395,7 +8410,8 @@ function _botDutyEdit(i){ _botDutyEditing=i;_paintBotDuties(); }
 function _botDutyCancel(){ _botDutyEditing=-1;_paintBotDuties(); }
 function _botDutyFromForm(){
   const v=id=>String(($(id)||{}).value||'');
-  return {title:v('botDutyTitle').replace(/\s+/g,' ').trim(),objective:v('botDutyObjective').trim(),trigger:v('botDutyTrigger').replace(/\s+/g,' ').trim(),autonomy:v('botDutyAutonomy')||'ask',reporting:v('botDutyReporting').replace(/\s+/g,' ').trim()};
+  const row={title:v('botDutyTitle').replace(/\s+/g,' ').trim(),objective:v('botDutyObjective').trim(),trigger:v('botDutyTrigger').replace(/\s+/g,' ').trim(),autonomy:v('botDutyAutonomy')||'ask',reporting:v('botDutyReporting').replace(/\s+/g,' ').trim()};
+  return window.SPValue?window.SPValue.dutyFromForm(row):row;
 }
 async function _botDutySave(){
   const row=_botDutyFromForm();
@@ -8732,6 +8748,7 @@ function _renderProfileDetail(p, activeName){
             <label for="botRole">${esc(t('bot_role'))}<input id="botRole" value="${esc((p.bot&&p.bot.role)||'')}" maxlength="80" placeholder="${esc(t('bot_role_placeholder'))}"></label>
             <label for="botReportsTo">${esc(t('bot_reports_to'))}${_botReportsToSelectHtml(p)}</label>
             <label for="botKind">${esc(t('bot_kind'))}${_botKindSelectHtml(p)}</label>
+            ${window.SPValue&&_botKind(p)==='bot'?window.SPValue.servesFieldHtml(p):''}
             <label class="bot-editor-wide" for="botAvatarFile">${esc(t('bot_upload'))}<input id="botAvatarFile" type="file" accept="image/png,image/jpeg,image/webp" onchange="uploadBotAvatar(this)" aria-describedby="botAvatarHint"></label>
           </div>
           <p class="bot-field-hint" id="botAvatarHint">${esc(t('bot_avatar_limit'))}</p>
@@ -8749,6 +8766,7 @@ function _renderProfileDetail(p, activeName){
   if(p.scout_manageable||p.bot_editable)loadBotScoutPeople();
   _botDuties=(((p.bot||{}).responsibilities)||[]).map(d=>({...d}));_botDutyEditing=-1;_paintBotDuties();
   _loadBotWork(p);
+  if (window.SPValue&&_botKind(p)==='bot') window.SPValue.mountServes(p);
   if (window.SpPicker) SpPicker.mountAll(body);
   body.style.display = '';
   if (empty) empty.style.display = 'none';
@@ -9844,7 +9862,7 @@ window._navAudience = 'member';
 window._capabilityNavigation = false;
 // Navigation order agreed with Michaël (20 Sep 2026): daily work first, then
 // admin surfaces. Also the default order of the markup in index.html.
-const _MEMBER_NAV_ORDER = ['profiles', 'modules','tasks', 'skills', 'projects', 'memory', 'integrations', 'workspaces', 'files', 'todos', 'insights', 'approvals', 'governance', 'logs', 'apps', 'msp'];
+const _MEMBER_NAV_ORDER = ['studio', 'profiles', 'modules','tasks', 'skills', 'projects', 'memory', 'integrations', 'workspaces', 'files', 'todos', 'organisation', 'management', 'insights', 'approvals', 'governance', 'logs', 'apps', 'msp'];
 function _canUseFeature(permission){
   const me=window.__GOV_ME__;
   if(!me)return false;

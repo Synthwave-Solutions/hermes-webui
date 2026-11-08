@@ -9,7 +9,7 @@ _LOCK = threading.RLock()
 SHAPES = ('circle','squircle','hexagon')
 BOT_TEXT_FIELDS = ('title','description','shape','color','category','role','reports_to','kind')
 # Appearance fields that hold a list and are validated by their own checker.
-_LIST_FIELDS = ('knowledge_sources','responsibilities')
+_LIST_FIELDS = ('knowledge_sources','responsibilities','serves')
 # A profile is a bot or the personal profile of a person (team member, partner).
 KINDS = ('bot','person')
 # Categories whose unmanaged profiles are people unless the editor says otherwise.
@@ -66,6 +66,8 @@ def read_profile(name):
         if scout:bot['scout']=scout
         duties=_stored_responsibilities(meta.get('responsibilities'))
         if duties:bot['responsibilities']=duties
+        serves=meta.get('serves')
+        if isinstance(serves,list):bot['serves']=[v for v in serves if isinstance(v,str)]
         return {
             'bot_configuration':configuration_summary(path.parent),
             'bot':bot,
@@ -86,6 +88,7 @@ def save_profile(name, values, revision):
     values=dict(values)
     if 'knowledge_sources' in values: validate_sources(values['knowledge_sources'])
     if 'responsibilities' in values: values['responsibilities']=validate_responsibilities(values['responsibilities'])
+    if 'serves' in values: values['serves']=validate_serves(values['serves'])
     for key,value in values.items():
         if key in _LIST_FIELDS: continue
         if not isinstance(value,str): raise ValueError('Appearance values must be text')
@@ -130,7 +133,7 @@ def validate_responsibilities(items):
     if not isinstance(items,list) or len(items)>RESP_MAX:raise ValueError('Use at most %d responsibilities'%RESP_MAX)
     clean=[]
     for item in items:
-        if not isinstance(item,dict) or set(item)-{*RESP_LIMITS,'autonomy'}:raise ValueError('Unknown responsibility field')
+        if not isinstance(item,dict) or set(item)-{*RESP_LIMITS,'autonomy',*RESP_VALUE_FIELDS}:raise ValueError('Unknown responsibility field')
         row={}
         for key,limit in RESP_LIMITS.items():
             value=item.get(key,'')
@@ -143,7 +146,43 @@ def validate_responsibilities(items):
         autonomy=item.get('autonomy','ask')
         if autonomy not in RESP_AUTONOMY:raise ValueError('Unknown responsibility autonomy')
         row['autonomy']=autonomy
+        row.update(_responsibility_value(item))
         clean.append(row)
+    return clean
+
+# Value per responsibility (8 Nov 2026): minutes of manual work before, the
+# minutes a person still spends now, how often it happens per week and where
+# the numbers come from. Display and Management only; never a permission.
+RESP_VALUE_FIELDS = ('minutes_before','minutes_now','times_per_week','value_source','value_confidence')
+
+def _responsibility_value(item):
+    out={}
+    for key in ('minutes_before','minutes_now'):
+        if item.get(key) in (None,''):continue
+        value=item.get(key)
+        if isinstance(value,bool) or not isinstance(value,(int,float)) or value<0 or value>6000:raise ValueError('Minutes must be between 0 and 6000')
+        out[key]=int(round(value))
+    if item.get('times_per_week') not in (None,''):
+        value=item.get('times_per_week')
+        if isinstance(value,bool) or not isinstance(value,(int,float)) or value<0 or value>500:raise ValueError('Times per week must be between 0 and 500')
+        out['times_per_week']=round(float(value),2)
+    if item.get('value_source'):
+        if item['value_source'] not in ('owner','ai_estimate','playbook','workshop'):raise ValueError('Unknown value source')
+        out['value_source']=item['value_source']
+    if item.get('value_confidence'):
+        if item['value_confidence'] not in ('estimated','confirmed'):raise ValueError('Unknown value confidence')
+        out['value_confidence']=item['value_confidence']
+    if out.get('minutes_now',0)>out.get('minutes_before',out.get('minutes_now',0)):raise ValueError('Minutes now cannot be more than minutes before')
+    return out
+
+def validate_serves(items):
+    """Team keys a bot works for; each must exist in the team structure."""
+    if not isinstance(items,list) or len(items)>20 or any(not isinstance(v,str) for v in items):raise ValueError('Invalid teams')
+    from api import org_structure
+    known=set(org_structure.team_keys())
+    clean=sorted({v.strip() for v in items if v.strip()})
+    unknown=[v for v in clean if v not in known]
+    if unknown:raise ValueError('Unknown team: '+', '.join(unknown))
     return clean
 
 def _stored_responsibilities(value):

@@ -12428,6 +12428,20 @@ def handle_get(handler, parsed) -> bool:
         from api import msp_service
         return msp_service.handle_get(handler, parsed)
 
+    if parsed.path in ("/api/org/structure", "/api/org/structure/me"):
+        from api import org_structure
+        return org_structure.handle_get(handler, parsed)
+
+    if parsed.path in ("/api/studio/usecases", "/api/studio/usecase", "/api/studio/backlog", "/api/studio/playbooks",
+                       "/api/studio/playbook", "/api/studio/media", "/api/studio/prompts", "/api/studio/profile"):
+        from api import studio
+        return studio.handle_get(handler, parsed)
+
+    if parsed.path in ("/api/org/chart", "/api/management/overview", "/api/management/job",
+                       "/api/management/pricing", "/api/value/chat"):
+        from api import management
+        return management.handle_get(handler, parsed)
+
     if parsed.path == "/api/org/modules":
         from api import org_modules
         return org_modules.handle_get(handler, parsed)
@@ -14127,6 +14141,7 @@ def handle_get(handler, parsed) -> bool:
             active_jobs, other_jobs = scope_cron_rows_for_caller(handler, active_jobs, other_jobs)
         _promote_prompt_diagrams(active_jobs)
         _promote_prompt_categories(active_jobs)
+        _promote_prompt_values(active_jobs)
         jobs = active_jobs + other_jobs if all_profiles else active_jobs
         try:
             from api.cron_bots import annotate_job_chats
@@ -14779,6 +14794,22 @@ def handle_post(handler, parsed) -> bool:
     if parsed.path in ("/api/msp/invoice", "/api/msp/order", "/api/msp/job-cost", "/api/msp/package", "/api/msp/tickets", "/api/msp/comment", "/api/msp/app-state", "/api/msp/app-request", "/api/msp/app-support"):
         from api import msp_service
         return msp_service.handle_post(handler, parsed.path, body)
+
+    if parsed.path == "/api/org/structure":
+        from api import org_structure
+        return org_structure.handle_post(handler, parsed, body)
+
+    if parsed.path in ("/api/studio/usecase", "/api/studio/step", "/api/studio/delete", "/api/studio/backlog",
+                       "/api/studio/backlog/order", "/api/studio/autopilot", "/api/studio/playbook",
+                       "/api/studio/playbook/delete", "/api/studio/playbook/draft", "/api/studio/playbook/run", "/api/studio/media",
+                       "/api/studio/prompts", "/api/studio/profile"):
+        from api import studio
+        return studio.handle_post(handler, parsed, body)
+
+    if parsed.path in ("/api/management/pricing", "/api/value/job", "/api/value/chat", "/api/value/collect"):
+        _ensure_agent_cron_import_path()
+        from api import management
+        return management.handle_post(handler, parsed, body)
 
     if parsed.path == "/api/org/modules/request":
         from api import org_modules
@@ -23501,6 +23532,64 @@ def _promote_prompt_diagrams(jobs, limit: int = 10) -> None:
         logger.debug("diagram promotion unavailable", exc_info=True)
 
 
+_CRON_PROMPT_VALUE_RE = re.compile(r"^\s*VALUE\s*:\s*([^\n]{1,400})\s*$", re.IGNORECASE | re.MULTILINE)
+_CRON_VALUE_PAIR_RE = re.compile(r'(\w+)\s*=\s*("([^"]*)"|\S+)')
+
+
+def _cron_value_from_prompt(prompt) -> dict | None:
+    """A ``VALUE: before=45 now=5 task="..." team=dept/team source=owner`` line
+    in a job prompt is what the work cost before and costs now (api/
+    value_tracking.py). Like DIAGRAM and CATEGORY it is the channel a governed
+    agent has through the cronjob tool; the listing promotes it into the job's
+    ``value`` field. Returns the validated block or None."""
+    match = _CRON_PROMPT_VALUE_RE.search(str(prompt or ""))
+    if not match:
+        return None
+    pairs = {k.lower(): (q if q is not None and v.startswith('"') else v)
+             for k, v, q in _CRON_VALUE_PAIR_RE.findall(match.group(1))}
+    raw = {"task": pairs.get("task", ""), "source": pairs.get("source", "owner")}
+    if pairs.get("before") in ("unknown", "onbekend", "?"):
+        raw.update({"unknown": True, "unknown_reason": pairs.get("reason") or "Nog niet bekend"})
+    else:
+        raw.update({"before_minutes": pairs.get("before"), "review_minutes": pairs.get("now", 0),
+                    "per": pairs.get("per", "run")})
+    if pairs.get("team"):
+        raw["team"] = pairs["team"]
+    try:
+        from api import value_tracking
+
+        value = value_tracking.validate_value(raw)
+    except Exception:
+        return None
+    return value
+
+
+def _promote_prompt_values(jobs, limit: int = 10) -> None:
+    """Copy a prompt-embedded VALUE line into ``value`` for active-store rows
+    that have none yet. Bounded per request; idempotent; never raises."""
+    todo = [job for job in (jobs or [])
+            if isinstance(job, dict) and not isinstance(job.get("value"), dict)
+            and not job.get("read_only") and _cron_value_from_prompt(job.get("prompt"))]
+    if not todo:
+        return
+    try:
+        from api.profiles import cron_profile_context
+        from cron.jobs import update_job
+
+        with cron_profile_context():
+            for job in todo[:limit]:
+                value = _cron_value_from_prompt(job.get("prompt"))
+                value["set_by"] = str(job.get("owner_email") or "")
+                value["set_at"] = str(job.get("created_at") or "")
+                try:
+                    update_job(job["id"], {"value": value})
+                    job["value"] = value
+                except Exception:
+                    logger.debug("value promotion failed for %s", job.get("id"), exc_info=True)
+    except Exception:
+        logger.debug("value promotion unavailable", exc_info=True)
+
+
 _CRON_CATEGORY_MAX = 40
 _CRON_PROMPT_CATEGORY_RE = re.compile(r"^\s*CATEGORY\s*:\s*([^\n]{1,60})\s*$", re.IGNORECASE | re.MULTILINE)
 
@@ -23587,7 +23676,10 @@ _CRON_WRITE_FIELDS = frozenset({
 })
 # Only a new task takes this (saveCronForm's create branch); an existing task
 # is paused and resumed through its own routes.
-_CRON_CREATE_ONLY_FIELDS = frozenset({"enabled"})
+# ``value`` (what the work cost by hand before and costs now) is validated by
+# api/value_tracking.validate_value in _handle_cron_create; changing it later
+# goes through POST /api/value/job with its own ownership check.
+_CRON_CREATE_ONLY_FIELDS = frozenset({"enabled", "value"})
 # The one shape each of those fields may have, cron admins included (400
 # otherwise): what the Tasks panel sends. A list stored as a task's name
 # broke the engine's lookups by name (resolve_job_ref) for its whole store.
@@ -24051,6 +24143,9 @@ def _handle_cron_create(handler, body):
         require(body, "prompt", "schedule")
         if "enabled" in body and not isinstance(body["enabled"], bool):
             raise ValueError("enabled must be a boolean")
+        if isinstance(body.get("value"), dict):
+            from api import value_tracking
+            value_tracking.validate_value(body["value"])
     except ValueError as e:
         return bad(handler, str(e))
     refusal = _cron_write_allowed(handler, body)
@@ -24148,6 +24243,22 @@ def _handle_cron_create(handler, body):
         _shared = _normalize_cron_shared_with(body.get("shared_with"))
         if _shared:
             post_create_updates["shared_with"] = _shared
+        # What this work cost by hand before and costs now (api/value_tracking.py):
+        # from the form's value block, else from a VALUE line in the prompt.
+        _value = None
+        if isinstance(body.get("value"), dict):
+            from api import value_tracking
+            _value = value_tracking.validate_value(body["value"])
+        else:
+            _value = _cron_value_from_prompt(body.get("prompt"))
+        if _value:
+            import datetime as _dt
+            _value["set_by"] = _cron_request_email(handler) or ""
+            _value["set_at"] = _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds")
+            if _value.get("confidence") == "confirmed":
+                _value["confirmed_by"] = _value["set_by"]
+                _value["confirmed_at"] = _value["set_at"]
+            post_create_updates["value"] = _value
         if "managed_by" in body:
             post_create_updates["managed_by"] = _normalize_cron_managed_by(body["managed_by"])
         post_create_updates.update(notification_updates)

@@ -34,6 +34,8 @@ ASSIGN = "window.SynthPulseHelpContent = "
 VIRTUAL_PAGES = {
     "group_chat", "voice_mode", "realtime_voice", "bot_builder", "profile_switching",
     "workspace_files", "plugins", "todos", "files", "logs",
+    # Organisation and Management are sections of the Studio screen (one nav item).
+    "organisation", "management",
 }
 # Structural keys: identical in every locale, never shown to a person.
 PAGE_KEYS = {"title", "summary", "sections", "related", "parent", "audience", "module", "modules", "enabled_if"}
