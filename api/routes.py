@@ -12460,6 +12460,9 @@ def handle_get(handler, parsed) -> bool:
         if not interactive_ui.serve(handler, parsed):
             j(handler, {"error": "not found"}, status=404)
         return True
+    if parsed.path.startswith("/api/artifacts/"):
+        from api import artifacts as _artifacts
+        return _artifacts.handle_get(handler, parsed)
     if parsed.path.startswith(("/static/interactive-ui/tiles/", "/session/static/interactive-ui/tiles/")):
         from api import map_tiles
         return map_tiles.serve(handler, parsed)
@@ -14757,6 +14760,14 @@ def handle_post(handler, parsed) -> bool:
     if parsed.path == "/api/map/resolve":
         from api import map_resolve
         return map_resolve.handle(handler)
+
+    if parsed.path.startswith("/api/artifacts/"):
+        from api import artifacts as _artifacts
+        try:
+            _body = read_body(handler)
+        except ValueError:
+            _body = None
+        return _artifacts.handle_post(handler, parsed, _body if isinstance(_body, dict) else None)
 
     if parsed.path == "/api/client-events/log":
         if diag:
