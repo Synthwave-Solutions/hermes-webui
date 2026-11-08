@@ -150,17 +150,18 @@ def _studio_prompt(actor_email, session_id):
     doc = _studio_doc(actor_email, session_id)
     if not doc:
         return ""
-    opps = "; ".join(f"{o.get('id')}: {o.get('title')}" for o in (doc.get("opportunities") or [])[:8])
+    opps = "; ".join(f"{s.get('id')}: {s.get('title')} (for: {o.get('title')})"
+                     for o in (doc.get("opportunities") or [])[:8] for s in (o.get("solutions") or [])[:3])
     return (
         "You are talking inside SynthPulse Studio about the use case \"" + str(doc.get("title") or "untitled")[:120]
         + "\" (phase " + str(doc.get("phase") or "discover") + "). The screen next to this conversation shows the "
         "Studio canvas and updates when you call the studio tools. When the person has described their work, its "
         "pain points and goals, call studio_capture with step discover and their own words. When they pick an "
-        "opportunity, call studio_choose. When they describe how the process runs now, call studio_capture with "
+        "solution, call studio_choose with its id. When they describe how the process runs now, call studio_capture with "
         "step design. When they want the plan, call studio_capture with step build_plan. Use studio_show to switch "
         "phase or between matrix and tree. Summarise what appeared on screen in one or two sentences. Building is "
         "never done by voice: the person clicks Build on the screen."
-        + (" Current opportunities: " + opps + "." if opps else ""))
+        + (" Current solutions: " + opps + "." if opps else ""))
 
 
 def session_config(actor_email=None, session_id=None):

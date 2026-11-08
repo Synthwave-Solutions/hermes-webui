@@ -110,21 +110,56 @@ def _int(value, lo=0, hi=6000) -> int:
 
 
 def clean_goals(items) -> list:
-    return [{"name": _txt(g.get("name"), 120), "kpi": _txt(g.get("kpi"), 160), "chosen": bool(g.get("chosen", True))}
-            for g in (items or [])[:8] if isinstance(g, dict) and _txt(g.get("name"))]
+    return [{"name": _txt(g.get("name"), 120), "kpi": _txt(g.get("kpi"), 160), "baseline": _txt(g.get("baseline"), 60),
+             "target": _txt(g.get("target"), 60), "chosen": bool(g.get("chosen", True))}
+            for g in (items or [])[:5] if isinstance(g, dict) and _txt(g.get("name"))]
+
+
+def _clean_solution(s, opp_id, j, legacy=None) -> dict:
+    s = s if isinstance(s, dict) else {}
+    legacy = legacy or {}
+    block = s.get("building_block") if s.get("building_block") in BLOCKS else (
+        legacy.get("building_block") if legacy.get("building_block") in BLOCKS else "task")
+    return {"id": _txt(s.get("id"), 24) or f"{opp_id}s{j + 1}",
+            "title": _txt(s.get("title") or legacy.get("title"), 140),
+            "building_block": block,
+            "impact": _int(s.get("impact", legacy.get("impact", 3)), 1, 5),
+            "effort": _int(s.get("effort", legacy.get("effort", 3)), 1, 5),
+            "how": _txt(s.get("how") or legacy.get("why"), 300), "test": _txt(s.get("test"), 240)}
 
 
 def clean_opportunities(items) -> list:
+    """Opportunities (problem space) with solutions underneath (solution
+    space). An old opportunity without solutions becomes one solution."""
     out = []
-    for i, o in enumerate((items or [])[:20]):
+    for i, o in enumerate((items or [])[:12]):
         if not isinstance(o, dict) or not _txt(o.get("title")):
             continue
-        block = o.get("building_block") if o.get("building_block") in BLOCKS else "task"
-        out.append({"id": _txt(o.get("id"), 20) or f"o{i + 1}", "title": _txt(o.get("title"), 140), "goal": _txt(o.get("goal"), 120),
-                    "why": _txt(o.get("why"), 300), "pain": _txt(o.get("pain"), 200),
-                    "impact": _int(o.get("impact"), 1, 5), "effort": _int(o.get("effort"), 1, 5),
-                    "building_block": block})
+        opp_id = _txt(o.get("id"), 20) or f"o{i + 1}"
+        raw = [s for s in (o.get("solutions") or []) if isinstance(s, dict) and _txt(s.get("title"))][:4]
+        solutions = [_clean_solution(s, opp_id, j) for j, s in enumerate(raw)] or [_clean_solution({}, opp_id, 0, o)]
+        seen = set()
+        for j, s in enumerate(solutions):
+            if s["id"] in seen or not s["id"].startswith(opp_id):
+                s["id"] = f"{opp_id}s{j + 1}"
+            seen.add(s["id"])
+        out.append({"id": opp_id, "title": _txt(o.get("title"), 140), "goal": _txt(o.get("goal"), 120),
+                    "pain": _txt(o.get("pain") or o.get("title"), 200), "cause": _txt(o.get("cause"), 200),
+                    "solutions": solutions})
     return out
+
+
+def selection(doc) -> tuple[dict | None, dict | None]:
+    """(opportunity, solution) for ``doc.selected``: a solution id, or an
+    opportunity id (its first solution)."""
+    sel = str(doc.get("selected") or "")
+    for o in doc.get("opportunities") or []:
+        for s in o.get("solutions") or []:
+            if s.get("id") == sel:
+                return o, s
+        if o.get("id") == sel:
+            return o, (o.get("solutions") or [None])[0]
+    return None, None
 
 
 def clean_process(raw) -> dict:
@@ -220,7 +255,9 @@ def update(view, body: dict) -> dict:
         if "ui_view" in body and body.get("ui_view") in ("matrix", "tree"):
             doc["ui_view"] = body["ui_view"]
         if "selected" in body:
-            doc["selected"] = _txt(body.get("selected"), 20)
+            doc["selected"] = _txt(body.get("selected"), 24)
+            if doc["selected"] and selection(doc) == (None, None):
+                raise ValueError("Unknown opportunity or solution")
         if "process" in body:
             doc["process"] = clean_process(body.get("process"))
         if "components" in body:
@@ -237,13 +274,29 @@ def update(view, body: dict) -> dict:
 
 # ── Model steps ──────────────────────────────────────────────────────────────
 
-DISCOVER = """Je bent de AI-consultant van SynthPulse. Iemand beschrijft zijn werk. Zoek waar AI echt helpt.
-Geef 2 tot 4 doelen (met een meetbare KPI), en 3 tot 6 kansen. Een kans is concreet werk dat een agent kan
-overnemen of ondersteunen. Per kans: impact 1-5, moeite 1-5, het knelpunt dat het oplost, waarom, en de
-bouwsteen: task (geplande taak), skill (werkwijze/kennis), bot (vaste AI-collega), human (blijft mens),
-connection (koppeling met een systeem), custom (maatwerksoftware). Antwoord in het Nederlands, alleen JSON:
-{"title": "korte titel", "goals": [{"name": "...", "kpi": "..."}],
- "opportunities": [{"id": "o1", "goal": "<name van het doel>", "title": "...", "pain": "...", "why": "...", "impact": 4, "effort": 2, "building_block": "task"}]}"""
+DISCOVER = """Je bent de AI-consultant van SynthPulse en maakt een opportunity solution tree (QuickScan).
+Iemand vertelt over zijn werk. Bouw drie lagen, strikt gescheiden:
+
+1. GEWENST DOEL (1 tot 3): de uitkomst die het team wil bereiken, in hun eigen taal. Meetbaar: een KPI met
+   nulmeting en doelwaarde. Gebruik alleen getallen die de persoon noemt; anders "nulmeting nog bepalen"
+   of "doelwaarde nog bepalen".
+   Een doel is nooit een oplossing ("minder openstaande facturen", niet "een bot die aanmaant").
+2. KANSEN (2 tot 5): behoeften, knelpunten of wensen die het doel in de weg staan, geformuleerd vanuit de
+   medewerker of klant ("ik verlies elke maandag twee uur aan nabellen"). Nog GEEN oplossing. Elke kans hoort
+   bij precies één doel (veld goal = naam van dat doel) en heeft een korte oorzaak.
+3. OPLOSSINGEN (1 tot 3 per kans): concreet wat de Super Agent, een bot of een geplande taak doet.
+   - building_block: task (geplande taak), skill (werkwijze), bot (vaste AI-collega), connection (koppeling),
+     human (blijft mens), custom (maatwerksoftware).
+   - impact 1-5: bijdrage aan de KPI van het doel. effort 1-5: bouwen plus verandering voor het team.
+   - how: in een zin hoe het werkt. test: het kleinste experiment om het te bewijzen (bijv. "een week lang
+     concepten laten maken en vergelijken").
+Verzin geen feiten. Ontbreekt informatie die de keuze verandert, zet dan 1 tot 3 korte vragen in "questions".
+Antwoord in het Nederlands, alleen JSON:
+{"title": "korte titel", "goals": [{"name": "...", "kpi": "...", "baseline": "...", "target": "..."}],
+ "opportunities": [{"id": "o1", "goal": "<name van het doel>", "title": "...", "cause": "...",
+   "solutions": [{"id": "o1s1", "title": "...", "building_block": "task", "impact": 4, "effort": 2,
+                  "how": "...", "test": "..."}]}],
+ "questions": ["..."]}"""
 
 DESIGN = """Je ontwerpt een werkproces opnieuw met AI. Gegeven de gekozen kans en de beschrijving van het huidige
 proces: maak het proces zoals het nu is (as_is: stap, actor mens/systeem, minuten per keer) en zoals het wordt
@@ -356,28 +409,38 @@ def run_step(view, body: dict) -> dict:
     history = "\n".join(f"- {n['text']}" for n in notes if n.get("role") == "user")[-MAX_TEXT:]
     if step == "discover":
         answer = _ask_json(DISCOVER, f"Team: {team_name or 'onbekend'}\nWat de persoon vertelt:\n{history}")
-        update(view, {"id": doc["id"], "goals": answer.get("goals"), "opportunities": answer.get("opportunities"),
-                      "title": doc.get("title") or answer.get("title") or "", "notes": notes + [
-                          {"role": "agent", "text": f"{len(answer.get('opportunities') or [])} kansen gevonden. Kies er één in de matrix.",
-                           "at": time.time()}]})
+        opps = clean_opportunities(answer.get("opportunities"))
+        n_sol = sum(len(o["solutions"]) for o in opps)
+        questions = [_txt(q, 200) for q in (answer.get("questions") or []) if _txt(q, 200)][:3]
+        text = f"{len(opps)} kansen met {n_sol} oplossingen. Kies een oplossing in de matrix of de boom."
+        if questions:
+            text += "\nOm het scherper te maken:\n" + "\n".join("• " + q for q in questions)
+        update(view, {"id": doc["id"], "goals": answer.get("goals"), "opportunities": opps, "selected": "",
+                      "title": doc.get("title") or answer.get("title") or "",
+                      "notes": notes + [{"role": "agent", "text": text, "at": time.time()}]})
     elif step == "design":
-        opp = next((o for o in doc.get("opportunities") or [] if o.get("id") == doc.get("selected")), None)
-        if not opp:
-            raise ValueError("Choose an opportunity first")
-        answer = _ask_json(DESIGN, f"Kans: {opp['title']}\nKnelpunt: {opp.get('pain')}\nWaarom: {opp.get('why')}\n"
+        opp, sol = selection(doc)
+        if not opp or not sol:
+            raise ValueError("Choose a solution first")
+        goal = next((g for g in doc.get("goals") or [] if g.get("name") == opp.get("goal")), {})
+        answer = _ask_json(DESIGN, f"Doel: {goal.get('name') or opp.get('goal') or '-'} (KPI: {goal.get('kpi') or '-'})\n"
+                                   f"Kans: {opp['title']} (oorzaak: {opp.get('cause') or '-'})\n"
+                                   f"Gekozen oplossing: {sol['title']} [{sol['building_block']}]. Hoe: {sol.get('how') or '-'}\n"
                                    f"Huidig proces volgens de persoon:\n{text or history}")
         for s in answer.get("to_be") or []:
             if isinstance(s, dict) and s.get("building_block") in ("task", "skill", "bot"):
-                s["reuse"] = _reuse_candidates(s.get("step", "") + " " + opp["title"])
+                s["reuse"] = _reuse_candidates(s.get("step", "") + " " + sol["title"])
         answer["description"] = text
         update(view, {"id": doc["id"], "process": answer, "phase": "design", "notes": notes + [
             {"role": "agent", "text": "Proces as-is en to-be staan klaar. Pas aan en ga door naar het bouwplan.", "at": time.time()}]})
     elif step == "playbook":
         process = doc.get("process") or {}
-        opp = next((o for o in doc.get("opportunities") or [] if o.get("id") == doc.get("selected")), {})
+        opp, sol = selection(doc)
+        opp, sol = opp or {}, sol or {}
         to_be = "\n".join(f"- [{s.get('building_block')}] {s.get('step')} ({s.get('actor')}) {s.get('note') or ''}"
                           for s in process.get("to_be") or [])
-        answer = _ask_json(PLAYBOOK, f"Kans: {opp.get('title')}\nTeam: {team_name or 'onbekend'}\nNieuw proces:\n{to_be}\n"
+        answer = _ask_json(PLAYBOOK, f"Kans: {opp.get('title')}\nOplossing: {sol.get('title')} (test: {sol.get('test') or '-'})\n"
+                                     f"Team: {team_name or 'onbekend'}\nNieuw proces:\n{to_be}\n"
                                      f"Extra wensen: {text or 'geen'}")
         components = answer.get("components") or []
         for c in components:

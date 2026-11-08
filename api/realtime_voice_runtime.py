@@ -43,7 +43,7 @@ STUDIO_TOOLS = [
          "input": {"type": "string", "description": "The person's own words for this step."}},
          "required": ["step", "input"], "additionalProperties": False}},
     {"type": "function", "name": "studio_choose",
-     "description": "Choose one opportunity of the use case (by its id, e.g. o2) to work out next.",
+     "description": "Choose the solution to work out next, by its id (e.g. o2s1); an opportunity id picks its first solution.",
      "parameters": {"type": "object", "properties": {"opportunity_id": {"type": "string"}},
                     "required": ["opportunity_id"], "additionalProperties": False}},
     {"type": "function", "name": "studio_show",
@@ -415,8 +415,10 @@ class VoiceController:
             doc = self.bridge.studio("POST", "/api/studio/step", {"id": uc_id, "step": step, "input": text.strip()})
             if step == "discover":
                 return {"shown": "opportunities", "goals": [g.get("name") for g in doc.get("goals") or []],
-                        "opportunities": [{"id": o.get("id"), "title": o.get("title"), "impact": o.get("impact"),
-                                           "effort": o.get("effort")} for o in doc.get("opportunities") or []]}
+                        "opportunities": [{"id": o.get("id"), "title": o.get("title"),
+                                           "solutions": [{"id": s.get("id"), "title": s.get("title"), "impact": s.get("impact"),
+                                                          "effort": s.get("effort")} for s in o.get("solutions") or []]}
+                                          for o in doc.get("opportunities") or []]}
             if step == "design":
                 return {"shown": "process", "to_be": [s.get("step") for s in (doc.get("process") or {}).get("to_be") or []]}
             return {"shown": "build plan", "components": [c.get("name") for c in (doc.get("playbook") or {}).get("components") or []],
@@ -425,10 +427,11 @@ class VoiceController:
             if set(args) != {"opportunity_id"} or not isinstance(args["opportunity_id"], str):
                 raise ValueError("Invalid choice")
             doc = self.bridge.studio("POST", "/api/studio/usecase", {"id": uc_id, "selected": args["opportunity_id"][:20], "phase": "design"}, timeout=20)
-            chosen = next((o for o in doc.get("opportunities") or [] if o.get("id") == doc.get("selected")), None)
-            if not chosen:
-                raise ValueError("Unknown opportunity")
-            return {"chosen": chosen.get("title"), "next": "Ask how the process runs now."}
+            from api.studio import selection
+            opp, sol = selection(doc)
+            if not sol:
+                raise ValueError("Unknown opportunity or solution")
+            return {"chosen": sol.get("title"), "opportunity": opp.get("title"), "next": "Ask how the process runs now."}
         if set(args) - {"phase", "view"}:
             raise ValueError("Invalid show request")
         body = {"id": uc_id}

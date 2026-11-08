@@ -154,3 +154,15 @@ main.main.showing-studio>#mainStudio{display:flex;flex-direction:column;overflow
 @keyframes stflash{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 45%,transparent)}100%{box-shadow:0 0 0 14px transparent}}
 .st-canvas.st-flash{animation:stflash .9s ease-out;border-radius:var(--sp-radius-lg)}
 @media (prefers-reduced-motion:reduce){.st-canvas.st-flash{animation:none}}
+
+.st-opp-list{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.st-opp-card{padding:4px 0}
+.st-opp-head{display:flex;flex-direction:column;gap:3px;padding:10px 16px;border-bottom:1px solid color-mix(in srgb,var(--border) 60%,transparent);border-left:3px solid var(--warning,#b7791f);border-radius:var(--sp-radius-lg) var(--sp-radius-lg) 0 0}
+.st-num-wide{width:auto;min-width:28px;padding:0 6px;border-radius:999px}
+.st-tree-opp{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:10px;position:relative}
+.st-tree-opp::before{content:"";position:absolute;left:-16px;top:22px;width:14px;height:2px;background:var(--border2,var(--border))}
+.st-tree-sols{display:flex;flex-direction:column;gap:8px}
+.st-node.sol.sel{border-color:var(--success);box-shadow:0 0 0 3px color-mix(in srgb,var(--success) 18%,transparent)}
+.st-kpi{font-size:12.5px;font-variant-numeric:tabular-nums;color:var(--text)}
+.st-chosen{padding:10px 12px;border:1px solid var(--border);border-radius:var(--sp-radius);background:var(--surface);margin-bottom:12px;font-size:13px;line-height:1.6}
+@media (max-width:900px){.st-tree-opp{grid-template-columns:1fr}}

@@ -34,14 +34,18 @@ from browser_conversation_lifecycle import _terminate_process  # noqa: E402
 from browser_org_management import ADMIN, LEAD, MEMBER, PASSWORD, ok, seed, start_server  # noqa: E402
 
 ANSWERS = {
-    "AI-consultant": {"title": "Debiteurenopvolging", "goals": [{"name": "Minder openstaande facturen", "kpi": "DSO van 41 naar 30 dagen"},
-                                                                  {"name": "Minder handwerk", "kpi": "3 uur per week minder"}],
-                      "opportunities": [{"id": "o1", "title": "Wekelijkse concept-aanmaningen", "pain": "Elke maandag handmatig nabellen",
-                                         "why": "Sneller betaald", "impact": 5, "effort": 2, "building_block": "task"},
-                                        {"id": "o2", "title": "Klantportaal voor betalingen", "pain": "Klanten vragen status",
-                                         "why": "Minder vragen", "impact": 3, "effort": 5, "building_block": "custom"},
-                                        {"id": "o3", "title": "Huisstijl aanmaning als werkwijze", "pain": "Wisselende toon",
-                                         "why": "Consistent", "impact": 3, "effort": 1, "building_block": "skill"}]},
+    "AI-consultant": {"title": "Debiteurenopvolging",
+                      "goals": [{"name": "Facturen sneller betaald", "kpi": "Gemiddelde betaaltermijn", "baseline": "41 dagen", "target": "30 dagen"},
+                                {"name": "Minder handwerk", "kpi": "Uren per week", "baseline": "3 uur", "target": "doelwaarde nog bepalen"}],
+                      "opportunities": [
+                          {"id": "o1", "goal": "Facturen sneller betaald", "title": "Ik zie pas op maandag welke facturen te laat zijn", "cause": "Wekelijks handmatig",
+                           "solutions": [{"id": "o1s1", "title": "Wekelijkse concept-aanmaningen", "building_block": "task", "impact": 5, "effort": 2, "how": "Elke maandag concepten", "test": "Een week concepten vergelijken"},
+                                         {"id": "o1s2", "title": "Dagelijkse controle op verlopen facturen", "building_block": "task", "impact": 4, "effort": 2, "how": "Elke ochtend", "test": "Twee weken meten"}]},
+                          {"id": "o2", "goal": "Facturen sneller betaald", "title": "Klanten vragen steeds de status", "cause": "Geen inzicht",
+                           "solutions": [{"id": "o2s1", "title": "Klantportaal voor betalingen", "building_block": "custom", "impact": 3, "effort": 5, "how": "Portaal", "test": "Prototype"}]},
+                          {"id": "o3", "goal": "Minder handwerk", "title": "De toon van herinneringen wisselt", "cause": "Iedereen schrijft anders",
+                           "solutions": [{"id": "o3s1", "title": "Huisstijl aanmaning als werkwijze", "building_block": "skill", "impact": 3, "effort": 1, "how": "Vaste stappen", "test": "Tien concepten laten beoordelen"}]}],
+                      "questions": ["Hoeveel van de drie uur gaat naar nabellen?"]},
     "werkproces opnieuw": {"as_is": [{"step": "Openstaande posten uit SnelStart halen", "actor": "mens", "minutes": 20},
                                      {"step": "Per klant mail schrijven", "actor": "mens", "minutes": 40}],
                            "to_be": [{"step": "Agent maakt lijst en concept-mails", "actor": "agent", "building_block": "task", "note": "maandag 08:00"},
@@ -172,7 +176,7 @@ def main() -> int:
             assert ctx.request.post("/api/studio/step", data={"id": uc_id, "step": "discover", "input": "Elke maandag bel ik facturen na"}).ok
             page.wait_for_selector(".st-matrix .st-dot", timeout=10000)
             assert ctx.request.post("/api/studio/usecase", data={"id": uc_id, "ui_view": "tree"}).ok
-            page.wait_for_selector(".st-tree .st-tree-branch", timeout=10000)
+            page.wait_for_selector(".st-tree .st-tree-opp", timeout=10000)
             page.evaluate("() => window.synPulseVoice.d.tasks([{task_id: 't1', title: 'Zoek voorbeelden van aanmaningen', status: 'running', session_id: 'abc123'}])")
             page.wait_for_selector('.st-live-tasks [data-st-open-session="abc123"]', timeout=5000)
             page.screenshot(path=str(art / "01c-live-canvas.png"), full_page=True)
@@ -192,24 +196,27 @@ def main() -> int:
             page.locator("[data-st-send] textarea").fill("Elke maandag bel ik facturen na en schrijf ik aanmaningen, dat kost me twee uur.")
             page.locator("[data-st-send] button[type=submit]").click()
             page.wait_for_selector(".st-matrix .st-dot", timeout=20000)
-            assert page.locator(".st-dot").count() == 3 and page.locator(".st-goal").count() == 2
+            assert page.locator(".st-dot").count() == 4 and page.locator(".st-goal").count() == 2
+            assert "41 dagen" in page.locator(".st-goals").inner_text() and "Hoeveel van de drie uur" in page.locator(".st-notes").inner_text()
             assert page.locator("[data-st-title]").input_value() == "Debiteurenopvolging"
-            page.locator('.om-row [data-st-select="o1"]').click()
-            page.wait_for_selector('.st-dot.sel[data-st-select="o1"]', timeout=10000)
+            page.locator('.om-row [data-st-select="o1s1"]').click()
+            page.wait_for_selector('.st-dot.sel[data-st-select="o1s1"]', timeout=10000)
             page.screenshot(path=str(art / "02-discover.png"), full_page=True)
             assert "Snelle winst" in page.locator(".st-matrix").inner_text()
             ok("discover gives goals and an impact/effort matrix with quadrants; an opportunity is chosen")
             page.locator('[data-st-oppview="tree"]').click()
-            page.wait_for_selector(".st-tree .st-tree-branch", timeout=5000)
-            assert page.locator(".st-tree-branch").count() == 3 and page.locator(".st-node.goal").count() >= 1
+            page.wait_for_selector(".st-tree .st-tree-opp", timeout=5000)
+            assert page.locator(".st-tree-opp").count() == 3 and page.locator(".st-node.goal").count() == 2
+            assert page.locator(".st-tree-sols .st-node.sol").count() == 4
             page.screenshot(path=str(art / "02b-tree.png"), full_page=True)
-            page.locator('[data-st-backlog="o3"]').click()
-            page.wait_for_selector('[data-st-backlog="o3"][disabled]', timeout=5000)
+            page.locator('.st-tree [data-st-backlog="o3s1"]').click()
+            page.wait_for_selector('.st-tree [data-st-backlog="o3s1"][disabled]', timeout=5000)
             page.locator("[data-st-backlog-all]").click()
             page.wait_for_timeout(800)
             backlog = ctx.request.get("/api/studio/backlog").json()["items"]
-            assert sorted(i["title"] for i in backlog) == sorted(["Huisstijl aanmaning als werkwijze", "Wekelijkse concept-aanmaningen", "Klantportaal voor betalingen"]), [i["title"] for i in backlog]
-            ok("opportunity solution tree (goal, pain point, opportunity, solution); opportunities go to the backlog without duplicates")
+            assert sorted(i["title"] for i in backlog) == sorted(["Huisstijl aanmaning als werkwijze", "Wekelijkse concept-aanmaningen", "Dagelijkse controle op verlopen facturen", "Klantportaal voor betalingen"]), [i["title"] for i in backlog]
+            assert next(i for i in backlog if i["title"] == "Huisstijl aanmaning als werkwijze")["pain"] == "De toon van herinneringen wisselt"
+            ok("opportunity solution tree: desired outcome with KPI, opportunities, solutions under each; solutions go to the backlog without duplicates")
 
             # 3. design
             page.locator('[data-st-goto="design"]').click()

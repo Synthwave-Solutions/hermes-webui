@@ -12,7 +12,7 @@
 (function(){
   'use strict';
   const NL = {
-    n_goal: 'Doel', n_pain: 'Knelpunt', n_opp: 'Kans', n_sol: 'Oplossing', untitled: 'Naamloze use case',
+    n_goal: 'Gewenst doel', n_pain: 'Knelpunt', n_opp: 'Kans', n_sol: 'Oplossing', untitled: 'Naamloze use case', cause: 'Oorzaak', test: 'Kleinste test',
     q_quick: 'Snelle winst', q_big: 'Grote inzet', q_fill: 'Opvulling', q_pit: 'Geldput',
     tab_uc: 'Use cases', tab_backlog: 'Backlog', tab_pb: 'Playbooks', view_matrix: 'Matrix', view_tree: 'Boom', to_backlog: 'Naar backlog', in_backlog: 'In backlog', all_to_backlog: 'Alle kansen naar de backlog', make_pb: 'Maak er een Playbook van', no_goal: 'Overig',
     studio: 'Studio', intro: 'Ontdek waar AI je werk overneemt, richt het proces in en laat de Super Agent het bouwen.',
@@ -26,7 +26,7 @@
     g_pain: 'Knelpunten', g_pain_d: 'Wat kost te veel tijd of moeite?', g_goals: 'Doelen', g_goals_d: 'Wat zou je willen verbeteren?',
     topics: 'Voorbeeldonderwerpen', t1: 'E-mail en communicatie afhandelen', t2: 'Documenten verwerken en beoordelen',
     t3: 'Gegevens invoeren en rapporteren', t4: 'Klanten opvolgen',
-    goals: 'Doelen', opps: 'Kansen', impact: 'Impact', effort: 'Moeite', choose: 'Kies', chosen: 'Gekozen',
+    goals: 'Doelen', opps: 'Kansen en oplossingen', impact: 'Impact', effort: 'Moeite', choose: 'Kies', chosen: 'Gekozen',
     quick_win: 'Snel resultaat', next_design: 'Verder naar inrichten', next_playbook: 'Maak het bouwplan', next_build: 'Droogrun',
     as_is: 'Zoals het nu gaat', to_be: 'Zoals het wordt', metrics: 'Succesmetingen', reuse: 'Bestaat al',
     a_bot: 'Nieuwe bot, alleen voor jou zichtbaar, werkt voor het team', instructions: 'Instructies', live: 'Live praten', live_stop: 'Stop live', live_on: 'Live gesprek met de Super Agent: hij vult het werkvlak terwijl je praat. Wat je zegt komt ook in het tekstvak.', open_work: 'Open werk', conn_ok: 'Al verbonden', conn_req: 'Aangevraagd bij beheer', conn_none: 'Niet in de catalogus; vraag het aan via Verbindingen',
@@ -46,7 +46,7 @@
     chat_prompt: 'Ik werk in Studio aan de use case "{t}". Help me verder: {s}'
   };
   const EN = {
-    n_goal: 'Goal', n_pain: 'Pain point', n_opp: 'Opportunity', n_sol: 'Solution', untitled: 'Untitled use case',
+    n_goal: 'Desired outcome', n_pain: 'Pain point', n_opp: 'Opportunity', n_sol: 'Solution', untitled: 'Untitled use case', cause: 'Cause', test: 'Smallest test',
     q_quick: 'Quick wins', q_big: 'Big bets', q_fill: 'Fill-ins', q_pit: 'Money pit',
     tab_uc: 'Use cases', tab_backlog: 'Backlog', tab_pb: 'Playbooks', view_matrix: 'Matrix', view_tree: 'Tree', to_backlog: 'To backlog', in_backlog: 'In backlog', all_to_backlog: 'All opportunities to the backlog', make_pb: 'Turn it into a Playbook', no_goal: 'Other',
     studio: 'Studio', intro: 'Discover where AI takes work off your hands, design the process and let the Super Agent build it.',
@@ -60,7 +60,7 @@
     g_pain: 'Pain points', g_pain_d: 'What takes too much time or effort?', g_goals: 'Goals', g_goals_d: 'What would you like to improve?',
     topics: 'Example topics', t1: 'Handling email and communication', t2: 'Processing and reviewing documents',
     t3: 'Entering data and reporting', t4: 'Following up customers',
-    goals: 'Goals', opps: 'Opportunities', impact: 'Impact', effort: 'Effort', choose: 'Choose', chosen: 'Chosen',
+    goals: 'Goals', opps: 'Opportunities and solutions', impact: 'Impact', effort: 'Effort', choose: 'Choose', chosen: 'Chosen',
     quick_win: 'Quick win', next_design: 'Continue to design', next_playbook: 'Make the build plan', next_build: 'Dry run',
     as_is: 'As it is', to_be: 'As it will be', metrics: 'Success measures', reuse: 'Already exists',
     a_bot: 'New bot, visible to you only, works for the team', instructions: 'Instructions', live: 'Talk live', live_stop: 'Stop live', live_on: 'Live conversation with the Super Agent: it fills the canvas while you talk. What you say also lands in the text box.', open_work: 'Open work', conn_ok: 'Already connected', conn_req: 'Requested from admins', conn_none: 'Not in the catalogue; request it in Connections',
@@ -174,20 +174,31 @@
     return `<div class="st-guide">${[['g_processes', 'g_processes_d'], ['g_pain', 'g_pain_d'], ['g_goals', 'g_goals_d']].map(([a, b]) => `<div class="om-card"><strong>${H(w(a))}</strong><p class="om-muted om-small">${H(w(b))}</p></div>`).join('')}</div>
       <p class="om-small om-muted" style="margin-top:14px">${H(w('topics'))}</p><div class="om-chips">${['t1', 't2', 't3', 't4'].map(k => `<button type="button" class="om-chip st-topic" data-st-topic="${H(w(k))}">${H(w(k))}</button>`).join('')}</div>`;
   }
+  function allSolutions(doc){
+    const out = [];
+    (doc.opportunities || []).forEach((o, i) => (o.solutions || []).forEach((s, j) => out.push(Object.assign({}, s, { opp: o, label: (i + 1) + '.' + (j + 1) }))));
+    return out;
+  }
+  function solRow(doc, s){
+    const sel = doc.selected === s.id;
+    const key = doc.id + ':' + s.id;
+    return `<div class="om-row ${sel ? 'st-row-sel' : ''}"><span class="st-num st-num-wide">${H(s.label)}</span>
+      <div class="om-row-main"><div class="om-row-title">${H(s.title)}</div><div class="om-row-sub">${H(s.how || '')}${s.test ? ' · ' + H(w('test')) + ': ' + H(s.test) : ''}</div></div>
+      <div class="om-row-actions"><span class="om-badge">${H(w('b_' + s.building_block))}</span><span class="om-small om-muted">${H(w('impact'))} ${s.impact} · ${H(w('effort'))} ${s.effort}</span>
+        <button type="button" class="sm-btn" data-st-backlog="${H(s.id)}" ${St.backlogged.has(key) ? 'disabled' : ''}>${H(St.backlogged.has(key) ? w('in_backlog') : w('to_backlog'))}</button>
+        <button type="button" class="sm-btn ${sel ? 'primary' : ''}" data-st-select="${H(s.id)}">${H(sel ? w('chosen') : w('choose'))}</button></div></div>`;
+  }
   function matrixHtml(doc){
-    const opps = doc.opportunities || [];
+    const sols = allSolutions(doc);
     const pos = o => `left:${(o.effort - 1) / 4 * 86 + 4}%;bottom:${(o.impact - 1) / 4 * 82 + 6}%`;
     return `<div class="st-matrix" role="group" aria-label="${H(w('impact'))} / ${H(w('effort'))}">
         <span class="st-quad q1">${H(w('q_quick'))}</span><span class="st-quad q2">${H(w('q_big'))}</span><span class="st-quad q3">${H(w('q_fill'))}</span><span class="st-quad q4">${H(w('q_pit'))}</span>
         <span class="st-axis y" style="top:auto;bottom:50%;left:4px;writing-mode:vertical-rl;transform:rotate(180deg)">${H(w('impact'))} ↑</span><span class="st-axis x" style="bottom:4px;right:50%;transform:translateX(50%)">${H(w('effort'))} →</span>
-        ${opps.map((o, i) => `<button type="button" class="st-dot ${doc.selected === o.id ? 'sel' : ''}" style="${pos(o)}" data-st-select="${H(o.id)}" title="${H(o.title)}">${i + 1}</button>`).join('')}
+        ${sols.map(s => `<button type="button" class="st-dot ${doc.selected === s.id ? 'sel' : ''}" style="${pos(s)}" data-st-select="${H(s.id)}" title="${H(s.title + ' (' + s.opp.title + ')')}">${H(s.label)}</button>`).join('')}
       </div>
-      <div class="om-card" style="padding:4px 0;margin-top:12px">${opps.slice().sort((a, b) => (b.impact - b.effort) - (a.impact - a.effort)).map(o => `<div class="om-row ${doc.selected === o.id ? 'st-row-sel' : ''}">
-          <span class="st-num">${opps.indexOf(o) + 1}</span>
-          <div class="om-row-main"><div class="om-row-title">${H(o.title)}</div><div class="om-row-sub">${H(o.pain || o.why)} · ${H(w('impact'))} ${o.impact} · ${H(w('effort'))} ${o.effort}</div></div>
-          <div class="om-row-actions"><span class="om-badge">${H(w('b_' + o.building_block))}</span><button type="button" class="sm-btn" data-st-backlog="${H(o.id)}" ${St.backlogged.has(doc.id + ':' + o.id) ? 'disabled' : ''}>${H(St.backlogged.has(doc.id + ':' + o.id) ? w('in_backlog') : w('to_backlog'))}</button><button type="button" class="sm-btn ${doc.selected === o.id ? 'primary' : ''}" data-st-select="${H(o.id)}">${H(doc.selected === o.id ? w('chosen') : w('choose'))}</button></div></div>`).join('')}</div>`;
+      <div class="st-opp-list">${(doc.opportunities || []).map((o, i) => `<div class="om-card st-opp-card"><div class="st-opp-head"><span class="st-node-kind">${H(w('n_opp'))} ${i + 1}</span><strong>${H(o.title)}</strong>${o.cause ? `<span class="om-small om-muted">${H(w('cause'))}: ${H(o.cause)}</span>` : ''}</div>
+        ${allSolutions(doc).filter(s => s.opp.id === o.id).map(s => solRow(doc, s)).join('')}</div>`).join('')}</div>`;
   }
-  // Opportunity solution tree: goal > pain point > opportunity > solution (building block).
   function treeHtml(doc){
     const goals = (doc.goals || []).map(g => g.name);
     const groups = {};
@@ -196,20 +207,22 @@
       (groups[g] = groups[g] || []).push(o);
     }
     const order = goals.concat(Object.keys(groups).filter(k => !goals.includes(k)));
+    const sols = allSolutions(doc);
     return `<div class="st-tree" role="tree">${order.filter(g => groups[g]).map(g => {
-      const goal = (doc.goals || []).find(x => x.name === g);
-      return `<div class="st-tree-goal" role="treeitem" aria-expanded="true"><div class="st-node goal"><span class="st-node-kind">${H(w('n_goal'))}</span><strong>${H(g)}</strong>${goal && goal.kpi ? `<span class="om-small om-muted">${H(goal.kpi)}</span>` : ''}</div>
-        <div class="st-tree-children" role="group">${groups[g].map(o => `<div class="st-tree-branch">
-          <div class="st-node pain"><span class="st-node-kind">${H(w('n_pain'))}</span>${H(o.pain || '·')}</div>
-          <div class="st-node opp ${doc.selected === o.id ? 'sel' : ''}"><span class="st-node-kind">${H(w('n_opp'))} · ${H(w('impact'))} ${o.impact} · ${H(w('effort'))} ${o.effort}</span><strong>${H(o.title)}</strong>
-            <span class="st-node-actions"><button type="button" class="sm-btn ${doc.selected === o.id ? 'primary' : ''}" data-st-select="${H(o.id)}">${H(doc.selected === o.id ? w('chosen') : w('choose'))}</button><button type="button" class="sm-btn" data-st-backlog="${H(o.id)}" ${St.backlogged.has(doc.id + ':' + o.id) ? 'disabled' : ''}>${H(St.backlogged.has(doc.id + ':' + o.id) ? w('in_backlog') : w('to_backlog'))}</button></span></div>
-          <div class="st-node sol bb-${H(o.building_block)}"><span class="st-node-kind">${H(w('n_sol'))} · ${H(w('b_' + o.building_block))}</span>${H(o.why || '')}</div>
+      const goal = (doc.goals || []).find(x => x.name === g) || {};
+      return `<div class="st-tree-goal" role="treeitem" aria-expanded="true"><div class="st-node goal"><span class="st-node-kind">${H(w('n_goal'))}</span><strong>${H(g)}</strong>${goal.kpi ? `<span class="om-small om-muted">${H(goal.kpi)}${goal.baseline || goal.target ? ' · ' + H(goal.baseline || '?') + ' → ' + H(goal.target || '?') : ''}</span>` : ''}</div>
+        <div class="st-tree-children" role="group">${groups[g].map(o => `<div class="st-tree-opp">
+          <div class="st-node pain"><span class="st-node-kind">${H(w('n_opp'))}</span><strong>${H(o.title)}</strong>${o.cause ? `<span class="om-small om-muted">${H(w('cause'))}: ${H(o.cause)}</span>` : ''}</div>
+          <div class="st-tree-sols">${sols.filter(s => s.opp.id === o.id).map(s => `<div class="st-node sol bb-${H(s.building_block)} ${doc.selected === s.id ? 'sel' : ''}">
+            <span class="st-node-kind">${H(w('n_sol'))} ${H(s.label)} · ${H(w('b_' + s.building_block))} · ${H(w('impact'))} ${s.impact} · ${H(w('effort'))} ${s.effort}</span><strong>${H(s.title)}</strong>
+            ${s.test ? `<span class="om-small om-muted">${H(w('test'))}: ${H(s.test)}</span>` : ''}
+            <span class="st-node-actions"><button type="button" class="sm-btn ${doc.selected === s.id ? 'primary' : ''}" data-st-select="${H(s.id)}">${H(doc.selected === s.id ? w('chosen') : w('choose'))}</button><button type="button" class="sm-btn" data-st-backlog="${H(s.id)}" ${St.backlogged.has(doc.id + ':' + s.id) ? 'disabled' : ''}>${H(St.backlogged.has(doc.id + ':' + s.id) ? w('in_backlog') : w('to_backlog'))}</button></span></div>`).join('')}</div>
         </div>`).join('')}</div></div>`;
     }).join('')}</div>`;
   }
   function discoverHtml(doc){
     if (!(doc.opportunities || []).length) return guideHtml();
-    return `<h3>${H(w('goals'))}</h3><div class="st-goals">${(doc.goals || []).map(g => `<div class="om-card st-goal"><strong>${H(g.name)}</strong><span class="om-muted om-small">${H(g.kpi)}</span></div>`).join('')}</div>
+    return `<h3>${H(w('goals'))}</h3><div class="st-goals">${(doc.goals || []).map(g => `<div class="om-card st-goal"><span class="st-node-kind">${H(w('n_goal'))}</span><strong>${H(g.name)}</strong><span class="om-muted om-small">${H(g.kpi)}</span>${g.baseline || g.target ? `<span class="st-kpi"><b>${H(g.baseline || '?')}</b> → <b>${H(g.target || '?')}</b></span>` : ''}</div>`).join('')}</div>
       <div class="om-section-head" style="margin-top:20px"><h3>${H(w('opps'))}</h3><div class="om-seg" style="margin-left:auto">${['matrix', 'tree'].map(v => `<button type="button" aria-pressed="${St.oppView === v}" data-st-oppview="${v}">${H(w('view_' + v))}</button>`).join('')}</div></div>
       ${St.oppView === 'tree' ? treeHtml(doc) : matrixHtml(doc)}
       <div class="om-value-actions" style="margin-top:8px"><button type="button" class="sm-btn" data-st-backlog-all>${H(w('all_to_backlog'))}</button></div>
@@ -224,9 +237,10 @@
   }
   function designHtml(doc){
     const p = doc.process || {};
-    const opp = (doc.opportunities || []).find(o => o.id === doc.selected);
-    if (!(p.to_be || []).length) return `<div class="om-card"><strong>${H(opp ? opp.title : '')}</strong><p class="om-muted">${H(w('ph_design'))}</p></div>`;
-    return `<p class="om-small om-muted">${H(opp ? opp.title : '')}</p><h3>${H(w('as_is'))}</h3>${laneHtml(p.as_is)}<h3 style="margin-top:18px">${H(w('to_be'))}</h3>${laneHtml(p.to_be, true)}
+    const chosen = allSolutions(doc).find(s => s.id === doc.selected) || allSolutions(doc).find(s => s.opp.id === doc.selected);
+    const head = chosen ? `<div class="st-chosen"><span class="st-node-kind">${H(w('n_opp'))}</span> ${H(chosen.opp.title)}<br><span class="st-node-kind">${H(w('n_sol'))}</span> <strong>${H(chosen.title)}</strong> <span class="om-badge">${H(w('b_' + chosen.building_block))}</span></div>` : '';
+    if (!(p.to_be || []).length) return `${head}<p class="om-muted">${H(w('ph_design'))}</p>`;
+    return `${head}<h3>${H(w('as_is'))}</h3>${laneHtml(p.as_is)}<h3 style="margin-top:18px">${H(w('to_be'))}</h3>${laneHtml(p.to_be, true)}
       ${(p.metrics || []).length ? `<h3 style="margin-top:18px">${H(w('metrics'))}</h3><div class="st-goals">${p.metrics.map(m => `<div class="om-card st-goal"><strong>${H(m.name)}</strong><span class="om-small om-muted">${H(m.baseline)} → ${H(m.target)}</span></div>`).join('')}</div>` : ''}
       <div class="om-value-actions"><button type="button" class="sm-btn primary" data-st-make-playbook>${H(w('next_playbook'))}</button></div>`;
   }
@@ -494,9 +508,9 @@
       if (b.dataset.stTab) { St.tab = b.dataset.stTab; St.doc = null; if (St.tab === 'usecases') await loadList(); render(); return; }
       if (b.dataset.stOppview) { St.oppView = b.dataset.stOppview; render(); if (St.doc) await save({ ui_view: St.oppView }, true); return; }
       if (b.dataset.stBacklog || b.hasAttribute('data-st-backlog-all')) {
-        const opps = (St.doc.opportunities || []).filter(o => b.dataset.stBacklog ? o.id === b.dataset.stBacklog : !St.backlogged.has(St.doc.id + ':' + o.id));
-        for (const o of opps) {
-          try { await post('/api/studio/backlog', { title: o.title, pain: o.pain, why: o.why, goal: o.goal, impact: o.impact, effort: o.effort, building_block: o.building_block, team: St.doc.team || '', source_use_case: St.doc.id }); St.backlogged.add(St.doc.id + ':' + o.id); }
+        const sols = allSolutions(St.doc).filter(s => b.dataset.stBacklog ? s.id === b.dataset.stBacklog : !St.backlogged.has(St.doc.id + ':' + s.id));
+        for (const s of sols) {
+          try { await post('/api/studio/backlog', { title: s.title, pain: s.opp.title, why: s.how, goal: s.opp.goal, impact: s.impact, effort: s.effort, building_block: s.building_block, team: St.doc.team || '', source_use_case: St.doc.id }); St.backlogged.add(St.doc.id + ':' + s.id); }
           catch (e) { toast(errMsg(e)); }
         }
         toast(w('in_backlog')); render(); return;

@@ -199,10 +199,10 @@ def autopilot(view, item_id: str) -> dict:
         return running
     doc = studio.update(view, {"title": item["title"], "team": item.get("team") or "", "notes": [
         {"role": "user", "text": f"Uit de backlog: {item['title']}. {item.get('pain') or ''}"}]})
-    opp = {"id": "o1", "title": item["title"], "pain": item.get("pain", ""), "why": item.get("why", ""),
-           "goal": item.get("goal", ""), "impact": item.get("impact", 3), "effort": item.get("effort", 3),
-           "building_block": item.get("building_block", "task")}
-    studio.update(view, {"id": doc["id"], "opportunities": [opp], "selected": "o1", "phase": "design",
+    opp = {"id": "o1", "title": item.get("pain") or item["title"], "pain": item.get("pain", ""), "goal": item.get("goal", ""),
+           "solutions": [{"id": "o1s1", "title": item["title"], "how": item.get("why", ""), "impact": item.get("impact", 3),
+                          "effort": item.get("effort", 3), "building_block": item.get("building_block", "task")}]}
+    studio.update(view, {"id": doc["id"], "opportunities": [opp], "selected": "o1s1", "phase": "design",
                          "goals": [{"name": item.get("goal") or item["title"], "kpi": ""}]})
     save_item(view, {"id": item_id, "status": "chosen", "use_case": doc["id"]})
     _AUTOPILOT[item_id] = {"use_case": doc["id"], "step": "start", "message": "Gestart", "done": False, "started": time.time()}
