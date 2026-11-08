@@ -270,7 +270,7 @@
   }
   function renderDoc(){
     const doc = St.doc;
-    const body = head(`<button type="button" class="sm-btn" data-st-back>← ${H(w('back'))}</button>${doc.editable ? `<button type="button" class="sm-btn danger" data-st-delete>${H(w('delete'))}</button>` : ''}`);
+    const body = head(tabsHtml() + `<button type="button" class="sm-btn" data-st-back>← ${H(w('back'))}</button>${doc.editable ? `<button type="button" class="sm-btn danger" data-st-delete>${H(w('delete'))}</button>` : ''}`);
     if (!body) return;
     const canvas = { discover: discoverHtml, design: designHtml, playbook: playbookHtml, build: buildHtml, measure: measureHtml }[doc.phase || 'discover'](doc);
     body.innerHTML = `<div class="st-top"><input class="st-title" data-st-title value="${H(doc.title)}" placeholder="${H(w('title_ph'))}" aria-label="${H(w('title_ph'))}">
