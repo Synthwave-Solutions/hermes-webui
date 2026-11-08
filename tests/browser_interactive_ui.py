@@ -541,7 +541,7 @@ def data_blocks(page, ctx, gateway, art, base_runs):
     assert frame.locator(".k-delta.is-bad .k-sr").text_content() == ", ongunstig"
     fill = frame.evaluate("() => { const f=document.querySelector('.k-target-fill'); return f.getBoundingClientRect().width / f.parentElement.getBoundingClientRect().width; }")
     assert abs(fill - 0.92) < 0.02, fill
-    assert frame.locator(".k-target-text").inner_text().replace("\u00a0", " ") == "92% van doel € 20.000"
+    assert frame.locator(".k-target-text").inner_text().replace("\u00a0", " ") == "92% van het doel van € 20.000"
     assert frame.evaluate("() => getComputedStyle(document.querySelector('.k-tile-label')).textTransform") == "none"
     card.scroll_into_view_if_needed()
     time.sleep(0.5)

@@ -43,7 +43,7 @@
       unresolved:'Niet op de kaart gevonden', later:'Wordt nog opgezocht', tilesFail:'De kaart laadt nu niet. De lijst klopt wel.',
       google:'Open in Google Maps', copyAddr:'Kopieer adressen', photo:function(a,l){ return 'Foto: ' + a + ', ' + l; },
       more:'Meer info', approxPin:'bij benadering', mapLabel:'Kaart', listLabel:'Locaties',
-      good:'gunstig', bad:'ongunstig', flat:'gelijk', target:function(p, t){ return p + ' van doel ' + t; }, limit:function(p, t){ return p + ' van budget ' + t; }, over:function(d, t){ return d + ' boven budget ' + t; },
+      good:'gunstig', bad:'ongunstig', flat:'gelijk', target:function(p, t){ return p + ' van het doel van ' + t; }, limit:function(p, t){ return p + ' van het budget van ' + t; }, over:function(d, t){ return d + ' boven het budget van ' + t; },
       today:'Vandaag', milestone:'Mijlpaal', tlLabel:'Planning', pick:'Kies een balk voor de details.'},
     en:{search:'Search table', showAll:function(n){ return 'Show all ' + n + ' rows'; }, total:'Total',
       count:function(a,b){ return a + ' of ' + b + ' rows'; }, empty:'No rows', noMatch:'No rows found',
@@ -60,6 +60,21 @@
   function T(key){ var v = (TEXT[LANG] || TEXT.nl)[key]; var args = Array.prototype.slice.call(arguments, 1); return typeof v === 'function' ? v.apply(null, args) : v; }
   function h(tag, cls, text){ var e = document.createElement(tag); if(cls) e.className = cls; if(text != null) e.textContent = String(text); return e; }
   function fmt(v, type, decimals){ return K.formatValue(v, type, decimals, LANG); }
+  // The target bar already states the goal or budget: a note that only repeats it is dropped.
+  function noteRepeatsTarget(note, target){
+    if(target === null || target === undefined || !isFinite(target)) return false;
+    var want = String(Math.round(Math.abs(target)));
+    if(want.length < 3) return false;
+    var nums = String(note).match(/\d[\d.,\s\u00a0\u202f]*\d|\d/g) || [];
+    for(var i = 0; i < nums.length; i++){
+      var n = nums[i].replace(/[\s\u00a0\u202f]/g, '');
+      var whole = n.replace(/[.,]\d{1,2}$/, '').replace(/[.,]/g, '');
+      if(whole === want) return true;
+      var k = n.match(/^(\d+)(?:[.,](\d+))?$/);
+      if(k && /\bk\b|duizend|thousand/i.test(note) && String(Math.round(parseFloat(k[1] + '.' + (k[2] || '0')) * 1000)) === want) return true;
+    }
+    return false;
+  }
 
   // ── Bridge ──────────────────────────────────────────────────────────────
   function deepFreeze(o){
@@ -741,7 +756,7 @@
         pill.append(arrow, document.createTextNode(K.kpiDeltaText(it, LANG)), h('span', 'k-sr', ', ' + T(tone === 'good' ? 'good' : tone === 'bad' ? 'bad' : 'flat')));
         meta.appendChild(pill);
       }
-      if(it.note) meta.appendChild(h('span', 'k-kpi-note', LANG === 'nl' ? String(it.note).replace(/(\d[\d.,]*)\s*(euro|eur)\b/gi, '€ $1') : it.note));
+      if(it.note && !noteRepeatsTarget(it.note, it.target)) meta.appendChild(h('span', 'k-kpi-note', LANG === 'nl' ? String(it.note).replace(/(\d[\d.,]*)\s*(euro|eur)\b/gi, '€ $1') : it.note));
       if(meta.childNodes.length) tile.appendChild(meta);
       if(it.target !== null){
         var target = h('div', 'k-target' + (it.over ? ' is-over' : it.met ? ' is-met' : ''));

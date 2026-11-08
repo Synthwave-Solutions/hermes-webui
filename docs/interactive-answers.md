@@ -97,7 +97,7 @@ block: only a body that starts with `{` is data.
   with `deltaFormat: "number"`) that is green or red by `good` (`up` by
   default, `down` for costs and churn) and also carries an arrow, the sign
   and a spoken "gunstig" or "ongunstig", an optional note and a thin bar
-  toward `target` ("92% van doel € 20.000"). The export has Label, Waarde,
+  toward `target` ("92% van het doel van € 20.000"; a note that only repeats the target is left out). The export has Label, Waarde,
   Verandering and Doel.
 - **Timeline:** a Gantt with a label column (owner and status under the
   label) and one track per item. `start` and `end` are dates (YYYY-MM-DD, or
