@@ -554,14 +554,24 @@ def serve(handler, parsed) -> bool:
     return True
 
 
+# Data blocks come first: for tables, charts and places they beat model code.
+PROMPT_DATA = """
+WebUI data blocks:
+- For data, write a fenced block that holds only JSON; the chat draws it in the theme, sortable and downloadable, and runs none of your code. ```table: more than 6 rows, or when the user will sort, filter or copy (```csv also works). ```chart: trends, rankings or shares. ```map: real places, addresses, customer visits or a trip.
+- Shapes: table {"title", "columns":["Naam", {"label":"Omzet", "type":"currency"}], "rows":[["Bakkerij Jansen", 1200]], "sort"?, "total"?}; chart {"title", "type":"bar|hbar|stacked|line|area|pie|donut", "labels":[], "series":[{"name", "data":[]}], "format"?:"number|currency|percent", "highlight"?}; map {"title", "kind":"places|route", "places":[{"name", "address", "time"?, "note"?}], "photos"?}. Every block may add "subtitle", "source", and "example":true for illustrative figures.
+- Numbers are JSON numbers, never formatted text: set the column type or the chart format and the chat formats them (percent: 12.5 means 12,5%). Every row and series has exactly one value per column or label.
+- Use only figures and places from the conversation or tools. Give real addresses; add lat and lng only when a tool or the user supplied them. Never put travel times, distances or opening hours in a block unless a tool returned them. Set photos:true only for landmarks.
+- At most one data block per reply; tables of up to 6 rows stay markdown. Always add one or two sentences outside the block with the takeaway.
+""".strip()
+
 PROMPT = """
 WebUI interactive answers:
-- A fenced block with the info string interactive-ui renders as a live mini app (HTML, CSS, JavaScript) inside your reply. Use it only when trying things out beats reading: a calculator or what-if model with the user's numbers, a chart of real data from the conversation or tools, a comparison with filters or weights, a plan or timeline to explore, a map. Also when the user asks for something interactive, a dashboard, calculator or simulation. Otherwise answer in text, a markdown table or one mermaid diagram. At most one per reply. For a follow-up, answer in text unless the user asks to change the app.
+- A fenced block with the info string interactive-ui renders as a live mini app (HTML, CSS, JavaScript) inside your reply. Use it only when trying things out beats reading: a calculator, what-if model or simulation with the user's numbers, or custom interaction that no data block offers. Also when the user asks for something interactive, a calculator or simulation. Otherwise answer in text, a markdown table, a data block or one mermaid diagram. At most one per reply. For a follow-up, answer in text unless the user asks to change the app.
 - Order: <!-- title: Short title --> and <!-- height: 420 --> (expected height in px), then one <style>, then readable markup with real labels and default results, then <script> tags last. Markup shows while streaming; scripts run when the block is complete, after the page has loaded, so run setup code directly (DOMContentLoaded and load are replayed, but do not rely on them). Never close the block early; keep it under 25 KB.
 - Scripts: plain inline scripts or <script src> from cdn.jsdelivr.net, unpkg.com, cdnjs.cloudflare.com or esm.sh only; anything else is removed. No Tailwind, Bootstrap, jQuery or font links: write plain CSS. Use addEventListener in the script rather than onclick attributes. Classic scripts cannot use top-level await or import; for modules use <script type="module"> with bare imports three, d3, gsap, chart.js or leaflet. No fetch to other hosts, no document.write, no alert, confirm or prompt; storage is temporary. Put all data inline.
 - Layout: the frame grows to its content, so never size anything to 100vh, height:100% or innerHeight; give charts a fixed-height container (Chart.js with maintainAspectRatio:false inside a div of e.g. 260px). It must work at 360 px wide.
 - Look: the frame already follows the chat theme. Use only the variables --sw-fg, --sw-strong, --sw-muted, --sw-surface, --sw-surface-2, --sw-border, --sw-accent, --sw-accent-soft, --sw-good, --sw-bad and the chart palette synthwave.theme.palette (in canvas use synthwave.theme.fg, muted and border). Never hardcode colours, greys, white or black, and never set a body background. Ready classes: .card .grid .row .stack .stat(.label .value) .badge .chip .bar .note, button.primary.
-- Maps: Leaflet with tiles https://tile.openstreetmap.org/{z}/{x}/{y}.png and the tileLayer option referrerPolicy:'origin' (without it the tiles are refused), credit OpenStreetMap.
+- Maps: for places use a map data block. Only a custom map (areas, a heatmap) belongs here: Leaflet with tiles https://tile.openstreetmap.org/{z}/{x}/{y}.png and the tileLayer option referrerPolicy:'origin' (without it the tiles are refused), credit OpenStreetMap.
 - Follow-ups: a button may call synthwave.sendPrompt("...") with the chosen values; the user confirms it before it is sent. synthwave.onTheme(cb) fires on a theme switch, redraw charts there.
 - Content: labels in the user's language, Dutch number and currency format for Dutch users (Intl.NumberFormat('nl-NL')), real numbers, assumptions labelled as examples in the app itself. Always add one or two sentences outside the block with the takeaway.
 - Reply suggestions: only when your reply ends by offering a choice between two or three concrete next steps, end it with a fenced block with the info string suggestions, one option per line, each a short reply in the user's own voice and language (at most 8 words, no numbering), for example "Werk scenario B uit". They show as buttons under your latest reply, so do not also list those options in the text. Never add them when the user has to supply information (names, numbers, dates), after a task is done, for drafts meant to be sent elsewhere, or when an interactive-ui block already offers buttons. Most replies have none.
@@ -595,4 +605,4 @@ def enabled(config_data=None) -> bool:
 
 
 def prompt_block(config_data=None) -> str:
-    return PROMPT if enabled(config_data) else ""
+    return PROMPT_DATA + "\n\n" + PROMPT if enabled(config_data) else ""

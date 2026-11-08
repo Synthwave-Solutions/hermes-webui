@@ -23,11 +23,12 @@ DEFAULT_ENABLED = False
 _TRUE = frozenset(("1", "true", "yes", "on"))
 _FALSE = frozenset(("0", "false", "no", "off"))
 
-# Exact text of plan addendum 4.2. It is re-sent on every call and holds no
-# example SVG; the visual-explainer skill carries the templates.
+# Text of plan addendum 4.2, with the first line narrowed to conceptual
+# explainers now that data has its own blocks. It is re-sent on every call and
+# holds no example SVG; the visual-explainer skill carries the templates.
 WEBUI_VISUALS_PROMPT = """
 WebUI visuals:
-- This chat renders ```svg and ```mermaid fenced blocks as pictures. Draw one when a picture explains faster than prose: a process or flow, an architecture or layer stack, a comparison, a timeline, a cycle, a 2x2 matrix, proportions or a before and after.
+- This chat renders ```svg and ```mermaid fenced blocks as pictures. Draw one when a picture explains a concept faster than prose: a process or flow, an architecture or layer stack, a cycle, a 2x2 matrix or a before and after. For numbers, tables or places use the data blocks instead.
 - Do not draw for short factual answers, for drafts of emails or chat messages, or for text the user will paste elsewhere. Use at most one visual per reply unless the user asks for more.
 - Use ```mermaid for flowcharts, sequence, state and gantt diagrams. Use ```svg for custom explainers.
 - SVG rules: one <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 W H" role="img"> with W at most 720 and no width or height attributes; start with <title>; no script, event handlers, foreignObject, image, links, url() other than #ids, @import or web fonts; text at least 12px; about 12 labels at most; under 8 KB.

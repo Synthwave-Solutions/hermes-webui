@@ -385,3 +385,24 @@ def test_kit_assets_load_in_order():
     assert "'./static/interactive-ui/kit-core.js' + VQ" in SW and "'./static/interactive_ui_map.js' + VQ" in SW
     assert "iframe.setAttribute('sandbox','allow-scripts');" in MODULE
     assert "if(e.origin!=='null') return;" in MODULE
+
+
+def test_data_prompt_appears_once_before_the_interactive_block(isolated_prompt):
+    text = _prompt({})
+    assert text.count("WebUI data blocks:") == 1
+    assert interactive_ui.PROMPT_DATA in text
+    assert text.index("WebUI data blocks:") < text.index(HEADER)
+    assert "WebUI data blocks:" not in _prompt({"webui_interactive_ui": False})
+
+
+def test_data_prompt_names_the_rules_within_its_budget():
+    text = interactive_ui.PROMPT_DATA
+    assert not re.search(LONG_DASHES, text)
+    assert len(text.split()) <= 260
+    for phrase in ("```table", "```chart", "```map", "```csv", "JSON numbers", "lat and lng only when a tool or the user supplied them",
+                   "Never put travel times, distances or opening hours", "photos:true only for landmarks",
+                   "At most one data block per reply", "takeaway"):
+        assert phrase in text, phrase
+    # The interactive-ui line now points data to these blocks.
+    assert "a chart of real data" not in interactive_ui.PROMPT
+    assert "calculator, what-if model or simulation" in interactive_ui.PROMPT
