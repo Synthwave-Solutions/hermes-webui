@@ -21,7 +21,7 @@
     pb_intro: 'Hoe wij processen uitvoeren met de Super Agent: stap voor stap, met screenshots en opnames.',
     new_pb: 'Nieuw playbook', search: 'Zoek in playbooks', steps: 'stappen', media: 'media', draft: 'Concept', published: 'Gepubliceerd',
     empty_pb: 'Nog geen playbooks. Maak er een, of laat de Super Agent er een schrijven vanuit een gebouwde use case.',
-    title: 'Titel', summary: 'Samenvatting', trigger: 'Wanneer gebruik je dit?', visibility: 'Zichtbaar voor', v_org: 'Hele organisatie', v_team: 'Alleen het team', v_private: 'Alleen ik',
+    title: 'Titel', summary: 'Samenvatting', trigger: 'Wanneer gebruik je dit?', visibility: 'Zichtbaar voor', category: 'Categorie', no_category: 'Zonder categorie', no_team: 'Zonder team', group_by: 'Groeperen', g_category: 'Categorie', g_team: 'Team', g_none: 'Geen', all_categories: 'Alle categorieën', v_org: 'Hele organisatie', v_team: 'Alleen het team', v_private: 'Alleen ik',
     publish: 'Publiceren', unpublish: 'Terug naar concept', save: 'Opslaan', saved: 'Opgeslagen', back: 'Alle playbooks', add_step: 'Stap toevoegen',
     step_title: 'Stap', actor: 'Wie', text: 'Wat doe je precies?', add_image: 'Screenshot', record_screen: 'Schermopname', record_voice: 'Spraaknotitie', stop_rec: 'Stop opname',
     recording: 'Opname loopt… maximaal 2 minuten', media_note: 'Opnames en afbeeldingen blijven binnen SynthPulse en zijn alleen zichtbaar voor wie dit playbook mag zien.',
@@ -40,7 +40,7 @@
     pb_intro: 'How we run processes with the Super Agent: step by step, with screenshots and recordings.',
     new_pb: 'New playbook', search: 'Search playbooks', steps: 'steps', media: 'media', draft: 'Draft', published: 'Published',
     empty_pb: 'No playbooks yet. Create one, or let the Super Agent write one from a built use case.',
-    title: 'Title', summary: 'Summary', trigger: 'When do you use this?', visibility: 'Visible to', v_org: 'Whole organisation', v_team: 'Team only', v_private: 'Only me',
+    title: 'Title', summary: 'Summary', trigger: 'When do you use this?', visibility: 'Visible to', category: 'Category', no_category: 'No category', no_team: 'No team', group_by: 'Group by', g_category: 'Category', g_team: 'Team', g_none: 'None', all_categories: 'All categories', v_org: 'Whole organisation', v_team: 'Team only', v_private: 'Only me',
     publish: 'Publish', unpublish: 'Back to draft', save: 'Save', saved: 'Saved', back: 'All playbooks', add_step: 'Add step',
     step_title: 'Step', actor: 'Who', text: 'What exactly do you do?', add_image: 'Screenshot', record_screen: 'Screen recording', record_voice: 'Voice note', stop_rec: 'Stop recording',
     recording: 'Recording… at most 2 minutes', media_note: 'Recordings and images stay inside SynthPulse and are visible only to those who may see this playbook.',
@@ -59,7 +59,8 @@
   const STATUSES = ['idea', 'chosen', 'design', 'built', 'live', 'parked'];
   const BLOCK = { task: 'Geplande taak', skill: 'Skill', bot: 'Bot', human: 'Mens', connection: 'Koppeling', custom: 'Maatwerk' };
 
-  const L = { runMode: null, body: null, tab: '', teams: [], items: [], team: '', status: '', pbs: [], q: '', pb: null, poll: null, rec: null, removedItem: null };
+  const L = { cat: '', group: (() => { try { return localStorage.getItem('sp-pb-group') || 'category'; } catch (_e) { return 'category'; } })(),
+    runMode: null, body: null, tab: '', teams: [], items: [], team: '', status: '', pbs: [], q: '', pb: null, poll: null, rec: null, removedItem: null };
   const teamName = k => (L.teams.find(t => t.key === k) || {}).name || '';
   const mediaUrl = (pb, f) => '/api/studio/media?pb=' + encodeURIComponent(pb) + '&f=' + encodeURIComponent(f);
 
@@ -111,18 +112,34 @@
 
   // ── Playbooks list ─────────────────────────────────────────────────────────
   async function loadPlaybooks(){ try { L.pbs = (await call('/api/studio/playbooks')).playbooks || []; } catch (e) { toast(errMsg(e)); L.pbs = []; } }
+  function pbCard(p){
+    return `<button type="button" class="pb-card" data-pb-open="${H(p.id)}">
+          <span class="pb-cover">${p.cover ? `<img src="${H(mediaUrl(p.id, p.cover))}" alt="" loading="lazy">` : '<span class="pb-cover-icon" aria-hidden="true">📘</span>'}</span>
+          <span class="pb-body"><span class="pb-title">${H(p.title)}</span><span class="om-small om-muted pb-summary">${H(p.summary || '')}</span>
+          <span class="om-chips">${L.group !== 'team' && p.team ? `<span class="om-chip">${H(teamName(p.team) || p.team)}</span>` : ''}${L.group !== 'category' && p.category ? `<span class="om-chip">${H(p.category)}</span>` : ''}<span class="om-chip">${p.steps} ${H(w('steps'))}</span>${p.media ? `<span class="om-chip">${p.media} ${H(w('media'))}</span>` : ''}${p.stats && p.stats.complete ? `<span class="om-chip">${p.stats.complete}× · ${H(w('avg'))} ${p.stats.avg_minutes ?? '·'} ${H(w('min'))}</span>` : ''}<span class="om-badge ${p.status === 'published' ? 'ok' : ''}">${H(w(p.status === 'published' ? 'published' : 'draft'))}</span></span></span>
+        </button>`;
+  }
   function paintPlaybooks(){
     const q = L.q.toLowerCase();
-    const rows = L.pbs.filter(p => (!L.team || p.team === L.team) && (!q || (p.title + ' ' + (p.summary || '')).toLowerCase().includes(q)));
+    const rows = L.pbs.filter(p => (!L.team || p.team === L.team) && (!L.cat || (p.category || '') === L.cat) && (!q || (p.title + ' ' + (p.summary || '') + ' ' + (p.category || '')).toLowerCase().includes(q)));
+    const cats = [...new Set(L.pbs.map(p => p.category).filter(Boolean))].sort();
+    const keyOf = p => L.group === 'team' ? (teamName(p.team) || (p.team ? p.team : w('no_team'))) : L.group === 'category' ? (p.category || w('no_category')) : '';
+    const groups = new Map();
+    for (const p of rows) { const k = keyOf(p); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(p); }
+    const last = k => k === w('no_category') || k === w('no_team');
+    const ordered = [...groups.entries()].sort((a, b) => last(a[0]) - last(b[0]) || a[0].localeCompare(b[0]));
+    let open = {}; try { open = JSON.parse(localStorage.getItem('sp-pb-open') || '{}') || {}; } catch (_e) {}
+    const grid = list => `<div class="pb-grid">${list.map(pbCard).join('')}</div>`;
     L.body.innerHTML = `<p class="om-intro">${H(w('pb_intro'))}</p>
       <div class="bl-filters"><input class="om-select pb-search" type="search" data-pb-q value="${H(L.q)}" placeholder="${H(w('search'))}" aria-label="${H(w('search'))}">
         <select class="om-select" data-pb-team><option value="">${H(w('all_teams'))}</option>${L.teams.map(t => `<option value="${H(t.key)}" ${L.team === t.key ? 'selected' : ''}>${H(t.name)}</option>`).join('')}</select>
+        ${cats.length ? `<select class="om-select" data-pb-cat><option value="">${H(w('all_categories'))}</option>${cats.map(c => `<option value="${H(c)}" ${L.cat === c ? 'selected' : ''}>${H(c)}</option>`).join('')}</select>` : ''}
+        <div class="om-seg" role="group" aria-label="${H(w('group_by'))}">${['category', 'team', 'none'].map(g => `<button type="button" aria-pressed="${L.group === g}" data-pb-group="${g}">${H(w('g_' + g))}</button>`).join('')}</div>
         <button type="button" class="sm-btn primary" data-pb-new style="margin-left:auto">${H(w('new_pb'))}</button></div>
-      ${rows.length ? `<div class="pb-grid">${rows.map(p => `<button type="button" class="pb-card" data-pb-open="${H(p.id)}">
-          <span class="pb-cover">${p.cover ? `<img src="${H(mediaUrl(p.id, p.cover))}" alt="" loading="lazy">` : '<span class="pb-cover-icon" aria-hidden="true">📘</span>'}</span>
-          <span class="pb-body"><span class="pb-title">${H(p.title)}</span><span class="om-small om-muted">${H(p.summary || '')}</span>
-          <span class="om-chips">${p.team ? `<span class="om-chip">${H(teamName(p.team) || p.team)}</span>` : ''}<span class="om-chip">${p.steps} ${H(w('steps'))}</span>${p.media ? `<span class="om-chip">${p.media} ${H(w('media'))}</span>` : ''}${p.stats && p.stats.complete ? `<span class="om-chip">${p.stats.complete}× · ${H(w('avg'))} ${p.stats.avg_minutes ?? '·'} ${H(w('min'))}</span>` : ''}<span class="om-badge ${p.status === 'published' ? 'ok' : ''}">${H(w(p.status === 'published' ? 'published' : 'draft'))}</span></span></span>
-        </button>`).join('')}</div>` : `<div class="om-empty"><p>${H(w('empty_pb'))}</p><div class="om-actions"><button type="button" class="sm-btn primary" data-pb-new>${H(w('new_pb'))}</button></div></div>`}`;
+      ${!rows.length ? `<div class="om-empty"><p>${H(w('empty_pb'))}</p><div class="om-actions"><button type="button" class="sm-btn primary" data-pb-new>${H(w('new_pb'))}</button></div></div>`
+        : L.group === 'none' ? grid(rows)
+        : `<div class="pb-groups">${ordered.map(([k, list]) => { const id = L.group + ':' + k; return `<details class="pb-group" data-pb-gopen="${H(id)}" ${open[id] === false ? '' : 'open'}>
+            <summary><span class="om-chev" aria-hidden="true"></span><strong>${H(k)}</strong><span class="om-side-count">${list.length}</span></summary>${grid(list)}</details>`; }).join('')}</div>`}`;
   }
 
   // ── One playbook ───────────────────────────────────────────────────────────
@@ -181,6 +198,7 @@
         <label class="om-field wide">${H(w('summary'))}<textarea data-pb-f="summary" rows="2">${H(pb.summary || '')}</textarea></label>
         <label class="om-field wide">${H(w('trigger'))}<input data-pb-f="trigger" value="${H(pb.trigger || '')}"></label>
         <label class="om-field">${H(w('team'))}<select data-pb-f="team"><option value="">${H(w('none'))}</option>${L.teams.map(t => `<option value="${H(t.key)}" ${pb.team === t.key ? 'selected' : ''}>${H(t.name)}</option>`).join('')}</select></label>
+        <label class="om-field">${H(w('category'))}<input data-pb-f="category" list="pbCategories" maxlength="60" value="${H(pb.category || '')}"><datalist id="pbCategories">${[...new Set(L.pbs.map(p => p.category).filter(Boolean))].sort().map(c => `<option value="${H(c)}">`).join('')}</datalist></label>
         <label class="om-field">${H(w('visibility'))}<select data-pb-f="visibility">${['org', 'team', 'private'].map(v => `<option value="${v}" ${pb.visibility === v ? 'selected' : ''}>${H(w('v_' + v))}</option>`).join('')}</select></label>
       </div>
       ${linkHtml ? `<p>${H(w('links'))}: ${linkHtml}</p>` : ''}
@@ -208,7 +226,7 @@
   async function savePb(extra, quiet){
     const pb = collectPb();
     try {
-      L.pb = await post('/api/studio/playbook', Object.assign({ id: pb.id, title: pb.title, summary: pb.summary, trigger: pb.trigger, team: pb.team, visibility: pb.visibility, steps: pb.steps }, extra || {}));
+      L.pb = await post('/api/studio/playbook', Object.assign({ id: pb.id, title: pb.title, summary: pb.summary, trigger: pb.trigger, team: pb.team, category: pb.category || '', visibility: pb.visibility, steps: pb.steps }, extra || {}));
       if (!quiet) toast(w('saved'));
     } catch (e) { toast(errMsg(e)); }
     paintPlaybook();
@@ -267,15 +285,23 @@
       if (el.hasAttribute('data-bl-filter-team')) { L.team = el.value; paintBacklog(); return; }
       if (el.hasAttribute('data-bl-filter-status')) { L.status = el.value; paintBacklog(); return; }
       if (el.hasAttribute('data-pb-team')) { L.team = el.value; paintPlaybooks(); return; }
+      if (el.hasAttribute('data-pb-cat')) { L.cat = el.value; paintPlaybooks(); return; }
       if (el.hasAttribute('data-bl-status')) { const id = el.closest('[data-bl]').dataset.bl; try { await post('/api/studio/backlog', { id, status: el.value }); } catch (e) { toast(errMsg(e)); } await loadBacklog(); paintBacklog(); return; }
       if (el.dataset.pbDone !== undefined && L.runMode) { const i = Number(el.dataset.pbDone); if (el.checked) L.runMode.done.add(i); else L.runMode.done.delete(i); el.closest('.pb-step').classList.toggle('done', el.checked); return; }
       if (el.dataset.pbFile !== undefined && el.files && el.files[0]) { await addMedia(Number(el.dataset.pbFile), el.files[0]); }
     });
+    root.addEventListener('toggle', ev => {
+      const d = ev.target;
+      if (!d || !d.dataset || !d.dataset.pbGopen) return;
+      let open = {}; try { open = JSON.parse(localStorage.getItem('sp-pb-open') || '{}') || {}; } catch (_e) {}
+      open[d.dataset.pbGopen] = d.open; try { localStorage.setItem('sp-pb-open', JSON.stringify(open)); } catch (_e) {}
+    }, true);
     root.addEventListener('input', ev => { if (ev.target.hasAttribute('data-pb-q')) { L.q = ev.target.value; const pos = ev.target.selectionStart; paintPlaybooks(); const q = L.body.querySelector('[data-pb-q]'); if (q) { q.focus(); q.setSelectionRange(pos, pos); } } });
     root.addEventListener('click', async ev => {
       const b = ev.target.closest('button');
       if (!b || !L.body || !L.body.contains(b)) return;
       const li = b.closest('[data-bl]');
+      if (b.dataset.pbGroup) { L.group = b.dataset.pbGroup; try { localStorage.setItem('sp-pb-group', L.group); } catch (_e) {} paintPlaybooks(); return; }
       if (b.dataset.blMove && li) { const ids = L.items.filter(i => (!L.team || i.team === L.team) && (!L.status || i.status === L.status)).map(i => i.id); const k = ids.indexOf(li.dataset.bl); const t = k + Number(b.dataset.blMove); if (t >= 0 && t < ids.length) { [ids[k], ids[t]] = [ids[t], ids[k]]; await saveOrder(ids); const nb = L.body.querySelector(`[data-bl="${li.dataset.bl}"] [data-bl-move="${b.dataset.blMove}"]`); if (nb && !nb.disabled) nb.focus(); } return; }
       if (b.hasAttribute('data-bl-remove') && li) {
         const item = L.items.find(i => i.id === li.dataset.bl);

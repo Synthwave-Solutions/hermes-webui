@@ -254,7 +254,7 @@ def playbooks_for(view) -> list[dict]:
         if _pb_visible(view, pb):
             media = sum(len(s.get("media") or []) for s in pb.get("steps") or [])
             cover = next((m for s in pb.get("steps") or [] for m in s.get("media") or [] if m.get("kind") == "image"), None)
-            out.append({k: pb.get(k) for k in ("id", "title", "summary", "team", "owner", "status", "visibility", "updated_at", "trigger")}
+            out.append({k: pb.get(k) for k in ("id", "title", "summary", "team", "category", "owner", "status", "visibility", "updated_at", "trigger")}
                        | {"steps": len(pb.get("steps") or []), "media": media, "cover": cover and cover.get("file"),
                           "links": pb.get("links") or {}, "stats": run_stats(pb)})
     return sorted(out, key=lambda r: -(r.get("updated_at") or 0))
@@ -272,7 +272,7 @@ def save_playbook(view, body: dict) -> dict:
                   "visibility": "org", "steps": [], "links": {}}
         if "title" in body or not pb_id:
             pb["title"] = _txt(body.get("title"), 120) or pb.get("title") or "Nieuw playbook"
-        for key, limit in (("summary", 600), ("trigger", 200)):
+        for key, limit in (("summary", 600), ("trigger", 200), ("category", 60)):
             if key in body:
                 pb[key] = _txt(body.get(key), limit)
         if "team" in body:

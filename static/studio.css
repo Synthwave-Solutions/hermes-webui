@@ -236,3 +236,14 @@ main.main.showing-studio>#mainStudio{display:flex;flex-direction:column;overflow
 .bl-secondary{display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap;transition:opacity .15s}
 @media (hover:hover){.bl-item .bl-secondary{opacity:0}.bl-item:hover .bl-secondary,.bl-item:focus-within .bl-secondary{opacity:1}}
 @media (max-width:900px){[data-st-conv-toggle]{display:none!important}#mainStudio .main-view-header{flex-wrap:wrap;gap:8px}.st-crumb-input{width:52vw}.st-team-pick{margin-left:0}}
+/* Playbooks grouped per category or team */
+.pb-groups{display:flex;flex-direction:column;gap:14px}
+.pb-group{border:1px solid var(--border);border-radius:calc(var(--sp-radius-lg) + 4px);background:color-mix(in srgb,var(--surface) 55%,transparent);padding:0 16px}
+.pb-group>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:14px 4px;font-size:15px}
+.pb-group>summary::-webkit-details-marker{display:none}
+.pb-group>summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:10px}
+.pb-group>summary strong{color:var(--strong,var(--text))}
+.pb-group>summary .om-side-count{margin-left:4px;font-size:12px;color:var(--muted);padding:2px 8px;border-radius:999px;background:var(--surface-subtle,rgba(127,127,127,.1))}
+.pb-group[open]>summary .om-chev{transform:rotate(90deg)}
+.pb-group>.pb-grid{padding:0 0 16px}
+.pb-summary{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}

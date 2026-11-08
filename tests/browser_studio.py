@@ -162,7 +162,7 @@ def main() -> int:
             # 1. from the org chart into Studio for the team
             assert page.locator('.rail [data-panel="studio"]').is_visible()
             hub(page, "chart")
-            page.locator('.om-team-card[data-om-team="finance/debiteuren"]').click()
+            page.locator('[data-om-team="finance/debiteuren"]').click()
             page.locator('[data-om-new-automation="finance/debiteuren"]').click()
             page.wait_for_selector("#mainStudio .st-stepper", timeout=15000)
             assert page.locator("[data-st-team]").input_value() == "finance/debiteuren"
@@ -311,15 +311,27 @@ def main() -> int:
             page.wait_for_timeout(2500)
             page.locator('[data-pb-rec="voice:1"]').click()
             page.wait_for_selector(".pb-step[data-pb-step='1'] .pb-media audio", timeout=15000)
+            page.locator('[data-pb-f="category"]').fill("Debiteurenbeheer")
             page.locator("[data-pb-publish]").click()
             page.wait_for_timeout(800)
             pbs = ctx.request.get("/api/studio/playbooks").json()["playbooks"]
             pbrow = next(x for x in pbs if x["title"].startswith("Zo verwerk"))
             assert pbrow["status"] == "published" and pbrow["media"] == 2 and pbrow["team"] == "finance/debiteuren", pbrow
+            assert pbrow["category"] == "Debiteurenbeheer", pbrow
             media_ok = ctx.request.get(f"/api/studio/media?pb={pbrow['id']}&f={pbrow['cover']}")
             assert media_ok.ok and media_ok.headers.get("content-type", "").startswith("image/"), media_ok.status
             page.screenshot(path=str(art / "09-playbook-editor.png"), full_page=True)
             ok("Playbook written by the agent from the use case; screenshot and voice note added; published for the team")
+            hub(page, "playbooks")
+            page.wait_for_selector('.pb-group[data-pb-gopen="category:Debiteurenbeheer"] .pb-card', timeout=10000)
+            page.locator('[data-pb-group="team"]').click()
+            page.wait_for_selector('.pb-group[data-pb-gopen="team:Debiteuren"] .pb-card', timeout=10000)
+            page.locator('.pb-group[data-pb-gopen="team:Debiteuren"] > summary').click()
+            assert not page.locator('.pb-group[data-pb-gopen="team:Debiteuren"] .pb-card').is_visible()
+            page.locator('[data-pb-group="category"]').click()
+            ok("Playbooks group by category or team in collapsible groups")
+            page.locator('.pb-group[data-pb-gopen="category:Debiteurenbeheer"] [data-pb-open]').first.click()
+            page.wait_for_selector(".pb-step-title", timeout=10000)
 
             # run it, with the clock, and try a step's prompt in the chat
             page.locator("[data-pb-run]").click()
@@ -350,9 +362,9 @@ def main() -> int:
 
             # the team's playbooks in the organisation chart
             hub(page, "chart")
-            page.wait_for_selector('.om-team-card[data-om-team="finance/debiteuren"]', timeout=10000)
+            page.wait_for_selector('[data-om-team="finance/debiteuren"]', timeout=10000)
             if not page.locator(".om-drawer").count():
-                page.locator('.om-team-card[data-om-team="finance/debiteuren"]').click()
+                page.locator('[data-om-team="finance/debiteuren"]').click()
             page.wait_for_selector(f'[data-om-open-pb="{pbrow["id"]}"]', timeout=10000)
             page.locator(f'[data-om-open-pb="{pbrow["id"]}"]').click()
             page.wait_for_selector(".pb-step-title, .pb-read", timeout=10000)

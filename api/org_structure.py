@@ -8,7 +8,8 @@ document under the WebUI state directory, layered on top of the policy:
 
 * departments of the policy (client installations) appear read-only by key
   and name; extra departments can be added here (that is how HQ gets any);
-* teams always live here, each under one department key;
+* teams always live here, each under one department key, optionally under a
+  parent team of the same department (sub-teams);
 * people carry an optional title and ``reports_to``.
 
 Who may see and change what
@@ -369,6 +370,7 @@ def snapshot(view: ViewScope, data: dict | None = None, policy=None) -> dict:
             "lead": norm_email(team.get("lead")),
             "members": sorted({norm_email(m) for m in team.get("members") or [] if norm_email(m)}),
             "chat_space": team.get("chat_space") or "",
+            "parent": team.get("parent") or "",
             "editable": view.edits_team(key, team),
         }
         if view.sees_money:
@@ -509,6 +511,23 @@ def apply(view: ViewScope, body: dict) -> dict:
                 team["members"] = clean
             if "hourly_rate" in body:
                 team["hourly_rate"] = _rate(body.get("hourly_rate"))
+            if "parent" in body:
+                parent = str(body.get("parent") or "")
+                if parent:
+                    if parent == key:
+                        raise ValueError("A team cannot sit under itself")
+                    above = data["teams"].get(parent)
+                    if not above:
+                        raise KeyError("Parent team not found")
+                    if above.get("department") != dept:
+                        raise ValueError("A sub-team stays in the department of its parent")
+                    cursor, seen = parent, set()
+                    while cursor and cursor not in seen:
+                        if cursor == key:
+                            raise ValueError("This would put the team under itself")
+                        seen.add(cursor)
+                        cursor = (data["teams"].get(cursor) or {}).get("parent") or ""
+                team["parent"] = parent
             if "chat_space" in body:
                 space = str(body.get("chat_space") or "").strip()
                 if space and not re.fullmatch(r"spaces/[A-Za-z0-9_-]{4,64}", space):
@@ -527,6 +546,9 @@ def apply(view: ViewScope, body: dict) -> dict:
             if not view.edits_team(key, team):
                 raise PermissionError("You do not administer this department")
             data["teams"].pop(key)
+            for child in data["teams"].values():
+                if isinstance(child, dict) and child.get("parent") == key:
+                    child["parent"] = team.get("parent") or ""
             detail = {"team": key}
         elif op == "member.move":
             email = norm_email(body.get("email"))
