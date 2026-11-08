@@ -3,8 +3,8 @@
 A reply can contain a small live app: calculators, what-if models,
 simulations or 3D. The agent writes a fenced block with the info string
 `interactive-ui`; the chat shows it as a card with the app inside. Tables,
-charts and maps are data blocks instead (see below): the agent only writes
-JSON and the chat draws it.
+charts, maps, headline figures and plans are data blocks instead (see
+below): the agent only writes JSON and the chat draws it.
 
 ## What the user sees
 
@@ -50,12 +50,13 @@ frame only accepts messages from its parent's origin and renders nothing when
 opened on its own. Nothing a widget sends acts for the user by itself: prompts
 need the host's Send button, copying needs a recent click.
 
-## Data blocks: tables, charts and maps
+## Data blocks: tables, charts, maps, KPIs and timelines
 
 For data the agent does not write code. It writes a fenced block that holds
-only JSON (```` ```table ````, ```` ```chart ````, ```` ```map ````, or the Dutch
-```` ```tabel ````, ```` ```grafiek ````, ```` ```kaart ````) or plain CSV
-(```` ```csv ````). A ```` ```chart ```` that holds JavaScript stays a code
+only JSON (```` ```table ````, ```` ```chart ````, ```` ```map ````,
+```` ```kpi ```` (also `kpis`, `kpi-row`), ```` ```timeline ````, or the Dutch
+```` ```tabel ````, ```` ```grafiek ````, ```` ```kaart ````, ```` ```tijdlijn ````,
+```` ```planning ````) or plain CSV (```` ```csv ````). A ```` ```chart ```` that holds JavaScript stays a code
 block: only a body that starts with `{` is data.
 
 - **Checking:** `static/interactive-ui/kit-core.js` (`SWKit.build`) reads the
@@ -90,6 +91,27 @@ block: only a body that starts with `{` is data.
   for places without a position, "Open in Google Maps", "Kopieer adressen"
   and, for a route, "Opnieuw afspelen". When tiles do not load the list stays
   with "De kaart laadt nu niet. De lijst klopt wel."
+- **KPI:** one to eight tiles side by side (two on a phone): the label, one
+  big number in the block's language (millions written short, "1,3 mln."),
+  a pill with the change ("+12,5%", "+0,4 pp" for a percentage, "€ -800"
+  with `deltaFormat: "number"`) that is green or red by `good` (`up` by
+  default, `down` for costs and churn) and also carries an arrow, the sign
+  and a spoken "gunstig" or "ongunstig", an optional note and a thin bar
+  toward `target` ("92% van doel € 20.000"). The export has Label, Waarde,
+  Verandering and Doel.
+- **Timeline:** a Gantt with a label column (owner and status under the
+  label) and one track per item. `start` and `end` are dates (YYYY-MM-DD, or
+  a month YYYY-MM) or unit numbers (`unit`: day, week or month; week 1 starts
+  on the block's `start`); `end` is included. Bars are green for done,
+  accent for doing, red for risk and grey for todo; milestones are diamonds;
+  a red line marks `today` (a unit number or a date; a plan with dates and no
+  `today` uses the browser's date, and the line only shows inside the
+  range). Clicking a bar, or its label, or pressing Enter on it (arrow keys
+  move between bars) writes its period, owner, status and note in a status
+  line; the choice is kept per tab. Under 480 px the chart becomes a stacked
+  list: label, period, then a slim full-width bar with today marked. The
+  export has Onderdeel, Start, Einde, Eigenaar, Status, Mijlpaal and
+  Notitie.
 - **Menu:** "Download als CSV" (`;`, decimal comma, UTF-8 BOM, as sorted and
   filtered), "Kopieer als tabel" (for Excel or Sheets), "Downloaden" (a
   standalone page) and, for developers, "Gegevens bekijken". There is no
@@ -139,8 +161,8 @@ dashboard, map) and the quality bar.
   switch, renderer seams, parser (Node, `tests/interactive_ui_parse.cjs`).
 - `tests/test_interactive_kits.py` with `tests/interactive_kits.cjs`: the kit
   helpers in Node (valid, fixable and fatal fixtures per kind, CSV quoting,
-  Dutch numbers, exports, the lat/lng swap, the fence seam) and the
-  renderer's DOM rules.
+  Dutch numbers, exports, the lat/lng swap, KPI deltas and the timeline axis,
+  the fence seam) and the renderer's DOM rules.
 - `tests/test_map_resolve.py`: the endpoint with a mocked network
   (User-Agent, spacing across threads, no redirects, PDOK parsing, cache
   times, limits, the Commons license gate, geocoder off, no addresses in logs).
@@ -150,8 +172,10 @@ dashboard, map) and the quality bar.
   follow-ups that keep the user's draft, kept settings after a re-render,
   automatic prompts never sent, theme sync, isolation, plain errors with repair,
   reload, narrow layout; then data blocks (table, csv, chart, map with stubbed
-  tiles and the geocoder off) with screenshots at desktop and 390 px, dark
-  and light.
+  tiles and the geocoder off, kpi tiles with delta colours, a timeline with
+  status colours, the today line, click and keyboard details and the
+  stacked list at 390 px) with screenshots at desktop and 390 px, dark and
+  light.
 
 The approach follows CopilotKit's Open Generative UI and Open Intelligent UI
 (MIT); no code from those projects is included.
