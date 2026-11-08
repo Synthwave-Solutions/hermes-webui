@@ -314,16 +314,24 @@
       const row = { key: c.key, type: c.type, status: 'ok', ref: c.name, at: Date.now() / 1000 };
       try {
         if (c.type === 'bot') {
-          const name = ('studio-' + slug(c.name)).slice(0, 60);
+          // A short suffix keeps the profile id unique: a deleted profile leaves a
+          // tombstone that blocks reusing the same id.
+          const name = ('studio-' + slug(c.name)).slice(0, 54) + '-' + Math.random().toString(36).slice(2, 6);
           await post('/api/bots/builder', { name, title: c.name, description: c.description || '', skills: [], mcp_servers: [], cli_tools: [], allowed_users: [], allowed_groups: [], default_model: '', model_provider: '',
             system_prompt: `${c.instructions || c.description || c.name}\n\nJe bent gemaakt in Studio voor de use case "${doc.title}". Je verstuurt nooit zelf iets naar anderen; je maakt concepten en vraagt eerst.` });
           botSlugs[slug(c.name)] = name;
           if (doc.team) {
-            try {
-              const list = await call('/api/profiles?fast=1');
-              const prof = ((list && list.profiles) || []).find(p => p.name === name) || {};
-              await post('/api/profile/appearance', { name, revision: prof.bot_revision || 0, bot: { serves: [doc.team], kind: 'bot' } });
-            } catch (_e) {}
+            // The builder may finish creating the profile home a moment later.
+            let placed = false;
+            for (let attempt = 0; attempt < 8 && !placed; attempt++) {
+              try {
+                const list = await call('/api/profiles?fast=1');
+                const prof = ((list && list.profiles) || []).find(p => p.name === name) || {};
+                await post('/api/profile/appearance', { name, revision: prof.bot_revision || 0, bot: { serves: [doc.team], kind: 'bot' } });
+                placed = true;
+              } catch (_e) { await new Promise(r => setTimeout(r, 1000)); }
+            }
+            if (!placed) row.error = 'Team niet gezet; kies het in de bot-editor';
           }
           row.ref = 'bot ' + name;
         } else if (c.type === 'task') {

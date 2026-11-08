@@ -237,9 +237,9 @@ def main() -> int:
             assert job.get("enabled") is False, job.get("enabled")
             assert job["value"]["before_minutes"] == 60 and job["value"]["team"] == "finance/debiteuren", job.get("value")
             assert (job.get("schedule") or {}).get("expr", job.get("schedule_display")) in ("0 9 * * 1",) or "9" in str(job.get("schedule")), job.get("schedule")
-            assert job.get("assigned_bot") == "studio-debiteuren-bot", job.get("assigned_bot")
+            assert str(job.get("assigned_bot") or "").startswith("studio-debiteuren-bot-"), job.get("assigned_bot")
             bots = ctx.request.get("/api/profiles?fast=1").json().get("profiles") or []
-            bot = next(b for b in bots if b["name"] == "studio-debiteuren-bot")
+            bot = next(b for b in bots if b["name"] == job["assigned_bot"])
             assert (bot.get("bot") or {}).get("serves") == ["finance/debiteuren"], bot.get("bot")
             skill = home / "skills" / "studio" / "aanmaning-opstellen" / "SKILL.md"
             assert skill.is_file() and "studio_use_case" in skill.read_text(), skill

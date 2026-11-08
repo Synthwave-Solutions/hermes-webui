@@ -936,7 +936,9 @@
     box.innerHTML = `<span class="om-chip-text">⏱ ${H(text)}</span>${final ? `<span class="om-badge confirmed">${H(w('label_confirmed'))}</span>` : `<button type="button" class="sm-btn" data-om-chip-yes>${H(w('yes'))}</button>`}<button type="button" class="sm-btn" data-om-chip-edit>${H(w('chip_wrong'))}</button>`;
   }
   async function refreshChip(){
-    const sid = (window.S && S.session && S.session.session_id) || '';
+    // S is the app's global state (a script-level binding, not a window property).
+    const state = typeof S !== 'undefined' ? S : null;
+    const sid = (state && state.session && state.session.session_id) || '';
     if (sid === C.sid) return;
     C.sid = sid; C.data = null; C.editing = false; paintChip();
     if (!sid) return;

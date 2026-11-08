@@ -353,7 +353,8 @@ def main() -> int:
             assert ctx.request.post("/api/value/chat", data={"session_id": "chat1", "duty": "Aanmaningen opstellen"}).status in (403, 404)
             page.evaluate("async () => { await switchPanel('chat'); }")
             page.wait_for_timeout(500)
-            page.evaluate("() => { window.S = window.S || {}; S.session = Object.assign({}, S.session || {}, {session_id: 'chat2'}); }")
+            assert page.evaluate("() => typeof window.S") == "undefined"  # the app's S is not a window property
+            page.evaluate("() => { S.session = Object.assign({}, S.session || {}, {session_id: 'chat2'}); }")
             page.wait_for_selector("#omChatValue:not([hidden]) .om-chip-text", timeout=10000)
             chip = page.locator("#omChatValue").inner_text()
             assert "Aanmaningen opstellen" in chip and "25 min" in chip, chip
