@@ -142,6 +142,42 @@ Nominatim as `email`) and `webui_map_tiles` (a tile URL template or
 are best effort under their usage policies; a tenant with heavy use should
 point `webui_map_tiles` at its own tile server.
 
+## Questions form
+
+When the agent needs a few answers before it can go on, it writes a fenced
+block with only JSON: ```` ```form ```` (also `vraag`, `vragen`,
+`questions`). Shape: `{"title"?, "intro"?, "fields":[{"id", "label",
+"type":"choice|multi|text|number|slider|date|yesno", "options"?, "min"?,
+"max"?, "step"?, "unit"?, "default"?, "required"?, "placeholder"?}],
+"submit"?}`; at most 8 questions and 12 options each, text answers up to 500
+characters. A body that does not start with `{` or `[` stays a code block.
+
+- **Drawn by the chat itself**, not in a frame: `static/interactive_ui.js`
+  builds the card from the checked JSON with `textContent` only, so every
+  click is a real click of the user. Choices are pills, `multi` are toggles,
+  a slider shows its value as it moves ("7 uur"), yes/no is two pills,
+  numbers take Dutch notation ("5.000", "€ 7.500,50") with the unit around
+  the box ("€ ... per maand"). Required questions carry a `*` and are
+  checked on Versturen ("Vul dit nog in.", "Nog 2 vragen in te vullen.").
+- **Checking** fixes what it can (a bare list or a single question, a string
+  as an open question, aliases such as `dropdown`, `getal`, `ja-nee`,
+  duplicate or extra options, swapped min and max, a default that does not
+  fit, a slider without a range) and keeps the fixes as warnings. When no
+  question is usable the card says "Deze vragen konden niet worden getoond."
+  with "Laat repareren", which sends the reason in a `[View report]` block.
+- **Sending:** Versturen composes a plain message in the block's language,
+  for example `Mijn antwoorden:\n- Budget: € 5.000 per maand\n- Start: 1
+  december`, and sends it through the same path as the reply chips: while a
+  reply is running it waits, and a draft in the message box is never
+  overwritten. Unanswered optional questions are left out.
+- **After sending** the card locks and lists the answers in a muted style
+  with "Verstuurd". A form under an older reply is shown answered: the
+  answers come from this tab's memory or are read back from the next user
+  message; otherwise it says "Het gesprek is verder gegaan." Only the form
+  under the latest reply can be used.
+- **While the reply streams** one quiet line ("Vragen worden klaargezet")
+  stands in for the block; the JSON is never shown.
+
 ## Agent side
 
 `api/interactive_ui.prompt_block` adds the contract to the WebUI runtime
@@ -163,6 +199,9 @@ dashboard, map) and the quality bar.
   helpers in Node (valid, fixable and fatal fixtures per kind, CSV quoting,
   Dutch numbers, exports, the lat/lng swap, KPI deltas and the timeline axis,
   the fence seam) and the renderer's DOM rules.
+- `tests/form_block.cjs` (run by `tests/test_interactive_ui.py`): the form
+  fences, checks and fixes, the composed message in Dutch and English, the
+  answers read back, the submit checks and the textContent-only rule.
 - `tests/test_map_resolve.py`: the endpoint with a mocked network
   (User-Agent, spacing across threads, no redirects, PDOK parsing, cache
   times, limits, the Commons license gate, geocoder off, no addresses in logs).
@@ -175,7 +214,8 @@ dashboard, map) and the quality bar.
   tiles and the geocoder off, kpi tiles with delta colours, a timeline with
   status colours, the today line, click and keyboard details and the
   stacked list at 390 px) with screenshots at desktop and 390 px, dark and
-  light.
+  light; and a questions form (quiet while streaming, required checks, the
+  kept draft, the sent answer, locked after sending and after a reload).
 
 The approach follows CopilotKit's Open Generative UI and Open Intelligent UI
 (MIT); no code from those projects is included.

@@ -262,6 +262,13 @@ def test_parser_in_node():
     assert "all parser checks passed" in result.stdout
 
 
+@pytest.mark.skipif(NODE is None, reason="node is not installed")
+def test_form_block_in_node():
+    result = subprocess.run([NODE, str(REPO / "tests" / "form_block.cjs")], capture_output=True, text=True, timeout=60)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "all form checks passed" in result.stdout
+
+
 # ── Data blocks: the kit frame ──────────────────────────────────────────────
 
 class _Request(_Handler):
