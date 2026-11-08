@@ -246,11 +246,11 @@
 
   function statsRow(sum){
     sum = sum || {};
-    return `<span class="om-mini">${STAT_KEYS.map(([k, l]) => `<span class="om-mini-stat" title="${H(w(l))}${k === 'connections' ? ' · ' + H(w('s_conn_hint')) + ((sum.connection_names || []).length ? ': ' + H(sum.connection_names.join(', ')) : '') : ''}">${icon(k)}<b>${H(nf(0).format(sum[k] || 0))}</b></span>`).join('')}</span>`;
+    return `<span class="om-mini">${STAT_KEYS.map(([k, l]) => `<span class="om-mini-stat" title="${H(w(l))}${k === 'connections' ? ' · ' + H(w('s_conn_hint')) + ((sum.connection_names || []).length ? ': ' + H(sum.connection_names.join(', ')) : '') : ''}">${icon(k, 17)}<b>${H(nf(0).format(sum[k] || 0))}</b></span>`).join('')}</span>`;
   }
   function savedHtml(sum){
     const m = (sum || {}).saved_minutes || 0;
-    return `<span class="om-saved ${m ? '' : 'none'}" title="${H(w('s_saved'))} · ${H(w('s_saved_sub'))}">${icon('saved')}<b>${H(hrs(m))}</b></span>`;
+    return `<span class="om-saved ${m ? '' : 'none'}" title="${H(w('s_saved'))} · ${H(w('s_saved_sub'))}">${icon('saved', 17)}<b>${H(hrs(m))}</b></span>`;
   }
   function orgStripHtml(sum){
     sum = sum || {};

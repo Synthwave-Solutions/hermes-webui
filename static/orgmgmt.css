@@ -301,3 +301,10 @@ details[open]>summary .om-node-count{background:var(--accent-bg,rgba(0,157,255,.
 @media (max-width:760px){.om-strip{grid-template-columns:repeat(2,minmax(0,1fr))}.om-team-body{padding-left:18px}.om-mini-stat{padding:3px 7px}}
 @media (prefers-reduced-motion:reduce){.om-chev,.om-team{transition:none}}
 .om-team-edit{grid-template-columns:minmax(130px,1fr) minmax(140px,1.1fr) minmax(180px,1.6fr) minmax(130px,1fr) 80px auto}
+/* Larger stat pills (feedback 8 Nov) */
+.om-mini{gap:6px}
+.om-mini-stat{gap:7px;padding:7px 13px;font-size:14px}
+.om-mini-stat b{font-size:14.5px}
+.om-saved{gap:7px;padding:7px 15px;font-size:15px;min-width:96px}
+.om-team-open{min-height:36px!important;padding:0 16px!important;font-size:13px!important}
+@media (max-width:760px){.om-mini-stat{padding:5px 9px;font-size:13px}.om-saved{padding:5px 11px;font-size:13.5px;min-width:0}}
