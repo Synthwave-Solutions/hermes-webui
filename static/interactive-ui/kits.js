@@ -61,17 +61,19 @@
   function h(tag, cls, text){ var e = document.createElement(tag); if(cls) e.className = cls; if(text != null) e.textContent = String(text); return e; }
   function fmt(v, type, decimals){ return K.formatValue(v, type, decimals, LANG); }
   // The target bar already states the goal or budget: a note that only repeats it is dropped.
-  function noteRepeatsTarget(note, target){
+  function noteRepeatsTarget(note, target, value){
     if(target === null || target === undefined || !isFinite(target)) return false;
-    var want = String(Math.round(Math.abs(target)));
-    if(want.length < 3) return false;
+    var wants = [String(Math.round(Math.abs(target)))];
+    if(isFinite(value) && value !== target) wants.push(String(Math.round(Math.abs(value - target))));
+    wants = wants.filter(function(w){ return w.length >= 3; });
+    if(!wants.length) return false;
     var nums = String(note).match(/\d[\d.,\s\u00a0\u202f]*\d|\d/g) || [];
     for(var i = 0; i < nums.length; i++){
       var n = nums[i].replace(/[\s\u00a0\u202f]/g, '');
       var whole = n.replace(/[.,]\d{1,2}$/, '').replace(/[.,]/g, '');
-      if(whole === want) return true;
+      if(wants.indexOf(whole) >= 0) return true;
       var k = n.match(/^(\d+)(?:[.,](\d+))?$/);
-      if(k && /\bk\b|duizend|thousand/i.test(note) && String(Math.round(parseFloat(k[1] + '.' + (k[2] || '0')) * 1000)) === want) return true;
+      if(k && /\bk\b|duizend|thousand/i.test(note) && wants.indexOf(String(Math.round(parseFloat(k[1] + '.' + (k[2] || '0')) * 1000))) >= 0) return true;
     }
     return false;
   }
@@ -756,7 +758,7 @@
         pill.append(arrow, document.createTextNode(K.kpiDeltaText(it, LANG)), h('span', 'k-sr', ', ' + T(tone === 'good' ? 'good' : tone === 'bad' ? 'bad' : 'flat')));
         meta.appendChild(pill);
       }
-      if(it.note && !noteRepeatsTarget(it.note, it.target)) meta.appendChild(h('span', 'k-kpi-note', LANG === 'nl' ? String(it.note).replace(/(\d[\d.,]*)\s*(euro|eur)\b/gi, '€ $1') : it.note));
+      if(it.note && !noteRepeatsTarget(it.note, it.target, it.value)) meta.appendChild(h('span', 'k-kpi-note', LANG === 'nl' ? String(it.note).replace(/(\d[\d.,]*)\s*(euro|eur)\b/gi, '€ $1') : it.note));
       if(meta.childNodes.length) tile.appendChild(meta);
       if(it.target !== null){
         var target = h('div', 'k-target' + (it.over ? ' is-over' : it.met ? ' is-met' : ''));

@@ -3065,6 +3065,12 @@ def _title_language_mismatch(user_text: str, title: str) -> bool:
 
 
 def _title_prompts(user_text: str, assistant_text: str) -> tuple[str, list[str]]:
+    # Code and data blocks (apps, tables, charts) are not the topic: titling them
+    # gave names like "card stack AI productivity". Keep the prose around them.
+    prose = re.sub(r'```[\s\S]*?(?:```|$)', ' ', str(assistant_text or ''))
+    prose = re.sub(r'\s+', ' ', prose).strip()
+    if prose:
+        assistant_text = prose
     qa = f"User question:\n{user_text[:500]}\n\nAssistant answer:\n{assistant_text[:500]}"
     language_rule = _title_prompt_language_rule(user_text)
     prompts = [
