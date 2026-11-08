@@ -185,11 +185,142 @@ for (const url of ['http://tile.openstreetmap.org/{z}/{x}/{y}.png', 'https://evi
   assert.ok(!K.tileUrlOk(url), url);
 }
 
+// ── kpi ──────────────────────────────────────────────────────────────────────
+const kpi = build('kpi', {title: 'Kerncijfers oktober', lang: 'nl', source: 'Boekhouding', items: [
+  {label: 'MRR', value: 18400, format: 'currency', delta: 12.5, target: 20000, note: 't.o.v. september'},
+  {label: 'Churn', value: 2.1, format: 'percent', delta: 0.4, good: 'down'},
+  {label: 'Klanten', value: '1.234', delta: -3},
+  {label: 'Kosten', value: 9100, format: 'euro', delta: -800, deltaFormat: 'number', good: 'down', target: 10000},
+  {label: 'Pijplijn', value: 1250000, format: 'currency', delta: 0}]});
+assert.deepStrictEqual(kpi.errors, []);
+assert.deepStrictEqual(kpi.warnings, []);
+assert.strictEqual(kpi.title, 'Kerncijfers oktober');
+assert.deepStrictEqual(plain(kpi.spec.items.map(i => [i.format, i.deltaFormat, i.good, i.tone])), [
+  ['currency', 'percent', 'up', 'good'], ['percent', 'number', 'down', 'bad'], ['number', 'percent', 'up', 'bad'],
+  ['currency', 'number', 'down', 'good'], ['currency', 'percent', 'up', 'flat']], 'a percentage moves in points; down is good for costs');
+assert.strictEqual(kpi.spec.items[2].value, 1234, 'a Dutch number written as text is read');
+assert.strictEqual(kpi.spec.items[0].progress, 0.92);
+assert.strictEqual(kpi.spec.items[0].met, false);
+assert.strictEqual(kpi.spec.items[3].met, true, 'under budget meets a target when down is good');
+assert.deepStrictEqual(kpi.spec.items.map(i => K.kpiValueText(i, 'nl')), ['€ 18.400', '2,1%', '1.234', '€ 9.100', '€ 1,3 mln.']);
+assert.deepStrictEqual(kpi.spec.items.map(i => K.kpiDeltaText(i, 'nl')), ['+12,5%', '+0,4 pp', '-3%', '€ -800', '0%']);
+assert.deepStrictEqual(kpi.spec.items.slice(0, 2).map(i => K.kpiDeltaText(i, 'en')), ['+12.5%', '+0.4 pp']);
+assert.ok(kpi.estHeight > 100 && kpi.estHeight < 400, kpi.estHeight);
+assert.deepStrictEqual(plain(K.kitTable('kpi', kpi.spec)).header, ['Label', 'Waarde', 'Verandering', 'Doel']);
+assert.strictEqual(K.toCsv(K.kitTable('kpi', kpi.spec), {delimiter: ';', decimalComma: true}),
+  '﻿Label;Waarde;Verandering;Doel\r\nMRR;18400;12,5;20000\r\nChurn;2,1;0,4;\r\nKlanten;1234;-3;\r\nKosten;9100;-800;10000\r\nPijplijn;1250000;0;\r\n');
+assert.deepStrictEqual(plain(K.kitTable('kpi', build('kpi', {title: 'x', lang: 'en', items: [{label: 'a', value: 1}]}).spec)).header, ['Label', 'Value', 'Change', 'Target']);
+// Fixable: bad fields are dropped with a warning that names the figure.
+const kpiFix = build('kpi', {items: [
+  {label: 'Omzet', value: '€ 1.200', format: 'money', delta: 'veel', good: 'sideways', target: -5, deltaFormat: 'ratio', note: 'n'.repeat(100)},
+  {label: 'Leeg', value: 'n.v.t.'}, {value: 3}, 'los', ...Array.from({length: 8}, (_, i) => ({label: 'k' + i, value: i}))]});
+assert.deepStrictEqual(kpiFix.errors, []);
+for (const w of ['De titel ontbreekt.', '"Omzet" heeft een onbekend format "money"; gebruik number, currency of percent.',
+  'De verandering (delta) van "Omzet" is geen getal en is weggelaten.', '"Omzet" heeft good "sideways"; gebruik up of down. Nu geldt up.',
+  'Het doel (target) van "Omzet" is geen getal boven 0 en is weggelaten.', '"Omzet" heeft een onbekend deltaFormat "ratio"; gebruik percent of number.',
+  'De notitie van "Omzet" is ingekort tot 80 tekens.', '"Leeg" heeft geen getal als waarde (value) en is weggelaten.',
+  'Cijfer 3 heeft geen label en is weggelaten.', 'Cijfer 4 is geen object met label en value en is weggelaten.',
+  'Er zijn 12 cijfers; alleen de eerste 8 worden getoond.']) {
+  assert.ok(kpiFix.warnings.includes(w), w + ' in ' + JSON.stringify(kpiFix.warnings));
+}
+assert.strictEqual(kpiFix.spec.title, 'Kerncijfers');
+const omzet = kpiFix.spec.items[0];
+assert.deepStrictEqual([omzet.value, omzet.format, omzet.delta, omzet.good, omzet.target], [1200, 'currency', null, 'up', null], 'the euro sign sets the format');
+assert.ok(omzet.note.length <= 80);
+assert.strictEqual(kpiFix.spec.items.length, 5);
+// Fatal: nothing to show.
+assert.deepStrictEqual(build('kpi', {title: 'x', items: []}).errors, ['Er zijn geen cijfers (items).']);
+assert.deepStrictEqual(build('kpi', {title: 'x', items: [{label: 'a', value: 'veel'}]}).errors, ['Geen enkel cijfer heeft een label en een getal als waarde (value).']);
+assert.deepStrictEqual(build('kpi', {title: 'x', lang: 'en', items: 'MRR 18k'}).errors, ['There are no figures (items).']);
+
+// ── timeline ─────────────────────────────────────────────────────────────────
+const plan = build('timeline', {title: 'Uitrol', lang: 'nl', unit: 'week', start: '2026-11-09', today: 3, source: 'Projectplan', items: [
+  {label: 'Kick-off', start: 1, milestone: true, owner: 'Michaël'},
+  {label: 'Bouw', start: 2, end: 5, status: 'doing', owner: 'Senna', note: 'Twee sprints'},
+  {label: 'Acceptatietest', start: 6, end: 7, status: 'risk'},
+  {label: 'Ontwerp', start: 1, end: 2, status: 'klaar'},
+  {label: 'Training', start: 7, end: 7, status: 'todo'},
+  {label: 'Live', start: 8, milestone: true}]});
+assert.deepStrictEqual(plan.errors, []);
+assert.deepStrictEqual(plan.warnings, []);
+assert.strictEqual(plan.spec.mode, 'date');
+assert.deepStrictEqual(plain(plan.spec.items.map(i => [i.from, i.to, i.status, i.milestone])), [
+  ['2026-11-09', '2026-11-09', '', true], ['2026-11-16', '2026-12-13', 'doing', false], ['2026-12-14', '2026-12-27', 'risk', false],
+  ['2026-11-09', '2026-11-22', 'done', false], ['2026-12-21', '2026-12-27', 'todo', false], ['2026-12-28', '2026-12-28', '', true]],
+  'week 1 starts on "start" and end is included; Dutch status words are read');
+assert.deepStrictEqual(plan.spec.items.map(i => K.timelinePeriod(plan.spec, i, 'nl')),
+  ['9 nov 2026', '16 nov t/m 13 dec 2026', '14 dec t/m 27 dec 2026', '9 nov t/m 22 nov 2026', '21 dec t/m 27 dec 2026', '28 dec 2026']);
+assert.strictEqual(K.timelinePeriod(plan.spec, plan.spec.items[1], 'en'), '16 Nov to 13 Dec 2026');
+const axis = K.timelineAxis(plan.spec, 'nl', K.dayOf('2030-01-01'));
+assert.strictEqual(K.isoOf(axis.min), '2026-11-09');
+assert.strictEqual(K.isoOf(axis.max), '2027-01-04');
+assert.deepStrictEqual(axis.ticks.map(t => t.label), ['9 nov', '16 nov', '23 nov', '30 nov', '7 dec', '14 dec', '21 dec', '28 dec']);
+assert.deepStrictEqual(axis.ticks.map(t => t.minor), [false, true, false, true, false, true, false, true], 'every other label can hide on a narrow frame');
+assert.strictEqual(axis.todayX, 0.3125, 'today: 3 is the middle of week 3');
+assert.ok(plan.estHeight > 200 && plan.estHeight < 520, plan.estHeight);
+assert.deepStrictEqual(plain(K.kitTable('timeline', plan.spec).rows[1]), ['Bouw', '2026-11-16', '2026-12-13', 'Senna', 'Bezig', '', 'Twee sprints']);
+assert.deepStrictEqual(plain(K.kitTable('timeline', plan.spec).header), ['Onderdeel', 'Start', 'Einde', 'Eigenaar', 'Status', 'Mijlpaal', 'Notitie']);
+assert.ok(K.toCsv(K.kitTable('timeline', plan.spec)).includes('Kick-off;2026-11-09;2026-11-09;Michaël;;ja;\r\n'));
+// Unit numbers without a start date: an index axis; without "today" no line.
+const idx = build('timeline', {title: 'Sprints', lang: 'en', unit: 'weeks', items: [{label: 'A', start: 1, end: 3, status: 'done'}, {label: 'B', start: 4, end: 6}]});
+assert.deepStrictEqual(idx.warnings, []);
+assert.deepStrictEqual([idx.spec.mode, idx.spec.unit, idx.spec.todayAuto], ['index', 'week', false]);
+const idxAxis = K.timelineAxis(idx.spec, 'en', K.dayOf('2026-11-08'));
+assert.deepStrictEqual(idxAxis.ticks.map(t => t.label), ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6']);
+assert.strictEqual(idxAxis.todayX, null);
+assert.strictEqual(K.timelinePeriod(idx.spec, idx.spec.items[0], 'en'), 'Weeks 1 to 3');
+assert.strictEqual(K.timelinePeriod(idx.spec, idx.spec.items[0], 'nl'), 'Week 1 t/m 3');
+assert.deepStrictEqual(plain(K.kitTable('timeline', idx.spec).rows[0]), ['A', 1, 3, '', 'Done', '', '']);
+// Dates by month; a plan with dates and no "today" uses the browser's date.
+const months = build('timeline', {title: 'Roadmap', unit: 'month', items: [{label: 'Fase 1', start: '2026-11-03', end: '2027-02-10'}, {label: 'Fase 2', start: '2027-03', end: '2027-04'}]});
+assert.deepStrictEqual(plain(months.spec.items.map(i => [i.from, i.to])), [['2026-11-03', '2027-02-10'], ['2027-03-01', '2027-04-30']], 'a YYYY-MM end is the end of that month');
+assert.strictEqual(months.spec.todayAuto, true);
+const mAxis = K.timelineAxis(months.spec, 'nl', K.dayOf('2026-12-01') + 0.5);
+assert.deepStrictEqual(mAxis.ticks.map(t => t.label), ['nov 2026', 'dec', 'jan 2027', 'feb', 'mrt', 'apr']);
+assert.ok(mAxis.todayX > 0.16 && mAxis.todayX < 0.17, mAxis.todayX);
+assert.strictEqual(K.timelineAxis(months.spec, 'nl', K.dayOf('2031-01-01')).todayX, null, 'today outside the range draws no line');
+// Fixable: swapped ends, a missing end, unknown status and unit, numbers without a start date.
+const tlFix = build('timeline', {unit: 'fortnight', today: 'gisteren', items: [
+  {label: 'Terug', start: '2026-12-10', end: '2026-12-01', status: 'paars'}, {label: 'Los', start: 3},
+  {title: 'Alias', date: '2026-12-05'}, {start: 1, end: 2}, {label: 'Kapot', start: 'morgen'}, 7,
+  {label: 'L'.repeat(80), start: '2026-12-02', end: '2026-12-03', owner: 'O'.repeat(50)}]});
+assert.deepStrictEqual(tlFix.errors, []);
+for (const w of ['De titel ontbreekt.', 'Onbekende unit "fortnight"; gebruik day, week of month. Nu geldt week.',
+  'Bij "Terug" lag end voor start; die zijn omgedraaid.', '"Terug" heeft een onbekende status "paars"; gebruik todo, doing, done of risk.',
+  '"Los" heeft geen geldige end en is als mijlpaal getoond.', 'Onderdeel 4 heeft geen label en is weggelaten.',
+  '"Kapot" heeft geen geldige start (een getal of JJJJ-MM-DD) en is weggelaten.', 'Onderdeel 6 is geen object met label en start en is weggelaten.',
+  'today is geen getal of datum (JJJJ-MM-DD); de lijn voor vandaag is weggelaten.',
+  'Getallen bij start en end tellen vanaf de start van de planning; die ontbrak, dus is 2026-12-01 gebruikt.',
+  'Het label van onderdeel 7 is ingekort tot 60 tekens.']) {
+  assert.ok(tlFix.warnings.includes(w), w + ' in ' + JSON.stringify(tlFix.warnings));
+}
+assert.strictEqual(tlFix.spec.title, 'Planning');
+assert.deepStrictEqual(plain(tlFix.spec.items.map(i => [i.label.slice(0, 6), i.from, i.to, i.status, i.milestone])), [
+  ['Terug', '2026-12-01', '2026-12-10', 'todo', false], ['Los', '2026-12-15', '2026-12-15', '', true], ['Alias', '2026-12-05', '2026-12-05', '', true],
+  ['LLLLLL', '2026-12-02', '2026-12-03', '', false]]);
+assert.strictEqual(tlFix.spec.today, null);
+assert.strictEqual(tlFix.spec.todayAuto, false, 'an unreadable today is left out, not replaced by the browser date');
+assert.ok(tlFix.spec.items[3].owner.length <= 40);
+assert.ok(build('timeline', {title: 't', items: [{label: 'a', start: 1, end: 2}], today: '2026-11-08'}).warnings.includes(
+  'today is een datum, maar de onderdelen gebruiken getallen zonder start; de lijn voor vandaag is weggelaten.'));
+assert.strictEqual(build('timeline', {title: 't', items: Array.from({length: 25}, (_, i) => ({label: 'x' + i, start: i, end: i + 1}))}).spec.items.length, 20);
+assert.strictEqual(build('timeline', {title: 't', items: [{label: 'a', start: 0, end: 1}]}).spec.first, 0, 'a block that uses 0 counts from 0');
+assert.ok(build('timeline', {title: 't', start: '2026-13-01', items: [{label: 'a', start: 1, end: 2}]}).warnings.includes('De start van de planning is geen datum (JJJJ-MM-DD) en is genegeerd.'));
+// Fatal.
+assert.deepStrictEqual(build('timeline', {title: 'x', items: []}).errors, ['Er zijn geen onderdelen (items).']);
+assert.deepStrictEqual(build('timeline', {title: 'x', items: [{label: 'a', start: '30-02-2026'}, {label: 'b', start: -1}]}).errors,
+  ['Geen enkel onderdeel heeft een label en een geldige start (een getal of JJJJ-MM-DD).']);
+assert.deepStrictEqual(build('timeline', {title: 'x', lang: 'en', items: [{label: 'a'}]}).errors, ['No item has a label and a valid start (a number or YYYY-MM-DD).']);
+assert.ok(Number.isNaN(K.dayOf('2026-02-30')), 'impossible dates are not dates');
+
 // ── Streaming title and fence seam ───────────────────────────────────────────
 assert.strictEqual(K.streamingTitle('{"type":"bar","title":"Omzet \\"Q3\\"", "lab'), 'Omzet "Q3"');
 assert.strictEqual(K.streamingTitle('{"title":"Half'), '');
 assert.strictEqual(K.kitKind('Grafiek'), 'chart');
 assert.strictEqual(K.kitKind('constructor'), '', 'no inherited keys');
+for (const [lang, kind] of [['kpi', 'kpi'], ['KPIs', 'kpi'], ['kpi-row', 'kpi'], ['timeline', 'timeline'], ['tijdlijn', 'timeline'], ['Planning', 'timeline']]) {
+  assert.strictEqual(K.kitKind(lang), kind, lang);
+}
 
 const src = fs.readFileSync(path.join(__dirname, '..', 'static', 'interactive_ui.js'), 'utf8');
 const sandbox = {
@@ -209,6 +340,9 @@ assert.strictEqual(accepts('csv', 'a,b\n1,2'), true, 'csv is always a table');
 assert.strictEqual(accepts('csv', '   '), false);
 assert.strictEqual(accepts('json', '{"title":"x"}'), false);
 assert.strictEqual(accepts('constructor', '{}'), false);
+assert.strictEqual(accepts('kpi-row', '{"items":[]}'), true);
+assert.strictEqual(accepts('tijdlijn', '{"items":[]}'), true);
+assert.strictEqual(accepts('planning', '- Week 1: kick-off\n- Week 2: bouw'), false, 'a plain text plan stays text');
 sandbox.SWKit = undefined;
 assert.strictEqual(accepts('table', '{"title":"x"}'), false, 'without the kit helpers a data block stays code');
 

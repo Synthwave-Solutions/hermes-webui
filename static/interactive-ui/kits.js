@@ -1,4 +1,5 @@
-// Data blocks: the kit frame (shell plus the table, chart and map renderers).
+// Data blocks: the kit frame (shell plus the table, chart, map, kpi and
+// timeline renderers).
 //
 // Runs inside static/interactive-ui/kit.html, which api/interactive_ui.py
 // serves with its own CSP: `sandbox allow-scripts` (an opaque origin, no
@@ -41,7 +42,9 @@
       routeNote:'De lijn toont alleen de volgorde, niet de weg.', approx:'Sommige locaties zijn bij benadering.',
       unresolved:'Niet op de kaart gevonden', later:'Wordt nog opgezocht', tilesFail:'De kaart laadt nu niet. De lijst klopt wel.',
       google:'Open in Google Maps', copyAddr:'Kopieer adressen', photo:function(a,l){ return 'Foto: ' + a + ', ' + l; },
-      more:'Meer info', approxPin:'bij benadering', mapLabel:'Kaart', listLabel:'Locaties'},
+      more:'Meer info', approxPin:'bij benadering', mapLabel:'Kaart', listLabel:'Locaties',
+      good:'gunstig', bad:'ongunstig', flat:'gelijk', target:function(p, t){ return p + ' van doel ' + t; },
+      today:'Vandaag', milestone:'Mijlpaal', tlLabel:'Planning', pick:'Kies een balk voor de details.'},
     en:{search:'Search table', showAll:function(n){ return 'Show all ' + n + ' rows'; }, total:'Total',
       count:function(a,b){ return a + ' of ' + b + ' rows'; }, empty:'No rows', noMatch:'No rows found',
       sortHint:'Sort', view:'View', chart:'Chart', table:'Table',
@@ -50,7 +53,9 @@
       routeNote:'The line shows the order, not the road.', approx:'Some places are approximate.',
       unresolved:'Not found on the map', later:'Still being looked up', tilesFail:'The map does not load right now. The list is correct.',
       google:'Open in Google Maps', copyAddr:'Copy addresses', photo:function(a,l){ return 'Photo: ' + a + ', ' + l; },
-      more:'More info', approxPin:'approximate', mapLabel:'Map', listLabel:'Places'}
+      more:'More info', approxPin:'approximate', mapLabel:'Map', listLabel:'Places',
+      good:'favourable', bad:'unfavourable', flat:'unchanged', target:function(p, t){ return p + ' of target ' + t; },
+      today:'Today', milestone:'Milestone', tlLabel:'Timeline', pick:'Choose a bar for the details.'}
   };
   function T(key){ var v = (TEXT[LANG] || TEXT.nl)[key]; var args = Array.prototype.slice.call(arguments, 1); return typeof v === 'function' ? v.apply(null, args) : v; }
   function h(tag, cls, text){ var e = document.createElement(tag); if(cls) e.className = cls; if(text != null) e.textContent = String(text); return e; }
@@ -715,10 +720,162 @@
     };
   }
 
+  // ── KPI tiles ───────────────────────────────────────────────────────────
+  function renderKpi(box, spec){
+    var grid = h('div', 'k-kpi');
+    grid.setAttribute('role', 'list');
+    spec.items.forEach(function(it){
+      var tile = h('div', 'k-tile');
+      tile.setAttribute('role', 'listitem');
+      tile.appendChild(h('span', 'k-tile-label', it.label));
+      var value = h('span', 'k-tile-value', K.kpiValueText(it, LANG));
+      var full = fmt(it.value, it.format, it.decimals);
+      if(full !== value.textContent) value.title = full;
+      tile.appendChild(value);
+      var meta = h('div', 'k-tile-meta');
+      if(it.delta !== null){
+        var tone = it.tone || 'flat';
+        var pill = h('span', 'k-delta is-' + tone);
+        var arrow = h('span', 'k-delta-arrow', it.delta > 0 ? '▲' : it.delta < 0 ? '▼' : '●');
+        arrow.setAttribute('aria-hidden', 'true');
+        pill.append(arrow, document.createTextNode(K.kpiDeltaText(it, LANG)), h('span', 'k-sr', ', ' + T(tone === 'good' ? 'good' : tone === 'bad' ? 'bad' : 'flat')));
+        meta.appendChild(pill);
+      }
+      if(it.note) meta.appendChild(h('span', 'k-kpi-note', it.note));
+      if(meta.childNodes.length) tile.appendChild(meta);
+      if(it.target !== null){
+        var target = h('div', 'k-target' + (it.met ? ' is-met' : ''));
+        var bar = h('div', 'k-target-bar'), fill = h('span', 'k-target-fill');
+        fill.style.width = Math.round(it.progress * 1000) / 10 + '%';
+        bar.appendChild(fill);
+        bar.setAttribute('role', 'progressbar');
+        bar.setAttribute('aria-valuemin', '0'); bar.setAttribute('aria-valuemax', '100');
+        bar.setAttribute('aria-valuenow', String(Math.round(it.progress * 100)));
+        var pct = fmt(Math.round(it.value / it.target * 100), 'percent', 0);
+        var text = h('span', 'k-target-text', T('target', pct, fmt(it.target, it.format, it.decimals)));
+        bar.setAttribute('aria-label', text.textContent);
+        target.append(bar, text);
+        tile.appendChild(target);
+      }
+      grid.appendChild(tile);
+    });
+    box.appendChild(grid);
+    if(spec.source) box.appendChild(h('p', 'k-source', spec.source));
+    return {};
+  }
+
+  // ── Timeline (Gantt) ────────────────────────────────────────────────────
+  function localDay(){ var d = new Date(); return Math.round(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 864e5) + 0.5; }
+  function pct(x){ return Math.round(x * 100000) / 1000 + '%'; }
+  function renderTimeline(box, spec, view){
+    var axis = K.timelineAxis(spec, LANG, localDay());
+    var span = axis.max - axis.min;
+    var used = {};
+    spec.items.forEach(function(it){ if(it.status) used[it.status] = true; });
+    var wrap = h('div', 'k-tl');
+    var legend = h('div', 'k-tl-legend');
+    ['done', 'doing', 'todo', 'risk'].forEach(function(st){
+      if(!used[st]) return;
+      var s = h('span', 'k-tl-key'), sw = h('span', 'k-tl-swatch is-' + st);
+      s.append(sw, document.createTextNode(K.statusWord(st, LANG)));
+      legend.appendChild(s);
+    });
+    if(axis.todayX !== null){
+      var tk = h('span', 'k-tl-key'), tl = h('span', 'k-tl-swatch is-today');
+      tk.append(tl, document.createTextNode(T('today')));
+      legend.appendChild(tk);
+    }
+    if(legend.childNodes.length) wrap.appendChild(legend);
+
+    var chart = h('div', 'k-tl-chart');
+    chart.setAttribute('role', 'group');
+    chart.setAttribute('aria-label', T('tlLabel') + ': ' + spec.title);
+    var n = spec.items.length;
+    chart.style.gridTemplateRows = 'auto repeat(' + n + ', minmax(38px, auto))';
+    // Every cell has its own place: the overlay spans all rows of the track column.
+    var corner = h('div', 'k-tl-corner');
+    corner.style.gridArea = '1 / 1';
+    chart.appendChild(corner);
+    var axisEl = h('div', 'k-tl-axis');
+    axisEl.style.gridArea = '1 / 2';
+    axisEl.setAttribute('aria-hidden', 'true');
+    axis.ticks.forEach(function(t){
+      var tick = h('span', 'k-tl-tick' + (t.minor ? ' is-minor' : ''), t.label);
+      tick.style.left = pct(t.x);
+      axisEl.appendChild(tick);
+    });
+    chart.appendChild(axisEl);
+    var detail = h('p', 'k-tl-detail', T('pick'));
+    detail.setAttribute('role', 'status');
+    detail.setAttribute('aria-live', 'polite');
+    var bars = [];
+    spec.items.forEach(function(it, i){
+      var period = K.timelinePeriod(spec, it, LANG);
+      var word = K.statusWord(it.status, LANG);
+      var cell = h('div', 'k-tl-label');
+      cell.appendChild(h('span', 'k-tl-name', it.label));
+      var meta = [it.owner, word].filter(Boolean).join(' · ');
+      if(meta) cell.appendChild(h('span', 'k-tl-meta', meta));
+      cell.appendChild(h('span', 'k-tl-when', period));
+      var track = h('div', 'k-tl-track');
+      cell.style.gridArea = (i + 2) + ' / 1';
+      track.style.gridArea = (i + 2) + ' / 2';
+      var b = h('button', (it.milestone ? 'k-tl-ms' : 'k-tl-bar') + (it.status ? ' is-' + it.status : ' is-plain'));
+      b.type = 'button';
+      b.dataset.k = it.k;
+      b.setAttribute('aria-label', [it.label, period, it.milestone ? T('milestone') : '', word].filter(Boolean).join(', '));
+      b.setAttribute('aria-pressed', 'false');
+      var x0 = (it.s - axis.min) / span;
+      b.style.left = pct(x0);
+      if(!it.milestone) b.style.width = 'max(6px, ' + pct((it.e - it.s) / span) + ')';
+      b.addEventListener('click', function(){ select(i, false); });
+      b.addEventListener('keydown', function(e){
+        var to = e.key === 'ArrowDown' || e.key === 'ArrowRight' ? i + 1 : e.key === 'ArrowUp' || e.key === 'ArrowLeft' ? i - 1 : e.key === 'Home' ? 0 : e.key === 'End' ? n - 1 : -2;
+        if(to === -2) return;
+        e.preventDefault();
+        to = Math.max(0, Math.min(n - 1, to));
+        bars[to].focus();
+      });
+      track.appendChild(b);
+      if(axis.todayX !== null){ var now = h('span', 'k-tl-now'); now.style.left = pct(axis.todayX); now.setAttribute('aria-hidden', 'true'); track.appendChild(now); }
+      // The label selects too: on a phone the bar is a thin strip.
+      cell.addEventListener('click', function(){ select(i, false); });
+      chart.append(cell, track);
+      bars.push(b);
+    });
+    var overlay = h('div', 'k-tl-overlay');
+    overlay.setAttribute('aria-hidden', 'true');
+    overlay.style.gridRow = '1 / ' + (n + 2);
+    axis.lines.forEach(function(x){ var l = h('span', 'k-tl-line'); l.style.left = pct(x); overlay.appendChild(l); });
+    if(axis.todayX !== null){
+      var today = h('span', 'k-tl-today');
+      today.style.left = pct(axis.todayX);
+      today.appendChild(h('span', 'k-tl-today-label', T('today')));
+      overlay.appendChild(today);
+    }
+    chart.appendChild(overlay);
+    wrap.append(chart, detail);
+    if(spec.source) wrap.appendChild(h('p', 'k-source', spec.source));
+    box.appendChild(wrap);
+
+    function select(i, restore){
+      var it = spec.items[i];
+      if(!it) return;
+      bars.forEach(function(b, j){ b.setAttribute('aria-pressed', String(j === i)); b.classList.toggle('is-active', j === i); });
+      var parts = [it.label, K.timelinePeriod(spec, it, LANG), it.milestone ? T('milestone') : '', it.owner, K.statusWord(it.status, LANG), it.note];
+      detail.textContent = parts.filter(Boolean).join(' · ');
+      detail.classList.add('is-set');
+      if(!restore) saveState({a:i});
+      scheduleHeight(false);
+    }
+    if(typeof view.a === 'number' && view.a >= 0 && view.a < n) select(view.a, true);
+    return {};
+  }
+
   // ── Render ──────────────────────────────────────────────────────────────
   function render(msg){
     var kit = msg.kit, spec = msg.spec;
-    if(!spec || typeof spec !== 'object' || (kit !== 'table' && kit !== 'chart' && kit !== 'map')) return;
+    if(!spec || typeof spec !== 'object' || ['table', 'chart', 'map', 'kpi', 'timeline'].indexOf(kit) < 0) return;
     LANG = msg.lang === 'en' ? 'en' : 'nl';
     document.documentElement.lang = LANG;
     lastMsg = msg;
@@ -740,6 +897,10 @@
         current = renderTable(box, spec, view, {onChange:function(v){ saveState({s:v.s, q:v.q, all:!!v.all}); }});
       } else if(kit === 'chart'){
         current = renderChart(box, spec, {v:restore.v === 'table' ? 'table' : 'chart'});
+      } else if(kit === 'kpi'){
+        current = renderKpi(box, spec);
+      } else if(kit === 'timeline'){
+        current = renderTimeline(box, spec, {a:typeof restore.a === 'number' ? restore.a : -1});
       } else {
         current = renderMap(box, spec, {a:typeof restore.a === 'number' ? restore.a : -1}, api.data);
       }

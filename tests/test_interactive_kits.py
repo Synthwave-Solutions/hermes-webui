@@ -1,9 +1,10 @@
 """Data blocks: the shared kit helpers in Node and the renderer's DOM rules.
 
 ``tests/interactive_kits.cjs`` runs ``static/interactive-ui/kit-core.js``
-over valid, fixable and fatal fixtures for ```table, ```csv, ```chart and
-```map, Dutch numbers, CSV quoting, exports, the NL lat/lng swap and the
-fence seam in ``static/interactive_ui.js``. The browser behaviour is covered
+over valid, fixable and fatal fixtures for ```table, ```csv, ```chart,
+```map, ```kpi and ```timeline, Dutch numbers, CSV quoting, exports, the NL
+lat/lng swap, the timeline axis and periods, and the fence seam in
+``static/interactive_ui.js``. The browser behaviour is covered
 by ``tests/browser_interactive_ui.py`` (step 10).
 """
 
@@ -54,6 +55,19 @@ def test_renderers_never_write_markup_or_run_strings():
 def test_frame_accepts_only_kit_theme_and_measure_messages():
     handled = set(re.findall(r"msg\.type === '([a-z-]+)'", KITS))
     assert handled == {"theme", "kit", "measure"}, handled
+
+
+def test_kpi_and_timeline_carry_meaning_beyond_colour():
+    # A delta pill has an arrow and a sign plus a spoken "gunstig"/"ongunstig".
+    assert "h('span', 'k-sr', ', ' + T(tone === 'good' ? 'good' : tone === 'bad' ? 'bad' : 'flat'))" in KITS
+    assert "good:'gunstig', bad:'ongunstig'" in KITS
+    # Bars are real buttons with a spoken period; the detail line is a live status.
+    assert "detail.setAttribute('role', 'status');" in KITS
+    assert "b.setAttribute('aria-label', [it.label, period" in KITS
+    assert "e.key === 'ArrowDown'" in KITS
+    css = (REPO / "static" / "interactive-ui" / "kits.css").read_text(encoding="utf-8")
+    assert "@media (max-width:479px)" in css and ".k-tl-chart{display:flex;flex-direction:column}" in css
+    assert "text-transform" not in css and "letter-spacing" not in css, "calm labels: no uppercase tracking"
 
 
 def test_map_host_calls_the_endpoint_once_per_block():

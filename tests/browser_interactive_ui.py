@@ -12,11 +12,14 @@ that streams replies with ```interactive-ui blocks, then drives Chromium:
 7. a broken widget shows the error bar; repair sends a prompt;
 8. after a hard reload the card renders again from the transcript;
 9. narrow (mobile) layout;
-10. data blocks (```table, ```csv, ```chart, ```map) in the kit frame:
-    sorting, search, "Toon alle", CSV export, the chart/table switch kept
-    over a reload, map pins and route, the unresolved group, the status line
-    without moving the chat, and the note when tiles do not load. Map tiles and
-    Wikimedia are stubbed with page.route and the geocoder is off: no network.
+10. data blocks (```table, ```csv, ```chart, ```map, ```kpi, ```timeline) in
+    the kit frame: sorting, search, "Toon alle", CSV export, the chart/table
+    switch kept over a reload, map pins and route, the unresolved group, the
+    status line without moving the chat, the note when tiles do not load, KPI
+    tiles with delta colours and a target bar, a Gantt with status colours,
+    milestones, the today line, click and keyboard details, and the stacked
+    list at 390 px. Map tiles and Wikimedia are stubbed with page.route and the
+    geocoder is off: no network.
 
 Screenshots land in IUI_ARTIFACT_DIR (default: a temp dir, printed at the end).
 
@@ -91,12 +94,31 @@ MAP_SPEC = {"title": "Bezoekroute Amsterdam", "kind": "route", "subtitle": "Vrij
     {"name": "De Dam", "lat": 52.3731, "lng": 4.8926, "time": "13:00"},
     {"name": "Kantoor Haarlem", "address": "Stationsplein 1, Haarlem", "time": "15:00"},
 ]}
+KPI_SPEC = {"title": "Kerncijfers oktober", "lang": "nl", "source": "Boekhouding", "items": [
+    {"label": "MRR", "value": 18400, "format": "currency", "delta": 12.5, "target": 20000, "note": "t.o.v. september"},
+    {"label": "Churn", "value": 2.1, "format": "percent", "delta": 0.4, "good": "down"},
+    {"label": "Kosten", "value": 9100, "format": "currency", "delta": -800, "deltaFormat": "number", "good": "down"},
+    {"label": "Conversie", "value": 3.4, "format": "percent", "delta": 0},
+]}
+TIMELINE_SPEC = {"title": "Uitrol Junior AI", "lang": "nl", "unit": "week", "start": "2026-11-09", "today": 3, "source": "Projectplan", "items": [
+    {"label": "Kick-off", "start": 1, "milestone": True, "owner": "Michaël"},
+    {"label": "Ontwerp", "start": 1, "end": 2, "status": "done", "owner": "Yaser"},
+    {"label": "Bouw", "start": 2, "end": 5, "status": "doing", "owner": "Senna", "note": "Twee sprints"},
+    {"label": "Acceptatietest", "start": 6, "end": 7, "status": "risk", "owner": "Klant"},
+    {"label": "Training", "start": 7, "end": 7, "status": "todo"},
+    {"label": "Live", "start": 8, "milestone": True, "status": "todo"},
+]}
 DATA_TURNS = {
     "[tabel]": ["Hier zijn de klanten.\n\n```table\n", json.dumps(TABLE_SPEC, ensure_ascii=False, indent=1), "\n```\n\nBos 08 groeit het hardst."],
     "[csv]": ["Als CSV:\n\n```csv\n", CSV_BLOCK, "```\n\nEn als code:\n\n```chart\nnew Chart(ctx, {type: 'bar'});\n```\n"],
     "[grafiek]": ["De omzet per maand:\n\n```chart\n", json.dumps(CHART_SPEC, ensure_ascii=False), "\n```\n\nMaart sprong eruit."],
     "[kaart]": ["Je route:\n\n```map\n", json.dumps(MAP_SPEC, ensure_ascii=False), "\n```\n\nDrie stops liggen dicht bij elkaar."],
+    "[kpi]": ["De cijfers van oktober:\n\n```kpi\n", json.dumps(KPI_SPEC, ensure_ascii=False), "\n```\n\nDe MRR groeit, de churn loopt op."],
+    "[planning]": ["De planning:\n\n```timeline\n", json.dumps(TIMELINE_SPEC, ensure_ascii=False, indent=1), "\n```\n\nDe acceptatietest is het risico."],
 }
+
+# A theme colour as the browser resolves it (for comparing computed colours).
+PROBE = "v => { const e=document.createElement('span'); e.style.color='var('+v+')'; document.body.appendChild(e); const c=getComputedStyle(e).color; e.remove(); return c; }"
 
 
 def _png(width=256, height=256, rgb=(226, 230, 236)):
@@ -497,6 +519,79 @@ def data_blocks(page, ctx, gateway, art, base_runs):
     state["tiles"] = "stub"
     ok("map without tiles: calm note, list still there")
 
+    # 10g. kpi: tiles, delta pills coloured by which direction is good, a target bar
+    runs += 1
+    send_turn(page, gateway, "Laat de kerncijfers zien [kpi]", runs, "De MRR groeit, de churn loopt op.")
+    page.wait_for_function(LAST_READY, arg="kpi", timeout=30000)
+    card = page.locator(".iui-card.iui-kit--kpi:visible").last
+    assert card.locator(".iui-title").inner_text() == KPI_SPEC["title"]
+    frame = kit_frame_for(page, card)
+    frame.wait_for_selector(".k-tile", timeout=10000)
+    assert frame.locator(".k-tile").count() == 4
+    labels = frame.locator(".k-tile-label").all_inner_texts()
+    values = frame.locator(".k-tile-value").all_inner_texts()
+    assert labels == ["MRR", "Churn", "Kosten", "Conversie"], labels
+    assert values[0].replace("\u00a0", " ") == "€ 18.400" and values[1] == "2,1%", values
+    tones = frame.evaluate("() => [...document.querySelectorAll('.k-delta')].map(p => p.className.replace('k-delta ', ''))")
+    assert tones == ["is-good", "is-bad", "is-good", "is-flat"], tones
+    deltas = [t.replace("\u00a0", " ") for t in frame.evaluate("() => [...document.querySelectorAll('.k-delta')].map(p => p.childNodes[1].textContent)")]
+    assert deltas == ["+12,5%", "+0,4 pp", "€ -800", "0 pp"], deltas
+    good, bad = frame.evaluate(PROBE, "--sw-good"), frame.evaluate(PROBE, "--sw-bad")
+    colours = frame.evaluate("() => [...document.querySelectorAll('.k-delta')].map(p => getComputedStyle(p).color)")
+    assert colours[0] == good and colours[1] == bad and colours[2] == good and colours[3] not in (good, bad), (colours, good, bad)
+    assert frame.locator(".k-delta.is-bad .k-sr").text_content() == ", ongunstig"
+    fill = frame.evaluate("() => { const f=document.querySelector('.k-target-fill'); return f.getBoundingClientRect().width / f.parentElement.getBoundingClientRect().width; }")
+    assert abs(fill - 0.92) < 0.02, fill
+    assert frame.locator(".k-target-text").inner_text().replace("\u00a0", " ") == "92% van doel € 20.000"
+    assert frame.evaluate("() => getComputedStyle(document.querySelector('.k-tile-label')).textTransform") == "none"
+    card.scroll_into_view_if_needed()
+    time.sleep(0.5)
+    card.screenshot(path=str(art / "15-kpi-desktop-dark.png"))
+    ok(f"kpi: 4 tiles, values {values[:2]}, delta pills {tones} (good {good}, bad {bad}), target bar at {fill:.0%}")
+
+    # 10h. timeline: Gantt bars by status, milestones, the today line, click and keyboard details
+    runs += 1
+    send_turn(page, gateway, "Maak een planning [planning]", runs, "De acceptatietest is het risico.")
+    page.wait_for_function(LAST_READY, arg="timeline", timeout=30000)
+    card = page.locator(".iui-card.iui-kit--timeline:visible").last
+    assert card.locator(".iui-title").inner_text() == TIMELINE_SPEC["title"]
+    frame = kit_frame_for(page, card)
+    frame.wait_for_selector(".k-tl-bar", timeout=10000)
+    assert frame.locator(".k-tl-bar").count() == 4 and frame.locator(".k-tl-ms").count() == 2
+    ticks = frame.locator(".k-tl-tick").all_inner_texts()
+    assert ticks[0] == "9 nov" and "28 dec" in ticks, ticks
+    bar_colours = frame.evaluate("""() => Object.fromEntries(['done', 'doing', 'risk', 'todo'].map(s =>
+        [s, getComputedStyle(document.querySelector('.k-tl-bar.is-' + s)).backgroundColor]))""")
+    accent = frame.evaluate(PROBE, "--sw-accent")
+    assert bar_colours["done"] == good and bar_colours["risk"] == bad and bar_colours["doing"] == accent, (bar_colours, good, bad, accent)
+    assert bar_colours["todo"] not in (good, bad, accent), bar_colours
+    today_x = frame.evaluate("""() => { const t=document.querySelector('.k-tl-today').getBoundingClientRect();
+        const r=document.querySelector('.k-tl-track').getBoundingClientRect(); return (t.left + t.width / 2 - r.left) / r.width; }""")
+    assert abs(today_x - 0.3125) < 0.02, today_x
+    assert frame.locator(".k-tl-today-label").inner_text() == "Vandaag"
+    ms = frame.evaluate("() => getComputedStyle(document.querySelector('.k-tl-ms')).transform")
+    assert ms not in ("none", ""), "a milestone is a diamond"
+    detail = frame.locator(".k-tl-detail")
+    assert detail.get_attribute("role") == "status" and detail.inner_text() == "Kies een balk voor de details."
+    frame.locator(".k-tl-bar.is-doing").click()
+    text = detail.inner_text()
+    assert all(part in text for part in ("Bouw", "16 nov t/m 13 dec 2026", "Senna", "Bezig", "Twee sprints")), text
+    assert frame.locator(".k-tl-bar.is-doing").get_attribute("aria-pressed") == "true"
+    frame.locator(".k-tl-bar.is-doing").focus()
+    page.keyboard.press("ArrowDown")
+    assert frame.evaluate("() => document.activeElement.getAttribute('aria-label')").startswith("Acceptatietest")
+    page.keyboard.press("Enter")
+    assert "Acceptatietest" in detail.inner_text() and "Risico" in detail.inner_text(), detail.inner_text()
+    card.scroll_into_view_if_needed()
+    time.sleep(0.6)  # the selection is saved after a short debounce
+    card.screenshot(path=str(art / "16-timeline-desktop-dark.png"))
+    with page.expect_download() as dl:
+        menu_action(page, "Download als CSV", "Download as CSV", card=".iui-card.iui-kit--timeline")
+    lines = Path(dl.value.path()).read_bytes().decode("utf-8-sig").splitlines()
+    assert lines[0] == "Onderdeel;Start;Einde;Eigenaar;Status;Mijlpaal;Notitie", lines[0]
+    assert "Bouw;2026-11-16;2026-12-13;Senna;Bezig;;Twee sprints" in lines, lines
+    ok(f"timeline: 4 bars and 2 diamonds, status colours {bar_colours}, today line at {today_x:.3f}, click and ArrowDown plus Enter show the detail, CSV export")
+
     # 10e. after a reload the chart comes back in the table view the user chose
     page.reload(wait_until="domcontentloaded")
     page.wait_for_function("t => document.getElementById('messages') && document.getElementById('messages').innerText.includes(t)",
@@ -517,7 +612,7 @@ def data_blocks(page, ctx, gateway, art, base_runs):
         for theme in ("dark", "light"):
             page.evaluate(f"() => _applyTheme('{theme}')")
             time.sleep(0.6)
-            for kind in ("table", "chart", "map"):
+            for kind in ("table", "chart", "map", "kpi", "timeline"):
                 c = bring_ready(page, kind, first=kind == "table")
                 f = kit_frame_for(page, c)
                 f.wait_for_function(f"() => document.documentElement.getAttribute('data-theme') === '{theme}'", timeout=5000)
@@ -525,6 +620,18 @@ def data_blocks(page, ctx, gateway, art, base_runs):
                 overflow = c.evaluate("c => c.scrollWidth - c.clientWidth")
                 assert overflow <= 1, f"{kind} card overflows by {overflow}px at {width}px"
                 name = f"14-{kind}-{'mobile' if width < 600 else 'desktop'}-{theme}.png"
+                if width < 600 and kind == "timeline" and theme == "dark":
+                    stack = f.evaluate("""() => { const l=document.querySelector('.k-tl-label').getBoundingClientRect();
+                        const t=document.querySelector('.k-tl-track').getBoundingClientRect();
+                        return {axis: getComputedStyle(document.querySelector('.k-tl-axis')).display,
+                                when: getComputedStyle(document.querySelector('.k-tl-when')).display,
+                                now: getComputedStyle(document.querySelector('.k-tl-now')).display,
+                                below: t.top >= l.bottom - 1, wide: t.width >= document.querySelector('.k-tl').getBoundingClientRect().width - 2}; }""")
+                    assert stack == {"axis": "none", "when": "block", "now": "block", "below": True, "wide": True}, stack
+                    ok(f"timeline at {width}px: a stacked list (label, period, then a full-width bar with today marked)")
+                if width < 600 and kind == "kpi" and theme == "dark":
+                    tops = f.evaluate("() => [...document.querySelectorAll('.k-tile')].map(t => Math.round(t.getBoundingClientRect().top))")
+                    assert tops[0] == tops[1] and tops[2] > tops[0], tops
                 if width < 600:
                     # A phone shows the top of the card under the app bar.
                     c.evaluate("c => c.scrollIntoView({block: 'start'})")

@@ -28,9 +28,9 @@ _FALSE = frozenset(("0", "false", "no", "off"))
 # holds no example SVG; the visual-explainer skill carries the templates.
 WEBUI_VISUALS_PROMPT = """
 WebUI visuals:
-- This chat renders ```svg and ```mermaid fenced blocks as pictures. Draw one when a picture explains a concept faster than prose: a process or flow, an architecture or layer stack, a cycle, a 2x2 matrix or a before and after. For numbers, tables or places use the data blocks instead.
+- This chat renders ```svg and ```mermaid fenced blocks as pictures. Draw one when a picture explains a concept faster than prose: a process or flow, an architecture or layer stack, a cycle, a 2x2 matrix or a before and after. For numbers, tables, places, headline figures or plans use the data blocks instead.
 - Do not draw for short factual answers, for drafts of emails or chat messages, or for text the user will paste elsewhere. Use at most one visual per reply unless the user asks for more.
-- Use ```mermaid for flowcharts, sequence, state and gantt diagrams. Use ```svg for custom explainers.
+- Use ```mermaid for flowcharts, sequence and state diagrams. Use ```svg for custom explainers.
 - SVG rules: one <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 W H" role="img"> with W at most 720 and no width or height attributes; start with <title>; no script, event handlers, foreignObject, image, links, url() other than #ids, @import or web fonts; text at least 12px; about 12 labels at most; under 8 KB.
 - Colours: use currentColor and var(--sp-fg,#1f2937), var(--sp-muted,#6b7280), var(--sp-accent,#f97316), var(--sp-surface,#f3f4f6), var(--sp-border,#d1d5db) so the visual follows the light or dark theme. Never hardcode black or white text.
 - Write labels in the user's language and always add one sentence that states the takeaway, so the answer still works without the picture.

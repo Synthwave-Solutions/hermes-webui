@@ -1,7 +1,7 @@
 // Data blocks: the shared, pure part (no DOM).
 //
-// A reply may hold a fenced block with JSON (```table, ```chart, ```map and
-// their Dutch names) or a ```csv block. The chat never runs model code for
+// A reply may hold a fenced block with JSON (```table, ```chart, ```map,
+// ```kpi, ```timeline and their Dutch names) or a ```csv block. The chat never runs model code for
 // these: static/interactive_ui.js checks the block with SWKit.build() and
 // sends the cleaned spec to the kit frame (static/interactive-ui/kits.js),
 // which draws it with its own fixed code. This file is loaded by the chat and
@@ -13,16 +13,30 @@
 (function(root){
   'use strict';
 
-  const KIT_LANGS={table:'table',tabel:'table',csv:'table',chart:'chart',grafiek:'chart',map:'map',kaart:'map'};
+  const KIT_LANGS={table:'table',tabel:'table',csv:'table',chart:'chart',grafiek:'chart',map:'map',kaart:'map',
+    kpi:'kpi',kpis:'kpi','kpi-row':'kpi',timeline:'timeline',tijdlijn:'timeline',planning:'timeline'};
   const LIMITS={title:120,subtitle:200,source:200,label:60,cell:300,columns:12,rows:500,
     chartLabels:60,pieLabels:8,series:6,seriesName:40,mapTitle:100,mapSubtitle:160,places:25,
-    placeName:80,address:200,time:20,note:240,category:30,categories:6,tones:20,specBytes:200*1024};
+    placeName:80,address:200,time:20,note:240,category:30,categories:6,tones:20,specBytes:200*1024,
+    kpiItems:8,kpiLabel:40,kpiNote:80,tlItems:20,tlLabel:60,tlOwner:40,tlNote:160,tlMaxUnit:1000,tlTicks:12};
   const COLUMN_TYPES=new Set(['text','number','currency','percent','date','status','link']);
   const CHART_TYPES=new Set(['bar','hbar','stacked','line','area','pie','donut']);
   const TONES=new Set(['good','warn','bad','info']);
   const WIKI_LANGS=new Set(['nl','en','de','fr']);
-  const NOUN={nl:{table:'tabel',chart:'grafiek',map:'kaart'},en:{table:'table',chart:'chart',map:'map'}};
-  const NAME={nl:{table:'Tabel',chart:'Grafiek',map:'Kaart'},en:{table:'Table',chart:'Chart',map:'Map'}};
+  const NOUN={nl:{table:'tabel',chart:'grafiek',map:'kaart',kpi:'KPI-rij',timeline:'planning'},
+    en:{table:'table',chart:'chart',map:'map',kpi:'KPI row',timeline:'timeline'}};
+  const NAME={nl:{table:'Tabel',chart:'Grafiek',map:'Kaart',kpi:'Kerncijfers',timeline:'Planning'},
+    en:{table:'Table',chart:'Chart',map:'Map',kpi:'Key figures',timeline:'Timeline'}};
+  const KPI_FORMATS={number:'number',currency:'currency',euro:'currency',eur:'currency',percent:'percent',percentage:'percent','%':'percent'};
+  const DELTA_FORMATS={percent:'percent',pct:'percent','%':'percent',number:'number',absolute:'number',abs:'number',value:'number'};
+  const GOOD_DIRS={up:'up',higher:'up',hoger:'up',down:'down',lower:'down',lager:'down'};
+  const TL_UNITS={day:'day',days:'day',dag:'day',dagen:'day',week:'week',weeks:'week',weken:'week',month:'month',months:'month',maand:'month',maanden:'month'};
+  const TL_STATUS={todo:'todo','to do':'todo',planned:'todo',open:'todo',gepland:'todo','te doen':'todo',
+    doing:'doing',active:'doing','in progress':'doing','in-progress':'doing',progress:'doing',bezig:'doing',
+    done:'done',complete:'done',completed:'done',klaar:'done',afgerond:'done',
+    risk:'risk',blocked:'risk',late:'risk',delayed:'risk',risico:'risk',geblokkeerd:'risk'};
+  const STATUS_WORDS={nl:{todo:'Te doen',doing:'Bezig',done:'Klaar',risk:'Risico'},en:{todo:'To do',doing:'In progress',done:'Done',risk:'At risk'}};
+  const UNIT_WORDS={nl:{day:['Dag','Dagen'],week:['Week','Weken'],month:['Maand','Maanden']},en:{day:['Day','Days'],week:['Week','Weeks'],month:['Month','Months']}};
 
   // ── Messages (short sentences, shown in details and sent with "repair") ──
   const MSG={
@@ -64,6 +78,31 @@
       placeWiki:(name)=>`Bij "${name}" is de Wikipedia-titel ongeldig (gebruik bijvoorbeeld "nl:Rijksmuseum").`,
       placeUrl:(name)=>`Bij "${name}" is de link geen https-adres en is weggelaten.`,
       categories:(max)=>`Er zijn meer dan ${max} categorieën; de rest krijgt geen eigen kleur.`,
+      kpiNoItems:()=>'Er zijn geen cijfers (items).',
+      kpiNone:()=>'Geen enkel cijfer heeft een label en een getal als waarde (value).',
+      kpiMany:(n,max)=>`Er zijn ${n} cijfers; alleen de eerste ${max} worden getoond.`,
+      kpiItem:(i)=>`Cijfer ${i} is geen object met label en value en is weggelaten.`,
+      kpiLabel:(i)=>`Cijfer ${i} heeft geen label en is weggelaten.`,
+      kpiValue:(l)=>`"${l}" heeft geen getal als waarde (value) en is weggelaten.`,
+      kpiFormat:(l,f)=>`"${l}" heeft een onbekend format "${f}"; gebruik number, currency of percent.`,
+      kpiDelta:(l)=>`De verandering (delta) van "${l}" is geen getal en is weggelaten.`,
+      kpiDeltaFormat:(l,f)=>`"${l}" heeft een onbekend deltaFormat "${f}"; gebruik percent of number.`,
+      kpiGood:(l,g)=>`"${l}" heeft good "${g}"; gebruik up of down. Nu geldt up.`,
+      kpiTarget:(l)=>`Het doel (target) van "${l}" is geen getal boven 0 en is weggelaten.`,
+      tlNoItems:()=>'Er zijn geen onderdelen (items).',
+      tlNone:()=>'Geen enkel onderdeel heeft een label en een geldige start (een getal of JJJJ-MM-DD).',
+      tlMany:(n,max)=>`Er zijn ${n} onderdelen; alleen de eerste ${max} worden getoond.`,
+      tlItem:(i)=>`Onderdeel ${i} is geen object met label en start en is weggelaten.`,
+      tlLabel:(i)=>`Onderdeel ${i} heeft geen label en is weggelaten.`,
+      tlBadStart:(l)=>`"${l}" heeft geen geldige start (een getal of JJJJ-MM-DD) en is weggelaten.`,
+      tlNoEnd:(l)=>`"${l}" heeft geen geldige end en is als mijlpaal getoond.`,
+      tlSwap:(l)=>`Bij "${l}" lag end voor start; die zijn omgedraaid.`,
+      tlStatus:(l,st)=>`"${l}" heeft een onbekende status "${st}"; gebruik todo, doing, done of risk.`,
+      tlUnit:(u)=>`Onbekende unit "${u}"; gebruik day, week of month. Nu geldt week.`,
+      tlStart:()=>'De start van de planning is geen datum (JJJJ-MM-DD) en is genegeerd.',
+      tlNoBase:(d)=>`Getallen bij start en end tellen vanaf de start van de planning; die ontbrak, dus is ${d} gebruikt.`,
+      tlToday:()=>'today is geen getal of datum (JJJJ-MM-DD); de lijn voor vandaag is weggelaten.',
+      tlTodayDate:()=>'today is een datum, maar de onderdelen gebruiken getallen zonder start; de lijn voor vandaag is weggelaten.',
     },
     en:{
       json:(line)=>`The data is not valid JSON${line?` (line ${line})`:''}.`,
@@ -103,6 +142,31 @@
       placeWiki:(name)=>`The Wikipedia title of "${name}" is not valid (use for example "en:Rijksmuseum").`,
       placeUrl:(name)=>`The link of "${name}" is not an https address and was left out.`,
       categories:(max)=>`There are more than ${max} categories; the rest gets no colour of its own.`,
+      kpiNoItems:()=>'There are no figures (items).',
+      kpiNone:()=>'No figure has a label and a number as its value.',
+      kpiMany:(n,max)=>`There are ${n} figures; only the first ${max} are shown.`,
+      kpiItem:(i)=>`Figure ${i} is not an object with label and value and was left out.`,
+      kpiLabel:(i)=>`Figure ${i} has no label and was left out.`,
+      kpiValue:(l)=>`"${l}" has no number as its value and was left out.`,
+      kpiFormat:(l,f)=>`"${l}" has an unknown format "${f}"; use number, currency or percent.`,
+      kpiDelta:(l)=>`The change (delta) of "${l}" is not a number and was left out.`,
+      kpiDeltaFormat:(l,f)=>`"${l}" has an unknown deltaFormat "${f}"; use percent or number.`,
+      kpiGood:(l,g)=>`"${l}" has good "${g}"; use up or down. Up is used now.`,
+      kpiTarget:(l)=>`The target of "${l}" is not a number above 0 and was left out.`,
+      tlNoItems:()=>'There are no items.',
+      tlNone:()=>'No item has a label and a valid start (a number or YYYY-MM-DD).',
+      tlMany:(n,max)=>`There are ${n} items; only the first ${max} are shown.`,
+      tlItem:(i)=>`Item ${i} is not an object with label and start and was left out.`,
+      tlLabel:(i)=>`Item ${i} has no label and was left out.`,
+      tlBadStart:(l)=>`"${l}" has no valid start (a number or YYYY-MM-DD) and was left out.`,
+      tlNoEnd:(l)=>`"${l}" has no valid end and is shown as a milestone.`,
+      tlSwap:(l)=>`The end of "${l}" was before its start; they were swapped.`,
+      tlStatus:(l,st)=>`"${l}" has an unknown status "${st}"; use todo, doing, done or risk.`,
+      tlUnit:(u)=>`Unknown unit "${u}"; use day, week or month. Week is used now.`,
+      tlStart:()=>'The start of the timeline is not a date (YYYY-MM-DD) and was ignored.',
+      tlNoBase:(d)=>`Numbers in start and end count from the start of the timeline; it was missing, so ${d} was used.`,
+      tlToday:()=>'today is not a number or a date (YYYY-MM-DD); the line for today was left out.',
+      tlTodayDate:()=>'today is a date, but the items use numbers without a start; the line for today was left out.',
     },
   };
   // The kind for a fence info string ('' when it is not a data block).
@@ -511,6 +575,265 @@
     return {errors,warnings,spec:Object.assign(out,{kind,region,photos:spec.photos===true,places:outPlaces,categories:cats})};
   }
 
+  // ── kpi ──────────────────────────────────────────────────────────────────
+  function fieldName(lang,nl,en){return lang==='nl'?nl:en;}
+  function kpiNumber(v){
+    if(typeof v==='number') return Number.isFinite(v)?{n:v,kind:''}:null;
+    if(typeof v!=='string'||!v.trim()) return null;
+    const p=parseNumber(v);
+    return Number.isFinite(p.n)?{n:p.n,kind:p.kind==='number'?'':p.kind}:null;
+  }
+  // Which way the change points and whether that is good news.
+  function kpiTone(delta,good){
+    if(delta===null||delta===undefined) return '';
+    if(delta===0) return 'flat';
+    return (delta>0)===(good!=='down')?'good':'bad';
+  }
+  function validateKpi(spec,lang){
+    const m=messenger(lang), errors=[], warnings=[];
+    const warn=(k,...a)=>warnings.push(m(k,...a));
+    const out=base(spec,lang,'kpi',m,warnings,LIMITS);
+    let items=Array.isArray(spec.items)?spec.items:(Array.isArray(spec.metrics)?spec.metrics:null);
+    if(!items||!items.length){errors.push(m('kpiNoItems'));return {errors,warnings};}
+    if(items.length>LIMITS.kpiItems){warn('kpiMany',items.length,LIMITS.kpiItems);items=items.slice(0,LIMITS.kpiItems);}
+    const outItems=[];
+    items.forEach((it,i)=>{
+      if(!isObj(it)){warn('kpiItem',i+1);return;}
+      const label=str(it.label!=null?it.label:(it.name!=null?it.name:it.title),LIMITS.kpiLabel,warn,fieldName(lang,`Het label van cijfer ${i+1}`,`The label of figure ${i+1}`));
+      if(!label){warn('kpiLabel',i+1);return;}
+      const v=kpiNumber(it.value);
+      if(!v){warn('kpiValue',label);return;}
+      let format=typeof it.format==='string'?it.format.trim().toLowerCase():'';
+      if(format&&!KPI_FORMATS[format]){warn('kpiFormat',label,it.format);format='';}
+      format=format?KPI_FORMATS[format]:(v.kind||'number');
+      let delta=null;
+      if(it.delta!=null&&it.delta!==''){const d=kpiNumber(it.delta);if(d)delta=d.n;else warn('kpiDelta',label);}
+      let deltaFormat=typeof it.deltaFormat==='string'?it.deltaFormat.trim().toLowerCase():'';
+      if(deltaFormat&&!DELTA_FORMATS[deltaFormat]){warn('kpiDeltaFormat',label,it.deltaFormat);deltaFormat='';}
+      // A percentage moves in points by default; anything else in percent.
+      deltaFormat=deltaFormat?DELTA_FORMATS[deltaFormat]:(format==='percent'?'number':'percent');
+      const goodRaw=it.good!=null?it.good:it.better;
+      let good='up';
+      if(goodRaw!=null&&goodRaw!==''){const g=GOOD_DIRS[String(goodRaw).trim().toLowerCase()];if(g)good=g;else warn('kpiGood',label,str(goodRaw,20));}
+      let target=null;
+      if(it.target!=null&&it.target!==''){const t=kpiNumber(it.target);if(t&&t.n>0)target=t.n;else warn('kpiTarget',label);}
+      const item={label,value:v.n,format,decimals:it.decimals==null?null:clampInt(it.decimals,0,2,null),
+        delta,deltaFormat,good,target,note:str(it.note,LIMITS.kpiNote,warn,fieldName(lang,`De notitie van "${label}"`,`The note of "${label}"`)),
+        tone:kpiTone(delta,good)};
+      if(target!==null){
+        item.progress=Math.max(0,Math.min(1,v.n/target));
+        item.met=good==='down'?v.n<=target:v.n>=target;
+      }
+      outItems.push(item);
+    });
+    if(!outItems.length){errors.push(m('kpiNone'));return {errors,warnings};}
+    return {errors,warnings,spec:Object.assign(out,{items:outItems})};
+  }
+  const kpiFormatters=new Map();
+  function kpiFormatter(lang,key,opts){
+    const l=pickLang(lang)==='nl'?'nl-NL':'en-GB', k=l+'|'+key;
+    let f=kpiFormatters.get(k);
+    if(!f){f=new Intl.NumberFormat(l,opts);kpiFormatters.set(k,f);}
+    return f;
+  }
+  function autoDecimals(v,decimals){return decimals!=null?decimals:(Number.isInteger(v)?0:Math.min(2,Math.max(1,(String(v).split('.')[1]||'').length)));}
+  // The big number on a tile: millions are written short ("1,2 mln").
+  function kpiValueText(item,lang){
+    const v=item.value;
+    if(Math.abs(v)>=1e6&&item.decimals==null&&item.format!=='percent'){
+      const o={notation:'compact',compactDisplay:'short',maximumFractionDigits:1};
+      if(item.format==='currency'){o.style='currency';o.currency='EUR';}
+      return kpiFormatter(lang,'c|'+item.format,o).format(v);
+    }
+    return formatValue(v,item.format,item.decimals,lang);
+  }
+  // The change with its sign: "+12,5%", "+€ 1.200", "-0,4 pp".
+  function kpiDeltaText(item,lang){
+    const d=item.delta;
+    if(d===null||d===undefined) return '';
+    const dec=autoDecimals(d,item.decimals);
+    const o={signDisplay:'exceptZero',minimumFractionDigits:dec,maximumFractionDigits:dec};
+    if(item.deltaFormat==='percent') return kpiFormatter(lang,'dp'+dec,Object.assign({style:'percent'},o)).format(d/100);
+    if(item.format==='currency') return kpiFormatter(lang,'dc'+dec,Object.assign({style:'currency',currency:'EUR'},o)).format(d);
+    const text=kpiFormatter(lang,'dn'+dec,o).format(d);
+    return item.format==='percent'?text+' pp':text;
+  }
+
+  // ── timeline ─────────────────────────────────────────────────────────────
+  // Dates are whole days since 1970-01-01 (UTC), so a plan never shifts with
+  // the browser's time zone. A bar runs from the start of its first day (or
+  // unit) to the end of its last: end is included.
+  const DAY_MS=864e5;
+  function dayOf(iso){
+    if(typeof iso!=='string'||!DATE_RE.test(iso.trim())) return NaN;
+    const [y,mo,d]=iso.trim().split('-').map(Number);
+    const t=Date.UTC(y,mo-1,d), dt=new Date(t);
+    if(dt.getUTCFullYear()!==y||dt.getUTCMonth()!==mo-1||dt.getUTCDate()!==d) return NaN;
+    return Math.round(t/DAY_MS);
+  }
+  function isoOf(day){return new Date(Math.round(day)*DAY_MS).toISOString().slice(0,10);}
+  function addMonths(day,n){
+    const d=new Date(day*DAY_MS), y=d.getUTCFullYear(), mo=d.getUTCMonth()+n;
+    const last=new Date(Date.UTC(y,mo+1,0)).getUTCDate();
+    return Math.round(Date.UTC(y,mo,Math.min(d.getUTCDate(),last))/DAY_MS);
+  }
+  function unitDay(baseDay,unit,n){
+    const whole=Math.floor(n), frac=n-whole;
+    const at=k=>unit==='day'?baseDay+k:unit==='week'?baseDay+7*k:addMonths(baseDay,k);
+    const a=at(whole);
+    return frac?a+frac*(at(whole+1)-a):a;
+  }
+  function monday(day){return day-(((day+3)%7)+7)%7;}
+  // A position: a unit number ({n}) or a date ({d}, a YYYY-MM month also counts).
+  function readPos(v){
+    if(typeof v==='number') return Number.isFinite(v)&&v>=0&&v<=LIMITS.tlMaxUnit?{n:v}:null;
+    if(typeof v!=='string') return null;
+    const s=v.trim();
+    if(/^\d+(\.\d+)?$/.test(s)){const n=Number(s);return n<=LIMITS.tlMaxUnit?{n}:null;}
+    if(DATE_RE.test(s)){const d=dayOf(s);return Number.isFinite(d)?{d}:null;}
+    const mm=/^(\d{4})-(\d{2})$/.exec(s);
+    if(mm&&+mm[2]>=1&&+mm[2]<=12) return {d:Math.round(Date.UTC(+mm[1],+mm[2]-1,1)/DAY_MS),last:Math.round(Date.UTC(+mm[1],+mm[2],0)/DAY_MS)};
+    return null;
+  }
+  function validateTimeline(spec,lang){
+    const m=messenger(lang), errors=[], warnings=[];
+    const warn=(k,...a)=>warnings.push(m(k,...a));
+    const out=base(spec,lang,'timeline',m,warnings,LIMITS);
+    let unit='week';
+    if(spec.unit!=null&&spec.unit!==''){const u=TL_UNITS[String(spec.unit).trim().toLowerCase()];if(u)unit=u;else warn('tlUnit',str(spec.unit,20));}
+    let baseDay=NaN;
+    if(spec.start!=null&&spec.start!==''){const p=readPos(spec.start);if(p&&p.d!=null)baseDay=p.d;else warn('tlStart');}
+    let items=Array.isArray(spec.items)?spec.items:(Array.isArray(spec.tasks)?spec.tasks:null);
+    if(!items||!items.length){errors.push(m('tlNoItems'));return {errors,warnings};}
+    if(items.length>LIMITS.tlItems){warn('tlMany',items.length,LIMITS.tlItems);items=items.slice(0,LIMITS.tlItems);}
+    const raw=[];
+    items.forEach((it,i)=>{
+      if(!isObj(it)){warn('tlItem',i+1);return;}
+      const label=str(it.label!=null?it.label:(it.title!=null?it.title:it.name),LIMITS.tlLabel,warn,fieldName(lang,`Het label van onderdeel ${i+1}`,`The label of item ${i+1}`));
+      if(!label){warn('tlLabel',i+1);return;}
+      let sp=readPos(it.start!=null?it.start:it.date);
+      if(!sp){warn('tlBadStart',label);return;}
+      let ms=it.milestone===true, ep=null;
+      if(!ms){
+        ep=it.end!=null&&it.end!==''?readPos(it.end):null;
+        if(!ep){warn('tlNoEnd',label);ms=true;}
+      }
+      let status='';
+      if(it.status!=null&&it.status!==''){
+        const st=TL_STATUS[String(it.status).trim().toLowerCase()];
+        if(st) status=st;else{warn('tlStatus',label,str(it.status,30));status='todo';}
+      }
+      raw.push({label,sp,ep,ms,status,
+        owner:str(it.owner,LIMITS.tlOwner,warn,fieldName(lang,`De eigenaar van "${label}"`,`The owner of "${label}"`)),
+        note:str(it.note,LIMITS.tlNote,warn,fieldName(lang,`De notitie van "${label}"`,`The note of "${label}"`))});
+    });
+    if(!raw.length){errors.push(m('tlNone'));return {errors,warnings};}
+    const nums=[], dates=[];
+    raw.forEach(r=>[r.sp,r.ep].forEach(p=>{if(p){if(p.n!=null)nums.push(p.n);else dates.push(p.d);}}));
+    let todayPos=null;
+    if(spec.today!=null&&spec.today!==''){todayPos=readPos(spec.today);if(!todayPos)warn('tlToday');}
+    const dateMode=Number.isFinite(baseDay)||dates.length>0;
+    if(dateMode&&!Number.isFinite(baseDay)&&(nums.length||(todayPos&&todayPos.n!=null))){
+      baseDay=Math.min(...dates);
+      warn('tlNoBase',isoOf(baseDay));
+    }
+    // Unit numbers count from 1 ("week 1" is the first week) unless the block uses 0.
+    const first=nums.concat(todayPos&&todayPos.n!=null?[todayPos.n]:[]).some(n=>n<1)?0:1;
+    const startOf=p=>p.n!=null?(dateMode?unitDay(baseDay,unit,p.n-first):p.n):p.d;
+    const endOf=p=>p.n!=null?(dateMode?unitDay(baseDay,unit,p.n+1-first):p.n+1):(p.last!=null?p.last:p.d)+1;
+    const midOf=p=>p.n!=null?(startOf(p)+(dateMode?unitDay(baseDay,unit,p.n+1-first):p.n+1))/2:p.d+0.5;
+    const outItems=raw.map((r,i)=>{
+      const item={k:String(i),label:r.label,owner:r.owner,status:r.status,note:r.note,milestone:r.ms};
+      let sp=r.sp, ep=r.ep;
+      if(r.ms){
+        item.s=item.e=midOf(sp);
+      } else {
+        if(startOf(ep)<startOf(sp)){warn('tlSwap',r.label);const t=sp;sp=ep;ep=t;}
+        item.s=startOf(sp);item.e=Math.max(endOf(ep),item.s);
+      }
+      if(dateMode){
+        item.from=isoOf(startOf(sp));
+        item.to=r.ms?item.from:isoOf(Math.ceil(item.e)-1);
+      } else {item.from=sp.n;item.to=r.ms?sp.n:ep.n;}
+      return item;
+    });
+    let today=null;
+    if(todayPos){
+      if(todayPos.d!=null&&!dateMode) warn('tlTodayDate');
+      else today=midOf(todayPos);
+    }
+    return {errors,warnings,spec:Object.assign(out,{unit,mode:dateMode?'date':'index',
+      start:Number.isFinite(baseDay)?isoOf(baseDay):'',first,today,todayAuto:dateMode&&(spec.today==null||spec.today===''),items:outItems})};
+  }
+  const dateFormatters=new Map();
+  function dayText(day,lang,opts){
+    const l=pickLang(lang)==='nl'?'nl-NL':'en-GB', key=l+JSON.stringify(opts);
+    let f=dateFormatters.get(key);
+    if(!f){f=new Intl.DateTimeFormat(l,Object.assign({timeZone:'UTC'},opts));dateFormatters.set(key,f);}
+    return f.format(new Date(Math.round(day)*DAY_MS));
+  }
+  function unitWord(unit,lang,plural){return UNIT_WORDS[pickLang(lang)][unit][plural?1:0];}
+  // "9 nov t/m 20 nov 2026", "Week 2 t/m 5" (or "9 Nov to 20 Nov 2026", "Weeks 2 to 5").
+  function timelinePeriod(spec,item,lang){
+    const nl=pickLang(lang)==='nl', through=nl?' t/m ':' to ';
+    if(spec.mode==='date'){
+      const a=dayOf(item.from), b=dayOf(item.to);
+      if(a===b) return dayText(a,lang,{day:'numeric',month:'short',year:'numeric'});
+      const sameYear=item.from.slice(0,4)===item.to.slice(0,4);
+      return dayText(a,lang,sameYear?{day:'numeric',month:'short'}:{day:'numeric',month:'short',year:'numeric'})+through+dayText(b,lang,{day:'numeric',month:'short',year:'numeric'});
+    }
+    const num=n=>formatValue(n,'number',null,lang);
+    if(item.from===item.to) return unitWord(spec.unit,lang,false)+' '+num(item.from);
+    return unitWord(spec.unit,lang,!nl)+' '+num(item.from)+through+num(item.to);
+  }
+  function statusWord(status,lang){return status?STATUS_WORDS[pickLang(lang)][status]||'':'';}
+  // The visible range, the ticks (x from 0 to 1) and where today falls.
+  // nowDay is the local date (days since 1970) for a plan without "today".
+  function timelineAxis(spec,lang,nowDay){
+    let min=Math.min(...spec.items.map(i=>i.s)), max=Math.max(...spec.items.map(i=>i.e));
+    const ticks=[];
+    let bounds=[];
+    if(spec.mode==='date'){
+      const baseDay=dayOf(spec.start);
+      if(spec.unit==='month'){
+        const d0=new Date(Math.floor(min)*DAY_MS);
+        let at=Math.round(Date.UTC(d0.getUTCFullYear(),d0.getUTCMonth(),1)/DAY_MS);
+        while(bounds.length<240){bounds.push(at);if(at>=max&&bounds.length>1)break;at=addMonths(at,1);}
+      } else {
+        const len=spec.unit==='week'?7:1;
+        const anchor=spec.unit==='week'?(Number.isFinite(baseDay)?baseDay:monday(Math.floor(min))):0;
+        let at=anchor+len*Math.floor((Math.floor(min)-anchor)/len);
+        while(bounds.length<800){bounds.push(at);if(at>=max&&bounds.length>1)break;at+=len;}
+      }
+    } else {
+      for(let k=Math.floor(min);bounds.length<800;k++){bounds.push(k);if(k>=max&&bounds.length>1)break;}
+    }
+    min=bounds[0];max=bounds[bounds.length-1];
+    const span=Math.max(1e-9,max-min), cells=bounds.length-1;
+    const step=Math.max(1,Math.ceil(cells/LIMITS.tlTicks));
+    let prevYear='';
+    for(let i=0;i<cells;i+=step){
+      const at=bounds[i];
+      let label;
+      if(spec.mode==='date'){
+        if(spec.unit==='month'){
+          const y=isoOf(at).slice(0,4);
+          label=dayText(at,lang,y!==prevYear?{month:'short',year:'numeric'}:{month:'short'});
+          prevYear=y;
+        } else label=dayText(at,lang,{day:'numeric',month:'short'});
+      } else {
+        const n=formatValue(at,'number',null,lang);
+        label=i===0||cells<=8?unitWord(spec.unit,lang,false)+' '+n:n;
+      }
+      ticks.push({x:(at-min)/span,label,minor:false});
+    }
+    if(ticks.length>7) ticks.forEach((t,i)=>{t.minor=i%2===1;});
+    let today=spec.today;
+    if(today===null&&spec.todayAuto&&Number.isFinite(nowDay)) today=nowDay;
+    const todayX=today!==null&&today>=min&&today<=max?(today-min)/span:null;
+    return {min,max,ticks,todayX,lines:bounds.slice(1,-1).map(b=>(b-min)/span)};
+  }
+
   // ── Entry point ──────────────────────────────────────────────────────────
   function estHeight(kind,spec){
     if(!spec) return 120;
@@ -520,6 +843,13 @@
     }
     if(kind==='chart') return Math.round(spec.height+(spec.subtitle?24:0)+76+(spec.source?28:0)+(spec.type==='pie'||spec.type==='donut'?Math.ceil(spec.labels.length/2)*26:0));
     if(kind==='map') return 460;
+    if(kind==='kpi'){
+      // Four tiles to a row in a chat column; the frame reports its real height.
+      const rows=Math.ceil(spec.items.length/4);
+      const tile=88+(spec.items.some(i=>i.note)?20:0)+(spec.items.some(i=>i.target!==null)?28:0);
+      return Math.round(24+(spec.subtitle?24:0)+rows*tile+(rows-1)*10+(spec.source?28:0));
+    }
+    if(kind==='timeline') return Math.round(24+(spec.subtitle?24:0)+34+30+spec.items.length*38+40+(spec.source?28:0));
     return 300;
   }
   // build(kind, text, {lang, fence}) -> {spec, title, errors, warnings, estHeight}
@@ -543,7 +873,7 @@
     // The block may name the conversation language; it sets labels and number format.
     const own=String(raw&&raw.lang||'').toLowerCase();
     if(own==='nl'||own==='en'){lang=own;m=messenger(lang);}
-    const fn=kind==='table'?validateTable:kind==='chart'?validateChart:kind==='map'?validateMap:null;
+    const fn={table:validateTable,chart:validateChart,map:validateMap,kpi:validateKpi,timeline:validateTimeline}[kind]||null;
     if(!fn){res.errors.push(m('notObject'));return res;}
     const r=fn(raw,lang);
     res.errors=r.errors;res.warnings=r.warnings;
@@ -659,6 +989,18 @@
           return [p.n,p.name,p.address||r.label||'',p.time,p.note,Number.isFinite(lat)?lat:null,Number.isFinite(lng)?lng:null];
         }),types:['number','text','text','text','text','number','number']};
     }
+    if(kind==='kpi'){
+      const en=spec.lang==='en';
+      return {header:en?['Label','Value','Change','Target']:['Label','Waarde','Verandering','Doel'],
+        rows:spec.items.map(i=>[i.label,i.value,i.delta,i.target]),
+        types:['text','number','number','number']};
+    }
+    if(kind==='timeline'){
+      const en=spec.lang==='en', lang=en?'en':'nl', pos=spec.mode==='date'?'date':'number';
+      return {header:en?['Item','Start','End','Owner','Status','Milestone','Note']:['Onderdeel','Start','Einde','Eigenaar','Status','Mijlpaal','Notitie'],
+        rows:spec.items.map(i=>[i.label,i.from,i.to,i.owner,statusWord(i.status,lang),i.milestone?(en?'yes':'ja'):'',i.note]),
+        types:['text',pos,pos,'text','text','text','text']};
+    }
     return {header:[],rows:[]};
   }
   function exportCell(v,decimalComma){
@@ -713,8 +1055,9 @@
   }
 
   const api={KIT_LANGS,kitKind,LIMITS,NOUN,NAME,pickLang,cleanJson,parseKit,parseCsv,detectDelimiter,parseNumber,
-    validateTable,validateChart,validateMap,build,estHeight,streamingTitle,compareCells,formatValue,viewIndices,
-    initialView,totals,kitTable,toCsv,toTsv,mapRequest,mapLocalData,tileUrlOk,googleMapsUrl,OSM_TILES};
+    validateTable,validateChart,validateMap,validateKpi,validateTimeline,build,estHeight,streamingTitle,compareCells,formatValue,viewIndices,
+    initialView,totals,kitTable,toCsv,toTsv,mapRequest,mapLocalData,tileUrlOk,googleMapsUrl,OSM_TILES,
+    kpiValueText,kpiDeltaText,timelineAxis,timelinePeriod,statusWord,dayOf,isoOf,STATUS_WORDS};
   root.SWKit=api;
   if(typeof module!=='undefined'&&module.exports) module.exports=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

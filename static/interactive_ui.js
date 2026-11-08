@@ -17,7 +17,8 @@
 // a follow-up question is shown in the card and only sent after a click on
 // the host's own button.
 //
-// Data blocks (```table, ```csv, ```chart, ```map and their Dutch names)
+// Data blocks (```table, ```csv, ```chart, ```map, ```kpi, ```timeline and
+// their Dutch names)
 // hold JSON or CSV instead of code. The chat checks them with SWKit.build()
 // (static/interactive-ui/kit-core.js) and sends only the cleaned spec to a
 // second frame, static/interactive-ui/kit.html, which draws it with fixed
@@ -32,10 +33,13 @@
 const _iui=(function(){
   const FRAME_URL='static/interactive-ui/frame.html';
   const KIT_URL='static/interactive-ui/kit.html';
-  const KIT_STREAM_H={table:300,chart:380,map:460};
+  const KIT_STREAM_H={table:300,chart:380,map:460,kpi:150,timeline:340};
+  const KIT_ICON={table:'table',chart:'chart',map:'pin',kpi:'gauge',timeline:'gantt'};
   const KIT_DATA_MAX=200*1024;
   function kits(){return typeof SWKit!=='undefined'&&SWKit&&typeof SWKit.build==='function'?SWKit:null;}
   function kitKindOf(lang){const K=kits();return K?K.kitKind(lang):'';}
+  // The data fence named by a code element's classes ('' when there is none).
+  function kitFenceOf(cls){return String(cls||'').split(/\s+/).map(t=>t.replace(/^language-/,'')).find(t=>t&&kitKindOf(t))||'';}
   const FENCE_LANGS=new Set(['interactive-ui','interactive','iui']);
   const CHIP_LANGS=new Set(['suggestions','replies']);
   const CDN_ORIGINS=new Set(['https://cdn.jsdelivr.net','https://unpkg.com','https://cdnjs.cloudflare.com','https://esm.sh']);
@@ -88,7 +92,8 @@ const _iui=(function(){
       draftBusy:'Je concept staat nog in het invoerveld. Verstuur of wis dat eerst.',
       repairPrompt:(title,msg)=>`Kun je de weergave "${title}" herstellen? Die werkt niet helemaal (${msg}). Stuur het volledige interactive-ui-blok opnieuw.`,
       sandboxNote:'Draait los van je account en de chat',chipsLabel:'Voorgestelde antwoorden',chipsBusy:'Even wachten tot het huidige antwoord klaar is.',
-      kitNoun:{table:'tabel',chart:'grafiek',map:'kaart'},kitName:{table:'Tabel',chart:'Grafiek',map:'Kaart'},
+      kitNoun:{table:'tabel',chart:'grafiek',map:'kaart',kpi:'KPI-rij',timeline:'planning'},
+      kitName:{table:'Tabel',chart:'Grafiek',map:'Kaart',kpi:'Kerncijfers',timeline:'Planning'},
       kitFail:noun=>`Deze ${noun} kon niet worden gemaakt.`,downloadCsv:'Download als CSV',copyTable:'Kopieer als tabel',
       viewData:'Gegevens bekijken',hideData:'Gegevens verbergen',copyData:'Gegevens kopiëren',example:'Voorbeeld',
       kitRepairPrompt:(noun,title,msg,fence)=>`Kun je de ${noun} "${title}" herstellen? ${msg} Stuur het volledige ${fence}-blok opnieuw.`},
@@ -101,7 +106,8 @@ const _iui=(function(){
       draftBusy:'Your draft is still in the message box. Send or clear it first.',
       repairPrompt:(title,msg)=>`Can you fix the view "${title}"? It is not fully working (${msg}). Send the complete interactive-ui block again.`,
       sandboxNote:'Runs separately from your account and the chat',chipsLabel:'Suggested replies',chipsBusy:'Wait until the current reply is finished.',
-      kitNoun:{table:'table',chart:'chart',map:'map'},kitName:{table:'Table',chart:'Chart',map:'Map'},
+      kitNoun:{table:'table',chart:'chart',map:'map',kpi:'KPI row',timeline:'timeline'},
+      kitName:{table:'Table',chart:'Chart',map:'Map',kpi:'Key figures',timeline:'Timeline'},
       kitFail:noun=>`This ${noun} could not be made.`,downloadCsv:'Download as CSV',copyTable:'Copy as table',
       viewData:'View data',hideData:'Hide data',copyData:'Copy data',example:'Example',
       kitRepairPrompt:(noun,title,msg,fence)=>`Can you fix the ${noun} "${title}"? ${msg} Send the complete ${fence} block again.`},
@@ -131,6 +137,8 @@ const _iui=(function(){
     table:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M9 10v10"/>',
     chart:'<path d="M4 20V10"/><path d="M10 20V4"/><path d="M16 20v-7"/><path d="M22 20H2"/>',
     pin:'<path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>',
+    gauge:'<rect x="3" y="5" width="8" height="6" rx="1.5"/><rect x="13" y="5" width="8" height="6" rx="1.5"/><rect x="3" y="13" width="8" height="6" rx="1.5"/><rect x="13" y="13" width="8" height="6" rx="1.5"/>',
+    gantt:'<path d="M4 6h8"/><path d="M8 12h9"/><path d="M13 18h7"/><path d="M3 3v18"/>',
     sheet:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M8 13h8"/><path d="M8 17h8"/>',
   };
   function icon(name){return `<svg class="iui-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${ICON[name]||''}</svg>`;}
@@ -548,7 +556,7 @@ const _iui=(function(){
     card.dataset.iuiCard=String(++seq);
     card.setAttribute('role','group');
     const head=document.createElement('div');head.className='iui-head';
-    const badge=document.createElement('span');badge.className='iui-badge';badge.innerHTML=icon(kit==='table'?'table':kit==='chart'?'chart':kit==='map'?'pin':'spark');
+    const badge=document.createElement('span');badge.className='iui-badge';badge.innerHTML=icon(KIT_ICON[kit]||'spark');
     const titleEl=document.createElement('span');titleEl.className='iui-title';
     const pill=document.createElement('span');pill.className='iui-pill';pill.textContent=tx('example');pill.hidden=true;
     const status=document.createElement('span');status.className='iui-status';
@@ -956,16 +964,16 @@ const _iui=(function(){
   // ── Live render while a reply streams ───────────────────────────────────
   function liveKey(text){const t=String(text||'').trim();return t.length>=24?hashSource(t.slice(0,160)):'';}
   function streamKit(code,cls){
-    const m=/ (?:language-)?(table|tabel|csv|chart|grafiek|map|kaart) /.exec(cls);
-    if(!m) return '';
+    const fence=kitFenceOf(cls);
+    if(!fence) return '';
     const pre=code.parentElement;
     if(pre.__iuiLive) return pre.__iuiLive.kit||'';
     if(pre.__iuiNotKit) return '';
     const text=code.textContent||'';
     if(!text.trim()) return '';
     // A ```chart with code in it stays a code block; only JSON (or CSV) is data.
-    if(m[1]!=='csv'&&!/^\s*\{/.test(text)){pre.__iuiNotKit=true;return '';}
-    return kitKindOf(m[1]);
+    if(fence!=='csv'&&!/^\s*\{/.test(text)){pre.__iuiNotKit=true;return '';}
+    return kitKindOf(fence);
   }
   function streamTick(root){
     if(!root||!root.querySelectorAll) return;
@@ -974,7 +982,7 @@ const _iui=(function(){
       if(/ (language-)?(suggestions|replies) /.test(cls)){code.parentElement.classList.add('iui-raw-hidden');return;}
       const kit=streamKit(code,cls);
       if(!kit&&!/ (language-)?(interactive-ui|interactive|iui) /.test(cls)) return;
-      const fence=kit?(/ (?:language-)?(table|tabel|csv|chart|grafiek|map|kaart) /.exec(cls)||[])[1]:'';
+      const fence=kit?kitFenceOf(cls):'';
       const pre=code.parentElement;
       let ctrl=pre.__iuiLive;
       if(!ctrl){
