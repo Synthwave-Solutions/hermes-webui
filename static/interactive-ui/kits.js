@@ -344,6 +344,8 @@
     bar.appendChild(seg);
     var canvasBox = h('div', 'k-canvas');
     canvasBox.style.height = spec.height + 'px';
+    // A radar on a phone follows the width, so the shape is not lost in empty space.
+    if(spec.type === 'radar'){ var bw = box.clientWidth || window.innerWidth; if(bw < 480) canvasBox.style.height = Math.max(260, Math.round(bw * 0.86)) + 'px'; }
     var canvas = h('canvas');
     canvas.setAttribute('role', 'img');
     canvas.setAttribute('aria-label', spec.title + ': ' + spec.labels.slice(0, 12).join(', '));
@@ -446,11 +448,26 @@
       if(round){ if(kind === 'doughnut'){ cfg.options.cutout = '62%'; cfg.plugins.push(centerPlugin(t)); } }
       else if(radar){
         cfg.options.interaction = {mode:'nearest', intersect:false};
-        cfg.options.scales = {r:{beginAtZero:true, angleLines:{color:alpha(t.border || '#2a2f3d', 0.9)}, grid:{color:alpha(t.border || '#2a2f3d', 0.9)},
-          pointLabels:{color:t.fg, font:{size:12}}, ticks:{display:false, maxTicksLimit:5}}};
+        // The outer ring is the scale the scores are on ("op 10"), never just the highest score.
+        var all = [].concat.apply([], spec.series.map(function(s){ return s.data.filter(function(v){ return typeof v === 'number'; }); }));
+        var top = Math.max.apply(null, all.concat([0])), low = Math.min.apply(null, all.concat([0]));
+        var rMax = spec.max || (spec.format === 'percent' ? 100 : (low >= 0 && top <= 10 ? 10 : (low >= 0 && top <= 100 && top > 10 ? 100 : undefined)));
+        var narrow = (box.clientWidth || window.innerWidth) < 480;
+        cfg.options.scales = {r:{beginAtZero:true, max:rMax, angleLines:{color:alpha(t.border || '#2a2f3d', 0.9)}, grid:{color:alpha(t.border || '#2a2f3d', 0.9)},
+          pointLabels:{color:t.fg, font:{size:narrow ? 11 : 12}, padding:narrow ? 4 : 8,
+            // Long criterion names wrap onto two lines instead of being cut at the edge.
+            callback:function(l){ return wrapLabel(l, narrow ? 12 : 16); }},
+          ticks:{display:false, maxTicksLimit:5, stepSize:rMax === 10 ? 2 : undefined}}};
       }
       else cfg.options.scales = horizontal ? {x:valueAxis, y:catAxis} : {x:catAxis, y:valueAxis};
       return cfg;
+    }
+    function wrapLabel(l, max){
+      var words = String(l || '').split(/\s+/), lines = [], cur = '';
+      words.forEach(function(w){ if(cur && (cur + ' ' + w).length > max){ lines.push(cur); cur = w; } else cur = cur ? cur + ' ' + w : w; });
+      if(cur) lines.push(cur);
+      if(lines.length > 2) lines = [lines[0], lines.slice(1).join(' ').slice(0, max + 6) + (lines.slice(1).join(' ').length > max + 6 ? '…' : '')];
+      return lines.length > 1 ? lines : lines[0] || '';
     }
     // The middle of a donut names the total, so the slices read as parts of it.
     function centerPlugin(t){
@@ -480,7 +497,9 @@
         var li = h('li'), sw = h('span', 'k-swatch');
         sw.style.background = spec.highlight ? (l === spec.highlight ? c.accent : alpha(c.pal[j % 8], 0.35)) : c.pal[j % 8];
         var v = s.data[j];
-        li.append(sw, h('span', 'k-legend-label', l), h('span', 'k-legend-value', v == null ? '' : f(v) + (sum > 0 && !whole ? ' (' + fmt(Math.round(v / sum * 100), 'percent', 0) + ')' : '')));
+        var share = sum > 0 && v > 0 ? v / sum * 100 : 0;
+        var shareText = share > 0 && share < 0.5 ? (LANG === 'nl' ? '<1%' : '<1%') : fmt(Math.round(share), 'percent', 0);
+        li.append(sw, h('span', 'k-legend-label', l), h('span', 'k-legend-value', v == null ? '' : f(v) + (sum > 0 && !whole ? ' (' + shareText + ')' : '')));
         legend.appendChild(li);
       });
     }
@@ -961,6 +980,13 @@
     return {};
   }
 
+  // A donut already names its total in the middle: a subtitle that only says the total goes.
+  function subtitleRepeatsTotal(kit, spec){
+    if(kit !== 'chart' || spec.type !== 'donut' || spec.format === 'percent' || !spec.series || !spec.series[0]) return false;
+    var sum = spec.series[0].data.reduce(function(a, v){ return a + (v || 0); }, 0);
+    var digits = String(spec.subtitle).replace(/[^\d]/g, '');
+    return /^(totaal|total)\b/i.test(String(spec.subtitle).trim()) || (digits.length >= 3 && digits === String(Math.round(sum)));
+  }
   // ── Render ──────────────────────────────────────────────────────────────
   function render(msg){
     var kit = msg.kit, spec = msg.spec;
@@ -975,7 +1001,7 @@
     root.className = 'kit kit-' + kit;
     current = null;
     try{
-      if(spec.subtitle) root.appendChild(h('p', 'k-sub', spec.subtitle));
+      if(spec.subtitle && !subtitleRepeatsTotal(kit, spec)) root.appendChild(h('p', 'k-sub', spec.subtitle));
       var box = h('div', 'k-body');
       root.appendChild(box);
       if(kit === 'table'){
