@@ -732,6 +732,20 @@ window.SynthPulseHelpContent = {
               "body": "How a process runs today with the Super Agent, grouped by category or team, with screenshots, recordings and prompts you can try in chat.",
               "target": "[data-tour='studio-playbooks']",
               "dynamic": true
+            },
+            {
+              "id": "prompts",
+              "title": "Prompts",
+              "body": "Shared prompts of your team, department or the organisation and your own, by category. Use them in chat with one click.",
+              "target": "[data-tour='studio-prompts']",
+              "dynamic": true
+            },
+            {
+              "id": "profile",
+              "title": "Organisation profile",
+              "body": "Who you are, your goals, systems and policy. The agent reads this in every QuickScan; let it research the website for a first proposal.",
+              "target": "[data-tour='studio-profile']",
+              "dynamic": true
             }
           ],
           "related": [
@@ -1642,6 +1656,20 @@ window.SynthPulseHelpContent = {
               "title": "Playbooks",
               "body": "Hoe een proces nu met de Super Agent loopt, gegroepeerd per categorie of team, met screenshots, opnames en prompts die je in de chat probeert.",
               "target": "[data-tour='studio-playbooks']",
+              "dynamic": true
+            },
+            {
+              "id": "prompts",
+              "title": "Prompts",
+              "body": "Gedeelde prompts van je team, afdeling of de organisatie en je eigen prompts, per categorie. Gebruik ze in de chat met één klik.",
+              "target": "[data-tour='studio-prompts']",
+              "dynamic": true
+            },
+            {
+              "id": "profile",
+              "title": "Organisatieprofiel",
+              "body": "Wie jullie zijn, jullie doelen, systemen en beleid. De agent leest dit mee bij elke QuickScan; laat de website onderzoeken voor een eerste voorstel.",
+              "target": "[data-tour='studio-profile']",
               "dynamic": true
             }
           ],

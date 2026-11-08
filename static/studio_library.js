@@ -28,6 +28,7 @@
     uploading: 'Uploaden…', too_big: 'Bestand is te groot (maximaal 14 MB)', remove_media: 'Verwijder', paste_hint: 'Tip: plak een screenshot direct in een stap (Ctrl+V).',
     links: 'Gebruikt', bots: 'Bots', tasks: 'Taken', skills: 'Skills', delete_pb: 'Playbook verwijderen', confirm_delete_pb: 'Dit playbook verwijderen voor iedereen? Dit kan niet ongedaan worden.',
     by: 'door', updated: 'bijgewerkt', from_uc: 'Uit use case',
+    save_prompt: 'Bewaar als prompt', prompt_saved_team: 'Bewaard bij de prompts van het team', prompt_saved_org: 'Bewaard bij de prompts van de organisatie',
     prompt: 'Prompt voor de Super Agent (optioneel)', try_chat: 'Probeer in de chat', run: 'Uitvoeren', run_intro: 'Vink af wat je gedaan hebt. De tijd loopt mee; zo zien we wat dit proces nu kost.', finish: 'Afronden', note: 'Notitie (optioneel)', cancel: 'Annuleren', run_saved: 'Uitvoering vastgelegd', runs: 'keer uitgevoerd', avg: 'gem.', min: 'min', elapsed: 'Verstreken'
   };
   const EN = {
@@ -47,6 +48,7 @@
     uploading: 'Uploading…', too_big: 'File is too large (at most 14 MB)', remove_media: 'Remove', paste_hint: 'Tip: paste a screenshot straight into a step (Ctrl+V).',
     links: 'Uses', bots: 'Bots', tasks: 'Tasks', skills: 'Skills', delete_pb: 'Delete playbook', confirm_delete_pb: 'Delete this playbook for everyone? This cannot be undone.',
     by: 'by', updated: 'updated', from_uc: 'From use case',
+    save_prompt: 'Save as prompt', prompt_saved_team: 'Saved to the team prompts', prompt_saved_org: 'Saved to the organisation prompts',
     prompt: 'Prompt for the Super Agent (optional)', try_chat: 'Try in chat', run: 'Run it', run_intro: 'Tick what you did. The clock runs along; that shows what this process costs now.', finish: 'Finish', note: 'Note (optional)', cancel: 'Cancel', run_saved: 'Run recorded', runs: 'runs', avg: 'avg.', min: 'min', elapsed: 'Elapsed'
   };
   const lang = () => ((document.documentElement.lang || 'nl').toLowerCase().startsWith('en') ? 'en' : 'nl');
@@ -154,7 +156,7 @@
     return `<figure class="pb-media">${el}${editable ? `<figcaption><input data-pb-caption="${i}:${j}" value="${H(m.caption || '')}" placeholder="Bijschrift" aria-label="Bijschrift"><button type="button" class="sm-btn" data-pb-media-remove="${i}:${j}">${H(w('remove_media'))}</button></figcaption>` : (m.caption ? `<figcaption>${H(m.caption)}</figcaption>` : '')}</figure>`;
   }
   function promptBox(s, i){
-    return s.prompt ? `<div class="pb-prompt"><code>${H(s.prompt)}</code><button type="button" class="sm-btn" data-pb-try="${i}">💬 ${H(w('try_chat'))}</button></div>` : '';
+    return s.prompt ? `<div class="pb-prompt"><code>${H(s.prompt)}</code><button type="button" class="sm-btn" data-pb-try="${i}">💬 ${H(w('try_chat'))}</button><button type="button" class="sm-btn" data-pb-save-prompt="${i}">${H(w('save_prompt'))}</button></div>` : '';
   }
   function statsLine(pb){
     const st = pb.stats || {};
@@ -206,7 +208,7 @@
       <ol class="pb-steps" data-tour="studio-playbook-steps">${(pb.steps || []).map((s, i) => `<li class="pb-step" data-pb-step="${i}">
         <div class="pb-step-head"><span class="st-num">${i + 1}</span><input class="pb-step-title" data-pb-s="${i}:title" value="${H(s.title)}" placeholder="${H(w('step_title'))}" aria-label="${H(w('step_title'))}"><input class="pb-actor" data-pb-s="${i}:actor" value="${H(s.actor || '')}" placeholder="${H(w('actor'))}" aria-label="${H(w('actor'))}"></div>
         <textarea data-pb-s="${i}:text" rows="3" placeholder="${H(w('text'))}" aria-label="${H(w('text'))}">${H(s.text || '')}</textarea>
-        <div class="pb-prompt-edit"><textarea data-pb-s="${i}:prompt" rows="2" placeholder="${H(w('prompt'))}" aria-label="${H(w('prompt'))}">${H(s.prompt || '')}</textarea>${s.prompt ? `<button type="button" class="sm-btn" data-pb-try="${i}">💬 ${H(w('try_chat'))}</button>` : ''}</div>
+        <div class="pb-prompt-edit"><textarea data-pb-s="${i}:prompt" rows="2" placeholder="${H(w('prompt'))}" aria-label="${H(w('prompt'))}">${H(s.prompt || '')}</textarea>${s.prompt ? `<button type="button" class="sm-btn" data-pb-try="${i}">💬 ${H(w('try_chat'))}</button><button type="button" class="sm-btn" data-pb-save-prompt="${i}">${H(w('save_prompt'))}</button>` : ''}</div>
         <div class="pb-media-row">${(s.media || []).map((m, j) => mediaHtml(m, i, j, true)).join('')}</div>
         <div class="pb-step-actions"><label class="sm-btn pb-file">🖼 ${H(w('add_image'))}<input type="file" accept="image/*,video/webm,video/mp4" data-pb-file="${i}" hidden></label>
           <button type="button" class="sm-btn" data-pb-rec="screen:${i}">${L.rec && L.rec.step === i && L.rec.kind === 'screen' ? '⏹ ' + H(w('stop_rec')) : '🎥 ' + H(w('record_screen'))}</button>
@@ -334,6 +336,12 @@
       if (b.dataset.pbStepRemove !== undefined) { collectPb(); L.pb.steps.splice(Number(b.dataset.pbStepRemove), 1); paintPlaybook(); return; }
       if (b.dataset.pbStepUp !== undefined) { collectPb(); const i = Number(b.dataset.pbStepUp); [L.pb.steps[i - 1], L.pb.steps[i]] = [L.pb.steps[i], L.pb.steps[i - 1]]; paintPlaybook(); return; }
       if (b.dataset.pbMediaRemove) { collectPb(); const [i, j] = b.dataset.pbMediaRemove.split(':').map(Number); L.pb.steps[i].media.splice(j, 1); await savePb({}, true); return; }
+      if (b.dataset.pbSavePrompt !== undefined) {
+        if (!L.runMode && L.pb.editable) collectPb();
+        const st = L.pb.steps[Number(b.dataset.pbSavePrompt)];
+        if (st && st.prompt && window.SPPrompts) { try { await window.SPPrompts.saveFromStep(L.pb, st); toast(w(L.pb.team ? 'prompt_saved_team' : 'prompt_saved_org')); } catch (e) { toast(errMsg(e)); } }
+        return;
+      }
       if (b.dataset.pbTry !== undefined) { if (!L.runMode && L.pb.editable) collectPb(); const s = L.pb.steps[Number(b.dataset.pbTry)]; if (s && s.prompt) await tryInChat(s.prompt); return; }
       if (b.hasAttribute('data-pb-run')) { if (L.pb.editable) collectPb(); L.runMode = { started: Date.now(), done: new Set() }; paintPlaybook(); return; }
       if (b.hasAttribute('data-pb-run-cancel')) { clearInterval(L.runMode && L.runMode.tick); L.runMode = null; paintPlaybook(); return; }

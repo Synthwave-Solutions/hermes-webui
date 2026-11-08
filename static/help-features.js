@@ -15539,8 +15539,8 @@ window.SynthPulseFeatureCatalog = {
         "#studioHubNav"
       ],
       "source_refs": [
-        "static/studio.js:152",
-        "static/studio.js:340",
+        "static/studio.js:162",
+        "static/studio.js:350",
         "api/studio.py:253"
       ],
       "related": [
@@ -15590,9 +15590,9 @@ window.SynthPulseFeatureCatalog = {
         "[data-tour='studio-steps']"
       ],
       "source_refs": [
-        "static/studio.js:238",
+        "static/studio.js:248",
         "api/studio.py:308",
-        "static/studio.js:213"
+        "static/studio.js:223"
       ],
       "related": [
         "webui.studio.usecases",
@@ -15640,8 +15640,8 @@ window.SynthPulseFeatureCatalog = {
         "[data-tour='studio-baseline']"
       ],
       "source_refs": [
-        "static/studio.js:258",
-        "api/studio.py:334",
+        "static/studio.js:268",
+        "api/studio.py:335",
         "api/studio.py:207"
       ],
       "related": [
@@ -15689,9 +15689,9 @@ window.SynthPulseFeatureCatalog = {
         "[data-tour='studio-plan']"
       ],
       "source_refs": [
-        "static/studio.js:293",
-        "api/studio.py:361",
-        "static/studio.js:275"
+        "static/studio.js:303",
+        "api/studio.py:362",
+        "static/studio.js:285"
       ],
       "related": [
         "webui.studio.design",
@@ -15738,8 +15738,8 @@ window.SynthPulseFeatureCatalog = {
         "[data-tour='studio-build']"
       ],
       "source_refs": [
-        "static/studio.js:308",
-        "static/studio.js:377"
+        "static/studio.js:318",
+        "static/studio.js:388"
       ],
       "related": [
         "webui.studio.plan",
@@ -15790,8 +15790,8 @@ window.SynthPulseFeatureCatalog = {
         "[data-tour='studio-conversation']"
       ],
       "source_refs": [
-        "static/studio.js:170",
-        "static/studio.js:465",
+        "static/studio.js:180",
+        "static/studio.js:476",
         "api/realtime_voice_runtime.py:38"
       ],
       "related": [
@@ -15839,7 +15839,7 @@ window.SynthPulseFeatureCatalog = {
         "[data-tour='studio-backlog-add']"
       ],
       "source_refs": [
-        "static/studio_library.js:106",
+        "static/studio_library.js:108",
         "api/studio_library.py:193"
       ],
       "related": [
@@ -15888,8 +15888,8 @@ window.SynthPulseFeatureCatalog = {
         "[data-tour='studio-playbook-new']"
       ],
       "source_refs": [
-        "static/studio_library.js:141",
-        "static/studio_library.js:122",
+        "static/studio_library.js:143",
+        "static/studio_library.js:124",
         "api/studio_library.py:263"
       ],
       "related": [
@@ -15937,8 +15937,8 @@ window.SynthPulseFeatureCatalog = {
         "[data-tour='studio-playbook-steps']"
       ],
       "source_refs": [
-        "static/studio_library.js:206",
-        "static/studio_library.js:235",
+        "static/studio_library.js:208",
+        "static/studio_library.js:237",
         "api/studio_library.py:367"
       ],
       "related": [
@@ -15986,8 +15986,8 @@ window.SynthPulseFeatureCatalog = {
         "[data-pb-run]"
       ],
       "source_refs": [
-        "static/studio_library.js:163",
-        "static/studio_library.js:175",
+        "static/studio_library.js:165",
+        "static/studio_library.js:177",
         "api/studio_library.py:342"
       ],
       "related": [
@@ -16038,8 +16038,8 @@ window.SynthPulseFeatureCatalog = {
         "[data-tour='org-chart']"
       ],
       "source_refs": [
-        "static/orgmgmt.js:487",
-        "static/orgmgmt.js:340",
+        "static/orgmgmt.js:410",
+        "static/orgmgmt.js:355",
         "api/management.py:671"
       ],
       "related": [
@@ -16091,8 +16091,8 @@ window.SynthPulseFeatureCatalog = {
         ".om-mini-stat"
       ],
       "source_refs": [
-        "static/orgmgmt.js:324",
-        "static/orgmgmt.js:262",
+        "static/orgmgmt.js:325",
+        "static/orgmgmt.js:263",
         "api/management.py:600"
       ],
       "related": [
@@ -16141,8 +16141,8 @@ window.SynthPulseFeatureCatalog = {
         "[data-tour='org-team']"
       ],
       "source_refs": [
-        "static/orgmgmt.js:444",
-        "static/orgmgmt.js:437"
+        "static/orgmgmt.js:455",
+        "static/orgmgmt.js:448"
       ],
       "related": [
         "webui.org.chart",
@@ -16191,7 +16191,7 @@ window.SynthPulseFeatureCatalog = {
         "[data-tour='org-teams']"
       ],
       "source_refs": [
-        "static/orgmgmt.js:528",
+        "static/orgmgmt.js:546",
         "api/org_structure.py:514"
       ],
       "related": [
@@ -16242,8 +16242,8 @@ window.SynthPulseFeatureCatalog = {
         "[data-tour='mgmt-decisions']"
       ],
       "source_refs": [
-        "static/orgmgmt.js:654",
-        "static/orgmgmt.js:691",
+        "static/orgmgmt.js:706",
+        "static/orgmgmt.js:743",
         "api/management.py:169"
       ],
       "related": [
@@ -16295,8 +16295,8 @@ window.SynthPulseFeatureCatalog = {
         "[data-tour='mgmt-bots']"
       ],
       "source_refs": [
-        "static/orgmgmt.js:737",
-        "static/orgmgmt.js:716"
+        "static/orgmgmt.js:789",
+        "static/orgmgmt.js:768"
       ],
       "related": [
         "webui.mgmt.overview"
@@ -16344,7 +16344,7 @@ window.SynthPulseFeatureCatalog = {
         "#omSettings"
       ],
       "source_refs": [
-        "static/orgmgmt.js:752",
+        "static/orgmgmt.js:804",
         "api/value_tracking.py:585"
       ],
       "related": [
@@ -16392,8 +16392,8 @@ window.SynthPulseFeatureCatalog = {
         "#omValueCard"
       ],
       "source_refs": [
-        "static/orgmgmt.js:884",
-        "static/orgmgmt.js:1018",
+        "static/orgmgmt.js:936",
+        "static/orgmgmt.js:1070",
         "api/value_tracking.py:95"
       ],
       "related": [
@@ -16444,8 +16444,8 @@ window.SynthPulseFeatureCatalog = {
         "#botServes"
       ],
       "source_refs": [
-        "static/orgmgmt.js:971",
-        "static/orgmgmt.js:992",
+        "static/orgmgmt.js:1023",
+        "static/orgmgmt.js:1044",
         "api/bot_metadata.py:12"
       ],
       "related": [
@@ -16495,7 +16495,7 @@ window.SynthPulseFeatureCatalog = {
         "#omChatValue"
       ],
       "source_refs": [
-        "static/orgmgmt.js:1051",
+        "static/orgmgmt.js:1103",
         "api/value_tracking.py:486"
       ],
       "related": [
@@ -16529,6 +16529,108 @@ window.SynthPulseFeatureCatalog = {
           "permissions": "Alleen de persoon van het gesprek bevestigt of verbetert het.",
           "limits": "De koppeling is een schatting tot jij hem bevestigt.",
           "example": "Aanmaningen opstellen, 20 minuten bespaard: Klopt."
+        }
+      }
+    },
+    {
+      "id": "webui.studio.prompts",
+      "area": "studio",
+      "status": "available",
+      "conditions": [],
+      "anchors": [
+        "?help_feature=webui.studio.prompts",
+        "[data-tour='studio-prompts']",
+        "[data-tour='studio-prompt-new']"
+      ],
+      "source_refs": [
+        "static/studio_prompts.js:115",
+        "api/studio_library.py:457",
+        "static/messages.js:824"
+      ],
+      "related": [
+        "webui.studio.playbooks",
+        "webui.studio.playbook_edit"
+      ],
+      "locales": {
+        "en": {
+          "title": "Sharing prompts per team and department",
+          "purpose": "Next to your own saved prompts you can share prompts with your team, your department or the whole organisation, with a category. Studio groups them by category or by where they are shared; the chat box lists them under your own prompts.",
+          "when": "When a prompt works well and colleagues should be able to use it too.",
+          "steps": [
+            "Choose Prompts in the Studio sidebar.",
+            "Choose New prompt, fill in name, prompt and category and choose who to share it with.",
+            "Choose Use in chat, or open the prompts in the chat box and pick one.",
+            "On a prompt of your own choose Share to share it with your team. On a Playbook step choose Save as prompt."
+          ],
+          "permissions": "You share only with teams and departments you belong to; organisation admins with everyone. The author and that team's admin change a shared prompt.",
+          "limits": "Your own prompts stay yours. A prompt is at most 8000 characters; the chat box shows the twelve most used per group.",
+          "example": "Share Make this mail shorter with the whole organisation, in the category Writing."
+        },
+        "nl": {
+          "title": "Prompts delen per team en afdeling",
+          "purpose": "Naast je eigen opgeslagen prompts kun je prompts delen met je team, je afdeling of de hele organisatie, met een categorie. In Studio zie je ze gegroepeerd per categorie of per plek waar ze gedeeld zijn; in het chatveld staan ze onder je eigen prompts.",
+          "when": "Als een prompt goed werkt en collega's hem ook moeten kunnen gebruiken.",
+          "steps": [
+            "Kies Prompts in de zijbalk van Studio.",
+            "Kies Nieuwe prompt, vul naam, prompt en categorie in en kies met wie je hem deelt.",
+            "Kies Gebruik in chat, of open de prompts in het chatveld en kies er een.",
+            "Bij een eigen prompt kies je Delen om hem met je team te delen. Bij een Playbook-stap kies je Bewaar als prompt."
+          ],
+          "permissions": "Je deelt alleen met teams en afdelingen waar je zelf bij hoort; organisatiebeheerders met iedereen. De auteur en de beheerder van dat team wijzigen een gedeelde prompt.",
+          "limits": "Eigen prompts blijven alleen van jou. Een prompt is hooguit 8000 tekens; het chatveld toont per groep de twaalf meest gebruikte.",
+          "example": "Deel Maak deze mail korter met de hele organisatie, in de categorie Schrijven."
+        }
+      }
+    },
+    {
+      "id": "webui.studio.org_profile",
+      "area": "studio",
+      "status": "conditional",
+      "conditions": [
+        "organisation-admin-to-edit"
+      ],
+      "anchors": [
+        "?help_feature=webui.studio.org_profile",
+        "[data-tour='studio-profile']",
+        "[data-tour='studio-profile-research']"
+      ],
+      "source_refs": [
+        "static/studio_prompts.js:159",
+        "api/studio_library.py:638",
+        "api/studio_library.py:550"
+      ],
+      "related": [
+        "webui.studio.discover",
+        "webui.studio.design"
+      ],
+      "locales": {
+        "en": {
+          "title": "Organisation profile",
+          "purpose": "One profile of the organisation: what you do, for whom, your goals, the systems in use and the policy for AI and data. The Super Agent reads it in every QuickScan, design and build plan, so proposals fit your situation.",
+          "when": "At the start, and when goals, systems or policy change.",
+          "steps": [
+            "Choose Organisation profile in the Studio sidebar.",
+            "Fill in the website and choose Research the website: the agent proposes fields from what the site says.",
+            "Choose Fill empty fields or Take all, and complete what is missing.",
+            "Choose Save. Under How the agent reads the profile you see exactly what goes along."
+          ],
+          "permissions": "Everyone in Studio reads the profile; only organisation admins change it and research the website.",
+          "limits": "Research reads public websites only and only proposes; nothing is saved until you choose Save. The agent receives a short summary at most.",
+          "example": "Sector installation engineering, systems Exact, Outlook and Excel, goal faster quotes."
+        },
+        "nl": {
+          "title": "Organisatieprofiel",
+          "purpose": "Eén profiel van de organisatie: wat jullie doen, voor wie, jullie doelen, de systemen in gebruik en het beleid voor AI en data. De Super Agent leest het mee bij elke QuickScan, elk ontwerp en elk bouwplan, zodat voorstellen aansluiten op jullie situatie.",
+          "when": "Bij de start, en als doelen, systemen of beleid veranderen.",
+          "steps": [
+            "Kies Organisatieprofiel in de zijbalk van Studio.",
+            "Vul de website in en kies Onderzoek de website: de agent stelt velden voor op basis van wat er op de site staat.",
+            "Kies Vul lege velden of Neem alles over, en vul aan wat ontbreekt.",
+            "Kies Opslaan. Onder Zo leest de agent het profiel zie je precies wat er meegaat."
+          ],
+          "permissions": "Iedereen in Studio leest het profiel; alleen organisatiebeheerders wijzigen het en laten de website onderzoeken.",
+          "limits": "Het onderzoek leest alleen openbare websites en stelt alleen voor; er wordt niets opgeslagen tot je Opslaan kiest. De agent krijgt hooguit een korte samenvatting mee.",
+          "example": "Sector installatietechniek, systemen Exact, Outlook en Excel, doel sneller offreren."
         }
       }
     }

@@ -332,6 +332,11 @@ def main() -> int:
             ok("Playbooks group by category or team in collapsible groups")
             page.locator('.pb-group[data-pb-gopen="category:Debiteurenbeheer"] [data-pb-open]').first.click()
             page.wait_for_selector(".pb-step-title", timeout=10000)
+            page.locator('[data-pb-save-prompt="0"]').first.click()
+            page.wait_for_function("() => /prompts van het team/.test(document.body.innerText)", timeout=10000)
+            shared = ctx.request.get("/api/studio/prompts").json()["prompts"]
+            assert any(p["text"] == "Laat de concept-aanmaningen van vandaag zien" and p["team"] == "finance/debiteuren"
+                       and p["category"] == "Debiteurenbeheer" and p["source"].startswith("playbook:") for p in shared), shared
 
             # run it, with the clock, and try a step's prompt in the chat
             page.locator("[data-pb-run]").click()
@@ -398,6 +403,57 @@ def main() -> int:
             hub(page, "usecases")
             page.wait_for_selector(".st-card", timeout=10000)
             ok("Explain this page and the feature guide explain Studio, the org chart and Management")
+
+            # shared prompts: per team, department or organisation, in Studio and in the chat box
+            assert page.locator(".st-profile-hint").is_visible(), "an empty organisation profile is pointed out to the admin"
+            hub(page, "prompts")
+            page.wait_for_selector('.pb-group[data-pr-gopen="category:Debiteurenbeheer"] .pr-card', timeout=10000)
+            page.locator("[data-pr-new]").click()
+            form = page.locator("[data-pr-form]")
+            form.locator('[name="label"]').fill("Korter")
+            form.locator('[name="text"]').fill("Maak deze tekst korter en zakelijker.")
+            form.locator('[name="category"]').fill("Schrijven")
+            form.locator('[name="scope"]').select_option("org")
+            form.locator('button[type="submit"]').click()
+            page.wait_for_selector('.pb-group[data-pr-gopen="category:Schrijven"] .pr-card', timeout=10000)
+            page.locator('[data-pr-group="where"]').click()
+            page.wait_for_selector('.pb-group[data-pr-gopen="where:Hele organisatie"] .pr-card', timeout=10000)
+            assert page.locator('.pb-group[data-pr-gopen="where:Team Debiteuren"] .pr-card').count() == 1
+            page.locator('.pr-card:has-text("Korter") [data-pr-use]').click()
+            page.wait_for_function("() => /Maak deze tekst korter/.test((document.getElementById('msg') || {}).value || '')", timeout=10000)
+            page.wait_for_timeout(500)
+            korter = next(p for p in ctx.request.get("/api/studio/prompts").json()["prompts"] if p["label"] == "Korter")
+            assert korter["uses"] == 1 and korter["scope"] == "org", korter
+            page.evaluate("() => { document.getElementById('msg').value = ''; }")
+            page.locator("#btnSavedPrompts").click()
+            page.wait_for_selector("#savedPromptsPopup .saved-prompts-group", timeout=10000)
+            groups = page.locator("#savedPromptsPopup .saved-prompts-group").all_inner_texts()
+            assert any("organisatie" in g.lower() for g in groups) and any("debiteuren" in g.lower() for g in groups), groups
+            page.locator('#savedPromptsPopup .saved-prompt-row.shared:has-text("Korter")').click()
+            assert "Maak deze tekst korter" in page.locator("#msg").input_value()
+            page.screenshot(path=str(art / "12-prompts-popup.png"))
+            ok("prompts are shared per team, department or organisation, grouped by category, used from Studio and from the chat box; a playbook step's prompt is saved for its team")
+
+            # organisation profile: context for every QuickScan
+            hub(page, "profile")
+            pf = page.locator("[data-pf-form]")
+            pf.wait_for(timeout=10000)
+            pf.locator('[name="name"]').fill("Acme Installatie")
+            pf.locator('[name="sector"]').fill("Installatietechniek")
+            pf.locator('[name="systems"]').fill("Exact, Outlook, Excel")
+            pf.locator('[name="goals"]').fill("Sneller offreren\nMinder handwerk")
+            pf.locator('button[type="submit"]').click()
+            page.wait_for_function("() => /Systemen in gebruik: Exact, Outlook, Excel/.test(document.querySelector('.pf-context pre')?.textContent || '')", timeout=10000)
+            prof = ctx.request.get("/api/studio/profile").json()
+            assert prof["name"] == "Acme Installatie" and prof["goals"] == ["Sneller offreren", "Minder handwerk"], prof
+            pf.locator('[name="website"]').fill("http://127.0.0.1:1/")
+            page.locator("[data-pf-research]").click()
+            page.wait_for_function("() => /openbare websites/i.test(document.body.innerText)", timeout=15000)
+            page.screenshot(path=str(art / "13-profile.png"), full_page=True)
+            hub(page, "usecases")
+            page.wait_for_selector(".st-card", timeout=10000)
+            assert not page.locator(".st-profile-hint").count()
+            ok("organisation profile saved by the admin and shown as the context the agent reads; research refuses a private address")
 
             # 7. narrow
             page.set_viewport_size({"width": 390, "height": 844})

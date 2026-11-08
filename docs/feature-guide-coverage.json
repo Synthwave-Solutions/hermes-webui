@@ -3139,8 +3139,8 @@
       "area": "studio",
       "status": "available",
       "source_refs": [
-        "static/studio.js:152",
-        "static/studio.js:340",
+        "static/studio.js:162",
+        "static/studio.js:350",
         "api/studio.py:253"
       ]
     },
@@ -3149,9 +3149,9 @@
       "area": "studio",
       "status": "available",
       "source_refs": [
-        "static/studio.js:238",
+        "static/studio.js:248",
         "api/studio.py:308",
-        "static/studio.js:213"
+        "static/studio.js:223"
       ]
     },
     {
@@ -3159,8 +3159,8 @@
       "area": "studio",
       "status": "available",
       "source_refs": [
-        "static/studio.js:258",
-        "api/studio.py:334",
+        "static/studio.js:268",
+        "api/studio.py:335",
         "api/studio.py:207"
       ]
     },
@@ -3169,9 +3169,9 @@
       "area": "studio",
       "status": "available",
       "source_refs": [
-        "static/studio.js:293",
-        "api/studio.py:361",
-        "static/studio.js:275"
+        "static/studio.js:303",
+        "api/studio.py:362",
+        "static/studio.js:285"
       ]
     },
     {
@@ -3179,8 +3179,8 @@
       "area": "studio",
       "status": "available",
       "source_refs": [
-        "static/studio.js:308",
-        "static/studio.js:377"
+        "static/studio.js:318",
+        "static/studio.js:388"
       ]
     },
     {
@@ -3188,8 +3188,8 @@
       "area": "studio",
       "status": "conditional",
       "source_refs": [
-        "static/studio.js:170",
-        "static/studio.js:465",
+        "static/studio.js:180",
+        "static/studio.js:476",
         "api/realtime_voice_runtime.py:38"
       ]
     },
@@ -3198,7 +3198,7 @@
       "area": "studio",
       "status": "available",
       "source_refs": [
-        "static/studio_library.js:106",
+        "static/studio_library.js:108",
         "api/studio_library.py:193"
       ]
     },
@@ -3207,8 +3207,8 @@
       "area": "studio",
       "status": "available",
       "source_refs": [
-        "static/studio_library.js:141",
-        "static/studio_library.js:122",
+        "static/studio_library.js:143",
+        "static/studio_library.js:124",
         "api/studio_library.py:263"
       ]
     },
@@ -3217,8 +3217,8 @@
       "area": "studio",
       "status": "available",
       "source_refs": [
-        "static/studio_library.js:206",
-        "static/studio_library.js:235",
+        "static/studio_library.js:208",
+        "static/studio_library.js:237",
         "api/studio_library.py:367"
       ]
     },
@@ -3227,8 +3227,8 @@
       "area": "studio",
       "status": "available",
       "source_refs": [
-        "static/studio_library.js:163",
-        "static/studio_library.js:175",
+        "static/studio_library.js:165",
+        "static/studio_library.js:177",
         "api/studio_library.py:342"
       ]
     },
@@ -3237,8 +3237,8 @@
       "area": "organisation",
       "status": "conditional",
       "source_refs": [
-        "static/orgmgmt.js:487",
-        "static/orgmgmt.js:340",
+        "static/orgmgmt.js:410",
+        "static/orgmgmt.js:355",
         "api/management.py:671"
       ]
     },
@@ -3247,8 +3247,8 @@
       "area": "organisation",
       "status": "conditional",
       "source_refs": [
-        "static/orgmgmt.js:324",
-        "static/orgmgmt.js:262",
+        "static/orgmgmt.js:325",
+        "static/orgmgmt.js:263",
         "api/management.py:600"
       ]
     },
@@ -3257,8 +3257,8 @@
       "area": "organisation",
       "status": "conditional",
       "source_refs": [
-        "static/orgmgmt.js:444",
-        "static/orgmgmt.js:437"
+        "static/orgmgmt.js:455",
+        "static/orgmgmt.js:448"
       ]
     },
     {
@@ -3266,7 +3266,7 @@
       "area": "organisation",
       "status": "conditional",
       "source_refs": [
-        "static/orgmgmt.js:528",
+        "static/orgmgmt.js:546",
         "api/org_structure.py:514"
       ]
     },
@@ -3275,8 +3275,8 @@
       "area": "organisation",
       "status": "conditional",
       "source_refs": [
-        "static/orgmgmt.js:654",
-        "static/orgmgmt.js:691",
+        "static/orgmgmt.js:706",
+        "static/orgmgmt.js:743",
         "api/management.py:169"
       ]
     },
@@ -3285,8 +3285,8 @@
       "area": "organisation",
       "status": "conditional",
       "source_refs": [
-        "static/orgmgmt.js:737",
-        "static/orgmgmt.js:716"
+        "static/orgmgmt.js:789",
+        "static/orgmgmt.js:768"
       ]
     },
     {
@@ -3294,7 +3294,7 @@
       "area": "organisation",
       "status": "conditional",
       "source_refs": [
-        "static/orgmgmt.js:752",
+        "static/orgmgmt.js:804",
         "api/value_tracking.py:585"
       ]
     },
@@ -3303,8 +3303,8 @@
       "area": "organisation",
       "status": "available",
       "source_refs": [
-        "static/orgmgmt.js:884",
-        "static/orgmgmt.js:1018",
+        "static/orgmgmt.js:936",
+        "static/orgmgmt.js:1070",
         "api/value_tracking.py:95"
       ]
     },
@@ -3313,8 +3313,8 @@
       "area": "organisation",
       "status": "conditional",
       "source_refs": [
-        "static/orgmgmt.js:971",
-        "static/orgmgmt.js:992",
+        "static/orgmgmt.js:1023",
+        "static/orgmgmt.js:1044",
         "api/bot_metadata.py:12"
       ]
     },
@@ -3323,8 +3323,28 @@
       "area": "organisation",
       "status": "conditional",
       "source_refs": [
-        "static/orgmgmt.js:1051",
+        "static/orgmgmt.js:1103",
         "api/value_tracking.py:486"
+      ]
+    },
+    {
+      "id": "webui.studio.prompts",
+      "area": "studio",
+      "status": "available",
+      "source_refs": [
+        "static/studio_prompts.js:115",
+        "api/studio_library.py:457",
+        "static/messages.js:824"
+      ]
+    },
+    {
+      "id": "webui.studio.org_profile",
+      "area": "studio",
+      "status": "conditional",
+      "source_refs": [
+        "static/studio_prompts.js:159",
+        "api/studio_library.py:638",
+        "api/studio_library.py:550"
       ]
     }
   ],
@@ -8721,10 +8741,12 @@
     "webui.studio.conversation",
     "webui.studio.design",
     "webui.studio.discover",
+    "webui.studio.org_profile",
     "webui.studio.plan",
     "webui.studio.playbook_edit",
     "webui.studio.playbook_run",
     "webui.studio.playbooks",
+    "webui.studio.prompts",
     "webui.studio.usecases"
   ],
   "commands": {

@@ -404,6 +404,267 @@ def serve_media(handler, view, pb_id: str, name: str) -> None:
     handler.wfile.write(data)
 
 
+
+# ── Shared prompts: per team, department or the whole organisation ──────────
+# Personal prompts stay where they are (/api/prompts, per profile). These are
+# the ones people share, with a category, the way SynthDrive's prompt bank did.
+
+PROMPT_SCOPES = ("team", "department", "org")
+
+
+def _member_departments(view) -> set:
+    return {k.split("/", 1)[0] for k in (view.member_teams | view.lead_teams)} | set(view.departments)
+
+
+def _prompt_visible(view, p: dict) -> bool:
+    if view.scope == org_structure.SCOPE_ALL or p.get("owner") == view.email:
+        return True
+    scope = p.get("scope")
+    if scope == "org":
+        return True
+    if scope == "team":
+        return _sees_team(view, p.get("team") or "")
+    if scope == "department":
+        return (p.get("department") or "") in _member_departments(view)
+    return False
+
+
+def _prompt_editable(view, p: dict) -> bool:
+    if view.scope == org_structure.SCOPE_ALL or p.get("owner") == view.email:
+        return True
+    if p.get("scope") == "team" and p.get("team"):
+        return view.edits_team(p["team"]) or p["team"] in view.lead_teams
+    if p.get("scope") == "department":
+        return (p.get("department") or "") in view.departments
+    return False
+
+
+def prompts_for(view) -> dict:
+    rows = [dict(p, editable=_prompt_editable(view, p)) for p in _read("prompts.json", {"prompts": []}).get("prompts") or []
+            if isinstance(p, dict) and _prompt_visible(view, p)]
+    data = org_structure.load()
+    depts = org_structure.departments(data)
+    teams = [{"key": k, "name": (t or {}).get("name") or k, "department": (t or {}).get("department") or k.split("/", 1)[0]}
+             for k, t in sorted((data.get("teams") or {}).items()) if isinstance(t, dict)]
+    mine = view.member_teams | view.lead_teams
+    return {"prompts": sorted(rows, key=lambda r: (-(r.get("uses") or 0), str(r.get("label") or "").lower())),
+            "teams": teams, "departments": [{"key": k, "name": (d or {}).get("name") or k} for k, d in sorted(depts.items())],
+            "my_teams": sorted(mine), "my_departments": sorted(_member_departments(view)),
+            "is_admin": view.scope == org_structure.SCOPE_ALL,
+            "categories": sorted({r.get("category") for r in rows if r.get("category")})}
+
+
+def save_prompt(view, body: dict) -> dict:
+    op = body.get("op") or "save"
+    with _LOCK:
+        data = _read("prompts.json", {"prompts": []})
+        rows = [p for p in data.get("prompts") or [] if isinstance(p, dict)]
+        pid = str(body.get("id") or "")
+        row = next((p for p in rows if p.get("id") == pid), None) if pid else None
+        if pid and row is None:
+            raise KeyError("Prompt not found")
+        if op == "use":
+            if row is None or not _prompt_visible(view, row):
+                raise KeyError("Prompt not found")
+            row["uses"] = int(row.get("uses") or 0) + 1
+            _write("prompts.json", {"prompts": rows})
+            return {"ok": True, "uses": row["uses"]}
+        if op == "delete":
+            if row is None or not _prompt_editable(view, row):
+                raise PermissionError("Only the author or an admin of that team can remove this prompt")
+            rows.remove(row)
+            _write("prompts.json", {"prompts": rows})
+            return {"ok": True}
+        if row is not None and not _prompt_editable(view, row):
+            raise PermissionError("Only the author or an admin of that team can change this prompt")
+        text = str(body.get("text") if "text" in body else (row or {}).get("text") or "").strip()
+        if not text:
+            raise ValueError("A prompt needs text")
+        if len(text) > 8000:
+            raise ValueError("Prompt too long (max 8000 characters)")
+        scope = body.get("scope") or (row or {}).get("scope") or "team"
+        if scope not in PROMPT_SCOPES:
+            raise ValueError("Share with a team, a department or the organisation")
+        team = str(body.get("team") if "team" in body else (row or {}).get("team") or "")
+        dept = str(body.get("department") if "department" in body else (row or {}).get("department") or "")
+        structure = org_structure.load()
+        if scope == "team":
+            if team not in (structure.get("teams") or {}):
+                raise ValueError("Choose a team")
+            if view.scope != org_structure.SCOPE_ALL and not _sees_team(view, team):
+                raise PermissionError("You can only share with your own team")
+            dept = ""
+        elif scope == "department":
+            if dept not in org_structure.departments(structure):
+                raise ValueError("Choose a department")
+            if view.scope != org_structure.SCOPE_ALL and dept not in _member_departments(view):
+                raise PermissionError("You can only share with your own department")
+            team = ""
+        else:
+            team = dept = ""
+        if row is None:
+            if len(rows) >= 2000:
+                raise ValueError("Too many shared prompts")
+            row = {"id": "pr_" + secrets.token_hex(6), "owner": view.email, "created_at": time.time(), "uses": 0}
+            rows.append(row)
+        row.update({"label": _txt(body.get("label") if "label" in body else row.get("label"), 120) or text[:60],
+                    "text": text, "category": _txt(body.get("category") if "category" in body else row.get("category"), 60),
+                    "scope": scope, "team": team, "department": dept, "updated_at": time.time(),
+                    "source": _txt(body.get("source") if "source" in body else row.get("source"), 80)})
+        _write("prompts.json", {"prompts": rows})
+        return dict(row, editable=True)
+
+
+# ── Organisation profile: context for every QuickScan ───────────────────────
+
+PROFILE_FIELDS = {"name": 120, "website": 200, "sector": 120, "size": 80, "description": 900, "customers": 400, "policy": 900}
+PROFILE_LISTS = {"goals": (8, 200), "systems": (40, 60), "products": (12, 120)}
+
+
+def load_profile() -> dict:
+    return _read("org_profile.json", {})
+
+
+def clean_profile(raw: dict) -> dict:
+    raw = raw if isinstance(raw, dict) else {}
+    out = {k: _txt(raw.get(k), n) for k, n in PROFILE_FIELDS.items()}
+    for k, (count, n) in PROFILE_LISTS.items():
+        items = raw.get(k) if isinstance(raw.get(k), list) else re.split(r"[,\n]", str(raw.get(k) or ""))
+        out[k] = [x for x in (_txt(i, n) for i in items[:count * 2]) if x][:count]
+    if out["website"] and not re.match(r"^https?://", out["website"]):
+        out["website"] = "https://" + out["website"]
+    return out
+
+
+def save_profile(view, body: dict) -> dict:
+    if view.scope != org_structure.SCOPE_ALL:
+        raise PermissionError("Only organisation admins change the organisation profile")
+    with _LOCK:
+        current = load_profile()
+        profile = dict(current, **clean_profile(dict({k: current.get(k) for k in (*PROFILE_FIELDS, *PROFILE_LISTS)}, **body)))
+        profile.update(updated_at=time.time(), updated_by=view.email)
+        _write("org_profile.json", profile)
+    return profile
+
+
+def context_text(limit: int = 1400) -> str:
+    """The organisation profile as a short context block for Studio prompts."""
+    p = load_profile()
+    if not any(p.get(k) for k in (*PROFILE_FIELDS, *PROFILE_LISTS)):
+        return ""
+    parts = []
+    head = ", ".join(x for x in (p.get("sector"), p.get("size")) if x)
+    if p.get("name"):
+        parts.append(p["name"] + (f" ({head})" if head else ""))
+    elif head:
+        parts.append(head)
+    if p.get("description"):
+        parts.append(p["description"])
+    if p.get("products"):
+        parts.append("Producten en diensten: " + "; ".join(p["products"]))
+    if p.get("customers"):
+        parts.append("Klanten: " + p["customers"])
+    if p.get("goals"):
+        parts.append("Doelen: " + "; ".join(p["goals"]))
+    if p.get("systems"):
+        parts.append("Systemen in gebruik: " + ", ".join(p["systems"]))
+    if p.get("policy"):
+        parts.append("Beleid voor AI en data: " + p["policy"])
+    return "\n".join(parts)[:limit]
+
+
+_RESEARCH = """Je onderzoekt een organisatie voor een AI QuickScan. Je krijgt tekst van hun website.
+Haal eruit wat er staat, en verzin niets: laat een veld leeg als het niet op de site staat.
+Nederlands, kort en zakelijk. Alleen JSON:
+{"name": "...", "sector": "...", "size": "...", "description": "twee of drie zinnen wat ze doen",
+ "products": ["..."], "customers": "voor wie", "systems": ["software of platforms die op de site genoemd worden"],
+ "goals": ["ambities of speerpunten die de site noemt"], "summary": "een zin wat je gevonden hebt"}"""
+
+
+def _public_host(host: str) -> bool:
+    import ipaddress
+    import socket
+
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except OSError:
+        return False
+    for info in infos:
+        ip = ipaddress.ip_address(info[4][0].split("%", 1)[0])
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast or ip.is_unspecified:
+            return False
+    return bool(infos)
+
+
+def fetch_public_page(url: str, limit: int = 400_000) -> tuple[str, str]:
+    """GET a public web page (no private addresses, at most three redirects). Returns (final url, text)."""
+    import html as _html
+    import urllib.error
+    import urllib.parse
+    import urllib.request
+
+    class _NoRedirect(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, *a, **k):
+            return None
+
+    opener = urllib.request.build_opener(_NoRedirect)
+    for _ in range(4):
+        parts = urllib.parse.urlsplit(url)
+        if parts.scheme not in ("http", "https") or not parts.hostname or not _public_host(parts.hostname):
+            raise ValueError("Only public web addresses can be researched")
+        req = urllib.request.Request(url, headers={"User-Agent": "SynthPulse-Studio/1.0 (organisation profile)",
+                                                   "Accept": "text/html,application/xhtml+xml"})
+        try:
+            resp = opener.open(req, timeout=10)
+        except urllib.error.HTTPError as e:
+            if e.code in (301, 302, 303, 307, 308) and e.headers.get("Location"):
+                url = urllib.parse.urljoin(url, e.headers["Location"])
+                continue
+            raise ValueError(f"The website answered {e.code}") from e
+        except (urllib.error.URLError, OSError) as e:
+            raise ValueError("The website could not be reached") from e
+        with resp:
+            raw = resp.read(limit)
+            charset = resp.headers.get_content_charset() or "utf-8"
+        text = raw.decode(charset, errors="replace")
+        text = re.sub(r"(?is)<(script|style|noscript|svg)[^>]*>.*?</\1>", " ", text)
+        links = re.findall(r'(?i)href=["\']([^"\']+)["\']', text)
+        body = _html.unescape(re.sub(r"<[^>]+>", " ", text))
+        body = re.sub(r"\s+", " ", body).strip()
+        return url, body + "\n\nLINKS: " + " ".join(links[:200])
+    raise ValueError("Too many redirects")
+
+
+def research_profile(view, url: str) -> dict:
+    """Read the organisation's website and propose profile fields. Nothing is saved."""
+    import urllib.parse
+
+    if view.scope != org_structure.SCOPE_ALL:
+        raise PermissionError("Only organisation admins research the organisation profile")
+    url = str(url or "").strip()
+    if url and not re.match(r"^https?://", url):
+        url = "https://" + url
+    if not url:
+        raise ValueError("Fill in the website first")
+    final, text = fetch_public_page(url)
+    pages, sources = [text.split("\n\nLINKS: ", 1)[0][:9000]], [final]
+    links = text.split("\n\nLINKS: ", 1)[1].split() if "\n\nLINKS: " in text else []
+    host = urllib.parse.urlsplit(final).hostname
+    for href in links:
+        if len(sources) >= 3:
+            break
+        full = urllib.parse.urljoin(final, href)
+        if urllib.parse.urlsplit(full).hostname == host and re.search(r"(?i)over|about|wie-|team|organisatie|company|diensten|services", full) and full not in sources:
+            try:
+                got, page = fetch_public_page(full)
+                pages.append(page.split("\n\nLINKS: ", 1)[0][:5000])
+                sources.append(got)
+            except ValueError:
+                continue
+    answer = studio._ask_json(_RESEARCH, "\n\n---\n\n".join(pages)[:16000])
+    proposal = clean_profile(dict(answer, website=final))
+    return {"proposal": proposal, "summary": _txt(answer.get("summary"), 300), "sources": sources}
+
 # ── HTTP ─────────────────────────────────────────────────────────────────────
 
 def handle_get(handler, parsed) -> bool:
@@ -417,6 +678,10 @@ def handle_get(handler, parsed) -> bool:
             j(handler, {"items": backlog_for(view)})
         elif parsed.path == "/api/studio/playbooks":
             j(handler, {"playbooks": playbooks_for(view)})
+        elif parsed.path == "/api/studio/prompts":
+            j(handler, prompts_for(view))
+        elif parsed.path == "/api/studio/profile":
+            j(handler, dict(load_profile(), editable=view.scope == org_structure.SCOPE_ALL, context=context_text()))
         elif parsed.path == "/api/studio/playbook":
             pb = _pb_load((qs.get("id") or [""])[0])
             if not _pb_visible(view, pb):
@@ -449,6 +714,13 @@ def handle_post(handler, parsed, body) -> bool:
             j(handler, autopilot(view, str(body.get("id") or "")))
         elif path == "/api/studio/playbook":
             j(handler, dict(save_playbook(view, body), editable=True))
+        elif path == "/api/studio/prompts":
+            j(handler, save_prompt(view, body))
+        elif path == "/api/studio/profile":
+            if body.get("op") == "research":
+                j(handler, research_profile(view, body.get("url") or ""))
+            else:
+                j(handler, dict(save_profile(view, body), editable=True))
         elif path == "/api/studio/playbook/run":
             j(handler, record_run(view, body))
         elif path == "/api/studio/playbook/draft":

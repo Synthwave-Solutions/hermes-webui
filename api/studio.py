@@ -306,7 +306,8 @@ def update(view, body: dict) -> dict:
 # ── Model steps ──────────────────────────────────────────────────────────────
 
 DISCOVER = """Je bent de AI-consultant van SynthPulse en maakt een opportunity solution tree (QuickScan).
-Iemand vertelt over zijn werk. Bouw drie lagen, strikt gescheiden:
+Iemand vertelt over zijn werk. Krijg je context over de organisatie, sluit dan aan op hun doelen, systemen en
+beleid (noem systemen die ze al gebruiken) zonder er iets bij te verzinnen. Bouw drie lagen, strikt gescheiden:
 
 1. GEWENST DOEL (1 tot 3): de uitkomst die het team wil bereiken, in hun eigen taal. Meetbaar: een KPI met
    nulmeting en doelwaarde. Gebruik alleen getallen die de persoon noemt; anders "nulmeting nog bepalen"
@@ -498,8 +499,11 @@ def run_step(view, body: dict) -> dict:
     if text:
         notes.append({"role": "user", "text": text, "at": time.time()})
     history = "\n".join(f"- {n['text']}" for n in notes if n.get("role") == "user")[-MAX_TEXT:]
+    from api import studio_library
+    org = studio_library.context_text()
+    org_block = f"Over de organisatie (gebruik dit als context, verzin er niets bij):\n{org}\n\n" if org else ""
     if step == "discover":
-        answer = _ask_json(DISCOVER, f"Team: {team_name or 'onbekend'}\nWat de persoon vertelt:\n{history}")
+        answer = _ask_json(DISCOVER, f"{org_block}Team: {team_name or 'onbekend'}\nWat de persoon vertelt:\n{history}")
         opps = clean_opportunities(answer.get("opportunities"))
         n_sol = sum(len(o["solutions"]) for o in opps)
         questions = [_txt(q, 200) for q in (answer.get("questions") or []) if _txt(q, 200)][:3]
@@ -514,7 +518,7 @@ def run_step(view, body: dict) -> dict:
         if not opp or not sol:
             raise ValueError("Choose a solution first")
         goal = next((g for g in doc.get("goals") or [] if g.get("name") == opp.get("goal")), {})
-        answer = _ask_json(DESIGN, f"Doel: {goal.get('name') or opp.get('goal') or '-'} (KPI: {goal.get('kpi') or '-'})\n"
+        answer = _ask_json(DESIGN, f"{org_block}Doel: {goal.get('name') or opp.get('goal') or '-'} (KPI: {goal.get('kpi') or '-'})\n"
                                    f"Kans: {opp['title']} (oorzaak: {opp.get('cause') or '-'})\n"
                                    f"Gekozen oplossing: {sol['title']} [{sol['building_block']}]. Hoe: {sol.get('how') or '-'}\n"
                                    f"Eerder verteld (ook gebruiken voor de nulmeting):\n{history or '-'}\n"
@@ -544,7 +548,7 @@ def run_step(view, body: dict) -> dict:
         b = process.get("baseline") or {}
         freq = process.get("frequency") or {}
         data = process.get("data_sensitivity") or "onbekend"
-        answer = _ask_json(PLAYBOOK, f"Kans: {opp.get('title')}\nOplossing: {sol.get('title')} (test: {sol.get('test') or '-'})\n"
+        answer = _ask_json(PLAYBOOK, f"{org_block}Kans: {opp.get('title')}\nOplossing: {sol.get('title')} (test: {sol.get('test') or '-'})\n"
                                      f"Team: {team_name or 'onbekend'}\nNieuw proces:\n{to_be}\n"
                                      f"Nulmeting: {b.get('minutes_before') or '?'} minuten handwerk per keer, straks "
                                      f"{b.get('minutes_after') or '?'}; {freq.get('count') or '?'} keer per {freq.get('per') or 'week'}\n"
@@ -565,7 +569,8 @@ def run_step(view, body: dict) -> dict:
 
 def handle_get(handler, parsed) -> bool:
     path = parsed.path
-    if path in ("/api/studio/backlog", "/api/studio/playbooks", "/api/studio/playbook", "/api/studio/media"):
+    if path in ("/api/studio/backlog", "/api/studio/playbooks", "/api/studio/playbook", "/api/studio/media",
+                "/api/studio/prompts", "/api/studio/profile"):
         from api import studio_library
         return studio_library.handle_get(handler, parsed)
     if path not in ("/api/studio/usecases", "/api/studio/usecase"):
@@ -592,7 +597,8 @@ def handle_get(handler, parsed) -> bool:
 def handle_post(handler, parsed, body) -> bool:
     path = parsed.path
     if path in ("/api/studio/backlog", "/api/studio/backlog/order", "/api/studio/autopilot", "/api/studio/playbook",
-                "/api/studio/playbook/delete", "/api/studio/playbook/draft", "/api/studio/playbook/run", "/api/studio/media"):
+                "/api/studio/playbook/delete", "/api/studio/playbook/draft", "/api/studio/playbook/run", "/api/studio/media",
+                "/api/studio/prompts", "/api/studio/profile"):
         from api import studio_library
         return studio_library.handle_post(handler, parsed, body)
     if path not in ("/api/studio/usecase", "/api/studio/step", "/api/studio/delete"):

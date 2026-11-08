@@ -2869,6 +2869,20 @@
     "targets": [
       "#omChatValue"
     ]
+  },
+  "webui.studio.prompts": {
+    "panel": "studio",
+    "targets": [
+      "[data-tour='studio-prompts']",
+      "[data-tour='studio-prompt-new']"
+    ]
+  },
+  "webui.studio.org_profile": {
+    "panel": "studio",
+    "targets": [
+      "[data-tour='studio-profile']",
+      "[data-tour='studio-profile-research']"
+    ]
   }
 };
   for (const entry of Object.values(entries)) {

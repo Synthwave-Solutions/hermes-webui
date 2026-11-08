@@ -12433,7 +12433,7 @@ def handle_get(handler, parsed) -> bool:
         return org_structure.handle_get(handler, parsed)
 
     if parsed.path in ("/api/studio/usecases", "/api/studio/usecase", "/api/studio/backlog", "/api/studio/playbooks",
-                       "/api/studio/playbook", "/api/studio/media"):
+                       "/api/studio/playbook", "/api/studio/media", "/api/studio/prompts", "/api/studio/profile"):
         from api import studio
         return studio.handle_get(handler, parsed)
 
@@ -14801,7 +14801,8 @@ def handle_post(handler, parsed) -> bool:
 
     if parsed.path in ("/api/studio/usecase", "/api/studio/step", "/api/studio/delete", "/api/studio/backlog",
                        "/api/studio/backlog/order", "/api/studio/autopilot", "/api/studio/playbook",
-                       "/api/studio/playbook/delete", "/api/studio/playbook/draft", "/api/studio/playbook/run", "/api/studio/media"):
+                       "/api/studio/playbook/delete", "/api/studio/playbook/draft", "/api/studio/playbook/run", "/api/studio/media",
+                       "/api/studio/prompts", "/api/studio/profile"):
         from api import studio
         return studio.handle_post(handler, parsed, body)
 
