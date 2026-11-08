@@ -182,7 +182,7 @@ def build(view: org_structure.ViewScope, days: int, start: float, end: float) ->
                           "duties": len(bot["duties"]), "duties_with_value": estimate["duties_with_value"],
                           "estimate_minutes_per_week": estimate["minutes_per_week"],
                           "estimate_confirmed": estimate["confirmed"],
-                          "chats": 0, "people": set(), "labeled_minutes": 0, "ai_cost_eur": 0.0,
+                          "chats": 0, "people": set(), "labeled_minutes": 0, "auto_minutes": 0, "auto_chats": 0, "ai_cost_eur": 0.0,
                           "unpriced_tokens": 0, "jobs": 0, "job_saved_minutes": 0}
     for chat in value_tracking.chats_between(start, end):
         row = bot_rows.get(chat["bot"])
@@ -193,6 +193,9 @@ def build(view: org_structure.ViewScope, days: int, start: float, end: float) ->
             row["people"].add(chat["user_hash"])
         if chat.get("label_state") == "confirmed":
             row["labeled_minutes"] += int(chat.get("saved_minutes") or 0)
+        elif chat.get("label_state") == "auto" and chat.get("duty"):
+            row["auto_minutes"] += int(chat.get("saved_minutes") or 0)
+            row["auto_chats"] += 1
         cost, source = value_tracking.ai_cost_eur(chat.get("model"), chat.get("tokens_in") or 0,
                                                   chat.get("tokens_out") or 0, chat.get("tokens_cache") or 0,
                                                   chat.get("provider_cost_usd"), pricing)
@@ -242,7 +245,9 @@ def build(view: org_structure.ViewScope, days: int, start: float, end: float) ->
             continue
         team["bots"] += 1
         team["saved_minutes"] += row["labeled_minutes"]
-        team["estimate_minutes"] += int(row["estimate_minutes_per_week"] * weeks)
+        # Estimate: chats a model linked to a duty; without such labels the
+        # duties' own "times per week" stand in.
+        team["estimate_minutes"] += row["auto_minutes"] if row["auto_chats"] else int(row["estimate_minutes_per_week"] * weeks)
         team["ai_cost_eur"] += row["ai_cost_eur"]
         team["unpriced_tokens"] += row["unpriced_tokens"]
         rate = rate_for(row["team"])

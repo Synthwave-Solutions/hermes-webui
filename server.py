@@ -724,6 +724,13 @@ def main() -> None:
         print(f'[!!] WARNING: cron WebUI delivery bridge failed to start: {e}', flush=True)
 
     try:
+        from api.value_tracking import start_collector_thread
+        if start_collector_thread():
+            print('[ok] value collector started', flush=True)
+    except Exception as e:
+        print(f'[!!] WARNING: value collector failed to start: {e}', flush=True)
+
+    try:
         from api.plugins import load_plugins
         load_plugins()
     except Exception as e:

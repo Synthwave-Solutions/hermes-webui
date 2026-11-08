@@ -642,3 +642,167 @@ def iter_store_jobs() -> Iterable[tuple[str, dict]]:
         for job in cron_bots.read_store_jobs(home):
             if isinstance(job, dict):
                 yield profile, job
+
+
+# ── Labelling bot chats ──────────────────────────────────────────────────────
+# A finished chat with a bot that has responsibilities with minutes gets one
+# label: which responsibility it covered, or none. A cheap model decides from
+# the chat title and the first user message. The label counts as an estimate
+# (``label_state: auto``) until the person confirms or corrects it.
+LABEL_BATCH = int(os.environ.get("SP_VALUE_LABEL_BATCH", "20"))
+LABEL_MODEL = os.environ.get("SP_VALUE_LABEL_MODEL", "synthwave-auto")
+LABEL_IDLE_SECONDS = 1800
+
+
+def _omniroute_key() -> str:
+    key = os.environ.get("OMNIROUTE_API_KEY", "")
+    if key:
+        return key
+    try:
+        from api.profiles import get_hermes_home_for_profile
+
+        env = Path(get_hermes_home_for_profile("default")) / ".env"
+        for line in env.read_text(encoding="utf-8").splitlines():
+            if line.startswith("OMNIROUTE_API_KEY="):
+                return line.split("=", 1)[1].strip().strip('"').strip("'")
+    except Exception:
+        pass
+    return ""
+
+
+def _ask_label(duties: list[dict], title: str, first: str) -> str | None:
+    """The duty title the chat covered, "" for none, None when unsure/failed."""
+    import urllib.request
+
+    names = [d["title"] for d in duties]
+    system = ("Je krijgt een gesprek met een AI-bot en de lijst verantwoordelijkheden van die bot. "
+              "Kies de ene verantwoordelijkheid die dit gesprek afhandelde, of 'geen'. "
+              "Antwoord alleen met de exacte titel uit de lijst, of met: geen.")
+    user = "Verantwoordelijkheden:\n" + "\n".join("- " + n for n in names) + f"\n\nTitel: {title}\nEerste vraag: {first[:800]}"
+    body = json.dumps({"model": LABEL_MODEL, "temperature": 0, "max_tokens": 40, "stream": False,
+                       "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}).encode()
+    headers = {"Content-Type": "application/json"}
+    key = _omniroute_key()
+    if key:
+        headers["Authorization"] = f"Bearer {key}"
+    url = os.environ.get("OMNIROUTE_URL", "http://127.0.0.1:20128/v1/chat/completions")
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, data=body, headers=headers), timeout=60) as resp:
+            raw = resp.read().decode()
+    except Exception:
+        return None
+    text = ""
+    raw = raw.strip()
+    try:
+        if raw.startswith("{"):
+            text = json.loads(raw)["choices"][0]["message"]["content"] or ""
+        else:
+            for line in raw.splitlines():
+                if line.startswith("data:") and line[5:].strip() not in ("", "[DONE]"):
+                    chunk = json.loads(line[5:].strip())
+                    for choice in chunk.get("choices") or []:
+                        text += (choice.get("delta") or {}).get("content") or ""
+    except ValueError:
+        return None
+    text = text.strip().strip(".").strip('"').strip()
+    if text.lower() in ("geen", "none", ""):
+        return ""
+    for name in names:
+        if text.lower() == name.lower():
+            return name
+    return None
+
+
+def label_chats(limit: int = LABEL_BATCH) -> int:
+    """Label up to ``limit`` finished, unlabelled chats of bots whose duties
+    carry minutes. Returns how many were labelled."""
+    from api import cron_bots
+
+    duties_by_bot = {}
+    conn = _connect()
+    done = 0
+    try:
+        rows = conn.execute(
+            "SELECT session_key, bot, session_id, title FROM chats WHERE label_state='none' AND last_at < ? "
+            "ORDER BY last_at DESC LIMIT ?", (time.time() - LABEL_IDLE_SECONDS, limit * 5)).fetchall()
+        homes = dict(cron_bots.store_homes())
+        for row in rows:
+            if done >= limit:
+                break
+            bot = row["bot"]
+            if bot not in duties_by_bot:
+                duties_by_bot[bot] = [d for d in bot_duties(bot) if int(d.get("minutes_before") or 0) > 0]
+            duties = duties_by_bot[bot]
+            if not duties:
+                conn.execute("UPDATE chats SET label_state='skipped' WHERE session_key=?", (row["session_key"],))
+                continue
+            first = ""
+            state = _readonly(Path(homes.get(bot, "")) / "state.db") if homes.get(bot) else None
+            if state is not None:
+                try:
+                    hit = state.execute("SELECT content FROM messages WHERE session_id=? AND role='user' "
+                                        "ORDER BY timestamp, id LIMIT 1", (row["session_id"],)).fetchone()
+                    first = str(hit["content"] or "") if hit else ""
+                except sqlite3.Error:
+                    first = ""
+                finally:
+                    state.close()
+            label = _ask_label(duties, row["title"] or "", first)
+            if label is None:
+                continue
+            minutes = 0
+            if label:
+                duty = next(d for d in duties if d["title"] == label)
+                minutes = max(0, int(duty.get("minutes_before") or 0) - int(duty.get("minutes_now") or 0))
+            conn.execute("UPDATE chats SET duty=?, label_state=?, saved_minutes=? WHERE session_key=?",
+                         (label or None, "auto" if label else "auto_none", minutes, row["session_key"]))
+            done += 1
+        conn.commit()
+    finally:
+        conn.close()
+    return done
+
+
+# ── Background collector ─────────────────────────────────────────────────────
+# The engine prunes each store's execution history to about 1000 rows, which
+# in a busy store is half a day. Collect on a timer so no run is lost when
+# nobody opens Management for a while.
+_COLLECTOR_THREAD = None
+_COLLECTOR_STOP = threading.Event()
+COLLECTOR_INTERVAL = int(os.environ.get("SP_VALUE_COLLECTOR_INTERVAL", "600"))
+
+
+def _collector_loop() -> None:
+    _COLLECTOR_STOP.wait(30)
+    while not _COLLECTOR_STOP.is_set():
+        try:
+            collect(force=True)
+        except Exception:
+            logger.warning("value collector run failed", exc_info=True)
+        if os.environ.get("SP_VALUE_LABELER", "1") != "0":
+            try:
+                label_chats()
+            except Exception:
+                logger.warning("value chat labelling failed", exc_info=True)
+        _COLLECTOR_STOP.wait(max(60, COLLECTOR_INTERVAL))
+
+
+def start_collector_thread() -> bool:
+    """Start the collector daemon (idempotent). Off with SP_VALUE_COLLECTOR=0."""
+    global _COLLECTOR_THREAD
+    if os.environ.get("SP_VALUE_COLLECTOR", "1") == "0":
+        return False
+    if _COLLECTOR_THREAD is not None and _COLLECTOR_THREAD.is_alive():
+        return False
+    _COLLECTOR_STOP.clear()
+    _COLLECTOR_THREAD = threading.Thread(target=_collector_loop, daemon=True, name="value-collector")
+    _COLLECTOR_THREAD.start()
+    return True
+
+
+def stop_collector_thread(timeout: float = 2.0) -> None:
+    global _COLLECTOR_THREAD
+    thread, _COLLECTOR_THREAD = _COLLECTOR_THREAD, None
+    _COLLECTOR_STOP.set()
+    if thread is not None and thread.is_alive():
+        thread.join(timeout=timeout)

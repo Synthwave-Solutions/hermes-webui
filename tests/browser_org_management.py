@@ -308,6 +308,20 @@ def main() -> int:
             page.locator("#omValueCard").screenshot(path=str(art / "07-task-value-card.png"))
             ok("task detail shows the value card: before, now, saving per run and measured runs")
 
+            # 6b. a new task from the form carries its value
+            created = ctx.request.post("/api/crons/create", data={
+                "prompt": "Stel de crediteurenlijst op", "schedule": "0 9 * * 2", "name": "Crediteurenlijst",
+                "deliver": "local", "enabled": False,
+                "value": {"before_minutes": 35, "review_minutes": 5, "task": "Crediteurenlijst", "source": "owner",
+                          "confidence": "confirmed"}})
+            assert created.ok, created.text()[:300]
+            job = created.json()["job"]
+            assert job["value"]["before_minutes"] == 35 and job["value"]["confirmed_by"] == ADMIN, job.get("value")
+            bad = ctx.request.post("/api/crons/create", data={"prompt": "x", "schedule": "0 9 * * 2",
+                                                              "value": {"task": "geen minuten"}})
+            assert bad.status == 400, bad.status
+            ok("a new task created through the API carries its value; a value without minutes is refused")
+
             # 7. bot responsibility minutes
             page.evaluate("async () => { await switchPanel('profiles'); openProfileDetail('finbot'); }")
             page.wait_for_selector("#botDutiesCard .bot-duty", timeout=15000)

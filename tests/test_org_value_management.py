@@ -322,3 +322,37 @@ def test_bot_responsibility_value_fields_validate():
         validate_responsibilities([{"title": "x", "minutes_before": 10, "minutes_now": 20}])
     with pytest.raises(ValueError):
         validate_responsibilities([{"title": "x", "minutes_before": -1}])
+
+
+def test_value_line_in_a_prompt_is_parsed(env):
+    from api.routes import _cron_value_from_prompt
+
+    _structure(env)
+    prompt = 'Stel de lijst op.\nVALUE: before=45 now=5 task="Debiteurenlijst samenstellen" team=finance/debiteuren\n'
+    value = _cron_value_from_prompt(prompt)
+    assert value["before_minutes"] == 45 and value["review_minutes"] == 5
+    assert value["task"] == "Debiteurenlijst samenstellen" and value["team"] == "finance/debiteuren"
+    assert value["confidence"] == "confirmed"
+    estimate = _cron_value_from_prompt("x\nVALUE: before=30 now=0 source=ai_estimate")
+    assert estimate["source"] == "ai_estimate" and estimate["confidence"] == "estimated"
+    assert _cron_value_from_prompt("VALUE: before=unknown reason=nieuw")["unknown"] is True
+    assert _cron_value_from_prompt("no value here") is None
+    assert _cron_value_from_prompt("VALUE: before=abc") is None
+
+
+def test_finished_bot_chats_get_a_duty_label(env, monkeypatch):
+    now = time.time()
+    _state(env.homes["finbot"], [("w1", "webui", MEMBER, "m", now - 7200, None, now - 4000, 4, 10, 10, 0, 0, 0, None,
+                                  "unknown", "Aanmaning voor klant X"),
+                                 ("w2", "webui", MEMBER, "m", now - 7200, None, now - 4000, 4, 10, 10, 0, 0, 0, None,
+                                  "unknown", "Vraag over vakantie")])
+    monkeypatch.setattr(vt, "bot_duties", lambda bot: [{"title": "Aanmaning opstellen", "minutes_before": 30, "minutes_now": 5}])
+    monkeypatch.setattr(vt, "_ask_label", lambda duties, title, first: "Aanmaning opstellen" if "Aanmaning" in title else "")
+    vt.collect(force=True)
+    assert vt.label_chats() == 2
+    rows = {r["session_id"]: r for r in vt.chats_between(0, now + 1)}
+    assert rows["w1"]["label_state"] == "auto" and rows["w1"]["saved_minutes"] == 25
+    assert rows["w2"]["label_state"] == "auto_none" and rows["w2"]["saved_minutes"] == 0
+    # The person's own correction wins and is final.
+    vt.label_chat("finbot:w1", "", MEMBER)
+    assert {r["session_id"]: r for r in vt.chats_between(0, now + 1)}["w1"]["label_state"] == "removed"

@@ -2774,6 +2774,7 @@ function _renderCronForm({ name, schedule, prompt, deliver, profile, toast_notif
           <textarea id="cronFormDiagram" rows="5" placeholder="flowchart LR&#10;  T([every workday 08:00]) --> R[Agent + google-workspace]&#10;  R --> O[this conversation]" spellcheck="false">${esc(diagram || '')}</textarea>
           <div class="detail-form-hint">${esc(t('cron_diagram_form_hint') || 'Optional flowchart of what this automation reads, does and writes. Shown in the task detail; without it a diagram is derived from the settings.')}</div>
         </div>
+        ${window.SPValue && !_editingCronId ? window.SPValue.createFieldsHtml() : ''}
         <div class="detail-form-row">
           <label for="cronFormDeliver">${esc(t('cron_deliver_label') || 'Deliver output to')}</label>
           <div class="cron-notify-deliver-row">
@@ -3093,7 +3094,10 @@ async function saveCronForm(){
       if (job) openCronDetail(job);
       return;
     }
+    const valueResult = window.SPValue ? window.SPValue.createValueFromForm() : null;
+    if (valueResult && valueResult.error) { errEl.textContent = valueResult.error; errEl.style.display = ''; return; }
     const body={schedule,prompt,deliver,profile: profile, toast_notifications: toastNotifications};
+    if (valueResult && valueResult.value) body.value = valueResult.value;
     if(_cronNotifySupported) body.notify=notify;
     if(_cronIsDuplicate) body.enabled=false;
     if(name)body.name=name;

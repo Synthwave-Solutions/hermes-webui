@@ -833,10 +833,34 @@
     });
   }
 
+  // ── Value fields in the new-task form ─────────────────────────────────────
+  function createFieldsHtml(){
+    return `<div class="detail-form-row" id="cronFormValueRow">
+      <label>${H(w('value'))}</label>
+      <div class="om-value-form" style="margin-top:0">
+        <label class="om-field">${H(w('minutes_before'))}<input id="cronFormValueBefore" type="number" min="1" max="6000" placeholder="45"></label>
+        <label class="om-field">${H(w('minutes_now'))}<input id="cronFormValueNow" type="number" min="0" max="6000" placeholder="5"></label>
+        <label class="om-field wide">${H(w('task_label'))}<input id="cronFormValueTask" maxlength="120" placeholder="${H(w('task_ph'))}"></label>
+        <label class="om-field wide" style="flex-direction:row;align-items:center;gap:8px;font-weight:500"><input type="checkbox" id="cronFormValueUnknown" style="min-height:0;width:16px" onchange="document.getElementById('cronFormValueBefore').disabled=this.checked;document.getElementById('cronFormValueNow').disabled=this.checked"> ${H(w('unknown'))}</label>
+      </div>
+      <div class="detail-form-hint">${H(w('value_intro'))}</div>
+    </div>`;
+  }
+  function createValueFromForm(){
+    const row = $id('cronFormValueRow');
+    if (!row) return null;
+    const unknown = !!($id('cronFormValueUnknown') || {}).checked;
+    const task = String(($id('cronFormValueTask') || {}).value || '').trim();
+    if (unknown) return { value: { unknown: true, unknown_reason: lang() === 'en' ? 'Not known when created' : 'Nog onbekend bij aanmaken', task } };
+    const before = Number(($id('cronFormValueBefore') || {}).value || 0);
+    if (!(before > 0)) return { error: w('need_minutes') };
+    return { value: { before_minutes: before, review_minutes: Number(($id('cronFormValueNow') || {}).value || 0), task, source: 'owner', confidence: 'confirmed' } };
+  }
+
   // ── Panel hooks ───────────────────────────────────────────────────────────
   window.SPOrg = { load: async () => { bindOrg(); await loadOrg(); }, refreshNav };
   window.SPManagement = { load: async () => { bindMgmt(); await loadMgmt(); } };
-  window.SPValue = { jobCardHtml, dutyFieldsHtml, dutyFromForm, dutyChipHtml, servesFieldHtml, mountServes };
+  window.SPValue = { createFieldsHtml, createValueFromForm, jobCardHtml, dutyFieldsHtml, dutyFromForm, dutyChipHtml, servesFieldHtml, mountServes };
 
   function boot(){ setTimeout(() => { refreshNav().catch(() => {}); }, 1200); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
