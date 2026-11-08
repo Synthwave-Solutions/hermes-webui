@@ -348,7 +348,26 @@
     }
   }
 
+  // Turns are added, replaced and recycled as direct children of #msgInner
+  // (the same signal static/chat-bots.js uses for its reply chips); decorate
+  // once per frame after such a change, so ui.js needs no extra hook.
+  let observed=null, decoratePending=false;
+  function scheduleDecorate(){
+    if(decoratePending) return;
+    decoratePending=true;
+    const run=()=>{ decoratePending=false; try{ decorate(null); }catch(_){} };
+    if(typeof root.requestAnimationFrame==='function') root.requestAnimationFrame(run); else setTimeout(run,0);
+  }
+  function observe(){
+    const inner=root.document&&root.document.getElementById('msgInner');
+    if(!inner||inner===observed||typeof root.MutationObserver!=='function') return;
+    observed=inner;
+    new root.MutationObserver(scheduleDecorate).observe(inner,{childList:true});
+    scheduleDecorate();
+  }
+
   function start(){
+    observe();
     root.document.addEventListener('click',event=>{
       const button=event.target?.closest?.('[data-sp-specialist-open]');
       if(!button)return;
@@ -373,6 +392,7 @@
       lastSignature=''; render();
     });
     setInterval(()=>{
+      observe();
       const sid=activeSid();
       if(sid!==currentSid) switchTo(sid);
       else if(workers.some(isLive)) render(); // keeps running durations fresh

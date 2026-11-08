@@ -86,7 +86,10 @@ def test_i18n_keys_exist_in_dutch_and_english_without_long_dashes():
 
 def test_ui_hooks_are_guarded():
     ui = (ROOT / "static" / "ui.js").read_text(encoding="utf-8")
-    assert "window.SynPulseSubagentThreads&&typeof window.SynPulseSubagentThreads.decorate==='function'" in ui
+    # Handoff lines hang off the #msgInner child-list signal, not a new ui.js hook.
+    threads = (ROOT / "static" / "subagent-threads.js").read_text(encoding="utf-8")
+    assert "observe(inner,{childList:true})" in threads
+    assert "SynPulseSubagentThreads" not in ui.split("function postProcessRenderedMessages", 1)[1][:1200]
     assert "window.SynPulseFriendlyTools&&window.SynPulseFriendlyTools.bots" in ui
     for name in ("tool-friendly.js", "subagent-threads.js"):
         assert "\U0001F916" not in (ROOT / "static" / name).read_text(encoding="utf-8"), name

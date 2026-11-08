@@ -19984,8 +19984,6 @@ function postProcessRenderedMessages(container) {
   loadHtmlInline(container);
   renderMermaidBlocks(container);
   renderKatexBlocks(container);
-  // Bot handoff lines inside settled turns (static/subagent-threads.js).
-  if(typeof window!=='undefined'&&window.SynPulseSubagentThreads&&typeof window.SynPulseSubagentThreads.decorate==='function'){try{window.SynPulseSubagentThreads.decorate(container);}catch(e){console.warn('[teamwork] render failed',e);}}
   initTreeViews(container);
   // Interactive answers: mount sandboxed cards for interactive-ui fences.
   if(typeof renderInteractiveUiBlocks==='function'){try{renderInteractiveUiBlocks(container);}catch(e){console.warn('[interactive-ui] render failed',e);}}
