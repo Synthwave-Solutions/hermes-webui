@@ -107,4 +107,10 @@ if (tplDir && fs.existsSync(tplDir)) {
   }
 }
 
+// A reply that is an app without its fence is wrapped; ordinary text is not.
+const wrapBare = vm.runInContext('interactiveUiWrapBare', sandbox);
+assert.ok(wrapBare('<!-- title: X -->\n<style>.a{}</style>\n<div>hoi</div>\n<script>var a=1;</script>\n\nUitleg.').startsWith('```interactive-ui\n<!-- title: X -->'));
+assert.ok(wrapBare('<!-- title: X -->\n<style>.a{}</style>\n<div>hoi</div>\n\nUitleg.').includes('```\n\n\nUitleg.'));
+assert.strictEqual(wrapBare('Gewoon tekst <!-- title: x --> <style>'), 'Gewoon tekst <!-- title: x --> <style>');
+assert.strictEqual(wrapBare('<!-- title: alleen een titel -->\nTekst'), '<!-- title: alleen een titel -->\nTekst');
 console.log('all parser checks passed');

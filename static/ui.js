@@ -1838,13 +1838,16 @@ function _renderCacheKey(text, isUser){
   if(text.length <= 500) return p + ':' + text;
   return p + ':' + text.length + ':' + text.slice(0,20) + ':' + text.slice(-20);
 }
+// A reply that is an interactive app written without its fence (it starts
+// with the block's own title comment) still renders as an app.
+function _iuiBare(t){ return typeof interactiveUiWrapBare==='function' ? interactiveUiWrapBare(t) : t; }
 function _getCachedRender(text, isUser){
   const key = _renderCacheKey(text, isUser);
   const hit = _renderCache.get(key);
   if(hit !== undefined) return hit;
   const rendered = isUser
     ? (window._renderUserMarkdown ? renderMd(text) : _renderUserFencedBlocks(text))
-    : renderMd(_stripXmlToolCallsDisplay(String(text)));
+    : renderMd(_iuiBare(_stripXmlToolCallsDisplay(String(text))));
   if(_renderCache.size > _renderCacheMax) _renderCache.clear();
   _renderCache.set(key, rendered);
   return rendered;

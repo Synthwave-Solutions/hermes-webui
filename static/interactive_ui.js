@@ -1017,6 +1017,18 @@ const _iui=(function(){
   return {parse,renderBlocks,streamTick,allowedUrl,rewriteUrl,themeMessage,chipTexts,kitKindOf,FENCE_LANGS,CHIP_LANGS,_byWindow:byWindow,_controllers:controllers};
 })();
 
+// A reply that starts with the interactive block's title comment but has no
+// fence around it is wrapped, so a model slip still shows the app.
+function interactiveUiWrapBare(text){
+  const s=String(text||'');
+  const lead=s.match(/^\s*/)[0].length;
+  if(!/^<!--\s*title\s*:/i.test(s.slice(lead,lead+40))) return s;
+  if(!/<(style|script)\b/i.test(s)) return s;
+  const ends=[/<\/script>/gi,/<\/style>/gi,/<\/div>/gi].map(re=>{let m,last=-1;while((m=re.exec(s)))last=m.index+m[0].length;return last;});
+  const end=Math.max(...ends);
+  if(end<=lead) return s;
+  return '```interactive-ui\n'+s.slice(lead,end).trim()+'\n```\n'+s.slice(end);
+}
 // Copy of a reply without its suggestion buttons block.
 function stripReplySuggestions(text){
   return String(text||'').replace(/(^|\n)[ ]{0,3}```[ \t]*(?:suggestions|replies)[ \t]*\n[\s\S]*?\n[ ]{0,3}```[ \t]*(?=\n|$)/gi,'$1').replace(/\s+$/,'');
