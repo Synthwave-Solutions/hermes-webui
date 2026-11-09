@@ -377,3 +377,8 @@ console.log('shorthand ok');
   assert.deepStrictEqual(t.spec.columns.map(c => c.type), ['text', 'number', 'number', 'text', 'text']);
   console.log('identifier columns ok');
 }
+{
+  const t = K.build('table', JSON.stringify({title: 't', columns: ['Product', 'Stuks', 'Jaar'], rows: [['A', 1950, 2023], ['B', 2040, 2024]]}), {lang: 'nl'});
+  assert.deepStrictEqual(t.spec.columns.map(c => c.type), ['text', 'number', 'text'], 'Stuks in the year range stays a quantity');
+  console.log('quantity in year range ok');
+}

@@ -449,7 +449,10 @@ function base(spec,lang,kind,m,warnings,limits){
       // no thousands point ("2.024") and no total. Also when the block says "number".
       if(col.type==='number'&&!/(bedrag|omzet|aantal|totaal|prijs|kosten|amount|total|price|cost|count|waarde)/i.test(col.label)){
         const idLabel=/^(jaar|year|bouwjaar|boekjaar)$/i.test(col.label.trim())||/(nummer|nr\.?$|\bnr\b|kvk|postcode|\bid\b|\bcode\b|factuurnr|factuurnummer)/i.test(col.label);
-        const years=cells.length>0&&cells.every(v=>{const n=typeof v==='number'?v:parseNumber(v).n;return Number.isInteger(n)&&n>=1900&&n<=2100;});
+        // Values that look like years only count when the column reads as a time column
+        // (or is the row label); "Stuks" with 1950 and 2040 stays a quantity.
+        const timeish=ci===0||/(jaar|year|periode|period|seizoen|season|editie|edition|cohort)/i.test(col.label);
+        const years=timeish&&cells.length>0&&cells.every(v=>{const n=typeof v==='number'?v:parseNumber(v).n;return Number.isInteger(n)&&n>=1900&&n<=2100;});
         if(idLabel||years) col.type='text';
       }
       if(col.type==='number'||col.type==='currency'||col.type==='percent'){
