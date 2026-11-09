@@ -243,7 +243,9 @@ th .k-sort{white-space:normal}
 .k-legend li{flex:0 1 auto}
 .k-scroll{overscroll-behavior-x:contain;overscroll-behavior-y:auto}
 /* A fixed cap: inside the frame vh follows the frame, which follows the table. */
-@media (pointer:coarse),(max-width:640px){.k-scroll{max-height:360px}}
+/* On a phone a table shows 8 rows without an inner vertical box; full screen shows the rest. */
+@media (pointer:coarse),(max-width:640px){.k-scroll{max-height:none;overflow-y:visible}}
+html.is-full .k-scroll{max-height:none}
 .k-list{overscroll-behavior-y:auto}
 .k-radar-key{margin:6px 0 0;padding:0 0 0 22px;font-size:.82rem;color:var(--sw-fg);display:grid;gap:2px}
 .k-radar-key li::marker{color:var(--sw-muted);font-variant-numeric:tabular-nums}

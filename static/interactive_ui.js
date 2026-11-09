@@ -429,6 +429,10 @@ const _iui=(function(){
       case 'open':
         openLink(String(data.url||''));
         break;
+      case 'full':
+        // A user tap inside the frame (checked there) asks for the whole table.
+        if(!ctrl.card.classList.contains('iui-full')) toggleFull(ctrl,true);
+        break;
       case 'key':
         if(data.key==='Escape'&&ctrl.card.classList.contains('iui-full')) toggleFull(ctrl,false);
         break;
@@ -533,14 +537,28 @@ const _iui=(function(){
   // ── Card ────────────────────────────────────────────────────────────────
   function fingerprint(src){return hashSource(String(src||'').slice(0,400));}
   function scroller(){return document.getElementById('messages');}
+  // The whole card (header included) fits in the part of the chat you can see.
+  function stageCap(ctrl){
+    const vis=scroller()&&scroller().clientHeight||0;
+    const chrome=ctrl&&ctrl.card&&ctrl.stage?Math.max(0,ctrl.card.offsetHeight-ctrl.stage.offsetHeight):56;
+    const byWindow=Math.round((window.innerHeight||900)*0.86);
+    const byChat=vis?vis-48-chrome:Infinity;
+    return Math.max(MIN_H,Math.min(byWindow,byChat));
+  }
+  // The keyboard or a rotated phone changes the visible chat: cards follow.
+  let capTimer=0;
+  function recap(){
+    clearTimeout(capTimer);
+    capTimer=setTimeout(()=>{controllers.forEach(c=>{if(c&&c.height&&c.card&&c.card.isConnected)setHeight(c,c.height);});},150);
+  }
+  window.addEventListener('resize',recap);
+  if(window.visualViewport) window.visualViewport.addEventListener('resize',recap);
   function setHeight(ctrl,h){
     if(!(h>0)) return;
     ctrl.height=h;
     if(ctrl.card.classList.contains('iui-full')) return;
     if(ctrl.final) rememberHeight(ctrl.fp,h);
-    // Never taller than the part of the chat you can see, so the whole card fits on a phone.
-    const vis=scroller()&&scroller().clientHeight||0;
-    const max=Math.max(320,Math.min(Math.round((window.innerHeight||900)*0.86),vis?vis-48:Infinity));
+    const max=stageCap(ctrl);
     const next=Math.max(MIN_H,Math.min(h,max));
     const prev=ctrl.stage.offsetHeight;
     const delta=next-prev;
@@ -783,7 +801,7 @@ const _iui=(function(){
     renderDetails(ctrl);
     if(!ctrl.height){
       const cached=heightCache.get(ctrl.fp);
-      ctrl.stage.style.height=(cached||p.height||DEFAULT_H)+'px';
+      ctrl.stage.style.height=Math.min(cached||p.height||DEFAULT_H,stageCap(ctrl))+'px';
       if(cached) ctrl.skeleton.classList.add('is-quiet');
     }
     if(ctrl.state!=='error') setState(ctrl,ctrl.final?(ctrl.rendered?'ready':'loading'):'building');
