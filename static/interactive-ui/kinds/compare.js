@@ -547,9 +547,12 @@
     setActive(start);
     if(start > 0) requestAnimationFrame(function(){ scrollToCard(start, false); });
     if(typeof ResizeObserver === 'function'){
+      // The layout switch runs after the observer callback, so a resize never loops.
+      var raf = 0;
       var ro = new ResizeObserver(function(){
         if(!box.isConnected){ ro.disconnect(); return; }
-        if(layout()){ scrollToCard(active, false); ctx.resize(); }
+        if(raf) return;
+        raf = requestAnimationFrame(function(){ raf = 0; if(layout()){ scrollToCard(active, false); ctx.resize(); } });
       });
       ro.observe(box);
     }
