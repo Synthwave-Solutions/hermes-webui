@@ -270,3 +270,5 @@ html.is-full .k-scroll{max-height:none}
 .k-more-cols{margin:6px 0 0;font-size:.78rem;color:var(--sw-muted)}
 /* On a phone a column is never cut through a number: the table snaps to column edges. */
 @media (max-width:640px){.k-scroll{scroll-snap-type:x proximity}.k-grid th,.k-grid td{scroll-snap-align:start}.k-grid td.num,.k-grid th.num{white-space:nowrap}}
+/* Compact table: the rows wait in full screen. */
+.is-compact .k-scroll-edge,.is-compact .k-tools,.is-compact .k-more-cols,.is-compact .k-source{display:none!important}

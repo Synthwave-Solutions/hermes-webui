@@ -6117,6 +6117,9 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
       if(_streamFinalized) return;
       _clearStreamEndRecovery();
       if(_bailOutOfTerminalEventsFromStaleStream(source)) return;
+      // Remember a stream this tab finished, so a late "turn started" frame for
+      // it never opens a second, empty live turn.
+      try{(window.__finishedStreamIds=window.__finishedStreamIds||new Set()).add(String(streamId));}catch(_){}
       // Set _streamFinalized IMMEDIATELY — before any fade delay. Without this,
       // a stream_end event arriving during the fade window sees
       // _streamFinalized=false, calls _restoreSettledSession(), and overwrites
@@ -8226,6 +8229,8 @@ function startSessionStream(sid) {
         // already attached to this very stream). attachLiveStream is
         // idempotent per (sid, streamId); bail if we're already on it.
         if (S.activeStreamId === streamId) return;
+        // This tab already received the end of this stream: nothing left to render.
+        if (window.__finishedStreamIds && window.__finishedStreamIds.has(streamId)) return;
         const existingLive = (typeof LIVE_STREAMS !== 'undefined') ? LIVE_STREAMS[sid] : null;
         if (existingLive && existingLive.streamId === streamId) return;
         // Mirror the loadSession reattach setup. For a fresh frame the turn

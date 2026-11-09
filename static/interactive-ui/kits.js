@@ -368,8 +368,11 @@
         });
         tfoot.appendChild(tr1);
       }
-      more.hidden = limit >= idx.length;
-      more.textContent = T('showAll', idx.length);
+      // Too little room (a phone with the keyboard open): only one line and the button.
+      var compact = PHONE() && CAP > 0 && CAP < 230 && !FULL && !opt.all;
+      wrap.classList.toggle('is-compact', compact);
+      more.hidden = !compact && limit >= idx.length;
+      more.textContent = compact ? (LANG === 'nl' ? 'Bekijk tabel (' + idx.length + ' rijen)' : 'View table (' + idx.length + ' rows)') : T('showAll', idx.length);
       if(count) count.textContent = view.q ? T('count', idx.length, spec.rows.length) : '';
       ths.forEach(function(th, ci){
         var dir = view.s && view.s[0] === ci ? view.s[1] : '';
