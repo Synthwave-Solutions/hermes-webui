@@ -238,7 +238,17 @@
       overallPrev:function(){ return spec.overallPrev === null ? '' : t('overallPrev', pct(spec.overallPrev)); },
       drop:function(){ return spec.drop < 0 ? '' : t('drop', stages[spec.drop - 1].label, stages[spec.drop].label, pctR(stages[spec.drop].conv, !!(stages[spec.drop].rough || stages[spec.drop - 1].rough))); },
       // A stage larger than the one before shows its growth ("+12%"), never the ratio ("112%").
-      chip:function(i){ var s = stages[i]; if(s.grows && s.conv !== null) return '+' + pctR(s.conv - 100, !!(s.rough || stages[i - 1].rough)).replace(/^ca\. /, 'ca. +').replace(/^\+ca\. \+/, 'ca. +'); return pctR(s.conv, !!(s.rough || stages[i - 1].rough)); },
+      chip:function(i){
+        var s = stages[i], rough = !!(s.rough || stages[i - 1].rough);
+        if(s.grows && s.conv !== null){
+          // Build the text, then put the plus in once: "+12%", "ca. +13%", "about +13%".
+          var g = pctR(s.conv - 100, rough);
+          if(/^(ca\.|about) /.test(g)) return g.replace(/^(ca\.|about) /, '$1 +');
+          if(/^(minder|less)/.test(g)) return g;
+          return '+' + g;
+        }
+        return pctR(s.conv, rough);
+      },
       aria:function(i){ var s = stages[i], p = [s.label, numS(s)]; if(i && s.conv !== null) p.push(t('fromPrev', pctR(s.conv, !!(s.rough || stages[i - 1].rough)), stages[i - 1].label)); return p.join(', '); },
       detail:function(i){
         var s = stages[i], parts = [s.label, numS(s)].concat(shares(i));

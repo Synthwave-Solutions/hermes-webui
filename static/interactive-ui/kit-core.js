@@ -444,9 +444,13 @@ function base(spec,lang,kind,m,warnings,limits){
         if(dates/cells.length>=0.9) col.type='date';
         else if(nums/cells.length>=0.9) col.type=cur>nums/2?'currency':pct>nums/2?'percent':'number';
         else col.type='text';
-        // Years, invoice and KvK numbers, postcodes and codes are labels, not amounts:
-        // no thousands point ("2.024") and no total.
-        if(col.type==='number'&&((/^(jaar|year|bouwjaar|boekjaar)$/i.test(col.label.trim())||/(nummer|nr\.?$|nr\b|kvk|postcode|\bid\b|code|factuur)/i.test(col.label))||cells.every(v=>{const n=typeof v==='number'?v:parseNumber(v).n;return Number.isInteger(n)&&n>=1900&&n<=2100;}))) col.type='text';
+      }
+      // Years, invoice and KvK numbers, postcodes and codes are labels, not amounts:
+      // no thousands point ("2.024") and no total. Also when the block says "number".
+      if(col.type==='number'&&!/(bedrag|omzet|aantal|totaal|prijs|kosten|amount|total|price|cost|count|waarde)/i.test(col.label)){
+        const idLabel=/^(jaar|year|bouwjaar|boekjaar)$/i.test(col.label.trim())||/(nummer|nr\.?$|\bnr\b|kvk|postcode|\bid\b|\bcode\b|factuurnr|factuurnummer)/i.test(col.label);
+        const years=cells.length>0&&cells.every(v=>{const n=typeof v==='number'?v:parseNumber(v).n;return Number.isInteger(n)&&n>=1900&&n<=2100;});
+        if(idLabel||years) col.type='text';
       }
       if(col.type==='number'||col.type==='currency'||col.type==='percent'){
         outRows.forEach(r=>{
