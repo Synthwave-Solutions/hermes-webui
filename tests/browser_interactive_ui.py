@@ -634,7 +634,23 @@ def data_blocks(page, ctx, gateway, art, base_runs):
         assert overflow <= 1, f"{kind} card overflows by {overflow}px"
         card.scroll_into_view_if_needed(); time.sleep(0.8)
         card.screenshot(path=str(art / f"17-{kind}-desktop-dark.png"))
-    ok("flow, compare and funnel: each drawn from its own kind file through the chat, no JSON on screen")
+    # A narrower window never turns a working comparison into an error card.
+    cmp_card = page.locator(".iui-card.iui-kit--compare:visible").last
+    for w in (800, 390, 1280):
+        page.set_viewport_size({"width": w, "height": 900})
+        seen = set()
+        deadline = time.time() + 15
+        while time.time() < deadline:
+            card_now = page.locator(".iui-card.iui-kit--compare").last
+            try: card_now.scroll_into_view_if_needed(timeout=2000)
+            except Exception: pass
+            st = card_now.get_attribute("data-state")
+            seen.add(st)
+            if st == "ready" and time.time() > deadline - 13:
+                break
+            time.sleep(0.3)
+        assert "error" not in seen and st == "ready", (w, seen, st)
+    ok("flow, compare and funnel: each drawn from its own kind file through the chat, no JSON on screen; compare stays ready when narrowed")
 
     # 10e. after a reload the chart comes back in the table view the user chose
     page.reload(wait_until="domcontentloaded")

@@ -156,6 +156,8 @@
   }
   window.addEventListener('error', function(e){
     if(e && e.target && e.target !== window && (e.target.src || e.target.href)) return;  // tiles and photos are handled where they load
+    // A ResizeObserver loop notice is a harmless browser message, never a broken block.
+    if(/^ResizeObserver loop/i.test(String(e && e.message || ''))) return;
     reportError(e && e.message, e && e.error && e.error.stack);
   }, true);
   window.addEventListener('unhandledrejection', function(e){ var r = e && e.reason; reportError(r && r.message || r, r && r.stack); });
@@ -410,7 +412,7 @@
       var kind = spec.type === 'hbar' || spec.type === 'stacked' ? 'bar' : spec.type === 'area' ? 'line' : spec.type === 'donut' ? 'doughnut' : spec.type;
       // On a phone, many or long category names read better as lying bars.
       var narrowC = (box.clientWidth || window.innerWidth) < 480;
-      var timeLike = spec.labels.every(function(l){ return /^(\d{4}([-\/]\d{1,2})?|q[1-4]|[a-z]{3}\.?|week \d+|wk \d+|\d{1,2}[-\/]\d{1,2})$/i.test(String(l).trim()); });
+      var timeLike = !!spec.isoLabels || spec.labels.every(function(l){ return /^(\d{4}([-\/]\d{1,2}){0,2}|q[1-4]( \d{4})?|[a-z]{3,9}\.?( \d{4})?|week \d+|wk \d+|\d{1,2}[-\/]\d{1,2}|(ma|di|wo|do|vr|za|zo|mon|tue|wed|thu|fri|sat|sun)?\.? ?\d{1,2} [a-z]{3,9}\.?( \d{4})?)$/i.test(String(l).trim()); });
       var autoH = narrowC && (spec.type === 'bar' || spec.type === 'stacked') && !timeLike && (spec.labels.length > 4 || spec.labels.some(function(l){ return String(l).length > 10; }));
       var lineLike = spec.type === 'line' || spec.type === 'area';
       var radar = kind === 'radar';
@@ -444,8 +446,9 @@
       if(spec.target && Number.isFinite(spec.target.value)) valueAxis.suggestedMax = spec.target.value * 1.06;
       // Named categories are never skipped on a phone: they wrap instead (dates and months may skip).
       // A line keeps skipping names on a phone (its points are what matter); bars never skip.
-      var catTicks = {color:t.muted, autoSkip:timeLike || (lineLike && narrowC), maxRotation:0, font:{size:narrowC ? 10.5 : 12}};
-      if(!timeLike && !(lineLike && narrowC)) catTicks.callback = function(v, i){ var l = this.getLabelForValue ? this.getLabelForValue(v) : spec.labels[i]; return wrapLabel(l, narrowC ? (horizontal ? 14 : 9) : 16); };
+      // A line or area always skips names when they do not fit; bars never skip.
+      var catTicks = {color:t.muted, autoSkip:timeLike || lineLike, maxRotation:0, font:{size:narrowC ? 10.5 : 12}};
+      if(!timeLike && !lineLike) catTicks.callback = function(v, i){ var l = this.getLabelForValue ? this.getLabelForValue(v) : spec.labels[i]; return wrapLabel(l, narrowC ? (horizontal ? 14 : 9) : 16); };
       var catAxis = {stacked:stacked, grid:{display:false}, border:{color:t.border}, ticks:catTicks};
       // A horizontal bar's name column takes at most 45% of the width.
       if(horizontal) catAxis.afterFit = function(sc){ var cap = Math.round((box.clientWidth || window.innerWidth) * 0.45); if(sc.width > cap) sc.width = cap; };
@@ -1147,6 +1150,15 @@
     }catch(err){
       reportError(err && err.message, err && err.stack);
     }
+    // Something was left out to keep the block readable: say so, quietly.
+    try{
+      var dr = spec.dropped;
+      if(dr && dr.total > dr.shown){
+        var what = kit === 'chart' ? (LANG === 'nl' ? 'punten' : 'points') : kit === 'map' ? (LANG === 'nl' ? 'plaatsen' : 'places') : (LANG === 'nl' ? 'onderdelen' : 'items');
+        var first = dr.last ? (LANG === 'nl' ? 'de laatste ' : 'the last ') : (LANG === 'nl' ? 'de eerste ' : 'the first ');
+        root.appendChild(h('p', 'k-note k-dropped', (LANG === 'nl' ? 'Alleen ' : 'Only ') + first + dr.shown + (LANG === 'nl' ? ' van ' : ' of ') + dr.total + ' ' + what + (LANG === 'nl' ? ' getoond.' : ' shown.')));
+      }
+    }catch(_){}
     post({type:'rendered'});
     scheduleHeight(true);
     setTimeout(function(){ scheduleHeight(true); }, 400);

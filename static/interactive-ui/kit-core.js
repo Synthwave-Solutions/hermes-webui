@@ -328,6 +328,14 @@
 
   // ── Small helpers ────────────────────────────────────────────────────────
   function isObj(v){return !!v&&typeof v==='object'&&!Array.isArray(v);}
+  function dateLabels(labels,lang){
+    const day=labels.every(l=>DATE_RE.test(String(l).trim())), month=!day&&labels.every(l=>/^\d{4}-\d{2}$/.test(String(l).trim()));
+    if(!day&&!month) return labels;
+    const l=pickLang(lang)==='nl'?'nl-NL':'en-GB';
+    const years=new Set(labels.map(x=>String(x).slice(0,4)));
+    const f=new Intl.DateTimeFormat(l,day?(years.size>1?{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'}:{day:'numeric',month:'short',timeZone:'UTC'}):{month:'short',year:'numeric',timeZone:'UTC'});
+    return labels.map(x=>{const d=new Date(String(x).trim()+(day?'T12:00:00Z':'-01T12:00:00Z'));return isNaN(d)?x:f.format(d);});
+  }
   // The decimals a set of numbers needs together: money 0 or 2, others up to 2.
   function sharedDecimals(values,type){
     let d=0;
@@ -486,7 +494,10 @@ function base(spec,lang,kind,m,warnings,limits){
     if(!seriesIn&&Array.isArray(spec.data)) seriesIn=[{name:out.title,data:spec.data}];
     if(!seriesIn&&Array.isArray(spec.values)) seriesIn=[{name:out.title,data:spec.values}];
     if(!labels||!labels.length){errors.push(m('noLabels'));return {errors,warnings};}
-    if(!round&&labels.length>LIMITS.chartLabels){warn('manyLabels',labels.length,LIMITS.chartLabels);labels=labels.slice(0,LIMITS.chartLabels);}
+    // A trend keeps its newest points; a ranking keeps its first ones.
+    const trend=type==='line'||type==='area';
+    let cut=0, totalLabels=labels.length;
+    if(!round&&labels.length>LIMITS.chartLabels){warn('manyLabels',labels.length,LIMITS.chartLabels);cut=trend?labels.length-LIMITS.chartLabels:0;labels=trend?labels.slice(cut):labels.slice(0,LIMITS.chartLabels);}
     if(!seriesIn||!seriesIn.length){errors.push(m('noSeries'));return {errors,warnings};}
     if(round&&seriesIn.length>1){warn('pieOne');seriesIn=seriesIn.slice(0,1);}
     if(seriesIn.length>LIMITS.series){warn('manySeries',seriesIn.length,LIMITS.series);seriesIn=seriesIn.slice(0,LIMITS.series);}
@@ -495,6 +506,7 @@ function base(spec,lang,kind,m,warnings,limits){
       const o=isObj(s)?s:{data:s};
       const name=str(o.name!=null?o.name:o.label,LIMITS.seriesName)||(lang==='nl'?'Reeks ':'Series ')+(si+1);
       let data=Array.isArray(o.data)?o.data:Array.isArray(o.values)?o.values:[];
+      if(cut&&data.length===totalLabels) data=data.slice(cut);
       if(data.length!==want){warn('seriesLength',name,data.length,want);data=data.slice(0,want);while(data.length<want)data.push(null);}
       let bad=false;
       data=data.map(v=>{
@@ -541,12 +553,16 @@ function base(spec,lang,kind,m,warnings,limits){
     if(type==='radar'&&labels.length<3) type='bar';
     if(type==='radar'&&target) target=null;
     const height=spec.height==null?(type==='hbar'?Math.max(220,Math.min(480,60+labels.length*28*Math.max(1,series.length*0.6))):type==='radar'?340:300):clampInt(spec.height,180,480,300);
+    // Dates as people write them ("5 okt", "jun 2026"); the export keeps the ISO value.
+    const isoLabels=labels.slice();
+    labels=dateLabels(labels,lang);
     return {errors,warnings,spec:Object.assign(out,{
-      type,labels,series,format,
+      type,labels,series,format,isoLabels:labels.some((l,i)=>l!==isoLabels[i])?isoLabels:null,
       decimals:spec.decimals==null?(sharedDecimals([].concat(...series.map(s=>s.data)),format)||null):clampInt(spec.decimals,0,2,null),
       highlight,target,
       xLabel:str(spec.xLabel,40),yLabel:str(spec.yLabel,40),
       max:type==='radar'&&Number.isFinite(Number(spec.max))&&Number(spec.max)>0?Number(spec.max):null,
+      dropped:totalLabels>labels.length?{shown:labels.length,total:totalLabels,last:trend}:null,
       height:Math.round(height),
     })};
   }
@@ -565,7 +581,9 @@ function base(spec,lang,kind,m,warnings,limits){
     if(!region.length) region=['nl'];
     let places=Array.isArray(spec.places)?spec.places:(Array.isArray(spec.stops)?spec.stops:null);
     if(!places||!places.length){errors.push(m('noPlaces'));return {errors,warnings};}
+    const placesTotal=places.length;
     if(places.length>LIMITS.places){warn('manyPlaces',places.length,LIMITS.places);places=places.slice(0,LIMITS.places);}
+    out.dropped=placesTotal>places.length?{shown:places.length,total:placesTotal}:null;
     const cats=[];
     let catWarned=false;
     const outPlaces=[];
@@ -746,7 +764,9 @@ function base(spec,lang,kind,m,warnings,limits){
     if(spec.start!=null&&spec.start!==''){const p=readPos(spec.start);if(p&&p.d!=null)baseDay=p.d;else warn('tlStart');}
     let items=Array.isArray(spec.items)?spec.items:(Array.isArray(spec.tasks)?spec.tasks:null);
     if(!items||!items.length){errors.push(m('tlNoItems'));return {errors,warnings};}
+    const tlTotal=items.length;
     if(items.length>LIMITS.tlItems){warn('tlMany',items.length,LIMITS.tlItems);items=items.slice(0,LIMITS.tlItems);}
+    out.dropped=tlTotal>items.length?{shown:items.length,total:tlTotal}:null;
     const raw=[];
     items.forEach((it,i)=>{
       if(!isObj(it)){warn('tlItem',i+1);return;}
@@ -1046,7 +1066,7 @@ function base(spec,lang,kind,m,warnings,limits){
     if(kind==='chart'){
       const en=spec.lang==='en';
       return {header:[en?'Label':'Categorie'].concat(spec.series.map(s=>s.name+unitTag(spec.format,s.name))),
-        rows:spec.labels.map((l,i)=>[l].concat(spec.series.map(s=>s.data[i]))),
+        rows:spec.labels.map((l,i)=>[spec.isoLabels?spec.isoLabels[i]:l].concat(spec.series.map(s=>s.data[i]))),
         types:['text'].concat(spec.series.map(()=>spec.format))};
     }
     if(kind==='map'){
