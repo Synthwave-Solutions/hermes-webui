@@ -538,7 +538,9 @@ const _iui=(function(){
     ctrl.height=h;
     if(ctrl.card.classList.contains('iui-full')) return;
     if(ctrl.final) rememberHeight(ctrl.fp,h);
-    const max=Math.max(320,Math.round((window.innerHeight||900)*0.86));
+    // Never taller than the part of the chat you can see, so the whole card fits on a phone.
+    const vis=scroller()&&scroller().clientHeight||0;
+    const max=Math.max(320,Math.min(Math.round((window.innerHeight||900)*0.86),vis?vis-48:Infinity));
     const next=Math.max(MIN_H,Math.min(h,max));
     const prev=ctrl.stage.offsetHeight;
     const delta=next-prev;

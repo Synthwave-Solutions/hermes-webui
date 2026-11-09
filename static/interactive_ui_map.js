@@ -50,17 +50,21 @@ const _iuiMap=(function(){
     const body=K.mapRequest(spec,opts.lang||'nl');
     const job=call(body).then(data=>{
       if(key) write(key,data);
-      if(pending(data)){
-        setTimeout(()=>{
-          const again=Object.assign({},body,{places:body.places.filter(p=>data.places.some(r=>r.k===p.k&&r.status==='later'))});
-          if(!again.places.length) return;
-          call(again).then(update=>{
-            const merged=merge(data,update);
-            if(key) write(key,merged);
-            if(typeof opts.onUpdate==='function') opts.onUpdate(merged);
-          },()=>{});
-        },RETRY_MS);
-      }
+      // Keep asking while places wait (the server spaces lookups out); after the
+      // last round they say plainly that they could not be looked up now.
+      const MAX_ROUNDS=6;
+      const giveUp=d=>Object.assign({},d,{places:d.places.map(p=>p.status==='later'?Object.assign({},p,{status:'not_found',gaveUp:true}):p)});
+      const done=d=>{if(key)write(key,d);if(typeof opts.onUpdate==='function')opts.onUpdate(d);};
+      const retry=(round,cur)=>setTimeout(()=>{
+        const again=Object.assign({},body,{places:body.places.filter(p=>cur.places.some(r=>r.k===p.k&&r.status==='later'))});
+        if(!again.places.length) return;
+        call(again).then(update=>{
+          const merged=merge(cur,update);
+          if(pending(merged)&&round<MAX_ROUNDS){done(merged);retry(round+1,merged);}
+          else done(pending(merged)?giveUp(merged):merged);
+        },()=>{if(round<MAX_ROUNDS)retry(round+1,cur);else done(giveUp(cur));});
+      },RETRY_MS);
+      if(pending(data)) retry(1,data);
       return data;
     }).finally(()=>{if(key)inflight.delete(key);});
     if(key) inflight.set(key,job);

@@ -259,3 +259,12 @@ th .k-sort{white-space:normal}
   .k-tl-detail.is-set{position:sticky;bottom:0;z-index:3;margin:0 -2px;padding:8px 10px;border-radius:10px;
     background:var(--sw-surface);border:1px solid var(--sw-border);box-shadow:0 -6px 16px rgba(0,0,0,.18)}
 }
+/* A table wider than the card: soft edges show where more columns are. */
+.k-scroll-edge{position:relative}
+.k-scroll-edge::before,.k-scroll-edge::after{content:"";position:absolute;top:0;bottom:0;width:22px;pointer-events:none;opacity:0;transition:opacity .15s;z-index:4}
+.k-scroll-edge::after{right:0;background:linear-gradient(to left,var(--sw-surface),transparent)}
+.k-scroll-edge::before{left:0;background:linear-gradient(to right,var(--sw-surface),transparent)}
+.k-scroll-edge.has-right::after,.k-scroll-edge.has-left::before{opacity:1}
+.k-more-cols{margin:6px 0 0;font-size:.78rem;color:var(--sw-muted)}
+/* On a phone a column is never cut through a number: the table snaps to column edges. */
+@media (max-width:640px){.k-scroll{scroll-snap-type:x proximity}.k-grid th,.k-grid td{scroll-snap-align:start}.k-grid td.num,.k-grid th.num{white-space:nowrap}}
