@@ -59,6 +59,7 @@
       limitMax:function(p, t){ return p + ' of the limit of ' + t; }, overMax:function(d, t){ return d + ' over the limit of ' + t; },
       today:'Today', milestone:'Milestone', tlLabel:'Timeline', pick:'Choose a bar for the details.'}
   };
+  function PHONE(){ return (window.innerWidth || 0) < 640 || !!(window.matchMedia && window.matchMedia('(pointer:coarse)').matches); }
   function T(key){ var v = (TEXT[LANG] || TEXT.nl)[key]; var args = Array.prototype.slice.call(arguments, 1); return typeof v === 'function' ? v.apply(null, args) : v; }
   function h(tag, cls, text){ var e = document.createElement(tag); if(cls) e.className = cls; if(text != null) e.textContent = String(text); return e; }
   function fmt(v, type, decimals){ return K.formatValue(v, type, decimals, LANG); }
@@ -322,7 +323,11 @@
     setTimeout(edges, 0);
     var more = h('button', 'k-more');
     more.type = 'button';
-    more.addEventListener('click', function(){ view.all = true; changed(); });
+    // On a phone the whole table opens in full screen, so the chat never gets stuck in a long box.
+    more.addEventListener('click', function(e){
+      if(PHONE() && !FULL && !standalone){ if(e && e.isTrusted) post({type:'full'}); return; }
+      view.all = true; changed();
+    });
     wrap.appendChild(more);
     if(spec.source && !opt.noSource) wrap.appendChild(h('p', 'k-source', spec.source));
     box.appendChild(wrap);
@@ -330,7 +335,7 @@
     function changed(){ draw(); if(opt.onChange) opt.onChange(view); }
     function draw(){
       var idx = K.viewIndices(spec, view, LANG);
-      var limit = (view.all || FULL || opt.all) ? idx.length : Math.min(idx.length, 50);
+      var limit = (view.all || FULL || opt.all) ? idx.length : Math.min(idx.length, PHONE() ? 8 : 50);
       tbody.textContent = '';
       var frag = document.createDocumentFragment();
       for(var r = 0; r < limit; r++){
@@ -1175,6 +1180,12 @@
         var what = kit === 'chart' ? (LANG === 'nl' ? 'punten' : 'points') : kit === 'map' ? (LANG === 'nl' ? 'plaatsen' : 'places') : (LANG === 'nl' ? 'onderdelen' : 'items');
         var first = dr.last ? (LANG === 'nl' ? 'de laatste ' : 'the last ') : (LANG === 'nl' ? 'de eerste ' : 'the first ');
         root.appendChild(h('p', 'k-note k-dropped', (LANG === 'nl' ? 'Alleen ' : 'Only ') + first + dr.shown + (LANG === 'nl' ? ' van ' : ' of ') + dr.total + ' ' + what + (LANG === 'nl' ? ' getoond.' : ' shown.')));
+      }
+    }catch(_){}
+    try{
+      if(spec.leftOut > 0){
+        var n1 = spec.leftOut;
+        root.appendChild(h('p', 'k-note k-dropped', LANG === 'nl' ? (n1 === 1 ? 'Eén onderdeel kon niet worden getoond.' : n1 + ' onderdelen konden niet worden getoond.') : (n1 === 1 ? 'One item could not be shown.' : n1 + ' items could not be shown.')));
       }
     }catch(_){}
     try{

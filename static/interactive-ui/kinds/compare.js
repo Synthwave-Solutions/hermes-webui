@@ -167,6 +167,15 @@
       if(recNames.indexOf(x.full) < 0) recNames.push(x.full);
       if(recIdx < 0) recIdx = k;
     });
+    // A short name for the pick ("Moneybird" for "Moneybird Basis", "Optie B" for
+    // "Optie B: LeasePlan") counts when exactly one option matches it.
+    if(recName && recIdx < 0){
+      var loose = opts.map(function(x, k){ return {k:k, x:x}; }).filter(function(y){
+        var f = y.x.full, head = f.split(':')[0].trim();
+        return f.indexOf(recName + ' ') === 0 || head === recName || recName.indexOf(f) === 0 || (recName.length >= 4 && f.indexOf(recName) >= 0);
+      });
+      if(loose.length === 1){ recIdx = loose[0].k; recNames.push(loose[0].x.full); }
+    }
     if(recName && recIdx < 0) warn(L.rec(H.str(recRaw, LIM.name)));
     if(recWhich && recIdx < 0) warn(L.recWhich(H.str(typeof recRaw === 'object' ? JSON.stringify(recRaw) : recRaw, 24)));
     // Two options with the same name are one choice, not two recommendations.

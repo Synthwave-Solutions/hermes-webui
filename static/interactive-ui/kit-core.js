@@ -444,6 +444,9 @@ function base(spec,lang,kind,m,warnings,limits){
         if(dates/cells.length>=0.9) col.type='date';
         else if(nums/cells.length>=0.9) col.type=cur>nums/2?'currency':pct>nums/2?'percent':'number';
         else col.type='text';
+        // Years, invoice and KvK numbers, postcodes and codes are labels, not amounts:
+        // no thousands point ("2.024") and no total.
+        if(col.type==='number'&&((/^(jaar|year|bouwjaar|boekjaar)$/i.test(col.label.trim())||/(nummer|nr\.?$|nr\b|kvk|postcode|\bid\b|code|factuur)/i.test(col.label))||cells.every(v=>{const n=typeof v==='number'?v:parseNumber(v).n;return Number.isInteger(n)&&n>=1900&&n<=2100;}))) col.type='text';
       }
       if(col.type==='number'||col.type==='currency'||col.type==='percent'){
         outRows.forEach(r=>{
@@ -984,7 +987,25 @@ function base(spec,lang,kind,m,warnings,limits){
     try{r=fn(raw,lang)||{errors:[m('notObject')],warnings:[]};}catch(err){r={errors:[m('notObject')],warnings:[]};}
     r.errors=Array.isArray(r.errors)?r.errors:[];r.warnings=Array.isArray(r.warnings)?r.warnings:[];
     res.errors=r.errors;res.warnings=r.warnings;
-    if(r.spec&&!r.errors.length){r.spec.lang=lang;res.spec=r.spec;res.title=r.spec.title;res.estHeight=estHeight(kind,r.spec);}
+    if(r.spec&&!r.errors.length){
+      r.spec.lang=lang;res.spec=r.spec;res.title=r.spec.title;res.estHeight=estHeight(kind,r.spec);
+      // Items the checks had to leave out (no number, no name, a bad date) are counted,
+      // so the block can say so to everyone, not only in the admin details.
+      try{
+        const LISTS={kpi:['items','metrics'],timeline:['items','tasks'],map:['places'],table:['rows'],compare:['options'],funnel:['stages','steps'],flow:['nodes','steps']};
+        const OUT={kpi:'items',timeline:'items',map:'places',table:'rows',compare:'options',funnel:'stages',flow:'nodes'};
+        const keys=LISTS[kind];
+        if(keys&&fence!=='csv'){
+          const src=keys.map(k=>raw[k]).find(Array.isArray);
+          const outList=r.spec[OUT[kind]];
+          if(src&&Array.isArray(outList)){
+            const limited=r.spec.dropped?(r.spec.dropped.total-r.spec.dropped.shown):0;
+            const left=src.length-outList.length-limited;
+            if(left>0) r.spec.leftOut=left;
+          }
+        }
+      }catch(_){}
+    }
     else res.title=str(raw&&raw.title,LIMITS.title);
     return res;
   }

@@ -237,7 +237,8 @@
       overall:function(){ return spec.overall === null ? '' : t('overall', stages[0].label, stages[stages.length - 1].label, pctR(spec.overall, anyRough)); },
       overallPrev:function(){ return spec.overallPrev === null ? '' : t('overallPrev', pct(spec.overallPrev)); },
       drop:function(){ return spec.drop < 0 ? '' : t('drop', stages[spec.drop - 1].label, stages[spec.drop].label, pctR(stages[spec.drop].conv, !!(stages[spec.drop].rough || stages[spec.drop - 1].rough))); },
-      chip:function(i){ return pctR(stages[i].conv, !!(stages[i].rough || stages[i - 1].rough)); },
+      // A stage larger than the one before shows its growth ("+12%"), never the ratio ("112%").
+      chip:function(i){ var s = stages[i]; if(s.grows && s.conv !== null) return '+' + pctR(s.conv - 100, !!(s.rough || stages[i - 1].rough)).replace(/^ca\. /, 'ca. +').replace(/^\+ca\. \+/, 'ca. +'); return pctR(s.conv, !!(s.rough || stages[i - 1].rough)); },
       aria:function(i){ var s = stages[i], p = [s.label, numS(s)]; if(i && s.conv !== null) p.push(t('fromPrev', pctR(s.conv, !!(s.rough || stages[i - 1].rough)), stages[i - 1].label)); return p.join(', '); },
       detail:function(i){
         var s = stages[i], parts = [s.label, numS(s)].concat(shares(i));
