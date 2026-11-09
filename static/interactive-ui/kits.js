@@ -23,7 +23,7 @@
   if(standalone && !DOC){ root.textContent = 'Open deze weergave vanuit de chat.'; return; }
   var HOST_ORIGIN = (function(){ try{ return new URL(location.href).origin; }catch(_){ return 'null'; } })();
   var HOST_OK = /^https?:\/\//i.test(HOST_ORIGIN);
-  var LANG = 'nl', FULL = false, current = null, lastMsg = null, lastHeight = 0, heightRaf = 0, errorCount = 0;
+  var CAP = 0, LANG = 'nl', FULL = false, current = null, lastMsg = null, lastHeight = 0, heightRaf = 0, errorCount = 0;
   var REDUCED = false;
   try{ REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(_){}
 
@@ -335,7 +335,10 @@
     function changed(){ draw(); if(opt.onChange) opt.onChange(view); }
     function draw(){
       var idx = K.viewIndices(spec, view, LANG);
-      var limit = (view.all || FULL || opt.all) ? idx.length : Math.min(idx.length, PHONE() ? 8 : 50);
+      // On a phone: as many rows as fit the card (between 3 and 8), the button always in view.
+      var phoneRows = 8;
+      if(PHONE() && CAP > 0){ var chrome = (spec.filter ? 48 : 0) + 44 + 52 + (spec.subtitle ? 24 : 0) + (spec.total ? 37 : 0) + 30; phoneRows = Math.max(3, Math.min(8, Math.floor((CAP - chrome) / 46))); }
+      var limit = (view.all || FULL || opt.all) ? idx.length : Math.min(idx.length, PHONE() ? phoneRows : 50);
       tbody.textContent = '';
       var frag = document.createDocumentFragment();
       for(var r = 0; r < limit; r++){
@@ -1211,7 +1214,12 @@
     if(msg.type === 'theme') applyTheme(msg.vars, msg.mode);
     else if(msg.type === 'kit'){ if(msg.final) render(msg); }
     else if(msg.type === 'scroll'){ var by = Number(msg.by) || 0; if(by > 0 && by < 4000) window.scrollBy(0, by); }
-    else if(msg.type === 'measure'){ if(typeof msg.full === 'boolean') setFull(msg.full); scheduleHeight(true); }
+    else if(msg.type === 'measure'){
+      if(typeof msg.full === 'boolean') setFull(msg.full);
+      // The room the chat gives this card; a phone table shows as many rows as fit.
+      if(typeof msg.cap === 'number' && msg.cap > 0 && Math.abs(msg.cap - CAP) > 4){ CAP = msg.cap; if(current && current.redraw && lastMsg && lastMsg.kit === 'table') try{ current.redraw(); }catch(_){} }
+      scheduleHeight(true);
+    }
   });
   post({type:'ready', kit:1});
 })();

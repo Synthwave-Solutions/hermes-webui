@@ -75,6 +75,13 @@ assert.ok(!dashes.test(w), 'no long dashes in messages');
 // Estimates stay estimates: the stage remembers it, so the frame shows "ca." and whole percents.
 { const est = K.build('funnel', JSON.stringify({title: 't', stages: [{label: 'A', value: 'ca. 1.000'}, {label: 'B', value: '>200'}, {label: 'C', value: 50}]}), {lang: 'nl'}).spec;
   assert.deepStrictEqual(est.stages.map(x => x.rough), ['ca', 'gt', '']); }
+// A growing stage shows its growth, also between estimates: "+12%", "ca. +13%", "about +13%".
+for (const lang of ['nl', 'en']) {
+  const f = K.build('funnel', JSON.stringify({title: 't', lang, stages: [{label: 'A', value: 1000}, {label: 'B', value: 'ca. 300'}, {label: 'C', value: 'ca. 340'}, {label: 'D', value: 1000}, {label: 'E', value: 1120}]}), {lang});
+  const X = require(path.join(__dirname, '..', 'static', 'interactive-ui', 'kinds', 'funnel.js')).texts(f.spec, (v, t, d) => K.formatValue(v, t, d, lang));
+  assert.strictEqual(X.chip(2), lang === 'nl' ? 'ca. +13%' : 'about +13%');
+  assert.strictEqual(X.chip(4), '+12%');
+}
 // A stage without any number stops the block: conversions never jump over a missing stage.
 assert.deepStrictEqual(K.build('funnel', JSON.stringify({title: 't', stages: [{label: 'A', value: 10}, {label: 'B', value: 'veel'}, {label: 'C', value: 2}]}), {lang: 'nl'}).errors,
   ['Bij "B" staat geen getal.']);

@@ -370,3 +370,10 @@ for (const [txt, n, kind] of [['€ 1,2 mln', 1200000, 'currency'], ['45k', 4500
 assert.ok(Number.isNaN(K.parseNumber('5m').n), 'a bare m is not a million without a currency');
 assert.ok(Number.isNaN(K.parseNumber('06 12345678').n), 'a phone number stays a code');
 console.log('shorthand ok');
+// Years and identifiers are text even when the block says "number"; amounts stay numbers.
+{
+  const t = K.build('table', JSON.stringify({title: 't', columns: [{label: 'Jaar', type: 'number'}, 'Factuurbedrag', 'Aantal verkocht', 'Factuurnr', 'Postcode'],
+    rows: [[2023, 1250, 1950, 10234, 1012], [2024, 980, 2040, 10235, 2011]]}), {lang: 'nl'});
+  assert.deepStrictEqual(t.spec.columns.map(c => c.type), ['text', 'number', 'number', 'text', 'text']);
+  console.log('identifier columns ok');
+}

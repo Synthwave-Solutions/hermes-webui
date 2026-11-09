@@ -560,6 +560,8 @@ const _iui=(function(){
     if(ctrl.final) rememberHeight(ctrl.fp,h);
     const max=stageCap(ctrl);
     const next=Math.max(MIN_H,Math.min(h,max));
+    // Tell a data block how much room it has (a phone table fits its rows to it).
+    if(ctrl.kit&&Math.abs((ctrl._cap||0)-max)>4){ctrl._cap=max;postTo(ctrl,{type:'measure',cap:max});}
     const prev=ctrl.stage.offsetHeight;
     const delta=next-prev;
     // Keep the reader's place when a card above the visible area resizes.
