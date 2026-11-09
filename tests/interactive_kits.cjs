@@ -360,3 +360,13 @@ assert.strictEqual(accepts('table', '{"title":"x"}'), false, 'without the kit he
   assert.strictEqual(r.spec.items[1].over, false); assert.strictEqual(r.spec.items[1].met, true);
 }
 console.log('all kit checks passed');
+
+// Business shorthand reads everywhere: charts and key figures never drop "€ 1,2 mln" or "45k".
+for (const [txt, n, kind] of [['€ 1,2 mln', 1200000, 'currency'], ['45k', 45000, 'number'], ['48.250 euro', 48250, 'currency'],
+  ['€ 2,5 miljoen', 2500000, 'currency'], ['ca. 900', 900, 'number'], ['1,1 mld', 1100000000, 'number']]) {
+  const p = K.parseNumber(txt);
+  assert.strictEqual(p.n, n, txt); assert.strictEqual(p.kind, kind, txt);
+}
+assert.ok(Number.isNaN(K.parseNumber('5m').n), 'a bare m is not a million without a currency');
+assert.ok(Number.isNaN(K.parseNumber('06 12345678').n), 'a phone number stays a code');
+console.log('shorthand ok');

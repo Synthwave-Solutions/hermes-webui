@@ -51,3 +51,6 @@ html[data-theme=light] .k-fn-drop::before{background:color-mix(in srgb,var(--sw-
   .k-fn-detail.is-set{position:sticky;bottom:0;z-index:3;padding:8px 10px;border-radius:10px;
     background:var(--sw-surface);border:1px solid var(--sw-border);box-shadow:0 -6px 16px rgba(0,0,0,.18)}
 }
+.k-fn-track{gap:8px;align-items:center}
+.k-fn-bar{min-width:22px}
+.k-fn-value-out{font-size:.86rem;font-weight:600;color:var(--sw-strong);white-space:nowrap;font-variant-numeric:tabular-nums}

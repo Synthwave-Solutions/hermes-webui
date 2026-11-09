@@ -59,6 +59,7 @@
       chartType:(t)=>`Onbekend grafiektype "${t}"; er is een staafgrafiek van gemaakt.`,
       noLabels:()=>'De labels ontbreken.',
       manyLabels:(n,max)=>`Er zijn ${n} labels; alleen de eerste ${max} worden getoond.`,
+      manyLabelsLast:(n,max)=>`Er zijn ${n} labels; alleen de laatste ${max} worden getoond.`,
       pieOther:(max)=>`Een taartgrafiek toont maximaal ${max} delen; de rest staat samen onder "Overig".`,
       noSeries:()=>'Er zijn geen reeksen (series) met getallen.',
       manySeries:(n,max)=>`Er zijn ${n} reeksen; alleen de eerste ${max} worden getoond.`,
@@ -123,6 +124,7 @@
       chartType:(t)=>`Unknown chart type "${t}"; a bar chart was drawn instead.`,
       noLabels:()=>'The labels are missing.',
       manyLabels:(n,max)=>`There are ${n} labels; only the first ${max} are shown.`,
+      manyLabelsLast:(n,max)=>`There are ${n} labels; only the last ${max} are shown.`,
       pieOther:(max)=>`A pie chart shows at most ${max} slices; the rest is grouped under "Other".`,
       noSeries:()=>'There are no series with numbers.',
       manySeries:(n,max)=>`There are ${n} series; only the first ${max} are shown.`,
@@ -294,8 +296,19 @@
     if(/^\(.*\)$/.test(s)){neg=true;s=s.slice(1,-1);}
     if(/^[-\u2212]/.test(s)){neg=!neg;s=s.slice(1);}
     else if(s[0]==='+') s=s.slice(1);
-    if(/^(€|eur|\$|usd|£|gbp)/i.test(s)){kind='currency';s=s.replace(/^(€|eur|\$|usd|£|gbp)/i,'');}
-    if(/(€|eur|\$|usd|£|gbp)$/i.test(s)){kind='currency';s=s.replace(/(€|eur|\$|usd|£|gbp)$/i,'');}
+    // Rough forms models write: "ca. 900", "~45", "± 300", "120+".
+    s=s.replace(/^(ca\.?|circa|ongeveer|about|approx\.?|±|~|≈)/i,'').replace(/\+$/,'');
+    if(/^(€|euro|eur|\$|usd|£|gbp)/i.test(s)){kind='currency';s=s.replace(/^(€|euro|eur|\$|usd|£|gbp)/i,'');}
+    if(/(€|euro|eur|\$|usd|£|gbp)$/i.test(s)){kind='currency';s=s.replace(/(€|euro|eur|\$|usd|£|gbp)$/i,'');}
+    // Business shorthand: "1,2 mln", "45k", "2,5 miljoen", "1,1 mld".
+    let mult=1;
+    const mag=/(duizend|thousand|miljoen|million|miljard|billion|mln\.?|mio\.?|mld\.?|bn|k|m)$/i.exec(s);
+    if(mag&&/\d/.test(s.slice(0,mag.index))&&(mag[1].toLowerCase()!=='m'||kind==='currency')){
+      const u=mag[1].toLowerCase().replace('.','');
+      mult=/^(duizend|thousand|k)$/.test(u)?1e3:/^(miljard|billion|mld|bn)$/.test(u)?1e9:1e6;
+      s=s.slice(0,mag.index);
+      if(/(€|euro|eur)$/i.test(s)){kind='currency';s=s.replace(/(€|euro|eur)$/i,'');}
+    }
     if(/%$/.test(s)){kind='percent';s=s.slice(0,-1);}
     if(/^[-\u2212]/.test(s)){neg=!neg;s=s.slice(1);}
     s=s.replace(/,-$/,'').replace(/\.-$/,'');
@@ -322,7 +335,8 @@
     // Leading zeros mark codes and phone numbers, not amounts ("007", "0612345678").
     if(/^0\d/.test(norm)) return {n:NaN,kind:'number'};
     const n=Number(norm);
-    return {n:Number.isFinite(n)?(neg?-n:n):NaN,kind};
+    const v=Number.isFinite(n)?Math.round(n*mult*1e6)/1e6:NaN;
+    return {n:Number.isFinite(v)?(neg?-v:v):NaN,kind};
   }
   const DATE_RE=/^\d{4}-\d{2}-\d{2}$/;
 
@@ -496,17 +510,19 @@ function base(spec,lang,kind,m,warnings,limits){
     if(!labels||!labels.length){errors.push(m('noLabels'));return {errors,warnings};}
     // A trend keeps its newest points; a ranking keeps its first ones.
     const trend=type==='line'||type==='area';
-    let cut=0, totalLabels=labels.length;
-    if(!round&&labels.length>LIMITS.chartLabels){warn('manyLabels',labels.length,LIMITS.chartLabels);cut=trend?labels.length-LIMITS.chartLabels:0;labels=trend?labels.slice(cut):labels.slice(0,LIMITS.chartLabels);}
+    let cut=0, totalLabels=labels.length, labelsCut=false;
+    if(!round&&labels.length>LIMITS.chartLabels){warn(trend?'manyLabelsLast':'manyLabels',labels.length,LIMITS.chartLabels);cut=trend?labels.length-LIMITS.chartLabels:0;labels=trend?labels.slice(cut):labels.slice(0,LIMITS.chartLabels);labelsCut=true;}
     if(!seriesIn||!seriesIn.length){errors.push(m('noSeries'));return {errors,warnings};}
     if(round&&seriesIn.length>1){warn('pieOne');seriesIn=seriesIn.slice(0,1);}
+    const seriesTotal=seriesIn.length;
     if(seriesIn.length>LIMITS.series){warn('manySeries',seriesIn.length,LIMITS.series);seriesIn=seriesIn.slice(0,LIMITS.series);}
     const want=labels.length;
     let series=seriesIn.map((s,si)=>{
       const o=isObj(s)?s:{data:s};
       const name=str(o.name!=null?o.name:o.label,LIMITS.seriesName)||(lang==='nl'?'Reeks ':'Series ')+(si+1);
       let data=Array.isArray(o.data)?o.data:Array.isArray(o.values)?o.values:[];
-      if(cut&&data.length===totalLabels) data=data.slice(cut);
+      // Data cut together with the labels is not a length problem.
+      if(labelsCut&&data.length===totalLabels) data=cut?data.slice(cut):data.slice(0,want);
       if(data.length!==want){warn('seriesLength',name,data.length,want);data=data.slice(0,want);while(data.length<want)data.push(null);}
       let bad=false;
       data=data.map(v=>{
@@ -562,7 +578,8 @@ function base(spec,lang,kind,m,warnings,limits){
       highlight,target,
       xLabel:str(spec.xLabel,40),yLabel:str(spec.yLabel,40),
       max:type==='radar'&&Number.isFinite(Number(spec.max))&&Number(spec.max)>0?Number(spec.max):null,
-      dropped:totalLabels>labels.length?{shown:labels.length,total:totalLabels,last:trend}:null,
+      dropped:labelsCut?{shown:labels.length,total:totalLabels,last:trend}:null,
+      droppedSeries:seriesTotal>series.length&&seriesTotal>LIMITS.series?{shown:LIMITS.series,total:seriesTotal}:null,
       height:Math.round(height),
     })};
   }

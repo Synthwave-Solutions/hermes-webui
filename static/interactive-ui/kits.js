@@ -40,7 +40,7 @@
       chartFail:'Grafiek kon niet laden, hier zijn de cijfers.', places:function(n){ return n === 1 ? '1 locatie' : n + ' locaties'; },
       route:'Route', replay:'Opnieuw afspelen', status:function(i,n,name){ return 'Locatie ' + i + ' van ' + n + ': ' + name; },
       routeNote:'De lijn toont alleen de volgorde, niet de weg.', approx:'Sommige locaties zijn bij benadering.',
-      unresolved:'Niet op de kaart gevonden', later:'Wordt nog opgezocht', tilesFail:'De kaart laadt nu niet. De lijst klopt wel.',
+      unresolved:'Niet op de kaart gevonden', later:'Wordt nog opgezocht', pendingHead:'Nog niet op de kaart', gaveUp:'Kon nu niet worden opgezocht', tilesFail:'De kaart laadt nu niet. De lijst klopt wel.',
       google:'Open in Google Maps', copyAddr:'Kopieer adressen', photo:function(a,l){ return 'Foto: ' + a + ', ' + l; },
       more:'Meer info', approxPin:'bij benadering', mapLabel:'Kaart', listLabel:'Locaties',
       good:'gunstig', bad:'ongunstig', flat:'gelijk', target:function(p, t){ return p + ' van het doel van ' + t; }, limit:function(p, t){ return p + ' van het budget van ' + t; }, over:function(d, t){ return d + ' boven het budget van ' + t; },
@@ -52,7 +52,7 @@
       chartFail:'The chart could not load, here are the numbers.', places:function(n){ return n === 1 ? '1 place' : n + ' places'; },
       route:'Route', replay:'Play again', status:function(i,n,name){ return 'Place ' + i + ' of ' + n + ': ' + name; },
       routeNote:'The line shows the order, not the road.', approx:'Some places are approximate.',
-      unresolved:'Not found on the map', later:'Still being looked up', tilesFail:'The map does not load right now. The list is correct.',
+      unresolved:'Not found on the map', later:'Still being looked up', pendingHead:'Not on the map yet', gaveUp:'Could not be looked up right now', tilesFail:'The map does not load right now. The list is correct.',
       google:'Open in Google Maps', copyAddr:'Copy addresses', photo:function(a,l){ return 'Photo: ' + a + ', ' + l; },
       more:'More info', approxPin:'approximate', mapLabel:'Map', listLabel:'Places',
       good:'favourable', bad:'unfavourable', flat:'unchanged', target:function(p, t){ return p + ' of target ' + t; }, limit:function(p, t){ return p + ' of budget ' + t; }, over:function(d, t){ return d + ' over budget ' + t; },
@@ -301,7 +301,25 @@
     table.append(thead, tbody);
     if(tfoot) table.appendChild(tfoot);
     scroll.appendChild(table);
-    wrap.appendChild(scroll);
+    // More columns to the right: a soft edge and one plain line say so.
+    var edge = h('div', 'k-scroll-edge');
+    edge.appendChild(scroll);
+    wrap.appendChild(edge);
+    var moreCols = h('p', 'k-more-cols', LANG === 'nl' ? 'Veeg voor meer kolommen' : 'Swipe for more columns');
+    moreCols.hidden = true;
+    wrap.appendChild(moreCols);
+    function edges(){
+      // Snapping lines columns up just right of the sticky first column.
+      var firstTh = ths[0];
+      if(firstTh) scroll.style.scrollPaddingLeft = firstTh.offsetWidth + 'px';
+      var over = scroll.scrollWidth - scroll.clientWidth > 2;
+      edge.classList.toggle('has-right', over && scroll.scrollLeft < scroll.scrollWidth - scroll.clientWidth - 2);
+      edge.classList.toggle('has-left', over && scroll.scrollLeft > 2);
+      moreCols.hidden = !over || scroll.scrollLeft > 8;
+    }
+    scroll.addEventListener('scroll', edges, {passive:true});
+    if(typeof ResizeObserver === 'function'){ var ero = new ResizeObserver(function(){ requestAnimationFrame(edges); }); ero.observe(scroll); }
+    setTimeout(edges, 0);
     var more = h('button', 'k-more');
     more.type = 'button';
     more.addEventListener('click', function(){ view.all = true; changed(); });
@@ -763,12 +781,12 @@
     });
     if(missing.length){
       var group = h('div', 'k-missing');
-      group.appendChild(h('h4', '', T('unresolved')));
+      group.appendChild(h('h4', '', missing.every(function(x){ return x.later; }) ? T('pendingHead') : T('unresolved')));
       var ul = h('ul');
       missing.forEach(function(x){
         var li = h('li');
         li.appendChild(h('span', 'k-item-name', x.p.n + '. ' + x.p.name));
-        var meta = [addrAfterName(x.p.name, x.p.address), x.later ? T('later') : ''].filter(Boolean).join(' · ');
+        var meta = [addrAfterName(x.p.name, x.p.address), x.later ? T('later') : x.r && x.r.gaveUp ? T('gaveUp') : ''].filter(Boolean).join(' · ');
         if(meta) li.appendChild(h('span', 'k-item-meta', meta));
         ul.appendChild(li);
       });
@@ -1158,6 +1176,10 @@
         var first = dr.last ? (LANG === 'nl' ? 'de laatste ' : 'the last ') : (LANG === 'nl' ? 'de eerste ' : 'the first ');
         root.appendChild(h('p', 'k-note k-dropped', (LANG === 'nl' ? 'Alleen ' : 'Only ') + first + dr.shown + (LANG === 'nl' ? ' van ' : ' of ') + dr.total + ' ' + what + (LANG === 'nl' ? ' getoond.' : ' shown.')));
       }
+    }catch(_){}
+    try{
+      var ds = spec.droppedSeries;
+      if(ds && ds.total > ds.shown) root.appendChild(h('p', 'k-note k-dropped', (LANG === 'nl' ? 'Alleen de eerste ' + ds.shown + ' van ' + ds.total + ' reeksen getoond.' : 'Only the first ' + ds.shown + ' of ' + ds.total + ' series shown.')));
     }catch(_){}
     post({type:'rendered'});
     scheduleHeight(true);

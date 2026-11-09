@@ -12,6 +12,13 @@
   // Models write rough numbers: "ca. 900", "120+", "± 300", "1,2k", "2 mln".
   function approx(v, H){
     var n = H.kpiNumber(v);
+    // Remember an estimate even when the shared parser reads the number itself.
+    if(n && typeof v === 'string'){
+      var t1 = v.trim();
+      var mark = /^(>|>=)/.test(t1) || /\+$/.test(t1) ? 'gt' : /^(<|<=)/.test(t1) ? 'lt' : /^(ca\.?|circa|ongeveer|about|approx\.?|around|±|~|≈)/i.test(t1) ? 'ca' : '';
+      if(mark) n.rough = mark;
+      return n;
+    }
     if(n || typeof v !== 'string') return n;
     var t0 = v.trim(), rough = /^(>|>=)/.test(t0) || /\+$/.test(t0) ? 'gt' : /^(<|<=)/.test(t0) ? 'lt' : 'ca';
     var s = t0.replace(/^(ca\.?|circa|ongeveer|about|approx\.?|around|±|~|≈|>=|<=|>|<)\s*/i, '').replace(/\s*\+$/, '');
@@ -281,7 +288,6 @@
     // Every bar starts at the width of the longest number in the block and adds
     // its share of the rest, so a larger value always gets a wider bar.
     var valueTexts = stages.map(function(s){ return X.numS ? X.numS(s) : num(s.value); });
-    var minEm = (1.8 + Math.max.apply(null, valueTexts.map(function(x){ return x.length; })) * 0.62).toFixed(2);
 
     stages.forEach(function(s, i){
       if(i > 0){
@@ -308,11 +314,17 @@
       var track = h('div', 'k-fn-track');
       var b = h('button', 'k-fn-bar');
       b.type = 'button';
-      b.style.width = 'calc(' + minEm + 'em + (100% - ' + minEm + 'em) * ' + (s.w / 100) + ')';
-      b.appendChild(h('span', 'k-fn-value', valueTexts[i]));
+      // Width follows the value (a small floor keeps a tiny stage tappable); a number
+      // that does not fit in its bar sits right next to it.
+      var share = Math.max(4, s.w);
+      b.style.width = share + '%';
+      var inside = share >= 34;
+      if(inside) b.appendChild(h('span', 'k-fn-value', valueTexts[i]));
+      else b.appendChild(h('span', 'k-sr', valueTexts[i]));
       b.setAttribute('aria-label', X.aria(i));
       b.setAttribute('aria-pressed', 'false');
       b.tabIndex = i === 0 ? 0 : -1;
+      if(!inside){ var outV = h('span', 'k-fn-value-out', valueTexts[i]); outV.setAttribute('aria-hidden', 'true'); b._out = outV; }
       b.addEventListener('click', function(){ select(i, false); });
       b.addEventListener('keydown', function(e){
         var to = e.key === 'ArrowDown' || e.key === 'ArrowRight' ? i + 1 : e.key === 'ArrowUp' || e.key === 'ArrowLeft' ? i - 1 : e.key === 'Home' ? 0 : e.key === 'End' ? n - 1 : -2;
@@ -324,6 +336,7 @@
       });
       lab.addEventListener('click', function(){ select(i, false); });
       track.appendChild(b);
+      if(b._out) track.appendChild(b._out);
       row.append(lab, track);
       list.appendChild(row);
       buttons.push(b); rows.push(row);

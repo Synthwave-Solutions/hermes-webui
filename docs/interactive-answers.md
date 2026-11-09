@@ -142,8 +142,8 @@ block: only a body that starts with `{` is data.
 
 `POST /api/map/resolve` (`api/map_resolve.py`, signed in plus CSRF) looks up
 the places of a finished map block once; the chat keeps the answer per tab
-(`static/interactive_ui_map.js`) and retries places marked `later` once after
-3 s. Order: coordinates in the block, the cache (`STATE_DIR/map_cache.sqlite`,
+(`static/interactive_ui_map.js`) and retries places marked `later` every 3 s
+for up to six rounds; after that they read "Kon nu niet worden opgezocht". Order: coordinates in the block, the cache (`STATE_DIR/map_cache.sqlite`,
 180 days for hits, 1 day for misses), PDOK Locatieserver for Dutch
 addresses, Nominatim (one request per 1.05 s for the whole server, an
 identifying User-Agent, at most 8 new lookups per map and about 500 a day),
