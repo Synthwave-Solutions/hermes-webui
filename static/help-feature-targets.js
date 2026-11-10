@@ -2727,6 +2727,13 @@
       "#studioHubNav"
     ]
   },
+  "webui.studio.overview": {
+    "panel": "studio",
+    "targets": [
+      ".wp-bar",
+      "#studioHubNav"
+    ]
+  },
   "webui.studio.discover": {
     "panel": "studio",
     "targets": [

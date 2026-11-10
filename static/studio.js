@@ -14,7 +14,7 @@
   const NL = {
     n_goal: 'Gewenst doel', n_pain: 'Knelpunt', n_opp: 'Kans', n_sol: 'Oplossing', untitled: 'Naamloze use case', cause: 'Oorzaak', test: 'Kleinste test',
     q_quick: 'Snelle winst', q_big: 'Grote inzet', q_fill: 'Opvulling', q_pit: 'Geldput',
-    tab_uc: 'Use cases', tab_backlog: 'Backlog', tab_pb: 'Playbooks', nav_work: 'Werk', nav_me: 'Over jou', nav_prompts: 'Prompts', nav_profile: 'Organisatieprofiel', nav_org: 'Organisatie', nav_chart: 'Organigram', nav_teams: 'Teams beheren', nav_mgmt: 'Management', nav_recent: 'Recent', nav_help: 'Uitleg over dit scherm', conv_hide: 'Gesprek verbergen', conv_show: 'Gesprek tonen', view_matrix: 'Matrix', view_tree: 'Boom', to_backlog: 'Naar backlog', in_backlog: 'In backlog', all_to_backlog: 'Alle kansen naar de backlog', make_pb: 'Maak er een Playbook van', no_goal: 'Overig',
+    tab_uc: 'Use cases', tab_backlog: 'Backlog', tab_pb: 'Playbooks', nav_work: 'Werk', nav_home: 'Overzicht', setup_h: 'Nog even instellen', none_in_view: 'Niets in deze weergave', none_in_view_p: 'Kies een andere weergave om meer use cases te zien.', nav_me: 'Over jou', nav_prompts: 'Prompts', nav_profile: 'Organisatieprofiel', nav_org: 'Organisatie', nav_chart: 'Organigram', nav_teams: 'Teams beheren', nav_mgmt: 'Management', nav_recent: 'Recent', nav_help: 'Uitleg over dit scherm', conv_hide: 'Gesprek verbergen', conv_show: 'Gesprek tonen', view_matrix: 'Matrix', view_tree: 'Boom', to_backlog: 'Naar backlog', in_backlog: 'In backlog', all_to_backlog: 'Alle kansen naar de backlog', make_pb: 'Maak er een Playbook van', no_goal: 'Overig',
     studio: 'Studio', intro: 'Ontdek waar AI je werk overneemt, richt het proces in en laat de Super Agent het bouwen.',
     new_uc: 'Nieuwe use case', team: 'Team', none: 'Geen team', title_ph: 'Naam van deze use case', back: 'Use cases',
     p_discover: 'Ontdekken', p_design: 'Inrichten', p_playbook: 'Bouwplan', p_build: 'Bouwen', p_measure: 'Meten',
@@ -49,7 +49,7 @@
   const EN = {
     n_goal: 'Desired outcome', n_pain: 'Pain point', n_opp: 'Opportunity', n_sol: 'Solution', untitled: 'Untitled use case', cause: 'Cause', test: 'Smallest test',
     q_quick: 'Quick wins', q_big: 'Big bets', q_fill: 'Fill-ins', q_pit: 'Money pit',
-    tab_uc: 'Use cases', tab_backlog: 'Backlog', tab_pb: 'Playbooks', nav_work: 'Work', nav_me: 'About you', nav_prompts: 'Prompts', nav_profile: 'Organisation profile', nav_org: 'Organisation', nav_chart: 'Org chart', nav_teams: 'Manage teams', nav_mgmt: 'Management', nav_recent: 'Recent', nav_help: 'How this screen works', conv_hide: 'Hide conversation', conv_show: 'Show conversation', view_matrix: 'Matrix', view_tree: 'Tree', to_backlog: 'To backlog', in_backlog: 'In backlog', all_to_backlog: 'All opportunities to the backlog', make_pb: 'Turn it into a Playbook', no_goal: 'Other',
+    tab_uc: 'Use cases', tab_backlog: 'Backlog', tab_pb: 'Playbooks', nav_work: 'Work', nav_home: 'Overview', setup_h: 'Finish setting up', none_in_view: 'Nothing in this view', none_in_view_p: 'Choose another view to see more use cases.', nav_me: 'About you', nav_prompts: 'Prompts', nav_profile: 'Organisation profile', nav_org: 'Organisation', nav_chart: 'Org chart', nav_teams: 'Manage teams', nav_mgmt: 'Management', nav_recent: 'Recent', nav_help: 'How this screen works', conv_hide: 'Hide conversation', conv_show: 'Show conversation', view_matrix: 'Matrix', view_tree: 'Tree', to_backlog: 'To backlog', in_backlog: 'In backlog', all_to_backlog: 'All opportunities to the backlog', make_pb: 'Turn it into a Playbook', no_goal: 'Other',
     studio: 'Studio', intro: 'Discover where AI takes work off your hands, design the process and let the Super Agent build it.',
     new_uc: 'New use case', team: 'Team', none: 'No team', title_ph: 'Name of this use case', back: 'Use cases',
     p_discover: 'Discover', p_design: 'Design', p_playbook: 'Build plan', p_build: 'Build', p_measure: 'Measure',
@@ -91,7 +91,7 @@
   const errMsg = e => (e && e.message) || String(e);
   const PHASES = ['discover', 'design', 'playbook', 'build', 'measure'];
 
-  const St = { list: null, teams: [], doc: null, busy: false, listening: false, rec: null, draft: '', building: false, presetTeam: '', tab: 'usecases', oppView: 'matrix', backlogged: new Set(), counts: {}, me: null,
+  const St = { list: null, teams: [], doc: null, busy: false, listening: false, rec: null, draft: '', building: false, presetTeam: '', tab: 'home', backTab: '', scope: null, oppView: 'matrix', backlogged: new Set(), counts: {}, me: null,
     convOpen: (() => { try { return localStorage.getItem('sp-studio-conv') !== '0'; } catch (_e) { return true; } })() };
 
   function root(){ return $id('mainStudio'); }
@@ -107,6 +107,11 @@
   async function loadList(){
     try { const d = await call('/api/studio/usecases'); St.list = d.usecases || []; St.teams = d.teams || []; }
     catch (e) { St.list = []; toast(errMsg(e)); }
+  }
+  // Who the viewer is in the structure; arrives after the first paint and then adds the lens.
+  function loadScope(){
+    if (!window.SPScope) return;
+    window.SPScope.load().then(c => { const first = !St.scope; St.scope = c; if (first && !St.doc && St.tab === 'usecases' && _currentPanel === 'studio') renderList(); }).catch(() => {});
   }
   async function loadCounts(){
     const [bl, pb, me, pr, pf, pm] = await Promise.all([
@@ -143,7 +148,28 @@
   function tabsHtml(){
     return `<div class="om-seg st-tabs" role="tablist">${[['usecases', 'tab_uc'], ['backlog', 'tab_backlog'], ['playbooks', 'tab_pb']].map(([k, l]) => `<button type="button" role="tab" aria-selected="${St.tab === k}" aria-pressed="${St.tab === k}" data-st-tab="${k}">${H(w(l))}</button>`).join('')}</div>`;
   }
+  // The two "finish setting up" pointers share one calm card: one row each, no second primary button.
+  function setupHtml(){
+    const me = St.personEmpty && window.SPIntake ? `<div class="st-setup-row st-me-hint"><span>${H(window.SPIntake.hintMe())}</span><button type="button" class="sm-btn" data-st-hub-go="me">${H(window.SPIntake.openMe())}</button></div>` : '';
+    const org = St.profileEmpty && St.profileEditable && window.SPPrompts ? `<div class="st-setup-row st-org-hint"><span>${H(window.SPPrompts.pfHint())}</span><button type="button" class="sm-btn" data-st-hub-go="profile">${H(window.SPPrompts.pfOpen())}</button></div>` : '';
+    return me || org ? `<section class="om-card st-setup" aria-label="${H(w('setup_h'))}"><div class="st-setup-label">${H(w('setup_h'))}</div>${me}${org}</section>` : '';
+  }
+  function cardHtml(r, sc){
+    const teamName = k => (St.teams.find(t => t.key === k) || {}).name || (sc && k ? window.SPScope.teamName(sc, k) : '');
+    const other = sc && r.owner && String(r.owner).toLowerCase() !== sc.email;
+    return `<button type="button" class="st-card" data-st-open="${H(r.id)}">
+          <span class="st-card-title ${r.title ? '' : 'st-side-untitled'}">${H(r.title || w('untitled'))}</span>
+          <span class="om-muted om-small">${H(teamName(r.team || (sc && window.SPScope.primaryTeam(sc, r.owner))) || w('none'))} · ${H(w('p_' + (r.phase || 'discover')))}</span>
+          <span class="st-card-meta"><span class="om-badge">${H(r.components || 0)} ${H(w('components'))}</span>${r.built ? `<span class="om-badge ok">${H(r.built)} ${H(w('built_n'))}</span>` : ''}${other ? `<span class="st-card-owner">${window.SPScope.face(sc, r.owner, 'st-face-xs')}${H(window.SPScope.personName(r.owner))}</span>` : ''}</span>
+        </button>`;
+  }
   function renderList(){
+    if (St.tab === 'home' && !window.SPWorkplace) St.tab = 'usecases';
+    if (St.tab === 'home') {
+      const body = head(`<button type="button" class="sm-btn primary" data-st-new>${H(w('new_uc'))}</button>`, w('nav_home'));
+      if (body) window.SPWorkplace.render(body, { setup: setupHtml() });
+      return;
+    }
     if ((St.tab === 'me' || St.tab === 'profile') && window.SPIntake) {
       const body = head('', w(St.tab === 'me' ? 'nav_me' : 'nav_profile'));
       if (body) window.SPIntake.render(body, St.tab === 'me' ? 'me' : 'org');
@@ -162,16 +188,28 @@
     const body = head(`<button type="button" class="sm-btn primary" data-st-new>${H(w('new_uc'))}</button>`, w('tab_uc'));
     if (!body) return;
     const rows = St.list || [];
-    const teamName = k => (St.teams.find(t => t.key === k) || {}).name || '';
+    // The lens (mine, my team, organisation) and the grouping per team need the structure;
+    // without it the list simply shows everything, as it always did.
+    const sc = window.SPScope ? St.scope : null;
+    let shown = rows.map(r => ({ row: r, owner: r.owner, team: r.team })), bar = '', lens = 'org';
+    if (sc && rows.length) {
+      shown = rows.map(r => ({ row: r, owner: r.owner, team: r.team || window.SPScope.primaryTeam(sc, r.owner) }));
+      const counts = new Set(window.SPScope.lenses(sc).map(l => shown.filter(it => window.SPScope.match(sc, it, l)).length));
+      if (counts.size > 1) {
+        lens = window.SPScope.getLens(sc, 'usecases', 'org');
+        bar = `<div class="st-lens-bar">${window.SPScope.barHtml(sc, 'usecases', shown, lens)}</div>`;
+        shown = shown.filter(it => window.SPScope.match(sc, it, lens));
+      }
+    }
+    const groups = sc && lens !== 'mine' ? window.SPScope.groupByTeam(sc, shown) : [];
+    const cards = groups.length > 1
+      ? groups.map(g => `<div class="st-group"><div class="st-group-label">${g.department && g.department !== g.name ? `<span>${H(g.department)}</span>` : ''}<strong>${H(g.name)}</strong><span class="om-side-count">${g.items.length}</span></div><div class="st-cards">${g.items.map(it => cardHtml(it.row, sc)).join('')}</div></div>`).join('')
+      : `<div class="st-cards">${shown.map(it => cardHtml(it.row, sc)).join('')}</div>`;
     body.innerHTML = `<p class="om-intro">${H(w('intro'))}</p>
-      ${St.personEmpty && window.SPIntake ? `<div class="om-card st-profile-hint st-me-hint"><span>${H(window.SPIntake.hintMe())}</span><button type="button" class="sm-btn primary" data-st-hub-go="me">${H(window.SPIntake.openMe())}</button></div>` : ''}
-      ${St.profileEmpty && St.profileEditable && window.SPPrompts ? `<div class="om-card st-profile-hint st-org-hint"><span>${H(window.SPPrompts.pfHint())}</span><button type="button" class="sm-btn" data-st-hub-go="profile">${H(window.SPPrompts.pfOpen())}</button></div>` : ''}
-      ${rows.length ? `<div class="st-cards" data-tour="studio-usecases">${rows.map(r => `<button type="button" class="st-card" data-st-open="${H(r.id)}">
-          <span class="st-card-title ${r.title ? '' : 'st-side-untitled'}">${H(r.title || w('untitled'))}</span>
-          <span class="om-muted om-small">${H(teamName(r.team) || w('none'))} · ${H(w('p_' + (r.phase || 'discover')))}</span>
-          <span class="st-card-meta"><span class="om-badge">${H(r.components || 0)} ${H(w('components'))}</span>${r.built ? `<span class="om-badge ok">${H(r.built)} ${H(w('built_n'))}</span>` : ''}</span>
-        </button>`).join('')}</div>`
-      : `<div class="om-empty" data-tour="studio-usecases"><h3>${H(w('new_uc'))}</h3><p>${H(w('empty_list'))}</p><div class="om-actions"><button type="button" class="sm-btn primary" data-st-new>${H(w('new_uc'))}</button></div></div>`}`;
+      ${setupHtml()}${bar}
+      ${!rows.length ? `<div class="om-empty" data-tour="studio-usecases"><h3>${H(w('new_uc'))}</h3><p>${H(w('empty_list'))}</p><div class="om-actions"><button type="button" class="sm-btn primary" data-st-new>${H(w('new_uc'))}</button></div></div>`
+      : shown.length ? `<div class="st-list" data-tour="studio-usecases">${cards}</div>`
+      : `<div class="om-empty" data-tour="studio-usecases"><h3>${H(w('none_in_view'))}</h3><p>${H(w('none_in_view_p'))}</p></div>`}`;
   }
 
   // ── Use case ───────────────────────────────────────────────────────────────
@@ -360,7 +398,7 @@
         if (!b) return;
         const go = b.dataset.stHub;
         if ((go || b.dataset.stSideOpen || b.hasAttribute('data-st-side-new')) && typeof _isDesktopWidth === 'function' && !_isDesktopWidth() && typeof closeMobileSidebar === 'function') closeMobileSidebar();
-        if (go === 'usecases' || go === 'backlog' || go === 'playbooks' || go === 'prompts' || go === 'profile' || go === 'me') {
+        if (go === 'home' || go === 'usecases' || go === 'backlog' || go === 'playbooks' || go === 'prompts' || go === 'profile' || go === 'me') {
           St.tab = go; St.doc = null;
           if (window.SPLibrary && window.SPLibrary.reset) window.SPLibrary.reset();
           if (_currentPanel !== 'studio' && typeof switchPanel === 'function') await switchPanel('studio'); else { await loadList(); render(); }
@@ -384,7 +422,7 @@
     box.setAttribute('aria-label', w('studio'));
     box.innerHTML = `<button type="button" class="st-side-new" data-st-side-new>＋ ${H(w('new_uc'))}</button>
       <div class="om-side-label">${H(w('nav_work'))}</div>
-      ${item('me', w('nav_me'), null, St.personEmpty)}${item('usecases', w('tab_uc'), (St.list || []).length || null)}${item('backlog', w('tab_backlog'), St.counts.backlog || null)}${item('playbooks', w('tab_pb'), St.counts.playbooks || null)}${item('prompts', w('nav_prompts'), St.counts.prompts || null)}
+      ${item('home', w('nav_home'))}${item('me', w('nav_me'), null, St.personEmpty)}${item('usecases', w('tab_uc'), (St.list || []).length || null)}${item('backlog', w('tab_backlog'), St.counts.backlog || null)}${item('playbooks', w('tab_pb'), St.counts.playbooks || null)}${item('prompts', w('nav_prompts'), St.counts.prompts || null)}
       <div class="om-side-label">${H(w('nav_org'))}</div>${item('profile', w('nav_profile'), null, St.profileEmpty && me.can_manage)}${me.can_view ? item('chart', w('nav_chart')) : ''}${me.can_manage ? item('teams', w('nav_teams')) + item('mgmt', w('nav_mgmt')) : ''}
       ${rows.length ? `<div class="om-side-label">${H(w('nav_recent'))}</div>` + rows.map(r => `<button type="button" class="st-side-recent" data-st-side-open="${H(r.id)}" aria-current="${!!(St.doc && St.doc.id === r.id && sec === 'usecases')}"><span class="st-side-recent-title ${r.title ? '' : 'st-side-untitled'}">${H(r.title || w('untitled'))}</span><span class="om-side-count">${H(w('p_' + (r.phase || 'discover')))}</span></button>`).join('') : ''}
       <button type="button" class="st-side-help" data-help-guide="${sec === 'mgmt' ? 'management' : (sec === 'chart' || sec === 'teams') ? 'organisation' : 'studio'}">${H(w('nav_help'))}</button>`;
@@ -600,11 +638,12 @@
         return;
       }
       if (b.hasAttribute('data-st-new')) {
+        if (St.tab === 'home') { St.backTab = 'home'; St.tab = 'usecases'; }
         try { St.doc = await post('/api/studio/usecase', { team: St.presetTeam || '' }); St.presetTeam = ''; } catch (e) { toast(errMsg(e)); }
         render(); return;
       }
       if (b.dataset.stOpen) { await open(b.dataset.stOpen); return; }
-      if (b.hasAttribute('data-st-back')) { if (St.live) stopLive(); St.doc = null; await loadList(); render(); return; }
+      if (b.hasAttribute('data-st-back')) { if (St.live) stopLive(); St.doc = null; if (St.backTab) { St.tab = St.backTab; St.backTab = ''; } if (window.SPWorkplace) window.SPWorkplace.invalidate(); await loadList(); render(); return; }
       if (b.hasAttribute('data-st-delete')) { if (confirm(w('confirm_delete'))) { try { await post('/api/studio/delete', { id: St.doc.id }); } catch (e) { toast(errMsg(e)); } St.doc = null; await loadList(); render(); } return; }
       if (b.dataset.stPhase) { await save({ phase: b.dataset.stPhase }, true); render(); return; }
       if (b.dataset.stGoto) {
@@ -631,10 +670,14 @@
     r.addEventListener('change', ev => { if (ev.target.hasAttribute('data-st-include')) ev.target.closest('.st-comp').classList.toggle('off', !ev.target.checked); });
   }
 
+  document.addEventListener('sp-lens-change', ev => {
+    if (ev.detail && ev.detail.surface === 'usecases' && !St.doc && St.tab === 'usecases' && typeof _currentPanel === 'string' && _currentPanel === 'studio') renderList();
+  });
+
   window.SPStudio = {
-    openUseCase: async (id) => { St.tab = 'usecases'; if (typeof switchPanel === 'function') await switchPanel('studio'); await open(id); },
+    openUseCase: async (id) => { St.backTab = St.tab === 'home' && _currentPanel === 'studio' ? 'home' : ''; St.tab = 'usecases'; if (typeof switchPanel === 'function') await switchPanel('studio'); await open(id); },
     setTab: (tab) => { St.tab = tab; St.doc = null; render(); },
-    load: async () => { bind(); await Promise.all([loadList(), loadCounts()]); render(); },
+    load: async () => { bind(); loadScope(); await Promise.all([loadList(), loadCounts()]); render(); },
     renderSide: async () => { if (St.list === null) await Promise.all([loadList(), loadCounts()]); renderSide(); },
     refreshCounts: async () => { await loadCounts(); renderSide(); },
     newForTeam: async (team) => { St.presetTeam = team || ''; St.doc = null; if (typeof switchPanel === 'function') await switchPanel('studio'); bind(); try { St.doc = await post('/api/studio/usecase', { team: St.presetTeam }); St.presetTeam = ''; } catch (e) { toast(errMsg(e)); } render(); }

@@ -10502,7 +10502,7 @@ function _systemHealthPercent(metric){
   return Math.max(0,Math.min(100,Math.round(percent*10)/10));
 }
 function _formatSystemHealthPercent(percent){
-  if(percent == null) return '—';
+  if(percent == null) return '…';
   return `${percent.toFixed(percent%1?1:0)}%`;
 }
 function _formatSystemHealthBytes(metric){
@@ -10532,13 +10532,17 @@ function _updateSystemHealthMetric(name,metric){
   if(bar) bar.setAttribute('aria-valuenow',String(percent));
   if(fill) fill.style.width=`${percent}%`;
 }
+function _systemHealthText(text){
+  if((document.documentElement.lang||'nl').toLowerCase().startsWith('en')) return text;
+  return ({Unavailable:'Niet beschikbaar',Partial:'Gedeeltelijk',Live:'Live'})[text]||text;
+}
 function setSystemHealthUnavailable(message){
   const panel=$('systemHealthPanel');
   const status=$('systemHealthStatus');
   if(!panel) return;
   panel.classList.remove('loading');
   panel.classList.add('unavailable');
-  if(status) status.textContent=message||'Unavailable';
+  if(status) status.textContent=_systemHealthText(message||'Unavailable');
   ['cpu','memory','disk'].forEach(name=>_updateSystemHealthMetric(name,null));
 }
 function renderSystemHealth(payload){
@@ -10550,7 +10554,7 @@ function renderSystemHealth(payload){
     return;
   }
   panel.classList.remove('loading','unavailable');
-  if(status) status.textContent=payload.status==='partial'?'Partial':'Live';
+  if(status) status.textContent=_systemHealthText(payload.status==='partial'?'Partial':'Live');
   _updateSystemHealthMetric('cpu',payload.cpu);
   _updateSystemHealthMetric('memory',payload.memory);
   _updateSystemHealthMetric('disk',payload.disk);

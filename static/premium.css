@@ -1,0 +1,78 @@
+/* Premium layer (10 Nov 2026): calmer navigation and surfaces.
+   Loaded after the feature stylesheets; it only refines what they define. */
+
+/* ── Grouped rail ─────────────────────────────────────────────────────────
+   nav_groups.js puts one .rail-group marker in front of each group. In the
+   icon rail it is a hairline, in the rail with labels a small heading. */
+.rail-group{display:none;}
+@media(min-width:641px){
+  .rail-group{display:block;flex:0 0 auto;width:20px;height:1px;margin:6px 0;background:var(--border2,var(--border));border-radius:1px;}
+  .rail-group[data-first]{display:none;}
+  .rail-group span{display:none;}
+  html[data-rail-expanded="1"] .rail-group,
+  html[data-nav-audience="member"] .rail-group{display:block;width:auto;height:auto;margin:12px 0 2px;padding:0 10px;background:none;}
+  html[data-rail-expanded="1"] .rail-group[data-first],
+  html[data-nav-audience="member"] .rail-group[data-first]{margin-top:2px;}
+  html[data-rail-expanded="1"] .rail-group span,
+  html[data-nav-audience="member"] .rail-group span{display:block;font-size:10.5px;font-weight:650;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);opacity:.78;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  /* A rail with labels may be taller than a small laptop screen. */
+  html[data-rail-expanded="1"] .rail,
+  html[data-nav-audience="member"] .rail{overflow-y:auto;overflow-x:hidden;scrollbar-width:none;}
+  html[data-rail-expanded="1"] .rail::-webkit-scrollbar,
+  html[data-nav-audience="member"] .rail::-webkit-scrollbar{display:none;}
+  html[data-rail-expanded="1"] .rail .rail-btn,
+  html[data-nav-audience="member"] .rail .rail-btn{height:34px;border-radius:9px;}
+}
+
+/* ── First-run tour offer ─────────────────────────────────────────────────
+   On a desktop the offer sat on top of the page header and its main button.
+   It now rests in the lower right corner; phones keep the top sheet. */
+@media(min-width:641px){
+  .sp-help-card[data-kind="tour_offer"]{top:auto;bottom:24px;right:24px;}
+}
+
+/* Rail with labels: wide enough for the longest Dutch destination names. */
+@media(min-width:641px){
+  html[data-rail-expanded="1"] .rail,
+  html[data-nav-audience="member"] .rail{width:208px;}
+}
+
+/* Overzicht: a single list uses the full width instead of half a grid. */
+.wp-grid > :only-child{grid-column:1 / -1;}
+
+/* ── Scheduled tasks: the title gets its own line, the labels sit below ── */
+.cron-item .cron-header{flex-wrap:wrap;row-gap:6px;align-items:flex-start;}
+.cron-item .cron-header .cron-name{flex:1 1 calc(100% - 72px);min-width:0;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.35;overflow-wrap:anywhere;}
+/* The bot label takes what the line has left, so the status never drops to a third line. */
+.cron-item .cron-header .cron-profile-badge{flex:1 1 64px;min-width:0;max-width:max-content;}
+.cron-item .cron-header .cron-profile-badge .cron-bot-chip-name{min-width:0;}
+.cron-item .cron-header .cron-status{margin-left:auto;}
+.cron-item .cron-header .cron-status ~ .cron-status{margin-left:0;}
+
+/* ── Chat sidebar: a long project list folds to four rows ── */
+.project-bar[data-sp-clamp="closed"]{max-height:var(--sp-clamp,84px);overflow:hidden;}
+.project-bar-more{display:block;margin:-2px 10px 8px;padding:2px 0;border:0;background:none;color:var(--muted);font:inherit;font-size:11px;font-weight:600;cursor:pointer;text-align:left;}
+.project-bar-more:hover,.project-bar-more:focus-visible{color:var(--text);text-decoration:underline;}
+
+/* ── Manage teams: fields in one row, quiet actions below ── */
+.om-team-edit{grid-template-columns:minmax(130px,1fr) minmax(140px,1fr) minmax(220px,2.4fr) minmax(130px,1fr) 80px;align-items:start;}
+.om-team-edit .om-row-actions{grid-column:1 / -1;flex-wrap:nowrap;flex-direction:row-reverse;justify-content:flex-start;gap:10px;}
+.main-view-body .om-team-edit:not([data-dirty]):not(:focus-within) .sm-btn.primary{background:var(--surface);border-color:var(--border2);color:var(--text);box-shadow:none;}
+.main-view-body .om-team-edit .sm-btn.danger{background:transparent;border-color:transparent;opacity:0;transition:opacity .15s ease;}
+.main-view-body .om-team-edit:hover .sm-btn.danger,
+.main-view-body .om-team-edit:focus-within .sm-btn.danger{opacity:1;}
+.main-view-body .om-team-edit .sm-btn.danger:hover,
+.main-view-body .om-team-edit .sm-btn.danger:focus-visible{border-color:color-mix(in srgb,var(--error) 40%,transparent);}
+@media(hover:none){.main-view-body .om-team-edit .sm-btn.danger{opacity:1;}}
+@media(max-width:900px){.om-team-edit{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media(prefers-reduced-motion:reduce){.main-view-body .om-team-edit .sm-btn.danger{transition:none;}}
+
+/* ── Management tiles: a missing figure reads as a sentence, not a dot ── */
+.om-kpi-value.om-kpi-none{font-size:15px;font-weight:600;letter-spacing:0;color:var(--muted);line-height:2;}
+
+/* ── Connections: status on one line, disconnect stays quiet until needed ── */
+.intg-badge{white-space:nowrap;}
+.intg-table .intg-btn.danger{background:transparent;border-color:transparent;color:var(--muted);}
+.intg-table tr:hover .intg-btn.danger,
+.intg-table tr:focus-within .intg-btn.danger{color:#f0717b;border-color:rgba(240,113,123,.35);}
+@media(hover:none){.intg-table .intg-btn.danger{color:#f0717b;}}
