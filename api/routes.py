@@ -9516,6 +9516,7 @@ def _keep_latest_messaging_session_per_source(
 from api.models import (
     Session,
     get_session,
+    get_session_for_scan,
     get_session_for_file_ops,
     new_session,
     all_sessions,
@@ -18135,6 +18136,48 @@ def _session_search_preview(text, query, max_len=124):
     return excerpt
 
 
+# Content search reads and parses every session transcript, which is CPU-bound
+# under the GIL. The sidebar fires one request per typing pause and never
+# cancels the previous one, so unbounded scans stack up and starve every other
+# request (12 Nov 2026: 14 overlapping scans, chat list and chat start stalled
+# for minutes). Cap the number of concurrent scans and give each one a time
+# budget; a request that loses out still returns its title matches at once.
+def _content_search_env_number(name, default, cast):
+    try:
+        value = cast(os.environ.get(name, "") or default)
+    except (TypeError, ValueError):
+        return default
+    return value if value > 0 else default
+
+
+_CONTENT_SEARCH_MAX_CONCURRENT = _content_search_env_number(
+    "HERMES_WEBUI_CONTENT_SEARCH_MAX_CONCURRENT", 2, int)
+_CONTENT_SEARCH_BUDGET_SECONDS = _content_search_env_number(
+    "HERMES_WEBUI_CONTENT_SEARCH_BUDGET_SECONDS", 20.0, float)
+# How long a new scan waits for a slot. Long enough for a superseded scan of
+# the same requester to notice and step aside, short enough to never queue up.
+_CONTENT_SEARCH_SLOT_WAIT_SECONDS = 3.0
+_CONTENT_SEARCH_SLOTS = threading.BoundedSemaphore(_CONTENT_SEARCH_MAX_CONCURRENT)
+# requester -> token of that requester's newest scan. An older scan stops as
+# soon as it sees a newer token, so the query the user ends on always wins.
+_CONTENT_SEARCH_LATEST = {}
+_CONTENT_SEARCH_LATEST_LOCK = threading.Lock()
+
+
+def _content_search_requester(handler):
+    try:
+        from api.ownership import request_owner_email
+        email = request_owner_email(handler)
+        if email:
+            return str(email).strip().lower()
+    except Exception:
+        pass
+    try:
+        return "addr:" + str(handler.client_address[0])
+    except Exception:
+        return "anonymous"
+
+
 def _handle_sessions_search(handler, parsed):
     qs = parse_qs(parsed.query)
     q = qs.get("q", [""])[0].lower().strip()
@@ -18180,38 +18223,83 @@ def _handle_sessions_search(handler, parsed):
             "active_profile": active_profile,
         })
     results = []
-    for s in sessions:
-        title_match = q in (s.get("title") or "").lower()
-        if title_match:
-            item = dict(s, match_type="title")
-            if isinstance(item.get("title"), str):
-                item["title"] = _redact_text(item["title"])
-            results.append(item)
-            continue
-        if content_search:
-            try:
-                sess = get_session(s["session_id"])
-                msgs = sess.messages[:depth] if depth else sess.messages
-                for m in msgs:
-                    c = _session_search_message_text(m)
-                    if q in str(c).lower():
-                        item = dict(s, match_type="content")
-                        preview = _session_search_preview(c, q)
-                        if preview:
-                            item["match_preview"] = _redact_text(preview)
-                        if isinstance(item.get("title"), str):
-                            item["title"] = _redact_text(item["title"])
-                        results.append(item)
-                        break
-            except (KeyError, Exception):
-                pass
-    return j(handler, {
+    content_search_state = None
+    scan_slot_held = False
+    scan_requester = None
+    scan_token = None
+    if content_search:
+        scan_requester = _content_search_requester(handler)
+        scan_token = object()
+        with _CONTENT_SEARCH_LATEST_LOCK:
+            _CONTENT_SEARCH_LATEST[scan_requester] = scan_token
+        scan_slot_held = _CONTENT_SEARCH_SLOTS.acquire(
+            timeout=_CONTENT_SEARCH_SLOT_WAIT_SECONDS)
+        if not scan_slot_held:
+            content_search = False
+            content_search_state = "busy"
+    scan_deadline = time.monotonic() + _CONTENT_SEARCH_BUDGET_SECONDS
+    try:
+        for s in sessions:
+            title_match = q in (s.get("title") or "").lower()
+            if title_match:
+                item = dict(s, match_type="title")
+                if isinstance(item.get("title"), str):
+                    item["title"] = _redact_text(item["title"])
+                results.append(item)
+                continue
+            if content_search:
+                if _CONTENT_SEARCH_LATEST.get(scan_requester) is not scan_token:
+                    # The same requester has since asked for something else.
+                    content_search = False
+                    content_search_state = "superseded"
+                    continue
+                if time.monotonic() > scan_deadline:
+                    # Out of budget: keep collecting title matches only.
+                    content_search = False
+                    content_search_state = "truncated"
+                    continue
+                try:
+                    # Scan accessor, not get_session(): a content search walks
+                    # every session, and routing that through the LRU would
+                    # evict the working set and re-check resident sessions
+                    # under the global session lock for every cold load.
+                    sess = get_session_for_scan(s["session_id"])
+                    if sess is None:
+                        continue
+                    msgs = sess.messages[:depth] if depth else sess.messages
+                    for m in msgs:
+                        c = _session_search_message_text(m)
+                        if q in str(c).lower():
+                            item = dict(s, match_type="content")
+                            preview = _session_search_preview(c, q)
+                            if preview:
+                                item["match_preview"] = _redact_text(preview)
+                            if isinstance(item.get("title"), str):
+                                item["title"] = _redact_text(item["title"])
+                            results.append(item)
+                            break
+                except (KeyError, Exception):
+                    pass
+    finally:
+        if scan_slot_held:
+            _CONTENT_SEARCH_SLOTS.release()
+        if scan_token is not None:
+            with _CONTENT_SEARCH_LATEST_LOCK:
+                if _CONTENT_SEARCH_LATEST.get(scan_requester) is scan_token:
+                    _CONTENT_SEARCH_LATEST.pop(scan_requester, None)
+    payload = {
         "sessions": results,
         "query": q,
         "count": len(results),
         "all_profiles": all_profiles,
         "active_profile": active_profile,
-    })
+    }
+    if content_search_state:
+        # "busy": other scans hold every slot; "truncated": budget ran out
+        # before the oldest sessions were read; "superseded": this requester
+        # sent a newer query. Title matches are complete in every case.
+        payload["content_search"] = content_search_state
+    return j(handler, payload)
 
 
 def _handle_list_dir(handler, parsed):
