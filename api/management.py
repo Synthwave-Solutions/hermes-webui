@@ -368,7 +368,9 @@ def build(view: org_structure.ViewScope, days: int, start: float, end: float) ->
                 "runs": r["runs"], "failed_runs": r["failed_runs"], "value_label": r["value_label"],
                 "failure_streak": r["failure_streak"], "state": r["state"], "suggested_team": r.get("suggested_team", ""),
                 "per": (r["value"] or {}).get("per", "run"), "confirmed": r.get("confirmed", False),
-                "before_minutes": (r["value"] or {}).get("before_minutes"), "review_minutes": (r["value"] or {}).get("review_minutes")}
+                "before_minutes": (r["value"] or {}).get("before_minutes"), "review_minutes": (r["value"] or {}).get("review_minutes"),
+                # Who set the task up and when it runs: lets the workplace group tasks per person.
+                "owner_email": r.get("owner_email", ""), "schedule": r.get("schedule", "")}
 
     decisions = []
     failing = [r for r in active if r["failure_streak"] >= FAILING_STREAK]

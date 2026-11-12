@@ -471,6 +471,47 @@ def release_async_delegation_delivery(
         _release_bounded_local(claim.delegation_id)
 
 
+def defer_async_delegation_delivery(
+    evt: Any,
+    claim: AsyncDelegationDeliveryClaim,
+) -> bool:
+    """Give a claim back without spending one of the core's delivery attempts.
+
+    Use this when the session could not take the wake-up yet (a turn is still
+    running, or the runtime must restart first) rather than when delivery was
+    tried and refused. The core counts every claim as an attempt and drops the
+    completion for good once the attempts run out, so a wait must not be
+    billed as a failure. Returns False when the attempt could not be returned
+    (older core without ``defer_completion_delivery``, or the row is no longer
+    pending under this claim); the claim is released either way.
+    """
+    deferred = False
+    try:
+        if claim.durable and claim.claim_id:
+            try:
+                from tools.async_delegation import defer_completion_delivery
+            except (ImportError, AttributeError):
+                from tools.async_delegation import release_event_delivery
+
+                release_event_delivery(evt, claim.claim_id)
+            else:
+                deferred = bool(
+                    defer_completion_delivery(
+                        str(evt.get("delegation_id") or ""),
+                        claim.claim_id,
+                    )
+                )
+    except Exception:
+        logger.warning(
+            "Failed to defer durable async delegation delivery for %s",
+            claim.delegation_id,
+            exc_info=True,
+        )
+    finally:
+        _release_bounded_local(claim.delegation_id)
+    return deferred
+
+
 def legacy_async_delivery_dedupe_size() -> int:
     """Return bounded compatibility-dedupe size for regression coverage."""
     with _LEGACY_ASYNC_DELIVERY_LOCK:

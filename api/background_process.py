@@ -53,6 +53,7 @@ from api.process_event_utils import (
     claim_async_delegation_delivery,
     complete_async_delegation_delivery,
     completion_delivery_id,
+    defer_async_delegation_delivery,
     release_async_delegation_delivery,
     requeue_async_delegation_event,
     schedule_async_delegation_claim_retry,
@@ -69,6 +70,17 @@ _PROCESS_RECOVERY_LOCK = threading.Lock()
 _REAPER_THREAD: Optional[threading.Thread] = None
 _REAPER_STOP = threading.Event()
 _REAPER_INTERVAL_SECS = 60.0
+
+# Async delegation wake-ups. The core drops a completion for good after a fixed
+# number of delivery claims, so waiting for a session must not spend them:
+# - busy: the session still runs a turn; checked before claiming, costs nothing.
+# - conflict: the turn start lost a race (409); the claim is deferred, which
+#   returns the attempt.
+# - refused: any other refusal or error; the attempt is spent and the wait is
+#   long enough that the core's attempts cover minutes, not seconds.
+_ASYNC_DELEGATION_BUSY_RETRY_SECONDS = 2.0
+_ASYNC_DELEGATION_CONFLICT_RETRY_SECONDS = 5.0
+_ASYNC_DELEGATION_REFUSED_RETRY_SECONDS = 15.0
 
 # Serializes the check-then-start of the module's daemon threads
 # (``start_drain_thread`` / ``start_session_channel_reaper``). Without it two
@@ -908,6 +920,39 @@ def _requeue_async_delegation_event(
     )
 
 
+def _requeue_async_delegation_event_later(
+    process_registry,
+    evt: dict,
+    *,
+    claim=None,
+    delay: float,
+) -> None:
+    """Requeue after ``delay`` without holding the caller's thread.
+
+    The drain loop is a single thread: sleeping there stalls every other
+    completion. The waiting event is owned by this short-lived thread until it
+    is back on the queue; the wait ends early, without enqueueing, once drain
+    shutdown starts, and the core's startup restore replays the pending row.
+    """
+    threading.Thread(
+        target=_requeue_async_delegation_event,
+        args=(process_registry, evt),
+        kwargs={"claim": claim, "delay": delay},
+        name="hermes-webui-delegation-retry",
+        daemon=True,
+    ).start()
+
+
+def _log_async_delegation_once(evt: dict, marker: str, level: int, msg: str, *args) -> dict:
+    """Log the first wait of a kind per completion, then stay quiet on retries."""
+    if evt.get(marker):
+        return evt
+    logger.log(level, msg, *args)
+    marked = dict(evt)
+    marked[marker] = True
+    return marked
+
+
 def _retry_unmapped_async_delegation_event(process_registry, evt: dict) -> None:
     """Retry durable routing, or one bounded best-effort legacy routing pass."""
     completion_queue = getattr(process_registry, "completion_queue", None)
@@ -988,28 +1033,62 @@ def _start_async_delegation_wakeup_turn(
                 )
                 return
 
-            release_async_delegation_delivery(evt, claim)
-            _requeue_async_delegation_event(process_registry, evt, claim=claim)
-            if status == 409 and (resp or {}).get("error") == "process_wakeup_paused":
-                logger.info(
-                    "async delegation wakeup paused for session %s; delivery remains retryable",
-                    session_id,
-                )
-            else:
-                logger.debug(
-                    "async delegation wakeup not accepted for session %s: "
-                    "status=%s err=%r; requeued",
+            error = (resp or {}).get("error")
+            if status == 409:
+                # The session started a turn first, or the runtime must restart
+                # before any turn can start. Nothing was tried yet: give the
+                # attempt back and try again shortly.
+                retry_evt = _log_async_delegation_once(
+                    evt,
+                    "_webui_conflict_logged",
+                    logging.INFO,
+                    "async delegation wakeup for session %s waits: status=%s err=%r type=%r; "
+                    "retrying every %.0fs",
                     session_id,
                     status,
-                    (resp or {}).get("error"),
+                    error,
+                    (resp or {}).get("type"),
+                    _ASYNC_DELEGATION_CONFLICT_RETRY_SECONDS,
                 )
-        except Exception:
-            release_async_delegation_delivery(evt, claim)
-            _requeue_async_delegation_event(process_registry, evt, claim=claim)
+                # Falls back to a plain release when the core cannot defer.
+                defer_async_delegation_delivery(evt, claim)
+                _requeue_async_delegation_event(
+                    process_registry,
+                    retry_evt,
+                    claim=claim,
+                    delay=_ASYNC_DELEGATION_CONFLICT_RETRY_SECONDS,
+                )
+                return
+
             logger.warning(
-                "async delegation wakeup turn failed for session %s; requeued",
+                "async delegation wakeup refused for session %s: status=%s err=%r; "
+                "delivery attempt spent, retrying in %.0fs",
                 session_id,
+                status,
+                error,
+                _ASYNC_DELEGATION_REFUSED_RETRY_SECONDS,
+            )
+            release_async_delegation_delivery(evt, claim)
+            _requeue_async_delegation_event(
+                process_registry,
+                evt,
+                claim=claim,
+                delay=_ASYNC_DELEGATION_REFUSED_RETRY_SECONDS,
+            )
+        except Exception:
+            logger.warning(
+                "async delegation wakeup turn failed for session %s; "
+                "delivery attempt spent, retrying in %.0fs",
+                session_id,
+                _ASYNC_DELEGATION_REFUSED_RETRY_SECONDS,
                 exc_info=True,
+            )
+            release_async_delegation_delivery(evt, claim)
+            _requeue_async_delegation_event(
+                process_registry,
+                evt,
+                claim=claim,
+                delay=_ASYNC_DELEGATION_REFUSED_RETRY_SECONDS,
             )
 
     threading.Thread(
@@ -1028,10 +1107,29 @@ def _process_async_delegation_event(
 ) -> None:
     """Claim and route one async completion without private registry markers."""
 
+    # A running turn owns the session. Wait for it before claiming: a claim is
+    # one of the core's limited delivery attempts, and a wait is not a failure.
+    # The result stays in the core record (restart-safe), never in the
+    # process-local deferred list.
+    if _session_has_active_turn(session_id):
+        retry_evt = _log_async_delegation_once(
+            evt,
+            "_webui_busy_logged",
+            logging.INFO,
+            "async delegation result for session %s waits for the running turn",
+            session_id,
+        )
+        _requeue_async_delegation_event_later(
+            process_registry,
+            retry_evt,
+            delay=_ASYNC_DELEGATION_BUSY_RETRY_SECONDS,
+        )
+        return
+
     try:
         claim = claim_async_delegation_delivery(evt, "webui-background")
     except Exception:
-        _requeue_async_delegation_event(process_registry, evt)
+        _requeue_async_delegation_event_later(process_registry, evt, delay=0.5)
         return
     if claim is None:
         completion_queue = getattr(process_registry, "completion_queue", None)
@@ -1044,14 +1142,6 @@ def _process_async_delegation_event(
         if not wakeup_prompt:
             raise RuntimeError("async delegation completion could not be formatted")
 
-        # Do not persist async results in the process-local deferred list. If a
-        # foreground turn owns the session, release the durable claim and retry
-        # from the shared queue; the core record therefore remains restart-safe.
-        if _session_has_active_turn(session_id):
-            release_async_delegation_delivery(evt, claim)
-            _requeue_async_delegation_event(process_registry, evt, claim=claim)
-            return
-
         _start_async_delegation_wakeup_turn(
             session_id,
             wakeup_prompt,
@@ -1062,7 +1152,7 @@ def _process_async_delegation_event(
         )
     except Exception:
         release_async_delegation_delivery(evt, claim)
-        _requeue_async_delegation_event(process_registry, evt, claim=claim)
+        _requeue_async_delegation_event_later(process_registry, evt, claim=claim, delay=0.5)
         logger.warning(
             "server-side async delegation dispatch failed for session %s",
             session_id,

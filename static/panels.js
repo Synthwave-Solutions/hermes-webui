@@ -937,8 +937,10 @@ function _cronScheduleInWords(expr){
   const step = minute.match(/^\*\/(\d+)$/);
   if (step && hour === '*' && dom === '*' && dow === '*') return tx('cron_words_minutes', Number(step[1])) || raw;
   if (/^\d+$/.test(minute) && hour === '*' && dom === '*' && dow === '*') return tx('cron_words_hourly', String(Number(minute)).padStart(2, '0')) || raw;
-  if (!/^\d+$/.test(minute) || !/^\d+$/.test(hour) || Number(hour) > 23 || Number(minute) > 59) return raw;
-  const time = `${String(Number(hour)).padStart(2, '0')}:${String(Number(minute)).padStart(2, '0')}`;
+  // Several hours on one line ("0 10,13,16 * * 1-5") read as a list of times.
+  const hours = hour.split(',');
+  if (!/^\d+$/.test(minute) || Number(minute) > 59 || hours.length > 6 || !hours.every(h => /^\d+$/.test(h) && Number(h) <= 23)) return raw;
+  const time = hours.map(h => `${String(Number(h)).padStart(2, '0')}:${String(Number(minute)).padStart(2, '0')}`).join(', ');
   if (dom === '*' && dow === '*') return tx('cron_words_daily', time) || raw;
   if (dom === '*' && (dow === '1-5' || dow.toLowerCase() === 'mon-fri')) return tx('cron_words_weekdays', time) || raw;
   if (dom === '*' && /^[0-7]$/.test(dow)) {
@@ -5659,6 +5661,7 @@ async function loadInsights(animate) {
     refreshBtn.disabled = true;
   }
   const period = ($('insightsPeriod') || {}).value || '30';
+  _localiseInsightsPeriod();
   try {
     const [data, wikiStatus, skillUsage] = await Promise.all([
       api(`/api/insights?days=${period}`),
@@ -5678,8 +5681,18 @@ async function loadInsights(animate) {
   }
 }
 
+// Insights copy follows the interface language (Dutch unless English is set).
+function _insightsText(en, nl) {
+  return (document.documentElement.lang || 'nl').toLowerCase().startsWith('en') ? en : nl;
+}
+function _localiseInsightsPeriod() {
+  const select = $('insightsPeriod');
+  if (!select) return;
+  for (const option of select.options) option.textContent = `${option.value} ${_insightsText('days', 'dagen')}`;
+}
+
 function _formatLlmWikiTimestamp(value) {
-  if (!value) return 'Never';
+  if (!value) return _insightsText('Never', 'Nog niet');
   try { return new Date(value).toLocaleString(); }
   catch (_) { return String(value); }
 }
@@ -5689,26 +5702,26 @@ function _renderSystemHealthPanel() {
     <section class="insights-card system-health-panel loading" id="systemHealthPanel" aria-label="Host resource health" aria-live="polite">
       <div class="system-health-head">
         <div>
-          <div class="insights-card-title">System health</div>
-          <div class="system-health-sub">Current VPS resource usage</div>
+          <div class="insights-card-title">${esc(_insightsText('System health', 'Systeemstatus'))}</div>
+          <div class="system-health-sub">${esc(_insightsText('Current VPS resource usage', 'Hoe druk de server het nu heeft'))}</div>
         </div>
-        <span class="system-health-status" id="systemHealthStatus"><span class="system-health-dot" aria-hidden="true"></span>Loading…</span>
+        <span class="system-health-status" id="systemHealthStatus"><span class="system-health-dot" aria-hidden="true"></span>${esc(_insightsText('Loading…', 'Laden…'))}</span>
       </div>
       <div class="system-health-metrics">
         <div class="system-health-metric" data-system-health-metric="cpu">
-          <div class="system-health-label"><span>CPU</span><span class="system-health-value" data-system-health-value>—</span></div>
+          <div class="system-health-label"><span>CPU</span><span class="system-health-value" data-system-health-value>…</span></div>
           <div class="system-health-bar" role="progressbar" aria-label="CPU usage" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="system-health-bar-fill"></div></div>
         </div>
         <div class="system-health-metric" data-system-health-metric="memory">
-          <div class="system-health-label"><span>RAM</span><span class="system-health-value" data-system-health-value>—</span></div>
+          <div class="system-health-label"><span>RAM</span><span class="system-health-value" data-system-health-value>…</span></div>
           <div class="system-health-bar" role="progressbar" aria-label="RAM usage" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="system-health-bar-fill"></div></div>
         </div>
         <div class="system-health-metric" data-system-health-metric="disk">
-          <div class="system-health-label"><span>Disk</span><span class="system-health-value" data-system-health-value>—</span></div>
+          <div class="system-health-label"><span>${esc(_insightsText('Disk', 'Schijf'))}</span><span class="system-health-value" data-system-health-value>…</span></div>
           <div class="system-health-bar" role="progressbar" aria-label="Disk usage" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="system-health-bar-fill"></div></div>
         </div>
       </div>
-      <div class="system-health-foot">Live snapshot only; historical resource charts can build on this surface later.</div>
+      <div class="system-health-foot">${esc(_insightsText('Live snapshot only; historical resource charts can build on this surface later.', 'Dit is de stand van dit moment, zonder geschiedenis.'))}</div>
     </section>`;
 }
 
@@ -5718,38 +5731,38 @@ function _renderLlmWikiStatus(d) {
   const isEmpty = status.available && status.status === 'empty';
   const isError = status.status === 'error';
   const badgeClass = isReady ? 'ok' : isError ? 'err' : isEmpty ? 'warn' : 'muted';
-  const badgeText = isReady ? 'Available' : isError ? 'Error' : isEmpty ? 'Empty' : 'Unavailable';
+  const badgeText = isReady ? _insightsText('Available', 'Beschikbaar') : isError ? _insightsText('Error', 'Fout') : isEmpty ? _insightsText('Empty', 'Leeg') : _insightsText('Unavailable', 'Niet beschikbaar');
   const rawDocsUrl = status.docs_url || 'https://synthwave.solutions/';
   // Guard against unsafe URL schemes (e.g. js: / data:) if docs_url ever
   // becomes config-driven. esc() HTML-escapes but doesn't validate URL scheme.
   const docsUrl = /^https?:\/\//i.test(rawDocsUrl) ? rawDocsUrl : '#';
   const toggleNote = status.toggle_available
-    ? 'Toggle available from the configured runtime setting.'
-    : (status.toggle_reason || 'No stable LLM Wiki on/off config flag was detected, so this panel is read-only.');
+    ? _insightsText('Toggle available from the configured runtime setting.', 'Aan en uit zetten kan via de instelling van de runtime.')
+    : _insightsText(status.toggle_reason || 'No stable LLM Wiki on/off config flag was detected, so this panel is read-only.', 'Alleen lezen: de wiki heeft geen aan/uit-instelling.');
   const statusNote = isReady
-    ? 'LLM Wiki is configured and page metadata is visible without exposing wiki content.'
+    ? _insightsText('LLM Wiki is configured and page metadata is visible without exposing wiki content.', 'De wiki staat aan. Je ziet hier alleen aantallen, niet de inhoud.')
     : isEmpty
-      ? 'LLM Wiki exists but has no entity, concept, comparison, or query pages yet.'
+      ? _insightsText('LLM Wiki exists but has no entity, concept, comparison, or query pages yet.', 'De wiki bestaat, maar heeft nog geen pagina\'s.')
       : isError
-        ? `Unable to inspect LLM Wiki status${status.error ? ': ' + status.error : ''}.`
-        : 'No LLM Wiki directory was found. Set WIKI_PATH or skills.config.wiki.path to enable status visibility.';
+        ? _insightsText(`Unable to inspect LLM Wiki status${status.error ? ': ' + status.error : ''}.`, `De status van de wiki is niet op te halen${status.error ? ': ' + status.error : ''}.`)
+        : _insightsText('No LLM Wiki directory was found. Set WIKI_PATH or skills.config.wiki.path to enable status visibility.', 'Er is nog geen wiki ingericht voor deze omgeving.');
   return `
     <div class="insights-card wiki-status-card" id="llmWikiStatusCard">
       <div class="wiki-status-head">
         <div>
           <div class="insights-card-title">LLM Wiki</div>
-          <div class="wiki-status-sub">Knowledge-base observability</div>
+          <div class="wiki-status-sub">${esc(_insightsText('Knowledge-base observability', 'De kennisbank van je bots'))}</div>
         </div>
         <span class="wiki-status-badge ${badgeClass}">${esc(badgeText)}</span>
       </div>
       <div class="wiki-status-note">${esc(statusNote)}</div>
       <div class="wiki-status-grid">
-        <div><span>Enabled</span><strong>${status.enabled ? 'Yes' : 'No'}</strong></div>
-        <div><span>Entries</span><strong>${Number(status.entry_count || 0).toLocaleString()}</strong></div>
-        <div><span>Pages</span><strong>${Number(status.page_count || 0).toLocaleString()}</strong></div>
-        <div><span>raw/ files</span><strong>${Number(status.raw_source_count || 0).toLocaleString()}</strong></div>
-        <div><span>Last updated</span><strong>${esc(_formatLlmWikiTimestamp(status.last_updated))}</strong></div>
-        <div><span>Last writer</span><strong>${esc(status.last_writer || 'Not available')}</strong></div>
+        <div><span>${esc(_insightsText('Enabled', 'Ingeschakeld'))}</span><strong>${status.enabled ? _insightsText('Yes', 'Ja') : _insightsText('No', 'Nee')}</strong></div>
+        <div><span>${esc(_insightsText('Entries', 'Items'))}</span><strong>${Number(status.entry_count || 0).toLocaleString()}</strong></div>
+        <div><span>${esc(_insightsText('Pages', "Pagina's"))}</span><strong>${Number(status.page_count || 0).toLocaleString()}</strong></div>
+        <div><span>${esc(_insightsText('raw/ files', 'Bronbestanden'))}</span><strong>${Number(status.raw_source_count || 0).toLocaleString()}</strong></div>
+        <div><span>${esc(_insightsText('Last updated', 'Laatst bijgewerkt'))}</span><strong>${esc(_formatLlmWikiTimestamp(status.last_updated))}</strong></div>
+        <div><span>${esc(_insightsText('Last writer', 'Laatst bijgewerkt door'))}</span><strong>${esc(status.last_writer || _insightsText('Not available', 'Onbekend'))}</strong></div>
       </div>
       <div class="wiki-status-footer">
         <span>${esc(toggleNote)}</span>

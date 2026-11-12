@@ -15580,6 +15580,57 @@ window.SynthPulseFeatureCatalog = {
       }
     },
     {
+      "id": "webui.studio.overview",
+      "area": "studio",
+      "status": "available",
+      "conditions": [],
+      "anchors": [
+        "?help_feature=webui.studio.overview",
+        "#studioHubNav [data-st-hub='home']",
+        "#studioHubNav"
+      ],
+      "source_refs": [
+        "static/workplace.js:115",
+        "static/workplace.js:309",
+        "api/org_structure.py"
+      ],
+      "related": [
+        "webui.studio.usecases",
+        "webui.studio.backlog",
+        "webui.studio.playbooks"
+      ],
+      "locales": {
+        "en": {
+          "title": "Overview: yours, your team's and the organisation's",
+          "purpose": "The Overview is the first screen of Studio. It puts use cases, scheduled tasks, bots, playbooks, prompts and backlog items in one place, and lets you choose whose work you look at: your own, your team's, your department's or the whole organisation's.",
+          "when": "When you want to see what is running for you or your team, or find the automation a colleague set up.",
+          "steps": [
+            "Choose Studio in the navigation; the Overview opens first.",
+            "Choose a view above the tiles: Mine, My team, My department or Organisation. The number shows how much is in each view.",
+            "In a team, department or organisation view, choose By kind, By team or By person to regroup the same items.",
+            "Choose a tile to jump to that kind, or open an item to go straight to it."
+          ],
+          "permissions": "Everyone sees their own items. Team and department views follow your place in the organisation chart: members see their team, leads see their teams and departments, administrators see everything.",
+          "limits": "The Overview only shows and groups. It changes nothing: owner, team and rights are set where the item itself lives.",
+          "example": "A marketing lead opens My team and By person to see which scheduled tasks each colleague runs."
+        },
+        "nl": {
+          "title": "Overzicht: van jou, je team en de organisatie",
+          "purpose": "Het Overzicht is het eerste scherm van Studio. Het zet use cases, geplande taken, bots, playbooks, prompts en backlogpunten op één plek, en laat je kiezen wiens werk je bekijkt: dat van jezelf, je team, je afdeling of de hele organisatie.",
+          "when": "Wanneer je wilt zien wat er voor jou of je team draait, of de automatisering van een collega zoekt.",
+          "steps": [
+            "Kies Studio in de navigatie; het Overzicht opent als eerste.",
+            "Kies boven de tegels een weergave: Van mij, Mijn team, Mijn afdeling of Organisatie. Het getal laat zien hoeveel er in elke weergave staat.",
+            "Kies in een team-, afdelings- of organisatieweergave Per soort, Per team of Per persoon om dezelfde punten anders te groeperen.",
+            "Kies een tegel om naar die soort te gaan, of open een punt om er direct heen te gaan."
+          ],
+          "permissions": "Iedereen ziet de eigen punten. Team- en afdelingsweergaven volgen je plek in het organigram: leden zien hun team, leads zien hun teams en afdelingen, beheerders zien alles.",
+          "limits": "Het Overzicht toont en groepeert alleen. Het wijzigt niets: eigenaar, team en rechten stel je in op de plek waar het punt zelf staat.",
+          "example": "Een marketinglead opent Mijn team en Per persoon om te zien welke geplande taken elke collega heeft lopen."
+        }
+      }
+    },
+    {
       "id": "webui.studio.discover",
       "area": "studio",
       "status": "available",

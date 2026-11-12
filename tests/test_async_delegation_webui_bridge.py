@@ -315,11 +315,12 @@ def test_background_wakeup_releases_claim_when_dispatch_fails(monkeypatch):
     assert "deleg_test123" not in cfg.BG_TASK_COMPLETE_EVENTS_SEEN.get("webui-session-1", set())
 
 
-def test_background_active_turn_releases_and_requeues_without_in_memory_defer(monkeypatch):
+def test_background_active_turn_waits_without_claiming_or_in_memory_defer(monkeypatch):
     _reset_wakeup_state()
     registry = _install_fake_process_registry(monkeypatch)
     delivery = _install_fake_durable_delivery_api(monkeypatch)
     cfg.PROCESS_SESSION_INDEX["webui-session-1"] = "webui-session-1"
+    monkeypatch.setattr(bp, "_ASYNC_DELEGATION_BUSY_RETRY_SECONDS", 0.2, raising=False)
     monkeypatch.setattr(bp, "_session_has_active_turn", lambda _session_id: True)
     monkeypatch.setattr(
         bp,
@@ -329,19 +330,23 @@ def test_background_active_turn_releases_and_requeues_without_in_memory_defer(mo
 
     bp._process_one(_async_delegation_event())
 
-    assert len(delivery["claim"]) == 1
+    # Waiting for the running turn is not a delivery attempt: no claim at all.
+    assert delivery["claim"] == []
     assert delivery["complete"] == []
-    assert len(delivery["release"]) == 1
-    assert registry.completion_queue.qsize() == 1
+    assert delivery["release"] == []
+    # The single drain thread is not held for the wait.
+    assert registry.completion_queue.qsize() == 0
+    assert _wait_until(lambda: registry.completion_queue.qsize() == 1)
     assert cfg.DEFERRED_PROCESS_WAKEUPS == {}
     assert cfg.BG_TASK_COMPLETE_EVENTS_SEEN == {}
 
 
-@pytest.mark.parametrize("status", [None, 302, 409, 500])
+@pytest.mark.parametrize("status", [None, 302, 403, 500])
 def test_autonomous_wakeup_only_acks_after_turn_acceptance(monkeypatch, status):
     _reset_wakeup_state()
     registry = _install_fake_process_registry(monkeypatch)
     delivery = _install_fake_durable_delivery_api(monkeypatch)
+    monkeypatch.setattr(bp, "_ASYNC_DELEGATION_REFUSED_RETRY_SECONDS", 0.01, raising=False)
     from api import routes
 
     monkeypatch.setattr(
@@ -372,6 +377,7 @@ def test_autonomous_wakeup_exception_releases_and_requeues(monkeypatch):
     _reset_wakeup_state()
     registry = _install_fake_process_registry(monkeypatch)
     delivery = _install_fake_durable_delivery_api(monkeypatch)
+    monkeypatch.setattr(bp, "_ASYNC_DELEGATION_REFUSED_RETRY_SECONDS", 0.01, raising=False)
     from api import routes
 
     monkeypatch.setattr(
@@ -395,6 +401,72 @@ def test_autonomous_wakeup_exception_releases_and_requeues(monkeypatch):
     assert _wait_until(lambda: len(delivery["release"]) == 1)
     assert delivery["complete"] == []
     assert _wait_until(lambda: registry.completion_queue.qsize() == 1)
+
+
+def _start_claimed_wakeup(registry):
+    evt = _async_delegation_event()
+    claim = peu.claim_async_delegation_delivery(evt, "webui-background")
+    assert claim is not None
+    bp._start_async_delegation_wakeup_turn(
+        "webui-session-1",
+        "delegation result",
+        delegation_id="deleg_test123",
+        evt=evt,
+        claim=claim,
+        process_registry=registry,
+    )
+
+
+@pytest.mark.parametrize("error", ["session already has an active stream", "agent_runtime_stale"])
+def test_autonomous_wakeup_conflict_returns_the_attempt_and_retries(monkeypatch, error):
+    _reset_wakeup_state()
+    registry = _install_fake_process_registry(monkeypatch)
+    delivery = _install_fake_durable_delivery_api(monkeypatch)
+    deferred = []
+
+    def _defer(delegation_id, claim_id):
+        deferred.append((delegation_id, claim_id))
+        return True
+
+    monkeypatch.setattr(
+        sys.modules["tools.async_delegation"], "defer_completion_delivery", _defer, raising=False
+    )
+    monkeypatch.setattr(bp, "_ASYNC_DELEGATION_CONFLICT_RETRY_SECONDS", 0.01, raising=False)
+    from api import routes
+
+    monkeypatch.setattr(
+        routes,
+        "start_session_turn",
+        lambda *_args, **_kwargs: {"_status": 409, "error": error},
+    )
+
+    _start_claimed_wakeup(registry)
+
+    assert _wait_until(lambda: registry.completion_queue.qsize() == 1)
+    assert deferred == [("deleg_test123", "claim:webui-background")]
+    assert delivery["release"] == []
+    assert delivery["complete"] == []
+
+
+def test_autonomous_wakeup_conflict_releases_when_core_cannot_defer(monkeypatch):
+    _reset_wakeup_state()
+    registry = _install_fake_process_registry(monkeypatch)
+    delivery = _install_fake_durable_delivery_api(monkeypatch)
+    assert not hasattr(sys.modules["tools.async_delegation"], "defer_completion_delivery")
+    monkeypatch.setattr(bp, "_ASYNC_DELEGATION_CONFLICT_RETRY_SECONDS", 0.01, raising=False)
+    from api import routes
+
+    monkeypatch.setattr(
+        routes,
+        "start_session_turn",
+        lambda *_args, **_kwargs: {"_status": 409, "error": "session already has an active stream"},
+    )
+
+    _start_claimed_wakeup(registry)
+
+    assert _wait_until(lambda: len(delivery["release"]) == 1)
+    assert _wait_until(lambda: registry.completion_queue.qsize() == 1)
+    assert delivery["complete"] == []
 
 
 def test_autonomous_wakeup_acks_after_successful_turn_acceptance(monkeypatch):
@@ -985,6 +1057,138 @@ print(json.dumps({{
     )
     assert probe.returncode == 0, probe.stderr
     assert probe.stdout.strip().splitlines()[-1] == "0"
+
+
+def test_real_core_busy_session_wait_does_not_spend_delivery_attempts(tmp_path):
+    """A completion that waits for a busy session must still be deliverable.
+
+    The core drops a completion for good after a fixed number of claims.
+    Waiting for the session's running turn used to claim and release on every
+    pass, so a turn that outlived a few seconds lost the result without a trace.
+    """
+    try:
+        from tools import async_delegation as ad
+    except Exception as exc:
+        pytest.skip(f"hermes-agent async delegation module unavailable: {exc}")
+    if not all(
+        hasattr(ad, name)
+        for name in (
+            "claim_event_delivery",
+            "complete_event_delivery",
+            "release_event_delivery",
+            "get_durable_delegation",
+            "defer_completion_delivery",
+        )
+    ):
+        pytest.skip("installed hermes-agent predates deferrable completion claims")
+
+    webui_repo = Path(__file__).resolve().parents[1]
+    agent_repo = Path(ad.__file__).resolve().parents[1]
+    env = dict(os.environ)
+    env["HERMES_HOME"] = str(tmp_path)
+    env["HERMES_BASE_HOME"] = str(tmp_path)
+    env["HERMES_CONFIG_PATH"] = str(tmp_path / "config.yaml")
+    env["HERMES_WEBUI_STATE_DIR"] = str(tmp_path)
+    env["HERMES_WEBUI_TEST_STATE_DIR"] = str(tmp_path)
+    env["HERMES_WEBUI_NO_DOTENV"] = "1"
+    env["HERMES_WEBUI_AGENT_DIR"] = str(agent_repo)
+    env["PYTHONPATH"] = os.pathsep.join(
+        part for part in (str(webui_repo), str(agent_repo), env.get("PYTHONPATH", "")) if part
+    )
+    python_executable = os.environ.get("HERMES_WEBUI_PYTHON") or sys.executable
+
+    script = """
+import json, os, queue, sys, time
+from tools import async_delegation as ad
+from tools.process_registry import process_registry
+from api import background_process as bp, config as cfg, routes
+
+record = ad.dispatch_async_delegation(
+    goal="busy-session", context=None, toolsets=None, role="leaf", model="m",
+    session_key="webui-session-1", parent_session_id="durable-parent",
+    runner=lambda: {"status": "completed", "summary": "after the turn"},
+)
+delegation_id = record["delegation_id"]
+deadline = time.time() + 10
+while ad.active_count() and time.time() < deadline:
+    time.sleep(.01)
+assert not ad.active_count()
+evt = process_registry.completion_queue.get(timeout=5)
+
+with cfg.PROCESS_SESSION_INDEX_LOCK:
+    cfg.PROCESS_SESSION_INDEX["webui-session-1"] = "webui-session-1"
+bp._ASYNC_DELEGATION_BUSY_RETRY_SECONDS = 0.01
+bp._ASYNC_DELEGATION_CONFLICT_RETRY_SECONDS = 0.01
+bp._session_has_active_turn = lambda _sid: True
+calls = {"conflict": 0, "accepted": 0}
+
+def _start(session_id, message, **kwargs):
+    if calls["conflict"] < 10:
+        calls["conflict"] += 1
+        return {"error": "session already has an active stream", "_status": 409}
+    calls["accepted"] += 1
+    return {"_status": 200, "stream_id": "stream-1"}
+
+routes.start_session_turn = _start
+bp._emit_bg_task_complete_events_coalesced = lambda *_args: 1
+
+# The session stays busy for more passes than the core allows claims.
+for _ in range(12):
+    bp._process_one(dict(evt))
+    try:
+        evt = process_registry.completion_queue.get(timeout=1.0)
+    except queue.Empty:
+        pass
+busy = ad.get_durable_delegation(delegation_id) or {}
+started_while_busy = calls["conflict"] + calls["accepted"]
+
+# The turn ends; the wake-up then races ten more turns before it is accepted.
+bp._session_has_active_turn = lambda _sid: False
+row = busy
+pending = evt
+deadline = time.time() + 15
+while time.time() < deadline:
+    if pending is not None:
+        bp._process_one(dict(pending))
+        pending = None
+    row = ad.get_durable_delegation(delegation_id) or {}
+    if row.get("delivery_state") != "pending":
+        break
+    try:
+        pending = process_registry.completion_queue.get(timeout=0.2)
+    except queue.Empty:
+        pending = None
+
+print(json.dumps({
+    "busy_state": busy.get("delivery_state"),
+    "busy_attempts": busy.get("delivery_attempts"),
+    "started_while_busy": started_while_busy,
+    "conflicts": calls["conflict"],
+    "accepted": calls["accepted"],
+    "state": row.get("delivery_state"),
+    "attempts": row.get("delivery_attempts"),
+}))
+sys.stdout.flush()
+os._exit(0)
+"""
+    run = subprocess.run(
+        [python_executable, "-c", script],
+        cwd=webui_repo,
+        env=env,
+        text=True,
+        capture_output=True,
+        timeout=60,
+        check=False,
+    )
+    assert run.returncode == 0, run.stderr
+    result = json.loads(run.stdout.strip().splitlines()[-1])
+    assert result["busy_state"] == "pending"
+    assert result["busy_attempts"] == 0
+    assert result["started_while_busy"] == 0
+    assert result["conflicts"] == 10
+    assert result["accepted"] == 1
+    assert result["state"] == "delivered"
+    assert result["attempts"] == 1
 
 
 # ── Combined-path coverage: #6185 origin-routing ⊕ #6159 durable-claims ──────

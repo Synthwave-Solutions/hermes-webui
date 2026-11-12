@@ -186,6 +186,18 @@ def require_ai_agent_class():
     from run_agent import AIAgent  # noqa: PLC0415
 
     _capture_loaded_agent_revision()
+    try:
+        # A forbidden lazy extra install must not cost a worker start per agent build.
+        from api.engine_lazy_install_guard import install as _install_lazy_guard  # noqa: PLC0415
+
+        _install_lazy_guard()
+    except Exception:
+        pass
+    try:
+        from api.engine_catalog_guard import install as _install_catalog_guard  # noqa: PLC0415
+        _install_catalog_guard()
+    except Exception:
+        pass
     return AIAgent
 
 

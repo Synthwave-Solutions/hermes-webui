@@ -47,7 +47,7 @@
       compare: 'Vergelijk met vorige periode', refresh: 'Vernieuwen', settings: 'Prijzen en tarieven', export: 'Exporteer CSV',
       k_saved: 'Tijd bespaard', k_saved_sub: 'uit geslaagde runs en gesprekken',
       k_estimate: 'geschat via bot-verantwoordelijkheden',
-      k_net: 'Netto waarde', k_net_sub: 'indicatief, op basis van uurtarieven', k_net_missing: 'Stel uurtarieven in',
+      k_net: 'Netto waarde', k_net_sub: 'indicatief, op basis van uurtarieven', k_net_missing: 'Stel uurtarieven in', k_none: 'Nog geen cijfer',
       k_cost: 'AI-kosten', k_cost_sub: 'API-equivalent', k_cost_missing: 'Prijzen instellen', tokens: 'tokens zonder prijs',
       k_return: 'Rendement', k_return_sub: 'waarde gedeeld door AI-kosten',
       k_active: 'Actief', k_active_sub: 'taken aan, bots',
@@ -118,7 +118,7 @@
       compare: 'Compare with previous period', refresh: 'Refresh', settings: 'Prices and rates', export: 'Export CSV',
       k_saved: 'Time saved', k_saved_sub: 'from completed runs and chats',
       k_estimate: 'estimated from bot responsibilities',
-      k_net: 'Net value', k_net_sub: 'indicative, based on hourly rates', k_net_missing: 'Set hourly rates',
+      k_net: 'Net value', k_net_sub: 'indicative, based on hourly rates', k_net_missing: 'Set hourly rates', k_none: 'No figure yet',
       k_cost: 'AI cost', k_cost_sub: 'API equivalent', k_cost_missing: 'Set prices', tokens: 'tokens without a price',
       k_return: 'Return', k_return_sub: 'value divided by AI cost',
       k_active: 'Active', k_active_sub: 'tasks on, bots',
@@ -706,11 +706,11 @@
     return `<div class="om-kpis" data-tour="mgmt-kpis">
       <div class="om-kpi"><span class="om-kpi-label">${H(w('k_saved'))}</span><span class="om-kpi-value">${H(hrs(t.saved_minutes))}</span>${delta(t.saved_minutes, p.saved_minutes)}
         <span class="om-kpi-sub">${H(w('k_saved_sub'))}${t.saved_minutes ? `<br><strong>${H(t.saved_confirmed_minutes ? w('of_which_confirmed', { h: hrs(t.saved_confirmed_minutes) }) : w('all_estimated'))}</strong>` : ''}${t.estimate_minutes ? `<br>+ ${H(hrs(t.estimate_minutes))} ${H(w('k_estimate'))}` : ''}</span></div>
-      <div class="om-kpi"><span class="om-kpi-label">${H(w('k_net'))}</span>${t.net_eur != null ? `<span class="om-kpi-value">${H(eur(t.net_eur))}</span>${delta(t.net_eur, p.net_eur)}<span class="om-kpi-sub">${H(w('k_net_sub'))}</span>` : `<span class="om-kpi-value om-muted">·</span><button type="button" class="om-link" data-om-goto-rates>${H(w('k_net_missing'))}</button>`}</div>
-      <div class="om-kpi"><span class="om-kpi-label">${H(w('k_cost'))}</span>${t.pricing_set ? `<span class="om-kpi-value">${H(eur(t.ai_cost_eur || 0))}</span>${delta(t.ai_cost_eur, p.ai_cost_eur, true)}<span class="om-kpi-sub">${H(w('k_cost_sub'))}${t.unpriced_tokens ? ' · ' + H(nf(0).format(t.unpriced_tokens)) + ' ' + H(w('tokens')) : ''}</span>` : `<span class="om-kpi-value om-muted">·</span><span class="om-kpi-sub">${H(nf(0).format(t.unpriced_tokens || 0))} ${H(w('tokens'))}</span><button type="button" class="om-link" data-om-settings>${H(w('k_cost_missing'))}</button>`}</div>
-      <div class="om-kpi"><span class="om-kpi-label">${H(w('k_return'))}</span><span class="om-kpi-value">${t.return_ratio != null ? H(nf(1).format(t.return_ratio)) + '×' : '<span class="om-muted">·</span>'}</span><span class="om-kpi-sub">${H(w('k_return_sub'))}</span></div>
+      <div class="om-kpi"><span class="om-kpi-label">${H(w('k_net'))}</span>${t.net_eur != null ? `<span class="om-kpi-value">${H(eur(t.net_eur))}</span>${delta(t.net_eur, p.net_eur)}<span class="om-kpi-sub">${H(w('k_net_sub'))}</span>` : `<span class="om-kpi-value om-kpi-none">${H(w('k_none'))}</span><button type="button" class="om-link" data-om-goto-rates>${H(w('k_net_missing'))}</button>`}</div>
+      <div class="om-kpi"><span class="om-kpi-label">${H(w('k_cost'))}</span>${t.pricing_set ? `<span class="om-kpi-value">${H(eur(t.ai_cost_eur || 0))}</span>${delta(t.ai_cost_eur, p.ai_cost_eur, true)}<span class="om-kpi-sub">${H(w('k_cost_sub'))}${t.unpriced_tokens ? ' · ' + H(nf(0).format(t.unpriced_tokens)) + ' ' + H(w('tokens')) : ''}</span>` : `<span class="om-kpi-value om-kpi-none">${H(w('k_none'))}</span><span class="om-kpi-sub">${H(nf(0).format(t.unpriced_tokens || 0))} ${H(w('tokens'))}</span><button type="button" class="om-link" data-om-settings>${H(w('k_cost_missing'))}</button>`}</div>
+      <div class="om-kpi"><span class="om-kpi-label">${H(w('k_return'))}</span><span class="om-kpi-value${t.return_ratio != null ? '' : ' om-kpi-none'}">${t.return_ratio != null ? H(nf(1).format(t.return_ratio)) + '×' : H(w('k_none'))}</span><span class="om-kpi-sub">${H(w('k_return_sub'))}</span></div>
       <div class="om-kpi"><span class="om-kpi-label">${H(w('k_active'))}</span><span class="om-kpi-value">${H(t.active_jobs || 0)} · ${H(t.bots || 0)}</span><span class="om-kpi-sub">${H(w('k_active_sub'))}</span></div>
-      <div class="om-kpi"><span class="om-kpi-label">${H(w('k_coverage'))}</span><span class="om-kpi-value">${cover == null ? '·' : H(cover) + '%'}</span><div class="om-bar" aria-hidden="true"><span style="width:${cover || 0}%"></span></div><span class="om-kpi-sub">${H(w('k_coverage_sub'))}</span></div>
+      <div class="om-kpi"><span class="om-kpi-label">${H(w('k_coverage'))}</span><span class="om-kpi-value${cover == null ? ' om-kpi-none' : ''}">${cover == null ? H(w('k_none')) : H(cover) + '%'}</span><div class="om-bar" aria-hidden="true"><span style="width:${cover || 0}%"></span></div><span class="om-kpi-sub">${H(w('k_coverage_sub'))}</span></div>
     </div>`;
   }
 

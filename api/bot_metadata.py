@@ -1,8 +1,10 @@
 """Bot presentation over stable Hermes profile IDs and upstream ui_meta."""
+import copy
 from pathlib import Path
 import re
 import threading
 import yaml
+from api import profile_yaml_cache
 from api.yaml_utils import safe_load
 
 _LOCK = threading.RLock()
@@ -53,9 +55,10 @@ def read_profile(name):
     from urllib.parse import quote
     from api.bot_builder import _KEY as builder_key
     try:
-        path=_path(name);data=_load(path)
+        # Shared parsed document (reused while the file is unchanged): read only here.
+        path=_path(name);data=profile_yaml_cache.load(path,_load)
         ui=data.get('ui_meta');ui=ui if isinstance(ui,dict) else {}
-        meta=ui.get('hermes-bots');meta=meta if isinstance(meta,dict) else {}
+        meta=ui.get('hermes-bots');meta=copy.deepcopy(meta) if isinstance(meta,dict) else {}
         revisions=data.get('_ui_meta_revisions');revisions=revisions if isinstance(revisions,dict) else {}
         revision=revisions.get('hermes-bots',0)
         image=path.parent/'assets/avatar.png'

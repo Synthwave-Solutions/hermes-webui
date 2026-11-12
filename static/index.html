@@ -26,7 +26,7 @@
 <script>(function(){try{var t=localStorage.getItem('hermes-theme')||'dark';if(t==='system')t=window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';var c=t==='dark'?'#0f172a':'#f6fbff';document.querySelectorAll('meta[name="theme-color"]').forEach(function(m){m.setAttribute('content',c);m.removeAttribute('media');});}catch(e){}})()</script>
 <script>(function(){try{document.documentElement.dataset.workspacePanel=localStorage.getItem('hermes-webui-workspace-panel')==='open'?'open':'closed';}catch(e){document.documentElement.dataset.workspacePanel='closed';}})()</script>
 <script>(function(){try{if(localStorage.getItem('hermes-webui-sidebar-collapsed')==='1')document.documentElement.dataset.sidebarCollapsed='1';}catch(e){}})()</script>
-<script>(function(){try{if(new URLSearchParams(location.search).get('pane')==='1')return;if(localStorage.getItem('hermes-webui-rail-expanded')==='1')document.documentElement.dataset.railExpanded='1';}catch(e){}})()</script>
+<script>(function(){try{if(new URLSearchParams(location.search).get('pane')==='1')return;var re=localStorage.getItem('hermes-webui-rail-expanded');if(re==='1'||(re===null&&window.innerWidth>=1360))document.documentElement.dataset.railExpanded='1';}catch(e){}})()</script>
 <link rel="preload" href="static/pwa-startup.js?v=__WEBUI_VERSION__" as="script">
 <script src="static/pwa-startup.js?v=__WEBUI_VERSION__"></script>
 <script>window.__HERMES_CONFIG__={maxUploadBytes:__MAX_UPLOAD_BYTES__,csrfToken:__CSRF_TOKEN_JSON__};</script>
@@ -119,6 +119,8 @@
 <link rel="stylesheet" href="static/msp.css?v=__WEBUI_VERSION__">
 <link rel="stylesheet" href="static/orgmgmt.css?v=__WEBUI_VERSION__">
 <link rel="stylesheet" href="static/studio.css?v=__WEBUI_VERSION__">
+<link rel="stylesheet" href="static/workplace.css?v=__WEBUI_VERSION__">
+<link rel="stylesheet" href="static/premium.css?v=__WEBUI_VERSION__">
 <link rel="stylesheet" href="static/modules.css?v=__WEBUI_VERSION__">
 <link rel="stylesheet" href="static/workspace-clarity.css?v=__WEBUI_VERSION__">
 </head>
@@ -2148,10 +2150,13 @@
 <link rel="stylesheet" href="static/memory_dashboard.css?v=__WEBUI_VERSION__">
 <script src="static/memory_dashboard.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/panels.js?v=__WEBUI_VERSION__" defer></script>
+<script src="static/nav_groups.js?v=__WEBUI_VERSION__" defer></script>
+<script src="static/premium.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/module-content.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/job-costs.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/msp.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/orgmgmt.js?v=__WEBUI_VERSION__" defer></script>
+<script src="static/workplace.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/studio.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/studio_library.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/studio_prompts.js?v=__WEBUI_VERSION__" defer></script>

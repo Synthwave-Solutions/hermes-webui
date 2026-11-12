@@ -41,14 +41,18 @@ def _yaml(path):
 
 
 def managed(name):
-    data = _yaml(_home(name) / "profile.yaml").get(_KEY)
+    from api import profile_yaml_cache
+    # Read on every turn for every bot (access check and team directory): the
+    # parsed file is reused while it is unchanged on disk, validated each call.
+    data = profile_yaml_cache.load(_home(name) / "profile.yaml", _yaml).get(_KEY)
     if data is None:
         return None
     if isinstance(data, dict) and data.get("updating"):
         raise PermissionError("Bot update in progress; retry shortly")
     if not isinstance(data, dict) or not data.get("owner_email"):
         raise PermissionError("Invalid bot access configuration")
-    return data
+    # The parsed document is shared; callers get their own copy to change.
+    return copy.deepcopy(data)
 
 
 def access(identity):

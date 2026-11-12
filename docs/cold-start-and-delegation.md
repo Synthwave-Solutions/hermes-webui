@@ -45,3 +45,24 @@ gated synthetic provider to exercise follower deadlines, cache-only access while
 the initiating request waits, simultaneous cold callers, interruption recovery
 and rejection of another profile's memory cache. Run with `./scripts/test.sh`,
 alongside session-visit freshness and profile-provider catalog tests.
+
+## Delivering background delegation results
+
+A background `delegate_task` result reaches its WebUI session as a new turn
+(`api/background_process.py`, `_process_async_delegation_event`). The agent core
+keeps every result in its durable ledger and gives up on it for good after a
+fixed number of delivery claims (eight), so the WebUI only claims when it can
+actually start the turn:
+
+- While the session still runs a turn, the result waits without a claim and is
+  checked again every two seconds. The drain thread is never held for the wait.
+- When the turn start loses a race or the runtime must restart first (HTTP 409),
+  the claim is deferred, which gives the attempt back, and retried after five
+  seconds.
+- Any other refusal or error spends the attempt, is logged at WARNING with the
+  status and error, and is retried after fifteen seconds.
+
+A waiting result is owned by the shared completion queue or by a short retry
+thread that stops at shutdown; after a restart the core replays pending results.
+Coverage: `tests/test_async_delegation_webui_bridge.py`, including
+`test_real_core_busy_session_wait_does_not_spend_delivery_attempts`.

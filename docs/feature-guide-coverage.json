@@ -3145,6 +3145,16 @@
       ]
     },
     {
+      "id": "webui.studio.overview",
+      "area": "studio",
+      "status": "available",
+      "source_refs": [
+        "static/workplace.js:115",
+        "static/workplace.js:309",
+        "api/org_structure.py"
+      ]
+    },
+    {
       "id": "webui.studio.discover",
       "area": "studio",
       "status": "available",
