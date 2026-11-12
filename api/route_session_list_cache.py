@@ -252,6 +252,57 @@ def _session_list_cache_stale_reason(key: tuple) -> str | None:
         return None
 
 
+# Source stamp positions that move when another process (the gateway, cron, a
+# CLI session) writes to state.db: the file, its WAL, the gateway session
+# metadata and the content fingerprint. The session index, the settings file
+# and the settings write version are this server's own writes and stay strict.
+_SESSIONS_CACHE_EXTERNAL_STAMP_POSITIONS = frozenset({0, 1, 2, 5})
+_SESSIONS_CACHE_EXTERNAL_STALE_MAX_SECONDS = 60.0
+
+
+def _session_list_cache_external_stale_max_seconds() -> float:
+    try:
+        value = float(os.environ.get("HERMES_WEBUI_SESSION_LIST_EXTERNAL_STALE_MAX_SECONDS", ""))
+    except (TypeError, ValueError):
+        return _SESSIONS_CACHE_EXTERNAL_STALE_MAX_SECONDS
+    return value if value >= 0 else _SESSIONS_CACHE_EXTERNAL_STALE_MAX_SECONDS
+
+
+def _session_list_cache_stale_is_external(key: tuple) -> bool:
+    """True when a source-stale entry is young and only external writes moved its stamp.
+
+    Every poll used to wait for a full rebuild whenever another process had
+    written to state.db since the entry was built, which during a cron or
+    gateway turn is every poll of every user (measured 12 Nov 2026: p90 7.2 s).
+    Such an entry may be served once more while one background rebuild runs.
+    Anything else keeps the strict path: a stream starting or stopping, a
+    settings change, a change of the session index, an unknown stamp shape or
+    an entry older than the limit.
+    """
+    limit = _session_list_cache_external_stale_max_seconds()
+    if limit <= 0:
+        return False
+    now = time.monotonic()
+    current = _session_list_cache_resolved_source_stamp(key)
+    with _SESSIONS_CACHE_LOCK:
+        entry = _SESSIONS_CACHE.get(key)
+        if not entry:
+            return False
+        ts, stamp, _payload = entry
+    if not (0 <= now - ts < limit):
+        return False
+    if not (isinstance(stamp, tuple) and isinstance(current, tuple) and len(stamp) == len(current) == 7):
+        return False
+    for side in (stamp, current):
+        for position in range(5):
+            part = side[position]
+            # A streaming hold-down marker is not a file stamp: stream transitions stay strict.
+            if not (isinstance(part, tuple) and len(part) == 2 and all(type(v) is int for v in part)):
+                return False
+    changed = {position for position in range(7) if stamp[position] != current[position]}
+    return bool(changed) and changed <= _SESSIONS_CACHE_EXTERNAL_STAMP_POSITIONS
+
+
 def _session_list_cache_set(key: tuple, payload: dict) -> None:
     if not isinstance(payload, dict):
         return

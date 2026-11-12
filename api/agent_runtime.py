@@ -193,6 +193,11 @@ def require_ai_agent_class():
         _install_lazy_guard()
     except Exception:
         pass
+    try:
+        from api.engine_catalog_guard import install as _install_catalog_guard  # noqa: PLC0415
+        _install_catalog_guard()
+    except Exception:
+        pass
     return AIAgent
 
 

@@ -300,6 +300,119 @@ def _file_signature(path: Path) -> tuple[int, int] | None:
 
 _PERSISTENT_SKILL_SCAN_CAP = 20000
 
+# The skill tree walk is remembered per tree and reused while no directory in it
+# changed. Adding, removing or renaming an entry changes the modification time
+# of its directory, so comparing one stat per visited directory is enough to
+# know the list of SKILL.md files is still right. The files themselves are
+# stat'ed on every snapshot, exactly as before. Measured 12 Nov 2026: 1979
+# directories and 6699 entries were listed for every turn, twice.
+_SKILL_WALK_MEMO: dict = {}
+_SKILL_WALK_MEMO_LOCK = threading.Lock()
+_SKILL_WALK_MEMO_MAX_TREES = 16
+_SKILL_WALK_MEMO_MAX_AGE_SECONDS = 1800.0
+# A directory touched this recently is never remembered: two changes inside one
+# timestamp tick, or a change during the walk itself, must not leave a stale list.
+_SKILL_WALK_RACY_NS = 2_000_000_000
+
+
+def _skill_walk_memo_enabled() -> bool:
+    return os.environ.get("HERMES_WEBUI_SKILL_WALK_MEMO", "1").strip().lower() not in {"0", "false", "off", "no"}
+
+
+def _walk_skill_files(skills_dir):
+    """Walk the skill tree once.
+
+    Returns ``(found, visited, complete)``: the SKILL.md files as ``(relative
+    name, path)`` in walk order, every visited directory with its signature,
+    and whether the walk saw the whole tree in a shape that can be remembered.
+    """
+    found = []
+    visited = []
+    complete = True
+    seen_dirs = set()
+    budget = _PERSISTENT_SKILL_SCAN_CAP
+    for current, dirs, files in os.walk(skills_dir, followlinks=True):
+        try:
+            # Follow directory symlinks once, rather than resolving every
+            # ancestor on every visit. Device + inode also closes link cycles.
+            st = os.stat(current)
+            real = (st.st_dev, st.st_ino) if st.st_ino else os.path.realpath(current)
+        except OSError:
+            dirs[:] = []
+            complete = False
+            continue
+        if real in seen_dirs:
+            dirs[:] = []
+            continue
+        seen_dirs.add(real)
+        if st.st_ino:
+            try:
+                visited.append((current, (st.st_dev, st.st_ino, int(st.st_mtime_ns), int(st.st_ctime_ns))))
+            except (AttributeError, TypeError, ValueError):
+                complete = False
+        else:
+            complete = False  # no directory identity on this filesystem
+        dirs[:] = [d for d in dirs if not d.startswith(".")]
+        budget -= 1
+        if budget <= 0:
+            complete = False
+            break
+        if "SKILL.md" not in files:
+            continue
+        skill_md = Path(current) / "SKILL.md"
+        try:
+            rel = os.path.relpath(skill_md, skills_dir).replace("\\", "/")
+        except ValueError:
+            rel = str(skill_md)
+        found.append((rel, skill_md))
+    return found, visited, complete
+
+
+def _skill_tree_unchanged(visited) -> bool:
+    try:
+        for directory, signature in visited:
+            st = os.stat(directory)
+            if (st.st_dev, st.st_ino, int(st.st_mtime_ns), int(st.st_ctime_ns)) != signature:
+                return False
+    except (OSError, AttributeError, TypeError, ValueError):
+        return False
+    return True
+
+
+def _skill_files(skills_dir):
+    """The SKILL.md files under ``skills_dir`` as ``(relative name, path)``, in walk order."""
+    key = None
+    if _skill_walk_memo_enabled():
+        try:
+            root = os.stat(skills_dir)
+            if root.st_ino:
+                key = (root.st_dev, root.st_ino, os.fspath(skills_dir))
+        except (OSError, AttributeError):
+            key = None
+    if key is not None:
+        with _SKILL_WALK_MEMO_LOCK:
+            entry = _SKILL_WALK_MEMO.get(key)
+        if entry is not None:
+            stored_at, found, visited = entry
+            age = time.monotonic() - stored_at
+            if 0 <= age < _SKILL_WALK_MEMO_MAX_AGE_SECONDS and _skill_tree_unchanged(visited):
+                return found
+    started_ns = time.time_ns()
+    found, visited, complete = _walk_skill_files(skills_dir)
+    if key is not None:
+        settled = complete and bool(visited) and all(
+            max(signature[2], signature[3]) < started_ns - _SKILL_WALK_RACY_NS for _, signature in visited
+        )
+        with _SKILL_WALK_MEMO_LOCK:
+            if settled:
+                if key not in _SKILL_WALK_MEMO and len(_SKILL_WALK_MEMO) >= _SKILL_WALK_MEMO_MAX_TREES:
+                    oldest = min(_SKILL_WALK_MEMO, key=lambda k: _SKILL_WALK_MEMO[k][0])
+                    _SKILL_WALK_MEMO.pop(oldest, None)
+                _SKILL_WALK_MEMO[key] = (time.monotonic(), tuple(found), tuple(visited))
+            else:
+                _SKILL_WALK_MEMO.pop(key, None)
+    return found
+
 
 def _persistent_state_snapshot(profile_home: str | None, memory_home: str | None = None) -> dict:
     """Capture lightweight memory/skill file signatures for save notices.
@@ -328,32 +441,7 @@ def _persistent_state_snapshot(profile_home: str | None, memory_home: str | None
     skills = {}
     skills_dir = root / "skills"
     try:
-        seen_dirs = set()
-        budget = _PERSISTENT_SKILL_SCAN_CAP
-        for current, dirs, files in os.walk(skills_dir, followlinks=True):
-            try:
-                # Follow directory symlinks once, rather than resolving every
-                # ancestor on every visit. Device + inode also closes link cycles.
-                st = os.stat(current)
-                real = (st.st_dev, st.st_ino) if st.st_ino else os.path.realpath(current)
-            except OSError:
-                dirs[:] = []
-                continue
-            if real in seen_dirs:
-                dirs[:] = []
-                continue
-            seen_dirs.add(real)
-            dirs[:] = [d for d in dirs if not d.startswith(".")]
-            budget -= 1
-            if budget <= 0:
-                break
-            if "SKILL.md" not in files:
-                continue
-            skill_md = Path(current) / "SKILL.md"
-            try:
-                rel = os.path.relpath(skill_md, skills_dir).replace("\\", "/")
-            except ValueError:
-                rel = str(skill_md)
+        for rel, skill_md in _skill_files(skills_dir):
             sig = _file_signature(skill_md)
             if sig is not None:
                 skills[rel] = sig

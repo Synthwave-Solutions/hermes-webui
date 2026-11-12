@@ -2559,6 +2559,7 @@ _session_list_cache_set = _route_session_list_cache._session_list_cache_set
 _session_list_cache_source_stamp = _route_session_list_cache._session_list_cache_source_stamp
 _session_list_cache_state_db_fingerprint = _route_session_list_cache._session_list_cache_state_db_fingerprint
 _session_list_cache_stale_reason = _route_session_list_cache._session_list_cache_stale_reason
+_session_list_cache_stale_is_external = _route_session_list_cache._session_list_cache_stale_is_external
 _session_list_cache_streaming_freeze_marker = _route_session_list_cache._session_list_cache_streaming_freeze_marker
 
 
@@ -3360,7 +3361,15 @@ def _get_cached_session_list_payload(
 
     stale = cached  # now actually a stale payload when one exists, else None
     stale_reason = _session_list_cache_stale_reason(key) if stale is not None else None
-    if stale is not None and stale_reason != "source":
+    if stale is not None and stale_reason == "source":
+        try:
+            # Writes by other processes do not make every poll wait for a rebuild.
+            serve_stale = _session_list_cache_stale_is_external(key)
+        except Exception:
+            serve_stale = False
+    else:
+        serve_stale = stale is not None
+    if serve_stale:
         event, is_owner = _session_list_cache_claim_rebuild(key)
         if is_owner:
             if diag is not None:
@@ -7785,6 +7794,14 @@ def _resolve_context_length_for_session_model(
     try:
         from agent.model_metadata import get_model_context_length as _get_cl
         from api.config import get_config as _get_config_for_cl
+
+        try:
+            # Session hydration can run before the first agent build of this process.
+            from api.engine_catalog_guard import install as _install_catalog_guard
+
+            _install_catalog_guard()
+        except Exception:
+            pass
 
         _cfg_for_cl = _get_config_for_cl()
         _ctx_lookup = _context_length_lookup_inputs_for_model(
@@ -21410,6 +21427,14 @@ def _handle_cron_recent(handler, parsed):
         since = float(qs.get("since", ["0"])[0])
     except (ValueError, TypeError):
         since = 0.0
+    try:
+        # Most polls have nothing to report: answer those from the job files' run times.
+        from api.cron_recent_precheck import nothing_new as _cron_nothing_new
+
+        if _cron_nothing_new(handler, since):
+            return j(handler, {"completions": [], "since": since})
+    except Exception:
+        logger.debug("cron completion precheck unavailable", exc_info=True)
     try:
         from cron.jobs import list_jobs
 
