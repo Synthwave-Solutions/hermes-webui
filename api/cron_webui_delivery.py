@@ -474,6 +474,13 @@ def _run_moment(job: dict) -> str:
     return dt.astimezone().strftime("%d-%m-%Y %H:%M")
 
 
+RESULT_HEADING = "🗓️ Uitkomst van "
+
+
+def scout_report_body(body: str) -> str:
+    return _SCOUT_CONTROL_LINE.sub("", body).strip()
+
+
 def build_update_text(job: dict, *, body: str | None, run_ok: bool, run_error: str | None) -> str:
     """One concise update for the chat the result belongs in (Dutch first,
     like the rest of SynthPulse; the capacity notice keeps its own words)."""
@@ -491,9 +498,9 @@ def build_update_text(job: dict, *, body: str | None, run_ok: bool, run_error: s
         )
     if body and job.get("managed_by") == "scout":
         # The collector reads the unchanged native output, never this chat projection.
-        body = _SCOUT_CONTROL_LINE.sub("", body).strip()
+        body = scout_report_body(body)
     if body:
-        return f"\U0001f5d3\ufe0f Uitkomst van {name}{stamp}\n\n{_truncate_body(body)}"
+        return f"{RESULT_HEADING}{name}{stamp}\n\n{_truncate_body(body)}"
     return (
         f"\U0001f5d3\ufe0f {name} is klaar{stamp}, maar er is geen uitkomst bewaard. "
         f"Kijk in Geplande taken (taak {job.get('id', '?')}) voor de run."

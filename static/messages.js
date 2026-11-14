@@ -955,9 +955,9 @@ document.addEventListener('click',(e)=>{
     if(btn)btn.setAttribute('aria-expanded','false');
   }
 },{capture:false});
-function _addNamedContextBlock(text){
+function _addNamedContextBlock(text, label){
   const id='ctx-'+(++_selectionIdCounter);
-  const name=(_selectedTextReplyT('context_block_name_default','Context'))+' '+_selectionIdCounter;
+  const name=label || (_selectedTextReplyT('context_block_name_default','Context'))+' '+_selectionIdCounter;
   _pendingSelections.push({id, name, text});
   _renderSelectionChips();
   return id;

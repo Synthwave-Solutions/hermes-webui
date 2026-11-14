@@ -2730,9 +2730,9 @@ function _sidebarSessionProfileName(session){
   return raw||'';
 }
 
-async function _ensureSidebarSessionProfile(session){
+async function _ensureSidebarSessionProfile(session, explicitProfile=false){
   const targetProfile=_sidebarSessionProfileName(session);
-  if(!_showAllProfiles||!targetProfile) return false;
+  if((!_showAllProfiles && !explicitProfile)||!targetProfile) return false;
   const activeProfile=S.activeProfile||'default';
   if(_profileMatchesActiveProfile(targetProfile,activeProfile)) return false;
   if(typeof switchToProfile!=='function') return false;
@@ -2760,7 +2760,8 @@ async function _openSidebarSession(session, loadOpts={}){
     try{await api('/api/session/import_cli',{method:'POST',body:JSON.stringify(_externalImportPayload(session))});}
     catch(_e){ /* import failed -- fall through to read-only view */ }
   }
-  await _ensureSidebarSessionProfile(session);
+  await _ensureSidebarSessionProfile(session, loadOpts.explicitProfile);
+  if(loadOpts.explicitProfile && !_profileMatchesActiveProfile(session.profile,S.activeProfile||'default')) return;
   // Tell loadSession to skip its pre-hook — we already ran it above.
   await loadSession(session.session_id, Object.assign({}, loadOpts, {_preloadNotified:true}));
   renderSessionListFromCache();

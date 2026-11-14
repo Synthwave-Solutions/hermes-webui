@@ -55,7 +55,7 @@ def test_selected_text_reply_collects_named_context_blocks_without_dumping_into_
     assert "replace(/\\n{3,}/g,'\\n\\n')" in js
     assert "map(line=>`> ${line}`).join('\\n')" in js
 
-    assert "function _addNamedContextBlock(text)" in js
+    assert "function _addNamedContextBlock(" in js
     assert "function _renderSelectionChips()" in js
     assert "function _flushSelectionBlocksToComposer()" in js
     assert "_pendingSelections.push({id, name, text})" in js

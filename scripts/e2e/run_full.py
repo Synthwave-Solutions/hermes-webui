@@ -59,7 +59,7 @@ def main():
     while len({port, provider_port, realtime_http_port, realtime_ws_port}) != 4:
         realtime_http_port, realtime_ws_port = free_port(), free_port()
     base=f'http://127.0.0.1:{port}'
-    env=dict(fixture_environment(state),QA_STATE=str(state),QA_SESSIONS=str(state/'browser-sessions.json'),QA_BASE_URL=base,QA_OUT=str(run/'results'),QA_REALTIME_HTTP_PORT=str(realtime_http_port),QA_REALTIME_WS_PORT=str(realtime_ws_port))
+    env=dict(fixture_environment(state),QA_STATE=str(state),QA_RUNTIME_PYTHON=sys.executable,QA_SESSIONS=str(state/'browser-sessions.json'),QA_BASE_URL=base,QA_OUT=str(run/'results'),QA_REALTIME_HTTP_PORT=str(realtime_http_port),QA_REALTIME_WS_PORT=str(realtime_ws_port))
     cli=os.environ.get('QA_PLAYWRIGHT_CLI',str(REPO.parent/'e2e-tooling/node_modules/@playwright/test/cli.js'))
     if not Path(cli).is_file(): parser.error('set QA_PLAYWRIGHT_CLI to installed @playwright/test/cli.js')
     env.setdefault('NODE_PATH',str(Path(cli).resolve().parents[2]))

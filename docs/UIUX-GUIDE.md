@@ -283,6 +283,12 @@ protects the delegation listing; authority records are never included in it.
 
 ### Workspace overview, projects and schedule
 
+Immediately below the greeting, **Findings for you** shows the three most recent
+personal updates delivered by bots. Read the full update in place, reveal up to
+twelve recent updates, or discuss a specific one in its original bot conversation.
+Discussing it attaches a removable quote and leaves the message for you to send.
+Team and organisation filters apply to the work lists below this personal feed.
+
 Opening SynthPulse in the browser or as an installed app starts on the Studio
 Overview for every role. The title-bar symbol returns to that same homepage.
 Studio is first in desktop and mobile navigation. Chats is directly below it

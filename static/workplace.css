@@ -135,3 +135,19 @@
 .wp-empty h3{margin:0;font-size:16px;font-weight:650;color:var(--strong,var(--text))}
 .wp-empty p{margin:0;max-width:46ch;font-size:13.5px;line-height:1.55;color:var(--muted)}
 .wp-empty .sm-btn{margin-top:10px}
+
+.wp-findings{border-top:2px solid color-mix(in srgb,var(--accent) 60%,var(--border))}
+.wp-findings>.wp-card-head{justify-content:space-between;flex-wrap:wrap}
+.wp-findings>.wp-card-head h3{font-size:17px}
+.wp-findings-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));padding:0 16px 16px;gap:10px}
+.wp-finding{display:flex;flex-direction:column;align-items:stretch;min-width:0;gap:10px;padding:14px;border:1px solid var(--border);border-radius:var(--sp-radius-md,10px);background:var(--surface-subtle);overflow-wrap:anywhere}
+.wp-finding[hidden],.wp-finding [hidden]{display:none}
+.wp-finding header{display:flex;align-items:baseline;justify-content:space-between;gap:4px 12px;flex-wrap:wrap}
+.wp-finding header strong{color:var(--accent-text,var(--accent));font-size:13px}
+.wp-finding time{font-size:12px;color:var(--muted)}
+.wp-finding-preview,.wp-finding-body{margin:0;font-size:14px;line-height:1.55;color:var(--text)}
+.wp-finding-body{white-space:pre-wrap;max-height:22rem;overflow:auto}
+.wp-finding-actions{display:flex;align-items:center;justify-content:space-between;gap:6px 12px;flex-wrap:wrap;margin-top:auto}
+.wp-finding-actions button,.wp-findings>.wp-card-head button{min-height:36px}
+.wp-findings-note{margin:0;padding:0 20px 16px;color:var(--muted);font-size:13px}
+@media(max-width:640px){.wp-findings-list{padding:0 12px 12px}.wp-finding-actions button,.wp-findings>.wp-card-head button{min-height:44px}}

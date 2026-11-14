@@ -56,6 +56,7 @@ def test_session_new_succeeds_with_cross_profile_prev_session_id(monkeypatch):
             self.session_id = "new123"
             self.profile = "work"
             self.messages = []
+            self.save = MagicMock()
 
         def compact(self):
             return {"session_id": self.session_id, "profile": self.profile}
@@ -89,6 +90,7 @@ def test_session_new_still_commits_same_profile_prev_session_id(monkeypatch):
             self.session_id = "new456"
             self.profile = "default"
             self.messages = []
+            self.save = MagicMock()
 
         def compact(self):
             return {"session_id": self.session_id}
