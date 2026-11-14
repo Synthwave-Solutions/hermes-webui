@@ -75,6 +75,7 @@ function _matchAll(root, sel) {
 }
 
 const els = {};
+global.window = global;
 global.document = {
   createElement: (t) => makeEl(t),
   createDocumentFragment: () => makeEl('frag'),

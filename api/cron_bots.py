@@ -246,16 +246,20 @@ def _chats_path() -> Path:
     return Path(_cfg.STATE_DIR) / JOB_CHATS_FILENAME
 
 
-def _load_chats() -> dict:
+def _load_chats(*, strict=False) -> dict:
     try:
         data = json.loads(_chats_path().read_text(encoding="utf-8"))
     except FileNotFoundError:
         return {"chats": {}}
     except Exception:
+        if strict:
+            raise
         logger.warning("cron bots: job chat map unreadable; starting fresh", exc_info=True)
         return {"chats": {}}
     if isinstance(data, dict) and isinstance(data.get("chats"), dict):
         return data
+    if strict:
+        raise ValueError("Invalid job chat registry")
     return {"chats": {}}
 
 

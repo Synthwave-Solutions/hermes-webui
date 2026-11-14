@@ -9401,7 +9401,7 @@ async function switchToProfile(name) {
     }
     if (typeof animateNextSessionListRefresh === 'function') animateNextSessionListRefresh();
 
-    if (sessionInProgress && _openingExistingSidebarSession) {
+    if (_openingExistingSidebarSession) {
       // The caller will immediately load the clicked session after this profile
       // cookie switch. Avoid creating/retagging an intermediate blank chat.
       const workspaceVisible = typeof _workspacePanelMode !== 'undefined' && _workspacePanelMode !== 'closed';

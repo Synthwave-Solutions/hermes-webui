@@ -12,6 +12,8 @@
 (function(){
   'use strict';
   const NL = {
+    findings:'Voor je uitgezocht', findings_empty:'Zodra een bot iets voor je vindt, verschijnt de update hier.',
+    findings_read:'Lees update', findings_close:'Sluit update', findings_chat:'Bespreek in chat', findings_older:'Eerdere updates ({n})',
     recent_chats:'Recente gesprekken', recent_runs:'Laatst uitgevoerde taken', no_chats:'Nog geen recente gesprekken.', no_runs:'Nog geen uitgevoerde taken in deze weergave.',
     projects:'Projecten', chart:'Botorganogram', agenda:'Taakagenda', navigate:'Alle onderdelen',
     title: 'Overzicht', morning: 'Goedemorgen', afternoon: 'Goedemiddag', evening: 'Goedenavond',
@@ -31,6 +33,8 @@
     p_discover: 'Ontdekken', p_design: 'Inrichten', p_playbook: 'Bouwplan', p_build: 'Bouwen', p_measure: 'Meten'
   };
   const EN = {
+    findings:'Findings for you', findings_empty:'When a bot finds something for you, its update appears here.',
+    findings_read:'Read update', findings_close:'Close update', findings_chat:'Discuss in chat', findings_older:'Earlier updates ({n})',
     recent_chats:'Recent conversations', recent_runs:'Recently run tasks', no_chats:'No recent conversations yet.', no_runs:'No task runs in this view yet.',
     projects:'Projects', chart:'Bot org chart', agenda:'Task calendar', navigate:'All destinations',
     title: 'Overview', morning: 'Good morning', afternoon: 'Good afternoon', evening: 'Good evening',
@@ -312,6 +316,67 @@
         ${rs.length ? `<div class="wp-badges">${rs.map(r => `<span class="om-badge wp-role ${r.cls}">${H(r.label)}</span>`).join('')}</div>` : ''}</div></section>`;
   }
   function allowed(panel) { return !!window.SynthPulseWorkspace?.allowed(panel); }
+  let findings = null, findingsFailed = false, showEarlier = false;
+  const expandedFindings = new Set();
+
+  function findingPreview(body) {
+    const plain = body.replace(/!?\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/^\s*(?:#{1,6}\s+|[-*>]\s+)/gm, '').replace(/\*\*|__|`/g, '')
+      .replace(/\s+/g, ' ').trim();
+    if (plain.length <= 170) return plain;
+    const cut = plain.slice(0, 169);
+    return (cut.replace(/\s+\S*$/, '') || cut) + '…';
+  }
+
+  function findingCard(row, index) {
+    const key = row.session_id + '/' + row.run_at;
+    const date = new Intl.DateTimeFormat(lang(), {day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'}).format(row.at * 1000);
+    const expanded = expandedFindings.has(key);
+    return `<article class="wp-finding" data-finding-index="${index}"${index >= 3 && !showEarlier ? ' hidden' : ''}>
+      <header><strong>${H(row.bot)}</strong><time datetime="${H(row.run_at)}">${H(date)}</time></header>
+      <p class="wp-finding-preview"${expanded ? ' hidden' : ''}>${H(findingPreview(row.body))}</p>
+      <div id="wpFindingBody${index}" class="wp-finding-body" tabindex="0"${expanded ? '' : ' hidden'}>${expanded ? H(row.body) : ''}</div>
+      <div class="wp-finding-actions"><button type="button" class="om-link" data-finding-read aria-expanded="${expanded}" aria-controls="wpFindingBody${index}">${H(w(expanded ? 'findings_close' : 'findings_read'))}</button>
+      <button type="button" class="sm-btn" data-finding-chat>${H(w('findings_chat'))}</button></div></article>`;
+  }
+
+  function findingsHtml() {
+    let content;
+    if (findingsFailed) content = `<div class="wp-findings-note" role="status">${H(w('failed'))} <button class="om-link" type="button" data-finding-retry>${H(w('retry'))}</button></div>`;
+    else if (findings === null) content = `<p class="wp-findings-note" role="status">${H(w('loading'))}</p>`;
+    else if (!findings.length) content = `<p class="wp-findings-note">${H(w('findings_empty'))}</p>`;
+    else content = `<div class="wp-findings-list" id="wpFindingsList">${findings.map(findingCard).join('')}</div>`;
+    const more = findings?.length > 3 ? `<button class="om-link" type="button" data-finding-more aria-controls="wpFindingsList" aria-expanded="${showEarlier}">${H(showEarlier ? w('less') : w('findings_older',{n:findings.length-3}))}</button>` : '';
+    return `<header class="wp-card-head"><h3 id="wpFindingsTitle">${H(w('findings'))}</h3>${more}</header>${content}`;
+  }
+
+  async function loadFindings(token) {
+    try {
+      const result = await call('/api/me/findings');
+      if (token !== Wp.token) return;
+      if (!Array.isArray(result?.findings)) throw new Error();
+      findings = result.findings;
+      findingsFailed = false;
+    } catch (_e) {
+      if (token !== Wp.token) return;
+      findingsFailed = true;
+    }
+    const section = Wp.body?.querySelector('[data-wp-findings]');
+    if (section) section.innerHTML = findingsHtml();
+  }
+
+  async function discussFinding(row, button) {
+    button.disabled = true;
+    try {
+      await _openSidebarSession(row, {explicitProfile:true});
+      if (_currentPanel === 'chat' && S.session?.session_id === row.session_id && _profileMatchesActiveProfile(row.profile,S.activeProfile||'default')) {
+        _addNamedContextBlock(row.body, row.bot + ' · ' + button.closest('article').querySelector('time').textContent);
+        document.getElementById('msg')?.focus();
+      }
+    } catch (_e) { showToast(w('failed')); }
+    finally { button.disabled = false; }
+  }
+
   function recentHtml(title, target, items, empty) {
     return `<section class="wp-card"><header class="wp-card-head"><h3>${H(w(title))}</h3><button type="button" class="om-link wp-all" data-wp-go="${target}">${H(w('all'))}</button></header>${items || '<p class="wp-no-recent">'+H(w(empty))+'</p>'}</section>`;
   }
@@ -362,6 +427,7 @@
     else if (group === 'person') main = `<div class="wp-stack">${personView(c, rows, lens)}</div>`;
     else main = `<div class="wp-grid">${KINDS.filter(k => n[k]).map(k => kindCard(c, k, rows.filter(it => it.kind === k), 'k:' + lens + ':' + k, { team: lens !== 'mine' && k !== 'bot', owner: lens !== 'mine' })).join('')}</div>`;
     body.innerHTML = `<div class="wp" data-tour="studio-home">${heroHtml(c)}
+      ${allowed('chat') ? '<section class="wp-card wp-findings" aria-labelledby="wpFindingsTitle" data-wp-findings>'+findingsHtml()+'</section>' : ''}
       ${Wp.setup}
       <div class="wp-bar">${barHtml(c, 'home', Wp.data, lens)}${groupSeg}</div>
       <div class="wp-kpis">${KINDS.filter(k => k === 'task' ? allowed('tasks') : k !== 'bot' || allowed('profiles')).map(k => `<button type="button" class="wp-kpi ${n[k] ? '' : 'zero'}" title="${H(w('kpi_hint', { k: w('k_' + k) }))}" data-wp-go="${k}"${k === 'usecase' ? ' data-tour="studio-usecases"' : ''}><span class="wp-kpi-label"><span class="wp-kind-dot k-${k}" aria-hidden="true"></span>${H(short(k))}</span><span class="wp-kpi-value">${n[k]}</span></button>`).join('')}</div>
@@ -374,6 +440,9 @@
   async function render(body, opts){
     Wp.body = body; Wp.setup = (opts && opts.setup) || '';
     const token = ++Wp.token;
+    findings = null; findingsFailed = false; showEarlier = false; expandedFindings.clear();
+    const fetchOnEntry = allowed('chat');
+    if (fetchOnEntry) void loadFindings(token);
     if (!body.dataset.wpBound) {
       body.dataset.wpBound = '1';
       body.addEventListener('click', onClick);
@@ -381,7 +450,10 @@
     if (ctxCache && Wp.data) paint(true); else body.innerHTML = `<div class="wp"><div class="wp-skeleton" aria-busy="true" aria-label="${H(w('loading'))}"><span></span><span></span><span></span></div></div>`;
     try { const c = await loadCtx(Date.now() - Wp.at > 30000); await loadData(c); }
     catch (_e) { if (token === Wp.token && body.isConnected && body.firstElementChild && body.firstElementChild.classList.contains('wp')) body.innerHTML = `<div class="om-empty wp-failed"><h3>${H(w('failed'))}</h3><div class="om-actions"><button type="button" class="sm-btn" data-wp-retry>${H(w('retry'))}</button></div></div>`; return; }
-    if (token === Wp.token) paint();
+    if (token === Wp.token) {
+      paint();
+      if (!fetchOnEntry && allowed('chat')) void loadFindings(token);
+    }
   }
   // Opens on "mine". Someone who owns nothing yet and never chose a lens starts on
   // the first lens that has something to show, so the first visit is never an empty page.
@@ -424,6 +496,30 @@
   function onClick(ev){
     const b = ev.target.closest('button');
     if (!b || !Wp.body || !Wp.body.contains(b)) return;
+    if (b.hasAttribute('data-finding-retry')) { b.disabled = true; void loadFindings(Wp.token); return; }
+    if (b.hasAttribute('data-finding-more')) {
+      showEarlier = !showEarlier;
+      Wp.body.querySelectorAll('[data-finding-index]').forEach((el, i) => { el.hidden = !showEarlier && i >= 3; });
+      b.setAttribute('aria-expanded', String(showEarlier));
+      b.textContent = showEarlier ? w('less') : w('findings_older', {n:findings.length-3});
+      return;
+    }
+    const card = b.closest('[data-finding-index]');
+    if (card && allowed('chat')) {
+      const row = findings?.[Number(card.dataset.findingIndex)];
+      if (!row) return;
+      if (b.hasAttribute('data-finding-chat')) { void discussFinding(row, b); return; }
+      if (b.hasAttribute('data-finding-read')) {
+        const key = row.session_id + '/' + row.run_at, expanded = !expandedFindings.has(key);
+        if (expanded) expandedFindings.add(key); else expandedFindings.delete(key);
+        const body = card.querySelector('.wp-finding-body');
+        body.textContent = expanded ? row.body : '';
+        body.hidden = !expanded;
+        card.querySelector('.wp-finding-preview').hidden = expanded;
+        b.setAttribute('aria-expanded', String(expanded)); b.textContent = w(expanded ? 'findings_close' : 'findings_read');
+        return;
+      }
+    }
     if (b.dataset.wpGroup) { Wp.group = b.dataset.wpGroup; store.set('sp-wp-group', Wp.group); paint(); return; }
     if (b.dataset.wpToggle) { const k = b.dataset.wpToggle; if (Wp.open.has(k)) Wp.open.delete(k); else Wp.open.add(k); paint(); return; }
     if (b.dataset.wpMore) { const k = b.dataset.wpMore; if (Wp.more.has(k)) Wp.more.delete(k); else Wp.more.add(k); paint(); return; }

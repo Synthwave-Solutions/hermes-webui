@@ -13732,6 +13732,10 @@ def handle_get(handler, parsed) -> bool:
         from api.user_avatars import handle_people_avatar
         return handle_people_avatar(handler, parse_qs(parsed.query))
 
+    if parsed.path == "/api/me/findings":
+        from api.personal_findings import handle
+        return handle(handler)
+
     if parsed.path == "/api/me/sidebar-organization":
         from api.sidebar_organization import handle
         return handle(handler)

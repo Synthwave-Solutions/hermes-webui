@@ -9,21 +9,6 @@ def read(rel: str) -> str:
     return (REPO / rel).read_text(encoding="utf-8")
 
 
-def _locale_blocks(src: str) -> dict[str, str]:
-    matches = list(
-        re.finditer(
-            r"\n  (?:(['\"])([A-Za-z][A-Za-z0-9-]*)\1|([A-Za-z][A-Za-z0-9-]*)): \{",
-            src,
-        )
-    )
-    blocks: dict[str, str] = {}
-    for idx, match in enumerate(matches):
-        start = match.end()
-        end = matches[idx + 1].start() if idx + 1 < len(matches) else src.rfind("\n};")
-        blocks[match.group(2) or match.group(3)] = src[start:end]
-    return blocks
-
-
 def test_selected_text_reply_button_is_selection_scoped_and_frontend_only():
     js = read("static/messages.js")
 
@@ -55,7 +40,7 @@ def test_selected_text_reply_collects_named_context_blocks_without_dumping_into_
     assert "replace(/\\n{3,}/g,'\\n\\n')" in js
     assert "map(line=>`> ${line}`).join('\\n')" in js
 
-    assert "function _addNamedContextBlock(text)" in js
+    assert "function _addNamedContextBlock(" in js
     assert "function _renderSelectionChips()" in js
     assert "function _flushSelectionBlocksToComposer()" in js
     assert "_pendingSelections.push({id, name, text})" in js
@@ -89,7 +74,6 @@ def test_selected_text_reply_context_cards_are_built_with_text_nodes():
 
 def test_selected_text_reply_styles_and_i18n_exist_for_all_locales():
     css = read("static/style.css")
-    i18n = read("static/i18n.js")
 
     assert ".selected-text-reply-btn" in css
     assert ".selected-text-reply-btn.visible" in css
@@ -124,9 +108,9 @@ def test_selected_text_reply_styles_and_i18n_exist_for_all_locales():
     assert "color:var(--text)" in css
     assert "outline:2px solid var(--focus-ring)" in css
 
-    blocks = _locale_blocks(i18n)
+    blocks = {p.stem: p.read_text(encoding="utf-8") for p in (REPO / "static/i18n").glob("*.js")}
     assert blocks, "No locale blocks found"
-    assert "zh-Hant" in blocks, "Locale parser must include quoted script locales"
+    assert "zh-Hant" in blocks, "Include script-specific locale bundles"
     required = {
         "selected_text_reply",
         "selected_text_reply_title",
@@ -135,7 +119,7 @@ def test_selected_text_reply_styles_and_i18n_exist_for_all_locales():
         "context_block_rename_aria",
         "context_block_remove",
     }
-    key_pattern = re.compile(r"^\s{4}([a-zA-Z0-9_]+):", re.MULTILINE)
+    key_pattern = re.compile(r'^\s*"?([a-zA-Z0-9_]+)"?\s*:', re.MULTILINE)
     for locale, block in blocks.items():
         keys = set(key_pattern.findall(block))
         missing = sorted(required - keys)

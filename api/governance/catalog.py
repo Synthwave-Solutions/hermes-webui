@@ -156,6 +156,7 @@ ROUTE_CATALOG: tuple[RouteRule, ...] = (
     # Profile photos: anyone who can see the directory may load a photo; the
     # POST only ever targets the caller's own identity (api/user_avatars.py).
     RouteRule("/api/people/avatar",       "sessions:read", match="exact"),
+    RouteRule("/api/me/findings", "sessions:read", match="exact"),
     RouteRule("/api/me/sidebar-organization", "sessions:read", "sessions:read", match="exact"),
     RouteRule("/api/me/avatar",           "sessions:read", "sessions:read", match="exact"),
     # Own bot and own platform ids (Connections, "Your bot"): always the caller.
