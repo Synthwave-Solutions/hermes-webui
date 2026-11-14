@@ -26,6 +26,7 @@ _MUTATION_METHODS: frozenset[str] = frozenset({"POST", "PUT", "PATCH", "DELETE"}
 # that special-case ever moves.
 _ANON_ROUTES: frozenset[str] = frozenset({
     "/api/auth/login",
+    "/api/auth/cloud-session",
     "/api/auth/status",
     "/api/auth/oidc/start",
     "/api/auth/oidc/callback",
