@@ -457,6 +457,17 @@
       ]
     },
     {
+      "id": "webui.tasks.calendar",
+      "area": "tasks",
+      "status": "available",
+      "source_refs": [
+        "static/index.html:940",
+        "static/index.html:954",
+        "static/cron-agenda.js",
+        "api/cron_agenda.py"
+      ]
+    },
+    {
       "id": "webui.tasks.schedule",
       "area": "tasks",
       "status": "available",
@@ -3151,7 +3162,9 @@
       "source_refs": [
         "static/workplace.js:115",
         "static/workplace.js:309",
-        "api/org_structure.py"
+        "api/org_structure.py",
+        "static/index.html:152",
+        "static/workspace-shell.js:24"
       ]
     },
     {
@@ -3387,6 +3400,16 @@
         "static/index.html"
       ],
       "feature_id": "webui.chat.background"
+    },
+    {
+      "control": "workspaceHome",
+      "tag": "button",
+      "label": "Overview",
+      "source_refs": [
+        "static/index.html:152",
+        "static/workspace-shell.js:24"
+      ],
+      "feature_id": "webui.studio.overview"
     },
     {
       "control": "titlebarProfileBtn",
@@ -4465,6 +4488,16 @@
         "static/index.html:863"
       ],
       "feature_id": "webui.memory.personal"
+    },
+    {
+      "control": "cronAgendaBack",
+      "tag": "button",
+      "label": "Calendar",
+      "source_refs": [
+        "static/index.html:940",
+        "static/cron-agenda.js:144"
+      ],
+      "feature_id": "webui.tasks.calendar"
     },
     {
       "control": "btnRunTaskDetail",
