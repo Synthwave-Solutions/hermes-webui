@@ -453,6 +453,13 @@
       "en": "The highlight marks New task. Open this form after the guide to see the described fields. A task is created only when you save it yourself."
     }
   },
+  "webui.tasks.calendar": {
+    "panel": "tasks",
+    "targets": [
+      "#cronAgenda [data-agenda-view]",
+      "#cronAgendaBack"
+    ]
+  },
   "webui.tasks.schedule": {
     "panel": "tasks",
     "targets": [
@@ -2732,7 +2739,8 @@
     "panel": "studio",
     "targets": [
       ".wp-bar",
-      "#studioHubNav"
+      "#studioHubNav",
+      "#workspaceHome"
     ]
   },
   "webui.studio.discover": {

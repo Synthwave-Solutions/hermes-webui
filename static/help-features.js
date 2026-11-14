@@ -2288,6 +2288,55 @@ window.SynthPulseFeatureCatalog = {
       }
     },
     {
+      "id": "webui.tasks.calendar",
+      "area": "tasks",
+      "status": "available",
+      "conditions": [],
+      "anchors": [
+        "?help_feature=webui.tasks.calendar",
+        "#cronAgenda [data-agenda-view]",
+        "#cronAgendaBack"
+      ],
+      "source_refs": [
+        "static/index.html:940",
+        "static/index.html:954",
+        "static/cron-agenda.js",
+        "api/cron_agenda.py"
+      ],
+      "related": [
+        "webui.tasks.schedule",
+        "webui.tasks.results"
+      ],
+      "locales": {
+        "en": {
+          "title": "Task calendar",
+          "purpose": "See upcoming runs for the bots you can access, in your local time zone.",
+          "when": "Use the calendar to check which tasks are due today or to compare upcoming days.",
+          "steps": [
+            "Open Tasks. If a task detail is open, select Calendar to return to the schedule.",
+            "Choose Day, Week or Month. Use the arrows to change the period or Today to return to the current date.",
+            "Select a date in the month view to see its tasks. Open a task to read its details."
+          ],
+          "permissions": "The calendar shows tasks you have permission to view.",
+          "limits": "The times are projections from the current schedules. Open a task’s run history to check what actually ran.",
+          "example": "Select next Monday in the month view to see when the finance report is scheduled."
+        },
+        "nl": {
+          "title": "Taakagenda",
+          "purpose": "Bekijk de volgende uitvoeringen van taken voor de bots waartoe je toegang hebt, in je eigen tijdzone.",
+          "when": "Gebruik de agenda om te zien welke taken vandaag gepland staan of om meerdere dagen te vergelijken.",
+          "steps": [
+            "Open Taken. Heb je een taak geopend, kies dan Agenda om terug te keren naar de planning.",
+            "Kies Dag, Week of Maand. Blader met de pijlen of kies Vandaag om naar de huidige datum te gaan.",
+            "Kies een datum in de maandweergave om de taken van die dag te zien. Open een taak voor de details."
+          ],
+          "permissions": "De agenda toont de taken die je mag bekijken.",
+          "limits": "De tijdstippen volgen uit de huidige planning. In de geschiedenis van een taak zie je welke uitvoeringen hebben plaatsgevonden.",
+          "example": "Kies in de maandweergave de volgende maandag om te zien wanneer de financiële rapportage gepland staat."
+        }
+      }
+    },
+    {
       "id": "webui.tasks.schedule",
       "area": "tasks",
       "status": "available",
@@ -15587,13 +15636,16 @@ window.SynthPulseFeatureCatalog = {
       "conditions": [],
       "anchors": [
         "?help_feature=webui.studio.overview",
+        "#workspaceHome",
         "#studioHubNav [data-st-hub='home']",
         "#studioHubNav"
       ],
       "source_refs": [
         "static/workplace.js:115",
         "static/workplace.js:309",
-        "api/org_structure.py"
+        "api/org_structure.py",
+        "static/index.html:152",
+        "static/workspace-shell.js:24"
       ],
       "related": [
         "webui.studio.usecases",
@@ -15606,7 +15658,7 @@ window.SynthPulseFeatureCatalog = {
           "purpose": "The Overview is the first screen of Studio. It puts use cases, scheduled tasks, bots, playbooks, prompts and backlog items in one place, and lets you choose whose work you look at: your own, your team's, your department's or the whole organisation's.",
           "when": "When you want to see what is running for you or your team, or find the automation a colleague set up.",
           "steps": [
-            "Choose Studio in the navigation; the Overview opens first.",
+            "Open Studio from the navigation. To return to its home page, select the logo labeled Overview in the title bar.",
             "Choose a view above the tiles: Mine, My team, My department or Organisation. The number shows how much is in each view.",
             "In a team, department or organisation view, choose By kind, By team or By person to regroup the same items.",
             "Choose a tile to jump to that kind, or open an item to go straight to it."
@@ -15620,7 +15672,7 @@ window.SynthPulseFeatureCatalog = {
           "purpose": "Het Overzicht is het eerste scherm van Studio. Het zet use cases, geplande taken, bots, playbooks, prompts en backlogpunten op één plek, en laat je kiezen wiens werk je bekijkt: dat van jezelf, je team, je afdeling of de hele organisatie.",
           "when": "Wanneer je wilt zien wat er voor jou of je team draait, of de automatisering van een collega zoekt.",
           "steps": [
-            "Kies Studio in de navigatie; het Overzicht opent als eerste.",
+            "Open Studio via de navigatie. Kies het logo met het label Overzicht in de titelbalk om terug te gaan naar de startpagina.",
             "Kies boven de tegels een weergave: Van mij, Mijn team, Mijn afdeling of Organisatie. Het getal laat zien hoeveel er in elke weergave staat.",
             "Kies in een team-, afdelings- of organisatieweergave Per soort, Per team of Per persoon om dezelfde punten anders te groeperen.",
             "Kies een tegel om naar die soort te gaan, of open een punt om er direct heen te gaan."
