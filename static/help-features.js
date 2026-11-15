@@ -15691,8 +15691,8 @@ window.SynthPulseFeatureCatalog = {
         "#studioHubNav"
       ],
       "source_refs": [
-        "static/workplace.js:115",
-        "static/workplace.js:309",
+        "static/workplace.js:121",
+        "static/workplace.js:319",
         "api/org_structure.py",
         "static/index.html:152",
         "static/workspace-shell.js:24"
