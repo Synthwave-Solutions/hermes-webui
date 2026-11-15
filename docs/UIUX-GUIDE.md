@@ -325,6 +325,8 @@ jobs have no future runs. Task history holds the actual execution results.
 
 Personal Scout findings on Studio Home use a short preview. If a report opens with
 a routine no-change notice, the preview favours the next concrete finding or
-recommendation. Read update opens the original report in a keyboard-accessible
+recommendation. Cards and the reader identify the author with the same profile
+photo as chat, falling back to the bot's initial when its photo is unavailable.
+Read update opens the original report in a keyboard-accessible
 reader with headings, lists and source links. Discuss in chat carries the original
 delivery into its conversation as a removable context chip.

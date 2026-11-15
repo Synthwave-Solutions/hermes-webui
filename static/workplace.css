@@ -142,7 +142,10 @@
 .wp-findings-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));padding:0 16px 16px;gap:10px}
 .wp-finding{display:flex;flex-direction:column;align-items:stretch;min-width:0;gap:10px;padding:14px;border:1px solid var(--border);border-radius:var(--sp-radius-md,10px);background:var(--surface-subtle);overflow-wrap:anywhere}
 .wp-finding[hidden],.wp-finding [hidden]{display:none}
-.wp-finding header{display:flex;align-items:baseline;justify-content:space-between;gap:4px 12px;flex-wrap:wrap}
+.wp-finding-author{display:flex;align-items:center;gap:10px;min-width:0}
+.wp-finding-author>div{min-width:0;display:grid;gap:2px}
+.wp-finding-author .wp-finding-avatar{width:34px;height:34px;flex:0 0 34px;border-radius:9px;font-size:14px}
+.wp-finding-reader .wp-finding-avatar{width:40px;height:40px;flex-basis:40px;font-size:16px}
 .wp-finding header strong{color:var(--accent-text,var(--accent));font-size:13px}
 .wp-finding time{font-size:12px;color:var(--muted)}
 .wp-finding-preview,.wp-finding-body{margin:0;font-size:14px;line-height:1.55;color:var(--text)}

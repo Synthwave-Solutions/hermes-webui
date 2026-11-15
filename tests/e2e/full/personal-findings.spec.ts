@@ -107,3 +107,46 @@ test('PERSONAL FINDINGS prioritises concrete advice and opens a readable report'
   await expect(page.getByRole('dialog')).toContainText('Review the schedule');
   await expect(page.getByRole('dialog').locator('a,img,iframe')).toHaveCount(0);
 });
+
+test('REPORT AVATARS follow the author of each delivery on cards and in the reader', async ({page}, info)=>{
+  const people = [['qa-ops-photo','Operations Bot'],['qa-design-photo','Design Bot'],['qa-no-photo','Planning Bot'],['qa-ops-photo','Operations Bot']];
+  const rows = people.map(([profile,bot], i)=>({profile,bot,session_id:'qa-photo-'+i,
+    at:1800000200-i,run_at:new Date((1800000200-i)*1000).toISOString(),body:['The release review is ready.','The design review starts on Friday.','Tomorrow’s planning is ready.','A previous operations update.'][i]}));
+  await page.route('**/api/me/findings', route=>route.fulfill({json:{findings:rows}}));
+  const art = ['<circle cx="16" cy="16" r="16" fill="#246276"/><circle cx="16" cy="12" r="5" fill="#d3f0ed"/><path d="M5 28q11-16 22 0" fill="#d3f0ed"/>',
+    '<rect width="32" height="32" rx="8" fill="#764867"/><circle cx="16" cy="13" r="5" fill="#fae5cb"/><path d="M6 28q10-15 20 0" fill="#fae5cb"/>'];
+  await page.route('**/api/profile/avatar?**',route=>{
+    const profile = new URL(route.request().url()).searchParams.get('profile');
+    const i = people.findIndex(p=>p[0]===profile);
+    if(i<0)return route.fallback();
+    if(i===2)return route.fulfill({status:404,body:''});
+    return route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">'+art[i]+'</svg>'});
+  });
+  await page.goto('/');
+  const tour=page.locator('#spHelpCard[data-kind="tour_offer"] .sp-help-btn').first();
+  await page.addLocatorHandler(tour,()=>tour.click());
+  await expect(page.locator('.wp-hero')).toBeVisible();
+  const feed=page.locator('[data-wp-findings]');
+  for(const width of [1440,900,390]){
+    await page.setViewportSize({width,height:900});
+    await page.evaluate(()=>closeMobileSidebar());
+    const cards=feed.locator('article');
+    for (const i of [0,1]){
+      const photo=cards.nth(i).locator('header img');
+      await expect(photo).toHaveAttribute('src',new RegExp('profile='+people[i][0]+'(?:&|$)'));
+      await expect.poll(()=>photo.evaluate(img=>img.naturalWidth)).toBeGreaterThan(0);
+    }
+    await expect(cards.nth(2).locator('header .sp-bot-avatar-initial')).toHaveText('P');
+    await expect(cards.nth(2).locator('header img')).toHaveCount(0);
+    await feed.scrollIntoViewIfNeeded();
+    await page.screenshot({path:info.outputPath('report-avatars-'+width+'.png')});
+    await cards.nth(1).getByRole('button',{name:'Read update'}).click();
+    const reader=page.getByRole('dialog',{name:'Design Bot'});
+    await expect(reader.locator('header img')).toHaveAttribute('src',/profile=qa-design-photo(?:&|$)/);
+    await expect.poll(()=>reader.locator('header img').evaluate(img=>img.naturalWidth)).toBeGreaterThan(0);
+    await page.keyboard.press('Escape');
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  }
+  await feed.getByRole('button',{name:'Earlier updates (1)'}).click();
+  await expect(feed.locator('article').last().locator('header img')).toHaveAttribute('src',/profile=qa-ops-photo(?:&|$)/);
+});
