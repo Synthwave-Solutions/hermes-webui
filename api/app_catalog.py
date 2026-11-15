@@ -60,6 +60,8 @@ _ROWS = (
             'Manage knowledge bases, process documents and test answers with source references.', 'knowledge_base', 'productivity', 'platform', dedicated_customer_workspace=True),
     AppSpec('langfuse', 'Langfuse', 'Bekijk AI-traces, gebruik, kosten en evaluaties van gekoppelde toepassingen.',
             'Inspect AI traces, usage, costs and evaluations from connected applications.', 'workspace', 'platform', 'platform', requestable=False),
+    AppSpec('nod', 'Nod', 'Persoonlijke AI-agent van n8n (pilot): voert taken uit, bouwt n8n-workflows en werkt op de achtergrond.',
+            'Personal AI agent by n8n (pilot): runs tasks, builds n8n workflows and works in the background.', 'workspace', 'automation', 'platform', requestable=False),
     AppSpec('hermes_docs', 'SynthPulse Office Docs (Word)', 'Schrijf en bewerk Word-documenten met opmaak, tabellen en AI-hulp.',
             'Write and edit Word documents with formatting, tables and AI assistance.', 'office_apps', 'productivity', 'platform'),
     AppSpec('hermes_sheets', 'SynthPulse Office Sheets (Excel)', 'Bewerk Excel-werkboeken met cellen, formules en AI-hulp.',

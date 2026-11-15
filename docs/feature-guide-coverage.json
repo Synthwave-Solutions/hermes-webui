@@ -2944,6 +2944,16 @@
       ]
     },
     {
+      "id": "webui.apps.nod",
+      "area": "apps",
+      "status": "conditional",
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ]
+    },
+    {
       "id": "webui.apps.hermes_docs",
       "area": "apps",
       "status": "conditional",

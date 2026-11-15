@@ -14507,6 +14507,56 @@ window.SynthPulseFeatureCatalog = {
       }
     },
     {
+      "id": "webui.apps.nod",
+      "area": "apps",
+      "status": "conditional",
+      "conditions": [
+        "Configured app directory and existing access"
+      ],
+      "anchors": [
+        "?help_feature=webui.apps.nod",
+        "#mainApps [data-app-id=\"nod\"]"
+      ],
+      "source_refs": [
+        "api/app_catalog.py",
+        "api/apps_launcher.py",
+        "static/apps.js"
+      ],
+      "related": [
+        "webui.apps.overview"
+      ],
+      "locales": {
+        "nl": {
+          "title": "Nod gebruiken",
+          "purpose": "Open de pilot van Nod, de persoonlijke AI-agent van n8n, om taken te laten uitvoeren en n8n-workflows te laten bouwen.",
+          "when": "Gebruik dit wanneer je het volgende wilt doen: Laat Nod een terugkerende taak voorbereiden en bekijk hoe het die aanpakt.",
+          "steps": [
+            "Kies Apps onderaan de navigatie en zoek Nod.",
+            "Kies Open app en meld je aan met het toegangstoken van deze Nod.",
+            "Rond de kennismaking af of ga verder in het bestaande gesprek.",
+            "Geef een opdracht en volg in het gesprek welke stappen Nod zet en waarvoor het toestemming vraagt."
+          ],
+          "permissions": "Platformbeheerrechten in SynthPulse en het toegangstoken van deze Nod.",
+          "limits": "Nod is een pilot voor één persoon, zonder rollen of gedeelde toegang. Wie het token heeft, heeft volledige toegang. De app is alleen binnen het eigen netwerk bereikbaar. Teamleden werken via de Super Agent.",
+          "example": "Laat Nod een terugkerende taak voorbereiden en bekijk hoe het die aanpakt."
+        },
+        "en": {
+          "title": "Nod guide",
+          "purpose": "Open the pilot of Nod, n8n's personal AI agent, to have tasks carried out and n8n workflows built.",
+          "when": "Use this when you want to do the following: Have Nod prepare a recurring task and see how it approaches it.",
+          "steps": [
+            "Choose Apps at the bottom of navigation and find Nod.",
+            "Choose Open app and sign in with the access token of this Nod.",
+            "Finish the introduction or continue in the existing conversation.",
+            "Give an instruction and follow in the conversation which steps Nod takes and what it asks approval for."
+          ],
+          "permissions": "Platform administration access in SynthPulse and the access token of this Nod.",
+          "limits": "Nod is a pilot for one person, without roles or shared access. Whoever holds the token has full access. The app is only reachable inside the private network. Team members work through the Super Agent.",
+          "example": "Have Nod prepare a recurring task and see how it approaches it."
+        }
+      }
+    },
+    {
       "id": "webui.apps.hermes_docs",
       "area": "apps",
       "status": "conditional",
