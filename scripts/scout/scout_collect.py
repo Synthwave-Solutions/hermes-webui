@@ -417,14 +417,38 @@ def _streak_start(led, jid: str, job: dict, failing: bool) -> str:
     return stored
 
 
-def collect_jobs(ctx: dict, since: float, led=None) -> list[dict]:
+def _assigned_root_jobs(ctx: dict) -> list[dict]:
+    """Central records that name both this recipient and this responsible bot."""
+    root, person = ctx.get("root"), ctx.get("person")
+    if not root or not person or ctx["home"].parent != root / "profiles":
+        return []
+    path = root / "cron" / "jobs.json"
+    if not path.exists():
+        return []
+    data = _read_json(path, 32 * 1024 * 1024)
+    rows = data.get("jobs") if isinstance(data, dict) else data
+    if not isinstance(rows, list):
+        raise ValueError("central job index unavailable")
+    owned = []
+    for job in rows:
+        if not isinstance(job, dict) or job.get("assigned_bot") != ctx["profile"]:
+            continue
+        origin = job.get("origin") if isinstance(job.get("origin"), dict) else {}
+        if (job.get("owner_email") or origin.get("platform") == "webui") and _job_owned_by(job, person):
+            owned.append(job)
+    return owned
+
+
+def collect_jobs(ctx: dict, since: float, led=None, assigned_only: bool = False) -> list[dict]:
     out_root = ctx["home"] / "cron" / "output"
     now = time.time()
     items: list[dict] = []
-    for job in load_jobs(ctx):
+    for job in (_assigned_root_jobs(ctx) if assigned_only else load_jobs(ctx)):
         jid = str(job.get("id") or "")
         if not jid or is_scout_job(job, ctx):
             continue
+        if assigned_only:
+            jid = "central/" + jid  # store-qualified incident identity
         name = clean(job.get("name") or jid, 100)
         mine = _job_owned_by(job, ctx.get("person"))
         enabled = job.get("enabled", True) is not False
@@ -434,7 +458,7 @@ def collect_jobs(ctx: dict, since: float, led=None) -> list[dict]:
                       and job.get("state", "scheduled") == "scheduled")
         start = _streak_start(led, jid, job, failing) if led is not None else ""
         if failing:
-            err = clean(job.get("last_error") or "", 160)
+            err = "" if assigned_only else clean(job.get("last_error") or "", 160)
             sig = re.sub(r"\d+", "#", err)[:80]
             streak = job.get("failure_streak")
             summary = f"last_status={status}"
@@ -446,6 +470,8 @@ def collect_jobs(ctx: dict, since: float, led=None) -> list[dict]:
                 source = "person_job_repeated_failure"
                 identity = f"{jid}:repeated:{start}"
                 title = f"Jouw taak faalt herhaaldelijk: {name}"
+            elif assigned_only:
+                continue
             else:
                 source = "person_job_failure" if mine else "job_failure"
                 identity = f"{jid}:fail:{status}:{sig}:{start}"
@@ -466,6 +492,8 @@ def collect_jobs(ctx: dict, since: float, led=None) -> list[dict]:
                                   "title": f"Planning loopt achter: {name}",
                                   "summary": f"Gepland voor {planned}. De planning toont nog geen latere uitvoering. "
                                              "Controleer de taakplanning en de laatste run.", "ts": slot})
+        if assigned_only:
+            continue  # Central assignments contribute schedule metadata only.
         out_dir = out_root / jid
         if not out_dir.is_dir():
             continue
@@ -1304,7 +1332,9 @@ def run() -> int:
         notes.extend(email_notes)
         candidates: list[dict] = []
         jobs_ok = False
+        assignments_ok = False
         for label, fn in (("cron-jobs", lambda: collect_jobs(ctx, since, led)),
+                          ("toegewezen taken", lambda: collect_jobs(ctx, since, led, True)),
                           ("kanban", lambda: collect_kanban(ctx, now)),
                           ("bot-screen", lambda: collect_screen(ctx, now))):
             if time.monotonic() - started > RUNTIME_BUDGET_S:
@@ -1315,6 +1345,8 @@ def run() -> int:
                 candidates.extend(found)
                 if label == "cron-jobs":
                     jobs_ok = time.monotonic() - started <= RUNTIME_BUDGET_S
+                elif label == "toegewezen taken":
+                    assignments_ok = time.monotonic() - started <= RUNTIME_BUDGET_S
             except Exception as exc:
                 notes.append(f"{label}: niet gelezen ({type(exc).__name__}: {clean(exc, 120)})")
         chat_context = ""
@@ -1347,7 +1379,8 @@ def run() -> int:
         for row in led.unclassified():
             # Schedule/incident snapshots expire when the source no longer confirms them.
             if row["source"] in {"person_job_overdue", "person_job_repeated_failure", "person_job_failure"}:
-                if jobs_ok and row["hash"] not in seen_batch:
+                source_ok = assignments_ok if row["id_or_url"].startswith("central/") else jobs_ok
+                if source_ok and row["hash"] not in seen_batch:
                     led.set_status(row["hash"], "ignored", now=int(now), only_from_new=True)
                 continue
             if row["hash"] not in seen_batch:

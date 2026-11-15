@@ -37,8 +37,11 @@ Unavailable sources still need to be reported honestly; ordinary jobs with
 explicit tool requirements retain their existing preflight checks. Saving an
 existing Scout upgrades its stored tool selection to this inherited mode.
 
-Each personal Scout checks the recurring jobs its recipient owns in the bot's
-profile during its regular run. A scheduled, unclaimed occurrence at least one
+Each personal Scout checks the jobs its recipient owns in the bot's profile.
+It also checks central schedule records that name both this bot as responsible
+and this person as owner or WebUI creator. Central assignments contribute task
+names, status, failure counts and timestamps. Their prompts, errors and output
+files stay outside the Scout digest. A scheduled, unclaimed occurrence at least one
 hour overdue can surface before an error has been recorded. A third consecutive
 run failure escalates an existing incident. The missed slot or failure episode
 identifies the finding across checks. The collector drops obsolete unclassified

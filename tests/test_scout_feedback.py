@@ -154,3 +154,61 @@ def test_recovered_overdue_slot_does_not_return_from_unclassified(collector, mon
         assert not ledger.unclassified()
     finally:
         ledger.close()
+
+def test_central_job_health_requires_matching_recipient_and_responsible_bot(collector, monkeypatch, tmp_path, capsys):
+    root = tmp_path
+    home = root / "profiles" / "qa"
+    home.mkdir(parents=True)
+    ctx = {"root": root, "home": home, "profile": "qa", "self_job": "scout-job", "person": "qa@example.test",
+           "person_explicit": True, "ledger": home / "seen.db"}
+    monkeypatch.setattr(collector, "resolve_context", lambda: ctx)
+    monkeypatch.setattr(collector, "load_meta", lambda _: {"title": "QA", "scout": {"enabled": True}})
+    for source in ("collect_calendar", "collect_email"):
+        monkeypatch.setattr(collector, source, lambda *a: ("", []))
+    for source in ("collect_kanban", "collect_screen", "collect_chats"):
+        monkeypatch.setattr(collector, source, lambda *a, **kw: [])
+    monkeypatch.setattr(collector, "collect_memory", lambda *a: "")
+    now = collector._parse_iso("2026-11-15T09:05:00Z")
+    monkeypatch.setattr(collector.time, "time", lambda: now)
+    job = {"id": "repeat", "name": "Assigned report", "owner_email": ctx["person"], "assigned_bot": "qa",
+           "state": "scheduled", "schedule": {"kind": "cron"}, "next_run_at": "2026-11-15T08:00:00Z"}
+    jobs = [job, dict(job, id="other", name="Other recipient", owner_email="other@example.test"),
+            dict(job, id="unrelated", name="Other bot", assigned_bot="unrelated"),
+            dict(job, id="unassigned", name="Unassigned", assigned_bot=None),
+            dict(job, id="fail", name="Repeated task", last_status="error", failure_streak=3,
+                 last_error="Private error text", last_run_at="2026-11-15T08:55:00Z"),
+            dict(job, id="external", name="Other identity", owner_email="", origin={"platform":"external","user_id":ctx["person"]})]
+    store = root / "cron" / "jobs.json"
+    store.parent.mkdir()
+    store.write_text(json.dumps({"jobs": jobs}))
+    log = root / "cron" / "output" / job["id"] / "latest.md"
+    log.parent.mkdir(parents=True)
+    log.write_text("Private central output")
+    assert collector.run() == 0
+    digest = capsys.readouterr().out
+    assert "Assigned report" in digest and "Repeated task" in digest
+    for hidden in ("Other recipient", "Other bot", "Unassigned", "Private error", "Private central output", "Other identity"):
+        assert hidden not in digest
+    # A failed source read cannot clear the pending snapshot or repeat it as current.
+    output(home, "answer.md", "# Cron Job: Scout\n## Response\n\nReview ready.", now + 1)
+    now += 10
+    store.write_text("{")
+    assert collector.run() == 0
+    assert "Assigned report" not in capsys.readouterr().out
+    ledger = collector.scout_ledger.Ledger(ctx["ledger"])
+    try:
+        assert len(ledger.unclassified()) == 2
+    finally:
+        ledger.close()
+    # A successful read after reassignment should retire the old snapshot.
+    now += 10
+    for j in jobs:
+        j["assigned_bot"] = "another"
+    store.write_text(json.dumps({"jobs": jobs}))
+    assert collector.run() == 0
+    assert "Assigned report" not in capsys.readouterr().out
+    ledger = collector.scout_ledger.Ledger(ctx["ledger"])
+    try:
+        assert not ledger.unclassified()
+    finally:
+        ledger.close()
