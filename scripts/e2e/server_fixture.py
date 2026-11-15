@@ -98,14 +98,14 @@ def main():
         os.environ['SYNPULSE_REALTIME_VOICE_ENABLED'] = '1'
         os.environ['OPENAI_API_KEY'] = 'qa-realtime-local-only'
 
-    users = ['clionce', 'clideny', 'cliauto', 'grantapprove', 'grantdeny', 'grantmanual', 'grantharddeny', 'climcp', 'continuation', 'govrequest', 'resource', 'admin', 'alice', 'bob', 'outsider', 'denied', 'voicedenied', 'autoapprove', 'autodeny', 'automanual', 'manualapprove', 'manualdeny']
+    users = ['qafindmember', 'qafindadmin', 'qaengineer', 'qaoperator', 'clionce', 'clideny', 'cliauto', 'grantapprove', 'grantdeny', 'grantmanual', 'grantharddeny', 'climcp', 'continuation', 'govrequest', 'resource', 'admin', 'alice', 'bob', 'outsider', 'denied', 'voicedenied', 'autoapprove', 'autodeny', 'automanual', 'manualapprove', 'manualdeny']
     permissions = ['chat:use', 'sessions:read', 'sessions:write', 'profiles:read',
                    'files:read', 'files:write', 'cron:read', 'cron:write',
                    'skills:read', 'skills:write', 'workspaces:read', 'workspaces:write', 'memory:read', 'memory:write', 'integrations:read',
                    'integrations:connect', 'model:read', 'model:write', 'config:read']
     policy = {
         'version': 1, 'mode': 'enforce', 'default_effect': 'deny',
-        'bootstrap_admins': ['admin@example.test'],
+        'bootstrap_admins': ['admin@example.test', 'qafindadmin@example.test'],
         'roles': {'member': {'grants': {
             'permissions': permissions, 'profiles': ['default', 'qa-research'],
             'routes': ['*'], 'files': {'read_roots': [str(workspace)], 'write_roots': [str(workspace)]},
@@ -115,6 +115,9 @@ def main():
         }}},
         'users': {u + '@example.test': {'roles': ['member']} for u in users if u not in {'admin', 'denied'}},
     }
+    for name in ('engineer', 'operator'):
+        policy['roles'][name] = {'grants': {}}
+        policy['users']['qa' + name + '@example.test']['roles'].append(name)
     for who, mode, rules in [('autoapprove','automatic','QA_ALLOW_ONLY: approve synthetic access requests.'),('autodeny','automatic','QA_DENY_ONLY: reject synthetic access requests.'),('automanual','automatic','QA_MANUAL_ONLY: require a human review.'),('manualapprove','manual',''),('manualdeny','manual','')]:
         policy['users'][who+'@example.test'].update({'access_level':'user','access_mode':'blacklist','approval':{'mode':mode,'prompt':rules}})
     policy['users']['voicedenied@example.test']['deny'] = {'models': {'providers': ['openai']}}

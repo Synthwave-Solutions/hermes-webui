@@ -1,6 +1,21 @@
 // Locale bundle; loaded on demand by static/i18n.js.
 // Dutch (nl): plain B1-level Dutch for SynthPulse. Missing keys fall back to English.
 window.__registerHermesLocale('nl', {
+  skills_library_search: 'Zoeken',
+  skills_library_search_hint: 'Naam of beschrijving',
+  skills_library_heading: 'Skillsbibliotheek',
+  skills_library_category: 'Categorie',
+  skills_library_status: 'Status',
+  skills_library_all_category: 'Alle categorieën',
+  skills_library_all_status: 'Alle statussen',
+  skills_library_more: 'Meer skills tonen',
+  skills_library_back: 'Terug naar bibliotheek',
+  skills_library_count: '{0} van {1} skills',
+  skills_library_empty: 'Er zijn nog geen skills beschikbaar.',
+  skills_library_reset: 'Wis filters',
+  skills_library_owner: 'Toegevoegd door {0}',
+  skills_library_pending: 'Wacht op goedkeuring',
+  skills_library_general: 'Algemeen',
   "voice_workspace_task_waiting_count": "{0} wachten op toestemming",
   "voice_workspace_title": "Spraakgesprek",
   "voice_workspace_minimize": "Verkleinen",

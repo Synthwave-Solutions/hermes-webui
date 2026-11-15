@@ -677,7 +677,16 @@
   window.SPStudio = {
     openUseCase: async (id) => { St.backTab = St.tab === 'home' && _currentPanel === 'studio' ? 'home' : ''; St.tab = 'usecases'; if (typeof switchPanel === 'function') await switchPanel('studio'); await open(id); },
     setTab: (tab) => { St.tab = tab; St.doc = null; render(); },
-    load: async () => { bind(); loadScope(); await Promise.all([loadList(), loadCounts()]); render(); },
+    load: async () => {
+      bind(); loadScope();
+      const home = St.tab === 'home' && !St.doc && window.SPWorkplace;
+      if (home) renderList();
+      await Promise.all([loadList(), loadCounts()]);
+      if (_currentPanel !== 'studio') return;
+      if (home && St.tab === 'home' && !St.doc) {
+        window.SPWorkplace.updateSetup(setupHtml()); renderSide();
+      } else render();
+    },
     renderSide: async () => { if (St.list === null) await Promise.all([loadList(), loadCounts()]); renderSide(); },
     refreshCounts: async () => { await loadCounts(); renderSide(); },
     newForTeam: async (team) => { St.presetTeam = team || ''; St.doc = null; if (typeof switchPanel === 'function') await switchPanel('studio'); bind(); try { St.doc = await post('/api/studio/usecase', { team: St.presetTeam }); St.presetTeam = ''; } catch (e) { toast(errMsg(e)); } render(); }

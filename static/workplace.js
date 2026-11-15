@@ -340,6 +340,10 @@
       <button type="button" class="sm-btn" data-finding-chat>${H(w('findings_chat'))}</button></div></article>`;
   }
 
+  function findingsSection() {
+    return allowed('chat') ? '<section class="wp-card wp-findings" aria-labelledby="wpFindingsTitle" data-wp-findings>'+findingsHtml()+'</section>' : '';
+  }
+
   function findingsHtml() {
     let content;
     if (findingsFailed) content = `<div class="wp-findings-note" role="status">${H(w('failed'))} <button class="om-link" type="button" data-finding-retry>${H(w('retry'))}</button></div>`;
@@ -427,8 +431,8 @@
     else if (group === 'person') main = `<div class="wp-stack">${personView(c, rows, lens)}</div>`;
     else main = `<div class="wp-grid">${KINDS.filter(k => n[k]).map(k => kindCard(c, k, rows.filter(it => it.kind === k), 'k:' + lens + ':' + k, { team: lens !== 'mine' && k !== 'bot', owner: lens !== 'mine' })).join('')}</div>`;
     body.innerHTML = `<div class="wp" data-tour="studio-home">${heroHtml(c)}
-      ${allowed('chat') ? '<section class="wp-card wp-findings" aria-labelledby="wpFindingsTitle" data-wp-findings>'+findingsHtml()+'</section>' : ''}
-      ${Wp.setup}
+      ${findingsSection()}
+      <div data-wp-setup>${Wp.setup}</div>
       <div class="wp-bar">${barHtml(c, 'home', Wp.data, lens)}${groupSeg}</div>
       <div class="wp-kpis">${KINDS.filter(k => k === 'task' ? allowed('tasks') : k !== 'bot' || allowed('profiles')).map(k => `<button type="button" class="wp-kpi ${n[k] ? '' : 'zero'}" title="${H(w('kpi_hint', { k: w('k_' + k) }))}" data-wp-go="${k}"${k === 'usecase' ? ' data-tour="studio-usecases"' : ''}><span class="wp-kpi-label"><span class="wp-kind-dot k-${k}" aria-hidden="true"></span>${H(short(k))}</span><span class="wp-kpi-value">${n[k]}</span></button>`).join('')}</div>
       ${shortcuts()}
@@ -447,9 +451,9 @@
       body.dataset.wpBound = '1';
       body.addEventListener('click', onClick);
     }
-    if (ctxCache && Wp.data) paint(true); else body.innerHTML = `<div class="wp"><div class="wp-skeleton" aria-busy="true" aria-label="${H(w('loading'))}"><span></span><span></span><span></span></div></div>`;
+    if (ctxCache && Wp.data) paint(true); else body.innerHTML = `<div class="wp">${findingsSection()}<div class="wp-skeleton" aria-busy="true" aria-label="${H(w('loading'))}"><span></span><span></span><span></span></div></div>`;
     try { const c = await loadCtx(Date.now() - Wp.at > 30000); await loadData(c); }
-    catch (_e) { if (token === Wp.token && body.isConnected && body.firstElementChild && body.firstElementChild.classList.contains('wp')) body.innerHTML = `<div class="om-empty wp-failed"><h3>${H(w('failed'))}</h3><div class="om-actions"><button type="button" class="sm-btn" data-wp-retry>${H(w('retry'))}</button></div></div>`; return; }
+    catch (_e) { if (token === Wp.token && body.isConnected && body.firstElementChild && body.firstElementChild.classList.contains('wp')) body.innerHTML = `<div class="wp">${findingsSection()}<div class="om-empty wp-failed"><h3>${H(w('failed'))}</h3><div class="om-actions"><button type="button" class="sm-btn" data-wp-retry>${H(w('retry'))}</button></div></div></div>`; return; }
     if (token === Wp.token) {
       paint();
       if (!fetchOnEntry && allowed('chat')) void loadFindings(token);
@@ -531,5 +535,10 @@
   }
   document.addEventListener('sp-lens-change', ev => { if (ev.detail && ev.detail.surface === 'home') paint(); });
 
-  window.SPWorkplace = { render, refreshRecent, title: () => w('title'), invalidate: () => { Wp.at = 0; ctxAt = 0; } };
+  function updateSetup(html) {
+    Wp.setup = html;
+    const setup = Wp.body?.querySelector('[data-wp-setup]');
+    if (setup) setup.innerHTML = html;
+  }
+  window.SPWorkplace = { render, updateSetup, refreshRecent, title: () => w('title'), invalidate: () => { Wp.at = 0; ctxAt = 0; } };
 })();

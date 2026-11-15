@@ -20,7 +20,9 @@ test.describe('role workspace', () => {
     await page.locator('#btnHamburger').click();
     await expect(page.locator('.sidebar-nav [data-panel="governance"]')).toBeHidden();
     await page.locator('.sidebar-nav [data-panel="profiles"]').click();
-    await expect(page.locator('#profilesPanel')).toBeVisible();
+    await expect(page.locator('#botDirectory')).toBeVisible();
+    await expect(page.locator('.sidebar')).not.toHaveClass(/mobile-open/);
+    await page.locator('#btnHamburger').click();
     await page.locator('.sidebar-nav [data-panel="chat"]').click();
     await expect(page.locator('#conversationBoardSearch')).toBeVisible();
     await page.locator('#conversationBoardBack').click();

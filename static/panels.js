@@ -388,7 +388,7 @@ async function switchPanel(name, opts = {}) {
   // clicking any panel while collapsed expands first. Programmatic switches
   // (no opts.fromRailClick) are unaffected so legacy callers preserve
   // behaviour exactly.
-  if (opts.fromRailClick && typeof _isSidebarCollapsed === 'function'
+  if (opts.fromRailClick && !['modules','apps','msp'].includes(nextPanel) && typeof _isSidebarCollapsed === 'function'
       && typeof _isDesktopWidth === 'function' && _isDesktopWidth()) {
     if (_isSidebarCollapsed()) {
       // Expand first, then continue to the normal panel switch below so
@@ -463,7 +463,7 @@ async function switchPanel(name, opts = {}) {
   }
   if (opts.fromRailClick && typeof _isDesktopWidth === 'function' && !_isDesktopWidth()) {
     const sidebar = document.querySelector('.sidebar');
-    if (['chat', 'conversations', 'governance', 'integrations', 'approvals', 'modules', 'apps', 'msp'].includes(nextPanel)) {
+    if (['chat', 'conversations', 'studio', 'skills', 'profiles', 'tasks', 'projects', 'insights', 'governance', 'integrations', 'approvals', 'modules', 'apps', 'msp'].includes(nextPanel)) {
       _closeMobileSidebarAfterPanelSelection();
     } else if (sidebar) {
       sidebar.classList.remove('mobile-session-page');
@@ -6098,18 +6098,27 @@ async function clearConversation() {
 }
 
 // ── Skills panel ──
+let skillListGeneration = 0;
 async function loadSkills() {
+  const generation = ++skillListGeneration;
   if (_skillsData) { renderSkills(_skillsData); return; }
   const box = $('skillsList');
   try {
     const data = await api('/api/skills');
+    if (generation !== skillListGeneration) return;
     _skillsData = data.skills || [];
     // Prune collapsed state to only keep categories present in fresh data,
     // avoiding stale keys when categories are renamed or removed server-side.
     const liveCats = new Set(_skillsData.map(s => s.category || '(general)'));
     for (const c of _collapsedCats) { if (!liveCats.has(c)) _collapsedCats.delete(c); }
     renderSkills(_skillsData);
-  } catch(e) { box.innerHTML = `<div style="padding:12px;color:var(--accent);font-size:12px">Error: ${esc(e.message)}</div>`; }
+  } catch(e) {
+    if (generation !== skillListGeneration) return;
+    box.textContent = e.message;
+    $('librarySkillCount').textContent = t('skill_load_failed') + e.message;
+    $('librarySkillGrid').innerHTML = '<button type="button" class="sm-btn" onclick="loadSkills()">'+esc(t('steer_recovery_retry'))+'</button>';
+    $('libraryMoreSkills').hidden = true;
+  }
 }
 
 let _collapsedCats = new Set(); // persisted collapsed state across re-renders
@@ -6123,6 +6132,7 @@ function _toggleCatCollapse(cat) {
     if (header && header.dataset.cat === cat) {
       const collapsed = _collapsedCats.has(cat);
       sec.classList.toggle('collapsed', collapsed);
+      header.setAttribute('aria-expanded', String(!collapsed));
       header.querySelector('.cat-chevron').style.transform = collapsed ? '' : 'rotate(90deg)';
       sec.querySelectorAll('.skill-item').forEach(el => el.style.display = collapsed ? 'none' : '');
     }
@@ -6130,19 +6140,21 @@ function _toggleCatCollapse(cat) {
 }
 
 function renderSkills(skills) {
-  const query = ($('skillsSearch').value || '').toLowerCase();
-  const filtered = query ? skills.filter(s =>
-    (s.name||'').toLowerCase().includes(query) ||
-    (s.description||'').toLowerCase().includes(query) ||
-    (s.category||'').toLowerCase().includes(query)
-  ) : skills;
-  // Group by category
-  const cats = {};
-  for (const s of filtered) {
-    const cat = s.category || '(general)';
-    if (!cats[cat]) cats[cat] = [];
-    cats[cat].push(s);
+  const category = $('librarySkillCategory'), status = $('librarySkillStatus').value;
+  const selected = category.value;
+  const categories = [...new Set(skills.map(skill => skill.category || '(general)'))].sort((a,b)=>a.localeCompare(b));
+  if (category.options.length !== categories.length + 1 || categories.some((c,i)=>category.options[i+1]?.value !== c)) {
+    category.replaceChildren(new Option(t('skills_library_all_category'), ''));
+    for (const c of categories) category.add(new Option(c === '(general)' ? t('skills_library_general') : c, c));
+    category.value = categories.includes(selected) ? selected : '';
   }
+  const query = $('skillsSearch').value.trim().toLocaleLowerCase();
+  const filtered = skills.filter(skill => (!category.value || (skill.category || '(general)') === category.value)
+    && (!status || !!skill.disabled === (status === 'off'))
+    && (!query || [skill.name,skill.description,skill.category].some(value=>String(value||'').toLocaleLowerCase().includes(query))));
+  const cats = Object.create(null);
+  for (const skill of filtered) (cats[skill.category || '(general)'] ||= []).push(skill);
+  renderLibrarySkills(skills, filtered);
   const box = $('skillsList');
   box.innerHTML = '';
   if (!filtered.length) { box.innerHTML = `<div style="padding:12px;color:var(--muted);font-size:12px">${esc(t('skills_no_match'))}</div>`; return; }
@@ -6150,10 +6162,12 @@ function renderSkills(skills) {
     const collapsed = _collapsedCats.has(cat);
     const sec = document.createElement('div');
     sec.className = 'skills-category' + (collapsed ? ' collapsed' : '');
-    const hdr = document.createElement('div');
+    const hdr = document.createElement('button');
+    hdr.type = 'button';
+    hdr.setAttribute('aria-expanded',String(!collapsed));
     hdr.className = 'skills-cat-header';
     hdr.dataset.cat = cat;
-    hdr.innerHTML = `<span class="cat-chevron" style="display:inline-flex;transition:transform .15s;${collapsed ? '' : 'transform:rotate(90deg)'}">${li('chevron-right',12)}</span> ${esc(cat)} <span style="opacity:.5">(${items.length})</span>`;
+    hdr.innerHTML = `<span class="cat-chevron" style="display:inline-flex;transition:transform .15s;${collapsed ? '' : 'transform:rotate(90deg)'}">${li('chevron-right',12)}</span> ${esc(cat === '(general)' ? t('skills_library_general') : cat)} <span style="opacity:.5">(${items.length})</span>`;
     hdr.onclick = () => _toggleCatCollapse(cat);
     sec.appendChild(hdr);
     for (const skill of items.sort((a,b) => a.name.localeCompare(b.name))) {
@@ -6161,14 +6175,19 @@ function renderSkills(skills) {
       el.className = 'skill-item' + (skill.disabled ? ' disabled' : '');
       el.style.display = collapsed ? 'none' : '';
       const isDisabled = skill.disabled || false;
-      const toggle = document.createElement('span');
+      const toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.disabled = !_canUseFeature('skills:write');
+      toggle.setAttribute('aria-label',skill.name + ' · ' + t(isDisabled ? 'skill_disabled' : 'skill_enabled'));
+      toggle.setAttribute('aria-pressed',String(!isDisabled));
       toggle.className = 'skill-toggle' + (isDisabled ? '' : ' enabled');
       toggle.title = isDisabled ? t('skill_disabled') : t('skill_enabled');
       toggle.addEventListener('click', (ev) => {
         ev.stopPropagation();
         toggleSkill(skill.name, !isDisabled);
       });
-      const nameEl = document.createElement('span');
+      const nameEl = document.createElement('button');
+      nameEl.type = 'button';
       nameEl.className = 'skill-name';
       nameEl.textContent = skill.name;
       const descEl = document.createElement('span');
@@ -6180,14 +6199,14 @@ function renderSkills(skills) {
       if (skill.added_by) {
         const ownerBadge = document.createElement('span');
         ownerBadge.className = 'skill-badge skill-badge-owner';
-        ownerBadge.textContent = 'added by ' + skill.added_by;
-        ownerBadge.title = 'added by ' + skill.added_by;
+        ownerBadge.textContent = t('skills_library_owner',skill.added_by);
+        ownerBadge.title = ownerBadge.textContent;
         el.appendChild(ownerBadge);
       }
       if (skill.approval_status === 'pending') {
         const pendingBadge = document.createElement('span');
         pendingBadge.className = 'skill-badge skill-badge-pending';
-        pendingBadge.textContent = 'pending approval';
+        pendingBadge.textContent = t('skills_library_pending');
         el.appendChild(pendingBadge);
       }
       el.appendChild(descEl);
@@ -6198,8 +6217,57 @@ function renderSkills(skills) {
   }
 }
 
-function filterSkills() {
+let libraryLimit = 24, skillReadGeneration = 0;
+function filterSkills(input) {
+  if (input) {
+    $('skillsSearch').value = input.value;
+    $('librarySkillQuery').value = input.value;
+  }
+  libraryLimit = 24;
   if (_skillsData) renderSkills(_skillsData);
+}
+
+function moreLibrarySkills() {
+  const previous = libraryLimit;
+  libraryLimit += 24;
+  renderSkills(_skillsData || []);
+  $('librarySkillGrid').querySelectorAll('.library-skill')[previous]?.focus();
+}
+
+function clearSkillFilters() {
+  $('librarySkillCategory').value = '';
+  $('librarySkillStatus').value = '';
+  $('librarySkillQuery').value = '';
+  filterSkills($('librarySkillQuery'));
+  $('librarySkillQuery').focus();
+}
+
+function renderLibrarySkills(skills, filtered) {
+  const grid = $('librarySkillGrid');
+  placeSkillCreateButton(_skillMode);
+  $('librarySkillCount').textContent = t('skills_library_count',Math.min(libraryLimit,filtered.length),filtered.length);
+  $('libraryMoreSkills').hidden = filtered.length <= libraryLimit;
+  if (!filtered.length) {
+    grid.innerHTML = '<div class="skill-library-message"><p>'+esc(t(skills.length ? 'skills_no_match' : 'skills_library_empty'))+'</p>'+
+      (skills.length ? '<button type="button" class="sm-btn" onclick="clearSkillFilters()">'+esc(t('skills_library_reset'))+'</button>' : '')+'</div>';
+    return;
+  }
+  const items = [...filtered].sort((a,b)=>a.name.localeCompare(b.name)).slice(0,libraryLimit);
+  grid.innerHTML = items.map(skill => `<button type="button" class="library-skill" data-library-skill="${esc(skill.name)}">
+    <span class="library-skill-meta"><span>${esc(skill.category || t('skills_library_general'))}</span><span class="library-skill-state" data-enabled="${!skill.disabled}">${esc(t(skill.disabled ? 'skill_disabled' : 'skill_enabled'))}</span></span>
+    <strong>${esc(skill.name)}</strong>${skill.description ? '<span class="library-skill-desc">'+esc(skill.description)+'</span>' : ''}
+    ${skill.approval_status === 'pending' ? '<span class="skill-badge skill-badge-pending">'+esc(t('skills_library_pending'))+'</span>' : ''}</button>`).join('');
+  grid.onclick = event => {
+    const button = event.target.closest('[data-library-skill]');
+    if (button) openSkill(button.dataset.librarySkill);
+  };
+}
+
+function showSkillLibrary() {
+  ++skillReadGeneration;
+  _currentSkillDetail = null; _skillPreFormDetail = null;
+  cancelSkillForm();
+  $('librarySkillQuery')?.focus();
 }
 
 
@@ -6302,10 +6370,19 @@ function _renderSkillError(name, message) {
   if (empty) empty.style.display = 'none';
   _currentSkillDetail = null;
   _skillMode = 'empty';
-  _setSkillHeaderButtons('empty');
+  _setSkillHeaderButtons('error');
+}
+
+function placeSkillCreateButton(mode) {
+  const button = $('btnNewSkill');
+  if (!button) return;
+  const library = mode === 'empty', slot = library ? $('librarySkillCreateSlot') : document.querySelector('#panelSkills .panel-head-actions');
+  if (slot && button.parentElement !== slot) slot.appendChild(button);
+  button.hidden = !_canUseFeature('skills:write') || mode === 'edit' || mode === 'create';
 }
 
 function _setSkillHeaderButtons(mode) {
+  placeSkillCreateButton(mode);
 
   const header = $('mainSkills') && $('mainSkills').querySelector('.main-view-header');  const editBtn = $('btnEditSkillDetail');
   const delBtn = $('btnDeleteSkillDetail');
@@ -6313,12 +6390,15 @@ function _setSkillHeaderButtons(mode) {
   const saveBtn = $('btnSaveSkillDetail');
   const show = b => b && (b.style.display = '');
   const hide = b => b && (b.style.display = 'none');
-  if (mode === 'read') { if (header) header.style.display = 'flex';  show(editBtn); show(delBtn); hide(cancelBtn); hide(saveBtn); }
+  if ($('skillLibraryBack')) $('skillLibraryBack').hidden = mode !== 'read' && mode !== 'error';
+  if (mode === 'error') { if (header) header.style.display = 'flex'; hide(editBtn); hide(delBtn); hide(cancelBtn); hide(saveBtn); }
+  else if (mode === 'read') { if (header) header.style.display = 'flex'; const writable = _canUseFeature('skills:write'); (writable ? show : hide)(editBtn); (writable ? show : hide)(delBtn); hide(cancelBtn); hide(saveBtn); }
   else if (mode === 'create' || mode === 'edit') { if (header) header.style.display = 'flex'; hide(editBtn); hide(delBtn); show(cancelBtn); show(saveBtn); }
   else { if (header) header.style.display = 'none';  hide(editBtn); hide(delBtn); hide(cancelBtn); hide(saveBtn); }
 }
 
 async function openSkill(name, el) {
+  const generation = ++skillReadGeneration;
   // Highlight active skill in the sidebar list
   document.querySelectorAll('.skill-item').forEach(e => e.classList.remove('active'));
   if (el) el.classList.add('active');
@@ -6326,6 +6406,7 @@ async function openSkill(name, el) {
   _editingSkillName = null;
   try {
     const data = await api(`/api/skills/content?name=${encodeURIComponent(name)}`);
+    if (generation !== skillReadGeneration || _currentPanel !== 'skills') return;
     if (data && (data.success === false || data.error)) {
       const message = data.error || t('skill_load_failed');
       _renderSkillError(name, message);
@@ -6335,12 +6416,14 @@ async function openSkill(name, el) {
     _currentSkillDetail = { name, content: data.content || '', linked_files: data.linked_files || {} };
     _renderSkillDetail(name, data.content || '', data.linked_files || {});
     _closeMobileSidebarAfterPanelSelection();
-  } catch(e) { setStatus(t('skill_load_failed') + e.message); }
+  } catch(e) { if (generation === skillReadGeneration && _currentPanel === 'skills') _renderSkillError(name,e.message); }
 }
 
 async function openSkillFile(skillName, filePath) {
+  const generation = ++skillReadGeneration;
   try {
     const data = await api(`/api/skills/content?name=${encodeURIComponent(skillName)}&file=${encodeURIComponent(filePath)}`);
+    if (generation !== skillReadGeneration || _currentPanel !== 'skills') return;
     if (data && data.error) {
       _renderSkillError(skillName, data.error);
       setStatus(t('skill_file_load_failed') + data.error);
@@ -6379,6 +6462,7 @@ async function openSkillFile(skillName, filePath) {
 }
 
 function editCurrentSkill() {
+  ++skillReadGeneration;
   if (!_currentSkillDetail) return;
   const s = _currentSkillDetail;
   let category = '';
@@ -6393,11 +6477,13 @@ function editCurrentSkill() {
 }
 
 function openSkillCreate() {
+  ++skillReadGeneration;
   if (typeof switchPanel === 'function' && _currentPanel !== 'skills') switchPanel('skills');
   _skillPreFormDetail = _currentSkillDetail ? { ..._currentSkillDetail } : null;
   _editingSkillName = null;
   _skillMode = 'create';
   _renderSkillForm({ name: '', category: '', content: '', isEdit: false });
+  _closeMobileSidebarAfterPanelSelection();
 }
 
 function _renderSkillForm({ name, category, content, isEdit }) {
@@ -9322,6 +9408,13 @@ async function switchToProfile(name) {
     if(typeof _clearPersistedModelState==='function') _clearPersistedModelState();
     else localStorage.removeItem('hermes-webui-model');
     _skillsData = null;
+    ++skillReadGeneration; ++skillListGeneration;
+    _currentSkillDetail = null; _skillPreFormDetail = null;
+    cancelSkillForm();
+    libraryLimit = 24;
+    $('skillsSearch').value = ''; $('librarySkillQuery').value = '';
+    $('librarySkillCategory').replaceChildren(); $('librarySkillStatus').value = '';
+    $('librarySkillGrid').replaceChildren(); $('librarySkillCount').textContent = t('loading');
     if (data.default_model) window._defaultModel = data.default_model;
     if (data.default_model_provider) window._activeProvider = data.default_model_provider;
 

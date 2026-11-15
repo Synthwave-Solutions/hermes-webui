@@ -283,10 +283,18 @@ protects the delegation listing; authority records are never included in it.
 
 ### Workspace overview, projects and schedule
 
+The Skills library opens on a searchable catalogue. Search by name or description,
+filter by category and enabled status, then open a card. Back to library retains
+the filters. Category sections in the sidebar can be toggled with the keyboard.
+On small screens, choosing a dashboard from the navigation opens its main view.
+The menu still provides the secondary list. The desktop Apps, Modules and
+Support pages use the space beside the primary navigation for their catalogues.
+
 Immediately below the greeting, **Findings for you** shows the three most recent
 personal updates delivered by bots. Read the full update in place, reveal up to
 twelve recent updates, or discuss a specific one in its original bot conversation.
 Discussing it attaches a removable quote and leaves the message for you to send.
+Personal reports can appear while other workspace lists are still loading.
 Team and organisation filters apply to the work lists below this personal feed.
 
 Opening SynthPulse in the browser or as an installed app starts on the Studio

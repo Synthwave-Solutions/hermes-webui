@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 const file = path.resolve(process.env.QA_SESSIONS || '../e2e-state/browser-sessions.json');
 export const auth = JSON.parse(fs.readFileSync(file, 'utf8'));
-export type User = 'clionce' | 'clideny' | 'cliauto' | 'grantapprove' | 'grantdeny' | 'grantmanual' | 'grantharddeny' | 'climcp' | 'continuation' | 'govrequest' | 'resource' | 'admin' | 'alice' | 'bob' | 'outsider' | 'denied' | 'voicedenied' | 'autoapprove' | 'autodeny' | 'automanual' | 'manualapprove' | 'manualdeny';
+export type User = 'qafindmember' | 'qafindadmin' | 'qaengineer' | 'qaoperator' | 'clionce' | 'clideny' | 'cliauto' | 'grantapprove' | 'grantdeny' | 'grantmanual' | 'grantharddeny' | 'climcp' | 'continuation' | 'govrequest' | 'resource' | 'admin' | 'alice' | 'bob' | 'outsider' | 'denied' | 'voicedenied' | 'autoapprove' | 'autodeny' | 'automanual' | 'manualapprove' | 'manualdeny';
 export const test = base.extend<{ user: User; errors: string[] }>({
   user: ['admin', { option: true }],
   errors: [async ({ page }, use, info) => {
