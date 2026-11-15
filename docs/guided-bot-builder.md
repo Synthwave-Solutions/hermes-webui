@@ -5,6 +5,7 @@ An optional profile loads editable bot configuration. `POST /api/bots/builder`
 validates instructions, skill names, selected shared MCP definitions, declared CLI
 commands, model defaults, and allowed users/groups before publishing a new
 profile directory. Creation omits revision; edits require the returned revision.
+An unrelated edit preserves an unchanged, installed skill when its shared catalogue entry moves and the owner still holds the skill grant. Changed skill selections use the current catalogue.
 Invalid selections or images never expose a partially created bot.
 
 Creation requires profiles:admin and active governance. New bots are private to

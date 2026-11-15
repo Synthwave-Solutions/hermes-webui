@@ -376,3 +376,21 @@ def test_appearance_cannot_publish_stale_acl_during_bot_edit(setup, monkeypatch)
     assert result['bot_memory'] == 'New shared notes'
     assert builder.allowed(BOB, 'research-bot') is False
     assert bot_metadata.read_profile('research-bot')['bot']['color'] == '#123456'
+
+def test_preserve_installed_skills_after_catalog_move_without_granting_new_ones(setup, monkeypatch):
+    cfg = builder.save(ADMIN, payload())["config"]
+    bot_file = setup / "profiles/research-bot/skills/research/SKILL.md"
+    before = bot_file.stat().st_ino
+    (setup / "skills/research").rename(setup / "skills/archived-research")
+    body = {k:v for k,v in cfg.items() if k != "avatar_url"}
+    body["mcp_servers"] = []
+    saved = builder.save(ADMIN, body)["config"]
+    assert saved["mcp_servers"] == [] and saved["skills"] == ["research"]
+    assert bot_file.stat().st_ino == before
+    with pytest.raises(PermissionError, match="Unavailable selection in skills"):
+        builder.save(ADMIN, dict(body,revision=saved["revision"],skills=["research","injected"]))
+    # Revoking a grant must also prevent retention through this path.
+    allowed = builder._selected_allowed
+    monkeypatch.setattr(builder, "_selected_allowed", lambda choices, name: name != "research" and allowed(choices, name))
+    with pytest.raises(PermissionError, match="Unavailable selection in skills"):
+        builder.save(ADMIN, dict(body, revision=saved["revision"]))
