@@ -8297,6 +8297,7 @@ let _botScoutTopics=[];
 let _botScoutSelected={bot:'',person:''};
 const _botScoutViews=new WeakMap();
 const _BOT_SCOUT_MAX=12,_BOT_SCOUT_TOPIC_MAX=80,_BOT_SCOUT_PROMPT_MAX=2000,_BOT_SCOUT_SPACES_MAX=6;
+const _BOT_SCOUT_TEMPLATES=['agenda','tasks','research','technical'];
 function _scoutFrequencyOptions(value, inherit=false){
   return [...(inherit?['']:[]),'hourly','3h','6h','12h','daily','weekdays'].map(v=>`<option value="${v}" ${v===value?'selected':''}>${esc(t('bot_scout_frequency_'+(v||'inherit')))}</option>`).join('');
 }
@@ -8352,7 +8353,7 @@ function _botScoutCardHtml(p){
       ${editable?`<details class="bot-scout-people" id="botScoutPeople"><summary><span><small>${esc(t('bot_scout_person'))}</small><strong>${esc(label)}</strong></span><span>${esc(t('bot_scout_choose_person'))}</span></summary><div class="bot-scout-directory"><label for="botScoutSearch">${esc(t('bot_scout_search_people'))}</label><input type="search" id="botScoutSearch" value="${esc(view.query)}" oninput="filterBotScoutPeople(this.value)"><p class="bot-field-hint">${esc(t('bot_scout_people_access'))}</p><div class="bot-scout-person-list" role="group" aria-label="${esc(t('bot_scout_person'))}">${rows}</div><p id="botScoutNoPeople" class="bot-field-hint" hidden>${esc(t('bot_scout_no_people'))}</p>${!p.scout_people_options?`<button type="button" class="sm-btn" onclick="loadBotScoutPeople()">${esc(t('bot_scout_load_people'))}</button>`:''}<p class="bot-scout-error" role="alert">${esc(view.peopleError||'')}</p></div></details>`:''}
       <div class="bot-scout-head"><div><h3 id="botScoutTitle">${esc(person?t('bot_scout_for_person').replace('{person}',label):t('bot_scout_me'))}</h3><p class="bot-field-hint">${esc(p.bot?.title||p.name)}${editable?' · '+esc(p.scout_people_count===1?t('bot_scout_people_one'):t('bot_scout_people_count').replace('{n}',String(p.scout_people_count||0))):''}</p></div><span class="bot-scout-state ${me.enabled?'is-on':''}">${esc(t(me.enabled?'bot_scout_saved_on':'bot_scout_saved_off'))}</span></div>
       <div class="bot-scout-field"><label for="botScoutPrompt">${esc(t('bot_scout_prepare'))}</label><p class="bot-field-hint">${esc(t('bot_scout_prepare_hint'))}</p>
-        <div class="bot-scout-presets" role="group" aria-label="${esc(t('bot_scout_starters'))}">${['agenda','tasks','research'].map(key=>`<button type="button" class="sm-btn" data-scout-template="${key}" onclick="applyBotScoutTemplate(this.dataset.scoutTemplate)">${esc(t('bot_scout_template_'+key))}</button>`).join('')}</div>
+        <div class="bot-scout-presets" role="group" aria-label="${esc(t('bot_scout_starters'))}">${_BOT_SCOUT_TEMPLATES.map(key=>`<button type="button" class="sm-btn" data-scout-template="${key}" onclick="applyBotScoutTemplate(this.dataset.scoutTemplate)">${esc(t('bot_scout_template_'+key))}</button>`).join('')}</div>
         <textarea id="botScoutPrompt" rows="4" maxlength="${_BOT_SCOUT_PROMPT_MAX}" placeholder="${esc(t('bot_scout_my_prompt_placeholder'))}" oninput="updateBotScoutPreview()">${esc(draft.prompt)}</textarea>
       </div>
       <div class="bot-scout-schedule"><label for="botScoutFrequency">${esc(t('bot_scout_frequency'))}<select id="botScoutFrequency" onchange="updateBotScoutPreview()">${_scoutFrequencyOptions(draft.frequency,true)}</select></label><label for="botScoutTime">${esc(t('bot_scout_run_time'))}<input type="time" id="botScoutTime" step="60" required value="${esc(draft.inherit_time?botTime:draft.digest_time)}" ${draft.inherit_time?'disabled':''} oninput="updateBotScoutPreview()"></label></div>
@@ -8407,7 +8408,7 @@ function updateBotScoutPreview(){
   $('botScoutPreview').textContent=_botScoutSchedule(draft.frequency||scout.frequency||'daily',draft.inherit_time?(scout.digest_time||'07:30'):draft.digest_time)+' · '+t('bot_scout_timezone_hint');
 }
 function applyBotScoutTemplate(key){
-  if(!['agenda','tasks','research'].includes(key)||_botScoutIsBusy())return;
+  if(!_BOT_SCOUT_TEMPLATES.includes(key)||_botScoutIsBusy())return;
   const input=$('botScoutPrompt');if(!input)return;
   const addition=t('bot_scout_template_'+key+'_prompt'),current=input.value.trim();
   if(current.includes(addition))return;

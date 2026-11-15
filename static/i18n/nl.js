@@ -184,6 +184,8 @@ window.__registerHermesLocale('nl', {
   "bot_scout_template_agenda": "Dag voorbereiden",
   "bot_scout_template_tasks": "Taken opvolgen",
   "bot_scout_template_research": "Kansen onderzoeken",
+  "bot_scout_template_technical": "Technische gezondheid",
+  "bot_scout_template_technical_prompt": "Volg de betrouwbaarheid van mijn geplande taken. Gebruik de planning en beschikbare uitvoer van deze bot om achterstallige runs en terugkerende fouten te duiden. Noem de taak, het geplande tijdstip of het aantal fouten en welke controle nu zinvol is. Benoem de gevolgen alleen als de bron ze bevestigt. Controleer bij de platformen die ik aantoonbaar gebruik ook officiële berichten over uitfaseringen en vereiste upgrades. Geef de brondatum, eventuele deadline en één concrete vervolgstap.",
   "bot_scout_template_agenda_prompt": "Kijk twee dagen vooruit in mijn agenda. Gebruik beschikbare e-mail, taken en recente gesprekken om afspraken voor te bereiden, ontbrekende informatie te signaleren en concrete vervolgstappen voor te stellen. Maak nuttige briefings of concepten; verstuur niets.",
   "bot_scout_template_tasks_prompt": "Bekijk mijn open taken, toezeggingen en opvolging via de beschikbare bronnen. Signaleer naderende deadlines en blokkades, onderzoek wat nodig is en bereid een nuttige vervolgstap of een concept voor ter beoordeling.",
   "bot_scout_template_research_prompt": "Verbind mijn recente werk en open vragen aan relevante ontwikkelingen. Onderzoek nuttige kansen grondig, controleer bronnen en stel concreet werk voor dat deze bot kan oppakken. Leg uit waarom het voor mij relevant is; vermijd algemeen nieuws.",

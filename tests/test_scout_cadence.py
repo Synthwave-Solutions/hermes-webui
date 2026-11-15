@@ -185,3 +185,47 @@ def test_other_bot_context_stays_owned_and_attributed(collector,monkeypatch,tmp_
     result=collector.collect_chats(ctx,led,now,context=True)
     assert len(result)==1 and result[0]['profile']=='other' and 'Chat met other' in result[0]['title']
     assert collector.collect_chats(ctx,led,now)==[]
+
+def test_personal_overdue_recurring_job_uses_a_stable_missed_slot(collector, tmp_path, monkeypatch):
+    ctx = {"home": tmp_path, "person": "owner@example.test", "self_job": "scout"}
+    base = {"id": "report", "state": "scheduled", "schedule": {"kind": "cron"},
+            "owner_email": ctx["person"], "next_run_at": "2026-11-15T09:00:00+00:00"}
+    slot = collector._parse_iso(base["next_run_at"])
+    def signals(now, **changes):
+        monkeypatch.setattr(collector, "load_jobs", lambda _: [dict(base, **changes)])
+        monkeypatch.setattr(collector.time, "time", lambda: now)
+        return [i for i in collector.collect_jobs(ctx, 0) if i["source"] == "person_job_overdue"]
+    assert not signals(slot + 3599)
+    signal, = signals(slot + 3600)
+    assert signals(slot + 7200)[0]["id_or_url"] == signal["id_or_url"]
+    assert "09:00" in signal["summary"]
+    for change in ({"state": "paused"}, {"enabled": False}, {"fire_claim": {"at": "now"}},
+                   {"owner_email": "another@example.test"}, {"managed_by": "scout"},
+                   {"last_run_at": base["next_run_at"]}, {"last_run_at": "unknown"}, {"next_run_at": "unknown"},
+                   {"schedule": {"kind": "once"}}, {"last_status": "error"}):
+        assert not signals(slot + 7200, **change)
+
+
+def test_personal_failure_escalates_once_per_incident(collector, tmp_path, monkeypatch):
+    ctx = {"home": tmp_path, "person": "owner@example.test", "self_job": "scout"}
+    job = {"id": "report", "owner_email": ctx["person"], "last_status": "error",
+           "last_run_at": "2026-11-15T09:00:00Z", "failure_streak": 1}
+    monkeypatch.setattr(collector, "load_jobs", lambda _: [job])
+    ledger = collector.scout_ledger.Ledger(tmp_path / "ledger.db")
+    try:
+        def read():
+            return collector.collect_jobs(ctx, 0, ledger)
+        assert read()[0]["source"] == "person_job_failure"
+        job.update(failure_streak=3)
+        escalation, = read()
+        assert escalation["source"] == "person_job_repeated_failure"
+        job.update(failure_streak=4, last_error="different error")
+        assert read()[0]["id_or_url"] == escalation["id_or_url"]
+        job.update(last_status="ok", failure_streak=0)
+        assert not read()
+        job.update(last_status="error", failure_streak=3, last_run_at="2026-11-16T09:00:00Z")
+        assert read()[0]["id_or_url"] != escalation["id_or_url"]
+        job.update(owner_email="another@example.test")
+        assert read()[0]["source"] == "job_failure"
+    finally:
+        ledger.close()

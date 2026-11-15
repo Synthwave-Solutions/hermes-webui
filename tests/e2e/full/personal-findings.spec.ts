@@ -35,8 +35,9 @@ test('PERSONAL FINDINGS read a delivered result and discuss that exact update', 
   await feed.getByRole('button',{name:'Earlier updates (1)'}).click();
   await expect(cards).toHaveCount(4);
   await cards.last().getByRole('button',{name:'Read update'}).click();
-  await expect(cards.last().locator('.wp-finding-body')).toContainText('dated comparison');
-  await cards.last().getByRole('button',{name:'Discuss in chat'}).click();
+  const report = page.getByRole('dialog');
+  await expect(report.locator('.wp-finding-body')).toContainText('dated comparison');
+  await report.getByRole('button',{name:'Discuss in chat'}).click();
   await expect(page.locator('#msg')).toBeVisible();
   await expect(page.locator('#composerSelectionChips blockquote')).toContainText('new supplier');
   await expect(page.locator('#composerSelectionChips')).not.toContainText('revised proposal');
@@ -60,4 +61,49 @@ test('PERSONAL FINDINGS empty feed and retry stay inside Studio', async ({page})
   await feed.getByRole('button',{name:'Retry'}).click();
   await expect(feed).toContainText('When a bot finds something for you');
   await expect(page.locator('.wp-hero')).toBeVisible();
+});
+
+test('PERSONAL FINDINGS prioritises concrete advice and opens a readable report', async ({page}, info) => {
+  const report = [
+    'Update: er zijn geen nieuwe scout-items. Ik heb de agenda gelezen.',
+    'De status is gebaseerd op de laatst opgeslagen planning.',
+    'Mijn advies: Bereid de technische overdracht van maandag voor.',
+    'Dit kan ik voor je oppakken:\n1. *Controleer de planning.* Bekijk de laatste run.\n2. Gebruik **taakstatus** en `jobs.json`.',
+    'Bron: [Planning](https://example.test/planning).',
+  ].join('\n\n');
+  const other = '## Update\nNo new scout findings.\n\n## Next step\nReview the schedule before Friday.\n\n![Diagram](https://example.test/tracker.png) <img src=x> [invalid](javascript:void)';
+  const bodies = [report, other, 'A proposal is ready for review.'];
+  const findings = bodies.map((body,i)=>({body,bot:['Operations Bot','Research Bot','Planning Bot'][i],at:1800000000-i,
+    run_at:new Date((1800000000-i)*1000).toISOString(),session_id:'qa-finding-'+i,profile:'qa-research'}));
+  await page.route('**/api/me/findings', r=>r.fulfill({json:{findings}}));
+  await page.goto('/');
+  const tour = page.locator('#spHelpCard[data-kind="tour_offer"] .sp-help-btn').first();
+  await page.addLocatorHandler(tour, async()=>{await tour.click();});
+  await expect(page.locator('.wp-hero')).toBeVisible();
+  const card = page.locator('.wp-finding').first();
+  const read = card.getByRole('button',{name:'Read update'});
+  for (const width of [1440,900,390]) {
+    await page.setViewportSize({width,height:900});
+    await page.evaluate(()=>closeMobileSidebar());
+    await read.click();
+    await page.screenshot({path:info.outputPath('finding-reader-'+width+'.png')});
+    const reader = page.getByRole('dialog',{name:'Operations Bot'});
+    await expect(reader).toBeVisible();
+    await expect(reader.getByRole('heading',{name:'Mijn advies'})).toBeVisible();
+    await expect(reader.locator('ol li')).toHaveCount(2);
+    await expect(reader.locator('em')).toHaveText('Controleer de planning.');
+    await expect(reader.locator('strong')).toContainText('taakstatus');
+    await expect(reader.locator('code')).toHaveText('jobs.json');
+    await expect(reader.getByRole('link')).toHaveCount(1);
+    await expect(reader.getByRole('link',{name:'Planning'})).toHaveAttribute('href','https://example.test/planning');
+    expect(await reader.evaluate(el=>el.scrollWidth<=el.clientWidth)).toBe(true);
+    await page.keyboard.press('Escape');
+    await expect(read).toBeFocused();
+    await expect(card.locator('.wp-finding-preview')).toHaveText('Bereid de technische overdracht van maandag voor.');
+  }
+  const second = page.locator('.wp-finding').nth(1);
+  await expect(second.locator('.wp-finding-preview')).toHaveText('Review the schedule before Friday.');
+  await second.getByRole('button',{name:'Read update'}).click();
+  await expect(page.getByRole('dialog')).toContainText('Review the schedule');
+  await expect(page.getByRole('dialog').locator('a,img,iframe')).toHaveCount(0);
 });

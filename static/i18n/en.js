@@ -183,6 +183,8 @@ window.__registerHermesLocale('en', {
   "bot_scout_template_agenda": "Prepare the day",
   "bot_scout_template_tasks": "Follow up on tasks",
   "bot_scout_template_research": "Research opportunities",
+  "bot_scout_template_technical": "Technical health",
+  "bot_scout_template_technical_prompt": "Watch the reliability of my scheduled tasks. Use this bot's schedule and available run output to explain overdue runs and recurring failures. Name the task, its scheduled time or failure count, and the next useful check. Describe impact only when supported by the source. For platforms I actually use, also check official notices about retirements and required upgrades. Include the source date, any deadline and one concrete next step.",
   "bot_scout_template_agenda_prompt": "Look ahead at the next two days in my calendar. Use available email, tasks and recent conversations to prepare meetings, surface missing information and propose concrete next steps. Prepare useful briefs or drafts; do not send anything.",
   "bot_scout_template_tasks_prompt": "Review my open tasks, commitments and follow-ups using the available sources. Identify approaching deadlines and blockers, investigate what is needed and prepare the next useful action or a draft for my review.",
   "bot_scout_template_research_prompt": "Connect my recent work and open questions with relevant developments. Research useful opportunities in depth, check sources and propose concrete work this bot can take on. Explain why it matters to me; avoid generic news.",

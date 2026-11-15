@@ -126,3 +126,31 @@ def test_successful_silent_run_still_classifies_pending_items(collector, tmp_pat
         collector.apply_feedback({"home": tmp_path, "self_job": "scout-job"}, ledger, 10010)
         assert ledger.known(h) == "ignored"
         assert ledger.unclassified() == []
+
+def test_recovered_overdue_slot_does_not_return_from_unclassified(collector, monkeypatch, tmp_path, capsys):
+    ctx = {"home": tmp_path, "profile": "qa", "self_job": "scout-job",
+           "person": "qa@example.test", "ledger": tmp_path / "seen.db"}
+    monkeypatch.setattr(collector, "resolve_context", lambda: ctx)
+    monkeypatch.setattr(collector, "load_meta", lambda _: {"title": "QA", "scout": {"enabled": True}})
+    for source in ("collect_calendar", "collect_email"):
+        monkeypatch.setattr(collector, source, lambda *a: ("", []))
+    for source in ("collect_kanban", "collect_screen", "collect_chats"):
+        monkeypatch.setattr(collector, source, lambda *a, **kw: [])
+    monkeypatch.setattr(collector, "collect_memory", lambda *a: "")
+    job = {"id": "daily", "name": "Daily check", "owner_email": ctx["person"], "schedule": {"kind":"cron"},
+           "next_run_at": "2026-11-15T08:00:00Z", "state": "scheduled"}
+    monkeypatch.setattr(collector, "load_jobs", lambda _: [job])
+    now = collector._parse_iso("2026-11-15T09:05:00Z")
+    monkeypatch.setattr(collector.time, "time", lambda: now)
+    assert collector.run() == 0
+    assert "person_job_overdue" in capsys.readouterr().out
+    output(tmp_path, "answer.md", "# Cron Job: Scout\n## Response\n\nPlanning checked.", now + 1)
+    now += 10
+    job.update(next_run_at="2026-11-16T08:00:00Z", last_run_at="2026-11-15T09:05:01Z")
+    assert collector.run() == 0
+    assert "person_job_overdue" not in capsys.readouterr().out
+    ledger = collector.scout_ledger.Ledger(ctx["ledger"])
+    try:
+        assert not ledger.unclassified()
+    finally:
+        ledger.close()

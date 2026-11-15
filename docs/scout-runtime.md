@@ -37,6 +37,16 @@ Unavailable sources still need to be reported honestly; ordinary jobs with
 explicit tool requirements retain their existing preflight checks. Saving an
 existing Scout upgrades its stored tool selection to this inherited mode.
 
+Each personal Scout checks the recurring jobs its recipient owns in the bot's
+profile during its regular run. A scheduled, unclaimed occurrence at least one
+hour overdue can surface before an error has been recorded. A third consecutive
+run failure escalates an existing incident. The missed slot or failure episode
+identifies the finding across checks. The collector drops obsolete unclassified
+alerts once a successful read confirms the job has recovered or the slot changed.
+The Technical health starter in the bot's personal Scout settings adds a focus
+on these signals, a concrete next check and official upgrade or retirement
+notices for platforms the recipient uses. It uses the existing delivery schedule.
+
 The collector records a pending attempt in the person's Scout ledger. Preparation,
 topic and source-warning cooldowns advance only after its saved output confirms
 an agent response (including a deliberate `[SILENT]`). A blocked, failed, missing
