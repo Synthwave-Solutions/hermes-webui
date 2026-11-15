@@ -32,6 +32,7 @@ import re
 import secrets
 import threading
 import time
+from datetime import date, timedelta
 from pathlib import Path
 from urllib.parse import parse_qs
 
@@ -87,19 +88,120 @@ def backlog_items() -> list[dict]:
 
 
 def _visible_item(view, item) -> bool:
-    return item.get("owner") == view.email or _sees_team(view, item.get("team") or "") or (
+    return view.email in (item.get("owner"), item.get("assignee")) or _sees_team(view, item.get("team") or "") or (
         view.scope != org_structure.SCOPE_NONE and not item.get("team"))
 
 
 def backlog_for(view) -> list[dict]:
-    rows = [dict(i, editable=_editable_item(view, i), autopilot=_AUTOPILOT.get(i["id"]))
-            for i in backlog_items() if _visible_item(view, i)]
+    items = backlog_items()
+    planned = plan(items)
+    rows = [dict(i, editable=_editable_item(view, i), autopilot=_AUTOPILOT.get(i["id"]),
+                 assignee=i.get("assignee") or i.get("owner") or "", plan=planned.get(i["id"]), **_use_case_facts(i))
+            for i in items if _visible_item(view, i)]
     return sorted(rows, key=lambda r: (STATUSES.index(r.get("status", "idea")) if r.get("status") in STATUSES else 9,
                                        r.get("rank", 1e9)))
 
 
+# ── Planning: when each idea runs ────────────────────────────────────────────
+# The roadmap shows every idea on a time axis. A start that someone set is kept.
+# Everything else gets a proposal: one idea at a time per person, started work
+# first, then the order of the backlog, with a duration that follows the effort.
+
+EFFORT_WEEKS = {1: 1, 2: 2, 3: 3, 4: 5, 5: 8}
+MAX_WEEKS = 52
+_STARTED = {"design": 0, "built": 0, "chosen": 1}
+
+
+def _monday(day: date) -> date:
+    return day - timedelta(days=day.weekday())
+
+
+def _day(value) -> date | None:
+    try:
+        return date.fromisoformat(str(value or "")[:10])
+    except ValueError:
+        return None
+
+
+def item_weeks(item: dict) -> int:
+    weeks = item.get("weeks")
+    if isinstance(weeks, int) and 1 <= weeks <= MAX_WEEKS:
+        return weeks
+    return EFFORT_WEEKS.get(item.get("effort") or 3, 3)
+
+
+def plan(items: list[dict], today: date | None = None) -> dict[str, dict]:
+    """Start week, duration and end per idea; ``auto`` marks a proposal.
+
+    Parked ideas are left out. Live ideas show when they were done and keep
+    nobody busy. A person's fixed ideas are never overlapped by a proposal.
+    """
+    this_week = _monday(today or date.today())
+    out: dict[str, dict] = {}
+    busy: dict[str, list[tuple[date, date]]] = {}
+
+    def entry(start: date, weeks: int, auto: bool) -> dict:
+        return {"start": start.isoformat(), "weeks": weeks, "end": (start + timedelta(weeks=weeks)).isoformat(), "auto": auto}
+
+    todo = []
+    for item in items:
+        status, weeks = item.get("status") or "idea", item_weeks(item)
+        person = item.get("assignee") or item.get("owner") or ""
+        start = _day(item.get("start"))
+        if status == "parked":
+            continue
+        if start is not None:
+            start = _monday(start)
+            out[item["id"]] = entry(start, weeks, False)
+            if status != "live":
+                busy.setdefault(person, []).append((start, start + timedelta(weeks=weeks)))
+        elif status == "live":
+            done = _monday(date.fromtimestamp(item.get("updated_at") or time.time()))
+            out[item["id"]] = entry(done - timedelta(weeks=weeks - 1), weeks, True)
+        else:
+            todo.append((_STARTED.get(status, 2), item.get("rank", 1e9), person, weeks, item["id"]))
+    cursor: dict[str, date] = {}
+    for _, _, person, weeks, item_id in sorted(todo):
+        start = cursor.get(person, this_week)
+        moved = True
+        while moved:
+            moved = False
+            for a, b in busy.get(person, []):
+                if start < b and a < start + timedelta(weeks=weeks):
+                    start, moved = b, True
+        out[item_id] = entry(start, weeks, True)
+        cursor[person] = start + timedelta(weeks=weeks)
+    return out
+
+
+def known_people() -> set[str]:
+    """Everyone the structure knows: leads and members of every team."""
+    data = org_structure.load()
+    people = {org_structure.norm_email(e) for e in (data.get("people") or {})}
+    for team in (data.get("teams") or {}).values():
+        if isinstance(team, dict):
+            people |= {org_structure.norm_email(team.get("lead"))} | {org_structure.norm_email(m) for m in team.get("members") or []}
+    return {p for p in people if p}
+
+
+def _use_case_facts(item: dict) -> dict:
+    """Phase and hours saved per week of the use case an idea was worked out in."""
+    if not item.get("use_case"):
+        return {}
+    try:
+        doc = studio._load(item["use_case"])
+    except (KeyError, OSError, ValueError):
+        return {}
+    base = ((doc.get("process") or {}).get("baseline") or {}) if isinstance(doc.get("process"), dict) else {}
+    out = {"uc_phase": doc.get("phase") if doc.get("phase") in studio.PHASES else "discover"}
+    before, after = base.get("hours_week_before"), base.get("hours_week_after")
+    if isinstance(before, (int, float)) and isinstance(after, (int, float)) and before > after:
+        out["saves_hours_week"] = round(before - after, 1)
+    return out
+
+
 def _editable_item(view, item) -> bool:
-    if item.get("owner") == view.email or view.scope == org_structure.SCOPE_ALL:
+    if view.email in (item.get("owner"), item.get("assignee")) or view.scope == org_structure.SCOPE_ALL:
         return True
     return bool(item.get("team")) and (view.edits_team(item["team"]) or item["team"] in view.lead_teams)
 
@@ -144,6 +246,27 @@ def save_item(view, body: dict) -> dict:
         for key in ("use_case", "source_use_case"):
             if key in body:
                 item[key] = _txt(body.get(key), 20)
+        if "start" in body:      # empty = let the roadmap propose a week again
+            if body.get("start"):
+                start = _day(body.get("start"))
+                if start is None:
+                    raise ValueError("The start needs a date")
+                item["start"] = _monday(start).isoformat()
+            else:
+                item.pop("start", None)
+        if "weeks" in body:      # empty = follow the effort again
+            if body.get("weeks") in (None, "", 0):
+                item.pop("weeks", None)
+            else:
+                item["weeks"] = studio._int(body.get("weeks"), 1, MAX_WEEKS)
+        if "assignee" in body:   # empty = the owner does it
+            person = org_structure.norm_email(body.get("assignee"))
+            if person and person != item.get("owner") and person not in known_people():
+                raise ValueError("Unknown person")
+            if person and person != item.get("owner"):
+                item["assignee"] = person
+            else:
+                item.pop("assignee", None)
         item.setdefault("impact", 3)
         item.setdefault("effort", 3)
         item.setdefault("building_block", "task")

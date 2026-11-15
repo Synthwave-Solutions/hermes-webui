@@ -2787,6 +2787,13 @@
       "[data-tour='studio-backlog-add']"
     ]
   },
+  "webui.studio.roadmap": {
+    "panel": "studio",
+    "targets": [
+      "[data-tour='studio-backlog-view']",
+      "[data-tour='studio-roadmap']"
+    ]
+  },
   "webui.studio.playbooks": {
     "panel": "studio",
     "targets": [
