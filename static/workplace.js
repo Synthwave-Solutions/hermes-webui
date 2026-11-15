@@ -386,9 +386,15 @@
     return new Intl.DateTimeFormat(lang(), {day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'}).format(row.at * 1000);
   }
 
+  function findingAuthor(row, reader = false) {
+    const avatar = window.SynPulseFriendlyTools.bots.avatarHtml(row.profile, row.bot, 'wp-finding-avatar');
+    const name = reader ? `<h2 id="wpFindingReaderTitle" tabindex="-1">${H(row.bot)}</h2>` : `<strong>${H(row.bot)}</strong>`;
+    return `<div class="wp-finding-author">${avatar}<div>${name}<time datetime="${H(row.run_at)}">${H(findingDate(row))}</time></div></div>`;
+  }
+
   function findingCard(row, index) {
     return `<article class="wp-finding" data-finding-index="${index}"${index >= 3 && !showEarlier ? ' hidden' : ''}>
-      <header><strong>${H(row.bot)}</strong><time datetime="${H(row.run_at)}">${H(findingDate(row))}</time></header>
+      <header>${findingAuthor(row)}</header>
       <p class="wp-finding-preview">${H(findingPreview(row.body))}</p>
       <div class="wp-finding-actions"><button type="button" class="om-link" data-finding-read aria-haspopup="dialog">${H(w('findings_read'))}</button>
       <button type="button" class="sm-btn" data-finding-chat>${H(w('findings_chat'))}</button></div></article>`;
@@ -398,8 +404,7 @@
     const dialog = document.createElement('dialog');
     dialog.className = 'wp-finding-reader';
     dialog.setAttribute('aria-labelledby', 'wpFindingReaderTitle');
-    dialog.innerHTML = `<header><div><h2 id="wpFindingReaderTitle" tabindex="-1">${H(row.bot)}</h2>
-      <time datetime="${H(row.run_at)}">${H(findingDate(row))}</time></div>
+    dialog.innerHTML = `<header>${findingAuthor(row, true)}
       <button type="button" class="sm-btn" data-reader-close>${H(w('findings_close'))}</button></header>
       <div class="wp-finding-body"></div><footer><button type="button" class="sm-btn" data-reader-chat>${H(w('findings_chat'))}</button></footer>`;
     dialog.querySelector('.wp-finding-body').append(findingDocument(row.body));
