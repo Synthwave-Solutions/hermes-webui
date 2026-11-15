@@ -221,7 +221,7 @@
   // ── Render and wiring ─────────────────────────────────────────────────────
   function paint(){
     const steps = I.kind === 'me' ? ME_STEPS : ORG_STEPS;
-    I.body.innerHTML = `<div class="in-wrap" data-tour="studio-intake"><div class="in-head"><h3>${H(w(I.kind === 'me' ? 'me_title' : 'org_title'))}</h3><p class="om-intro">${H(w(I.kind === 'me' ? 'me_intro' : 'org_intro'))}</p></div>
+    I.body.innerHTML = `<div class="in-wrap" data-tour="studio-intake"><div class="in-head"><h3>${H(w(I.kind === 'me' ? 'me_title' : 'org_title'))}</h3><p class="om-intro">${H(w(I.kind === 'me' ? 'me_intro' : 'org_intro'))}</p>${I.kind === 'me' && window.SPIntakeChat ? `<button type="button" class="sm-btn in-as-chat" data-intake-chat-open>${H(window.SPIntakeChat.label())}</button>` : ''}</div>
       ${stepper(steps)}<section class="om-card in-step">${I.kind === 'me' ? meStep() : orgStep()}</section>${nav(steps, w(I.kind === 'me' ? 'save_me' : 'save_org'))}</div>`;
   }
   function setPath(obj, path, val){ const k = path.split('.'); let o = obj; while (k.length > 1) { const x = k.shift(); o = o[x] = o[x] || {}; } o[k[0]] = val; }

@@ -263,3 +263,81 @@ def test_full_user_notes_are_left_alone_and_the_intake_is_kept(env):
     assert out["note_written"] is False and out["notes_room"] < 160
     assert personal_context.read_file(personal_context.paths(ident)["user"]) == "y" * 1370
     assert lib.load_person(ADMIN)["role"]["title"] == "Directeur", "the intake itself is still kept for Studio"
+
+
+def test_wishes_go_into_the_note_and_survive_a_save_from_the_studio_form(env):
+    tom, ident = V(OWNER, env), {"email": OWNER}
+    out = lib.save_person(tom, ident, {"role": {"title": "Debiteurenbeheerder"}, "wishes": ["mail", "meetings", "onzin", "mail"],
+                                        "wish_other": "Declaraties indienen"})
+    assert out["wishes"] == ["mail", "meetings"]
+    assert "Wil als eerste uit handen geven: mail en chat bijhouden; vergaderingen en de dag voorbereiden; Declaraties indienen." in out["note"]
+    # The Studio form does not send wishes; they stay.
+    again = lib.save_person(tom, ident, {"role": {"title": "Teamlead debiteuren"}})
+    assert again["wishes"] == ["mail", "meetings"] and again["wish_other"] == "Declaraties indienen"
+
+
+def test_first_tasks_follow_the_intake_and_fall_back_when_the_model_is_off(env, monkeypatch):
+    tom, ident = V(OWNER, env), {"email": OWNER}
+    lib.save_person(tom, ident, {"role": {"title": "Debiteurenbeheerder"}, "wishes": ["mail", "calendar"],
+                                 "tasks": [{"name": "Aanmaningen opstellen", "cadence": "weekly"}], "tools": ["Exact"]})
+    seen = {}
+
+    def good(system, user):
+        seen["system"], seen["user"] = system, user
+        return {"intro": "Gebaseerd op je aanmaningen en je mail.",
+                "tasks": [{"kind": "ongoing", "title": "Maak concepten voor de aanmaningen van deze week."},
+                          {"kind": "ongoing", "title": "Zet elke maandag de openstaande posten uit Exact klaar"},
+                          {"kind": "now", "title": "Vat elke ochtend mijn nieuwe mail samen"}]}
+
+    monkeypatch.setattr(studio, "_ask_json", good)
+    out = lib.first_tasks(tom, {"lang": "nl"})
+    assert "Aanmaningen opstellen" in seen["user"] and "Nederlands" in seen["system"]
+    assert out["personal"] is True and out["intro"] == "Gebaseerd op je aanmaningen en je mail."
+    # The first card is always the one to finish now; a closing full stop is dropped.
+    assert [t["kind"] for t in out["tasks"]] == ["now", "ongoing", "ongoing"]
+    assert out["tasks"][0]["title"] == "Maak concepten voor de aanmaningen van deze week"
+    assert len(out["common"]) == 2 and "mail" in out["mail"]
+    assert lib.load_person(OWNER)["first_tasks"]["tasks"] == out["tasks"], "kept for the chat's empty state"
+
+    # Too many cards, a title that is too long or a model error: the fixed cards for the person's wishes.
+    for bad in ({"tasks": [{"kind": "now", "title": "Een"}]},
+                {"intro": "x", "tasks": [{"title": "woord " * 20}, {"title": "Twee"}, {"title": "Drie"}]}):
+        monkeypatch.setattr(studio, "_ask_json", lambda system, user, bad=bad: bad)
+        out = lib.first_tasks(tom, {"lang": "nl"})
+        assert out["personal"] is False
+        assert out["tasks"][0] == {"kind": "now", "title": "Maak concepten voor de mails die op mijn antwoord wachten"}
+        assert out["tasks"][2]["title"] == "Loop elke maandag mijn agenda van de week met me door"
+
+    def boom(system, user):
+        raise RuntimeError("no model")
+
+    monkeypatch.setattr(studio, "_ask_json", boom)
+    out = lib.first_tasks(tom, {"lang": "en"})
+    assert out["personal"] is False and out["tasks"][0]["title"] == "Draft replies to the mails waiting for my answer"
+    # A later save of the intake keeps the cards.
+    lib.save_person(tom, ident, {"role": {"title": "Teamlead debiteuren"}})
+    assert lib.load_person(OWNER)["first_tasks"]["lang"] == "en"
+
+
+def test_first_tasks_without_an_intake_do_not_call_the_model(env, monkeypatch):
+    def never(system, user):
+        raise AssertionError("no model call without answers")
+
+    monkeypatch.setattr(studio, "_ask_json", never)
+    out = lib.first_tasks(V(OTHER, env), {})
+    assert out["personal"] is False and [t["kind"] for t in out["tasks"]] == ["now", "ongoing", "ongoing"]
+    assert len({t["title"] for t in out["tasks"]} | set(out["common"])) == 5, "no card twice"
+
+
+def test_the_chat_intake_is_offered_once(env, monkeypatch):
+    eve = V(OTHER, env)
+    assert lib.intake_offer(lib.load_person(OTHER)) is False, "an install switches the offer on itself"
+    monkeypatch.setenv("SP_INTAKE_OFFER", "1")
+    assert lib.intake_offer(lib.load_person(OTHER)) is True
+    lib.onboarding_state(eve, {"dismissed": True})
+    assert lib.intake_offer(lib.load_person(OTHER)) is False
+    # Someone who saved the intake is not asked again, and "later" survives that save.
+    lib.save_person(V(OWNER, env), {"email": OWNER}, {"role": {"title": "Debiteurenbeheerder"}})
+    assert lib.intake_offer(lib.load_person(OWNER)) is False
+    lib.save_person(eve, {"email": OTHER}, {"role": {"title": "Accountmanager"}})
+    assert lib.load_person(OTHER)["onboarding"]["dismissed_at"]

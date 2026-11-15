@@ -3385,9 +3385,10 @@
       "area": "studio",
       "status": "available",
       "source_refs": [
-        "static/studio_intake.js:217",
-        "api/studio_library.py:777",
-        "api/studio_library.py:746"
+        "static/studio_intake.js:321",
+        "static/intake_chat.js",
+        "api/studio_library.py:786",
+        "api/studio_library.py:752"
       ]
     },
     {
