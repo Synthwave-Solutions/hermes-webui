@@ -151,3 +151,4 @@
 .wp-finding-actions button,.wp-findings>.wp-card-head button{min-height:36px}
 .wp-findings-note{margin:0;padding:0 20px 16px;color:var(--muted);font-size:13px}
 @media(max-width:640px){.wp-findings-list{padding:0 12px 12px}.wp-finding-actions button,.wp-findings>.wp-card-head button{min-height:44px}}
+.wp>[data-wp-setup]:empty{display:none}

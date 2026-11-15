@@ -74,3 +74,51 @@
   #mainIntegrations .intg-table-wrap{overflow-x:auto}
 }
 @media(prefers-reduced-motion:reduce){.bot-builder-tabs{scroll-behavior:auto}}
+
+/* Standalone catalogues have all their navigation and actions in the page. */
+@media(min-width:769px){
+  .layout:has(>main:is(.showing-apps,.showing-modules,.showing-msp))> :is(.sidebar,#sidebarResize){display:none}
+}
+#mainSkills .skills-library{padding:clamp(16px,3vw,38px);background:var(--bg);overflow:auto}
+.skills-library-inner{max-width:1280px;margin-inline:auto}
+.skills-library-head{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:22px}
+.skills-library-head h1{margin:0;color:var(--strong,var(--text));font-size:clamp(22px,2vw,30px);line-height:1.2;letter-spacing:-.03em}
+.skills-library-tools{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+.skills-library-tools label{display:grid;gap:6px;min-width:0;flex:1 1 140px;font-weight:600;font-size:12px;color:var(--muted)}
+.skills-library-tools label:first-child{flex:3 1 220px}
+.skills-library-tools :is(input,select){width:100%;min-width:0;height:42px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--sp-radius-sm,8px);background:var(--surface);color:var(--text);font:inherit;font-weight:450;font-size:14px}
+#librarySkillCount{margin:18px 0 12px;color:var(--muted);font-size:13px}
+.skill-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,230px),1fr));gap:12px}
+.library-skill{display:flex;flex-direction:column;align-items:flex-start;gap:10px;min-width:0;min-height:120px;padding:16px;border:1px solid var(--border);border-radius:var(--sp-radius-lg,14px);background:var(--surface);color:var(--text);text-align:start;font:inherit;cursor:pointer;overflow-wrap:anywhere}
+.library-skill:hover{border-color:var(--accent);background:color-mix(in srgb,var(--surface) 96%,var(--accent))}
+.library-skill:focus-visible,.skills-library-tools :focus-visible,#mainSkills button:focus-visible,#panelSkills button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.library-skill-meta{display:flex;align-items:baseline;justify-content:space-between;gap:8px;width:100%;font-size:12px;color:var(--muted)}
+.library-skill-state{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.library-skill-state:before{content:'';width:7px;height:7px;border-radius:50%;background:var(--muted)}
+.library-skill-state[data-enabled=true]:before{background:var(--success,#35ad78)}
+.library-skill strong{font-size:16px;line-height:1.35;color:var(--strong,var(--text))}
+.library-skill-desc{font-size:13px;line-height:1.5;color:var(--muted);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
+.skill-library-message{grid-column:1/-1;padding:18px;border:1px dashed var(--border);border-radius:var(--sp-radius-md);color:var(--muted)}
+.skill-library-message p{margin:0 0 10px}
+.skills-library-inner>.sp-empty-guide{display:block;margin-top:14px}
+#libraryMoreSkills{margin-top:16px}
+#mainSkills [hidden],#panelSkills [hidden]{display:none!important}
+#mainSkills .main-view-header{flex-wrap:wrap;gap:10px}
+#mainSkills .main-view-title{flex:1;min-width:0;overflow-wrap:anywhere}
+#panelSkills .skills-cat-header{font-family:inherit;width:100%;min-height:32px;text-align:start;border:0;border-radius:var(--sp-radius-sm);background:transparent;color:var(--muted)}
+#panelSkills .skills-cat-header:hover{background:var(--surface-subtle);color:var(--text)}
+#panelSkills button.skill-name{appearance:none;border:0;background:none;font:inherit;text-align:start;color:inherit;padding:4px 0;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+#panelSkills .skill-item.disabled,#panelSkills .skill-item.disabled .skill-name{opacity:1}
+#panelSkills .skill-toggle{padding:0}
+@media(max-width:640px){
+  #mainSkills .skills-library{padding:18px 14px}
+  .skills-library-tools{gap:10px}
+  .skills-library-tools label:first-child{flex-basis:100%}
+  .skills-library-tools :is(input,select),.skills-library .sm-btn{min-height:44px}
+  #mainIntegrations .intg-hub-tabs{display:flex;flex-wrap:wrap;overflow:visible}
+  #mainIntegrations .intg-hub-tabs button{flex:1 1 calc(50% - 8px);white-space:normal}
+}
+
+#panelSkills .skill-new-label{display:none}
+#librarySkillCreateSlot #btnNewSkill{display:inline-flex;align-items:center;gap:8px;width:auto;height:auto;min-height:40px;padding:8px 14px;border:1px solid var(--border);background:var(--surface);color:var(--strong,var(--text));font:600 13px var(--font-ui)}
+#librarySkillCreateSlot #btnNewSkill svg{width:15px;height:15px}

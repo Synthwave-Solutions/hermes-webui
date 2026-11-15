@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import { test, expect, open, session, api, auth, capture } from './fixtures';
+import { test, expect, open, session, api, auth, capture, selectPicker } from './fixtures';
 const marker = (prefix:string) => prefix+'-'+Date.now();
 test('US-SP-BOT-001 wizard validates, preserves draft back navigation and creates real bot',async({page},info)=>{
  const name=marker('qa-bot');await open(page,'profiles');await page.getByRole('button',{name:'New bot',exact:true}).click();
@@ -39,7 +39,7 @@ test('US-SP-MEM-001 personal memory edits persist, cancel preserves previous val
  await page.reload();await page.locator('.rail-btn[data-panel="memory"]').click();await page.locator('#memoryPanel .side-menu-item').filter({hasText:'My Notes'}).click();await expect(page.locator('#memoryDetailBody')).toContainText(text);
 });
 test('US-SP-SKILL-001 create real skill and filter list without changing stored content',async({page})=>{
- const name=marker('qa-skill');await open(page,'skills');await page.getByRole('button',{name:'New skill',exact:true}).click();await page.locator('#skillFormName').fill(name);await page.locator('#skillFormCategory').fill('qa');await page.locator('#skillFormContent').fill('---\nname: '+name+'\ndescription: Synthetic workflow validation\n---\nUse synthetic evidence only.');await page.locator('#btnSaveSkillDetail').click();await expect(page.locator('#skillDetailBody')).toContainText('Use synthetic evidence only.');
+ const name=marker('qa-skill');await open(page,'skills');await page.getByRole('button',{name:'New skill',exact:true}).click();await page.locator('#skillFormName').fill(name);await selectPicker(page,'skillFormCategory','qa');await page.locator('#skillFormContent').fill('---\nname: '+name+'\ndescription: Synthetic workflow validation\n---\nUse synthetic evidence only.');await page.locator('#btnSaveSkillDetail').click();await expect(page.locator('#skillDetailBody')).toContainText('Use synthetic evidence only.');
  await page.locator('#skillsSearch').fill(name);await expect(page.locator('#skillsList')).toContainText(name);await page.locator('#skillsSearch').fill('NO_SUCH_SKILL');await expect(page.locator('#skillsList')).not.toContainText(name);await page.locator('#skillsSearch').fill('');await expect(page.locator('#skillsList')).toContainText(name);
 });
 test('US-SP-WS-001 invalid workspace rejected; valid child added and renamed',async({page})=>{
