@@ -64,13 +64,10 @@
   const KINDS = ['usecase', 'task', 'bot', 'playbook', 'prompt', 'backlog'];
 
   // ── Scope: who am I in the structure ───────────────────────────────────────
-  let ctxCache = null, ctxAt = 0, ctxLoading = null;
-  async function loadCtx(force){
-    if (!force && ctxCache && Date.now() - ctxAt < 60000) return ctxCache;
-    if (ctxLoading) return ctxLoading;
-    ctxLoading = (async () => {
-      const [me, pr] = await Promise.all([call('/api/org/structure/me').catch(() => ({})), call('/api/studio/prompts').catch(() => null)]);
-      const chart = me && me.can_view ? await call('/api/org/chart').catch(() => null) : null;
+  let ctxCache = null, ctxAt = 0, ctxLoading = null, ctxEarly = null;
+  // The structure arrives in two steps. Who you are and the team names are quick. The chart
+  // (members, faces, the team of each scheduled task) is slow, so the first paint does not wait for it.
+  function buildCtx(me, pr, chart){
       const c = { email: norm(me.email), scope: me.scope || 'none', canView: !!me.can_view, canManage: !!me.can_manage,
                   leadTeams: new Set(me.lead_teams || []), memberTeams: new Set(me.member_teams || []), adminDepts: new Set(me.departments || []),
                   teams: new Map(), depts: new Map(), people: new Map(), jobTeam: new Map(), promptRows: pr ? (pr.prompts || []) : [], chart };
@@ -88,9 +85,18 @@
       }
       for (const [email, p] of Object.entries((chart && chart.people) || {})) c.people.set(norm(email), { email: norm(email), title: p.title || '', avatar_url: p.avatar_url || '' });
       c.myDepts = new Set([...c.adminDepts, ...[...c.myTeams].map(k => deptKey(c, k))].filter(Boolean));
-      ctxCache = c; ctxAt = Date.now();
       return c;
-    })();
+  }
+  async function loadCtx(force){
+    if (!force && ctxCache && Date.now() - ctxAt < 60000) return ctxCache;
+    if (ctxLoading) return ctxLoading;
+    const base = Promise.all([call('/api/org/structure/me').catch(() => ({})), call('/api/studio/prompts').catch(() => null)]);
+    ctxEarly = base.then(([me, pr]) => buildCtx(me, pr, null));
+    ctxLoading = base.then(async ([me, pr]) => {
+      const chart = me && me.can_view ? await call('/api/org/chart').catch(() => null) : null;
+      ctxCache = buildCtx(me, pr, chart); ctxAt = Date.now();
+      return ctxCache;
+    });
     try { return await ctxLoading; } finally { ctxLoading = null; }
   }
   function deptKey(c, teamKey){ const t = c.teams.get(teamKey); return t ? t.department : String(teamKey || '').split('/')[0]; }
@@ -173,13 +179,19 @@
   }
 
   // ── Workplace: the items ───────────────────────────────────────────────────
-  const Wp = { data: null, at: 0, group: store.get('sp-wp-group', 'kind'), open: new Set(), more: new Set(), token: 0, body: null, intake: null, setup: '' };
-
-  async function loadData(c){
-    const [uc, bl, pb, cr, pf, me] = await Promise.all([
-      call('/api/studio/usecases').catch(() => null), call('/api/studio/backlog').catch(() => null), call('/api/studio/playbooks').catch(() => null),
-      call('/api/crons?all_profiles=1').catch(() => null), call('/api/profiles').catch(() => null), call('/api/studio/profile?who=me').catch(() => null)]);
-    Wp.intake = me;
+  const Wp = { data: null, at: 0, group: store.get('sp-wp-group', 'kind'), open: new Set(), more: new Set(), token: 0, body: null, intake: null, setup: '',
+               raw: {}, early: null, sig: '' };
+  // The structure the page paints with: the full one, or the quick one until the chart is in.
+  const cur = () => ctxCache || Wp.early;
+  // Kinds whose list has never arrived yet. They show as loading, not as zero.
+  function pendingKinds(){
+    const p = new Set();
+    if (Wp.raw.cr === undefined) p.add('task');
+    if (Wp.raw.pf === undefined) p.add('bot');
+    return p;
+  }
+  function buildItems(c){
+    const { uc, bl, pb, cr, pf } = Wp.raw;
     const items = [];
     const withTeam = (team, owner) => team || primaryTeam(c, owner);
     for (const r of (uc && uc.usecases) || []) items.push({ kind: 'usecase', id: r.id, title: r.title || '', owner: norm(r.owner), team: withTeam(r.team, r.owner), sub: w('p_' + (r.phase || 'discover')), at: r.updated_at || 0 });
@@ -208,8 +220,6 @@
                    team: c.jobTeam.get(st + ':' + j.id) || (bots.get(bot) || {}).team || primaryTeam(c, j.owner_email),
                    sub: [sched, botTitle].filter(Boolean).join(' · '), status, runStatus:j.last_status === 'error' ? w('s_error') : j.last_status === 'ok' || j.last_status === 'success' ? w('s_done') : '', at: Date.parse(j.last_run_at || '') / 1000 || 0 });
     }
-    Wp.runsReadable = Array.isArray(cr?.jobs);
-    Wp.data = items; Wp.at = Date.now();
     return items;
   }
 
@@ -472,7 +482,7 @@
   }
   function recentChats() {
     const chats = window.ConversationWorkbench?.recent() || [];
-    return recentHtml('recent_chats', 'conversations', chats.map(s => rowHtml(ctxCache, {kind:'conversation', id:s.id,
+    return recentHtml('recent_chats', 'conversations', chats.map(s => rowHtml(cur(), {kind:'conversation', id:s.id,
       title:s.title, sub:[s.bot, s.at ? _formatRelativeSessionTime(s.at) : ''].filter(Boolean).join(' · ')})).join(''), 'no_chats');
   }
   function refreshRecent() {
@@ -485,10 +495,10 @@
   }
   function activity(rows) {
     const jobs = rows.filter(r=>r.kind === 'task' && r.at > 0).sort((a,b)=>b.at-a.at).slice(0,4);
-    const runs = jobs.map(r=>rowHtml(ctxCache, {...r, status:undefined, kind:'run',
+    const runs = jobs.map(r=>rowHtml(cur(), {...r, status:undefined, kind:'run',
       sub:[_formatRelativeSessionTime(r.at*1000), r.runStatus].filter(Boolean).join(' · ')})).join('');
     return `<div class="wp-grid wp-activity">${allowed('chat') ? '<div data-wp-recent-chats>'+recentChats()+'</div>' : ''}
-      ${allowed('tasks') ? recentHtml('recent_runs','task',runs,Wp.runsReadable ? 'no_runs' : 'failed') : ''}</div>`;
+      ${allowed('tasks') ? recentHtml('recent_runs','task',runs,pendingKinds().has('task') ? 'loading' : Wp.runsReadable ? 'no_runs' : 'failed') : ''}</div>`;
   }
   function shortcuts() {
     const actions = [['projects','projects','projects'],['profiles','chart','chart'],['tasks','agenda','agenda']];
@@ -497,7 +507,7 @@
       `<button type="button" class="sm-btn" data-wp-go="navigate">${H(t('workspace_navigation_search'))}</button></div>`;
   }
   function paint(force){
-    const body = Wp.body, c = ctxCache;
+    const body = Wp.body, c = cur(), pending = pendingKinds();
     if (!body || !body.isConnected || !c || !Wp.data) return;
     // The Studio body is shared by every hub: never paint over another hub that opened meanwhile.
     if (!force && !(body.firstElementChild && body.firstElementChild.classList.contains('wp'))) return;
@@ -507,7 +517,8 @@
     const n = Object.fromEntries(KINDS.map(k => [k, rows.filter(it => it.kind === k).length]));
     const groupSeg = lens === 'mine' ? '' : `<div class="om-seg" role="group" aria-label="${H(w('group'))}">${['kind', 'team', 'person'].map(g => `<button type="button" aria-pressed="${g === group}" data-wp-group="${g}">${H(w('g_' + g))}</button>`).join('')}</div>`;
     let main;
-    if (!rows.length) {
+    if (!rows.length && pending.size) main = `<div class="wp-skeleton" aria-busy="true" aria-label="${H(w('loading'))}"><span></span><span></span></div>`;
+    else if (!rows.length) {
       const wider = lenses(c).find(l => l !== lens && Wp.data.some(it => match(c, it, l)));
       main = `<div class="wp-empty"><span class="wp-empty-art" aria-hidden="true"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.2 5.3L20 9.5l-4.3 3.9L17 19l-5-2.9L7 19l1.3-5.6L4 9.5l5.8-1.2z"/></svg></span>
         <h3>${H(w('empty_h'))}</h3><p>${H(w(lens === 'mine' ? 'empty_mine' : 'empty_scope'))}</p>
@@ -520,7 +531,7 @@
       ${findingsSection()}
       <div data-wp-setup>${Wp.setup}</div>
       <div class="wp-bar">${barHtml(c, 'home', Wp.data, lens)}${groupSeg}</div>
-      <div class="wp-kpis">${KINDS.filter(k => k === 'task' ? allowed('tasks') : k !== 'bot' || allowed('profiles')).map(k => `<button type="button" class="wp-kpi ${n[k] ? '' : 'zero'}" title="${H(w('kpi_hint', { k: w('k_' + k) }))}" data-wp-go="${k}"${k === 'usecase' ? ' data-tour="studio-usecases"' : ''}><span class="wp-kpi-label"><span class="wp-kind-dot k-${k}" aria-hidden="true"></span>${H(short(k))}</span><span class="wp-kpi-value">${n[k]}</span></button>`).join('')}</div>
+      <div class="wp-kpis">${KINDS.filter(k => k === 'task' ? allowed('tasks') : k !== 'bot' || allowed('profiles')).map(k => `<button type="button" class="wp-kpi ${n[k] || pending.has(k) ? '' : 'zero'}" title="${H(w('kpi_hint', { k: w('k_' + k) }))}" data-wp-go="${k}"${k === 'usecase' ? ' data-tour="studio-usecases"' : ''}><span class="wp-kpi-label"><span class="wp-kind-dot k-${k}" aria-hidden="true"></span>${H(short(k))}</span><span class="wp-kpi-value"${pending.has(k) ? ` aria-busy="true" aria-label="${H(w('loading'))}">…` : `>${n[k]}`}</span></button>`).join('')}</div>
       ${shortcuts()}
       <details class="wp-card wp-destinations"><summary>${H(w('navigate'))}</summary><div class="wp-shortcuts">${(window.WorkspaceDestinations?.destinations() || []).map(d=>
         `<button type="button" class="sm-btn" data-wp-destination="${H(d.panel)}">${H(d.label)}</button>`).join('')}${[...document.querySelectorAll('#studioHubNav [data-st-hub]')].filter(b=>['me','profile','teams','chart','mgmt'].includes(b.dataset.stHub)).map(b=>
@@ -538,10 +549,33 @@
       body.addEventListener('click', onClick);
     }
     if (ctxCache && Wp.data) paint(true); else body.innerHTML = `<div class="wp">${findingsSection()}<div class="wp-skeleton" aria-busy="true" aria-label="${H(w('loading'))}"><span></span><span></span><span></span></div></div>`;
-    try { const c = await loadCtx(Date.now() - Wp.at > 30000); await loadData(c); }
+    // Paint as soon as the quick lists are in. Tasks, bots and the chart join when they arrive;
+    // a repaint that would show the same thing is skipped.
+    const step = () => {
+      const c = cur();
+      if (token !== Wp.token || !c || !Wp.raw.quick) return;
+      const items = buildItems(c);
+      const sig = JSON.stringify(items) + '|' + [...pendingKinds()].join() + '|' + c.people.size + '|' + [...c.teams.values()].map(t => t.members.length).join();
+      if (Wp.data && sig === Wp.sig && body.querySelector('.wp-kpis')) return;
+      Wp.data = items; Wp.sig = sig;
+      paint();
+    };
+    try {
+      const full = loadCtx(Date.now() - Wp.at > 30000);
+      if (!ctxCache && ctxEarly) void ctxEarly.then(c => { Wp.early = c; step(); });
+      await Promise.all([
+        full.then(step),
+        Promise.all([call('/api/studio/usecases').catch(() => null), call('/api/studio/backlog').catch(() => null), call('/api/studio/playbooks').catch(() => null),
+                     call('/api/studio/profile?who=me').catch(() => null)])
+          .then(([uc, bl, pb, me]) => { Object.assign(Wp.raw, { uc, bl, pb, quick: true }); Wp.intake = me; step(); }),
+        call('/api/crons?all_profiles=1').catch(() => null).then(cr => { Wp.raw.cr = cr; Wp.runsReadable = Array.isArray(cr?.jobs); step(); }),
+        // The fast list skips the alias scan and the skill counts, which this page never shows.
+        call('/api/profiles?fast=1&counts=0').catch(() => null).then(pf => { Wp.raw.pf = pf; step(); })]);
+      Wp.at = Date.now();
+    }
     catch (_e) { if (token === Wp.token && body.isConnected && body.firstElementChild && body.firstElementChild.classList.contains('wp')) body.innerHTML = `<div class="wp">${findingsSection()}<div class="om-empty wp-failed"><h3>${H(w('failed'))}</h3><div class="om-actions"><button type="button" class="sm-btn" data-wp-retry>${H(w('retry'))}</button></div></div></div>`; return; }
     if (token === Wp.token) {
-      paint();
+      step();
       if (!fetchOnEntry && allowed('chat')) void loadFindings(token);
     }
   }
@@ -549,12 +583,12 @@
   // the first lens that has something to show, so the first visit is never an empty page.
   function homeLens(c){
     const lens = getLens(c, 'home', 'mine');
-    if (lens !== 'mine' || store.get('sp-lens-home', '') || !Wp.data) return lens;
+    if (lens !== 'mine' || store.get('sp-lens-home', '') || !Wp.data || pendingKinds().size) return lens;
     if (Wp.data.some(it => match(c, it, 'mine'))) return lens;
     return lenses(c).find(l => l !== 'mine' && Wp.data.some(it => match(c, it, l))) || lens;
   }
   async function go(kind){
-    const c = ctxCache;
+    const c = cur();
     const lens = c ? homeLens(c) : 'org';
     if (kind === 'conversations' && allowed('chat')) return window.ConversationWorkbench.show();
     if (kind === 'projects' && allowed('projects')) return switchPanel('projects');
