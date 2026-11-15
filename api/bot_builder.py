@@ -232,6 +232,8 @@ def _validate(identity, body):
         value = body.get(key, "")
         if not isinstance(value, str) or len(value) > maximum:
             raise ValueError("Invalid " + key)
+    existing = _config(identity, name) if target.exists() else None
+    _, rights = access(identity)
     choices = catalog(identity)
     clean = {key: body.get(key, "") for key in ("title", "description", "system_prompt", "default_model", "model_provider")}
     for key in ("skills", "mcp_servers", "cli_tools", "allowed_users", "allowed_groups"):
@@ -239,7 +241,18 @@ def _validate(identity, body):
         if not isinstance(values, list) or len(values) > 10000 or any(not isinstance(v, str) for v in values):
             raise ValueError("Invalid " + key)
         known = {entry.get("email", entry.get("name")) for entry in choices[{"allowed_users":"users", "allowed_groups":"groups"}.get(key, key)]}
-        if set(values) - known:
+        missing = set(values) - known
+        if missing and key == "skills" and existing and set(values) == set(existing["skills"]):
+            # A bot owns its installed copy after the shared catalogue moves.
+            # The unchanged selection is never recopied. Check current grants
+            # and the local files before accepting it for an unrelated edit.
+            installed = target / "skills"
+            for skill in tuple(missing):
+                file = installed / skill / "SKILL.md"
+                if (_selected_allowed(rights.grants.skills_load, skill) and file.is_file()
+                        and file.resolve() == file and file.is_relative_to(installed)):
+                    missing.remove(skill)
+        if missing:
             raise PermissionError("Unavailable selection in " + key)
         clean[key] = sorted(set(values))
     if "bot_memory" in body:
@@ -247,7 +260,6 @@ def _validate(identity, body):
             raise ValueError("Bot memory must be at most 32768 characters")
         clean["bot_memory"] = body["bot_memory"]
     from api.profiles import _validate_profile_model_selection
-    existing = _config(identity, name) if target.exists() else None
     unchanged_model = existing is not None and all(
         clean[key] == existing[key] for key in ("default_model", "model_provider"))
     # Editing instructions/photo must not depend on live provider discovery
@@ -255,7 +267,6 @@ def _validate(identity, body):
     # authoritative, and any new selection still uses strict validation.
     if not unchanged_model:
         _validate_profile_model_selection(clean["default_model"], clean["model_provider"])
-    _, rights = access(identity)
     for field, value in ((rights.grants.models, clean["default_model"]),
                          (rights.grants.model_providers, clean["model_provider"])):
         if value and not _selected_allowed(field, value):
@@ -267,8 +278,8 @@ def save(identity, body):
     from api import profiles, bot_metadata
     from utils import atomic_yaml_write
     # Validate every field before a profile directory becomes discoverable.
-    name, target, clean = _validate(identity, body)
     with _LOCK, bot_metadata._LOCK:
+        name, target, clean = _validate(identity, body)
         exists = target.exists()
         require_edit(identity, name if exists else None)
         previous = managed(name) if exists else None
