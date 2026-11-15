@@ -146,7 +146,27 @@
 .wp-finding header strong{color:var(--accent-text,var(--accent));font-size:13px}
 .wp-finding time{font-size:12px;color:var(--muted)}
 .wp-finding-preview,.wp-finding-body{margin:0;font-size:14px;line-height:1.55;color:var(--text)}
-.wp-finding-body{white-space:pre-wrap;max-height:22rem;overflow:auto}
+.wp-finding-reader{box-sizing:border-box;width:min(46rem,calc(100% - 24px));max-height:min(82dvh,56rem);padding:0;margin:auto;overflow:hidden;border:1px solid var(--border);border-radius:var(--sp-radius-lg,14px);background:var(--surface);color:var(--text);box-shadow:0 16px 60px #0004}
+.wp-finding-reader[open]{display:flex;flex-direction:column}
+.wp-finding-reader::backdrop{background:rgba(13,17,24,.58)}
+.wp-finding-reader>header,.wp-finding-reader>footer{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px clamp(16px,4vw,28px);flex:none}
+.wp-finding-reader>header{border-bottom:1px solid var(--border)}
+.wp-finding-reader h2{margin:0;font-size:18px;line-height:1.35;overflow-wrap:anywhere}
+.wp-finding-reader h2:focus{outline:none}
+.wp-finding-reader time{font-size:12px;color:var(--muted)}
+.wp-finding-reader>footer{justify-content:flex-end;border-top:1px solid var(--border)}
+.wp-finding-reader button{min-height:40px}
+.wp-finding-body{padding:20px clamp(16px,4vw,28px);overflow:auto;overscroll-behavior:contain;overflow-wrap:anywhere;font-size:15px;line-height:1.65}
+.wp-finding-body>:first-child{margin-top:0}
+.wp-finding-body>:last-child{margin-bottom:0}
+.wp-finding-body h3{font-size:1.05em;line-height:1.4;margin:1.35em 0 .35em;color:var(--strong,var(--text))}
+.wp-finding-body p,.wp-finding-body ul,.wp-finding-body ol{margin:.4em 0 .8em}
+.wp-finding-body ul,.wp-finding-body ol{padding-inline-start:1.6em}
+.wp-finding-body li+li{margin-top:.35em}
+.wp-finding-body a{color:var(--accent-text,var(--accent));text-decoration:underline;text-underline-offset:2px}
+.wp-finding-body pre,.wp-finding-body table{max-width:100%;overflow:auto}
+.wp-finding-body table{display:block}
+.wp-finding-body code{font-size:.89em;background:var(--surface-subtle);padding:.1em .25em;border-radius:3px}
 .wp-finding-actions{display:flex;align-items:center;justify-content:space-between;gap:6px 12px;flex-wrap:wrap;margin-top:auto}
 .wp-finding-actions button,.wp-findings>.wp-card-head button{min-height:36px}
 .wp-findings-note{margin:0;padding:0 20px 16px;color:var(--muted);font-size:13px}

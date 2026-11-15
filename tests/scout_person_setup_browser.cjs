@@ -74,6 +74,11 @@ const scout=source.slice(source.indexOf('// Scout card (api/bot_scout.py)'),sour
     await page.locator('#builderTab6').click();
     assert.equal(await page.locator('#botScoutPrompt').inputValue(),'Keep this personal draft','Scout draft survives editor tab switch');
     await page.locator('[data-scout-template="agenda"]').click();
+    await page.getByRole('button',{name:'Technische gezondheid'}).click();
+    const technicalDraft=await page.locator('#botScoutPrompt').inputValue();
+    assert.match(technicalDraft,/terugkerende fouten/);
+    await page.getByRole('button',{name:'Technische gezondheid'}).click();
+    assert.equal(await page.locator('#botScoutPrompt').inputValue(),technicalDraft);
     assert.match(await page.locator('#botScoutPrompt').inputValue(),/^Keep this personal draft/);
     assert.equal(await page.locator('#botScoutCrossBot').isChecked(),false,'templates do not grant extra conversation context');
     await page.locator('#botScoutFrequency').selectOption('weekdays');

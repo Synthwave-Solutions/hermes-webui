@@ -322,3 +322,9 @@ The task calendar opens in the current week. Select a day in the month grid to
 inspect its tasks and expand repeated times. Projections use the scheduler
 owner's timezone and display in the viewer's timezone. Paused and completed
 jobs have no future runs. Task history holds the actual execution results.
+
+Personal Scout findings on Studio Home use a short preview. If a report opens with
+a routine no-change notice, the preview favours the next concrete finding or
+recommendation. Read update opens the original report in a keyboard-accessible
+reader with headings, lists and source links. Discuss in chat carries the original
+delivery into its conversation as a removable context chip.

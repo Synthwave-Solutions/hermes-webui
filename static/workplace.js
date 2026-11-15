@@ -317,27 +317,108 @@
   }
   function allowed(panel) { return !!window.SynthPulseWorkspace?.allowed(panel); }
   let findings = null, findingsFailed = false, showEarlier = false;
-  const expandedFindings = new Set();
+  // Older reports use plain section labels. Give them the same hierarchy as new Markdown reports.
+  const findingLabel = /^(?:\*\*)?(update|mijn advies|advies|dit kan ik voor je oppakken|volgende stap|waarom nu|bron(?:nen)?|my advice|my recommendation|what i can do for you|next steps?|why now|sources?)(?:\*\*)?\s*(?::(?:\*\*)?\s*|$)/i;
+  const quietFinding = /^(?:(?:er zijn|ik heb)\s+geen nieuwe (?:scout[ -]?)?(?:items|signalen|bevindingen)|(?:there are |i found )?no new (?:scout[ -]?)?(?:items|signals|findings|updates))\b/i;
 
   function findingPreview(body) {
-    const plain = body.replace(/!?\[([^\]]+)\]\([^)]+\)/g, '$1')
-      .replace(/^\s*(?:#{1,6}\s+|[-*>]\s+)/gm, '').replace(/\*\*|__|`/g, '')
-      .replace(/\s+/g, ' ').trim();
+    let first = '', fallback = '', section = '', plain = '';
+    for (const line of body.split(/\r?\n/)) {
+      const text = line.trim().replace(/^#{1,6}\s+/, '');
+      const label = text.match(findingLabel);
+      if (label) section = label[1].toLowerCase();
+      const snippet = text.slice(label ? label[0].length : 0)
+        .replace(/!?\[([^\]]*)\]\([^)]+\)/g, '$1')
+        .replace(/^(?:[-*>]|\d+[.)])\s+/, '')
+        .replace(/(\*\*|__|\*|`)(.+?)\1/g, '$2').trim();
+      if (!snippet) continue;
+      if (!first) first = snippet;
+      if (quietFinding.test(snippet)) continue;
+      if (!fallback) fallback = snippet;
+      if (!quietFinding.test(first) || /advies|oppakken|volgende|advice|recommendation|next step|can do/.test(section)) {
+        plain = snippet;
+        break;
+      }
+    }
+    plain = plain || fallback || first;
     if (plain.length <= 170) return plain;
     const cut = plain.slice(0, 169);
     return (cut.replace(/\s+\S*$/, '') || cut) + '…';
   }
 
+  function findingDocument(source) {
+    let fenced = false;
+    const normalized = source.split(/\r?\n/).map(line => {
+      if (/^\s*`{3}/.test(line)) { fenced = !fenced; return line; }
+      if (fenced) return line;
+      return line.trim().replace(findingLabel, (_,label) => '### ' + label + '\n')
+        .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1');
+    }).join('\n');
+    const template = document.createElement('template');
+    template.innerHTML = _kanbanRenderMarkdown(normalized);
+    // Keep only reading elements from the inert Markdown document. No embeds, controls or remote media.
+    const tags = new Set('p h1 h2 h3 h4 h5 h6 strong em del code pre ol ul li a blockquote table tbody tr td hr br'.split(' '));
+    for (const node of [...template.content.querySelectorAll('*')].reverse()) {
+      if (node.matches('input[type=checkbox]')) {
+        node.replaceWith(node.checked ? '☑ ' : '☐ ');
+        continue;
+      }
+      if (!tags.has(node.localName)) { node.replaceWith(...node.childNodes); continue; }
+      const href = node.getAttribute('href');
+      for (const attr of [...node.attributes]) node.removeAttribute(attr.name);
+      if (node.localName === 'a') {
+        let url;
+        try { url = new URL(href); } catch (_) {}
+        if (!url || !['https:', 'http:'].includes(url.protocol) || url.username || url.password) {
+          node.replaceWith(...node.childNodes); continue;
+        }
+        node.href = url.href; node.target = '_blank'; node.rel = 'noopener noreferrer';
+      }
+      if (/^h[1-6]$/.test(node.localName) && node.localName !== 'h3') {
+        const heading = document.createElement('h3');
+        heading.append(...node.childNodes); node.replaceWith(heading);
+      }
+    }
+    return template.content;
+  }
+
+  function findingDate(row) {
+    return new Intl.DateTimeFormat(lang(), {day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'}).format(row.at * 1000);
+  }
+
   function findingCard(row, index) {
-    const key = row.session_id + '/' + row.run_at;
-    const date = new Intl.DateTimeFormat(lang(), {day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit'}).format(row.at * 1000);
-    const expanded = expandedFindings.has(key);
     return `<article class="wp-finding" data-finding-index="${index}"${index >= 3 && !showEarlier ? ' hidden' : ''}>
-      <header><strong>${H(row.bot)}</strong><time datetime="${H(row.run_at)}">${H(date)}</time></header>
-      <p class="wp-finding-preview"${expanded ? ' hidden' : ''}>${H(findingPreview(row.body))}</p>
-      <div id="wpFindingBody${index}" class="wp-finding-body" tabindex="0"${expanded ? '' : ' hidden'}>${expanded ? H(row.body) : ''}</div>
-      <div class="wp-finding-actions"><button type="button" class="om-link" data-finding-read aria-expanded="${expanded}" aria-controls="wpFindingBody${index}">${H(w(expanded ? 'findings_close' : 'findings_read'))}</button>
+      <header><strong>${H(row.bot)}</strong><time datetime="${H(row.run_at)}">${H(findingDate(row))}</time></header>
+      <p class="wp-finding-preview">${H(findingPreview(row.body))}</p>
+      <div class="wp-finding-actions"><button type="button" class="om-link" data-finding-read aria-haspopup="dialog">${H(w('findings_read'))}</button>
       <button type="button" class="sm-btn" data-finding-chat>${H(w('findings_chat'))}</button></div></article>`;
+  }
+
+  function readFinding(row, button) {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'wp-finding-reader';
+    dialog.setAttribute('aria-labelledby', 'wpFindingReaderTitle');
+    dialog.innerHTML = `<header><div><h2 id="wpFindingReaderTitle" tabindex="-1">${H(row.bot)}</h2>
+      <time datetime="${H(row.run_at)}">${H(findingDate(row))}</time></div>
+      <button type="button" class="sm-btn" data-reader-close>${H(w('findings_close'))}</button></header>
+      <div class="wp-finding-body"></div><footer><button type="button" class="sm-btn" data-reader-chat>${H(w('findings_chat'))}</button></footer>`;
+    dialog.querySelector('.wp-finding-body').append(findingDocument(row.body));
+    document.body.append(dialog);
+    const dismiss = () => dialog.close();
+    dialog.querySelector('[data-reader-close]').onclick = dismiss;
+    dialog.querySelector('[data-reader-chat]').onclick = () => { dismiss(); void discussFinding(row, button); };
+    dialog.addEventListener('click', ev => {
+      if (ev.target !== dialog) return;
+      const box = dialog.getBoundingClientRect();
+      if (ev.clientX < box.left || ev.clientX > box.right || ev.clientY < box.top || ev.clientY > box.bottom) dismiss();
+    });
+    window.addEventListener('popstate', dismiss);
+    dialog.addEventListener('close', () => {
+      window.removeEventListener('popstate', dismiss);
+      dialog.remove();
+    }, {once:true});
+    dialog.showModal();
+    dialog.querySelector('h2').focus({preventScroll:true});
   }
 
   function findingsSection() {
@@ -374,7 +455,7 @@
     try {
       await _openSidebarSession(row, {explicitProfile:true});
       if (_currentPanel === 'chat' && S.session?.session_id === row.session_id && _profileMatchesActiveProfile(row.profile,S.activeProfile||'default')) {
-        _addNamedContextBlock(row.body, row.bot + ' · ' + button.closest('article').querySelector('time').textContent);
+        _addNamedContextBlock(row.body, row.bot + ' · ' + findingDate(row));
         document.getElementById('msg')?.focus();
       }
     } catch (_e) { showToast(w('failed')); }
@@ -444,7 +525,7 @@
   async function render(body, opts){
     Wp.body = body; Wp.setup = (opts && opts.setup) || '';
     const token = ++Wp.token;
-    findings = null; findingsFailed = false; showEarlier = false; expandedFindings.clear();
+    findings = null; findingsFailed = false; showEarlier = false;
     const fetchOnEntry = allowed('chat');
     if (fetchOnEntry) void loadFindings(token);
     if (!body.dataset.wpBound) {
@@ -514,13 +595,7 @@
       if (!row) return;
       if (b.hasAttribute('data-finding-chat')) { void discussFinding(row, b); return; }
       if (b.hasAttribute('data-finding-read')) {
-        const key = row.session_id + '/' + row.run_at, expanded = !expandedFindings.has(key);
-        if (expanded) expandedFindings.add(key); else expandedFindings.delete(key);
-        const body = card.querySelector('.wp-finding-body');
-        body.textContent = expanded ? row.body : '';
-        body.hidden = !expanded;
-        card.querySelector('.wp-finding-preview').hidden = expanded;
-        b.setAttribute('aria-expanded', String(expanded)); b.textContent = w(expanded ? 'findings_close' : 'findings_read');
+        readFinding(row, b);
         return;
       }
     }

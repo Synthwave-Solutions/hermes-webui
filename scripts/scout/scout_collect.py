@@ -73,9 +73,11 @@ TOPIC_INTERVAL_HOURS = float(os.environ.get("SCOUT_TOPIC_INTERVAL_HOURS", "20"))
 MAX_TOPICS = 8
 RUNTIME_BUDGET_S = 50.0
 OK_STATUSES = {"ok", "success", "silent", "skipped", None, ""}
+OVERDUE_GRACE_SECONDS = 3600
 
 # Lower = more important; within a rank newest first.
-RANK = {"person_job_failure": 0, "job_failure": 0, "kanban_person": 1, "gchat": 1, "screen": 1,
+RANK = {"person_job_repeated_failure": 0, "person_job_overdue": 0, "person_job_failure": 0,
+        "job_failure": 0, "kanban_person": 1, "gchat": 1, "screen": 1,
         "kanban_blocked": 2, "kanban_review": 3, "kanban_stale": 4, "kanban_opportunity": 5,
         "person_job_output": 5, "job_output": 6, "bot_chat": 2}
 
@@ -417,6 +419,7 @@ def _streak_start(led, jid: str, job: dict, failing: bool) -> str:
 
 def collect_jobs(ctx: dict, since: float, led=None) -> list[dict]:
     out_root = ctx["home"] / "cron" / "output"
+    now = time.time()
     items: list[dict] = []
     for job in load_jobs(ctx):
         jid = str(job.get("id") or "")
@@ -427,6 +430,8 @@ def collect_jobs(ctx: dict, since: float, led=None) -> list[dict]:
         enabled = job.get("enabled", True) is not False
         status = job.get("last_status")
         failing = enabled and status not in OK_STATUSES
+        monitoring = (mine and bool(job.get("enabled", True)) and not job.get("paused_at")
+                      and job.get("state", "scheduled") == "scheduled")
         start = _streak_start(led, jid, job, failing) if led is not None else ""
         if failing:
             err = clean(job.get("last_error") or "", 160)
@@ -437,10 +442,30 @@ def collect_jobs(ctx: dict, since: float, led=None) -> list[dict]:
                 summary += f", failure_streak={streak}"
             if err:
                 summary += f": {err}"
-            items.append({"source": "person_job_failure" if mine else "job_failure",
-                          "id_or_url": f"{jid}:fail:{status}:{sig}:{start}",
-                          "title": f"{'Jouw job' if mine else 'Job'} faalt: {name}", "summary": clean(summary, SUMMARY_CHARS),
-                          "ts": _parse_iso(job.get("last_run_at")) or time.time()})
+            if monitoring and isinstance(streak, int) and streak >= 3:
+                source = "person_job_repeated_failure"
+                identity = f"{jid}:repeated:{start}"
+                title = f"Jouw taak faalt herhaaldelijk: {name}"
+            else:
+                source = "person_job_failure" if mine else "job_failure"
+                identity = f"{jid}:fail:{status}:{sig}:{start}"
+                title = f"{'Jouw job' if mine else 'Job'} faalt: {name}"
+            items.append({"source": source, "id_or_url": identity, "title": title,
+                          "summary": clean(summary, SUMMARY_CHARS), "ts": _parse_iso(job.get("last_run_at")) or now})
+        elif monitoring and not job.get("fire_claim") and not job.get("manual_run_at"):
+            # Recurring runs advance next_run_at on claim. A passed slot is a
+            # schedule discrepancy, not proof that downstream delivery failed.
+            schedule = job.get("schedule")
+            planned = job.get("next_run_at")
+            if (isinstance(schedule, dict) and schedule.get("kind") in ("cron", "interval")
+                    and isinstance(planned, str) and re.search(r"(?:Z|[+-]\d\d:\d\d)$", planned)):
+                slot = _parse_iso(planned)
+                last = _parse_iso(job.get("last_run_at"))
+                if slot and now - slot >= OVERDUE_GRACE_SECONDS and (not job.get("last_run_at") or (last is not None and last < slot)):
+                    items.append({"source": "person_job_overdue", "id_or_url": f"{jid}:due:{slot}",
+                                  "title": f"Planning loopt achter: {name}",
+                                  "summary": f"Gepland voor {planned}. De planning toont nog geen latere uitvoering. "
+                                             "Controleer de taakplanning en de laatste run.", "ts": slot})
         out_dir = out_root / jid
         if not out_dir.is_dir():
             continue
@@ -1213,6 +1238,11 @@ def render(meta: dict, ctx: dict, items: list[dict], notes: list[str], topics: l
         head.append("## Bronnotities")
         head.extend(f"- {n}" for n in notes)
     text = "\n".join(head)
+    text += ("\n\nSchrijf de update met de belangrijkste concrete bevinding of voorbereiding voorop. "
+             "Sla een algemene opening over ontbrekend nieuws over als er concreet advies is. "
+             "Gebruik korte alinea’s, een bron bij de bevinding en een voorstel voor de eerstvolgende stap. "
+             "Bij een technische melding: noem de taak en het gemeten tijdstip of aantal fouten. "
+             "Onderbouw gevolgen en onderscheid een vermoeden van een vastgestelde oorzaak.")
     shown: list[dict] = []
     if items:
         text += "\n\n## Items"
@@ -1315,6 +1345,11 @@ def run() -> int:
             fresh.append(it)
         # Rows shown before that nobody classified come back (up to MAX_SHOWS times).
         for row in led.unclassified():
+            # Schedule/incident snapshots expire when the source no longer confirms them.
+            if row["source"] in {"person_job_overdue", "person_job_repeated_failure", "person_job_failure"}:
+                if jobs_ok and row["hash"] not in seen_batch:
+                    led.set_status(row["hash"], "ignored", now=int(now), only_from_new=True)
+                continue
             if row["hash"] not in seen_batch:
                 seen_batch.add(row["hash"])
                 fresh.append(row)
