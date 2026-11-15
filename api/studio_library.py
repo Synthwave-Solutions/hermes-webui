@@ -696,6 +696,8 @@ CADENCES = ("daily", "weekly", "monthly", "adhoc")
 TASK_KINDS = ("automate", "assist", "human")
 LANGS, TONES, LENGTHS, FORMATS = ("nl", "en"), ("informal", "formal"), ("short", "detailed"), ("bullets", "prose")
 AI_LEVELS = ("beginner", "regular", "advanced")
+# What the person wants off their plate first (the chat intake asks this).
+WISHES = ("mail", "calendar", "meetings", "documents", "research", "recurring")
 
 
 def _person_file(email: str) -> str:
@@ -732,7 +734,9 @@ def clean_person(raw: dict) -> dict:
     lit = raw.get("literacy") if isinstance(raw.get("literacy"), dict) else {}
     out_lit = {"self": lit.get("self") if lit.get("self") in AI_LEVELS else "", "score": studio._int(lit.get("score"), 0, 3),
                "answered": bool(lit.get("answered"))}
-    return {"role": out_role, "tasks": tasks, "tools": lst(raw.get("tools"), 30, 40), "prefs": out_prefs, "literacy": out_lit}
+    wishes = [x for x in dict.fromkeys(raw.get("wishes") if isinstance(raw.get("wishes"), list) else []) if x in WISHES]
+    return {"role": out_role, "tasks": tasks, "tools": lst(raw.get("tools"), 30, 40), "prefs": out_prefs, "literacy": out_lit,
+            "wishes": wishes, "wish_other": _txt(raw.get("wish_other"), 120)}
 
 
 _NL = {"seniority": {"junior": "junior", "medior": "medior", "senior": "senior", "lead": "teamlead", "management": "management"},
@@ -740,7 +744,9 @@ _NL = {"seniority": {"junior": "junior", "medior": "medior", "senior": "senior",
        "cadence": {"daily": "dagelijks", "weekly": "wekelijks", "monthly": "maandelijks", "adhoc": "af en toe"},
        "language": {"nl": "Nederlands", "en": "Engels"}, "tone": {"informal": "informeel (je)", "formal": "formeel (u)"},
        "length": {"short": "kort en bondig", "detailed": "uitgebreid"}, "format": {"bullets": "opsommingen", "prose": "lopende tekst"},
-       "ai": {"beginner": "beginner met AI", "regular": "gebruikt AI regelmatig", "advanced": "ervaren met AI"}}
+       "ai": {"beginner": "beginner met AI", "regular": "gebruikt AI regelmatig", "advanced": "ervaren met AI"},
+       "wish": {"mail": "mail en chat bijhouden", "calendar": "agenda beheren", "meetings": "vergaderingen en de dag voorbereiden",
+                "documents": "documenten en voorstellen maken", "research": "dingen uitzoeken", "recurring": "terugkerende taken overnemen"}}
 
 
 def person_note(intake: dict, team_name: str = "") -> str:
@@ -752,6 +758,9 @@ def person_note(intake: dict, team_name: str = "") -> str:
         bits.append("Rol: " + role + ("; werkt " + _NL["work_type"][r["work_type"]] if r.get("work_type") else "") + ".")
     if r.get("focus"):
         bits.append("Focus: " + "; ".join(r["focus"][:4]) + ".")
+    wish = [_NL["wish"][x] for x in intake.get("wishes") or []] + ([intake["wish_other"]] if intake.get("wish_other") else [])
+    if wish:
+        bits.append("Wil als eerste uit handen geven: " + "; ".join(wish[:6]) + ".")
     if t:
         bits.append("Terugkerend werk: " + "; ".join(f"{x['name']} ({_NL['cadence'][x['cadence']]})" for x in t[:5]) + ".")
     if intake.get("tools"):
@@ -779,6 +788,13 @@ def save_person(view, identity, body: dict) -> dict:
     from api import personal_context
 
     intake = clean_person(body)
+    before = load_person(view.email)
+    if "wishes" not in body and "wish_other" not in body:
+        # The Studio form does not ask this; keep what the chat intake stored.
+        intake.update(wishes=[x for x in before.get("wishes") or [] if x in WISHES], wish_other=_txt(before.get("wish_other"), 120))
+    for key in ("first_tasks", "onboarding"):
+        if isinstance(before.get(key), dict):
+            intake[key] = before[key]
     team_key = intake["role"]["team"]
     teams = org_structure.load().get("teams") or {}
     team_name = (teams.get(team_key) or {}).get("name") or ""
@@ -802,6 +818,148 @@ def save_person(view, identity, body: dict) -> dict:
         _write(_person_file(view.email), intake)
     used = sum(len(e) for e in entries) + max(0, len(entries) - 1) * 3
     return dict(intake, notes_used=used, notes_limit=USER_NOTE_LIMIT, note_written=written, notes_room=max(0, room))
+
+
+# ── First tasks: what the agent proposes right after the intake ─────────────
+# The idea and the rules for the cards follow the onboarding of Nod, n8n's open
+# source personal agent (Apache 2.0, https://github.com/n8n-io/nod): one result
+# that can be finished now, two recurring jobs, titles written as the person's
+# own request because choosing a card puts exactly that text in the chat.
+# Nothing is read from mail or calendar here: that only happens when the person
+# chooses the card that asks for it, in an ordinary governed conversation.
+
+FIRST_TASK_WORDS = 14
+_FIRST = """Je stelt iemand die net kennis heeft gemaakt met zijn AI-assistent drie eerste taken voor.
+Je krijgt wat die persoon over zichzelf vertelde: rol, wat hij uit handen wil geven, terugkerend werk en systemen.
+Kies precies drie taken: eerst een nuttig resultaat dat de assistent nu in een paar minuten kan afmaken (kind "now"),
+daarna twee terugkerende klussen (kind "ongoing").
+Regels:
+- Baseer elke taak op wat de persoon noemde. Verzin geen systemen, klanten of feiten.
+- De taak nu is lezen, uitzoeken, samenvatten of een concept maken. Nooit iets versturen, boeken, betalen of verwijderen.
+- Schrijf de titel als het verzoek van de persoon zelf, in de ik-vorm of gebiedende wijs, omdat de titel letterlijk
+  als bericht in de chat komt. Begin met een werkwoord. Hooguit 12 woorden. Geen punt aan het eind.
+- Een terugkerende titel zegt wat en wanneer, bijvoorbeeld elke werkdag om 8 uur, elke vrijdag of zodra er iets binnenkomt.
+- Geen gevoelige onderwerpen, geen wachtwoorden of inloggegevens.
+- intro: een zin van hooguit 30 woorden die zegt waarop je de voorstellen baseerde. Geen groet, geen uitroeptekens.
+- Schrijf in de taal: {language}. Gebruik geen gedachtestreepjes.
+Alleen JSON: {{"intro": "...", "tasks": [{{"kind": "now", "title": "..."}}, {{"kind": "ongoing", "title": "..."}}, {{"kind": "ongoing", "title": "..."}}]}}"""
+
+_FIRST_TEXT = {
+    "nl": {"intro": "Dit zijn drie taken waar veel mensen mee beginnen. Kies er een, dan zet ik hem voor je klaar in de chat.",
+           "now": "Zet op een rij wat vandaag mijn aandacht nodig heeft",
+           "ongoing": ["Geef me elke werkdag om 8 uur een overzicht van mijn dag", "Stuur me elke vrijdag een terugblik op mijn week"],
+           "by_wish": {"mail": ("Maak concepten voor de mails die op mijn antwoord wachten", "Vat elke ochtend mijn nieuwe mail voor me samen"),
+                       "calendar": ("Laat zien waar mijn agenda deze week te vol zit", "Loop elke maandag mijn agenda van de week met me door"),
+                       "meetings": ("Bereid mijn eerstvolgende overleg voor met de stukken erbij", "Bereid elke ochtend mijn overleggen van die dag voor"),
+                       "documents": ("Maak een eerste opzet voor het document waar ik nu aan werk", "Werk elke vrijdag mijn lopende documenten bij met wat er nieuw is"),
+                       "research": ("Zoek uit wat er deze maand nieuw is in mijn vakgebied", "Geef me elke maandag het nieuws uit mijn vakgebied"),
+                       "recurring": ("Zet mijn terugkerende taken op een rij met wat jij kunt overnemen", "Herinner me elke maandag aan mijn terugkerende taken van die week")},
+           "common": ["Geef me elke werkdag om 8 uur een overzicht van mijn dag", "Stuur me elke vrijdag een terugblik op mijn week",
+                      "Geef me elke maandag het nieuws uit mijn vakgebied", "Zet op een rij welk terugkerend werk je van me kunt overnemen"],
+           "mail": "Kijk in mijn recente mail en agenda en stel drie taken voor die je van me kunt overnemen"},
+    "en": {"intro": "These are three tasks many people start with. Pick one and I will put it ready for you in the chat.",
+           "now": "List what needs my attention today",
+           "ongoing": ["Give me an overview of my day every workday at 8", "Send me a review of my week every Friday"],
+           "by_wish": {"mail": ("Draft replies to the mails waiting for my answer", "Summarise my new mail for me every morning"),
+                       "calendar": ("Show me where my calendar is too full this week", "Walk me through my week's calendar every Monday"),
+                       "meetings": ("Prepare my next meeting with the documents that belong to it", "Prepare my meetings of the day every morning"),
+                       "documents": ("Make a first outline for the document I am working on now", "Update my running documents every Friday with what is new"),
+                       "research": ("Find out what is new in my field this month", "Give me the news in my field every Monday"),
+                       "recurring": ("List my recurring tasks with what you can take over", "Remind me every Monday of my recurring tasks for the week")},
+           "common": ["Give me an overview of my day every workday at 8", "Send me a review of my week every Friday",
+                      "Give me the news in my field every Monday", "List which recurring work you can take over from me"],
+           "mail": "Look at my recent mail and calendar and propose three tasks you can take over from me"},
+}
+
+
+def _fallback_tasks(intake: dict, lang: str) -> list:
+    """Three cards that always make sense, steered by what the person wants off their plate."""
+    text = _FIRST_TEXT[lang]
+    wishes = [x for x in intake.get("wishes") or [] if x in WISHES]
+    now = text["by_wish"][wishes[0]][0] if wishes else text["now"]
+    ongoing = [text["by_wish"][x][1] for x in wishes[:2]]
+    for extra in text["ongoing"]:
+        if len(ongoing) < 2 and extra not in ongoing:
+            ongoing.append(extra)
+    return [{"kind": "now", "title": now}] + [{"kind": "ongoing", "title": x} for x in ongoing[:2]]
+
+
+def _valid_first_tasks(answer) -> list:
+    """The model's three cards, or an empty list when the shape or a title is off."""
+    rows = answer.get("tasks") if isinstance(answer, dict) else None
+    if not isinstance(rows, list) or len(rows) != 3:
+        return []
+    out, seen = [], set()
+    for i, row in enumerate(rows):
+        title = _txt(row.get("title") if isinstance(row, dict) else "", 160).rstrip(".!")
+        kind = "now" if i == 0 else "ongoing"
+        if not title or len(title.split()) > FIRST_TASK_WORDS or title.lower() in seen or re.search(r"[\u2013\u2014]|https?://", title):
+            return []
+        seen.add(title.lower())
+        out.append({"kind": kind, "title": title})
+    return out
+
+
+def first_tasks(view, body: dict) -> dict:
+    """Propose the first three tasks from the stored intake and keep them for the chat's empty state."""
+    lang = "en" if str(body.get("lang") or "").lower().startswith("en") else "nl"
+    person = load_person(view.email)
+    intake = clean_person(person)
+    text = _FIRST_TEXT[lang]
+    known = any((intake["role"]["title"], intake["tasks"], intake["wishes"], intake["wish_other"], intake["tools"]))
+    tasks, intro, personal = [], "", False
+    if known:
+        facts = {"rol": intake["role"]["title"], "specialisme": intake["role"]["speciality"], "focus": intake["role"]["focus"],
+                 "wil_uit_handen_geven": [_NL["wish"][x] for x in intake["wishes"]] + ([intake["wish_other"]] if intake["wish_other"] else []),
+                 "terugkerend_werk": [{"taak": t["name"], "hoe_vaak": _NL["cadence"][t["cadence"]]} for t in intake["tasks"][:10]],
+                 "systemen": intake["tools"][:12]}
+        try:
+            answer = studio._ask_json(_FIRST.format(language="Engels" if lang == "en" else "Nederlands"), json.dumps(facts, ensure_ascii=False))
+            tasks = _valid_first_tasks(answer)
+            intro = _txt(answer.get("intro"), 240) if tasks else ""
+            personal = bool(tasks)
+        except Exception:
+            tasks = []
+    if not tasks:
+        tasks = _fallback_tasks(intake, lang)
+    if not intro or re.search(r"[\u2013\u2014!]", intro):
+        intro = text["intro"]
+    taken = {t["title"].lower() for t in tasks}
+    common = [x for x in text["common"] if x.lower() not in taken][:2]
+    result = {"intro": intro, "tasks": tasks, "common": common, "mail": text["mail"], "personal": personal, "lang": lang,
+              "created_at": time.time()}
+    with _LOCK:
+        (_dir() / "people").mkdir(parents=True, exist_ok=True)
+        fresh = load_person(view.email)
+        fresh["first_tasks"] = result
+        fresh.setdefault("email", view.email)
+        _write(_person_file(view.email), fresh)
+    return result
+
+
+def onboarding_state(view, body: dict) -> dict:
+    """Remember that the person chose 'later' or hid the cards, so the offer shows once."""
+    with _LOCK:
+        (_dir() / "people").mkdir(parents=True, exist_ok=True)
+        person = load_person(view.email)
+        state = person.get("onboarding") if isinstance(person.get("onboarding"), dict) else {}
+        if body.get("dismissed"):
+            state["dismissed_at"] = time.time()
+        if body.get("cards_hidden"):
+            state["cards_hidden_at"] = time.time()
+        person["onboarding"] = state
+        person.setdefault("email", view.email)
+        _write(_person_file(view.email), person)
+    return {"ok": True, "onboarding": state}
+
+
+def intake_offer(person: dict) -> bool:
+    """Offer the chat intake once: nothing saved yet and not postponed. An install switches the
+    offer on with SP_INTAKE_OFFER=1; without it the intake only opens when the person asks for it."""
+    if os.environ.get("SP_INTAKE_OFFER") != "1":
+        return False
+    state = person.get("onboarding") if isinstance(person.get("onboarding"), dict) else {}
+    return not person.get("updated_at") and not state.get("dismissed_at")
 
 
 def person_context_text(email: str) -> str:
@@ -844,7 +1002,8 @@ def handle_get(handler, parsed) -> bool:
             notes = personal_context.read_file(personal_context.paths(_request_identity(handler))["user"])
             data = org_structure.load()
             mine = sorted(view.member_teams | view.lead_teams)
-            j(handler, dict(load_person(view.email), email=view.email, my_teams=mine,
+            person = load_person(view.email)
+            j(handler, dict(person, email=view.email, my_teams=mine, offer_intake=intake_offer(person),
                             teams=[{"key": k, "name": (t or {}).get("name") or k} for k, t in sorted((data.get("teams") or {}).items()) if isinstance(t, dict)],
                             org_systems=load_profile().get("systems") or [],
                             notes_used=len(notes), notes_limit=USER_NOTE_LIMIT))
@@ -892,6 +1051,10 @@ def handle_post(handler, parsed, body) -> bool:
                 j(handler, save_person(view, _request_identity(handler), body))
             elif body.get("op") == "me_extract":
                 j(handler, {"tasks": extract_tasks(body.get("text") or "")})
+            elif body.get("op") == "me_first_tasks":
+                j(handler, first_tasks(view, body))
+            elif body.get("op") == "me_onboarding":
+                j(handler, onboarding_state(view, body))
             else:
                 j(handler, dict(save_profile(view, body), editable=True))
         elif path == "/api/studio/playbook/run":

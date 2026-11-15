@@ -16750,9 +16750,10 @@ window.SynthPulseFeatureCatalog = {
         "[data-tour='studio-intake-note']"
       ],
       "source_refs": [
-        "static/studio_intake.js:217",
-        "api/studio_library.py:777",
-        "api/studio_library.py:746"
+        "static/studio_intake.js:321",
+        "static/intake_chat.js",
+        "api/studio_library.py:786",
+        "api/studio_library.py:752"
       ],
       "related": [
         "webui.studio.org_profile",
@@ -16763,7 +16764,7 @@ window.SynthPulseFeatureCatalog = {
         "en": {
           "title": "About you: the personal intake",
           "purpose": "In six steps you tell the Super Agent who you are: your role and team, your recurring work (describe your week, the agent pulls out the tasks), your systems, what AI may do, how the agent should work with you and a short AI check. A short summary goes into your user profile, so the agent takes it into account in every conversation.",
-          "when": "The first time in Studio, and when your role or work changes.",
+          "when": "The first time in Studio, and when your role or work changes. Rather talk than fill in a form? Choose Rather as a conversation: the agent asks the same things one question at a time and then proposes first tasks.",
           "steps": [
             "Choose About you at the top of the Studio sidebar.",
             "Fill in your role, describe your week and choose Find the tasks; adjust tasks, frequency and minutes.",
@@ -16771,13 +16772,13 @@ window.SynthPulseFeatureCatalog = {
             "Choose Save to my profile. Then put the tasks AI may do on the backlog with one click."
           ],
           "permissions": "Everyone fills in their own intake; nobody else sees or changes it.",
-          "limits": "Only one short note goes into your user profile and replaces the previous intake; your own notes stay. The profile has limited room; the intake respects it.",
+          "limits": "Only one short note goes into your user profile and replaces the previous intake; your own notes stay. The profile has limited room; the intake respects it. A proposed first task is only put ready in the chat; nothing runs until you send it.",
           "example": "Debtors team lead, calls weekly, wants short answers in bullets and never the agent mailing on its own."
         },
         "nl": {
           "title": "Over jou: de persoonlijke intake",
           "purpose": "In zes stappen vertel je de Super Agent wie je bent: je rol en team, je terugkerende werk (beschrijf je week, de agent haalt de taken eruit), je systemen, wat AI mag doen, hoe de agent met je moet werken en een korte AI-check. Een korte samenvatting komt in je gebruikersprofiel, zodat de agent er in elk gesprek rekening mee houdt.",
-          "when": "De eerste keer in Studio, en als je rol of werk verandert.",
+          "when": "De eerste keer in Studio, en als je rol of werk verandert. Liever praten dan een formulier invullen? Kies Liever als gesprek: de agent vraagt hetzelfde, één vraag tegelijk, en stelt daarna eerste taken voor.",
           "steps": [
             "Kies Over jou bovenaan de zijbalk van Studio.",
             "Vul je rol in, beschrijf je week en kies Haal taken eruit; pas de taken, frequentie en minuten aan.",
@@ -16785,7 +16786,7 @@ window.SynthPulseFeatureCatalog = {
             "Kies Opslaan in mijn profiel. Zet daarna met één klik de taken die AI mag doen in de backlog."
           ],
           "permissions": "Iedereen vult zijn eigen intake in; niemand anders ziet of wijzigt die.",
-          "limits": "Alleen één korte notitie gaat naar je gebruikersprofiel en vervangt de vorige intake; je eigen notities blijven. Het profiel heeft beperkte ruimte; de intake houdt daar rekening mee.",
+          "limits": "Alleen één korte notitie gaat naar je gebruikersprofiel en vervangt de vorige intake; je eigen notities blijven. Het profiel heeft beperkte ruimte; de intake houdt daar rekening mee. Een voorgestelde eerste taak wordt alleen klaargezet in de chat; er start niets tot jij hem verstuurt.",
           "example": "Teamlead debiteuren, belt wekelijks na, wil korte antwoorden in opsommingen en nooit dat de agent zelf mailt."
         }
       }
