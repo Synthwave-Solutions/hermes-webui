@@ -2558,6 +2558,12 @@
       "#mainApps [data-app-id=\"langfuse\"]"
     ]
   },
+  "webui.apps.nod": {
+    "panel": "apps",
+    "targets": [
+      "#mainApps [data-app-id=\"nod\"]"
+    ]
+  },
   "webui.apps.hermes_docs": {
     "panel": "apps",
     "targets": [
