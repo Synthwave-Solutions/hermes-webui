@@ -16032,6 +16032,56 @@ window.SynthPulseFeatureCatalog = {
       }
     },
     {
+      "id": "webui.studio.roadmap",
+      "area": "studio",
+      "status": "available",
+      "conditions": [],
+      "anchors": [
+        "?help_feature=webui.studio.roadmap",
+        "[data-tour='studio-backlog-view']",
+        "[data-tour='studio-roadmap']"
+      ],
+      "source_refs": [
+        "static/studio_roadmap.js",
+        "static/studio_library.js",
+        "api/studio_library.py"
+      ],
+      "related": [
+        "webui.studio.backlog",
+        "webui.studio.design"
+      ],
+      "locales": {
+        "en": {
+          "title": "Backlog as a schedule",
+          "purpose": "The same ideas as the backlog list, on a time axis with months and weeks: one bar per idea, coloured by how far it is. A solid bar has a start that someone set. A dashed bar is a proposal: one idea at a time per person, started work first, then the order of the backlog, with a duration that follows the effort.",
+          "when": "To see who does what in which weeks, for yourself, your team, your department or the whole organisation, and to agree on a start.",
+          "steps": [
+            "Open Backlog in the Studio and choose Schedule at the top right.",
+            "Choose whose ideas you see with the view buttons, and group them per person, per team or per department.",
+            "Choose an idea or its bar to set the start week, the number of weeks, who does it and the status.",
+            "Choose Let it be proposed to remove a fixed start again."
+          ],
+          "permissions": "You see the ideas you may see in the list. You schedule your own ideas, the ideas given to you and those of teams you administer.",
+          "limits": "A proposal is indicative: it moves when the order, the effort or the person changes. Parked ideas are left out. The expected saving only counts ideas whose Deep Dive has a baseline.",
+          "example": "Group per person, open Weekly draft reminders and set the start to the first week of December."
+        },
+        "nl": {
+          "title": "Backlog als planning",
+          "purpose": "Dezelfde ideeën als in de backloglijst, op een tijdas met maanden en weken: één balk per idee, gekleurd naar hoe ver het is. Een vaste balk heeft een start die iemand heeft gekozen. Een gestreepte balk is een voorstel: per persoon één idee tegelijk, begonnen werk eerst, daarna de volgorde van de backlog, met een duur die de moeite volgt.",
+          "when": "Om te zien wie wat doet in welke weken, voor jezelf, je team, je afdeling of de hele organisatie, en om een start af te spreken.",
+          "steps": [
+            "Open Backlog in de Studio en kies rechtsboven Planning.",
+            "Kies met de weergaveknoppen wiens ideeën je ziet, en groepeer per persoon, per team of per afdeling.",
+            "Kies een idee of de balk om de startweek, het aantal weken, wie het doet en de status in te stellen.",
+            "Kies Laat voorstellen om een vaste start weer weg te halen."
+          ],
+          "permissions": "Je ziet de ideeën die je ook in de lijst mag zien. Je plant je eigen ideeën, de ideeën die aan jou zijn gegeven en die van teams die je beheert.",
+          "limits": "Een voorstel is indicatief: het schuift mee als de volgorde, de moeite of de persoon verandert. Geparkeerde ideeën blijven buiten beeld. De verwachte besparing telt alleen ideeën waarvan de Deep Dive een nulmeting heeft.",
+          "example": "Groepeer per persoon, open Wekelijkse concept-aanmaningen en zet de start op de eerste week van december."
+        }
+      }
+    },
+    {
       "id": "webui.studio.playbooks",
       "area": "studio",
       "status": "available",

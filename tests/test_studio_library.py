@@ -68,6 +68,63 @@ def test_backlog_scope_rank_and_status(env):
     assert [i["title"] for i in lib.backlog_for(tom)] == ["Rapport"]
 
 
+def test_roadmap_keeps_a_set_start_and_proposes_the_rest(env):
+    from datetime import date
+
+    tom = V(OWNER, env)
+    today = date(2026, 11, 18)                                     # a Wednesday; its week starts on the 16th
+    a = lib.save_item(tom, {"title": "Aanmaningen", "team": "finance/debiteuren", "effort": 2})
+    b = lib.save_item(tom, {"title": "Rapport", "team": "finance/debiteuren", "effort": 1})
+    c = lib.save_item(tom, {"title": "Vast", "team": "finance/debiteuren", "start": "2026-11-26", "weeks": 2})
+    d = lib.save_item(tom, {"title": "Later", "team": "finance/debiteuren", "status": "parked"})
+    lib.save_item(tom, {"id": b["id"], "status": "design"})
+    p = lib.plan(lib.backlog_items(), today)
+    assert c["start"] == "2026-11-23" and p[c["id"]] == {"start": "2026-11-23", "weeks": 2, "end": "2026-12-07", "auto": False}
+    assert p[b["id"]] == {"start": "2026-11-16", "weeks": 1, "end": "2026-11-23", "auto": True}   # started work goes first
+    assert p[a["id"]]["start"] == "2026-12-07" and p[a["id"]]["weeks"] == 2                        # two weeks do not fit before the fixed one
+    assert d["id"] not in p
+    lib.save_item(tom, {"id": c["id"], "start": "", "weeks": ""})
+    again = lib.plan(lib.backlog_items(), today)
+    assert again[c["id"]]["auto"] and again[c["id"]]["weeks"] == 3 and again[a["id"]]["start"] == "2026-11-23"
+    with pytest.raises(ValueError):
+        lib.save_item(tom, {"id": a["id"], "start": "next week"})
+
+
+def test_an_idea_can_be_given_to_a_colleague_who_then_sees_and_plans_it(env):
+    from datetime import date
+
+    tom, eve = V(OWNER, env), V(OTHER, env)
+    a = lib.save_item(tom, {"title": "Aanmaningen", "team": "finance/debiteuren"})
+    assert not lib.backlog_for(eve)
+    with pytest.raises(ValueError):
+        lib.save_item(tom, {"id": a["id"], "assignee": "stranger@example.com"})
+    lib.save_item(tom, {"id": a["id"], "assignee": OTHER})
+    row = lib.backlog_for(eve)[0]
+    assert row["assignee"] == OTHER and row["editable"] and row["plan"]["auto"]
+    lib.save_item(eve, {"id": a["id"], "start": "2026-12-01"})
+    lib.save_item(eve, {"title": "Leads", "team": "sales/inside", "effort": 1})
+    p = lib.plan(lib.backlog_items(), date(2026, 11, 30))
+    leads = next(i for i in lib.backlog_items() if i["title"] == "Leads")
+    assert p[a["id"]]["start"] == "2026-11-30" and p[leads["id"]]["start"] == "2026-12-21"      # one idea at a time per person
+    lib.save_item(tom, {"id": a["id"], "assignee": ""})
+    assert not [r for r in lib.backlog_for(eve) if r["id"] == a["id"]]
+    assert lib.backlog_for(tom)[0]["assignee"] == OWNER
+
+
+def test_the_roadmap_shows_what_the_deep_dive_expects_to_save(env):
+    tom = V(OWNER, env)
+    a = lib.save_item(tom, {"title": "Aanmaningen", "team": "finance/debiteuren"})
+    uc = studio.update(tom, {"title": "Aanmaningen", "team": "finance/debiteuren"})
+    studio.update(tom, {"id": uc["id"], "phase": "design", "process": {
+        "frequency": {"count": 10, "per": "week"},
+        "as_is": [{"step": "Handwerk", "minutes": 30}], "to_be": [{"step": "Controle", "minutes": 6}]}})
+    lib.save_item(tom, {"id": a["id"], "use_case": uc["id"]})
+    row = lib.backlog_for(tom)[0]
+    assert row["uc_phase"] == "design" and row["saves_hours_week"] == 4.0
+    lib.save_item(tom, {"id": a["id"], "use_case": "uc_000000000000"})
+    assert "uc_phase" not in lib.backlog_for(tom)[0]
+
+
 def test_agent_works_an_idea_out_to_the_dry_run(env):
     tom = V(OWNER, env)
     item = lib.save_item(tom, {"title": "Aanmaningen", "team": "finance/debiteuren", "pain": "Handwerk"})

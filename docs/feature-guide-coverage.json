@@ -3236,6 +3236,16 @@
       ]
     },
     {
+      "id": "webui.studio.roadmap",
+      "area": "studio",
+      "status": "available",
+      "source_refs": [
+        "static/studio_roadmap.js",
+        "static/studio_library.js",
+        "api/studio_library.py"
+      ]
+    },
+    {
       "id": "webui.studio.playbooks",
       "area": "studio",
       "status": "available",

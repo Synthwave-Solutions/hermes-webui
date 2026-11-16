@@ -18,6 +18,7 @@
     work_out: 'Uitwerken', open_uc: 'Open use case', agent_make: 'Laat de agent het maken', agent_busy: 'Agent werkt…', agent_done: 'Klaar voor jouw controle', agent_failed: 'Mislukt',
     up: 'Omhoog', down: 'Omlaag', impact: 'Impact', effort: 'Moeite', team: 'Team', none: 'Geen team', remove: 'Verwijderen', undo: 'Ongedaan maken', removed: 'Idee verwijderd',
     empty_backlog: 'Nog geen ideeën. Voeg er een toe, of zet kansen uit een use case in de backlog.',
+    view: 'Weergave', view_list: 'Lijst', view_plan: 'Planning', does: 'Doet', saves_week: 'uur per week',
     pb_intro: 'Hoe wij processen uitvoeren met de Super Agent: stap voor stap, met screenshots en opnames.',
     new_pb: 'Nieuw playbook', search: 'Zoek in playbooks', steps: 'stappen', media: 'media', draft: 'Concept', published: 'Gepubliceerd',
     empty_pb: 'Nog geen playbooks. Maak er een, of laat de Super Agent er een schrijven vanuit een gebouwde use case.',
@@ -38,6 +39,7 @@
     work_out: 'Work it out', open_uc: 'Open use case', agent_make: 'Let the agent make it', agent_busy: 'Agent working…', agent_done: 'Ready for your review', agent_failed: 'Failed',
     up: 'Up', down: 'Down', impact: 'Impact', effort: 'Effort', team: 'Team', none: 'No team', remove: 'Delete', undo: 'Undo', removed: 'Idea deleted',
     empty_backlog: 'No ideas yet. Add one, or put opportunities from a use case on the backlog.',
+    view: 'View', view_list: 'List', view_plan: 'Schedule', does: 'Does it', saves_week: 'hours per week',
     pb_intro: 'How we run processes with the Super Agent: step by step, with screenshots and recordings.',
     new_pb: 'New playbook', search: 'Search playbooks', steps: 'steps', media: 'media', draft: 'Draft', published: 'Published',
     empty_pb: 'No playbooks yet. Create one, or let the Super Agent write one from a built use case.',
@@ -62,7 +64,8 @@
   const BLOCK = { task: 'Geplande taak', skill: 'Skill', bot: 'Bot', human: 'Mens', connection: 'Koppeling', custom: 'Maatwerk' };
 
   const L = { cat: '', group: (() => { try { return localStorage.getItem('sp-pb-group') || 'category'; } catch (_e) { return 'category'; } })(),
-    runMode: null, body: null, tab: '', teams: [], items: [], team: '', status: '', pbs: [], q: '', pb: null, poll: null, rec: null, removedItem: null };
+    runMode: null, body: null, tab: '', teams: [], items: [], team: '', status: '', pbs: [], q: '', pb: null, poll: null, rec: null, removedItem: null,
+    view: (() => { try { return localStorage.getItem('sp-bl-view') === 'plan' ? 'plan' : 'list'; } catch (_e) { return 'list'; } })() };
   const teamName = k => (L.teams.find(t => t.key === k) || {}).name || '';
   const mediaUrl = (pb, f) => '/api/studio/media?pb=' + encodeURIComponent(pb) + '&f=' + encodeURIComponent(f);
 
@@ -84,7 +87,7 @@
       <span class="bl-grip" aria-hidden="true">⋮⋮</span><span class="st-num">${i + 1}</span>
       <div class="om-row-main"><div class="om-row-title">${H(it.title)}</div>
         <div class="om-row-sub">${H(it.pain || it.why || '')}</div>
-        <div class="om-chips"><span class="om-chip">${H(BLOCK[it.building_block] || it.building_block)}</span><span class="om-chip">${H(w('impact'))} ${it.impact} · ${H(w('effort'))} ${it.effort}</span>${score >= 2 ? '<span class="om-chip bl-quick">Quick win</span>' : ''}${it.team ? `<span class="om-chip">${H(teamName(it.team) || it.team)}</span>` : ''}${apHtml}</div></div>
+        <div class="om-chips"><span class="om-chip">${H(BLOCK[it.building_block] || it.building_block)}</span><span class="om-chip">${H(w('impact'))} ${it.impact} · ${H(w('effort'))} ${it.effort}</span>${score >= 2 ? '<span class="om-chip bl-quick">Quick win</span>' : ''}${it.team ? `<span class="om-chip">${H(teamName(it.team) || it.team)}</span>` : ''}${it.assignee && it.assignee !== it.owner ? `<span class="om-chip">${H(w('does'))}: ${H(window.SPScope ? window.SPScope.personName(it.assignee) : it.assignee)}</span>` : ''}${it.saves_hours_week ? `<span class="om-chip rm-saves">${it.saves_hours_week} ${H(w('saves_week'))}</span>` : ''}${apHtml}</div></div>
       <div class="om-row-actions">
         <span class="bl-secondary">
         ${it.editable ? `<select class="om-select" data-bl-status aria-label="Status">${STATUSES.map(s => `<option value="${s}" ${it.status === s ? 'selected' : ''}>${H(w('s_' + s))}</option>`).join('')}</select>
@@ -99,7 +102,17 @@
   }
   function paintBacklog(){
     const items = L.items.filter(i => (!L.team || i.team === L.team) && (!L.status || i.status === L.status));
-    L.body.innerHTML = `<p class="om-intro">${H(w('backlog_intro'))}</p>
+    const viewSeg = window.SPRoadmap ? `<div class="om-seg bl-view" role="group" aria-label="${H(w('view'))}" data-tour="studio-backlog-view">${['list', 'plan'].map(v => `<button type="button" aria-pressed="${L.view === v}" data-bl-view="${v}">${H(w('view_' + v))}</button>`).join('')}</div>` : '';
+    clearTimeout(L.poll);
+    if (L.view === 'plan' && window.SPRoadmap) {
+      // The same ideas on a time axis: who does what in which weeks.
+      L.body.innerHTML = `<div class="bl-head">${viewSeg}</div><div data-bl-roadmap></div>`;
+      void window.SPRoadmap.render(L.body.querySelector('[data-bl-roadmap]'), { items: L.items, teams: L.teams,
+        reload: async () => { await loadBacklog(); paintBacklog(); },
+        openUseCase: id => { if (window.SPStudio) void window.SPStudio.openUseCase(id); } });
+      return;
+    }
+    L.body.innerHTML = `<div class="bl-head">${viewSeg}</div><p class="om-intro">${H(w('backlog_intro'))}</p>
       <form class="bl-add om-card" data-bl-add data-tour="studio-backlog-add"><input name="title" required maxlength="140" placeholder="${H(w('idea_ph'))}" aria-label="${H(w('idea_ph'))}">
         <select name="team" class="om-select" aria-label="${H(w('team'))}"><option value="">${H(w('none'))}</option>${L.teams.map(t => `<option value="${H(t.key)}">${H(t.name)}</option>`).join('')}</select>
         <button type="submit" class="sm-btn primary">${H(w('add_idea'))}</button></form>
@@ -107,7 +120,6 @@
         <select class="om-select" data-bl-filter-status><option value="">${H(w('all_status'))}</option>${STATUSES.map(s => `<option value="${s}" ${L.status === s ? 'selected' : ''}>${H(w('s_' + s))}</option>`).join('')}</select></div>
       ${items.length ? `<ol class="bl-list" data-tour="studio-backlog">${items.map((it, i) => itemRow(it, i, items.length)).join('')}</ol>` : `<div class="om-empty"><p>${H(w('empty_backlog'))}</p></div>`}`;
     const busy = L.items.some(i => i.autopilot && !i.autopilot.done);
-    clearTimeout(L.poll);
     if (busy) L.poll = setTimeout(async () => { if (L.tab === 'backlog' && document.body.contains(L.body)) { await loadBacklog(); paintBacklog(); } }, 3000);
   }
   async function saveOrder(ids){ try { await post('/api/studio/backlog/order', { ids }); } catch (e) { toast(errMsg(e)); } await loadBacklog(); paintBacklog(); }
@@ -303,6 +315,7 @@
       const b = ev.target.closest('button');
       if (!b || !L.body || !L.body.contains(b)) return;
       const li = b.closest('[data-bl]');
+      if (b.dataset.blView) { L.view = b.dataset.blView; try { localStorage.setItem('sp-bl-view', L.view); } catch (_e) {} paintBacklog(); const again = L.body.querySelector(`[data-bl-view="${L.view}"]`); if (again) again.focus(); return; }
       if (b.dataset.pbGroup) { L.group = b.dataset.pbGroup; try { localStorage.setItem('sp-pb-group', L.group); } catch (_e) {} paintPlaybooks(); return; }
       if (b.dataset.blMove && li) { const ids = L.items.filter(i => (!L.team || i.team === L.team) && (!L.status || i.status === L.status)).map(i => i.id); const k = ids.indexOf(li.dataset.bl); const t = k + Number(b.dataset.blMove); if (t >= 0 && t < ids.length) { [ids[k], ids[t]] = [ids[t], ids[k]]; await saveOrder(ids); const nb = L.body.querySelector(`[data-bl="${li.dataset.bl}"] [data-bl-move="${b.dataset.blMove}"]`); if (nb && !nb.disabled) nb.focus(); } return; }
       if (b.hasAttribute('data-bl-remove') && li) {
