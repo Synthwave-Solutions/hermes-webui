@@ -53,3 +53,16 @@ html[data-rail-expanded="1"] .rail .rail-btn>.sp-nav-count,html[data-nav-audienc
 @media(max-width:640px){.approval-card.approval-simple .approval-more-toggle{grid-column:1/-1;min-height:44px;margin:0 auto}}
 .approval-card.approval-simple.approval-more-open .approval-more-toggle{order:4;flex-basis:100%;margin-left:0;text-align:left;padding-left:0}
 .bot-directory-footer .bot-model-label[hidden]{display:none}
+
+/* Insights opens on the numbers; server load and the wiki status sit under Technical details. */
+.insights-tech{margin-top:16px;border:1px solid var(--border);border-radius:var(--sp-radius-lg,14px);background:var(--surface)}
+.insights-tech>summary{padding:14px 18px;cursor:pointer;font-weight:600;font-size:13.5px;color:var(--muted);min-height:44px;display:flex;align-items:center;gap:8px}
+.insights-tech>summary:hover,.insights-tech[open]>summary{color:var(--text)}
+.insights-tech[open]{padding:0 14px 14px}
+.insights-tech[open]>summary{padding-left:4px}
+
+/* Phone: the tour offer sits above the composer instead of over the page title and its buttons. */
+@media(max-width:640px){.sp-help-card[data-kind="tour_offer"]{top:auto;bottom:calc(132px + env(safe-area-inset-bottom,0px))}}
+
+/* Labelled rail on a wide screen: room for the longest names and a counter, so nothing is cut off. */
+@media(min-width:1101px){html[data-rail-expanded="1"] body .rail,html[data-nav-audience="member"] body .rail{width:236px}}

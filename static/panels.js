@@ -6063,9 +6063,6 @@ function _renderInsights(d, box, wikiStatus, skillUsage) {
   const scopeHtml = `<div class="insights-scope${scopeGlobal ? ' global' : ''}">${esc(t(scopeGlobal ? 'insights_scope_global' : 'insights_scope_mine'))}</div>`;
   box.innerHTML = `
     ${scopeHtml}
-    ${_renderSystemHealthPanel()}
-    ${_renderLlmWikiStatus(wikiStatus)}
-    ${_renderSkillUsage(skillUsage)}
     <div class="insights-grid">
       ${overviewCards.map(c => `<div class="insights-stat"><div class="insights-stat-icon">${c.icon}</div><div class="insights-stat-info"><div class="insights-stat-value">${c.value}</div><div class="insights-stat-label">${esc(c.label)}</div></div></div>`).join('')}
     </div>
@@ -6077,6 +6074,11 @@ function _renderInsights(d, box, wikiStatus, skillUsage) {
     </div>
     ${dowHtml}
     ${hodHtml}
+    ${_renderSkillUsage(skillUsage)}
+    <details class="insights-tech"><summary>${esc(_insightsText('Technical details', 'Technische details'))}</summary>
+    ${_renderSystemHealthPanel()}
+    ${_renderLlmWikiStatus(wikiStatus)}
+    </details>
     <div style="text-align:center;color:var(--muted);font-size:10px;margin-top:12px;opacity:.6">${esc(t('insights_footer').replace('{days}', d.period_days))}</div>
   `;
 }
