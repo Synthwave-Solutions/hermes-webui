@@ -124,6 +124,8 @@
       open.setAttribute('aria-label', botDisplayName(p) + ' · ' + tx('overview'));
       const footer = document.createElement('div'); footer.className = 'bot-directory-footer';
       const model = document.createElement('span'); model.className = 'bot-model-label'; model.textContent = typeof p.model === 'string' ? p.model.split('/').pop() : ''; model.title = p.model || '';
+      // The model is a setting for whoever manages bots; for everyone else it is noise on the card.
+      model.hidden = !_canUseFeature('profiles:admin');
       const start = button(tx('start'), 'sm-btn bot-start-action', () => chat(p, start)); start.dataset.botStart = p.name;
       start.setAttribute('aria-label', tx('chat') + ': ' + botDisplayName(p));
       footer.append(start, model, favorite(p)); card.append(open, footer); grid.appendChild(card);

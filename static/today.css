@@ -1,0 +1,55 @@
+/* Start of the day on the Studio overview and counters in the navigation (static/today.js). */
+.sp-today{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:16px;align-items:stretch}
+.sp-today.sp-today-single{grid-template-columns:minmax(0,1fr)}
+.sp-today>.wp-card{display:flex;flex-direction:column}
+.sp-today-ask{padding:22px 24px 20px;gap:14px;border-top:2px solid color-mix(in srgb,var(--accent) 60%,var(--border))}
+.sp-today-ask h3{font-size:19px!important;letter-spacing:-.01em}
+.sp-today-form{display:flex;gap:8px;align-items:center;padding:6px;border:1px solid var(--border2,var(--border));border-radius:14px;background:var(--bg,var(--surface))}
+.sp-today-form:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
+.sp-today-form input{flex:1 1 auto;min-width:0;height:44px;padding:0 12px;border:0;outline:0;background:none;color:var(--text);font:inherit;font-size:16px}
+.sp-today-form input::placeholder{color:var(--muted)}
+.sp-today .sp-today-form input,.sp-today .sp-today-form input:focus,.sp-today .sp-today-form input:focus-visible{border:0!important;outline:0!important;box-shadow:none!important;background:none!important}
+.sp-today-form .sm-btn.primary{flex:0 0 auto;width:44px;height:44px;min-height:44px;padding:0;border-radius:10px;display:inline-flex;align-items:center;justify-content:center}
+.sp-today-starters{display:flex;flex-wrap:wrap;gap:8px}
+.sp-today-starter{min-height:36px;padding:6px 14px;border:1px solid var(--border2,var(--border));border-radius:999px;background:none;color:var(--text);font:inherit;font-size:13.5px;cursor:pointer;transition:background .15s,border-color .15s}
+.sp-today-starter:hover,.sp-today-starter:focus-visible{background:color-mix(in srgb,var(--accent) 12%,transparent);border-color:color-mix(in srgb,var(--accent) 50%,var(--border))}
+.sp-today-waiting>.wp-card-head{justify-content:space-between}
+.sp-today-waiting>.wp-card-head h3{font-size:17px!important}
+.sp-today-note{margin:0;padding:0 20px 18px;color:var(--muted);font-size:13.5px}
+.sp-today-list{list-style:none;margin:0;padding:0 12px 10px}
+.sp-today-list li{display:flex;align-items:center;gap:12px;padding:10px 8px;border-top:1px solid var(--border)}
+.sp-today-list li:first-child{border-top:0}
+.sp-today-item{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px}
+.sp-today-item-title{font-weight:600;font-size:14px;color:var(--strong,var(--text));overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.sp-today-item-sub{color:var(--muted);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sp-today-list .sm-btn{flex:0 0 auto}
+.sp-today-more{margin:0 20px 16px;align-self:flex-start}
+.wp-hero [data-today-sub]{margin-top:6px;color:var(--text);font-size:14px}
+
+/* Counter on a navigation item. */
+.sp-nav-count{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--warning,#e0a23c);color:#1b1b1f;font-size:11.5px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.sp-today-count[hidden]{display:none}
+.rail .rail-btn>.sp-nav-count{position:absolute;top:-2px;right:-4px;min-width:16px;height:16px;padding:0 4px;font-size:10px}
+html[data-rail-expanded="1"] .rail .rail-btn>.sp-nav-count,html[data-nav-audience="member"] .rail .rail-btn>.sp-nav-count{position:static;order:9;margin-left:auto;min-width:18px;height:18px;padding:0 5px;font-size:11px;flex:0 0 auto}
+.sidebar-nav .nav-tab>.sp-nav-count{position:absolute;top:2px;right:2px;min-width:16px;height:16px;padding:0 4px;font-size:10px}
+
+@media(max-width:900px){.sp-today{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:640px){
+  .sp-today-ask{padding:18px 16px 16px}
+  .sp-today-starter{min-height:44px}
+  .sp-today-list .sm-btn{min-height:44px}
+}
+
+/* Approval card: allow once and deny first, the wider choices behind "More options" (static/approval-simple.js). */
+.approval-card.approval-simple .approval-btn.once{order:0;padding:10px 20px;font-size:13.5px}
+.approval-card.approval-simple .approval-btn.deny{order:1;padding:10px 20px;font-size:13.5px}
+.approval-card.approval-simple .approval-more-toggle{order:2;margin-left:auto;min-height:36px;padding:6px 10px;border:0;background:none;color:var(--muted);font:inherit;font-size:12.5px;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.approval-card.approval-simple .approval-more-toggle:hover,.approval-card.approval-simple .approval-more-toggle:focus-visible{color:var(--text)}
+.approval-card.approval-simple .approval-more-toggle[hidden]{display:none}
+.approval-card.approval-simple .approval-btn.session,.approval-card.approval-simple .approval-btn.always,.approval-card.approval-simple .approval-btn.yolo{order:3}
+.approval-card.approval-simple:not(.approval-more-open) .approval-btn.session,
+.approval-card.approval-simple:not(.approval-more-open) .approval-btn.always,
+.approval-card.approval-simple:not(.approval-more-open) .approval-btn.yolo{display:none}
+@media(max-width:640px){.approval-card.approval-simple .approval-more-toggle{grid-column:1/-1;min-height:44px;margin:0 auto}}
+.approval-card.approval-simple.approval-more-open .approval-more-toggle{order:4;flex-basis:100%;margin-left:0;text-align:left;padding-left:0}
+.bot-directory-footer .bot-model-label[hidden]{display:none}
