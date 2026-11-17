@@ -321,7 +321,7 @@
     const job = ((Wp.intake || {}).role || {}).title || (c.people.get(c.email) || {}).title || '';
     const rs = roles(c);
     return `<section class="wp-hero">${faceHtml(c, c.email, 'wp-avatar')}
-      <div class="wp-hero-main"><h2>${H(greeting())}, ${H(first)}</h2>
+      <div class="wp-hero-main"><h2>${H(greeting())}, <span class="wp-hero-name">${H(first)}</span></h2>
         <p>${H(job || w('intro'))}</p>
         <p data-today-sub hidden></p>
         ${rs.length ? `<div class="wp-badges">${rs.map(r => `<span class="om-badge wp-role ${r.cls}">${H(r.label)}</span>`).join('')}</div>` : ''}</div></section>`;

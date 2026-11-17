@@ -99,3 +99,5 @@ html[data-rail-expanded="1"] .rail .rail-btn>.sp-nav-count,html[data-nav-audienc
   /* The tour offer clears the bar as well as the composer. */
   .sp-help-card[data-kind="tour_offer"]{bottom:calc(196px + env(safe-area-inset-bottom,0px))}
 }
+
+.sp-today-av{display:none}

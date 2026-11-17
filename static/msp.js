@@ -84,6 +84,17 @@
   }
   root.append(section);
  }
+ // What someone opens Support for, above every tab: hours left, open tickets and a new ticket.
+ function renderSummary(root){
+  const nl=lang()==='nl',open=tickets.filter(t=>!['resolved','closed'].includes(t.status)).length,strip=el('div',undefined,'msp-summary');
+  const left=el('div',undefined,'msp-stat');left.append(el('strong',String(hours(overview.support_access?.available_minutes)),'msp-stat-value'),el('span',nl?'uur beschikbaar':'hours available','msp-stat-label'));
+  if(overview.permissions?.billing){const more=button(nl?'Uren bijkopen':'Buy hours',()=>toOrders('hours'));more.classList.add('msp-stat-action');left.append(more);}
+  const mine=el('button',undefined,'msp-stat msp-stat-link');mine.type='button';mine.disabled=busy;mine.append(el('strong',String(open),'msp-stat-value'),el('span',open===1?(nl?'open ticket':'open ticket'):(nl?'open tickets':'open tickets'),'msp-stat-label'));
+  mine.addEventListener('click',()=>{tab='tickets';detail=null;render();});
+  strip.append(left,mine);
+  if(overview.support_access?.can_submit){const cta=el('div',undefined,'msp-stat msp-stat-cta'),go=button(nl?'Nieuw ticket':'New ticket',()=>{tab='tickets';detail=null;draft.need='question';render();document.querySelector('#mainMsp form input')?.focus();});go.classList.add('msp-primary');cta.append(el('span',nl?'Vraag, storing of wens?':'Question, problem or request?','msp-stat-label'),go);strip.append(cta);}
+  root.append(strip);
+ }
  function renderOverview(root){
   renderMaintenance(root);
   renderAnnual(root);const nl=lang()==='nl',open=tickets.filter(t=>!['resolved','closed'].includes(t.status)).length;
@@ -156,7 +167,7 @@
  }
  function render(){const root=$('mainMsp');if(!root)return;root.replaceChildren();if(!allowed)return;const w=c(),head=el('div',undefined,'msp-heading');head.append(el('h1',w.title),button(lang()==='nl'?'Gids':'Guide',()=>window.SynthPulseHelp?.startFeatureTour(['webui.msp.annual-support','webui.msp.package','webui.msp.consultant','webui.msp.overview','webui.msp.job-costs','webui.msp.tickets','webui.msp.billing'],{locale:lang()})),button(w.refresh,load),select(w.language,[['nl','Nederlands'],['en','English']],lang(),v=>{language=v;notice='';render();}));root.append(head,el('p',overview?.org?.name||w.intro,'msp-muted'));
  const tabs=el('div',undefined,'msp-tabs');tabs.setAttribute('role','tablist');for(const name of ['overview','tickets','billing']){const b=button(w[name],()=>{tab=name;detail=null;render();});b.id={overview:'mspOverviewTab',tickets:'mspTicketsTab',billing:'mspBillingTab'}[name];b.setAttribute('role','tab');b.setAttribute('aria-selected',String(tab===name));tabs.append(b);}root.append(tabs);
- if(error){const n=el('p',error,'msp-error');n.setAttribute('role','alert');root.append(n);}if(notice){const n=el('p',notice,'msp-notice');n.setAttribute('role','status');root.append(n);}if(!overview){if(busy||!error)root.append(el('p',busy?w.loading:w.error));return;}if(tab==='overview')renderOverview(root);if(tab==='tickets')renderTickets(root);if(tab==='billing')renderBilling(root);if($('mspSidebar'))$('mspSidebar').textContent=w.intro;
+ if(error){const n=el('p',error,'msp-error');n.setAttribute('role','alert');root.append(n);}if(notice){const n=el('p',notice,'msp-notice');n.setAttribute('role','status');root.append(n);}if(!overview){if(busy||!error)root.append(el('p',busy?w.loading:w.error));return;}renderSummary(root);if(tab==='overview')renderOverview(root);if(tab==='tickets')renderTickets(root);if(tab==='billing')renderBilling(root);if($('mspSidebar'))$('mspSidebar').textContent=w.intro;
  }
  window.SynthPulseMSP={load,applyVisible,openOrders(filter=''){orderFilter=filter;tab='billing';switchPanel('msp',{fromRailClick:true});}};
 })();

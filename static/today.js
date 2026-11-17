@@ -59,9 +59,9 @@
         get('/api/governance/approvals/mine'), get('/api/governance/approvals')]);
       const items = [];
       ((screens && screens.screens) || []).filter(r => r && r.state === 'waiting' && r.rights && r.rights.control).forEach(r =>
-        items.push({ title: botLabel(r.bot), sub: r.reason || w('wait_screen'), go: 'approvals' }));
+        items.push({ title: botLabel(r.bot), sub: r.reason || w('wait_screen'), go: 'approvals', bot: botLabel(r.bot) }));
       ((tasks && tasks.tasks) || []).forEach(task =>
-        items.push({ title: task.title || task.id, go: 'approvals',
+        items.push({ title: task.title || task.id, go: 'approvals', bot: botLabel(task.assignee),
           sub: [botLabel(task.assignee), w(task.status === 'blocked' ? 'wait_input' : 'wait_review')].filter(Boolean).join(' · ') }));
       state.mine = ((mine && mine.requests) || []).filter(r => String((r && r.status) || '').toLowerCase() === 'pending').length;
       state.decide = Array.isArray(queue && queue.pending) ? queue.pending.length : 0;
@@ -91,11 +91,18 @@
     badge('governance', state.decide);
   }
 
+  // Two initials on a steady colour per bot, so the same bot is recognisable at a glance.
+  const TINTS = ['#0F7B4F', '#7C3AED', '#0A8FD6', '#C2410C', '#334155', '#BE185D'];
+  function avatar(name){
+    if (!name) return '';
+    const text = String(name).trim(), hash = [...text].reduce((n, ch) => (n * 31 + ch.charCodeAt(0)) >>> 0, 7);
+    return '<span class="sp-today-av" aria-hidden="true" style="background:' + TINTS[hash % TINTS.length] + '">' + H(text.slice(0, 2).toUpperCase()) + '</span>';
+  }
   function waitingHtml(){
     if (!state.items) return '<p class="sp-today-note" aria-busy="true">…</p>';
     if (!state.items.length) return '<p class="sp-today-note">' + H(w('wait_none')) + '</p>';
     return '<ul class="sp-today-list">' + state.items.slice(0, 4).map(it =>
-      '<li><span class="sp-today-item"><span class="sp-today-item-title">' + H(it.title) + '</span>' +
+      '<li>' + avatar(it.bot) + '<span class="sp-today-item"><span class="sp-today-item-title">' + H(it.title) + '</span>' +
       (it.sub ? '<span class="sp-today-item-sub">' + H(it.sub) + '</span>' : '') + '</span>' +
       '<button type="button" class="sm-btn" data-today-go="' + H(it.go) + '">' + H(w('view')) + '</button></li>').join('') + '</ul>' +
       (state.items.length > 4 ? '<button type="button" class="om-link sp-today-more" data-today-go="approvals">' + H(w('wait_all')) + '</button>' : '');
