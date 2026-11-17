@@ -34,6 +34,45 @@
     node.setAttribute('aria-pressed', String(selected)); node.title = node.getAttribute('aria-label');
     return node;
   }
+  // Status in words and grouping per department. The task list and the waiting list are routes
+  // the viewer already reads elsewhere; without access the cards simply show no status.
+  const WORDS = {
+    nl: {working:'Werkt', waiting:'Wacht op jou', error_one:'1 taak met fout', error_many:'{n} taken met fout', paused:'Gepauzeerd', other:'Overig'},
+    en: {working:'Working', waiting:'Waiting on you', error_one:'1 task with an error', error_many:'{n} tasks with an error', paused:'Paused', other:'Other'},
+  };
+  function word(key, n) {
+    let lang = 'nl';
+    try { lang = String(localStorage.getItem('hermes-lang') || 'nl').slice(0, 2); } catch (_) {}
+    return ((WORDS[lang] || WORDS.nl)[key] || key).replace('{n}', String(n));
+  }
+  const work = {at: 0, loading: false, bots: new Map()};
+  function loadWork() {
+    if (work.loading || Date.now() - work.at < 60000 || typeof api !== 'function') return;
+    work.loading = true;
+    const get = url => api(url, {timeoutToast: false, redirect401: false}).catch(() => null);
+    const board = typeof _botWorkQuery === 'function' ? _botWorkQuery() : '';
+    Promise.all([get('/api/crons?all_profiles=1'), get('/api/kanban/waiting' + board)]).then(([crons, waiting]) => {
+      const bots = new Map(), row = name => { if (!bots.has(name)) bots.set(name, {on: 0, failing: 0, paused: 0, waiting: 0}); return bots.get(name); };
+      for (const j of (crons && crons.jobs) || []) {
+        if (j.state === 'completed') continue;
+        const r = row(String(j.assigned_bot || '') || String(j.owner_profile ?? j.profile ?? '') || 'default');
+        if (!j.enabled) r.paused++;
+        else if (j.last_status === 'error' || (j.failure_streak || 0) > 0) r.failing++;
+        else r.on++;
+      }
+      for (const task of (waiting && waiting.tasks) || []) if (task.assignee) row(String(task.assignee)).waiting++;
+      const before = JSON.stringify([...work.bots]);
+      work.bots = bots; work.at = Date.now(); work.loading = false;
+      if (JSON.stringify([...bots]) !== before && document.getElementById('botDirectory')?.getClientRects().length) filterProfilesPanel();
+    }, () => { work.at = Date.now(); work.loading = false; });
+  }
+  function statusPill(p) {
+    const r = work.bots.get(p.name) || (p.is_default ? work.bots.get('default') : null);
+    if (!r) return '';
+    const [cls, text] = r.failing ? ['error', word(r.failing === 1 ? 'error_one' : 'error_many', r.failing)]
+      : r.waiting ? ['waiting', word('waiting')] : r.on ? ['working', word('working')] : r.paused ? ['paused', word('paused')] : ['', ''];
+    return text ? '<span class="bot-status-pill is-' + cls + '">' + esc(text) + '</span>' : '';
+  }
   function matches(p, words) {
     const value = preferences();
     const text = [botDisplayName(p), p.name, p.bot?.description, p.bot?.category, p.bot?.role, p.model].join(' ').toLocaleLowerCase();
@@ -69,11 +108,11 @@
     const node = button(tx('chat'), 'sm-btn bot-chat-action', () => chat(p, node));
     node.dataset.botChat = p.name; return node;
   }
-  function tags(p) {
-    const values = [p.bot?.role, p.bot?.category];
+  function tags(p, grouped) {
+    const values = [p.bot?.role, grouped ? '' : p.bot?.category];
     if (p.name === S.activeProfile) values.push(tx('selected'));
     if (p.visible === false) values.push(tx('hidden'));
-    return values.filter(Boolean).map(value => '<span class="bot-meta-pill">' + esc(value) + '</span>').join('');
+    return statusPill(p) + values.filter(Boolean).map(value => '<span class="bot-meta-pill">' + esc(value) + '</span>').join('');
   }
   function render(data, profiles) {
     const value = preferences(); toolbar();
@@ -116,11 +155,23 @@
     directory.querySelector('#botDirectoryCount').textContent = t('profiles_search_count', profiles.length, (data.profiles || []).length);
     const grid = directory.querySelector('.bot-directory-grid');
     const focused = grid.contains(document.activeElement) ? {key:document.activeElement.dataset.botOpen ? 'bot-open' : document.activeElement.dataset.botStart ? 'bot-start' : 'bot-favorite', name:document.activeElement.dataset.botOpen || document.activeElement.dataset.botStart || document.activeElement.dataset.botFavorite} : null;
-    grid.replaceChildren();
-    for (const p of profiles) {
+    grid.replaceChildren(); loadWork();
+    // With two or more departments in view the cards are grouped per department, in the order
+    // the first bot of each appears; bots without one come last.
+    const category = p => String(p.bot?.category || '').trim();
+    const grouped = new Set(profiles.map(category)).size > 1;
+    const order = [...new Set(profiles.map(category))].sort((a, b) => !a - !b);
+    const sorted = grouped ? order.flatMap(name => profiles.filter(p => category(p) === name)) : profiles;
+    let section = null;
+    for (const p of sorted) {
+      if (grouped && category(p) !== section) {
+        section = category(p);
+        const head = document.createElement('h3'); head.className = 'bot-directory-group'; head.textContent = section || word('other');
+        grid.appendChild(head);
+      }
       const card = document.createElement('article'); card.className = 'bot-directory-card';
       const open = button('', 'bot-directory-open', () => openProfileDetail(p.name)); open.dataset.botOpen = p.name;
-      open.innerHTML = '<div class="bot-directory-identity">' + botAvatarHtml(p) + '<div><h3>' + esc(botDisplayName(p)) + '</h3><div class="bot-meta-pills">' + tags(p) + '</div></div><span class="bot-card-chevron" aria-hidden="true">›</span></div><p>' + esc(p.bot?.description || t('bot_description_empty')) + '</p>';
+      open.innerHTML = '<div class="bot-directory-identity">' + botAvatarHtml(p) + '<div><h3>' + esc(botDisplayName(p)) + '</h3><div class="bot-meta-pills">' + tags(p, grouped) + '</div></div><span class="bot-card-chevron" aria-hidden="true">›</span></div><p>' + esc(p.bot?.description || t('bot_description_empty')) + '</p>';
       open.setAttribute('aria-label', botDisplayName(p) + ' · ' + tx('overview'));
       const footer = document.createElement('div'); footer.className = 'bot-directory-footer';
       const model = document.createElement('span'); model.className = 'bot-model-label'; model.textContent = typeof p.model === 'string' ? p.model.split('/').pop() : ''; model.title = p.model || '';

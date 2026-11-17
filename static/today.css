@@ -66,3 +66,36 @@ html[data-rail-expanded="1"] .rail .rail-btn>.sp-nav-count,html[data-nav-audienc
 
 /* Labelled rail on a wide screen: room for the longest names and a counter, so nothing is cut off. */
 @media(min-width:1101px){html[data-rail-expanded="1"] body .rail,html[data-nav-audience="member"] body .rail{width:236px}}
+
+/* Composer, stage between full labels and icons only: the bot and the model keep their name. */
+.composer-footer.cf-some .composer-workspace-label,.composer-footer.cf-some .composer-reasoning-label,
+.composer-footer.cf-some .composer-people-label,.composer-footer.cf-some .composer-toolsets-label,
+.composer-footer.cf-some .composer-chat-mode-label{display:none}
+.composer-footer.cf-some .composer-left{gap:6px}
+.composer-footer.cf-some .composer-left > *{flex-shrink:0}
+.composer-footer.cf-some .composer-profile-chevron,.composer-footer.cf-some .composer-model-chevron,.composer-footer.cf-some .composer-reasoning-chevron{display:none}
+.composer-footer.cf-some .composer-profile-label,.composer-footer.cf-some .composer-model-label{max-width:92px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.composer-footer.cf-some .composer-divider{display:none}
+
+/* Bots: department headings and a status in words. */
+.bot-directory-group{grid-column:1/-1;margin:14px 0 -4px;font-size:12px;font-weight:650;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.bot-directory-group:first-child{margin-top:0}
+.bot-status-pill{font-size:11px;font-weight:650;line-height:1.5;border-radius:999px;padding:3px 9px;background:var(--surface-subtle);color:var(--muted)}
+.bot-status-pill.is-working{background:color-mix(in srgb,var(--success,#3fb37f) 18%,transparent);color:var(--success,#3fb37f)}
+.bot-status-pill.is-waiting{background:color-mix(in srgb,var(--warning,#e0a23c) 20%,transparent);color:var(--warning,#e0a23c)}
+.bot-status-pill.is-error{background:color-mix(in srgb,var(--error,#ef5350) 18%,transparent);color:var(--error,#ef5350)}
+
+/* Phone: bar with the daily destinations under the page (static/bottom-nav.js). */
+.sp-bottom-nav{display:none}
+@media(max-width:640px){
+  .sp-bottom-nav{display:flex;flex:0 0 auto;align-items:stretch;justify-content:space-around;gap:2px;padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px));background:var(--sidebar,var(--surface));border-top:1px solid var(--border)}
+  .sp-bottom-nav.is-typing{display:none}
+  .sp-bottom-item{position:relative;flex:1 1 0;min-width:0;min-height:52px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:4px 0;border:0;border-radius:12px;background:none;color:var(--muted);font:inherit;font-size:10.5px;font-weight:600;letter-spacing:-.01em;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  .sp-bottom-item svg{width:22px;height:22px;flex:0 0 auto}
+  .sp-bottom-item span:not(.sp-nav-count){max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sp-bottom-item.active{color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent)}
+  .sp-bottom-item:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+  .sp-bottom-item>.sp-nav-count{position:absolute;top:2px;left:calc(50% + 6px);min-width:16px;height:16px;padding:0 4px;font-size:10px}
+  /* The tour offer clears the bar as well as the composer. */
+  .sp-help-card[data-kind="tour_offer"]{bottom:calc(196px + env(safe-area-inset-bottom,0px))}
+}
