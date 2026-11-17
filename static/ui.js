@@ -5329,8 +5329,12 @@ function _fitComposerFooter(){
   if(!left) return;
   if(!left.clientWidth) return;
   const overflows=function(){return left.scrollWidth>left.clientWidth+1;};
-  footer.classList.remove('cf-icons','cf-burger');
+  footer.classList.remove('cf-some','cf-icons','cf-burger');
   if(!overflows()) return;
+  // First give up the secondary labels; who answers and which model stay readable.
+  footer.classList.add('cf-some');
+  if(!overflows()) return;
+  footer.classList.remove('cf-some');
   footer.classList.add('cf-icons');
   if(!overflows()) return;
   footer.classList.add('cf-burger');

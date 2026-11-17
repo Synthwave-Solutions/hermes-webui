@@ -321,8 +321,9 @@
     const job = ((Wp.intake || {}).role || {}).title || (c.people.get(c.email) || {}).title || '';
     const rs = roles(c);
     return `<section class="wp-hero">${faceHtml(c, c.email, 'wp-avatar')}
-      <div class="wp-hero-main"><h2>${H(greeting())}, ${H(first)}</h2>
+      <div class="wp-hero-main"><h2>${H(greeting())}, <span class="wp-hero-name">${H(first)}</span></h2>
         <p>${H(job || w('intro'))}</p>
+        <p data-today-sub hidden></p>
         ${rs.length ? `<div class="wp-badges">${rs.map(r => `<span class="om-badge wp-role ${r.cls}">${H(r.label)}</span>`).join('')}</div>` : ''}</div></section>`;
   }
   function allowed(panel) { return !!window.SynthPulseWorkspace?.allowed(panel); }
@@ -528,6 +529,7 @@
     else if (group === 'person') main = `<div class="wp-stack">${personView(c, rows, lens)}</div>`;
     else main = `<div class="wp-grid">${KINDS.filter(k => n[k]).map(k => kindCard(c, k, rows.filter(it => it.kind === k), 'k:' + lens + ':' + k, { team: lens !== 'mine' && k !== 'bot', owner: lens !== 'mine' })).join('')}</div>`;
     body.innerHTML = `<div class="wp" data-tour="studio-home">${heroHtml(c)}
+      <div data-sp-today></div>
       ${findingsSection()}
       <div data-wp-setup>${Wp.setup}</div>
       <div class="wp-bar">${barHtml(c, 'home', Wp.data, lens)}${groupSeg}</div>
@@ -537,6 +539,7 @@
         `<button type="button" class="sm-btn" data-wp-destination="${H(d.panel)}">${H(d.label)}</button>`).join('')}${[...document.querySelectorAll('#studioHubNav [data-st-hub]')].filter(b=>['me','profile','teams','chart','mgmt'].includes(b.dataset.stHub)).map(b=>
         `<button type="button" class="sm-btn" data-wp-studio="${H(b.dataset.stHub)}">${H(b.textContent)}</button>`).join('')}</div></details>
       ${activity(rows)}${main}</div>`;
+    window.SPToday?.mount(body.querySelector('[data-sp-today]'));
   }
   async function render(body, opts){
     Wp.body = body; Wp.setup = (opts && opts.setup) || '';
