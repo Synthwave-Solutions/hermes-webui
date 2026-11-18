@@ -3,7 +3,11 @@
  */
 (() => {
   let rows = [], loading = false, query = '', filter = 'all', limit = 36;
-  let selectedSection = '', creating = false, optionIndex = null;
+  let selectedSection = '', creating = false, optionIndex = null, groupWith = '';
+  // Group chats (18 Nov 2026): a chat with at least one other person (sessions.js).
+  const isGroup = s => typeof _isGroupChatSession === 'function' && _isGroupChatSession(s);
+  const withMatches = s => !groupWith || (groupWith.startsWith('bot:')
+    ? _sessionGroupBots(s).includes(groupWith.slice(4)) : _sessionGroupPeople(s).includes(groupWith));
   const branchPageSize = 6;
   const branchLimits = new Map();
   const filteredFolds = new Map();
@@ -123,7 +127,7 @@
     search.oninput = () => { query = search.value; resetPages(); render(); };
     const filters = document.createElement('div'); filters.className = 'conversation-board-filters';
     filters.setAttribute('aria-label', tx('filter'));
-    for (const key of ['all', 'attention', 'running', 'unread', 'pinned']) {
+    for (const key of ['all', 'groups', 'attention', 'running', 'unread', 'pinned']) {
       const node = button(tx(key), () => { filter = key; resetPages(); render(); });
       node.dataset.conversationFilter = key; filters.appendChild(node);
     }
@@ -131,8 +135,11 @@
     const select = document.createElement('select'); select.id = 'conversationBoardSectionPick';
     select.setAttribute('aria-label',tx('sections'));
     select.onchange = () => { selectedSection = select.value; resetPages(); render(); };
+    const withPick = document.createElement('select'); withPick.id = 'conversationBoardGroupWith';
+    withPick.setAttribute('aria-label', tx('group_with'));
+    withPick.onchange = () => { groupWith = withPick.value; resetPages(); render(); };
     const foldAll = button('', null); foldAll.id = 'conversationBoardFoldAll'; foldAll.hidden = true;
-    sections.append(select, foldAll, button(t('sidebar_org_new'), () => window.SynthPulseSidebarOrg.newSection()));
+    sections.append(select, withPick, foldAll, button(t('sidebar_org_new'), () => window.SynthPulseSidebarOrg.newSection()));
     toolbar.append(search, filters);
     const notice = document.createElement('div'); notice.id = 'conversationBoardNotice'; notice.className = 'conversation-board-notice'; notice.setAttribute('role', 'status');
     const count = document.createElement('p'); count.id = 'conversationBoardCount'; count.className = 'conversation-board-count'; count.setAttribute('role', 'status');
@@ -164,7 +171,8 @@
       const text = [title(s), bot(s), project(s), index?.paths.get(section)].join(' ').toLocaleLowerCase();
       return words.every(word => text.includes(word));
     });
-    const accepts = ({s, flags}, key) => key === 'all' || (key === 'pinned' ? s.pinned : flags[key]);
+    const accepts = ({s, flags}, key) => key === 'all' || (key === 'groups' ? isGroup(s) && withMatches(s) : key === 'pinned' ? s.pinned : flags[key]);
+    updateGroupPicker(candidates);
     const useSections = updateSectionPicker(index);
     const searched = selectedSection ? candidates.filter(row => row.section === selectedSection) : candidates;
     root.querySelectorAll('[data-conversation-filter]').forEach(node => {
@@ -208,6 +216,25 @@
       (target || (attr === 'data-more-in-section' && grid.querySelector('[data-section-toggle="' + id + '"]')) || $('conversationBoardSearch')).focus({preventScroll:true});
     }
   }
+  function updateGroupPicker(candidates) {
+    const pick = $('conversationBoardGroupWith'); if (!pick) return;
+    const counts = new Map();
+    for (const {s} of candidates) {
+      if (!isGroup(s)) continue;
+      for (const p of _sessionGroupPeople(s)) counts.set(p, (counts.get(p) || 0) + 1);
+      for (const b of _sessionGroupBots(s)) counts.set('bot:' + b, (counts.get('bot:' + b) || 0) + 1);
+    }
+    pick.hidden = filter !== 'groups' || !counts.size;
+    const keys = [...counts.keys()].sort((a, b) => (a.startsWith('bot:') - b.startsWith('bot:')) || _sessionGroupLabel(a).localeCompare(_sessionGroupLabel(b)));
+    if (groupWith && !counts.has(groupWith)) keys.unshift(groupWith);
+    const sig = keys.map(k => k + counts.get(k)).join('|');
+    if (pick.dataset.sig !== sig) {
+      pick.replaceChildren(new Option(tx('group_with_anyone'), ''));
+      for (const k of keys) pick.add(new Option((k.startsWith('bot:') ? '\u{1F916} ' : '') + _sessionGroupLabel(k) + ' (' + (counts.get(k) || 0) + ')', k));
+      pick.dataset.sig = sig;
+    }
+    pick.value = groupWith;
+  }
   function conversationCard({s, flags}) {
     const card = button('', async () => {
       card.disabled = true;
@@ -235,7 +262,7 @@
     const entries = selectedSection ? index.sections.filter(({s}) => s.id === selectedSection) : index.sections;
     const buckets = new Map();
     for (const row of matches) {
-      const key = index.paths.has(row.section) ? row.section : 'unassigned';
+      const key = index.paths.has(row.section) ? row.section : isGroup(row.s) ? 'groupchats' : 'unassigned';
       if (!buckets.has(key)) buckets.set(key, []);
       buckets.get(key).push(row);
     }
@@ -250,8 +277,12 @@
         totals.set(parent,(totals.get(parent) || 0) + (totals.get(id) || 0));
       }
     }
-    const branches = entries.slice();
-    if (buckets.has('unassigned')) branches.push({s:{id:'unassigned',name:tx('unassigned')},path:'',depth:0});
+    // Without a section first, then a separate block of group chats, then the
+    // sections (18 Nov 2026).
+    const branches = [];
+    if (!selectedSection && buckets.has('unassigned')) branches.push({s:{id:'unassigned',name:tx('unassigned')},path:'',depth:0});
+    if (!selectedSection && buckets.has('groupchats')) branches.push({s:{id:'groupchats',name:tx('groupchats')},path:'',depth:0});
+    branches.push(...entries);
     const folds = foldState(filtered || !!selectedSection);
     const bodies = new Map();
     const matchingIds = [];
@@ -277,7 +308,7 @@
       toggle.setAttribute('aria-controls','conversation-branch-' + id);
       toggle.innerHTML = '<span class="conversation-chevron" aria-hidden="true"></span><span>' + esc(selectedSection ? path : s.name) + '</span><span class="conversation-branch-count">' + total + '</span>';
       heading.appendChild(toggle); header.appendChild(heading);
-      if (id !== 'unassigned') {
+      if (id !== 'unassigned' && id !== 'groupchats') {
         const create = button(t('new_conversation'), () => startInSection(id));
         create.dataset.createInSection = id; create.disabled = creating;
         const label = tx('create_in').replace('{name}', () => path);
