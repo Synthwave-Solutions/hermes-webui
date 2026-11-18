@@ -216,4 +216,8 @@ def test_the_handler_answers_empty_without_building_the_job_list(stores, monkeyp
     monkeypatch.setitem(sys.modules, "cron", cron_pkg)
     monkeypatch.setitem(sys.modules, "cron.jobs", cron_jobs)
     routes._handle_cron_recent(object(), urlparse(f"/api/crons/recent?since={SINCE}"))
+    assert len(sent) == 1
+    checked_until = sent[0].pop("checked_until")
     assert sent == [{"completions": [], "since": SINCE}]
+    # The tab may ask from a later moment next time, with two minutes of slack.
+    assert SINCE <= checked_until <= time.time() - 119

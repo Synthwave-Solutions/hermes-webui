@@ -15265,6 +15265,7 @@ function startCronPolling(){
       const pollGeneration=_cronPollGeneration;
       const data=await api(`/api/crons/recent?since=${_cronPollSince}`);
       if(pollGeneration!==_cronPollGeneration) return;
+      if(typeof data.checked_until==='number'&&data.checked_until>_cronPollSince) _cronPollSince=data.checked_until;
       if(data.completions&&data.completions.length>0){
         for(const c of data.completions){
           // Per-viewer flags (plan 3.1): toast, badge (with the unread

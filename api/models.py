@@ -4422,14 +4422,72 @@ def _apply_sidebar_state_db_overrides(sessions: list[dict]) -> None:
     else:
         count_ids = None  # cap disabled / under cap -> count every row too
     try:
-        metadata = _read_state_db_sidebar_overrides(
-            _active_state_db_path(),
-            all_ids,
-            count_session_ids=count_ids,
+        metadata = _sidebar_state_db_overrides_memoized(
+            _active_state_db_path(), all_ids, count_ids,
         )
     except Exception:
         return
     _apply_sidebar_state_db_override_metadata(sessions, metadata)
+
+
+# Every sidebar poll of every open tab asked state.db the same question. The
+# answer is remembered per set of rows: as long as state.db (and its WAL) did
+# not change it stays valid for five minutes, and while they do change (a chat
+# is streaming) it is reused for a few seconds. Measured 18 Nov 2026: this
+# stage took ~1.8 s of a /api/sessions request. HERMES_WEBUI_STATE_DB_OVERRIDE_MEMO_SECONDS=0
+# switches it off.
+_SIDEBAR_STATE_DB_MEMO: dict = {}
+_SIDEBAR_STATE_DB_MEMO_LOCK = threading.Lock()
+_SIDEBAR_STATE_DB_MEMO_MAX = 32
+_SIDEBAR_STATE_DB_MEMO_UNCHANGED_SECONDS = 300.0
+
+
+def _sidebar_state_db_memo_seconds() -> float:
+    import os as _os
+    try:
+        return max(0.0, float(_os.environ.get("HERMES_WEBUI_STATE_DB_OVERRIDE_MEMO_SECONDS", "8")))
+    except (TypeError, ValueError):
+        return 8.0
+
+
+def _state_db_change_signature(db_path) -> tuple:
+    import os as _os
+    parts = []
+    for suffix in ("", "-wal"):
+        try:
+            st = _os.stat(str(db_path) + suffix)
+            parts.append((st.st_ino, st.st_size, int(st.st_mtime_ns)))
+        except OSError:
+            parts.append(None)
+    return tuple(parts)
+
+
+def _sidebar_state_db_overrides_memoized(db_path, all_ids, count_ids) -> dict:
+    ttl = _sidebar_state_db_memo_seconds()
+    if ttl <= 0:
+        return _read_state_db_sidebar_overrides(db_path, all_ids, count_session_ids=count_ids)
+    key = (
+        str(db_path), frozenset(all_ids), None if count_ids is None else frozenset(count_ids),
+        _read_state_db_sidebar_overrides,  # a replaced reader never sees another's answer
+    )
+    signature = _state_db_change_signature(db_path)
+    now = time.monotonic()
+    with _SIDEBAR_STATE_DB_MEMO_LOCK:
+        entry = _SIDEBAR_STATE_DB_MEMO.get(key)
+    if entry is not None:
+        stored_at, stored_signature, metadata = entry
+        age = now - stored_at
+        if 0 <= age < ttl or (
+            stored_signature == signature and 0 <= age < _SIDEBAR_STATE_DB_MEMO_UNCHANGED_SECONDS
+        ):
+            return metadata
+    metadata = _read_state_db_sidebar_overrides(db_path, all_ids, count_session_ids=count_ids)
+    with _SIDEBAR_STATE_DB_MEMO_LOCK:
+        if key not in _SIDEBAR_STATE_DB_MEMO and len(_SIDEBAR_STATE_DB_MEMO) >= _SIDEBAR_STATE_DB_MEMO_MAX:
+            oldest = min(_SIDEBAR_STATE_DB_MEMO, key=lambda k: _SIDEBAR_STATE_DB_MEMO[k][0])
+            _SIDEBAR_STATE_DB_MEMO.pop(oldest, None)
+        _SIDEBAR_STATE_DB_MEMO[key] = (now, signature, metadata)
+    return metadata
 
 
 def _apply_sidebar_state_db_override_metadata(sessions: list[dict], metadata: dict[str, dict]) -> None:
