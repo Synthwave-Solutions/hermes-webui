@@ -8727,6 +8727,7 @@ html[data-sp-merged="1"] #composerWorkspaceLabel::before{content:attr(data-sp-pr
 .session-kind-btn{flex:1 1 0;min-width:0;position:relative;display:inline-flex;align-items:center;justify-content:center;gap:5px;height:28px;padding:0 6px;white-space:nowrap;border:0;border-radius:8px;background:transparent;color:var(--muted);font:inherit;font-size:12px;font-weight:550;cursor:pointer;transition:background .15s var(--sp-ease,ease),color .15s var(--sp-ease,ease);}
 .session-kind-btn:hover{color:var(--text);}
 .session-kind-btn.active{background:var(--surface);color:var(--text);box-shadow:var(--sp-shadow-xs,0 1px 2px rgba(0,0,0,.08));}
+.session-group-with{display:block;width:calc(100% - 16px);margin:6px 8px 2px;height:28px;padding:0 8px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font:inherit;font-size:12px;}
 .session-kind-btn:focus-visible{outline:none;box-shadow:0 0 0 2px var(--sp-ring,var(--focus-ring));}
 .session-kind-count{font-size:10.5px;font-weight:600;padding:0 6px;min-width:18px;height:16px;line-height:16px;border-radius:999px;background:var(--border-subtle,var(--border));color:var(--muted);}
 .session-kind-btn.active .session-kind-count{background:var(--accent-bg);color:var(--accent-text,var(--accent));}

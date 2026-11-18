@@ -100,7 +100,10 @@
         if(query&&!matching.has(row.s.id))continue;
         result.push({key:'section:'+row.s.id,label:row.s.name+' ('+items.length+')',items,depth:row.depth,ancestors:row.ancestors,section:row.s,path:row.path});
       }
-      for(const g of original){const items=g.items.filter(s=>!job(s)&&!assigned.has(s.session_id));if(items.length)result.push({...g,items});}
+      // Chats without a section come first, above the sections (18 Nov 2026).
+      const loose=[];
+      for(const g of original){const items=g.items.filter(s=>!job(s)&&!assigned.has(s.session_id));if(items.length)loose.push({...g,items});}
+      result.unshift(...loose);
     }else if(chats.length){result.push({key:'active-chat',label:tx('active_chat'),items:chats});}
     result.push(...taskGroups(tasks,data));
     return result.filter(g=>{

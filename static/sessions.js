@@ -7808,32 +7808,96 @@ function _sidebarRowHasVisibleMessages(s, activeSidForSidebar){
 // "Alles | Gesprekken | Taken" keeps them apart; the choice is per browser and
 // the open chat always stays in view. Counts feed the chips.
 const SESSION_KIND_STORAGE_KEY='hermes-webui-session-kind';
-let _sessionKindFilter=(()=>{try{const v=localStorage.getItem(SESSION_KIND_STORAGE_KEY);return v==='all'||v==='jobs'||v==='chats'?v:'chats';}catch(_e){return 'chats';}})();
-let _sessionKindCounts={chats:0,jobs:0,jobsUnread:0};
+let _sessionKindFilter=(()=>{try{const v=localStorage.getItem(SESSION_KIND_STORAGE_KEY);return v==='all'||v==='jobs'||v==='chats'||v==='groups'?v:'chats';}catch(_e){return 'chats';}})();
+let _sessionKindCounts={chats:0,jobs:0,jobsUnread:0,groups:0};
+// Group chats (18 Nov 2026): a chat with at least one other person in it.
+// "Met wie" narrows the Groups view to one person or bot; per browser.
+const SESSION_GROUP_WITH_STORAGE_KEY='hermes-webui-session-group-with';
+let _sessionGroupWith=(()=>{try{return localStorage.getItem(SESSION_GROUP_WITH_STORAGE_KEY)||'';}catch(_e){return '';}})();
+let _sessionGroupMembers=new Map();
 function _isJobChatSession(s){
   return !!(s&&s.cron_job&&typeof s.cron_job==='object'&&s.cron_job.job_id&&s.cron_job.kind!=='scout');
+}
+function _sessionGroupPeople(s){
+  const me=String((window.__GOV_ME__||{}).email||'').trim().toLowerCase();
+  const out=[];
+  for(const raw of [s&&s.owner_email,...((s&&Array.isArray(s.participants))?s.participants:[])]){
+    const v=String(raw||'').trim().toLowerCase();
+    if(v&&v!==me&&!out.includes(v)) out.push(v);
+  }
+  return out;
+}
+function _sessionGroupBots(s){
+  return (s&&Array.isArray(s.bot_participants))?s.bot_participants.map(b=>String(b||'').trim()).filter(Boolean):[];
+}
+function _isGroupChatSession(s){
+  return !_isJobChatSession(s)&&_sessionGroupPeople(s).length>0;
+}
+function _sessionGroupLabel(key){
+  if(key.startsWith('bot:')){
+    const name=key.slice(4);
+    return name==='default'?'SynthPulse':name.replace(/^synthwave-/,'');
+  }
+  const local=key.split('@')[0]||key;
+  return local.charAt(0).toUpperCase()+local.slice(1);
 }
 function _sessionKindMatches(s, activeSid){
   if(_sessionKindFilter==='all') return true;
   if(activeSid&&s.session_id===activeSid) return true;
+  if(_sessionKindFilter==='groups'){
+    if(!_isGroupChatSession(s)) return false;
+    if(!_sessionGroupWith) return true;
+    return _sessionGroupWith.startsWith('bot:')
+      ?_sessionGroupBots(s).includes(_sessionGroupWith.slice(4))
+      :_sessionGroupPeople(s).includes(_sessionGroupWith);
+  }
   return _sessionKindFilter==='jobs'?_isJobChatSession(s):!_isJobChatSession(s);
 }
 function setSessionKindFilter(kind){
-  if(kind!=='all'&&kind!=='jobs'&&kind!=='chats') kind='chats';
+  if(kind!=='all'&&kind!=='jobs'&&kind!=='chats'&&kind!=='groups') kind='chats';
   if(_sessionKindFilter===kind) return;
   _sessionKindFilter=kind;
   try{localStorage.setItem(SESSION_KIND_STORAGE_KEY,kind);}catch(_e){}
+  if(typeof renderSessionListFromCache==='function') renderSessionListFromCache();
+}
+function setSessionGroupWith(value){
+  _sessionGroupWith=String(value||'');
+  try{localStorage.setItem(SESSION_GROUP_WITH_STORAGE_KEY,_sessionGroupWith);}catch(_e){}
   if(typeof renderSessionListFromCache==='function') renderSessionListFromCache();
 }
 function _renderSessionKindFilter(){
   const box=$('sessionKindFilter');
   if(!box) return;
   const c=_sessionKindCounts;
-  if(!c.jobs&&_sessionKindFilter!=='jobs'){box.hidden=true;return;}
+  if(!c.jobs&&!c.groups&&_sessionKindFilter!=='jobs'&&_sessionKindFilter!=='groups'){box.hidden=true;return;}
   box.hidden=false;
   const tx=(k,f)=>{const v=(typeof t==='function')?t(k):'';return v&&v!==k?v:f;};
-  const opts=[['chats',tx('session_kind_chats','Conversations'),0,0],['jobs',tx('session_kind_jobs','Tasks'),c.jobs,c.jobsUnread],['all',tx('session_kind_all','All'),0,0]];
-  box.innerHTML=opts.map(([k,label,n,unread])=>`<button type="button" role="tab" class="session-kind-btn${_sessionKindFilter===k?' active':''}" aria-selected="${_sessionKindFilter===k}" onclick="setSessionKindFilter('${k}')">${esc(label)}${n?`<span class="session-kind-count">${n}</span>`:''}${unread?`<span class="session-kind-unread" title="${unread}"></span>`:''}</button>`).join('');
+  const opts=[['chats',tx('session_kind_chats','Conversations'),0,0]];
+  if(c.groups||_sessionKindFilter==='groups') opts.push(['groups',tx('session_kind_groups','Groups'),c.groups,0]);
+  if(c.jobs||_sessionKindFilter==='jobs') opts.push(['jobs',tx('session_kind_jobs','Tasks'),c.jobs,c.jobsUnread]);
+  opts.push(['all',tx('session_kind_all','All'),0,0]);
+  let html=opts.map(([k,label,n,unread])=>`<button type="button" role="tab" class="session-kind-btn${_sessionKindFilter===k?' active':''}" aria-selected="${_sessionKindFilter===k}" onclick="setSessionKindFilter('${k}')">${esc(label)}${n?`<span class="session-kind-count">${n}</span>`:''}${unread?`<span class="session-kind-unread" title="${unread}"></span>`:''}</button>`).join('');
+  box.innerHTML=html;
+  const holder=box.parentElement;
+  let pick=document.getElementById('sessionGroupWith');
+  if(_sessionKindFilter!=='groups'){ if(pick) pick.remove(); return; }
+  if(!pick){
+    pick=document.createElement('select');
+    pick.id='sessionGroupWith';
+    pick.className='session-group-with';
+    pick.onchange=()=>setSessionGroupWith(pick.value);
+    if(holder) holder.insertBefore(pick, box.nextSibling);
+  }
+  pick.setAttribute('aria-label',tx('session_group_with','With'));
+  const keys=[..._sessionGroupMembers.keys()].sort((a,b)=>{
+    const ab=a.startsWith('bot:'),bb=b.startsWith('bot:');
+    if(ab!==bb) return ab?1:-1;
+    return _sessionGroupLabel(a).localeCompare(_sessionGroupLabel(b));
+  });
+  if(_sessionGroupWith&&!_sessionGroupMembers.has(_sessionGroupWith)) keys.unshift(_sessionGroupWith);
+  pick.innerHTML=`<option value="">${esc(tx('session_group_with_anyone','With anyone'))}</option>`+
+    keys.map(k=>`<option value="${esc(k)}">${esc((k.startsWith('bot:')?'\u{1F916} ':'')+_sessionGroupLabel(k))} (${_sessionGroupMembers.get(k)||0})</option>`).join('');
+  pick.value=_sessionGroupWith;
 }
 
 function _partitionSidebarSessionRows(allMatched, activeSidForSidebar){
@@ -7846,7 +7910,8 @@ function _partitionSidebarSessionRows(allMatched, activeSidForSidebar){
   const cliSessionsRaw=[];
   let webuiArchivedCount=0;
   let cliArchivedCount=0;
-  const kindCounts={chats:0,jobs:0,jobsUnread:0};
+  const kindCounts={chats:0,jobs:0,jobsUnread:0,groups:0};
+  const groupMembers=new Map();
   for(const s of allMatched){
     if(!_sidebarRowHasVisibleMessages(s, activeSidForSidebar)) continue;
     const isCli=_isCliSession(s);
@@ -7872,11 +7937,17 @@ function _partitionSidebarSessionRows(allMatched, activeSidForSidebar){
         kindCounts.jobs++;
         if(typeof _hasUnreadForSession==='function'&&_hasUnreadForSession(s)) kindCounts.jobsUnread++;
       } else kindCounts.chats++;
+      if(typeof _isGroupChatSession==='function'&&_isGroupChatSession(s)){
+        kindCounts.groups++;
+        for(const p of _sessionGroupPeople(s)) groupMembers.set(p,(groupMembers.get(p)||0)+1);
+        for(const b of _sessionGroupBots(s)) groupMembers.set('bot:'+b,(groupMembers.get('bot:'+b)||0)+1);
+      }
     }
     if(typeof _sessionKindMatches==='function'&&!_sessionKindMatches(s, activeSidForSidebar)) continue;
     sessionsRaw.push(s);
   }
   if(typeof _sessionKindCounts!=='undefined') _sessionKindCounts=kindCounts;
+  if(typeof _sessionGroupMembers!=='undefined') _sessionGroupMembers=groupMembers;
   if(_sessionSourceFilter==='cli' && !window._showCliSessions && cliSessionCount===0){
     _sessionSourceFilter='webui';
   }
