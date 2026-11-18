@@ -7531,11 +7531,11 @@ def _run_agent_streaming(
         if sender_email or execution_profile:
             from api.group_chat import require_turn_membership
             require_turn_membership(s, _turn_identity)
-        # Admins get YOLO (skip action approvals) by default, once per chat
-        # per server start, so turning it off in the chat sticks.
+        # Admins and owners (sw-admins) get YOLO (skip action approvals) by
+        # default, once per chat per server start, so turning it off sticks.
         try:
-            from api.bot_builder import _is_bootstrap_admin
-            if _is_bootstrap_admin(_turn_identity):
+            from api.route_approvals import yolo_by_default
+            if yolo_by_default(_turn_identity):
                 from tools.approval_yolo import apply_launch_yolo
                 apply_launch_yolo(session_id)
         except Exception:
