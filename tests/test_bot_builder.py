@@ -232,7 +232,8 @@ def test_legacy_large_skills_unchanged_preserve_tree_and_wildcard(setup):
     assert result["config"]["system_prompt"] == "Updated instructions"
     assert (setup / "skills/research/SKILL.md").stat().st_ino == before
     _, rights = builder.access(ADMIN)
-    assert builder.access_ceiling(ADMIN, "default", rights).grants.skills_load == frozenset({"*"})
+    # Admins are never narrowed by a bot's capability list.
+    assert builder.access_ceiling(ADMIN, "default", rights) is None
 
 
 def test_recovery_session_routes_remain_available_with_revoked_cookie(setup, monkeypatch):

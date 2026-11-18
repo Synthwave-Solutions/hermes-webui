@@ -458,12 +458,26 @@ def _avatar_bytes(value):
         return result.getvalue()
 
 
+def _is_bootstrap_admin(identity):
+    email = str((identity or {}).get("email") if isinstance(identity, dict) else identity or "").strip().lower()
+    if not email:
+        return False
+    try:
+        from api.governance.loader import get_policy
+        return email in {str(a).strip().lower() for a in get_policy().bootstrap_admins}
+    except Exception:
+        return False
+
+
 def access_ceiling(identity, name, rights):
     data = managed(name)
     if data is None:
         return None
     if not allowed(identity, name):
         raise PermissionError("Bot access was revoked")
+    if _is_bootstrap_admin(identity):
+        # Admins are never narrowed by a bot's capability list.
+        return None
     from api.governance.resolver import _wildcard_grants
     return replace(rights, mode="enforce", permissions=frozenset({"*"}),
                    profiles=frozenset({name}), grants=replace(
@@ -520,3 +534,34 @@ def guard_profile_request(handler, parsed, method):
                 pass
         bad(handler, "Bot access is restricted. Select an available bot.", 403)
         return False
+
+
+_BOT_GRANT_FIELDS = {"bot_cli": "cli_tools", "bot_skill": "skills", "bot_mcp": "mcp_servers"}
+
+
+def apply_bot_grant(approver, gkind, value):
+    """Add one CLI, skill or MCP server to a managed bot's capability list.
+
+    Used when an admin approves an access request that a bot ran into
+    (gkind bot_cli, bot_skill or bot_mcp, value "<bot>:<item>"). Goes through
+    save(), so the same validation, skill install and revision check apply as
+    in the Bot Builder. Returns (before, after) audit strings.
+    """
+    field = _BOT_GRANT_FIELDS.get(gkind)
+    name, _, item = str(value or "").partition(":")
+    if not field or not name or not item:
+        raise ValueError("request does not describe a bot capability")
+    if managed(name) is None:
+        raise ValueError("bot is not managed in the Bot Builder")
+    config = get(approver, name)["config"]
+    current = list(config.get(field) or [])
+    if item in current:
+        return "absent", "already granted"
+    body = {key: config[key] for key in ("name", "title", "description", "system_prompt", "skills",
+                                         "mcp_servers", "cli_tools", "allowed_users", "allowed_groups",
+                                         "default_model", "model_provider", "revision") if key in config}
+    body["name"] = name
+    body[field] = sorted(set(current) | {item})
+    save(approver, body)
+    return "absent", f"bot {name}: {field}+{item}"
+

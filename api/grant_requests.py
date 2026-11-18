@@ -113,6 +113,9 @@ def _request_label(item: dict) -> str:
     value = str(item.get("value") or "")
     labels = {
         "cli": "CLI command",
+        "bot_cli": "Bot CLI command",
+        "bot_skill": "Bot skill",
+        "bot_mcp": "Bot MCP server",
         "skill": "Skill",
         "skill_manage": "Skill editing",
         "workdir": "CLI workdir",
@@ -351,7 +354,7 @@ def materialise_suggested_grant(
     email = str(email or "").strip().lower()
     gkind = str(gkind or "").strip()
     value = str(value or "").strip()
-    if not email or not value or gkind not in _GRANT_TARGETS:
+    if not email or not value or not _is_grant_kind(gkind):
         return None
     if gkind == "permission" and not _permission_is_grantable(value):
         return None
@@ -436,7 +439,7 @@ def ingest_spool(owner_scope: str | None = None) -> int:
                 continue
             gkind = str(item.get("gkind") or "")
             value = str(item.get("value") or "")
-            if not email or gkind not in _GRANT_TARGETS or not value:
+            if not email or not _is_grant_kind(gkind) or not value:
                 continue
             rk = f"{approvals.KIND_GRANT}:{skey}"
             notification = None
@@ -529,6 +532,15 @@ def _secret_glob_values(value: str) -> list[str]:
     if any(ch in path for ch in "*?["):
         return [path]
     return [path, path + "/**"] if is_dir else [path]
+
+
+_BOT_GRANT_KINDS = ("bot_cli", "bot_skill", "bot_mcp")
+
+
+def _is_grant_kind(gkind: str) -> bool:
+    """Policy grants plus requests to widen a managed bot (applied in the
+    Bot Builder, see api.bot_builder.apply_bot_grant)."""
+    return gkind in _GRANT_TARGETS or gkind in _BOT_GRANT_KINDS
 
 
 def apply_grant_to_policy(raw: dict, payload: dict) -> tuple[str, str] | None:

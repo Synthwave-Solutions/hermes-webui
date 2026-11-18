@@ -220,8 +220,9 @@ def bind_governed_agent_turn(identity: Any, *, active_profile: str = "default",
             return None
 
     email = _identity_email(identity)
-    if email and email in {str(a).strip().lower() for a in policy.bootstrap_admins} and not project_workspace and not workspace_path and not _has_bot_policy:
-        # Never-deny principals: run unbound. The resolver would grant
+    if email and email in {str(a).strip().lower() for a in policy.bootstrap_admins} and not project_workspace and not workspace_path:
+        # Never-deny principals: run unbound, also on a managed bot (a bot's
+        # capability list narrows what it does for others, never for an admin). The resolver would grant
         # wildcard anyway; skipping the bind keeps admin turns byte-identical
         # to today's behavior (and immune to translation bugs).
         return None
