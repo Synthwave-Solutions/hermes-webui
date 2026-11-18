@@ -9956,6 +9956,11 @@ _SIDEBAR_SESSION_RESPONSE_FIELDS = {
     "read_only",
     "is_read_only",
     "gateway_routing",
+    # Group chats filter (sidebar and conversation board): who is in the chat.
+    # Rows are already limited to chats the viewer may see.
+    "owner_email",
+    "participants",
+    "bot_participants",
 }
 
 
