@@ -278,6 +278,26 @@ def approval_choice_allowed(session_key: str, approval_id: str, choice: str) -> 
     return True  # A stale id still follows the ordinary stale-card handling.
 
 
+YOLO_DEFAULT_GROUPS = frozenset({"sw-admins"})
+
+
+def yolo_by_default(identity) -> bool:
+    """Bootstrap admins and the owners group skip action approvals by default."""
+    from api.governance import loader
+    try:
+        policy = loader.get_policy()
+        email = str((identity or {}).get("email") or "").strip().lower()
+        if not email:
+            return False
+        if email in policy.bootstrap_admins:
+            return True
+        user = (policy.users or {}).get(email)
+        groups = set(getattr(user, "groups", None) or ())
+        return bool(groups & YOLO_DEFAULT_GROUPS)
+    except Exception:
+        return False
+
+
 def require_yolo_eligible(identity, session_key: str) -> None:
     """Governed users and live once-only requests cannot enable skip-all."""
     from api.governance import loader
@@ -291,7 +311,7 @@ def require_yolo_eligible(identity, session_key: str) -> None:
     if policy.mode == "enforce":
         subject = subject_from_identity(identity)
         access = resolve_effective_access(policy, subject)
-        if subject.normalized_email not in policy.bootstrap_admins and (
+        if not yolo_by_default(identity) and (
             access.access_mode or access.access_level or access.approval_configured
         ):
             raise PermissionError("Governed users cannot skip action approvals")
