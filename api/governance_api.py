@@ -1492,7 +1492,19 @@ def decide_grant_request(key: str, decision: str, subject: GovernanceSubject, re
                 return 409, {"error": "stale_review", "message": "Automatic review is no longer enabled"}
         payload = entry.get("payload") if isinstance(entry.get("payload"), dict) else {}
         digest = _approval_digest(entry)
-        if decision == "approve":
+        if decision == "approve" and str(payload.get("gkind") or "").startswith("bot_"):
+            # A bot ran into its own capability list: widen that bot in the
+            # Bot Builder, not the person's policy entry.
+            from api import bot_builder
+            try:
+                before, after = bot_builder.apply_bot_grant(
+                    {"email": decided_by}, str(payload.get("gkind")), str(payload.get("value") or ""))
+            except PermissionError as exc:
+                return 403, {"error": "forbidden", "message": f"Not available for this bot: {exc}"}
+            except (ValueError, RuntimeError) as exc:
+                return 400, {"error": "invalid_payload", "message": str(exc)}
+            new_etag = old_etag
+        elif decision == "approve":
             raw = deepcopy(original_raw)
             result = grant_requests.apply_grant_to_policy(raw, payload)
             if result is None:
@@ -1511,7 +1523,7 @@ def decide_grant_request(key: str, decision: str, subject: GovernanceSubject, re
         except (ValueError, KeyError, OSError):
             # A failed queue write must not leave a newly granted capability
             # behind. Keep competing policy edits excluded during rollback.
-            if decision == "approve":
+            if decision == "approve" and not str(payload.get("gkind") or "").startswith("bot_"):
                 save_governance_policy(original_raw)
             return 500, {"error": "decision_write_failed", "message": "The decision could not be saved; retry after checking the request"}
 
