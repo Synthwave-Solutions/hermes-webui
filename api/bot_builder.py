@@ -458,12 +458,26 @@ def _avatar_bytes(value):
         return result.getvalue()
 
 
+def _is_bootstrap_admin(identity):
+    email = str((identity or {}).get("email") if isinstance(identity, dict) else identity or "").strip().lower()
+    if not email:
+        return False
+    try:
+        from api.governance.loader import get_policy
+        return email in {str(a).strip().lower() for a in get_policy().bootstrap_admins}
+    except Exception:
+        return False
+
+
 def access_ceiling(identity, name, rights):
     data = managed(name)
     if data is None:
         return None
     if not allowed(identity, name):
         raise PermissionError("Bot access was revoked")
+    if _is_bootstrap_admin(identity):
+        # Admins are never narrowed by a bot's capability list.
+        return None
     from api.governance.resolver import _wildcard_grants
     return replace(rights, mode="enforce", permissions=frozenset({"*"}),
                    profiles=frozenset({name}), grants=replace(
