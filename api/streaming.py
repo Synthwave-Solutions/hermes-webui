@@ -450,6 +450,16 @@ def _persistent_state_snapshot(profile_home: str | None, memory_home: str | None
     return {"memory": memory, "skills": skills}
 
 
+def _persistent_state_wait_seconds() -> float:
+    try:
+        return max(0.0, float(os.environ.get("HERMES_WEBUI_PERSISTENT_STATE_WAIT_SECONDS", "0.15")))
+    except (TypeError, ValueError):
+        return 0.15
+
+
+_PERSISTENT_STATE_WAIT_SECONDS = _persistent_state_wait_seconds()
+
+
 class _PersistentStateSnapshotTask:
     """One turn-owned, explicit-path scan; join before model work and on every exit."""
 
@@ -9129,15 +9139,25 @@ def _run_agent_streaming(
                 agent._memory_manager.raw_user_content = msg_text
             with _run_timing_stage('attachment_prepare'):
                 user_message = _build_native_multimodal_message(workspace_ctx, _agent_msg_text, attachments, workspace, cfg=_cfg)
-            try:
-                with _run_timing_stage('persistent_state_wait'):
-                    _persistent_state_before = _persistent_state_scan.result()
-            finally:
+            # The "before" picture of memory and skill files is only compared
+            # after the turn. The scan started before the prompt was prepared
+            # and normally ends well before the model's first reply, so the
+            # request no longer waits for it (measured 18 Nov 2026: 0.3 s per
+            # turn, 1.6 s for one turn in ten). Only when the scan is still
+            # running after a short grace does the turn go on without it; the
+            # result is picked up at writeback.
+            with _run_timing_stage('persistent_state_wait'):
+                if _persistent_state_scan.thread is not None:
+                    _persistent_state_scan.thread.join(_PERSISTENT_STATE_WAIT_SECONDS)
+            if _persistent_state_scan.finished is not None:
                 _record_run_timing(
                     'persistent_state_before', _persistent_state_scan.started,
                     _persistent_state_scan.finished,
                     outcome='raised' if _persistent_state_scan.error else 'completed',
                 )
+                _persistent_state_before = _persistent_state_scan.result()
+            else:
+                _persistent_state_before = _persistent_state_scan
             with _run_timing_stage('history_sanitize'):
                 _run_conversation_kwargs = dict(
                     user_message=user_message,
@@ -10190,6 +10210,8 @@ def _run_agent_streaming(
                         logger.debug("Memory lifecycle mark failed for session %s", s.session_id, exc_info=True)
                 with _stream_writeback_stage(_writeback_timings, "persistent_state_scan"):
                     try:
+                        if isinstance(_persistent_state_before, _PersistentStateSnapshotTask):
+                            _persistent_state_before = _persistent_state_before.result()
                         _persistent_changes = _persistent_state_changes(
                             _persistent_state_before,
                             _persistent_state_snapshot(_profile_home, str(_personal_root)),

@@ -241,6 +241,19 @@ def j(handler, payload, status: int=200, extra_headers: dict=None, *, pretty: bo
     (e.g., {'Set-Cookie': '...'}).  Headers are sent before end_headers().
     """
     body = _json_response_body(payload, pretty=pretty)
+    if status == 200 and not extra_headers:
+        capture = getattr(handler, "_poll_memo_capture", None)
+        if capture is not None:
+            handler._poll_memo_capture = None
+            try:
+                capture(body)
+            except Exception:
+                pass
+    send_json_body(handler, body, status, extra_headers)
+
+
+def send_json_body(handler, body: bytes, status: int=200, extra_headers: dict=None) -> None:
+    """Send an already serialized JSON body with the standard JSON headers."""
     handler.send_response(status)
     handler.send_header('Content-Type', 'application/json; charset=utf-8')
 

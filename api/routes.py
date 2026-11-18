@@ -12438,6 +12438,9 @@ def handle_get(handler, parsed) -> bool:
     from api.workspace_access import guard_session_request as guard_workspace_request
     if not guard_workspace_request(handler, parsed):
         return True
+    from api import poll_memo
+    if poll_memo.serve(handler, parsed):
+        return True
     proxy_result = _handle_extension_sidecar_proxy(handler, parsed, "GET")
     if proxy_result is not False:
         return proxy_result
@@ -14701,6 +14704,11 @@ from api.project_collaboration import transaction as _project_transaction
 @_project_transaction
 def handle_post(handler, parsed) -> bool:
     """Handle all POST routes. Returns True if handled, False for 404."""
+    try:
+        from api import poll_memo as _poll_memo
+        _poll_memo.invalidate(parsed.path)
+    except Exception:
+        pass
     from api.bot_builder import guard_profile_request
     if not guard_profile_request(handler, parsed, "POST"):
         return True
@@ -17859,6 +17867,11 @@ def handle_post(handler, parsed) -> bool:
 
 def handle_patch(handler, parsed) -> bool:
     """Handle all PATCH routes. Returns True if handled, False for 404."""
+    try:
+        from api import poll_memo as _poll_memo
+        _poll_memo.invalidate(parsed.path)
+    except Exception:
+        pass
     from api.bot_builder import guard_profile_request
     if not guard_profile_request(handler, parsed, "PATCH"):
         return True
@@ -17890,6 +17903,11 @@ def handle_patch(handler, parsed) -> bool:
 
 def handle_delete(handler, parsed) -> bool:
     """Handle all DELETE routes. Returns True if handled, False for 404."""
+    try:
+        from api import poll_memo as _poll_memo
+        _poll_memo.invalidate(parsed.path)
+    except Exception:
+        pass
     from api.bot_builder import guard_profile_request
     if not guard_profile_request(handler, parsed, "DELETE"):
         return True
@@ -17958,6 +17976,11 @@ def handle_delete(handler, parsed) -> bool:
 
 def handle_put(handler, parsed) -> bool:
     """Handle all PUT routes. Returns True if handled, False for 404."""
+    try:
+        from api import poll_memo as _poll_memo
+        _poll_memo.invalidate(parsed.path)
+    except Exception:
+        pass
     from api.bot_builder import guard_profile_request
     if not guard_profile_request(handler, parsed, "PUT"):
         return True
@@ -21461,8 +21484,14 @@ def _handle_cron_recent(handler, parsed):
         # Most polls have nothing to report: answer those from the job files' run times.
         from api.cron_recent_precheck import nothing_new as _cron_nothing_new
 
+        _cron_poll_started = time.time()
         if _cron_nothing_new(handler, since):
-            return j(handler, {"completions": [], "since": since})
+            # Nothing of the caller's ran after `since`. Tell the tab it may ask
+            # from a later moment next time, so a long-open tab stops rescanning
+            # every run since it was loaded. Two minutes of slack cover a run
+            # whose stamp is just before its file write.
+            return j(handler, {"completions": [], "since": since,
+                               "checked_until": max(since, _cron_poll_started - 120.0)})
     except Exception:
         logger.debug("cron completion precheck unavailable", exc_info=True)
     try:
