@@ -2794,6 +2794,19 @@
       "[data-tour='studio-roadmap']"
     ]
   },
+  "webui.studio.quickscan_roadmap": {
+    "panel": "studio",
+    "targets": [
+      "[data-tour='studio-quickscan-roadmap']",
+      "[data-tour='studio-quickscan-strip']"
+    ]
+  },
+  "webui.studio.hours": {
+    "panel": "studio",
+    "targets": [
+      "[data-tour='studio-hours']"
+    ]
+  },
   "webui.studio.playbooks": {
     "panel": "studio",
     "targets": [

@@ -107,7 +107,7 @@ def _visible_item(view, item) -> bool:
 def backlog_for(view) -> list[dict]:
     items = backlog_items()
     planned = plan(items)
-    rows = [dict(i, editable=_editable_item(view, i), autopilot=_AUTOPILOT.get(i["id"]),
+    rows = [dict(i, editable=_editable_item(view, i), removable=_removable_item(view, i), autopilot=_AUTOPILOT.get(i["id"]),
                  assignee=i.get("assignee") or i.get("owner") or "", plan=planned.get(i["id"]), **_use_case_facts(i))
             for i in items if _visible_item(view, i)]
     return sorted(rows, key=lambda r: (STATUSES.index(r.get("status", "idea")) if r.get("status") in STATUSES else 9,
@@ -1166,7 +1166,7 @@ def handle_get(handler, parsed) -> bool:
             pb = _pb_load((qs.get("id") or [""])[0])
             if not _pb_visible(view, pb):
                 raise KeyError("Playbook not found")
-            out = dict(pb, editable=_pb_editable(view, pb), stats=run_stats(pb))
+            out = dict(pb, editable=_pb_editable(view, pb), removable=_pb_removable(view, pb), stats=run_stats(pb))
             # Runs of other people stay private; the stats are enough.
             out["runs"] = [r for r in pb.get("runs") or [] if r.get("by") == view.email][-20:]
             j(handler, out)
@@ -1195,7 +1195,8 @@ def handle_post(handler, parsed, body) -> bool:
         elif path == "/api/studio/autopilot":
             j(handler, autopilot(view, str(body.get("id") or "")))
         elif path == "/api/studio/playbook":
-            j(handler, dict(save_playbook(view, body), editable=True))
+            pb = save_playbook(view, body)
+            j(handler, dict(pb, editable=True, removable=_pb_removable(view, pb)))
         elif path == "/api/studio/prompts":
             j(handler, save_prompt(view, body))
         elif path == "/api/studio/profile":
@@ -1215,7 +1216,8 @@ def handle_post(handler, parsed, body) -> bool:
         elif path == "/api/studio/playbook/run":
             j(handler, record_run(view, body))
         elif path == "/api/studio/playbook/draft":
-            j(handler, dict(draft_from_use_case(view, str(body.get("use_case") or "")), editable=True))
+            pb = draft_from_use_case(view, str(body.get("use_case") or ""))
+            j(handler, dict(pb, editable=True, removable=_pb_removable(view, pb)))
         elif path == "/api/studio/playbook/delete":
             pb = _pb_load(str(body.get("id") or ""))
             if not _pb_removable(view, pb):

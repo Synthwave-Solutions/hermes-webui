@@ -223,15 +223,17 @@
   function hoursHtml(d){
     if (!d) return '';
     const loc = lang() === 'en' ? 'en-GB' : 'nl-NL';
-    const hm = m => (m == null ? null : (Math.round(m / 6) / 10).toLocaleString(loc, { maximumFractionDigits: 1 }));
-    const cell = m => (m == null ? `<span class="om-muted">${H(w('hrs_unknown'))}</span>` : H(hm(m)) + ' ' + H(w('hrs_h')));
-    const shell = body => `<section class="wp-card sp-hours" aria-label="${H(w('hrs_title'))}"><div class="wp-card-head"><h3>${H(w('hrs_title'))}</h3>${d.usage_as_of ? `<span class="om-muted om-small">${H(w('hrs_as_of'))} ${H(new Date(d.usage_as_of * 1000).toLocaleDateString(loc, { day: 'numeric', month: 'long' }))}</span>` : ''}</div>${body}</section>`;
+    // Tenths of an hour, rounded the same way above and below zero so used and remaining add up.
+    const hm = m => (m == null ? null : (Math.sign(m) * Math.round(Math.abs(m) / 6) / 10).toLocaleString(loc, { maximumFractionDigits: 1 }));
+    const cell = m => (m == null ? `<span class="om-muted">${H(w('hrs_unknown'))}</span>` : `<span class="${m < 0 ? 'sp-hours-over' : ''}">${H(hm(m))} ${H(w('hrs_h'))}</span>`);
+    const date = v => { const d = new Date(String(v).slice(0, 10) + 'T00:00:00Z'); return isNaN(d) ? String(v).slice(0, 10) : d.toLocaleDateString(loc, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }); };
+    const shell = body => `<section class="wp-card sp-hours" data-tour="studio-hours" aria-label="${H(w('hrs_title'))}"><div class="wp-card-head"><h3>${H(w('hrs_title'))}</h3>${d.usage_as_of ? `<span class="om-muted om-small">${H(w('hrs_as_of'))} ${H(new Date(d.usage_as_of * 1000).toLocaleDateString(loc, { day: 'numeric', month: 'long' }))}</span>` : ''}</div>${body}</section>`;
     if (!d.configured) return shell(`<p class="sp-hours-empty">${H(w('hrs_off'))}</p>`);
     if (!d.available) return shell(`<p class="sp-hours-empty">${H(w('hrs_down'))}</p>`);
     const depts = (d.departments || []).filter(x => (x.roles || []).length || (x.team || []).length);
     if (!depts.length) return shell(`<p class="sp-hours-empty">${H(w('hrs_none'))}</p>`);
     return shell(depts.map(x => `<div class="sp-hours-dept">
-        <div class="sp-hours-head"><strong>${H(x.name || '')}</strong>${x.tier_name || x.tier ? `<span class="om-badge">${H(w('hrs_package'))}: ${H(x.tier_name || x.tier)}</span>` : ''}${x.term_ends_at ? `<span class="om-muted om-small">${H(w('hrs_until'))} ${H(String(x.term_ends_at).slice(0, 10))}</span>` : ''}${x.planned_tier_change ? `<span class="om-badge warn">${H(w('hrs_change'))}</span>` : ''}</div>
+        <div class="sp-hours-head"><strong>${H(x.name || '')}</strong>${x.tier_name || x.tier ? `<span class="om-badge">${H(w('hrs_package'))}: ${H(x.tier_name || x.tier)}</span>` : ''}${x.term_ends_at ? `<span class="om-muted om-small">${H(w('hrs_until'))} ${H(date(x.term_ends_at))}</span>` : ''}${x.planned_tier_change ? `<span class="om-badge warn">${H(w('hrs_change'))}</span>` : ''}</div>
         ${(x.roles || []).length ? `<div class="om-table-wrap sp-hours-table"><table class="om-table"><thead><tr><th>${H(w('hrs_role'))}</th><th class="num">${H(w('hrs_allocated'))}</th><th class="num">${H(w('hrs_used'))}</th><th class="num">${H(w('hrs_left'))}</th></tr></thead><tbody>${x.roles.map(r => `<tr><td><strong>${H(r.label || Partners.label(r.role).replace(/^Synthwave /, ''))}</strong></td><td class="num">${cell(r.allocated_minutes)}</td><td class="num">${cell(r.used_minutes)}</td><td class="num">${cell(r.remaining_minutes)}</td></tr>${(r.people || []).map(p => `<tr class="sp-hours-person"><td>${H(p.name)}</td><td></td><td class="num">${cell(p.used_minutes)}</td><td></td></tr>`).join('')}`).join('')}</tbody></table></div>` : ''}
         ${(x.team || []).length ? `<div class="sp-hours-team"><span class="om-muted om-small">${H(w('hrs_team'))}</span>${x.team.map(t => `<span class="om-chip">${H(t.name)}${t.label || t.role ? ' · ' + H(t.label || Partners.label(t.role).replace(/^Synthwave /, '')) : ''}${t.hours_per_week != null ? ' · ' + H(Number(t.hours_per_week).toLocaleString(loc, { maximumFractionDigits: 1 })) + ' ' + H(w('hrs_week')) : ''}</span>`).join('')}</div>` : ''}</div>`).join(''));
   }

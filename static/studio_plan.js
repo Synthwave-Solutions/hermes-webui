@@ -42,7 +42,10 @@
     y_te_valideren: 'Te valideren', y_te_bevestigen: 'Te bevestigen', y_voorgesteld: 'Voorgesteld', y_onbekend: 'Onbekend', y_alleen_genoemd: 'Alleen genoemd', y_bevestigd: 'Bevestigd',
     dia_empty: 'Geen procesdiagrammen in deze roadmap.', notes: 'Bij deze planning', open_points: 'Governance, privacy en adoptie', pilot_all: 'Pilotcriteria',
     tree_hint: 'De kansenboom en de matrix van impact en moeite staan per use case in Studio.', tree_open: 'Naar de use cases',
-    block_status: 'Blok', loading: 'Laden…', failed_load: 'De roadmap kon niet geladen worden.'
+    block_status: 'Blok', loading: 'Laden…', failed_load: 'De roadmap kon niet geladen worden.',
+    import_failed: 'De roadmap is niet geladen: {m}', link_one: '1 koppeling', links_n: '{n} koppelingen', runs_30_one: '1 run in 30 dagen',
+    ahead: 'Handmatig staat dit op {s}, maar dat blijkt nog niet uit wat er draait', hidden_item: 'Niet zichtbaar voor jou',
+    block_link: 'Blok koppelen', block_link_hint: 'Koppel wat voor het hele blok geldt, zoals de bot of het playbook van dit blok.', block_save: 'Blok opslaan'
   };
   const EN = {
     tab_plan: 'Roadmap', tab_systems: 'Systems', tab_diagrams: 'Process diagrams',
@@ -71,7 +74,10 @@
     y_te_valideren: 'To validate', y_te_bevestigen: 'To confirm', y_voorgesteld: 'Proposed', y_onbekend: 'Unknown', y_alleen_genoemd: 'Only mentioned', y_bevestigd: 'Confirmed',
     dia_empty: 'No process diagrams in this roadmap.', notes: 'About this planning', open_points: 'Governance, privacy and adoption', pilot_all: 'Pilot criteria',
     tree_hint: 'The opportunity tree and the impact and effort matrix live in each use case in Studio.', tree_open: 'To the use cases',
-    block_status: 'Block', loading: 'Loading…', failed_load: 'The roadmap could not be loaded.'
+    block_status: 'Block', loading: 'Loading…', failed_load: 'The roadmap could not be loaded.',
+    import_failed: 'The roadmap was not loaded: {m}', link_one: '1 link', links_n: '{n} links', runs_30_one: '1 run in 30 days',
+    ahead: 'By hand this is {s}, but what runs does not show that yet', hidden_item: 'Not visible to you',
+    block_link: 'Link the block', block_link_hint: 'Link what holds for the whole block, such as the bot or the playbook of this block.', block_save: 'Save block'
   };
   const lang = () => ((document.documentElement.lang || 'nl').toLowerCase().startsWith('en') ? 'en' : 'nl');
   const w = (k, v) => { let s = (lang() === 'en' ? EN : NL)[k] || NL[k] || k; if (v) for (const [a, b] of Object.entries(v)) s = s.replace('{' + a + '}', b); return s; };
@@ -87,8 +93,14 @@
   const day = s => new Date(String(s).slice(0, 10) + 'T00:00:00Z');
   const fmt = (d, o) => new Intl.DateTimeFormat(loc(), Object.assign({ timeZone: 'UTC' }, o)).format(d);
   const when = ts => (ts ? fmt(new Date(ts * 1000), { day: 'numeric', month: 'short', year: 'numeric' }) : '');
+  const dateText = iso => (iso ? fmt(day(iso), { day: 'numeric', month: 'short', year: 'numeric' }) : '');
+  const RANK = { planned: 0, in_progress: 1, built: 2, live: 3 };
+  // The mark in the chart is for one case only: the status set by hand claims more than the evidence shows.
+  // That a linked row moved past 'planned' by itself is progress, and is told in the panel, not flagged.
+  const ahead = st => !!st.differs && (st.manual === 'parked' || (RANK[st.manual] || 0) > (RANK[st.status] || 0));
+  const linkCount = n => (n === 1 ? w('link_one') : w('links_n', { n: String(n) }));
 
-  const P = { host: null, data: null, tab: 'plan', open: '', error: '', importing: false, importError: '', options: null, token: 0 };
+  const P = { host: null, data: null, tab: 'plan', open: '', phaseOpen: '', error: '', importing: false, importError: '', options: null, token: 0 };
 
   // ── Reading ────────────────────────────────────────────────────────────────
   async function load(){
@@ -109,7 +121,7 @@
   function stripHtml(){
     const u = P.data.rollup, r = roadmap();
     const tile = (label, value, unit, sub) => `<div class="rm-tile"><span class="rm-tile-label">${H(label)}</span><span class="rm-tile-value">${H(value)}${unit ? `<small>${H(unit)}</small>` : ''}</span>${sub ? `<span class="pl-tile-sub">${H(sub)}</span>` : ''}</div>`;
-    return `<div class="rm-tiles pl-strip" data-tour="studio-plan-strip">
+    return `<div class="rm-tiles pl-strip" data-tour="studio-quickscan-strip">
       ${tile(w('running', { a: String(u.rows_live), b: String(u.rows_total) }), String(u.rows_live), '/ ' + u.rows_total, w('built_n', { n: String(u.rows_built) }) + ' · ' + w('planned_n', { n: String(u.rows_planned) }))}
       ${tile(w('measured'), num(u.measured_hours_week_saved), w('hours'), u.baseline_hours_week_saved ? w('baseline') + ': ' + num(u.baseline_hours_week_saved) + ' ' + w('hours') : '')}
       ${tile(w('version'), r.report_version, '', r.updated_at ? w('updated') + ' ' + when(r.updated_at) : '')}</div>`;
@@ -124,7 +136,7 @@
     }
     const steer = new Set(r.steering_weeks || []);
     return `<div class="rm-row rm-head" aria-hidden="true"><div class="rm-left"></div><div class="rm-track rm-months">${months.map((m, i) =>
-        `<span style="grid-column:span ${m.span}">${m.span > 1 ? H(fmt(m.d, { month: 'long' }) + (m.d.getUTCMonth() === 0 || i === 0 ? ' ' + m.d.getUTCFullYear() : '')) : ''}</span>`).join('')}</div></div>
+        `<span style="grid-column:span ${m.span}">${m.span > 2 ? H(fmt(m.d, { month: 'long' }) + (m.d.getUTCMonth() === 0 || i === 0 ? ' ' + m.d.getUTCFullYear() : '')) : m.span === 2 ? H(fmt(m.d, { month: 'short' }).replace('.', '')) : ''}</span>`).join('')}</div></div>
       <div class="rm-row rm-head rm-weeks" aria-hidden="true"><div class="rm-left">${H(w('wk'))}</div><div class="rm-track">${weeks.map((d, i) =>
         `<span class="${i === nowIndex ? 'now' : ''}" title="${H(fmt(d, { day: 'numeric', month: 'short' }))}">${i + 1}</span>`).join('')}</div></div>
       <div class="rm-row rm-head pl-steering"><div class="rm-left">${H(w('steering'))}</div><div class="rm-track">${weeks.map((_d, i) =>
@@ -136,7 +148,7 @@
     const label = `${row.name}: ${w('k_' + row.kind)}, ${w('s_' + st.status)}, ${span(row)}`;
     return `<div class="rm-row rm-item${open ? ' open' : ''}" data-pl-row="${H(row.id)}"><div class="rm-left">
         <button type="button" class="rm-title" data-pl-open="${H(row.id)}" aria-expanded="${open}">${H(row.name)}</button>
-        <span class="rm-sub"><span>${H(w('k_' + row.kind))}</span>${(row.links || []).length ? `<span class="om-chip pl-linked">${(row.links || []).length} ${H(w('links').toLowerCase())}</span>` : ''}${st.differs ? `<span class="om-badge warn pl-differs" title="${H(w('differs', { s: w('s_' + st.manual).toLowerCase() }))}">!</span>` : ''}</span></div>
+        <span class="rm-sub"><span>${H(w('k_' + row.kind))}</span>${(row.links || []).length ? `<span class="om-chip pl-linked">${H(linkCount((row.links || []).length))}</span>` : ''}${ahead(st) ? `<span class="om-badge warn pl-differs" title="${H(w('ahead', { s: w('s_' + st.manual).toLowerCase() }))}" role="img" aria-label="${H(w('ahead', { s: w('s_' + st.manual).toLowerCase() }))}">!</span>` : ''}</span></div>
       <div class="rm-track" style="--rm-today:${todayPct}">
         <button type="button" class="rm-bar pl-bar s-${H(st.status)} k-${H(row.kind)}" style="grid-column:${row.start_week} / span ${row.weeks}" data-pl-open="${H(row.id)}" aria-expanded="${open}" aria-label="${H(label)}" title="${H(label)}"><span>${row.weeks >= 3 ? H(w('s_' + st.status)) : ''}</span></button>
       </div></div>${open ? panelHtml(row, group) : ''}`;
@@ -161,12 +173,12 @@
     const type = `<span class="om-badge">${H(w('t_' + e.type))}</span>`;
     const head = (name, dot) => `<span class="om-dot ${dot}"></span><div class="om-row-main"><div class="om-row-title">${H(name)} ${type}</div>`;
     if (!e.found) return `<div class="om-row pl-ev">${head(e.ref, 'error')}<div class="om-row-sub">${H(w('missing'))}</div></div></div>`;
-    if (!e.visible) return `<div class="om-row pl-ev">${head(w('t_' + e.type), e.live ? 'ok' : 'new')}<div class="om-row-sub">${H(w('hidden'))}</div></div></div>`;
+    if (!e.visible) return `<div class="om-row pl-ev pl-ev-hidden"><span class="om-dot ${e.live ? 'ok' : 'new'}"></span><div class="om-row-main"><div class="om-row-title">${type}</div><div class="om-row-sub">${H(w('hidden'))}</div></div></div>`;
     let sub = [], dot = 'new', go = '';
     if (e.type === 'job') {
       dot = e.live ? 'ok' : e.last_result === 'failed' ? 'error' : 'new';
       sub = [e.enabled ? w('on') : w('off'), e.schedule, e.last_run_at ? `${w('last_run')}: ${when(e.last_run_at)}${e.last_result ? ' (' + w(e.last_result === 'ok' ? 'ok' : 'failed') + ')' : ''}` : w('never'),
-             w('runs_30', { n: String(e.runs_30d || 0) }), e.hours_saved_30d ? w('saved_30', { h: num(e.hours_saved_30d) }) : ''];
+             e.runs_30d === 1 ? w('runs_30_one') : e.runs_30d || !e.last_run_at ? w('runs_30', { n: String(e.runs_30d || 0) }) : '', e.hours_saved_30d ? w('saved_30', { h: num(e.hours_saved_30d) }) : ''];
       go = 'tasks';
     } else if (e.type === 'bot') {
       dot = e.active ? 'ok' : 'new';
@@ -183,7 +195,10 @@
       dot = e.published ? 'ok' : 'new';
       sub = [e.published ? w('published') : w('draft'), w('followed', { n: String(e.runs || 0) })];
     }
-    const action = go ? `data-pl-nav="${go}"` : `data-pl-go="${H(e.type)}" data-pl-ref="${H(e.ref)}"`;
+    // A task and a bot open on that task or bot; a skill opens the Skills screen.
+    const action = e.type === 'job' && e.job_id ? `data-pl-job="${H(e.job_id)}" data-pl-store="${H(e.store || '')}" data-pl-bot="${H(e.bot || '')}"`
+      : e.type === 'bot' ? `data-pl-bot-open="${H(e.ref)}"`
+      : go ? `data-pl-nav="${go}"` : `data-pl-go="${H(e.type)}" data-pl-ref="${H(e.ref)}"`;
     return `<div class="om-row pl-ev">${head(e.name || e.ref, dot)}<div class="om-row-sub">${H(sub.filter(Boolean).join(' · '))}</div></div>
       <div class="om-row-actions"><button type="button" class="sm-btn" ${action}>${H(w('open'))}</button></div></div>`;
   }
@@ -199,22 +214,31 @@
       ${phase.human_role ? `<div class="pl-card-part"><h5>${H(w('human_role'))}</h5><p>${H(phase.human_role)}</p></div>` : ''}
       ${listHtml(w('steps'), phase.steps)}${listHtml(w('pilot'), phase.pilot_criteria)}
       ${phase.ready_when ? `<div class="pl-card-part pl-ready"><h5>${H(w('ready_when'))}</h5><p>${H(phase.ready_when)}</p></div>` : ''}
-      ${(ps.evidence || []).length ? `<div class="pl-card-part"><h5>${H(w('evidence'))}</h5><div class="om-list">${ps.evidence.map(evidenceHtml).join('')}</div></div>` : ''}</section>`;
+      ${(ps.evidence || []).length ? `<div class="pl-card-part" data-pl-phase-evidence><h5>${H(w('evidence'))}</h5><div class="om-list">${ps.evidence.map(evidenceHtml).join('')}</div></div>` : ''}
+      ${P.data.editable ? phaseEditHtml(phase) : ''}</section>`;
+  }
+  const linkFields = item => { const csv = t => (item.links || []).filter(l => l.type === t).map(l => l.ref).join(','); return LINK_TYPES.map(t => `<label>${H(w('l_' + t))}<input name="link_${t}" data-sp-picker data-sp-source="plan:${t}" data-sp-multi="1" data-sp-custom="0" placeholder="${H(w('pick'))}" value="${H(csv(t))}"></label>`).join(''); };
+  // The block card links what holds for the whole block. Folded away until somebody wants it.
+  function phaseEditHtml(phase){
+    return `<details class="pl-card-links" ${P.phaseOpen === phase.id ? 'open' : ''} data-pl-phase-links="${H(phase.id)}"><summary>${H(w('block_link'))}${(phase.links || []).length ? ` <span class="om-chip pl-linked">${H(linkCount(phase.links.length))}</span>` : ''}</summary>
+      <form class="pl-edit pl-phase-edit" data-pl-form="${H(phase.id)}" data-pl-target="phase"><p class="om-small om-muted">${H(w('block_link_hint'))}</p>
+        <div class="rm-edit-fields"><label>${H(w('status'))}<select name="status" class="om-select">${(P.data.statuses || []).map(s => `<option value="${H(s)}" ${phase.status === s ? 'selected' : ''}>${H(w('s_' + s))}</option>`).join('')}</select></label></div>
+        <div class="rm-edit-fields pl-links">${linkFields(phase)}</div>
+        <div class="rm-edit-actions"><button type="submit" class="sm-btn primary">${H(w('block_save'))}</button></div></form></details>`;
   }
   function editHtml(row){
-    const csv = t => (row.links || []).filter(l => l.type === t).map(l => l.ref).join(',');
-    return `<form class="pl-edit" data-pl-form="${H(row.id)}">
+    return `<form class="pl-edit" data-pl-form="${H(row.id)}" data-pl-target="row">
       <div class="rm-edit-fields">
         <label>${H(w('status'))}<select name="status" class="om-select">${(P.data.statuses || []).map(s => `<option value="${H(s)}" ${row.status === s ? 'selected' : ''}>${H(w('s_' + s))}</option>`).join('')}</select></label>
         <label>${H(w('delivered'))}<input type="date" name="delivered_at" value="${H(row.delivered_at || '')}"></label>
         <label class="pl-wide">${H(w('note'))}<input type="text" name="note" maxlength="400" value="${H(row.note || '')}"></label>
       </div>
-      <div class="rm-edit-fields pl-links">${LINK_TYPES.map(t => `<label>${H(w('l_' + t))}<input name="link_${t}" data-sp-picker data-sp-source="plan:${t}" data-sp-multi="1" data-sp-custom="0" placeholder="${H(w('pick'))}" value="${H(csv(t))}"></label>`).join('')}</div>
+      <div class="rm-edit-fields pl-links">${linkFields(row)}</div>
       <div class="rm-edit-actions"><button type="submit" class="sm-btn primary">${H(w('save'))}</button><button type="button" class="sm-btn" data-pl-close>${H(w('close'))}</button></div></form>`;
   }
   function panelHtml(row, group){
     const st = rowState(row.id);
-    const facts = [w('k_' + row.kind), span(row), row.delivered_at ? w('delivered').toLowerCase() + ' ' + row.delivered_at : ''].filter(Boolean).join(' · ');
+    const facts = [w('k_' + row.kind), span(row), row.delivered_at ? w('delivered').toLowerCase() + ' ' + dateText(row.delivered_at) : ''].filter(Boolean).join(' · ');
     return `<div class="rm-edit pl-panel" data-pl-panel role="region" aria-label="${H(row.name)}">
       <div class="pl-panel-head"><span class="om-badge pl-s s-${H(st.status)}">${H(w('s_' + st.status))}</span><span class="om-small om-muted">${H(st.derived ? w('derived') : w('manual'))}${st.differs ? ' · ' + H(w('differs', { s: w('s_' + st.manual).toLowerCase() })) : ''}</span>
         ${P.data.editable ? '' : `<button type="button" class="sm-btn pl-panel-close" data-pl-close>${H(w('close'))}</button>`}</div>
@@ -267,17 +291,36 @@
     const tabs = `<div class="om-seg pl-tabs" role="tablist">${[['plan', 'tab_plan'], ['systems', 'tab_systems'], ['diagrams', 'tab_diagrams']].map(([k, l]) => `<button type="button" role="tab" aria-selected="${P.tab === k}" aria-pressed="${P.tab === k}" data-pl-tab="${k}">${H(w(l))}</button>`).join('')}</div>`;
     const actions = editable ? `<span class="pl-actions"><button type="button" class="sm-btn" data-pl-import-open>${H(w('import'))}</button><button type="button" class="sm-btn" data-pl-export>${H(w('export'))}</button></span>` : '';
     const main = P.tab === 'systems' ? systemsHtml() : P.tab === 'diagrams' ? diagramsHtml() : ganttHtml() + notesHtml();
-    host.innerHTML = `<div class="rm pl" data-tour="studio-plan"><p class="om-intro">${H(w('intro'))}</p>${stripHtml()}
+    host.innerHTML = `<div class="rm pl" data-tour="studio-quickscan-roadmap"><p class="om-intro">${H(w('intro'))}</p>${stripHtml()}
       <div class="rm-bar-row">${tabs}${actions}</div>${P.importing ? importHtml() : ''}${main}</div>`;
-    if (P.tab === 'diagrams' && typeof renderMermaidBlocks === 'function') { try { renderMermaidBlocks(host); } catch (_e) {} }
+    if (P.tab === 'diagrams' && typeof renderMermaidBlocks === 'function') { try { renderMermaidBlocks(host); fitDiagrams(host, 40); } catch (_e) {} }
     if (P.open && editable) void mountPickers();
+  }
+  // The inline viewer opens a diagram at the height of its frame, so a wide diagram runs off the side.
+  // Those are fitted once, the way the viewer's own fit button does it. The diagrams arrive a moment after the paint.
+  function fitDiagrams(host, tries){
+    let waiting = false;
+    for (const block of host.querySelectorAll('.pl-diagram .mermaid-block')) {
+      const viewer = block.querySelector('.mermaid-viewer'), s = viewer && viewer._mermaidViewer;
+      if (!s) { waiting = true; continue; }
+      if (viewer.dataset.plFitted) continue;
+      viewer.dataset.plFitted = '1';
+      try { if (s.box && s.viewport && s.box.width * s.scale > s.viewport.clientWidth + 1 && typeof s.fit === 'function') s.fit(); } catch (_e) {}
+    }
+    if (waiting && tries > 0) setTimeout(() => { if (P.tab === 'diagrams' && host.isConnected) fitDiagrams(host, tries - 1); }, 250);
   }
   async function mountPickers(){
     if (!window.SpPicker) return;
     if (!P.options) { try { P.options = await call('/api/studio/roadmap/options'); } catch (_e) { P.options = {}; } }
-    for (const t of LINK_TYPES) window.SpPicker.sources['plan:' + t] = () => (P.options[t] || []);
-    const form = P.host && P.host.querySelector('[data-pl-form]');
-    if (form) window.SpPicker.mountAll(form);
+    const names = {};
+    for (const st of [...Object.values(P.data.rows || {}), ...Object.values(P.data.phases || {})]) for (const e of st.evidence || []) names[e.type + ':' + e.ref] = e.visible && e.name ? e.name : w(e.found ? 'hidden_item' : 'missing');
+    for (const t of LINK_TYPES) window.SpPicker.sources['plan:' + t] = () => {
+      const known = P.options[t] || [], have = new Set(known.map(o => o.value));
+      // What is linked already stays choosable under a label, also when it is not in the viewer's own list.
+      const extra = Object.keys(names).filter(k => k.startsWith(t + ':') && !have.has(k.slice(t.length + 1))).map(k => ({ value: k.slice(t.length + 1), label: names[k] }));
+      return known.concat(extra);
+    };
+    if (P.host) for (const form of P.host.querySelectorAll('[data-pl-form]')) window.SpPicker.mountAll(form);
   }
 
   // ── Changing ───────────────────────────────────────────────────────────────
@@ -292,7 +335,7 @@
     if (doc && typeof doc === 'object') { delete doc.updated_at; delete doc.updated_by; delete doc.version; }
     const result = await send({ op: 'import', roadmap: doc }, w('imported'));
     if (result === true) { P.importing = false; P.importError = ''; P.open = ''; P.options = null; }
-    else P.importError = result;
+    else P.importError = w('import_failed', { m: result });
     paint();
   }
   function exportJson(){
@@ -312,7 +355,7 @@
     host.addEventListener('click', async ev => {
       const el = ev.target.closest('button');
       if (!el || !host.contains(el)) return;
-      if (el.dataset.plTab) { P.tab = el.dataset.plTab; P.open = ''; paint(); return; }
+      if (el.dataset.plTab) { P.tab = el.dataset.plTab; P.open = ''; P.phaseOpen = ''; paint(); return; }
       if (el.dataset.plOpen) {
         const id = el.dataset.plOpen;
         P.open = P.open === id ? '' : id; paint();
@@ -326,9 +369,16 @@
       if (el.hasAttribute('data-pl-import-go')) { el.disabled = true; await runImport((host.querySelector('[data-pl-json]') || {}).value || ''); return; }
       if (el.hasAttribute('data-pl-export')) { exportJson(); return; }
       if (el.hasAttribute('data-pl-usecases')) { if (window.SPStudio) window.SPStudio.setTab('usecases'); return; }
+      if (el.dataset.plJob) {
+        if (typeof openCronFromBot === 'function') await openCronFromBot(el.dataset.plJob, el.dataset.plStore || 'default', el.dataset.plBot || el.dataset.plStore || 'default');
+        else if (typeof switchPanel === 'function') await switchPanel('tasks');
+        return;
+      }
+      if (el.dataset.plBotOpen) { if (typeof switchPanel === 'function') await switchPanel('profiles'); if (typeof openProfileDetail === 'function') openProfileDetail(el.dataset.plBotOpen); return; }
       if (el.dataset.plNav) { if (typeof switchPanel === 'function') await switchPanel(el.dataset.plNav); return; }
       if (el.dataset.plGo) { await go(el.dataset.plGo, el.dataset.plRef); }
     });
+    host.addEventListener('toggle', ev => { const d = ev.target; if (d && d.dataset && d.dataset.plPhaseLinks) P.phaseOpen = d.open ? d.dataset.plPhaseLinks : (P.phaseOpen === d.dataset.plPhaseLinks ? '' : P.phaseOpen); }, true);
     host.addEventListener('change', ev => {
       const input = ev.target;
       if (!input.hasAttribute || !input.hasAttribute('data-pl-file') || !input.files || !input.files[0]) return;
@@ -342,9 +392,12 @@
       ev.preventDefault();
       const fd = new FormData(form), links = [];
       for (const t of LINK_TYPES) for (const ref of String(fd.get('link_' + t) || '').split(',').map(s => s.trim()).filter(Boolean)) links.push({ type: t, ref });
-      const result = await send({ op: 'update', target: 'row', id: form.dataset.plForm, status: String(fd.get('status') || 'planned'),
-                                  delivered_at: String(fd.get('delivered_at') || ''), note: String(fd.get('note') || ''), links });
+      const phase = form.dataset.plTarget === 'phase';
+      const body = { op: 'update', target: phase ? 'phase' : 'row', id: form.dataset.plForm, status: String(fd.get('status') || 'planned'), links };
+      if (!phase) Object.assign(body, { delivered_at: String(fd.get('delivered_at') || ''), note: String(fd.get('note') || '') });
+      const result = await send(body);
       if (result !== true) toast(result);
+      P.phaseOpen = phase && result !== true ? form.dataset.plForm : '';
       paint();
     });
     host.addEventListener('keydown', ev => { if (ev.key === 'Escape' && P.open && ev.target.closest('[data-pl-panel]') && !ev.target.closest('.sp-picker')) { ev.stopPropagation(); const id = P.open; P.open = ''; paint(); const back = host.querySelector(`[data-pl-row="${CSS.escape(id)}"] .rm-title`); if (back) back.focus(); } });

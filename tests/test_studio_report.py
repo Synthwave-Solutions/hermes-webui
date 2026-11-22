@@ -415,6 +415,20 @@ def test_request_enforcement_and_the_login_label_for_a_partner(env, monkeypatch)
                          ("GET", "/api/management/overview"), ("GET", "/api/msp/overview")):
         assert enforce.evaluate_request(identity, method, path).allow is False, path
 
+    # What a partner is denied never becomes an access request in the customer's queue: approving one
+    # would give the address its own policy entry, and then it no longer resolves through the partner role.
+    from api import grant_requests
+
+    assert grant_requests.record_route_denial(CONSULTANT, "/api/management/overview") is False
+    assert grant_requests.record_route_denial(CONSULTANT, "/api/crons") is False
+    assert not grant_requests._spool_path().exists()
+    assert grant_requests.record_route_denial(OWNER, "/api/crons") is True          # a person of the customer still can ask
+    assert list(grant_requests._load_spool()) == [f"{OWNER}|route|/api/crons"]
+    spool = grant_requests._load_spool()
+    spool[f"{CONSULTANT}|skill|pdf"] = {"email": CONSULTANT, "gkind": "skill", "value": "pdf", "reason": "skill_not_allowed", "count": 1}
+    grant_requests._spool_path().write_text(json.dumps(spool), encoding="utf-8")       # as the engine would spool it
+    assert grant_requests.ingest_spool() == 1
+
     # The customer's own account (invoices, orders) is closed to a partner, also behind the route layer.
     subject = GovernanceSubject(email=CONSULTANT, provider="synthpulse_cloud")
     monkeypatch.setattr(msp_service, "context", lambda handler: (policy, subject, None))

@@ -175,6 +175,24 @@ def _route_is_requestable(path: str, method: str) -> bool:
     return True
 
 
+def _is_assigned_partner(email: str) -> bool:
+    """True when ``email`` signs in through the partner role (a current central assignment).
+
+    A partner's rights are the partner role and nothing else. A grant request
+    would land in the customer's approval queue, and approving it would give
+    the address its own entry in the policy, after which it no longer resolves
+    through the partner role at all. So nothing a partner is denied becomes a
+    request. Never raises; any doubt is False.
+    """
+    try:
+        from api.governance import loader
+        from api.governance.resolver import partner_role_for
+
+        return partner_role_for(loader.get_policy(), str(email or "").strip().lower()) is not None
+    except Exception:
+        return False
+
+
 def record_route_denial(email: str, path: str, method: str = "GET") -> bool:
     """Spool a route_not_allowed denial as a grantable request (kind route).
 
@@ -187,7 +205,7 @@ def record_route_denial(email: str, path: str, method: str = "GET") -> bool:
         path = (str(path or "").split("?", 1)[0]).strip()
         if not email or not path or not path.startswith("/api/"):
             return False
-        if not _route_is_requestable(path, method):
+        if not _route_is_requestable(path, method) or _is_assigned_partner(email):
             return False
         key = f"{email}|route|{path}"
         now = time.time()
@@ -441,6 +459,8 @@ def ingest_spool(owner_scope: str | None = None) -> int:
             value = str(item.get("value") or "")
             if not email or not _is_grant_kind(gkind) or not value:
                 continue
+            if _is_assigned_partner(email):
+                continue        # also covers denials the engine spooled for a partner
             rk = f"{approvals.KIND_GRANT}:{skey}"
             notification = None
             with approvals._REGISTRY_LOCK:

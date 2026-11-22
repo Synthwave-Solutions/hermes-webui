@@ -433,8 +433,12 @@ button.om-mini-stat:focus-visible,button.om-saved:focus-visible,button.om-strip-
 .st-progress-open:hover{color:var(--accent-text,var(--accent))}
 .st-progress-open:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
 .st-progress-total{margin-top:10px}
-.st-consultant-pick{margin-left:12px}
-@media (max-width:640px){.sp-partner-list{padding:0 16px 14px}.st-consultant-pick{margin-left:0}}
+.st-picks{display:flex;align-items:center;gap:8px 16px;flex-wrap:wrap;margin-left:auto}
+.st-picks .st-team-pick{margin-left:0}
+.st-read-only{margin:10px 12px}
+.sp-studio-reads-only :is([data-st-new],[data-st-side-new]){display:none!important}
+@media (max-width:900px){.st-picks{margin-left:0}}
+@media (max-width:640px){.sp-partner-list{padding:0 16px 14px}}
 .st-progress td:first-child{white-space:normal;min-width:220px}
 /* Hours of the month on the Studio overview. */
 .sp-hours{margin:0 0 16px}
@@ -445,4 +449,13 @@ button.om-mini-stat:focus-visible,button.om-saved:focus-visible,button.om-strip-
 .sp-hours-person td{padding-top:5px;padding-bottom:5px;color:var(--muted);font-size:12.5px;border-bottom-color:transparent}
 .sp-hours-person td:first-child{padding-left:26px}
 .sp-hours-team{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px}
-@media (max-width:640px){.sp-hours-dept,.sp-hours-empty{padding-left:16px;padding-right:16px}}
+.sp-hours-over{color:var(--warning,#b7791f);font-weight:600}
+.sp-hours .wp-card-head,.sp-partners .wp-card-head{flex-wrap:wrap;gap:4px 10px}
+.wp .sp-partners,.wp .sp-hours{margin:0}
+@media (max-width:640px){.sp-hours-dept,.sp-hours-empty{padding-left:16px;padding-right:16px}
+  .sp-hours-table table{table-layout:fixed}
+  .sp-hours-table th,.sp-hours-table td{padding-left:6px;padding-right:6px;white-space:normal;font-size:12px;overflow-wrap:anywhere}
+  .sp-hours-table th{font-size:10px;letter-spacing:0;padding-left:4px;padding-right:4px;overflow-wrap:normal}
+  .sp-hours-table th:first-child{width:28%}
+  .sp-hours-table th:first-child,.sp-hours-table td:first-child{padding-left:10px}.sp-hours-person td:first-child{padding-left:18px}
+  .st-progress td:first-child{min-width:150px}}

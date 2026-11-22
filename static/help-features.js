@@ -16082,6 +16082,111 @@ window.SynthPulseFeatureCatalog = {
       }
     },
     {
+      "id": "webui.studio.quickscan_roadmap",
+      "area": "studio",
+      "status": "available",
+      "conditions": [],
+      "anchors": [
+        "?help_feature=webui.studio.quickscan_roadmap",
+        "[data-tour='studio-quickscan-roadmap']",
+        "[data-tour='studio-quickscan-strip']"
+      ],
+      "source_refs": [
+        "static/studio_plan.js",
+        "api/studio_roadmap.py"
+      ],
+      "related": [
+        "webui.studio.roadmap",
+        "webui.studio.backlog"
+      ],
+      "locales": {
+        "en": {
+          "title": "Roadmap: the plan from the quickscan, with proof that it runs",
+          "purpose": "The roadmap that came out of the quickscan as a chart in months and weeks: a start group and one group per block, steering sessions as stars, foundation work as dashed bars and a marker for today. Every part can be linked to the scheduled tasks, bots, skills, use cases and playbooks that carry it out, and the status of a part follows from what really runs.",
+          "when": "To see how far the agreed plan is, which parts already run in this environment and what that saves per week, and to prepare a steering session.",
+          "steps": [
+            "Open Roadmap in the Studio sidebar.",
+            "Read the strip at the top: how many parts run, the measured saving per week and the report version.",
+            "Choose a part or its bar to open the panel with the evidence and the card of the block.",
+            "Link a scheduled task, a bot, a skill, a use case or a playbook from the lists and choose Save.",
+            "Choose Link the block on the card to link what holds for the whole block.",
+            "Use the tabs Systems and Process diagrams for the systems overview and the process per block.",
+            "Choose Load roadmap to replace the roadmap by a new JSON document from the quickscan."
+          ],
+          "permissions": "Everybody with a place in the organisation and every assigned partner reads the roadmap. Organisation admins and assigned consultants or developers load a roadmap and change links, status and notes. Details of a linked item you may not see are left out.",
+          "limits": "A part counts as running only when a linked task completed a run in the last 30 days or a linked bot was active. With links but without a run it counts as built. Without links the status set by hand is shown. A mark in the chart means the status set by hand claims more than the evidence shows. Loading a roadmap replaces the whole document.",
+          "example": "Open Prepare reminders, link the weekly reminder task and its bot, and see the part turn to Running after the first completed run."
+        },
+        "nl": {
+          "title": "Roadmap: het plan uit de quickscan, met bewijs dat het draait",
+          "purpose": "De roadmap die uit de quickscan kwam als planning in maanden en weken: een startgroep en een groep per blok, stuurgroepen als sterren, fundamentwerk als gestreepte balken en een markering voor vandaag. Elk onderdeel koppel je aan de geplande taken, bots, skills, use cases en playbooks die het uitvoeren, en de status van een onderdeel volgt uit wat er echt draait.",
+          "when": "Om te zien hoe ver het afgesproken plan is, welke onderdelen al draaien in deze omgeving en wat dat per week bespaart, en om een stuurgroep voor te bereiden.",
+          "steps": [
+            "Open Roadmap in de zijbalk van de Studio.",
+            "Lees de strook bovenaan: hoeveel onderdelen draaien, de gemeten besparing per week en de rapportversie.",
+            "Kies een onderdeel of de balk om het paneel met het bewijs en de kaart van het blok te openen.",
+            "Koppel een geplande taak, een bot, een skill, een use case of een playbook uit de lijsten en kies Opslaan.",
+            "Kies Blok koppelen op de kaart om te koppelen wat voor het hele blok geldt.",
+            "Gebruik de tabs Systemen en Procesdiagrammen voor het systeemoverzicht en het proces per blok.",
+            "Kies Roadmap laden om de roadmap te vervangen door een nieuw JSON-document uit de quickscan."
+          ],
+          "permissions": "Iedereen met een plek in de organisatie en elke toegewezen partner leest de roadmap. Organisatiebeheerders en toegewezen consultants of developers laden een roadmap en wijzigen koppelingen, status en notities. Details van iets gekoppelds dat je niet mag zien blijven weg.",
+          "limits": "Een onderdeel telt pas als draaiend wanneer een gekoppelde taak in de laatste 30 dagen een run heeft afgerond of een gekoppelde bot actief was. Met koppelingen maar zonder run telt het als gebouwd. Zonder koppelingen zie je de handmatig gezette status. Een markering in de planning betekent dat de handmatige status meer belooft dan het bewijs laat zien. Een roadmap laden vervangt het hele document.",
+          "example": "Open Aanmaningen voorbereiden, koppel de wekelijkse aanmaningstaak en de bot, en zie het onderdeel na de eerste afgeronde run op Draait springen."
+        }
+      }
+    },
+    {
+      "id": "webui.studio.hours",
+      "area": "studio",
+      "status": "conditional",
+      "conditions": [
+        "The installation is linked to the central Cloud.",
+        "You are an organisation admin, a department admin or an assigned partner."
+      ],
+      "anchors": [
+        "?help_feature=webui.studio.hours",
+        "[data-tour='studio-hours']"
+      ],
+      "source_refs": [
+        "static/workplace.js",
+        "api/studio_hours.py"
+      ],
+      "related": [
+        "webui.studio.quickscan_roadmap"
+      ],
+      "locales": {
+        "en": {
+          "title": "Hours this month",
+          "purpose": "Per department the package and, per role, the hours that are allocated, used and remaining this month, with the people behind the used hours and the assigned team with their hours per week. The figures come from the central Cloud.",
+          "when": "To see during the month how much of the agreed hours has been used and what is left, before you plan new work.",
+          "steps": [
+            "Open Overview in the Studio.",
+            "Find the block Hours this month under the assigned team.",
+            "Read per role the allocated, used and remaining hours; the rows below a role show the hours per person.",
+            "Check Updated until at the top to see up to which day the used hours are counted."
+          ],
+          "permissions": "Organisation admins, department admins and assigned partners see this block. It shows hours only: no rates and no amounts.",
+          "limits": "Not known yet means the Cloud has no used hours for that role yet. The block is read only and is refreshed at most every five minutes. Without a link to the Cloud it says so and shows no figures.",
+          "example": "Consultant: 16 hours allocated, 7.1 used and 8.9 remaining, updated until yesterday."
+        },
+        "nl": {
+          "title": "Uren deze maand",
+          "purpose": "Per afdeling het pakket en per rol de uren die deze maand zijn toegewezen, verbruikt en nog over zijn, met de mensen achter de verbruikte uren en het toegewezen team met hun uren per week. De cijfers komen uit de centrale Cloud.",
+          "when": "Om tijdens de maand te zien hoeveel van de afgesproken uren is gebruikt en wat er over is, voordat je nieuw werk plant.",
+          "steps": [
+            "Open Overzicht in de Studio.",
+            "Zoek het blok Uren deze maand onder het toegewezen team.",
+            "Lees per rol de toegewezen, verbruikte en resterende uren; de regels onder een rol tonen de uren per persoon.",
+            "Kijk bij Bijgewerkt tot bovenaan tot welke dag de verbruikte uren zijn geteld."
+          ],
+          "permissions": "Organisatiebeheerders, afdelingsbeheerders en toegewezen partners zien dit blok. Het toont alleen uren: geen tarieven en geen bedragen.",
+          "limits": "Nog niet bekend betekent dat de Cloud voor die rol nog geen verbruikte uren heeft. Het blok is alleen lezen en wordt hooguit elke vijf minuten ververst. Zonder koppeling met de Cloud staat dat er en zie je geen cijfers.",
+          "example": "Consultant: 16 uur toegewezen, 7,1 verbruikt en 8,9 over, bijgewerkt tot gisteren."
+        }
+      }
+    },
+    {
       "id": "webui.studio.playbooks",
       "area": "studio",
       "status": "available",

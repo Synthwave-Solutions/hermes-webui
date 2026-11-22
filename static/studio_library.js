@@ -93,7 +93,7 @@
         ${it.editable ? `<select class="om-select" data-bl-status aria-label="Status">${STATUSES.map(s => `<option value="${s}" ${it.status === s ? 'selected' : ''}>${H(w('s_' + s))}</option>`).join('')}</select>
         <button type="button" class="sm-btn bl-arrow" data-bl-move="-1" ${i === 0 ? 'disabled' : ''} aria-label="${H(w('up'))}">↑</button><button type="button" class="sm-btn bl-arrow" data-bl-move="1" ${i === n - 1 ? 'disabled' : ''} aria-label="${H(w('down'))}">↓</button>` : ''}
         ${it.use_case ? '' : `<button type="button" class="sm-btn" data-bl-work>${H(w('work_out'))}</button>`}
-        ${it.editable ? `<button type="button" class="sm-btn bl-arrow" data-bl-remove aria-label="${H(w('remove'))}">✕</button>` : ''}
+        ${(it.removable ?? it.editable) ? `<button type="button" class="sm-btn bl-arrow" data-bl-remove aria-label="${H(w('remove'))}">✕</button>` : ''}
         </span>
         ${it.editable ? '' : `<span class="om-badge">${H(w('s_' + it.status))}</span>`}
         ${it.use_case ? `<button type="button" class="sm-btn" data-bl-open="${H(it.use_case)}">${H(w('open_uc'))}</button>` : ''}
@@ -205,7 +205,7 @@
     }
     L.body.innerHTML = `<div class="pb-toolbar"><button type="button" class="sm-btn" data-pb-back>← ${H(w('back'))}</button>
         <span class="om-badge ${pb.status === 'published' ? 'ok' : ''}">${H(w(pb.status === 'published' ? 'published' : 'draft'))}</span>
-        ${statsLine(pb)}<span style="margin-left:auto"></span><button type="button" class="sm-btn" data-pb-run>▶ ${H(w('run'))}</button><button type="button" class="sm-btn danger" data-pb-delete>${H(w('delete_pb'))}</button>
+        ${statsLine(pb)}<span style="margin-left:auto"></span><button type="button" class="sm-btn" data-pb-run>▶ ${H(w('run'))}</button>${pb.removable === false ? '' : `<button type="button" class="sm-btn danger" data-pb-delete>${H(w('delete_pb'))}</button>`}
         <button type="button" class="sm-btn" data-pb-publish>${H(w(pb.status === 'published' ? 'unpublish' : 'publish'))}</button><button type="button" class="sm-btn primary" data-pb-save>${H(w('save'))}</button></div>
       <div class="om-value-form pb-meta">
         <label class="om-field wide">${H(w('title'))}<input data-pb-f="title" value="${H(pb.title)}"></label>

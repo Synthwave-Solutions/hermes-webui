@@ -48,6 +48,7 @@
     consultant: 'Consultant', consultant_none: 'Nog niemand', nav_progress: 'Voortgang', nav_plan: 'Roadmap',
     pg_intro: 'Hoe ver elke use case is, wie van Synthwave meewerkt en wat het per week oplevert.',
     pg_uc: 'Use case', pg_team: 'Team', pg_phase: 'Fase', pg_consultant: 'Consultant', pg_saved: 'Uren per week bespaard', pg_measured: 'Gemeten, 30 dagen',
+    read_only: 'Je kunt deze use case bekijken, niet wijzigen.',
     pg_empty: 'Nog geen use cases om te tonen.', pg_total: '{n} use cases, samen {h} uur per week bespaard volgens het ontwerp.', pg_unknown: 'nog bepalen', pg_hours: 'uur'
   };
   const EN = {
@@ -87,6 +88,7 @@
     consultant: 'Consultant', consultant_none: 'Nobody yet', nav_progress: 'Progress', nav_plan: 'Roadmap',
     pg_intro: 'How far each use case is, who from Synthwave works on it and what it saves per week.',
     pg_uc: 'Use case', pg_team: 'Team', pg_phase: 'Phase', pg_consultant: 'Consultant', pg_saved: 'Hours saved per week', pg_measured: 'Measured, 30 days',
+    read_only: 'You can view this use case, not change it.',
     pg_empty: 'No use cases to show yet.', pg_total: '{n} use cases, together {h} hours saved per week by design.', pg_unknown: 'to be determined', pg_hours: 'hours'
   };
   const lang = () => ((document.documentElement.lang || 'nl').toLowerCase().startsWith('en') ? 'en' : 'nl');
@@ -276,7 +278,8 @@
       <div class="st-notes" aria-live="polite">${notes.map(n => `<div class="st-note ${n.role}">${H(n.text)}</div>`).join('')}${St.busy ? `<div class="st-note agent st-thinking">${H(w('thinking'))}</div>` : ''}</div>
       ${St.live ? `<p class="om-small st-live-note">${H(w('live_on'))}</p>` : ''}
       ${St.live && St.live.tasks.length ? `<div class="st-live-tasks">${St.live.tasks.map(tk => `<div class="om-row"><span class="om-dot ${tk.status === 'done' ? 'ok' : tk.status === 'error' ? 'error' : 'new'}"></span><div class="om-row-main"><div class="om-row-title">${H(tk.title || '')}</div><div class="om-row-sub">${H(tk.status || '')}</div></div>${tk.session_id ? `<button type="button" class="sm-btn" data-st-open-session="${H(tk.session_id)}">${H(w('open_work'))}</button>` : ''}</div>`).join('')}</div>` : ''}
-      ${canSend ? `<form class="st-compose" data-st-send>
+      ${doc.editable === false ? `<p class="om-small om-muted st-read-only" data-st-read-only>${H(w('read_only'))}</p>` : ''}
+      ${canSend && doc.editable !== false ? `<form class="st-compose" data-st-send>
         <textarea name="input" rows="4" placeholder="${H(w(ph))}" aria-label="${H(w(ph))}">${H(St.draft)}</textarea>
         <div class="st-compose-actions">
           ${window.synPulseVoice ? `<button type="button" class="sm-btn" data-st-live aria-pressed="${!!St.live}">🎧 ${H(St.live ? w('live_stop') : w('live'))}</button>` : ''}
@@ -427,15 +430,15 @@
   }
   function renderDoc(){
     const doc = St.doc;
-    const body = head(`<button type="button" class="sm-btn" data-st-conv-toggle aria-pressed="${St.convOpen}">${H(St.convOpen ? w('conv_hide') : w('conv_show'))}</button>${doc.editable ? `<button type="button" class="sm-btn st-quiet-danger" data-st-delete>${H(w('delete'))}</button>` : ''}`,
+    const body = head(`<button type="button" class="sm-btn" data-st-conv-toggle aria-pressed="${St.convOpen}">${H(St.convOpen ? w('conv_hide') : w('conv_show'))}</button>${(doc.deletable ?? doc.editable) ? `<button type="button" class="sm-btn st-quiet-danger" data-st-delete>${H(w('delete'))}</button>` : ''}`,
       w('tab_uc'));
     const r = root(); const t = r && r.querySelector('[data-st-title-h]');
     if (t && !(document.activeElement && document.activeElement.matches && document.activeElement.matches('[data-st-title]'))) t.innerHTML = `<button type="button" class="st-crumb" data-st-back>${H(w('back'))}</button><span class="st-crumb-sep" aria-hidden="true">/</span><input class="st-crumb-input" data-st-title value="${H(doc.title)}" placeholder="${H(w('title_ph'))}" aria-label="${H(w('title_ph'))}" ${doc.editable ? '' : 'readonly'}>`;
     if (!body) return;
     const canvas = { discover: discoverHtml, design: designHtml, playbook: playbookHtml, build: buildHtml, measure: measureHtml }[doc.phase || 'discover'](doc);
     body.innerHTML = `<div class="st-top">${stepper(doc)}
-        <label class="om-inline-form om-small om-muted st-team-pick">${H(w('team'))} <select class="om-select" data-st-team><option value="">${H(w('none'))}</option>${St.teams.map(t => `<option value="${H(t.key)}" ${doc.team === t.key ? 'selected' : ''}>${H(t.name)}</option>`).join('')}</select></label>
-        ${consultantPick(doc)}</div>
+        <div class="st-picks"><label class="om-inline-form om-small om-muted st-team-pick">${H(w('team'))} <select class="om-select" data-st-team ${doc.editable === false ? 'disabled' : ''}><option value="">${H(w('none'))}</option>${St.teams.map(t => `<option value="${H(t.key)}" ${doc.team === t.key ? 'selected' : ''}>${H(t.name)}</option>`).join('')}</select></label>
+        ${consultantPick(doc)}</div></div>
       <div class="st-layout ${St.convOpen || St.live ? '' : 'conv-closed'}">${St.convOpen || St.live ? convHtml(doc) : ''}<section class="st-canvas" aria-live="polite">${canvas}</section></div>`;
     const notes = body.querySelector('.st-notes');
     if (notes) notes.scrollTop = notes.scrollHeight;
@@ -477,6 +480,8 @@
     }
     const sec = section();
     const me = St.me || {};
+    // A partner with the role qa only reads: the screens offer no new use case that the server would refuse.
+    document.documentElement.classList.toggle('sp-studio-reads-only', !!(me.partner && me.partner.role === 'qa' && me.scope === 'none'));
     const item = (key, label, count, flag) => `<button type="button" data-st-hub="${key}" aria-current="${sec === key && !(key === 'usecases' && St.doc)}">${flag ? '<span class="om-side-flag" aria-hidden="true"></span>' : ''}${H(label)}${count != null ? `<span class="om-side-count">${H(count)}</span>` : ''}</button>`;
     const rows = (St.list || []).slice(0, 5);
     box.setAttribute('aria-label', w('studio'));
@@ -707,7 +712,7 @@
       }
       if (b.dataset.stOpen) { await open(b.dataset.stOpen); return; }
       if (b.hasAttribute('data-st-back')) { if (St.live) stopLive(); St.doc = null; if (St.backTab) { St.tab = St.backTab; St.backTab = ''; } if (window.SPWorkplace) window.SPWorkplace.invalidate(); await loadList(); render(); return; }
-      if (b.hasAttribute('data-st-delete')) { if (confirm(w('confirm_delete'))) { try { await post('/api/studio/delete', { id: St.doc.id }); } catch (e) { toast(errMsg(e)); } St.doc = null; await loadList(); render(); } return; }
+      if (b.hasAttribute('data-st-delete')) { if (confirm(w('confirm_delete'))) { try { await post('/api/studio/delete', { id: St.doc.id }); } catch (e) { toast(errMsg(e)); return; } St.doc = null; await loadList(); render(); } return; }
       if (b.dataset.stPhase) { await save({ phase: b.dataset.stPhase }, true); render(); return; }
       if (b.dataset.stGoto) {
         if (b.dataset.stGoto === 'build' && St.doc.phase === 'playbook') await save({ components: collectComponents() }, true);

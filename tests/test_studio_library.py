@@ -420,6 +420,8 @@ def test_partner_works_on_team_backlog_and_can_be_assignee(env):
     loose = lib.save_item(tom, {"title": "Los idee"})                       # no team: not for the partner
     assert {i["title"] for i in lib.backlog_for(carla)} == {"Aanmaningen", "Leads"}
     assert all(i["editable"] for i in lib.backlog_for(carla))
+    assert not any(i["removable"] for i in lib.backlog_for(carla))          # the screen offers no delete that would be refused
+    assert all(i["removable"] for i in lib.backlog_for(tom))
     assert lib.save_item(carla, {"id": a["id"], "status": "chosen", "assignee": CONSULTANT})["assignee"] == CONSULTANT
     with pytest.raises(PermissionError):
         lib.save_item(carla, {"id": loose["id"], "status": "chosen"})

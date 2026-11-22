@@ -635,7 +635,7 @@ def handle_get(handler, parsed) -> bool:
         doc = _load((parse_qs(parsed.query or "").get("id") or [""])[0])
         if not _visible(view, doc):
             raise KeyError("Use case not found")
-        j(handler, dict(doc, editable=_editable(view, doc)))
+        j(handler, dict(doc, editable=_editable(view, doc), deletable=_deletable(view, doc)))
     except KeyError as e:
         j(handler, {"error": str(e).strip("'")}, status=404)
     return True
@@ -662,9 +662,11 @@ def handle_post(handler, parsed, body) -> bool:
         if view.partner_read_only:
             raise PermissionError("This account can only read in Studio")
         if path == "/api/studio/usecase":
-            j(handler, dict(update(view, body), editable=True))
+            doc = update(view, body)
+            j(handler, dict(doc, editable=True, deletable=_deletable(view, doc)))
         elif path == "/api/studio/step":
-            j(handler, dict(run_step(view, body), editable=True))
+            doc = run_step(view, body)
+            j(handler, dict(doc, editable=True, deletable=_deletable(view, doc)))
         else:
             doc = _load(str(body.get("id") or ""))
             if not _deletable(view, doc):
