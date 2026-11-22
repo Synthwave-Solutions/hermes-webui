@@ -16,7 +16,10 @@ Push   ``POST /v1/customer/studio/summary``, shortly after a Studio save and
        on a timer. Body: ``{"generated_at", "use_cases": [...], "partners":
        [{"email", "role"}]}``. Per use case: id, title, phase, backlog_status,
        team, consultant, updated_at, hours_week_before, hours_week_after,
-       hours_week_saved, measured_hours_saved_30d.
+       hours_week_saved, measured_hours_saved_30d. With a roadmap in Studio
+       the body also carries ``roadmap``: report_version, updated_at, per
+       block its name and rows_total, rows_built, rows_live, the same three
+       counts for the whole roadmap and measured_hours_week_saved.
 
 Privacy of the push: installation state only. No e-mail address or name of
 anybody at the customer (the owner of a use case is left out), no notes, no
@@ -191,6 +194,16 @@ def build_summary() -> dict:
             "partners": [{"email": p["email"], "role": p["role"]} for p in org_structure.current_partners(structure)]}
     if len(rows) > MAX_USE_CASES:
         body["truncated"] = True
+    try:
+        from api import studio_roadmap
+
+        roadmap = studio_roadmap.summary_block()
+    except Exception:
+        logger.warning("roadmap progress left out of the summary", exc_info=True)
+        roadmap = None
+    if roadmap is not None:
+        # Counts and block names only; present only when the installation has a roadmap.
+        body["roadmap"] = roadmap
     return body
 
 

@@ -455,3 +455,46 @@ button.rm-bar{cursor:pointer}
 .rm-now{display:inline-block;width:2px;height:14px;background:var(--error);opacity:.7}
 @media (max-width:700px){.rm{--rm-left:150px;--rm-col:22px}.rm-left{padding-left:10px;padding-right:8px}.rm-title{font-size:12.5px}}
 @media (prefers-reduced-motion:reduce){.rm-bar{transition:none}}
+
+/* Quickscan roadmap (static/studio_plan.js): the Gantt reuses the .rm chart above. */
+.pl{--pl-planned:var(--muted);--pl-progress:var(--info,#0288A8);--pl-built:#1FA391;--pl-live:var(--success);--pl-parked:color-mix(in srgb,var(--muted) 55%,var(--surface))}
+.pl-strip{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.pl-tile-sub{font-size:12px;color:var(--muted)}
+.pl-actions{display:inline-flex;gap:8px;flex-wrap:wrap}
+.pl-bar.s-planned{--c:var(--pl-planned)}.pl-bar.s-in_progress{--c:var(--pl-progress)}.pl-bar.s-built{--c:var(--pl-built)}.pl-bar.s-live{--c:var(--pl-live)}.pl-bar.s-parked{--c:var(--pl-parked)}
+.pl-bar.s-planned,.pl-bar.s-parked{background:color-mix(in srgb,var(--c) 22%,var(--surface));color:var(--strong,var(--text))}
+.pl-bar.k-fundament{border-style:dashed;background:color-mix(in srgb,var(--c) 16%,var(--surface));color:var(--strong,var(--text))}
+.pl-bar.k-werksessie,.pl-bar.k-borging{height:16px;border-radius:999px}
+.pl-steering .rm-track{min-height:26px;background-image:none}
+.pl-steering .rm-left{text-transform:none;letter-spacing:0;font-weight:600}
+.pl-star{color:var(--warning,#b7791f);font-size:15px;line-height:1;text-align:center}
+.pl-group-track{background-image:none}
+.pl-group-count{grid-column:1 / -1;font-size:12px;color:var(--muted);padding:0 10px;white-space:nowrap}
+.pl-linked{font-size:11px}
+.pl-differs{padding:0 6px;font-weight:800}
+.om-badge.pl-s.s-live{color:var(--success);border-color:color-mix(in srgb,var(--success) 35%,transparent);background:color-mix(in srgb,var(--success) 8%,transparent)}
+.om-badge.pl-s.s-built{color:var(--pl-built);border-color:color-mix(in srgb,var(--pl-built) 35%,transparent)}
+.om-badge.pl-s.s-in_progress{color:var(--pl-progress);border-color:color-mix(in srgb,var(--pl-progress) 35%,transparent)}
+.pl-panel{max-width:min(100%,calc(100vw - 48px))}
+.pl-panel-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pl-panel-close{margin-left:auto}
+.pl-panel-grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:20px;max-width:1100px}
+.pl-panel h4,.pl-card h4,.pl-diagram h4,.pl-import h4{margin:0 0 8px;font-size:13.5px;font-weight:650;color:var(--strong,var(--text));display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pl-card-part{margin-top:10px}
+.pl-card-part h5{margin:0 0 4px;font-size:11.5px;font-weight:650;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.pl-card-part p,.pl-card p{margin:0 0 6px;font-size:13px;line-height:1.5}
+.pl-card-part ul{margin:0;padding-left:18px;font-size:13px;line-height:1.5}
+.pl-ready{padding:10px 12px;border-radius:var(--sp-radius-sm);background:color-mix(in srgb,var(--success) 7%,transparent)}
+.pl-ev .om-row-sub{white-space:normal}
+.pl-edit{display:flex;flex-direction:column;gap:10px;margin-top:14px;padding-top:12px;border-top:1px dashed var(--border)}
+.pl-edit .pl-wide{grid-column:1 / -1}
+.pl-links{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.pl-notes,.pl-diagram,.pl-import{padding:16px 20px;margin-top:16px}
+.pl-tree-hint{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-top:10px;border-top:1px solid var(--border)}
+.pl-tree-hint p{margin:0;color:var(--muted)}
+.pl-import textarea{width:100%;box-sizing:border-box;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;border:1px solid var(--border2,var(--border));border-radius:var(--sp-radius-sm);background:var(--surface);color:var(--text);padding:10px;margin:8px 0}
+.pl-import-error{margin:0 0 8px;font-size:13px;color:var(--error)}
+.pl-file{cursor:pointer}
+.pl-systems td.pl-wrap{white-space:normal;min-width:220px}
+.pl-diagram .mermaid-block{overflow:auto}
+@media (max-width:760px){.pl-panel-grid{grid-template-columns:minmax(0,1fr)}.pl-notes,.pl-diagram,.pl-import{padding:14px 16px}}

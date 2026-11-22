@@ -612,6 +612,9 @@ def handle_get(handler, parsed) -> bool:
     if path == "/api/studio/summary":
         from api import studio_report
         return studio_report.handle_get(handler, parsed)
+    if path in ("/api/studio/roadmap", "/api/studio/roadmap/options"):
+        from api import studio_roadmap
+        return studio_roadmap.handle_get(handler, parsed)
     if path not in ("/api/studio/usecases", "/api/studio/usecase"):
         return False
     view = org_structure.request_scope(handler)
@@ -642,6 +645,9 @@ def handle_post(handler, parsed, body) -> bool:
                 "/api/studio/prompts", "/api/studio/profile"):
         from api import studio_library
         return studio_library.handle_post(handler, parsed, body)
+    if path == "/api/studio/roadmap":
+        from api import studio_roadmap
+        return studio_roadmap.handle_post(handler, parsed, body)
     if path not in ("/api/studio/usecase", "/api/studio/step", "/api/studio/delete"):
         return False
     view = org_structure.request_scope(handler)

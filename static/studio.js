@@ -45,7 +45,7 @@
     discuss: 'Bespreek in chat', delete: 'Verwijderen', confirm_delete: 'Use case verwijderen?', empty_list: 'Nog geen use cases. Begin met een gesprek over je werk.',
     components: 'onderdelen', built_n: 'gebouwd', need_input: 'Vertel eerst iets, dan gaat de Super Agent aan de slag.',
     chat_prompt: 'Ik werk in Studio aan de use case "{t}". Help me verder: {s}',
-    consultant: 'Consultant', consultant_none: 'Nog niemand', nav_progress: 'Voortgang',
+    consultant: 'Consultant', consultant_none: 'Nog niemand', nav_progress: 'Voortgang', nav_plan: 'Roadmap',
     pg_intro: 'Hoe ver elke use case is, wie van Synthwave meewerkt en wat het per week oplevert.',
     pg_uc: 'Use case', pg_team: 'Team', pg_phase: 'Fase', pg_consultant: 'Consultant', pg_saved: 'Uren per week bespaard', pg_measured: 'Gemeten, 30 dagen',
     pg_empty: 'Nog geen use cases om te tonen.', pg_total: '{n} use cases, samen {h} uur per week bespaard volgens het ontwerp.', pg_unknown: 'nog bepalen', pg_hours: 'uur'
@@ -84,7 +84,7 @@
     discuss: 'Discuss in chat', delete: 'Delete', confirm_delete: 'Delete this use case?', empty_list: 'No use cases yet. Start with a conversation about your work.',
     components: 'components', built_n: 'built', need_input: 'Tell something first, then the Super Agent gets to work.',
     chat_prompt: 'I am working in Studio on the use case "{t}". Help me further: {s}',
-    consultant: 'Consultant', consultant_none: 'Nobody yet', nav_progress: 'Progress',
+    consultant: 'Consultant', consultant_none: 'Nobody yet', nav_progress: 'Progress', nav_plan: 'Roadmap',
     pg_intro: 'How far each use case is, who from Synthwave works on it and what it saves per week.',
     pg_uc: 'Use case', pg_team: 'Team', pg_phase: 'Phase', pg_consultant: 'Consultant', pg_saved: 'Hours saved per week', pg_measured: 'Measured, 30 days',
     pg_empty: 'No use cases to show yet.', pg_total: '{n} use cases, together {h} hours saved per week by design.', pg_unknown: 'to be determined', pg_hours: 'hours'
@@ -208,6 +208,11 @@
     if (St.tab === 'home') {
       const body = head(`<button type="button" class="sm-btn primary" data-st-new>${H(w('new_uc'))}</button>`, w('nav_home'));
       if (body) window.SPWorkplace.render(body, { setup: setupHtml() });
+      return;
+    }
+    if (St.tab === 'plan' && window.SPPlan) {
+      const body = head('', w('nav_plan'));
+      if (body) void window.SPPlan.render(body);
       return;
     }
     if (St.tab === 'progress') {
@@ -452,7 +457,7 @@
         if (!b) return;
         const go = b.dataset.stHub;
         if ((go || b.dataset.stSideOpen || b.hasAttribute('data-st-side-new')) && typeof _isDesktopWidth === 'function' && !_isDesktopWidth() && typeof closeMobileSidebar === 'function') closeMobileSidebar();
-        if (go === 'home' || go === 'usecases' || go === 'backlog' || go === 'playbooks' || go === 'prompts' || go === 'profile' || go === 'me' || go === 'progress') {
+        if (go === 'home' || go === 'usecases' || go === 'backlog' || go === 'playbooks' || go === 'prompts' || go === 'profile' || go === 'me' || go === 'progress' || go === 'plan') {
           St.tab = go; St.doc = null;
           if (go === 'progress') { St.progress = null; void loadProgress(); }
           if (window.SPLibrary && window.SPLibrary.reset) window.SPLibrary.reset();
@@ -477,7 +482,7 @@
     box.setAttribute('aria-label', w('studio'));
     box.innerHTML = `<button type="button" class="st-side-new" data-st-side-new>＋ ${H(w('new_uc'))}</button>
       <div class="om-side-label">${H(w('nav_work'))}</div>
-      ${item('home', w('nav_home'))}${item('me', w('nav_me'), null, St.personEmpty)}${item('usecases', w('tab_uc'), (St.list || []).length || null)}${item('backlog', w('tab_backlog'), St.counts.backlog || null)}${item('playbooks', w('tab_pb'), St.counts.playbooks || null)}${item('prompts', w('nav_prompts'), St.counts.prompts || null)}
+      ${item('home', w('nav_home'))}${item('me', w('nav_me'), null, St.personEmpty)}${item('usecases', w('tab_uc'), (St.list || []).length || null)}${item('backlog', w('tab_backlog'), St.counts.backlog || null)}${window.SPPlan ? item('plan', w('nav_plan')) : ''}${item('playbooks', w('tab_pb'), St.counts.playbooks || null)}${item('prompts', w('nav_prompts'), St.counts.prompts || null)}
       <div class="om-side-label">${H(w('nav_org'))}</div>${item('profile', w('nav_profile'), null, St.profileEmpty && me.can_manage)}${me.can_manage || me.partner ? item('progress', w('nav_progress')) : ''}${me.can_view ? item('chart', w('nav_chart')) : ''}${me.can_manage ? item('teams', w('nav_teams')) + item('mgmt', w('nav_mgmt')) : ''}
       ${window.SPPartners ? window.SPPartners.teamHtml(true) : ''}
       ${rows.length ? `<div class="om-side-label">${H(w('nav_recent'))}</div>` + rows.map(r => `<button type="button" class="st-side-recent" data-st-side-open="${H(r.id)}" aria-current="${!!(St.doc && St.doc.id === r.id && sec === 'usecases')}"><span class="st-side-recent-title ${r.title ? '' : 'st-side-untitled'}">${H(r.title || w('untitled'))}</span><span class="om-side-count">${H(w('p_' + (r.phase || 'discover')))}</span></button>`).join('') : ''}

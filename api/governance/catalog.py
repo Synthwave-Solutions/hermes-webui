@@ -80,6 +80,10 @@ _SELF_ROUTES: frozenset[str] = frozenset({
     # Progress per use case (22 Nov 2026): the handler admits organisation
     # admins, department admins for their teams and assigned partners.
     "/api/studio/summary",
+    # The quickscan roadmap and its link picker: read for everybody with a
+    # place in the structure, edits for organisation admins and assigned
+    # consultants or developers; decided in api/studio_roadmap.py.
+    "/api/studio/roadmap", "/api/studio/roadmap/options",
     "/api/org/modules",
     "/api/org/modules/request",
     "/api/org/overview",

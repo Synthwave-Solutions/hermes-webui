@@ -652,29 +652,41 @@ def runs_between(start: float, end: float) -> list[dict]:
         conn.close()
 
 
-def saved_minutes_by_use_case(start: float, end: float) -> dict[str, int]:
-    """Measured saved minutes per Studio use case over the period.
+def _saved_minutes(start: float, end: float, group, per_of=None) -> dict[str, int]:
+    """Measured saved minutes over the period, summed per ``group(run)``.
 
-    Counts completed runs of tasks whose value names a use case, the same way
-    Management does: per run, or once per day or ISO week with a completed run.
+    Counts completed runs the same way Management does: per run, or once per
+    day or ISO week with a completed run. ``per_of(run)`` may say how a task's
+    value counts now; otherwise what the run recorded is used.
     """
     out: dict[str, int] = {}
     periods: dict[tuple, int] = {}
     for run in runs_between(start, end):
-        use_case = run.get("use_case")
-        if not use_case or run.get("status") != "ok" or run.get("before_minutes") is None:
+        name = group(run)
+        if not name or run.get("status") != "ok" or run.get("before_minutes") is None:
             continue
         each = max(0, int(run.get("before_minutes") or 0) - int(run.get("review_minutes") or 0))
-        per = run.get("value_per") or "run"
+        per = (per_of(run) if per_of else None) or run.get("value_per") or "run"
         if per == "run" or not run.get("finished_at"):
-            out[use_case] = out.get(use_case, 0) + each
+            out[name] = out.get(name, 0) + each
             continue
         stamp = time.gmtime(run["finished_at"])
-        key = (use_case, run["store"], run["job_id"], time.strftime("%Y-%j" if per == "day" else "%G-%V", stamp))
+        key = (name, run["store"], run["job_id"], time.strftime("%Y-%j" if per == "day" else "%G-%V", stamp))
         periods[key] = max(periods.get(key, 0), each)
     for key, each in periods.items():
         out[key[0]] = out.get(key[0], 0) + each
     return out
+
+
+def saved_minutes_by_use_case(start: float, end: float) -> dict[str, int]:
+    """Measured saved minutes per Studio use case: runs of tasks whose value names a use case."""
+    return _saved_minutes(start, end, lambda run: run.get("use_case"))
+
+
+def saved_minutes_by_job(start: float, end: float, per: dict | None = None) -> dict[str, int]:
+    """Measured saved minutes per task, keyed ``store:job_id``. ``per`` maps that key to run, day or week."""
+    key = lambda run: f"{run.get('store')}:{run.get('job_id')}"
+    return _saved_minutes(start, end, key, (lambda run: per.get(key(run))) if per else None)
 
 
 def chats_between(start: float, end: float) -> list[dict]:
