@@ -67,6 +67,31 @@ from api.models import (
 from api.session_ops import mark_session_title_generated, session_has_manual_title
 
 
+_SYNTHPULSE_NO_ANSWER = "The user did not provide a response within the time limit."
+
+
+def _synthpulse_clarify_adapter(impl, sid, cancel_evt, put_event, *args, **kwargs):
+    """synthpulse: oude (question, choices) en nieuwe (lijst vragen) clarify-callback."""
+    if len(args) == 1 and not kwargs and isinstance(args[0], list):
+        answers, outcome = {}, "submitted"
+        for q in args[0]:
+            if not isinstance(q, dict):
+                continue
+            raw = impl(q.get("question"), q.get("choices") or q.get("choices_offered"), sid, cancel_evt, put_event)
+            if isinstance(raw, str) and raw.startswith(_SYNTHPULSE_NO_ANSWER):
+                outcome = "cancelled" if cancel_evt.is_set() else "timed_out"
+                break
+            answers[q.get("qid") or f"q{len(answers)}"] = raw
+        reply = {"answers": answers, "outcome": outcome}
+        if outcome != "submitted":
+            reply["notice"] = "No answer from the user in the WebUI; decide sensibly or ask in your reply."
+        return reply
+    question = args[0] if args else kwargs.get("question")
+    choices = args[1] if len(args) > 1 else kwargs.get("choices")
+    return impl(question, choices, sid, cancel_evt, put_event)
+
+
+
 def _session_payload_with_full_messages(session, *, tool_calls=None):
     """Return compact session metadata plus the embedded full transcript.
 
@@ -8732,8 +8757,8 @@ def _run_agent_streaming(
                 reasoning_callback=on_reasoning,
                 tool_progress_callback=on_tool,
                 clarify_callback=(
-                    lambda question, choices: _clarify_callback_impl(
-                        question, choices, session_id, cancel_event, put
+                    lambda *a, **k: _synthpulse_clarify_adapter(
+                        _clarify_callback_impl, session_id, cancel_event, put, *a, **k
                     )
                 ),
             )
