@@ -79,6 +79,9 @@ _REGISTRY_ROWS = (
                route_prefixes=("/api/notebook/",), app_tile="notebook"),
     ModuleSpec("e_signing", ADVANCED, requires=("workspace",),
                route_prefixes=("/api/signing/",), app_tile="sign"),
+    # The WhatsApp bridge of the department. Its guard serves its own API on the installation
+    # (/_synthpulse/whatsapp), outside the WebUI: no panel, no app tile and no WebUI route to gate.
+    ModuleSpec("whatsapp_channel", ADVANCED, requires=("workspace",)),
     ModuleSpec("dictation", ADVANCED, requires=("workspace",),
                route_prefixes=("/api/dictation/",)),
     ModuleSpec("meeting_notes", ADVANCED, requires=("workspace",),
