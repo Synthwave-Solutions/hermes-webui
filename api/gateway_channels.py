@@ -177,6 +177,51 @@ def load_identities() -> dict:
         return {}
 
 
+# ── Verified WhatsApp links of the bridge module (read only) ─────────────────
+# The WhatsApp bridge keeps its links in a volume of its own, in the same
+# identity-map shape under the platform key ``whatsapp_bridge``. A row only
+# exists after the person proved the number with a code from their own phone.
+# The WebUI may get that volume mounted read only and then lists the links next
+# to the other platforms. It never writes the file, and it shows a number
+# masked: the full number stays in the bridge.
+WHATSAPP_BRIDGE_PLATFORM = "whatsapp_bridge"
+WHATSAPP_BRIDGE_LINKS_ENV = "SP_WHATSAPP_BRIDGE_IDENTITIES"
+WHATSAPP_BRIDGE_LINKS_DEFAULT = "/var/lib/whatsapp-bridge-links/gateway-identities.json"
+_BRIDGE_LINKS_MAX_BYTES = 2 * 1024 * 1024
+
+
+def mask_number(number) -> str:
+    """``31612345678`` as ``+31•••••5678``: the country part and the last four digits."""
+    digits = re.sub(r"\D", "", str(number or ""))
+    if len(digits) < 7:
+        return "+" + "•" * max(1, len(digits))
+    return "+" + digits[:2] + "•" * (len(digits) - 6) + digits[-4:]
+
+
+def whatsapp_bridge_links() -> list[dict]:
+    """The verified links of the bridge, for display only. Never raises; [] without the mount."""
+    path = Path(os.environ.get(WHATSAPP_BRIDGE_LINKS_ENV) or WHATSAPP_BRIDGE_LINKS_DEFAULT)
+    try:
+        if path.stat().st_size > _BRIDGE_LINKS_MAX_BYTES:
+            return []
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    rows = data.get(WHATSAPP_BRIDGE_PLATFORM) if isinstance(data, dict) else None
+    out = []
+    for number, entry in (rows.items() if isinstance(rows, dict) else ()):
+        # A row without verified_at is not a link (the bridge ignores it too).
+        if not isinstance(entry, dict) or not entry.get("verified_at") or not str(entry.get("email") or "").strip():
+            continue
+        out.append({"platform": WHATSAPP_BRIDGE_PLATFORM, "user_id": mask_number(number),
+                    "email": str(entry.get("email") or "").strip().lower()[:254], "name": str(entry.get("name") or "")[:120],
+                    "profile": str(entry.get("profile") or "")[:64], "department": str(entry.get("department") or "")[:80],
+                    "verified_at": entry.get("verified_at") if isinstance(entry.get("verified_at"), (int, float)) else None,
+                    "added_at": entry.get("added_at") if isinstance(entry.get("added_at"), (int, float)) else None,
+                    "read_only": True})
+    return sorted(out, key=lambda r: (r["email"], r["user_id"]))[:1000]
+
+
 def _seed_from_env() -> dict:
     """First boot at a client: client.yaml people[].channels arrives as
     SP_GATEWAY_IDENTITIES_JSON (rendered by client_render). Materialise it once
@@ -320,6 +365,8 @@ def status_payload() -> dict:
                 people.append({"platform": platform, "user_id": uid, "email": entry.get("email", ""),
                                "name": entry.get("name", ""), "profile": entry.get("profile", ""),
                                "added_at": entry.get("added_at")})
+    # The WebUI's own map never holds rows of the bridge: only the verified links count.
+    people = [r for r in people if r["platform"] != WHATSAPP_BRIDGE_PLATFORM] + whatsapp_bridge_links()
     people.sort(key=lambda r: (r["platform"], str(r.get("email") or ""), r["user_id"]))
     hooks = public_hooks_status(env)
     for p in platforms:

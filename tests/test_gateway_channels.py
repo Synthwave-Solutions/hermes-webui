@@ -543,3 +543,34 @@ def test_discord_and_slack_are_own_bot_platforms_too(me):
     assert [f["key"] for f in own["discord"]["fields"]] == ["DISCORD_BOT_TOKEN", "DISCORD_HOME_CHANNEL"]
     with pytest.raises(ValueError):
         ch.set_my_bot(object(), "teams", {"TEAMS_CLIENT_ID": "x"})
+
+
+def test_whatsapp_bridge_links_are_read_only_masked_and_verified_only(env, monkeypatch, tmp_path):
+    """The verified links of the WhatsApp bridge show next to the other platforms, for display only."""
+    links = tmp_path / "links" / "gateway-identities.json"
+    monkeypatch.setenv(ch.WHATSAPP_BRIDGE_LINKS_ENV, str(links))
+    monkeypatch.setattr(ch, "_pairing_store", lambda: None)
+    assert ch.whatsapp_bridge_links() == []                                   # no mount: nothing, and no error
+    links.parent.mkdir()
+    links.write_text(json.dumps({"whatsapp_bridge": {
+        "31698765432": {"email": "Andre@Example.test", "name": "Andre", "profile": "", "department": "sales",
+                        "business_number": "31201234567", "link_id": "wl_0123456789abcdef01234567", "verified_at": 1795000000,
+                        "added_at": 1795000000, "added_by": "andre@example.test"},
+        "31687654321": {"email": "michael@example.test", "name": "Michael"},        # never verified: not a link
+        "bad": "row"}, "telegram": {"9": {"email": "x@example.test"}}}), encoding="utf-8")
+    rows = ch.whatsapp_bridge_links()
+    assert rows == [{"platform": "whatsapp_bridge", "user_id": "+31•••••5432", "email": "andre@example.test", "name": "Andre", "profile": "",
+                     "department": "sales", "verified_at": 1795000000, "added_at": 1795000000, "read_only": True}]
+    text = json.dumps(ch.status_payload())
+    assert "+31•••••5432".encode("unicode_escape").decode() in text or "+31•••••5432" in text
+    assert "31698765432" not in text and "31201234567" not in text and "wl_0123456789" not in text
+    # The WebUI's own map cannot hold or write a row of the bridge.
+    with pytest.raises(ValueError):
+        ch.set_identity("whatsapp_bridge", "31600000000", "andre@example.test")
+    ch._save_identities({"whatsapp_bridge": {"31600000000": {"email": "michael@example.test"}}})
+    people = ch.status_payload()["people"]
+    assert [p["email"] for p in people if p["platform"] == "whatsapp_bridge"] == ["andre@example.test"]
+    assert json.loads(links.read_text(encoding="utf-8"))["whatsapp_bridge"]["31698765432"]["verified_at"] == 1795000000     # untouched
+    links.write_text("{not json", encoding="utf-8")
+    assert ch.whatsapp_bridge_links() == []
+    assert ch.mask_number("316") == "+•••" and ch.mask_number("+31 6 1234 5678") == "+31•••••5678"
