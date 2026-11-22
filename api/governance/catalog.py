@@ -77,6 +77,9 @@ _SELF_ROUTES: frozenset[str] = frozenset({
     "/api/studio/backlog", "/api/studio/backlog/order", "/api/studio/autopilot", "/api/studio/playbooks",
     "/api/studio/playbook", "/api/studio/playbook/delete", "/api/studio/playbook/draft", "/api/studio/playbook/run", "/api/studio/media",
     "/api/studio/prompts", "/api/studio/profile",
+    # Progress per use case (22 Nov 2026): the handler admits organisation
+    # admins, department admins for their teams and assigned partners.
+    "/api/studio/summary",
     "/api/org/modules",
     "/api/org/modules/request",
     "/api/org/overview",

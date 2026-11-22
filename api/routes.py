@@ -12461,7 +12461,8 @@ def handle_get(handler, parsed) -> bool:
         return org_structure.handle_get(handler, parsed)
 
     if parsed.path in ("/api/studio/usecases", "/api/studio/usecase", "/api/studio/backlog", "/api/studio/playbooks",
-                       "/api/studio/playbook", "/api/studio/media", "/api/studio/prompts", "/api/studio/profile"):
+                       "/api/studio/playbook", "/api/studio/media", "/api/studio/prompts", "/api/studio/profile",
+                       "/api/studio/summary"):
         from api import studio
         return studio.handle_get(handler, parsed)
 

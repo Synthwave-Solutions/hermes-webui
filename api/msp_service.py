@@ -18,6 +18,12 @@ def identity(handler):
     personal = subject.provider=='synthpulse_cloud' and os.environ.get('SP_CLOUD_PERSONAL_MSP')=='1'
     if not email or subject.provider=='auth_disabled' or (email not in known and not personal):
         raise PermissionError('Sign in with an organisation account')
+    if email not in known:
+        # The supplier's assigned staff work in Studio; the customer's own account
+        # (invoices, orders, packages, tickets) is not theirs to open.
+        from api import org_structure
+        if org_structure.partner_for(email) is not None:
+            raise PermissionError('Sign in with an organisation account')
     return {'user':email,'member_of':delegation.member_departments(policy,email),
             'admin_of':delegation.admin_departments(policy,email)}
 

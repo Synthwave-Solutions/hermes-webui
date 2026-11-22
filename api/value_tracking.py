@@ -61,6 +61,7 @@ MINUTES_MAX = 6000
 USD_TO_EUR = float(os.environ.get("SP_VALUE_USD_TO_EUR", "0.92"))
 COLLECT_MIN_INTERVAL = int(os.environ.get("SP_VALUE_COLLECT_INTERVAL", "180"))
 CHAT_SOURCES = ("webui", "api_server", "telegram", "slack", "teams", "gchat")
+_USE_CASE_RE = re.compile(r"^uc_[a-f0-9]{12}$")
 _COLLECT_LOCK = threading.Lock()
 _last_collect = 0.0
 
@@ -97,7 +98,7 @@ def validate_value(raw: Any) -> dict:
     if not isinstance(raw, dict):
         raise ValueError("Value must be an object")
     allowed = {"task", "before_minutes", "review_minutes", "per", "source", "confidence", "rationale",
-               "unknown", "unknown_reason", "team", "confirmed_by", "confirmed_at", "set_by", "set_at"}
+               "unknown", "unknown_reason", "team", "use_case", "confirmed_by", "confirmed_at", "set_by", "set_at"}
     if set(raw) - allowed:
         raise ValueError("Unknown value field: " + ", ".join(sorted(set(raw) - allowed)))
     out: dict[str, Any] = {}
@@ -133,6 +134,12 @@ def validate_value(raw: Any) -> dict:
         if team not in org_structure.team_keys():
             raise ValueError("Unknown team")
         out["team"] = team
+    use_case = str(raw.get("use_case") or "").strip()
+    if use_case:
+        # The Studio use case this task was built from, so measured savings add up per use case.
+        if not _USE_CASE_RE.match(use_case):
+            raise ValueError("Unknown use case")
+        out["use_case"] = use_case
     for key in ("confirmed_by", "confirmed_at", "set_by", "set_at"):
         if raw.get(key):
             out[key] = _text(raw.get(key), 120, key)
@@ -183,8 +190,9 @@ def set_job_value(job_id: str, store_profile: str, value: dict | None, actor: st
                 match.pop("value", None)
             else:
                 previous = match.get("value") if isinstance(match.get("value"), dict) else {}
-                if "team" not in clean and previous.get("team"):
-                    clean["team"] = previous["team"]
+                for keep in ("team", "use_case"):
+                    if keep not in clean and previous.get(keep):
+                        clean[keep] = previous[keep]
                 match["value"] = clean
             cron_bots._save(cj, jobs)
             return dict(match)
@@ -280,6 +288,14 @@ def _connect() -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.executescript(SCHEMA)
+    # Added 22 Nov 2026: the use case a run belongs to and how its value counts.
+    have = {row[1] for row in conn.execute("PRAGMA table_info(runs)")}
+    for column in ("use_case", "value_per"):
+        if column not in have:
+            try:
+                conn.execute(f"ALTER TABLE runs ADD COLUMN {column} TEXT")
+            except sqlite3.OperationalError:
+                pass     # another process added it first
     return conn
 
 
@@ -403,8 +419,9 @@ def collect(force: bool = False) -> dict:
                             conn.execute(
                                 "INSERT OR IGNORE INTO runs(exec_id,store,job_id,job_name,bot,team,owner_email,status,"
                                 "started_at,finished_at,duration_s,session_id,model,tokens_in,tokens_out,tokens_cache,"
-                                "provider_cost_usd,before_minutes,review_minutes,value_source,value_confidence,collected_at)"
-                                " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                                "provider_cost_usd,before_minutes,review_minutes,value_source,value_confidence,collected_at,"
+                                "use_case,value_per)"
+                                " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                                 (exec_key, profile, str(row["job_id"]), name,
                                  cron_bots.job_bot(job, profile) if job else profile,
                                  _job_team(job, structure) if job else "",
@@ -419,7 +436,8 @@ def collect(force: bool = False) -> dict:
                                  _provider_cost(session),
                                  None if value.get("unknown") else value.get("before_minutes"),
                                  None if value.get("unknown") else value.get("review_minutes"),
-                                 value.get("source"), value.get("confidence"), now))
+                                 value.get("source"), value.get("confidence"), now,
+                                 value.get("use_case"), None if value.get("unknown") else value.get("per", "run")))
                             stats["runs"] += 1
                         if newest != mark:
                             _meta_set(conn, mark_key, newest)
@@ -632,6 +650,31 @@ def runs_between(start: float, end: float) -> list[dict]:
             "SELECT * FROM runs WHERE finished_at >= ? AND finished_at < ?", (start, end))]
     finally:
         conn.close()
+
+
+def saved_minutes_by_use_case(start: float, end: float) -> dict[str, int]:
+    """Measured saved minutes per Studio use case over the period.
+
+    Counts completed runs of tasks whose value names a use case, the same way
+    Management does: per run, or once per day or ISO week with a completed run.
+    """
+    out: dict[str, int] = {}
+    periods: dict[tuple, int] = {}
+    for run in runs_between(start, end):
+        use_case = run.get("use_case")
+        if not use_case or run.get("status") != "ok" or run.get("before_minutes") is None:
+            continue
+        each = max(0, int(run.get("before_minutes") or 0) - int(run.get("review_minutes") or 0))
+        per = run.get("value_per") or "run"
+        if per == "run" or not run.get("finished_at"):
+            out[use_case] = out.get(use_case, 0) + each
+            continue
+        stamp = time.gmtime(run["finished_at"])
+        key = (use_case, run["store"], run["job_id"], time.strftime("%Y-%j" if per == "day" else "%G-%V", stamp))
+        periods[key] = max(periods.get(key, 0), each)
+    for key, each in periods.items():
+        out[key[0]] = out.get(key[0], 0) + each
+    return out
 
 
 def chats_between(start: float, end: float) -> list[dict]:

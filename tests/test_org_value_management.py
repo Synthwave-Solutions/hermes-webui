@@ -416,3 +416,116 @@ def test_high_estimate_is_flagged(env, engine_store, monkeypatch):
     vt.collect(force=True)
     model = mgmt.build(_view(ADMIN), 7, now - 7 * 86400, now + 60)
     assert "check_high" in {d["kind"] for d in model["decisions"]}
+
+
+# ── Partners: assigned staff of the supplier (22 Nov 2026) ──────────────────
+
+CONSULTANT = "carla@partner.example"
+QA = "quinn@partner.example"
+
+
+def test_partners_are_stored_audited_and_only_for_organisation_admins(env):
+    _structure(env)
+    admin = _view(ADMIN)
+    snap = org.apply(admin, {"op": "partner.save", "email": CONSULTANT, "name": "Carla Jansen", "role": "consultant",
+                             "starts_at": "2026-11-01", "ends_at": "2099-01-31"})
+    assert snap["partners"] == [{"email": CONSULTANT, "name": "Carla Jansen", "role": "consultant", "org": "synthwave",
+                                 "starts_at": "2026-11-01", "ends_at": "2099-01-31", "source": "local"}]
+    assert snap["people"][CONSULTANT]["partner"] == {"role": "consultant", "org": "synthwave"}
+    assert snap["partners_all"][0]["current"] is True
+    audit = [json.loads(line) for line in (env.state_dir / "org_structure" / "audit.jsonl").read_text().splitlines()]
+    assert audit[-1]["action"] == "partner.save" and audit[-1]["detail"]["partner"] == CONSULTANT
+    # A department admin edits teams, never the partners; neither does the partner.
+    for email in (OTHER, CONSULTANT):
+        with pytest.raises(PermissionError):
+            org.apply(_view(email), {"op": "partner.save", "email": QA, "role": "qa"})
+        with pytest.raises(PermissionError):
+            org.apply(_view(email), {"op": "partner.remove", "email": CONSULTANT})
+    for bad in ({"email": "x", "role": "consultant"}, {"email": QA, "role": "boss"},
+                {"email": QA, "role": "qa", "starts_at": "soon"},
+                {"email": QA, "role": "qa", "starts_at": "2026-12-02", "ends_at": "2026-12-01"}):
+        with pytest.raises(ValueError):
+            org.apply(admin, dict({"op": "partner.save"}, **bad))
+    with pytest.raises(KeyError):
+        org.apply(admin, {"op": "partner.remove", "email": QA})
+    assert org.apply(admin, {"op": "partner.remove", "email": CONSULTANT})["partners"] == []
+
+
+def test_partner_gets_a_role_and_no_structure_edits_or_money(env, monkeypatch):
+    _structure(env)
+    org.apply(_view(ADMIN), {"op": "partner.save", "email": CONSULTANT, "name": "Carla", "role": "consultant"})
+    view = _view(CONSULTANT)
+    # The role is separate: no scope, no departments, no editing, no money.
+    assert view.partner_role == "consultant" and view.to_dict()["partner"] == {"role": "consultant", "org": "synthwave"}
+    assert view.scope == org.SCOPE_NONE and not view.departments and not view.can_edit and not view.sees_money
+    snap = org.snapshot(view)
+    assert set(snap["teams"]) == {"finance/debiteuren", "sales/inside-sales"}           # reads the teams
+    assert not any(t["editable"] for t in snap["teams"].values())
+    assert not any("hourly_rate" in row for row in list(snap["teams"].values()) + list(snap["departments"].values()))
+    assert "partners_all" not in snap
+    for body in ({"op": "team.save", "department": "finance", "name": "Nieuw"},
+                 {"op": "team.delete", "key": "finance/debiteuren"},
+                 {"op": "member.move", "email": CONSULTANT, "to": "finance/debiteuren"},
+                 {"op": "department.save", "key": "finance", "hourly_rate": 1},
+                 {"op": "person.save", "email": MEMBER, "title": "x"}):
+        with pytest.raises(PermissionError):
+            org.apply(view, body)
+
+    # Management: the overview, the pricing and the organisation chart refuse a partner.
+    sent = []
+    monkeypatch.setattr(org, "request_scope", lambda handler: view)
+    monkeypatch.setattr(mgmt, "j", lambda handler, payload, status=200, **_kw: sent.append((status, payload)))
+    monkeypatch.setattr(mgmt, "_collect_safely", lambda: None)
+    for path in ("/api/management/overview", "/api/management/pricing", "/api/org/chart"):
+        assert mgmt.handle_get(None, SimpleNamespace(path=path, query="")) is True
+        assert sent[-1][0] == 403, path
+    assert mgmt.handle_post(None, SimpleNamespace(path="/api/management/pricing", query=""), {"models": {}}) is True
+    assert sent[-1][0] == 403
+
+    # The self view says who they are, and that they may open the structure read-only.
+    monkeypatch.setattr(org, "j", lambda handler, payload, status=200, **_kw: sent.append((status, payload)))
+    org.handle_get(None, SimpleNamespace(path="/api/org/structure/me", query=""))
+    me = sent[-1][1]
+    assert me["partner"] == {"role": "consultant", "org": "synthwave"} and me["can_view"] and not me["can_manage"]
+    org.handle_post(None, SimpleNamespace(path="/api/org/structure", query=""), {"op": "team.delete", "key": "finance/debiteuren"})
+    assert sent[-1][0] == 403
+
+    # An assignment that ended: nothing is left, not even the read.
+    org.apply(_view(ADMIN), {"op": "partner.save", "email": CONSULTANT, "role": "consultant", "ends_at": "2020-01-01"})
+    ended = _view(CONSULTANT)
+    assert ended.partner_role is None and ended.to_dict()["partner"] is None
+    monkeypatch.setattr(org, "request_scope", lambda handler: ended)
+    org.handle_get(None, SimpleNamespace(path="/api/org/structure", query=""))
+    assert sent[-1][0] == 403
+    assert org.snapshot(_view(ADMIN))["partners"] == [] and org.snapshot(_view(ADMIN))["partners_all"][0]["current"] is False
+
+
+def test_value_carries_the_use_case_into_the_ledger(env, engine_store):
+    _structure(env)
+    now = time.time()
+    home = env.homes["finbot"]
+    uc = "uc_0123456789ab"
+    with pytest.raises(ValueError):
+        vt.validate_value({"before_minutes": 10, "use_case": "../etc"})
+    value = vt.validate_value({"before_minutes": 45, "review_minutes": 5, "source": "playbook", "confidence": "estimated",
+                               "team": "finance/debiteuren", "use_case": uc})
+    assert value["use_case"] == uc
+    _jobs(home, [_job("j1", value=value),
+                 _job("j2", value={"before_minutes": 30, "review_minutes": 0, "per": "day", "source": "playbook",
+                                   "confidence": "estimated", "use_case": uc}),
+                 _job("j3", value={"before_minutes": 99, "source": "owner"})])
+    _executions(home, [
+        ("e1", "j1", "s", "p", 1, "completed", _iso(now - 3600), _iso(now - 3600), _iso(now - 3500), None),
+        ("e2", "j1", "s", "p", 1, "completed", _iso(now - 7200), _iso(now - 7200), _iso(now - 7100), None),
+        ("e3", "j1", "s", "p", 1, "failed", _iso(now - 9000), _iso(now - 9000), _iso(now - 8990), "x"),
+        ("e4", "j2", "s", "p", 1, "completed", _iso(now - 300), _iso(now - 300), _iso(now - 290), None),
+        ("e5", "j2", "s", "p", 1, "completed", _iso(now - 200), _iso(now - 200), _iso(now - 190), None),
+        ("e6", "j3", "s", "p", 1, "completed", _iso(now - 200), _iso(now - 200), _iso(now - 190), None),
+    ])
+    assert vt.collect(force=True)["runs"] == 6
+    saved = vt.saved_minutes_by_use_case(now - 30 * 86400, now + 60)
+    # j1: two completed runs x 40; j2 counts once per day with a run (30, or 60 when the two runs straddle midnight UTC).
+    assert set(saved) == {uc} and saved[uc] in (110, 140)
+    # Changing the value later keeps the link to the use case.
+    job = vt.set_job_value("j1", "finbot", {"before_minutes": 50, "review_minutes": 5, "source": "owner"}, MEMBER)
+    assert job["value"]["use_case"] == uc and job["value"]["team"] == "finance/debiteuren"

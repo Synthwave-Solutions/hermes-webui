@@ -27,6 +27,18 @@ Editing: ``all`` edits everything; a department admin edits the teams of
 their own departments. Team leads and members read only. Every mutation is
 written atomically under a file lock and appended to ``audit.jsonl``.
 
+Partners
+--------
+``partners`` is one list for the whole installation: the staff of the
+supplier that the central Cloud assigned to it (consultant, developer, qa),
+each with a start and an end. The normal source is a pull from the control
+plane (``api/studio_report.py``, ``source: cloud``); an organisation admin
+can add local ones. A current partner gets ``ViewScope.partner_role`` and
+nothing else: Studio reads that role to let a consultant or developer work
+on the use cases, backlog and playbooks of the teams. It never widens
+``scope``, so a partner edits no structure and sees no rates or Management
+figures, and the moment the assignment ends or is removed the role is gone.
+
 The document is organisation data, not authorisation: it never grants a
 tool, a profile or a route. Rights stay in the governance policy.
 """
@@ -41,6 +53,7 @@ import threading
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -62,6 +75,12 @@ SCOPE_DEPARTMENTS = "departments"
 SCOPE_TEAMS = "teams"
 SCOPE_NONE = "none"
 
+PARTNER_ROLES = ("consultant", "developer", "qa")
+PARTNER_EDIT_ROLES = ("consultant", "developer")
+PARTNER_ORG = "synthwave"
+PARTNER_SOURCES = ("cloud", "local")
+_PARTNERS_MAX = 50
+
 
 # ── Storage ──────────────────────────────────────────────────────────────────
 
@@ -78,7 +97,7 @@ def _path() -> Path:
 
 
 def _empty() -> dict:
-    return {"version": VERSION, "departments": {}, "teams": {}, "people": {},
+    return {"version": VERSION, "departments": {}, "teams": {}, "people": {}, "partners": [],
             "updated_at": None, "updated_by": None}
 
 
@@ -97,6 +116,8 @@ def load() -> dict:
     for key in ("departments", "teams", "people"):
         value = data.get(key)
         base[key] = value if isinstance(value, dict) else {}
+    partners = data.get("partners")
+    base["partners"] = [p for p in partners if isinstance(p, dict)] if isinstance(partners, list) else []
     base["updated_at"] = data.get("updated_at")
     base["updated_by"] = data.get("updated_by")
     return base
@@ -175,6 +196,150 @@ def _rate(value: Any) -> float | None:
     return round(number, 2)
 
 
+# ── Partners: staff of the supplier assigned to this installation ────────────
+
+def _instant(value: Any, *, end: bool = False) -> float | None:
+    """Epoch seconds of a date (``2026-12-01``) or an ISO date-time; None when empty.
+
+    A bare date as an end counts through the whole of that day (UTC). Raises
+    ValueError on anything else.
+    """
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", text):
+            moment = datetime.strptime(text, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            if end:
+                moment += timedelta(days=1)
+            return moment.timestamp()
+        moment = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        raise ValueError("Use a date such as 2026-12-01")
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    return moment.timestamp()
+
+
+def _when(value: Any, field_name: str) -> str:
+    """A stored start or end: a date, or a UTC date-time, or ""."""
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    try:
+        stamp = _instant(text)
+    except ValueError:
+        raise ValueError(f"{field_name} must be a date such as 2026-12-01")
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", text):
+        return text
+    return datetime.fromtimestamp(stamp, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def clean_partner(raw: Any, source: str) -> dict:
+    """One validated partner row. Raises ValueError."""
+    if not isinstance(raw, dict):
+        raise ValueError("Invalid partner")
+    email = norm_email(raw.get("email"))
+    if not email:
+        raise ValueError("A partner needs an e-mail address")
+    role = str(raw.get("role") or "").strip().lower()
+    if role not in PARTNER_ROLES:
+        raise ValueError("A partner is a consultant, a developer or qa")
+    if source not in PARTNER_SOURCES:
+        raise ValueError("Unknown partner source")
+    starts, ends = _when(raw.get("starts_at"), "Start"), _when(raw.get("ends_at"), "End")
+    if starts and ends and _instant(ends, end=True) <= _instant(starts):
+        raise ValueError("The end lies before the start")
+    return {"email": email, "name": _clean_text(raw.get("name"), _NAME_MAX, "Name"), "role": role,
+            "org": PARTNER_ORG, "starts_at": starts, "ends_at": ends, "source": source}
+
+
+def partner_is_current(row: dict, now: float | None = None) -> bool:
+    """Inside its start and end. A row that cannot be read is not current."""
+    if not isinstance(row, dict) or row.get("role") not in PARTNER_ROLES or not norm_email(row.get("email")):
+        return False
+    now = time.time() if now is None else now
+    try:
+        starts, ends = _instant(row.get("starts_at")), _instant(row.get("ends_at"), end=True)
+    except ValueError:
+        return False
+    return (starts is None or now >= starts) and (ends is None or now < ends)
+
+
+def current_partners(data: dict | None = None, now: float | None = None) -> list[dict]:
+    """The partners assigned right now, one row per e-mail (a central assignment wins)."""
+    data = data or load()
+    rows: dict[str, dict] = {}
+    for row in data.get("partners") or []:
+        if not partner_is_current(row, now):
+            continue
+        email = norm_email(row.get("email"))
+        if email not in rows or (row.get("source") == "cloud" and rows[email].get("source") != "cloud"):
+            rows[email] = row
+    return [partner_public(rows[e]) for e in sorted(rows, key=lambda e: (PARTNER_ROLES.index(rows[e]["role"]), e))]
+
+
+def partner_public(row: dict) -> dict:
+    return {"email": norm_email(row.get("email")), "name": str(row.get("name") or ""), "role": row.get("role"),
+            "org": PARTNER_ORG, "starts_at": row.get("starts_at") or "", "ends_at": row.get("ends_at") or "",
+            "source": row.get("source") if row.get("source") in PARTNER_SOURCES else "local"}
+
+
+def partner_for(email: str, data: dict | None = None, now: float | None = None) -> dict | None:
+    """The current assignment of ``email``, or None."""
+    email = norm_email(email)
+    if not email:
+        return None
+    return next((p for p in current_partners(data, now) if p["email"] == email), None)
+
+
+def cloud_partner_for(email: str, data: dict | None = None, now: float | None = None) -> dict | None:
+    """The current assignment of ``email`` that came from the control plane, or None.
+
+    This is the only partner fact the governance resolver reads (the
+    ``synthwave_partner`` role, see ``api/governance/resolver.py``): a partner
+    that an organisation admin added locally works in Studio but gets no
+    sign-in and no route from it.
+    """
+    partner = partner_for(email, data, now)
+    return partner if partner and partner.get("source") == "cloud" else None
+
+
+def replace_cloud_partners(assignments: list, actor: str = "cloud") -> dict:
+    """Replace every ``source: cloud`` partner by ``assignments``; local ones stay.
+
+    Rows that do not validate are skipped (counted), so one bad row from the
+    control plane never removes the others. Written and audited only when the
+    list changed. Returns ``{"changed", "count", "skipped"}``.
+    """
+    clean, skipped, seen = [], 0, set()
+    for raw in (assignments or [])[:_PARTNERS_MAX * 2]:
+        try:
+            row = clean_partner(raw, "cloud")
+        except ValueError:
+            skipped += 1
+            continue
+        if row["email"] in seen or len(clean) >= _PARTNERS_MAX:
+            skipped += 1
+            continue
+        seen.add(row["email"])
+        clean.append(row)
+    clean.sort(key=lambda r: r["email"])
+    with _locked():
+        data = load()
+        before = [p for p in data["partners"] if p.get("source") == "cloud"]
+        local = [p for p in data["partners"] if p.get("source") != "cloud"]
+        changed = sorted(before, key=lambda r: str(r.get("email"))) != clean
+        if changed:
+            data["partners"] = clean + local
+            _touch(data, actor)
+            _write(data)
+    if changed:
+        _audit(actor, "partners.sync", {"partners": [{"email": r["email"], "role": r["role"], "ends_at": r["ends_at"]} for r in clean],
+                                        "removed": sorted({str(p.get("email")) for p in before} - seen)})
+    return {"changed": changed, "count": len(clean), "skipped": skipped}
+
+
 # ── Policy view ──────────────────────────────────────────────────────────────
 
 def _policy():
@@ -231,10 +396,27 @@ class ViewScope:
     departments: set[str] = field(default_factory=set)
     lead_teams: set[str] = field(default_factory=set)
     member_teams: set[str] = field(default_factory=set)
+    # Set for a current partner (consultant, developer, qa). Separate from
+    # ``scope`` on purpose: it opens Studio work, never structure or money.
+    partner_role: str | None = None
 
     @property
     def is_none(self) -> bool:
         return self.scope == SCOPE_NONE
+
+    @property
+    def is_partner(self) -> bool:
+        return self.partner_role in PARTNER_ROLES
+
+    @property
+    def partner_edits(self) -> bool:
+        """Consultants and developers work on Studio content; qa only reads."""
+        return self.partner_role in PARTNER_EDIT_ROLES
+
+    @property
+    def partner_read_only(self) -> bool:
+        """A partner that only reads (qa) and has no place of their own in the structure."""
+        return self.is_partner and not self.partner_edits and self.scope == SCOPE_NONE
 
     def sees_department(self, key: str) -> bool:
         return self.scope == SCOPE_ALL or key in self.departments
@@ -263,7 +445,8 @@ class ViewScope:
     def to_dict(self) -> dict:
         return {"email": self.email, "scope": self.scope, "departments": sorted(self.departments),
                 "lead_teams": sorted(self.lead_teams), "member_teams": sorted(self.member_teams),
-                "can_edit": self.can_edit}
+                "can_edit": self.can_edit,
+                "partner": {"role": self.partner_role, "org": PARTNER_ORG} if self.is_partner else None}
 
 
 def identity_email(identity) -> str:
@@ -308,6 +491,14 @@ def scope_for(email: str, data: dict | None = None, policy=None, subject=None) -
             view.scope = SCOPE_DEPARTMENTS
         elif view.lead_teams or view.member_teams:
             view.scope = SCOPE_TEAMS
+    # Read on every request, so an assignment that ended or was removed stops
+    # working at once. It only sets the role; the scope above is untouched.
+    try:
+        partner = partner_for(email, data)
+    except Exception:
+        logger.warning("partner lookup failed in org structure", exc_info=True)
+        partner = None
+    view.partner_role = partner["role"] if partner else None
     return view
 
 
@@ -361,7 +552,8 @@ def snapshot(view: ViewScope, data: dict | None = None, policy=None) -> dict:
     depts = departments(data, policy)
     teams = {}
     for key, team in (data.get("teams") or {}).items():
-        if not isinstance(team, dict) or not view.sees_team(key, team):
+        # A partner reads every team (names and members, to place a use case); no rates, no editing.
+        if not isinstance(team, dict) or not (view.sees_team(key, team) or view.is_partner):
             continue
         row = {
             "key": key,
@@ -392,12 +584,22 @@ def snapshot(view: ViewScope, data: dict | None = None, policy=None) -> dict:
             people_keys.add(team["lead"])
     for dept in visible_depts.values():
         people_keys.update(dept["admins"])
+    partners = current_partners(data)
+    by_email = {p["email"]: p for p in partners}
+    people_keys.update(by_email)
     people = {}
     for email in sorted(people_keys):
         row = (data.get("people") or {}).get(email) or {}
         people[email] = {"email": email, "title": row.get("title") or "", "reports_to": norm_email(row.get("reports_to"))}
-    return {"departments": visible_depts, "teams": teams, "people": people,
-            "updated_at": data.get("updated_at"), "viewer": view.to_dict()}
+        if email in by_email:
+            people[email]["partner"] = {"role": by_email[email]["role"], "org": PARTNER_ORG}
+            people[email]["name"] = by_email[email]["name"]
+    out = {"departments": visible_depts, "teams": teams, "people": people, "partners": partners,
+           "updated_at": data.get("updated_at"), "viewer": view.to_dict()}
+    if view.scope == SCOPE_ALL:
+        # The admin also sees assignments that have not started yet or have ended.
+        out["partners_all"] = [dict(partner_public(p), current=partner_is_current(p)) for p in data.get("partners") or []]
+    return out
 
 
 # ── Mutations ────────────────────────────────────────────────────────────────
@@ -588,6 +790,28 @@ def apply(view: ViewScope, body: dict) -> dict:
                 row["reports_to"] = manager
             data["people"][email] = row
             detail = {"person": email}
+        elif op == "partner.save":
+            if view.scope != SCOPE_ALL:
+                raise PermissionError("Only organisation admins change the assigned partners")
+            row = clean_partner(body, "local")
+            if any(norm_email(p.get("email")) == row["email"] and p.get("source") == "cloud" for p in data["partners"]):
+                raise ValueError("This partner is assigned centrally; change it there")
+            others = [p for p in data["partners"] if not (norm_email(p.get("email")) == row["email"] and p.get("source") != "cloud")]
+            if len(others) >= _PARTNERS_MAX:
+                raise ValueError("Too many partners")
+            data["partners"] = others + [row]
+            detail = {"partner": row["email"], "role": row["role"], "ends_at": row["ends_at"]}
+        elif op == "partner.remove":
+            if view.scope != SCOPE_ALL:
+                raise PermissionError("Only organisation admins change the assigned partners")
+            email = norm_email(body.get("email"))
+            match = [p for p in data["partners"] if norm_email(p.get("email")) == email]
+            if not match:
+                raise KeyError("Partner not found")
+            if all(p.get("source") == "cloud" for p in match):
+                raise ValueError("This partner is assigned centrally; remove it there")
+            data["partners"] = [p for p in data["partners"] if not (norm_email(p.get("email")) == email and p.get("source") != "cloud")]
+            detail = {"partner": email, "removed": True}
         elif op == "import":
             if view.scope != SCOPE_ALL:
                 raise PermissionError("Only organisation admins import a structure")
@@ -625,11 +849,11 @@ def handle_get(handler, parsed) -> bool:
     if path == "/api/org/structure/me":
         payload = view.to_dict()
         payload["has_structure"] = bool(load().get("teams"))
-        payload["can_view"] = not view.is_none
+        payload["can_view"] = not view.is_none or view.is_partner
         payload["can_manage"] = view.scope in (SCOPE_ALL, SCOPE_DEPARTMENTS)
         j(handler, payload)
         return True
-    if view.is_none:
+    if view.is_none and not view.is_partner:
         j(handler, {"error": "forbidden", "reason": "org_scope", "viewer": view.to_dict()}, status=403)
         return True
     j(handler, snapshot(view))
