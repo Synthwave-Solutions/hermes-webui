@@ -436,3 +436,13 @@ button.om-mini-stat:focus-visible,button.om-saved:focus-visible,button.om-strip-
 .st-consultant-pick{margin-left:12px}
 @media (max-width:640px){.sp-partner-list{padding:0 16px 14px}.st-consultant-pick{margin-left:0}}
 .st-progress td:first-child{white-space:normal;min-width:220px}
+/* Hours of the month on the Studio overview. */
+.sp-hours{margin:0 0 16px}
+.sp-hours-empty{margin:0;padding:0 20px 16px;font-size:13px;color:var(--muted)}
+.sp-hours-dept{padding:0 20px 16px}
+.sp-hours-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;font-size:13.5px}
+.sp-hours-table{box-shadow:none}
+.sp-hours-person td{padding-top:5px;padding-bottom:5px;color:var(--muted);font-size:12.5px;border-bottom-color:transparent}
+.sp-hours-person td:first-child{padding-left:26px}
+.sp-hours-team{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px}
+@media (max-width:640px){.sp-hours-dept,.sp-hours-empty{padding-left:16px;padding-right:16px}}

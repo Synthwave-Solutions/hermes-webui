@@ -32,7 +32,11 @@
     loading: 'Laden…', failed: 'Laden is niet gelukt. Probeer het opnieuw.', retry: 'Opnieuw', people: 'Mensen', nothing: 'Nog niets',
     p_discover: 'Ontdekken', p_design: 'Inrichten', p_playbook: 'Bouwplan', p_build: 'Bouwen', p_measure: 'Meten',
     partner_consultant: 'Synthwave consultant', partner_developer: 'Synthwave developer', partner_qa: 'Synthwave QA',
-    partner_team: 'Team van Synthwave', partner_team_sub: 'Zij werken met jullie aan de use cases in deze omgeving.'
+    partner_team: 'Team van Synthwave', partner_team_sub: 'Zij werken met jullie aan de use cases in deze omgeving.',
+    hrs_title: 'Uren deze maand', hrs_package: 'Pakket', hrs_allocated: 'Toegewezen', hrs_used: 'Verbruikt', hrs_left: 'Resterend', hrs_unknown: 'Nog niet bekend',
+    hrs_as_of: 'Bijgewerkt tot', hrs_team: 'Team van Synthwave', hrs_week: 'uur per week', hrs_role: 'Rol', hrs_h: 'uur',
+    hrs_off: 'De uren zijn in deze omgeving nog niet gekoppeld aan de Cloud.', hrs_down: 'De uren zijn nu niet op te halen. Probeer het later opnieuw.',
+    hrs_none: 'Voor deze maand zijn nog geen uren toegewezen.', hrs_until: 'loopt tot', hrs_change: 'Wijziging van pakket gepland'
   };
   const EN = {
     findings:'Findings for you', findings_empty:'When a bot finds something for you, its update appears here.',
@@ -55,7 +59,11 @@
     loading: 'Loading…', failed: 'Loading failed. Try again.', retry: 'Retry', people: 'People', nothing: 'Nothing yet',
     p_discover: 'Discover', p_design: 'Design', p_playbook: 'Build plan', p_build: 'Build', p_measure: 'Measure',
     partner_consultant: 'Synthwave consultant', partner_developer: 'Synthwave developer', partner_qa: 'Synthwave QA',
-    partner_team: 'Synthwave team', partner_team_sub: 'They work with you on the use cases in this environment.'
+    partner_team: 'Synthwave team', partner_team_sub: 'They work with you on the use cases in this environment.',
+    hrs_title: 'Hours this month', hrs_package: 'Package', hrs_allocated: 'Allocated', hrs_used: 'Used', hrs_left: 'Remaining', hrs_unknown: 'Not known yet',
+    hrs_as_of: 'Updated until', hrs_team: 'Synthwave team', hrs_week: 'hours per week', hrs_role: 'Role', hrs_h: 'hours',
+    hrs_off: 'The hours are not linked to the Cloud in this environment yet.', hrs_down: 'The hours cannot be fetched right now. Try again later.',
+    hrs_none: 'No hours have been allocated for this month yet.', hrs_until: 'runs until', hrs_change: 'Package change planned'
   };
   const lang = () => ((document.documentElement.lang || 'nl').toLowerCase().startsWith('en') ? 'en' : 'nl');
   const w = (k, v) => { let s = (lang() === 'en' ? EN : NL)[k] || NL[k] || k; if (v) for (const [a, b] of Object.entries(v)) s = s.replace('{' + a + '}', b); return s; };
@@ -209,6 +217,23 @@
   function faceHtml(c, email, cls){
     const p = (c && c.people.get(norm(email))) || {};
     return `<span class="om-face ${cls || ''}" style="--h:${hue(email)}" title="${H(personName(email))}">${p.avatar_url ? `<img src="${H(p.avatar_url)}" alt="" loading="lazy">` : H(initials(email))}</span>`;
+  }
+
+  // ── Hours of the month (organisation admins, department admins, partners) ──
+  function hoursHtml(d){
+    if (!d) return '';
+    const loc = lang() === 'en' ? 'en-GB' : 'nl-NL';
+    const hm = m => (m == null ? null : (Math.round(m / 6) / 10).toLocaleString(loc, { maximumFractionDigits: 1 }));
+    const cell = m => (m == null ? `<span class="om-muted">${H(w('hrs_unknown'))}</span>` : H(hm(m)) + ' ' + H(w('hrs_h')));
+    const shell = body => `<section class="wp-card sp-hours" aria-label="${H(w('hrs_title'))}"><div class="wp-card-head"><h3>${H(w('hrs_title'))}</h3>${d.usage_as_of ? `<span class="om-muted om-small">${H(w('hrs_as_of'))} ${H(new Date(d.usage_as_of * 1000).toLocaleDateString(loc, { day: 'numeric', month: 'long' }))}</span>` : ''}</div>${body}</section>`;
+    if (!d.configured) return shell(`<p class="sp-hours-empty">${H(w('hrs_off'))}</p>`);
+    if (!d.available) return shell(`<p class="sp-hours-empty">${H(w('hrs_down'))}</p>`);
+    const depts = (d.departments || []).filter(x => (x.roles || []).length || (x.team || []).length);
+    if (!depts.length) return shell(`<p class="sp-hours-empty">${H(w('hrs_none'))}</p>`);
+    return shell(depts.map(x => `<div class="sp-hours-dept">
+        <div class="sp-hours-head"><strong>${H(x.name || '')}</strong>${x.tier_name || x.tier ? `<span class="om-badge">${H(w('hrs_package'))}: ${H(x.tier_name || x.tier)}</span>` : ''}${x.term_ends_at ? `<span class="om-muted om-small">${H(w('hrs_until'))} ${H(String(x.term_ends_at).slice(0, 10))}</span>` : ''}${x.planned_tier_change ? `<span class="om-badge warn">${H(w('hrs_change'))}</span>` : ''}</div>
+        ${(x.roles || []).length ? `<div class="om-table-wrap sp-hours-table"><table class="om-table"><thead><tr><th>${H(w('hrs_role'))}</th><th class="num">${H(w('hrs_allocated'))}</th><th class="num">${H(w('hrs_used'))}</th><th class="num">${H(w('hrs_left'))}</th></tr></thead><tbody>${x.roles.map(r => `<tr><td><strong>${H(r.label || Partners.label(r.role).replace(/^Synthwave /, ''))}</strong></td><td class="num">${cell(r.allocated_minutes)}</td><td class="num">${cell(r.used_minutes)}</td><td class="num">${cell(r.remaining_minutes)}</td></tr>${(r.people || []).map(p => `<tr class="sp-hours-person"><td>${H(p.name)}</td><td></td><td class="num">${cell(p.used_minutes)}</td><td></td></tr>`).join('')}`).join('')}</tbody></table></div>` : ''}
+        ${(x.team || []).length ? `<div class="sp-hours-team"><span class="om-muted om-small">${H(w('hrs_team'))}</span>${x.team.map(t => `<span class="om-chip">${H(t.name)}${t.label || t.role ? ' · ' + H(t.label || Partners.label(t.role).replace(/^Synthwave /, '')) : ''}${t.hours_per_week != null ? ' · ' + H(Number(t.hours_per_week).toLocaleString(loc, { maximumFractionDigits: 1 })) + ' ' + H(w('hrs_week')) : ''}</span>`).join('')}</div>` : ''}</div>`).join(''));
   }
 
   // ── Workplace: the items ───────────────────────────────────────────────────
@@ -565,7 +590,7 @@
       <div data-sp-today></div>
       ${findingsSection()}
       <div data-wp-setup>${Wp.setup}</div>
-      ${Partners.teamHtml(false)}
+      ${Partners.teamHtml(false)}${hoursHtml(Wp.hours)}
       <div class="wp-bar">${barHtml(c, 'home', Wp.data, lens)}${groupSeg}</div>
       <div class="wp-kpis">${KINDS.filter(k => k === 'task' ? allowed('tasks') : k !== 'bot' || allowed('profiles')).map(k => `<button type="button" class="wp-kpi ${n[k] || pending.has(k) ? '' : 'zero'}" title="${H(w('kpi_hint', { k: w('k_' + k) }))}" data-wp-go="${k}"${k === 'usecase' ? ' data-tour="studio-usecases"' : ''}><span class="wp-kpi-label"><span class="wp-kind-dot k-${k}" aria-hidden="true"></span>${H(short(k))}</span><span class="wp-kpi-value"${pending.has(k) ? ` aria-busy="true" aria-label="${H(w('loading'))}">…` : `>${n[k]}`}</span></button>`).join('')}</div>
       ${shortcuts()}
@@ -592,7 +617,7 @@
       const c = cur();
       if (token !== Wp.token || !c || !Wp.raw.quick) return;
       const items = buildItems(c);
-      const sig = JSON.stringify(items) + '|' + [...pendingKinds()].join() + '|' + c.people.size + '|' + [...c.teams.values()].map(t => t.members.length).join() + '|' + Partners.rows.map(p => p.email + p.role).join();
+      const sig = JSON.stringify(items) + '|' + [...pendingKinds()].join() + '|' + c.people.size + '|' + [...c.teams.values()].map(t => t.members.length).join() + '|' + Partners.rows.map(p => p.email + p.role).join() + '|' + JSON.stringify(Wp.hours || null);
       if (Wp.data && sig === Wp.sig && body.querySelector('.wp-kpis')) return;
       Wp.data = items; Wp.sig = sig;
       paint();
@@ -600,6 +625,8 @@
     try {
       const full = loadCtx(Date.now() - Wp.at > 30000);
       if (!ctxCache && ctxEarly) void ctxEarly.then(c => { Wp.early = c; step(); });
+      // Hours of the month: only asked for the people the server shows them to.
+      void (ctxEarly || full).then(c => (c && (c.canManage || c.partner) ? call('/api/studio/hours').catch(() => null) : null)).then(h => { if (token === Wp.token) { Wp.hours = h; step(); } }).catch(() => {});
       await Promise.all([
         full.then(step),
         Promise.all([call('/api/studio/usecases').catch(() => null), call('/api/studio/backlog').catch(() => null), call('/api/studio/playbooks').catch(() => null),

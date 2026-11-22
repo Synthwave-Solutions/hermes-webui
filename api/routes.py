@@ -12462,7 +12462,8 @@ def handle_get(handler, parsed) -> bool:
 
     if parsed.path in ("/api/studio/usecases", "/api/studio/usecase", "/api/studio/backlog", "/api/studio/playbooks",
                        "/api/studio/playbook", "/api/studio/media", "/api/studio/prompts", "/api/studio/profile",
-                       "/api/studio/summary", "/api/studio/roadmap", "/api/studio/roadmap/options"):
+                       "/api/studio/summary", "/api/studio/roadmap", "/api/studio/roadmap/options",
+                       "/api/studio/hours"):
         from api import studio
         return studio.handle_get(handler, parsed)
 

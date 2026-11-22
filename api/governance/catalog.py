@@ -84,6 +84,9 @@ _SELF_ROUTES: frozenset[str] = frozenset({
     # place in the structure, edits for organisation admins and assigned
     # consultants or developers; decided in api/studio_roadmap.py.
     "/api/studio/roadmap", "/api/studio/roadmap/options",
+    # Hours of the month from the central Cloud, read only: organisation
+    # admins, department admins and assigned partners (api/studio_hours.py).
+    "/api/studio/hours",
     "/api/org/modules",
     "/api/org/modules/request",
     "/api/org/overview",

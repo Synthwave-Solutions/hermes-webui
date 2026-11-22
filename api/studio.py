@@ -615,6 +615,9 @@ def handle_get(handler, parsed) -> bool:
     if path in ("/api/studio/roadmap", "/api/studio/roadmap/options"):
         from api import studio_roadmap
         return studio_roadmap.handle_get(handler, parsed)
+    if path == "/api/studio/hours":
+        from api import studio_hours
+        return studio_hours.handle_get(handler, parsed)
     if path not in ("/api/studio/usecases", "/api/studio/usecase"):
         return False
     view = org_structure.request_scope(handler)

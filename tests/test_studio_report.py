@@ -11,6 +11,7 @@ partner's sign-in role in the governance resolver.
 from __future__ import annotations
 
 import json
+import re
 import sys
 import threading
 import time
@@ -25,6 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import api.org_structure as org  # noqa: E402
 import api.studio as studio  # noqa: E402
 import api.studio_library as lib  # noqa: E402
+import api.studio_hours as hours  # noqa: E402
 import api.studio_report as report  # noqa: E402
 from api import control_plane_client as cpc  # noqa: E402
 from api.governance import resolver  # noqa: E402
@@ -45,6 +47,7 @@ class FakeControlPlane:
 
     def __init__(self):
         self.assignments = {"assignments": []}
+        self.hours = None
         self.status = 200
         self.requests = []
         fake = self
@@ -65,6 +68,8 @@ class FakeControlPlane:
                     payload = fake.assignments
                 elif self.command == "POST" and self.path == report.SUMMARY_PATH:
                     payload = {"ok": True}
+                elif self.command == "GET" and fake.hours is not None and re.fullmatch(r"/v1/customer/hours\?period=\d{4}-\d{2}", self.path):
+                    payload = dict(fake.hours, period=self.path.rsplit("=", 1)[1])
                 else:
                     payload = {"error": {"code": "not_found", "message": "unknown"}}
                 data = json.dumps(payload).encode()
@@ -103,6 +108,7 @@ def env(monkeypatch, tmp_path):
         monkeypatch.delenv(name, raising=False)
     cpc.clear_cache()
     report._reset_for_tests()
+    hours.clear_cache()
     policy = GovernancePolicy(bootstrap_admins=(ADMIN,), installation_kind="hq")
     monkeypatch.setattr(org, "_policy", lambda: policy)
     monkeypatch.setattr(report, "_measured_hours", lambda: {})
@@ -415,3 +421,76 @@ def test_request_enforcement_and_the_login_label_for_a_partner(env, monkeypatch)
     with pytest.raises(PermissionError):
         msp_service.identity(None)
     assert msp_service.visible(None) is False
+
+
+# ── Hours of the month ───────────────────────────────────────────────────────
+
+HOURS = {"usage_as_of": 1795000000, "departments": [{
+    "department_id": "dep_1", "name": "Finance", "tier": "t2", "tier_name": "Pakket twee", "term_ends_at": "2027-03-31",
+    "planned_tier_change": False, "price_cents": 500000, "internal": "x",
+    "roles": [{"role": "consultant", "label": "Consultant", "allocated_minutes": 960, "used_minutes": 420, "remaining_minutes": 540,
+               "people": [{"name": "Carla Jansen", "used_minutes": 420, "email": "carla@partner.example"}], "rate": 150},
+              {"role": "developer", "label": "Developer", "allocated_minutes": 1920, "used_minutes": None, "remaining_minutes": None, "people": []},
+              {"role": "owner", "label": "x", "allocated_minutes": 1}],
+    "team": [{"role": "consultant", "label": "Consultant", "name": "Carla Jansen", "hours_per_week": 4}]}],
+    "maintenance": [], "support": None, "productive": {"status": "ok", "token": "secret"}}
+
+
+def test_hours_are_proxied_cached_and_bounded(env):
+    # Not configured: a friendly empty state, nothing is sent.
+    assert hours.hours("2026-11") == {"configured": False, "available": False, "period": "2026-11", "departments": []}
+    assert env.plane.requests == []
+    env.configure()
+    env.plane.hours = HOURS
+    got = hours.hours("2026-11")
+    request = env.plane.requests[-1]
+    assert request["method"] == "GET" and request["path"] == "/v1/customer/hours?period=2026-11"
+    assert request["headers"]["authorization"].startswith("SP-HMAC-SHA256 ")
+    assert not any(h.startswith("x-sp-acting") or "organi" in h for h in request["headers"])
+    assert got["configured"] and got["available"] and got["period"] == "2026-11" and got["usage_as_of"] == 1795000000
+    dept = got["departments"][0]
+    assert set(dept) == {"department_id", "name", "tier", "tier_name", "term_ends_at", "planned_tier_change", "roles", "team"}
+    assert [r["role"] for r in dept["roles"]] == ["consultant", "developer"]                    # an unknown role is dropped
+    assert dept["roles"][0] == {"role": "consultant", "label": "Consultant", "allocated_minutes": 960, "used_minutes": 420,
+                                "remaining_minutes": 540, "people": [{"name": "Carla Jansen", "used_minutes": 420}]}
+    assert dept["roles"][1]["used_minutes"] is None and dept["roles"][1]["remaining_minutes"] is None    # not known yet stays null
+    assert dept["team"] == [{"role": "consultant", "label": "Consultant", "name": "Carla Jansen", "hours_per_week": 4}]
+    text = json.dumps(got)
+    for leak in ("price_cents", "rate", "secret", "internal", "partner.example", "maintenance", "support"):
+        assert leak not in text, leak
+    # Five minutes from the cache, then asked again; another month is its own entry.
+    sent = len(env.plane.requests)
+    assert hours.hours("2026-11") == got and len(env.plane.requests) == sent
+    assert hours.hours("2026-11", now=time.time() + 301)["available"] and len(env.plane.requests) == sent + 1
+    assert hours.hours("2026-10")["period"] == "2026-10" and len(env.plane.requests) == sent + 2
+    assert hours.hours()["period"] == time.strftime("%Y-%m")
+    for bad in ("2026-13", "2026-1", "november", "2026-11&x=1", "../x"):
+        with pytest.raises(ValueError):
+            hours.hours(bad)
+    # Down: an empty state that is not kept, so the next look asks again.
+    hours.clear_cache()
+    env.plane.status = 503
+    down = hours.hours("2026-11")
+    assert down == {"configured": True, "available": False, "period": "2026-11", "departments": [], "status": 503}
+    env.plane.status = 200
+    assert hours.hours("2026-11")["available"] is True
+
+
+def test_hours_route_for_admins_department_admins_and_partners(env):
+    env.configure()
+    env.plane.hours = HOURS
+    org.apply(env.admin, {"op": "partner.save", "email": CONSULTANT, "name": "Carla", "role": "consultant"})
+    org.apply(env.admin, {"op": "partner.save", "email": "quinn@partner.example", "name": "Quinn", "role": "qa"})
+    sent = []
+    old_j, old_scope = hours.j, org.request_scope
+    hours.j = lambda handler, payload, status=200, **_kw: sent.append((status, payload))
+    try:
+        for email, query, status in ((ADMIN, "period=2026-11", 200), (DEPT_ADMIN, "", 200), (CONSULTANT, "", 200),
+                                     ("quinn@partner.example", "", 200), (OWNER, "", 403), ("stranger@example.com", "", 403),
+                                     (ADMIN, "period=nonsense", 400)):
+            org.request_scope = lambda handler, email=email: V(email, env)
+            assert studio.handle_get(None, SimpleNamespace(path="/api/studio/hours", query=query)) is True
+            assert sent[-1][0] == status, (email, query)
+        assert sent[0][1]["departments"][0]["tier_name"] == "Pakket twee"
+    finally:
+        hours.j, org.request_scope = old_j, old_scope
