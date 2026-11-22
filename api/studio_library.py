@@ -68,6 +68,18 @@ def _write(name: str, data) -> None:
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
     os.replace(tmp, path)
+    if name == "backlog.json":
+        studio._changed()      # the backlog status is part of the central summary
+
+
+def _partner_sees(view, team: str) -> bool:
+    """A partner (consultant, developer, qa) reads everything that belongs to a team."""
+    return bool(team) and view.is_partner
+
+
+def _partner_edits(view, team: str) -> bool:
+    """A consultant or developer works on everything that belongs to a team; qa does not."""
+    return bool(team) and view.partner_edits
 
 
 def _txt(v, n=300) -> str:
@@ -89,13 +101,13 @@ def backlog_items() -> list[dict]:
 
 def _visible_item(view, item) -> bool:
     return view.email in (item.get("owner"), item.get("assignee")) or _sees_team(view, item.get("team") or "") or (
-        view.scope != org_structure.SCOPE_NONE and not item.get("team"))
+        view.scope != org_structure.SCOPE_NONE and not item.get("team")) or _partner_sees(view, item.get("team") or "")
 
 
 def backlog_for(view) -> list[dict]:
     items = backlog_items()
     planned = plan(items)
-    rows = [dict(i, editable=_editable_item(view, i), autopilot=_AUTOPILOT.get(i["id"]),
+    rows = [dict(i, editable=_editable_item(view, i), removable=_removable_item(view, i), autopilot=_AUTOPILOT.get(i["id"]),
                  assignee=i.get("assignee") or i.get("owner") or "", plan=planned.get(i["id"]), **_use_case_facts(i))
             for i in items if _visible_item(view, i)]
     return sorted(rows, key=lambda r: (STATUSES.index(r.get("status", "idea")) if r.get("status") in STATUSES else 9,
@@ -175,9 +187,10 @@ def plan(items: list[dict], today: date | None = None) -> dict[str, dict]:
 
 
 def known_people() -> set[str]:
-    """Everyone the structure knows: leads and members of every team."""
+    """Everyone the structure knows: leads and members of every team, and the current partners."""
     data = org_structure.load()
     people = {org_structure.norm_email(e) for e in (data.get("people") or {})}
+    people |= {p["email"] for p in org_structure.current_partners(data)}
     for team in (data.get("teams") or {}).values():
         if isinstance(team, dict):
             people |= {org_structure.norm_email(team.get("lead"))} | {org_structure.norm_email(m) for m in team.get("members") or []}
@@ -201,6 +214,13 @@ def _use_case_facts(item: dict) -> dict:
 
 
 def _editable_item(view, item) -> bool:
+    if _removable_item(view, item):
+        return True
+    return _partner_edits(view, item.get("team") or "")
+
+
+def _removable_item(view, item) -> bool:
+    """Who may delete an idea: the people who could change it before partners existed."""
     if view.email in (item.get("owner"), item.get("assignee")) or view.scope == org_structure.SCOPE_ALL:
         return True
     return bool(item.get("team")) and (view.edits_team(item["team"]) or item["team"] in view.lead_teams)
@@ -217,6 +237,8 @@ def save_item(view, body: dict) -> dict:
                 raise KeyError("Idea not found")
             if not _editable_item(view, item):
                 raise PermissionError("Only the owner, the team lead or an admin can change this idea")
+            if body.get("delete") and not _removable_item(view, item):
+                raise PermissionError("Only the owner, the team lead or an admin can remove this idea")
         else:
             item = {"id": "bl_" + secrets.token_hex(6), "owner": view.email, "created_at": time.time(),
                     "status": "idea", "rank": (max([i.get("rank", 0) for i in items] or [0]) + 1)}
@@ -317,6 +339,8 @@ def autopilot(view, item_id: str) -> dict:
     item = next((i for i in backlog_items() if i.get("id") == item_id), None)
     if item is None or not _visible_item(view, item):
         raise KeyError("Idea not found")
+    if view.is_partner and not _editable_item(view, item):
+        raise PermissionError("This account can only read in Studio")
     running = _AUTOPILOT.get(item_id)
     if running and not running.get("done"):
         return running
@@ -353,6 +377,8 @@ def _pb_load(pb_id: str) -> dict:
 def _pb_visible(view, pb: dict) -> bool:
     if pb.get("owner") == view.email or view.scope == org_structure.SCOPE_ALL:
         return True
+    if _partner_sees(view, pb.get("team") or ""):
+        return True
     if pb.get("status") != "published":
         return False
     vis = pb.get("visibility", "org")
@@ -361,9 +387,13 @@ def _pb_visible(view, pb: dict) -> bool:
     return vis == "team" and _sees_team(view, pb.get("team") or "")
 
 
-def _pb_editable(view, pb: dict) -> bool:
+def _pb_removable(view, pb: dict) -> bool:
     return pb.get("owner") == view.email or view.scope == org_structure.SCOPE_ALL or (
         bool(pb.get("team")) and view.edits_team(pb["team"]))
+
+
+def _pb_editable(view, pb: dict) -> bool:
+    return _pb_removable(view, pb) or _partner_edits(view, pb.get("team") or "")
 
 
 def playbooks_for(view) -> list[dict]:
@@ -1136,7 +1166,7 @@ def handle_get(handler, parsed) -> bool:
             pb = _pb_load((qs.get("id") or [""])[0])
             if not _pb_visible(view, pb):
                 raise KeyError("Playbook not found")
-            out = dict(pb, editable=_pb_editable(view, pb), stats=run_stats(pb))
+            out = dict(pb, editable=_pb_editable(view, pb), removable=_pb_removable(view, pb), stats=run_stats(pb))
             # Runs of other people stay private; the stats are enough.
             out["runs"] = [r for r in pb.get("runs") or [] if r.get("by") == view.email][-20:]
             j(handler, out)
@@ -1155,6 +1185,8 @@ def handle_post(handler, parsed, body) -> bool:
         return True
     try:
         path = parsed.path
+        if view.partner_read_only and not (path == "/api/studio/profile" and str(body.get("op") or "").startswith("me")):
+            raise PermissionError("This account can only read in Studio")
         if path == "/api/studio/backlog":
             j(handler, save_item(view, body))
         elif path == "/api/studio/backlog/order":
@@ -1163,7 +1195,8 @@ def handle_post(handler, parsed, body) -> bool:
         elif path == "/api/studio/autopilot":
             j(handler, autopilot(view, str(body.get("id") or "")))
         elif path == "/api/studio/playbook":
-            j(handler, dict(save_playbook(view, body), editable=True))
+            pb = save_playbook(view, body)
+            j(handler, dict(pb, editable=True, removable=_pb_removable(view, pb)))
         elif path == "/api/studio/prompts":
             j(handler, save_prompt(view, body))
         elif path == "/api/studio/profile":
@@ -1183,10 +1216,11 @@ def handle_post(handler, parsed, body) -> bool:
         elif path == "/api/studio/playbook/run":
             j(handler, record_run(view, body))
         elif path == "/api/studio/playbook/draft":
-            j(handler, dict(draft_from_use_case(view, str(body.get("use_case") or "")), editable=True))
+            pb = draft_from_use_case(view, str(body.get("use_case") or ""))
+            j(handler, dict(pb, editable=True, removable=_pb_removable(view, pb)))
         elif path == "/api/studio/playbook/delete":
             pb = _pb_load(str(body.get("id") or ""))
-            if not _pb_editable(view, pb):
+            if not _pb_removable(view, pb):
                 raise PermissionError("Only the author or an admin can delete this playbook")
             _pb_path(pb["id"]).unlink()
             j(handler, {"ok": True})

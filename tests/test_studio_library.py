@@ -398,3 +398,64 @@ def test_the_chat_intake_is_offered_once(env, monkeypatch):
     assert lib.intake_offer(lib.load_person(OWNER)) is False
     lib.save_person(eve, {"email": OTHER}, {"role": {"title": "Accountmanager"}})
     assert lib.load_person(OTHER)["onboarding"]["dismissed_at"]
+
+
+# ── Partners in the backlog and the playbooks (22 Nov 2026) ─────────────────
+
+CONSULTANT = "carla@partner.example"
+QA = "quinn@partner.example"
+
+
+def _partners(policy, *rows):
+    admin = org.scope_for(ADMIN, policy=policy)
+    for email, role in rows:
+        org.apply(admin, {"op": "partner.save", "email": email, "name": "P", "role": role})
+
+
+def test_partner_works_on_team_backlog_and_can_be_assignee(env):
+    _partners(env, (CONSULTANT, "consultant"), (QA, "qa"))
+    tom, carla, quinn = V(OWNER, env), V(CONSULTANT, env), V(QA, env)
+    a = lib.save_item(tom, {"title": "Aanmaningen", "team": "finance/debiteuren"})
+    lib.save_item(V(OTHER, env), {"title": "Leads", "team": "sales/inside"})
+    loose = lib.save_item(tom, {"title": "Los idee"})                       # no team: not for the partner
+    assert {i["title"] for i in lib.backlog_for(carla)} == {"Aanmaningen", "Leads"}
+    assert all(i["editable"] for i in lib.backlog_for(carla))
+    assert not any(i["removable"] for i in lib.backlog_for(carla))          # the screen offers no delete that would be refused
+    assert all(i["removable"] for i in lib.backlog_for(tom))
+    assert lib.save_item(carla, {"id": a["id"], "status": "chosen", "assignee": CONSULTANT})["assignee"] == CONSULTANT
+    with pytest.raises(PermissionError):
+        lib.save_item(carla, {"id": loose["id"], "status": "chosen"})
+    with pytest.raises(PermissionError):
+        lib.save_item(carla, {"id": lib.save_item(V(OTHER, env), {"title": "Weg", "team": "sales/inside"})["id"], "delete": True})
+    # A teamless idea the partner made is theirs.
+    own = lib.save_item(carla, {"title": "Eigen notitie"})
+    assert own["id"] in {i["id"] for i in lib.backlog_for(carla)}
+    # qa reads the same ideas and changes none.
+    assert {i["title"] for i in lib.backlog_for(quinn)} == {"Aanmaningen", "Leads", "Weg"}
+    assert not any(i["editable"] for i in lib.backlog_for(quinn))
+    with pytest.raises(PermissionError):
+        lib.save_item(quinn, {"id": a["id"], "status": "parked"})
+    with pytest.raises(PermissionError):
+        lib.autopilot(quinn, a["id"])
+    # Once the assignment is gone, so is the partner access. What is left is what any
+    # address has: the idea they are assignee of and the one they made themselves.
+    org.apply(org.scope_for(ADMIN, policy=env), {"op": "partner.remove", "email": CONSULTANT})
+    gone = V(CONSULTANT, env)
+    assert {i["title"] for i in lib.backlog_for(gone)} == {"Aanmaningen", "Eigen notitie"}
+    with pytest.raises(PermissionError):
+        lib.save_item(gone, {"id": lib.backlog_for(V(OTHER, env))[0]["id"], "status": "parked"})
+
+
+def test_partner_edits_team_playbooks_and_qa_only_reads(env):
+    _partners(env, (CONSULTANT, "consultant"), (QA, "qa"))
+    tom, carla, quinn = V(OWNER, env), V(CONSULTANT, env), V(QA, env)
+    draft = lib.save_playbook(tom, {"title": "Aanmaningen", "team": "finance/debiteuren"})      # still a draft
+    private = lib.save_playbook(tom, {"title": "Kladje"})
+    assert [p["id"] for p in lib.playbooks_for(carla)] == [draft["id"]]
+    assert lib.save_playbook(carla, {"id": draft["id"], "summary": "Aangevuld"})["summary"] == "Aangevuld"
+    with pytest.raises(PermissionError):
+        lib.save_playbook(carla, {"id": private["id"], "summary": "x"})
+    assert lib._pb_removable(carla, draft) is False
+    assert [p["id"] for p in lib.playbooks_for(quinn)] == [draft["id"]]
+    with pytest.raises(PermissionError):
+        lib.save_playbook(quinn, {"id": draft["id"], "summary": "x"})

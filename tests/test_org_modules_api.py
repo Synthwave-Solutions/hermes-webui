@@ -41,7 +41,7 @@ def test_local_status_not_policy_or_body(write_policy,caller,monkeypatch,env,act
     else:monkeypatch.setenv('SP_ENABLED_MODULES',env)
     modules.clear_cache()
     response=call(caller,ORG[0]);rows={r['id']:r for r in response.body['modules']}
-    assert len(rows)==10
+    assert len(rows)==11
     assert sum(r['status']=='included' for r in rows.values())==4
     assert rows['knowledge_base']['status']==('active' if active else 'available')
     assert response.body['requests_connected'] is False

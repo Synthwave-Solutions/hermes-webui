@@ -87,13 +87,13 @@
       <span class="bl-grip" aria-hidden="true">⋮⋮</span><span class="st-num">${i + 1}</span>
       <div class="om-row-main"><div class="om-row-title">${H(it.title)}</div>
         <div class="om-row-sub">${H(it.pain || it.why || '')}</div>
-        <div class="om-chips"><span class="om-chip">${H(BLOCK[it.building_block] || it.building_block)}</span><span class="om-chip">${H(w('impact'))} ${it.impact} · ${H(w('effort'))} ${it.effort}</span>${score >= 2 ? '<span class="om-chip bl-quick">Quick win</span>' : ''}${it.team ? `<span class="om-chip">${H(teamName(it.team) || it.team)}</span>` : ''}${it.assignee && it.assignee !== it.owner ? `<span class="om-chip">${H(w('does'))}: ${H(window.SPScope ? window.SPScope.personName(it.assignee) : it.assignee)}</span>` : ''}${it.saves_hours_week ? `<span class="om-chip rm-saves">${it.saves_hours_week} ${H(w('saves_week'))}</span>` : ''}${apHtml}</div></div>
+        <div class="om-chips"><span class="om-chip">${H(BLOCK[it.building_block] || it.building_block)}</span><span class="om-chip">${H(w('impact'))} ${it.impact} · ${H(w('effort'))} ${it.effort}</span>${score >= 2 ? '<span class="om-chip bl-quick">Quick win</span>' : ''}${it.team ? `<span class="om-chip">${H(teamName(it.team) || it.team)}</span>` : ''}${it.assignee && it.assignee !== it.owner ? `<span class="om-chip">${H(w('does'))}: ${H(window.SPScope ? window.SPScope.personName(it.assignee) : it.assignee)}</span>` : ''}${window.SPPartners ? window.SPPartners.badge(it.assignee || it.owner) : ''}${it.saves_hours_week ? `<span class="om-chip rm-saves">${it.saves_hours_week} ${H(w('saves_week'))}</span>` : ''}${apHtml}</div></div>
       <div class="om-row-actions">
         <span class="bl-secondary">
         ${it.editable ? `<select class="om-select" data-bl-status aria-label="Status">${STATUSES.map(s => `<option value="${s}" ${it.status === s ? 'selected' : ''}>${H(w('s_' + s))}</option>`).join('')}</select>
         <button type="button" class="sm-btn bl-arrow" data-bl-move="-1" ${i === 0 ? 'disabled' : ''} aria-label="${H(w('up'))}">↑</button><button type="button" class="sm-btn bl-arrow" data-bl-move="1" ${i === n - 1 ? 'disabled' : ''} aria-label="${H(w('down'))}">↓</button>` : ''}
         ${it.use_case ? '' : `<button type="button" class="sm-btn" data-bl-work>${H(w('work_out'))}</button>`}
-        ${it.editable ? `<button type="button" class="sm-btn bl-arrow" data-bl-remove aria-label="${H(w('remove'))}">✕</button>` : ''}
+        ${(it.removable ?? it.editable) ? `<button type="button" class="sm-btn bl-arrow" data-bl-remove aria-label="${H(w('remove'))}">✕</button>` : ''}
         </span>
         ${it.editable ? '' : `<span class="om-badge">${H(w('s_' + it.status))}</span>`}
         ${it.use_case ? `<button type="button" class="sm-btn" data-bl-open="${H(it.use_case)}">${H(w('open_uc'))}</button>` : ''}
@@ -205,7 +205,7 @@
     }
     L.body.innerHTML = `<div class="pb-toolbar"><button type="button" class="sm-btn" data-pb-back>← ${H(w('back'))}</button>
         <span class="om-badge ${pb.status === 'published' ? 'ok' : ''}">${H(w(pb.status === 'published' ? 'published' : 'draft'))}</span>
-        ${statsLine(pb)}<span style="margin-left:auto"></span><button type="button" class="sm-btn" data-pb-run>▶ ${H(w('run'))}</button><button type="button" class="sm-btn danger" data-pb-delete>${H(w('delete_pb'))}</button>
+        ${statsLine(pb)}<span style="margin-left:auto"></span><button type="button" class="sm-btn" data-pb-run>▶ ${H(w('run'))}</button>${pb.removable === false ? '' : `<button type="button" class="sm-btn danger" data-pb-delete>${H(w('delete_pb'))}</button>`}
         <button type="button" class="sm-btn" data-pb-publish>${H(w(pb.status === 'published' ? 'unpublish' : 'publish'))}</button><button type="button" class="sm-btn primary" data-pb-save>${H(w('save'))}</button></div>
       <div class="om-value-form pb-meta">
         <label class="om-field wide">${H(w('title'))}<input data-pb-f="title" value="${H(pb.title)}"></label>

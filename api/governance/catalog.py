@@ -66,7 +66,7 @@ _SELF_ROUTES: frozenset[str] = frozenset({
     "/api/client-errors",
     "/api/apps",
     "/api/bot-screen", "/api/bot-screen/ws", "/api/bot-screen/status",
-    "/api/msp/invoice", "/api/msp/order", "/api/msp/job-cost", "/api/msp/package", "/api/msp/overview", "/api/msp/tickets", "/api/msp/ticket", "/api/msp/comment",
+    "/api/msp/invoice", "/api/msp/invoices", "/api/msp/order", "/api/msp/job-cost", "/api/msp/package", "/api/msp/overview", "/api/msp/tickets", "/api/msp/ticket", "/api/msp/comment",
     "/api/msp/app-state", "/api/msp/app-request", "/api/msp/app-intake", "/api/msp/app-support",
     # Team structure, organisation chart and Management (8 Nov 2026): every
     # handler decides from org_structure.request_scope itself.
@@ -77,6 +77,16 @@ _SELF_ROUTES: frozenset[str] = frozenset({
     "/api/studio/backlog", "/api/studio/backlog/order", "/api/studio/autopilot", "/api/studio/playbooks",
     "/api/studio/playbook", "/api/studio/playbook/delete", "/api/studio/playbook/draft", "/api/studio/playbook/run", "/api/studio/media",
     "/api/studio/prompts", "/api/studio/profile",
+    # Progress per use case (22 Nov 2026): the handler admits organisation
+    # admins, department admins for their teams and assigned partners.
+    "/api/studio/summary",
+    # The quickscan roadmap and its link picker: read for everybody with a
+    # place in the structure, edits for organisation admins and assigned
+    # consultants or developers; decided in api/studio_roadmap.py.
+    "/api/studio/roadmap", "/api/studio/roadmap/options",
+    # Hours of the month from the central Cloud, read only: organisation
+    # admins, department admins and assigned partners (api/studio_hours.py).
+    "/api/studio/hours",
     "/api/org/modules",
     "/api/org/modules/request",
     "/api/org/overview",

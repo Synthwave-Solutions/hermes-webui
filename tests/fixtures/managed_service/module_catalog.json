@@ -713,6 +713,92 @@
       }
     },
     {
+      "id": "whatsapp_channel",
+      "tier": "advanced",
+      "lifecycle": "pilot",
+      "confirmed": false,
+      "name": {
+        "nl": "WhatsApp per afdeling",
+        "en": "WhatsApp per department"
+      },
+      "summary": {
+        "nl": "Collega's appen één zakelijk nummer van hun afdeling en werken daar met hun eigen rechten met de AI-assistent.",
+        "en": "Colleagues message one business number of their department and work with the AI assistant there under their own rights."
+      },
+      "components": {
+        "core_container": false,
+        "profiles": [
+          {
+            "name": "whatsapp_bridge"
+          }
+        ],
+        "toggles": [],
+        "tool_servers": [],
+        "desktop_app": null,
+        "notes": "profile whatsapp_bridge (the bridge at a pinned commit plus the guard); public HTTPS host wa.<domain> for the webhook only; pairing page and settings under the WebUI route; needs a WaAPI instance per business number"
+      },
+      "requires": [
+        "workspace"
+      ],
+      "conflicts": [],
+      "architectures": [
+        "amd64",
+        "arm64"
+      ],
+      "placement": {
+        "default": "core",
+        "allowed": [
+          "core"
+        ]
+      },
+      "ram_budget_mb": 256,
+      "measured": false,
+      "model_usage": {
+        "level": "medium",
+        "consumers": "assistant turns started from WhatsApp messages"
+      },
+      "backup": [
+        {
+          "kind": "volume_tar",
+          "service": "whatsapp-bridge",
+          "volume": "whatsapp-bridge-data",
+          "what": "bridge settings, the WaAPI key, the audit trail and replay state"
+        },
+        {
+          "kind": "volume_tar",
+          "service": "whatsapp-bridge",
+          "volume": "whatsapp-bridge-links",
+          "what": "verified links between private numbers and accounts"
+        }
+      ],
+      "backup_notes": "both volumes belong to the bridge container only; the audit trail is pruned after the retention period",
+      "probes": [
+        {
+          "service": "whatsapp-bridge",
+          "check": "compose_healthcheck",
+          "profile": "whatsapp_bridge"
+        }
+      ],
+      "app_link": null,
+      "licence": "Synthwave bridge and guard; WaAPI is a separate paid subscription per WhatsApp number and connects the number as a linked device, not through the WhatsApp Business Platform",
+      "dpa": "Private phone numbers of linked people (stored normalised, shown masked), message content in transit to the assistant, an audit trail of links and refused messages; WaAPI and WhatsApp (Meta) as sub-processors",
+      "hosting": {
+        "client_cloud": {
+          "public_host": "wa",
+          "note": "needs a public IP or the client's gateway for wa.<domain>"
+        },
+        "synthwave_eu_cloud": {
+          "public_host": "wa",
+          "note": "wa.<domain> on Synthwave's ingress"
+        },
+        "on_premise": {
+          "public_host": "wa",
+          "client_published": true,
+          "note": "only when the client publishes wa.<domain> (or a Funnel path) to the internet"
+        }
+      }
+    },
+    {
       "id": "dictation",
       "tier": "advanced",
       "lifecycle": "pilot",

@@ -111,3 +111,57 @@ def test_cloud_login_refuses_another_origin_before_exchange(monkeypatch):
     handler=SimpleNamespace(headers={'Host':'work.example','Origin':'https://evil.example','X-SynthPulse-Login':'1'})
     assert cloud_login.redeem(handler,{'code':'b'*64})
     assert handler.status==403
+
+
+LEDGER={'title':'Betalingen en facturatie','currency':'EUR','invoices_complete':False,'notice':'Nog niet elke betaling heeft hier een factuur.',
+        'invoices':[{'id':'br_example1','number':'F-2026-0012','date':'2026-11-03T09:00:00+00:00','period':'2026','status':'paid',
+                     'description':'Jaarsupport','lines':[{'kind':'annual_support','description':'Jaarsupport','department':None,'quantity':1,
+                                                         'amount_ex_vat_cents':120000,'internal_note':'x'}],
+                     'amount_ex_vat_cents':120000,'vat_cents':25200,'total_cents':145200,'vat_rate_bp':2100,'reverse_charge':False,
+                     'payment_method':'mollie','pdf_available':True,'customer_email':'owner@acme.example'},
+                    {'id':'other_format','number':'F-2026-0013','status':'open','lines':[],'total_cents':1000,'pdf_available':True}],
+        'payments':[{'id':'tr_1','order_id':'sp_secret','date':'2026-11-01T08:00:00+00:00','period':'2026-11','service_from':'2026-11-01',
+                     'service_until':'2026-12-01','kind':'subscription','description':'Pakket twee','department_id':'dep_1',
+                     'department_name':'Finance','lines':[{'kind':'package','description':'Afdelingsabonnement','department':'Finance',
+                                                          'quantity':1,'amount_ex_vat_cents':500000}],
+                     'amount_ex_vat_cents':500000,'vat_cents':105000,'total_cents':605000,'status':'paid','under_review':False,
+                     'payment_method':'directdebit','provider':'mollie','invoice_id':None,'pdf_available':False}]}
+
+
+def test_payments_and_invoices_for_organisation_admins_only(write_policy,caller,monkeypatch):
+    from api import msp_service, org_structure
+    scope={'value':org_structure.SCOPE_ALL,'partner':None}
+    monkeypatch.setattr(org_structure,'request_scope',lambda handler:SimpleNamespace(scope=scope['value'],is_partner=bool(scope['partner'])))
+    calls=[]
+    monkeypatch.setattr(control_plane_client,'call',lambda *a,**k:(calls.append((a,k)) or (200,LEDGER)))
+    caller.email=PLATFORM[0]
+    h=_Handler();assert msp_service.handle_get(h,SimpleNamespace(path='/api/msp/invoices',query=''))
+    assert h.status==200 and calls[0][0]==('GET','/v1/customer/invoices') and calls[0][1]['acting']['user']==PLATFORM[0]
+    got=msp_service.clean_ledger(LEDGER)
+    assert got['title']=='Betalingen en facturatie' and got['invoices_complete'] is False and got['notice'].startswith('Nog niet')
+    first=got['invoices'][0]
+    assert first['number']=='F-2026-0012' and first['status']=='paid' and first['pdf_available'] is True
+    assert first['totals']=={'amount_ex_vat_cents':120000,'vat_cents':25200,'total_cents':145200}
+    assert first['lines']==[{'kind':'annual_support','description':'Jaarsupport','department':None,'quantity':1,'amount_ex_vat_cents':120000}]
+    assert got['invoices'][1]['pdf_available'] is False            # no document without an id the download route accepts
+    payment=got['payments'][0]
+    assert payment['department_name']=='Finance' and payment['service_until']=='2026-12-01' and payment['totals']['total_cents']==605000
+    import json
+    for leak in ('sp_secret','internal_note','customer_email','order_id','department_id'):
+        assert leak not in json.dumps(got), leak
+    # A normal user, a department admin and a partner never reach the control plane for this.
+    for value,partner in (('teams',None),('departments',None),('none',None),(org_structure.SCOPE_ALL,'consultant')):
+        scope.update(value=value,partner=partner)
+        h=_Handler();msp_service.handle_get(h,SimpleNamespace(path='/api/msp/invoices',query=''))
+        assert h.status==403, (value,partner)
+    assert len(calls)==1
+    scope.update(value=org_structure.SCOPE_ALL,partner=None)
+    for who in (None,'stranger@elsewhere.example'):
+        caller.email=who;h=_Handler();msp_service.handle_get(h,SimpleNamespace(path='/api/msp/invoices',query=''))
+        assert h.status==403
+    assert len(calls)==1
+    # What the control plane refuses stays refused.
+    caller.email=PLATFORM[0]
+    monkeypatch.setattr(control_plane_client,'call',lambda *a,**k:(403,{'error':{'code':'forbidden','message':'no'}}))
+    h=_Handler();msp_service.handle_get(h,SimpleNamespace(path='/api/msp/invoices',query=''))
+    assert h.status==403

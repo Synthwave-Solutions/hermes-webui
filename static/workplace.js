@@ -30,7 +30,16 @@
     empty_scope: 'In deze weergave staat nog niets. Kies een andere weergave of maak een use case.',
     empty_peek: 'Bekijk {l}', kpi_hint: '{k} openen',
     loading: 'Laden…', failed: 'Laden is niet gelukt. Probeer het opnieuw.', retry: 'Opnieuw', people: 'Mensen', nothing: 'Nog niets',
-    p_discover: 'Ontdekken', p_design: 'Inrichten', p_playbook: 'Bouwplan', p_build: 'Bouwen', p_measure: 'Meten'
+    p_discover: 'Ontdekken', p_design: 'Inrichten', p_playbook: 'Bouwplan', p_build: 'Bouwen', p_measure: 'Meten',
+    role_consultant: 'Agentic Consultant', role_developer: 'Agentic Developer', role_reader: 'leest mee',
+    role_consultant_does: 'brengt de processen in kaart, kiest en prioriteert de use cases, traint en draagt over.', role_developer_does: 'bouwt en onderhoudt de automations in dit platform.',
+    partner_team: 'Team van Synthwave', partner_team_sub: 'Zij werken met jullie aan de use cases in deze omgeving.',
+    hrs_title: 'Uren deze maand', hrs_package: 'Pakket', hrs_allocated: 'Maanduren', hrs_used: 'Verbruikt', hrs_left: 'Resterend', hrs_unknown: 'Nog niet bekend',
+    hrs_basis: 'Basis {a} uur, extra blokken {b} uur', hrs_from_card: 'Uit strippenkaart gebruikt: {h} uur', hrs_uncovered: '{h} uur valt buiten de maanduren en de strippenkaarten.',
+    hrs_closed: 'Maand afgesloten', hrs_cards: 'Strippenkaarten', hrs_card: '{l}: {r} van {p} uur over', hrs_card_until: 'geldig tot {d}', hrs_card_expired: 'verlopen op {d}', hrs_card_used: 'opgebruikt', hrs_card_voided: 'vervallen',
+    hrs_as_of: 'Bijgewerkt tot', hrs_team: 'Team van Synthwave', hrs_week: 'uur per week', hrs_role: 'Rol', hrs_h: 'uur',
+    hrs_off: 'De uren zijn in deze omgeving nog niet gekoppeld aan de Cloud.', hrs_down: 'De uren zijn nu niet op te halen. Probeer het later opnieuw.',
+    hrs_none: 'Voor deze maand zijn nog geen uren toegewezen.', hrs_until: 'loopt tot', hrs_change: 'Wijziging van pakket gepland'
   };
   const EN = {
     findings:'Findings for you', findings_empty:'When a bot finds something for you, its update appears here.',
@@ -51,7 +60,16 @@
     empty_scope: 'Nothing in this view yet. Choose another view or create a use case.',
     empty_peek: 'View {l}', kpi_hint: 'Open {k}',
     loading: 'Loading…', failed: 'Loading failed. Try again.', retry: 'Retry', people: 'People', nothing: 'Nothing yet',
-    p_discover: 'Discover', p_design: 'Design', p_playbook: 'Build plan', p_build: 'Build', p_measure: 'Measure'
+    p_discover: 'Discover', p_design: 'Design', p_playbook: 'Build plan', p_build: 'Build', p_measure: 'Measure',
+    role_consultant: 'Agentic Consultant', role_developer: 'Agentic Developer', role_reader: 'read only',
+    role_consultant_does: 'maps the processes, chooses and prioritises the use cases, trains and hands over.', role_developer_does: 'builds and maintains the automations in this platform.',
+    partner_team: 'Synthwave team', partner_team_sub: 'They work with you on the use cases in this environment.',
+    hrs_title: 'Hours this month', hrs_package: 'Package', hrs_allocated: 'Monthly hours', hrs_used: 'Used', hrs_left: 'Remaining', hrs_unknown: 'Not known yet',
+    hrs_basis: 'Base {a} hours, extra blocks {b} hours', hrs_from_card: 'Used from hour card: {h} hours', hrs_uncovered: '{h} hours fall outside the monthly hours and the hour cards.',
+    hrs_closed: 'Month closed', hrs_cards: 'Hour cards', hrs_card: '{l}: {r} of {p} hours left', hrs_card_until: 'valid until {d}', hrs_card_expired: 'expired on {d}', hrs_card_used: 'used up', hrs_card_voided: 'withdrawn',
+    hrs_as_of: 'Updated until', hrs_team: 'Synthwave team', hrs_week: 'hours per week', hrs_role: 'Role', hrs_h: 'hours',
+    hrs_off: 'The hours are not linked to the Cloud in this environment yet.', hrs_down: 'The hours cannot be fetched right now. Try again later.',
+    hrs_none: 'No hours have been allocated for this month yet.', hrs_until: 'runs until', hrs_change: 'Package change planned'
   };
   const lang = () => ((document.documentElement.lang || 'nl').toLowerCase().startsWith('en') ? 'en' : 'nl');
   const w = (k, v) => { let s = (lang() === 'en' ? EN : NL)[k] || NL[k] || k; if (v) for (const [a, b] of Object.entries(v)) s = s.replace('{' + a + '}', b); return s; };
@@ -70,7 +88,8 @@
   function buildCtx(me, pr, chart){
       const c = { email: norm(me.email), scope: me.scope || 'none', canView: !!me.can_view, canManage: !!me.can_manage,
                   leadTeams: new Set(me.lead_teams || []), memberTeams: new Set(me.member_teams || []), adminDepts: new Set(me.departments || []),
-                  teams: new Map(), depts: new Map(), people: new Map(), jobTeam: new Map(), promptRows: pr ? (pr.prompts || []) : [], chart };
+                  teams: new Map(), depts: new Map(), people: new Map(), jobTeam: new Map(), promptRows: pr ? (pr.prompts || []) : [], chart,
+                  partner: me.partner && me.partner.role ? me.partner : null };
       c.myTeams = new Set([...c.leadTeams, ...c.memberTeams]);
       for (const d of (pr && pr.departments) || []) c.depts.set(d.key, { key: d.key, name: d.name || d.key });
       for (const t of (pr && pr.teams) || []) c.teams.set(t.key, { key: t.key, name: t.name || t.key, department: t.department || t.key.split('/')[0], lead: '', members: [] });
@@ -103,6 +122,8 @@
   function teamName(c, key){ return (c.teams.get(key) || {}).name || (key ? String(key).split('/').pop() : w('no_team')); }
   function deptName(c, key){ return (c.depts.get(key) || {}).name || key || w('no_dept'); }
   function personName(email){
+    const partner = Partners.get(email);
+    if (partner && partner.name) return partner.name;
     const local = String(email || '').replace(/@.*/, '');
     return local.split(/[._-]+/).filter(Boolean).map(p => p[0].toUpperCase() + p.slice(1)).join(' ') || w('no_owner');
   }
@@ -119,6 +140,7 @@
   }
   function roles(c){
     const out = [];
+    if (c.partner) out.push({ label: Partners.label(c.partner.role), cls: 'partner' });
     if (c.scope === 'all') out.push({ label: w('r_admin'), cls: 'admin' });
     else if (c.scope === 'departments') out.push({ label: w('r_dept') + ' ' + [...c.adminDepts].map(k => deptName(c, k)).join(', '), cls: 'admin' });
     if (c.leadTeams.size) out.push({ label: w('r_lead') + ' ' + [...c.leadTeams].map(k => teamName(c, k)).join(', '), cls: 'lead' });
@@ -170,12 +192,76 @@
     store.set('sp-lens-' + surface, b.dataset.spLens);
     document.dispatchEvent(new CustomEvent('sp-lens-change', { detail: { surface, lens: b.dataset.spLens } }));
   });
+  // ── Partners: the supplier's staff assigned to this installation ───────────
+  // One small shared store. Studio, the backlog and the organisation screens fill it from
+  // what the server already sends them and read the badge and the team block from here.
+  const Partners = {
+    rows: [],
+    set(list){ if (Array.isArray(list)) Partners.rows = list.filter(p => p && p.email).map(p => ({ email: norm(p.email), name: p.name || '', role: p.role || '', org: p.org || 'synthwave' })); },
+    list(){ return Partners.rows.slice(); },
+    get(email){ const e = norm(email); return e ? Partners.rows.find(p => p.email === e) || null : null; },
+    // The Cloud assigns consultants and developers. An older stored assignment with another role only reads.
+    // The one place where a role id becomes a name: `consultant` is the Agentic Consultant, `developer` the
+    // Agentic Developer (role_* above, Dutch and English). Ids and API fields keep their own names.
+    short(role){ return ['consultant', 'developer'].includes(role) ? w('role_' + role) : role === 'qa' ? w('role_reader') : ''; },
+    label(role){ const name = Partners.short(role); return name ? 'Synthwave ' + name : ''; },
+    // Who can be named on a use case or take an idea: the people who work along.
+    workers(){ return Partners.rows.filter(p => ['consultant', 'developer'].includes(p.role)); },
+    name(p){ return p.name || String(p.email).replace(/@.*/, '').split(/[._-]+/).filter(Boolean).map(x => x[0].toUpperCase() + x.slice(1)).join(' '); },
+    // Badge for a person (by address) or for a role name. Empty when it is not a partner.
+    badge(who){
+      const role = ['consultant', 'developer', 'qa'].includes(who) ? who : (Partners.get(who) || {}).role;
+      return role ? `<span class="om-badge sp-partner">${H(Partners.label(role))}</span>` : '';
+    },
+    // "Team van Synthwave": who is assigned. `compact` is the sidebar form.
+    teamHtml(compact){
+      if (!Partners.rows.length) return '';
+      const rows = Partners.rows.map(p => `<div class="sp-partner-row"><span class="om-face ${compact ? 'st-face-xs' : ''}" style="--h:${hue(p.email)}" aria-hidden="true">${H(initials(Partners.name(p)))}</span><span class="sp-partner-name">${H(Partners.name(p))}</span>${compact ? `<span class="sp-partner-role">${H(Partners.short(p.role))}</span>` : Partners.badge(p.role)}</div>`).join('');
+      return compact ? `<div class="om-side-label">${H(w('partner_team'))}</div><div class="sp-partner-list compact">${rows}</div>`
+        : `<section class="wp-card sp-partners" aria-label="${H(w('partner_team'))}"><div class="wp-card-head"><h3>${H(w('partner_team'))}</h3><span class="om-muted om-small">${H(w('partner_team_sub'))}</span></div><div class="sp-partner-list">${rows}</div><ul class="sp-partner-roles">${['consultant', 'developer'].filter(r => Partners.rows.some(p => p.role === r)).map(r => `<li><strong>${H(Partners.short(r))}:</strong> ${H(w('role_' + r + '_does'))}</li>`).join('')}</ul></section>`;
+    }
+  };
+  window.SPPartners = Partners;
+
   window.SPScope = { load: loadCtx, lenses, lensLabel, match, getLens, barHtml, groupByTeam, teamName, deptName, deptKey, personName, primaryTeam, roles,
     face: (c, email, cls) => faceHtml(c, email, cls) };
 
   function faceHtml(c, email, cls){
     const p = (c && c.people.get(norm(email))) || {};
     return `<span class="om-face ${cls || ''}" style="--h:${hue(email)}" title="${H(personName(email))}">${p.avatar_url ? `<img src="${H(p.avatar_url)}" alt="" loading="lazy">` : H(initials(email))}</span>`;
+  }
+
+  // ── Hours of the month (organisation admins, department admins, partners) ──
+  function hoursHtml(d){
+    if (!d) return '';
+    const loc = lang() === 'en' ? 'en-GB' : 'nl-NL';
+    // Tenths of an hour, rounded the same way above and below zero so used and remaining add up.
+    const hm = m => (m == null ? null : (Math.sign(m) * Math.round(Math.abs(m) / 6) / 10).toLocaleString(loc, { maximumFractionDigits: 1 }));
+    const cell = m => (m == null ? `<span class="om-muted">${H(w('hrs_unknown'))}</span>` : `<span class="${m < 0 ? 'sp-hours-over' : ''}">${H(hm(m))} ${H(w('hrs_h'))}</span>`);
+    const date = v => { const d = typeof v === 'number' ? new Date(v * 1000) : new Date(String(v).slice(0, 10) + 'T00:00:00Z'); return isNaN(d) ? String(v).slice(0, 10) : d.toLocaleDateString(loc, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }); };
+    const roleName = r => Partners.short(r.role || r.resource) || r.label || '';
+    const shell = body => `<section class="wp-card sp-hours" data-tour="studio-hours" aria-label="${H(w('hrs_title'))}"><div class="wp-card-head"><h3>${H(w('hrs_title'))}</h3>${d.usage_as_of ? `<span class="om-muted om-small">${H(w('hrs_as_of'))} ${H(new Date(d.usage_as_of * 1000).toLocaleDateString(loc, { day: 'numeric', month: 'long' }))}</span>` : ''}</div>${body}</section>`;
+    if (!d.configured) return shell(`<p class="sp-hours-empty">${H(w('hrs_off'))}</p>`);
+    if (!d.available) return shell(`<p class="sp-hours-empty">${H(w('hrs_down'))}</p>`);
+    const depts = (d.departments || []).filter(x => (x.roles || []).length || (x.team || []).length || (x.cards || []).length);
+    if (!depts.length) return shell(`<p class="sp-hours-empty">${H(w('hrs_none'))}</p>`);
+    // Under a role: how the month is built up, what came from an hour card, and what nothing covers.
+    const notes = r => {
+      const out = [];
+      if (r.increment_minutes > 0) out.push(H(w('hrs_basis', { a: hm(r.base_minutes), b: hm(r.increment_minutes) })));
+      if (r.card_minutes_used > 0) out.push(H(w('hrs_from_card', { h: hm(r.card_minutes_used) })));
+      if (r.uncovered_minutes > 0) out.push(`<span data-sp-hours-uncovered>${H(w('hrs_uncovered', { h: hm(r.uncovered_minutes) }))}</span>`);
+      return out.length ? `<tr class="sp-hours-note"><td colspan="4">${out.join(' · ')}</td></tr>` : '';
+    };
+    const cardLine = k => {
+      const state = k.status === 'voided' ? w('hrs_card_voided') : k.status === 'used' ? w('hrs_card_used') : k.expires_at ? w(k.status === 'expired' ? 'hrs_card_expired' : 'hrs_card_until', { d: date(k.expires_at) }) : '';
+      return `<span class="om-chip sp-hours-card ${k.status && k.status !== 'active' ? 'done' : ''}">${H(w('hrs_card', { l: roleName(k), r: hm(k.remaining_minutes), p: hm(k.purchased_minutes) }))}${state ? ' · ' + H(state) : ''}</span>`;
+    };
+    return shell(depts.map(x => `<div class="sp-hours-dept">
+        <div class="sp-hours-head"><strong>${H(x.name || '')}</strong>${x.tier_name || x.tier ? `<span class="om-badge">${H(w('hrs_package'))}: ${H(x.tier_name || x.tier)}</span>` : ''}${x.term_ends_at ? `<span class="om-muted om-small">${H(w('hrs_until'))} ${H(date(x.term_ends_at))}</span>` : ''}${x.planned_tier_change ? `<span class="om-badge warn">${H(w('hrs_change'))}</span>` : ''}</div>
+        ${(x.roles || []).length ? `<div class="om-table-wrap sp-hours-table"><table class="om-table"><thead><tr><th>${H(w('hrs_role'))}</th><th class="num">${H(w('hrs_allocated'))}</th><th class="num">${H(w('hrs_used'))}</th><th class="num">${H(w('hrs_left'))}</th></tr></thead><tbody>${x.roles.map(r => `<tr><td><strong>${H(roleName(r))}</strong>${r.closed ? ` <span class="om-badge sp-hours-closed">${H(w('hrs_closed'))}</span>` : ''}</td><td class="num">${cell(r.allocated_minutes)}</td><td class="num">${cell(r.used_minutes)}</td><td class="num">${cell(r.remaining_minutes)}</td></tr>${notes(r)}${(r.people || []).map(p => `<tr class="sp-hours-person"><td>${H(p.name)}</td><td></td><td class="num">${cell(p.used_minutes)}</td><td></td></tr>`).join('')}`).join('')}</tbody></table></div>` : ''}
+        ${(x.cards || []).length ? `<div class="sp-hours-team sp-hours-cards"><span class="om-muted om-small">${H(w('hrs_cards'))}</span>${x.cards.map(cardLine).join('')}</div>` : ''}
+        ${(x.team || []).length ? `<div class="sp-hours-team"><span class="om-muted om-small">${H(w('hrs_team'))}</span>${x.team.map(t => `<span class="om-chip">${H(t.name)}${t.label || t.role ? ' · ' + H(Partners.short(t.role) || t.label) : ''}${t.hours_per_week != null ? ' · ' + H(Number(t.hours_per_week).toLocaleString(loc, { maximumFractionDigits: 1 })) + ' ' + H(w('hrs_week')) : ''}</span>`).join('')}</div>` : ''}</div>`).join(''));
   }
 
   // ── Workplace: the items ───────────────────────────────────────────────────
@@ -532,6 +618,7 @@
       <div data-sp-today></div>
       ${findingsSection()}
       <div data-wp-setup>${Wp.setup}</div>
+      ${Partners.teamHtml(false)}${hoursHtml(Wp.hours)}
       <div class="wp-bar">${barHtml(c, 'home', Wp.data, lens)}${groupSeg}</div>
       <div class="wp-kpis">${KINDS.filter(k => k === 'task' ? allowed('tasks') : k !== 'bot' || allowed('profiles')).map(k => `<button type="button" class="wp-kpi ${n[k] || pending.has(k) ? '' : 'zero'}" title="${H(w('kpi_hint', { k: w('k_' + k) }))}" data-wp-go="${k}"${k === 'usecase' ? ' data-tour="studio-usecases"' : ''}><span class="wp-kpi-label"><span class="wp-kind-dot k-${k}" aria-hidden="true"></span>${H(short(k))}</span><span class="wp-kpi-value"${pending.has(k) ? ` aria-busy="true" aria-label="${H(w('loading'))}">…` : `>${n[k]}`}</span></button>`).join('')}</div>
       ${shortcuts()}
@@ -558,7 +645,7 @@
       const c = cur();
       if (token !== Wp.token || !c || !Wp.raw.quick) return;
       const items = buildItems(c);
-      const sig = JSON.stringify(items) + '|' + [...pendingKinds()].join() + '|' + c.people.size + '|' + [...c.teams.values()].map(t => t.members.length).join();
+      const sig = JSON.stringify(items) + '|' + [...pendingKinds()].join() + '|' + c.people.size + '|' + [...c.teams.values()].map(t => t.members.length).join() + '|' + Partners.rows.map(p => p.email + p.role).join() + '|' + JSON.stringify(Wp.hours || null);
       if (Wp.data && sig === Wp.sig && body.querySelector('.wp-kpis')) return;
       Wp.data = items; Wp.sig = sig;
       paint();
@@ -566,11 +653,13 @@
     try {
       const full = loadCtx(Date.now() - Wp.at > 30000);
       if (!ctxCache && ctxEarly) void ctxEarly.then(c => { Wp.early = c; step(); });
+      // Hours of the month: only asked for the people the server shows them to.
+      void (ctxEarly || full).then(c => (c && (c.canManage || c.partner) ? call('/api/studio/hours').catch(() => null) : null)).then(h => { if (token === Wp.token) { Wp.hours = h; step(); } }).catch(() => {});
       await Promise.all([
         full.then(step),
         Promise.all([call('/api/studio/usecases').catch(() => null), call('/api/studio/backlog').catch(() => null), call('/api/studio/playbooks').catch(() => null),
                      call('/api/studio/profile?who=me').catch(() => null)])
-          .then(([uc, bl, pb, me]) => { Object.assign(Wp.raw, { uc, bl, pb, quick: true }); Wp.intake = me; step(); }),
+          .then(([uc, bl, pb, me]) => { Object.assign(Wp.raw, { uc, bl, pb, quick: true }); Wp.intake = me; if (uc) Partners.set(uc.partners); step(); }),
         call('/api/crons?all_profiles=1').catch(() => null).then(cr => { Wp.raw.cr = cr; Wp.runsReadable = Array.isArray(cr?.jobs); step(); }),
         // The fast list skips the alias scan and the skill counts, which this page never shows.
         call('/api/profiles?fast=1&counts=0').catch(() => null).then(pf => { Wp.raw.pf = pf; step(); })]);

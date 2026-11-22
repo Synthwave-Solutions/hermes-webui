@@ -548,6 +548,11 @@ TOOLSET_RISKS = {
         "data": "Whatever the scheduled work is set up to touch.",
         "risks": (RISK_SCHEDULING, RISK_FILE_WRITE),
     },
+    "synthpulse_cloud": {
+        "capability": "See and change the AI model routes of this Cloud environment from chat: test, switch on or off, place in the route, set the monthly limit.",
+        "data": "The route, the connections and the limits of the environment. Never a provider key: that is typed on the secure account page.",
+        "risks": (RISK_FINANCIAL,),
+    },
     "delegation": {
         "capability": "Hand parts of a task to other assistants that run on their own.",
         "data": "Whatever those assistants reach in turn.",

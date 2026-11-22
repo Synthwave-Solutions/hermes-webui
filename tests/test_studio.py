@@ -155,3 +155,92 @@ def test_reuse_needs_a_real_fit():
     assert studio._reuse_score(words, "concept offertes maken huisstijl") > 0
     assert studio._reuse_score(studio._stems("debiteurenlijst maandag"), "Debiteurenlijst") > 0
     assert studio._reuse_score(studio._stems("Agent maakt lijst en concept-mails"), "manage agent") == 0
+
+
+# ── Partners: the supplier's consultant, developer and qa (22 Nov 2026) ─────
+
+CONSULTANT = "carla@partner.example"
+DEVELOPER = "dev@partner.example"
+QA = "quinn@partner.example"
+
+
+def _assign(policy, *rows):
+    admin = org.scope_for(ADMIN, policy=policy)
+    for email, role, extra in rows:
+        org.apply(admin, dict({"op": "partner.save", "email": email, "name": email.split("@")[0].title(), "role": role}, **extra))
+
+
+def test_partner_sees_and_edits_team_use_cases_but_not_private_ones(env):
+    _assign(env, (CONSULTANT, "consultant", {}), (DEVELOPER, "developer", {}))
+    owner = _view(OWNER, env)
+    team_doc = studio.update(owner, {"team": "finance/debiteuren", "title": "Aanmaningen"})
+    private = studio.update(owner, {"title": "Alleen van Tom"})          # no team
+    for email in (CONSULTANT, DEVELOPER):
+        partner = _view(email, env)
+        assert partner.scope == org.SCOPE_NONE and partner.partner_role in ("consultant", "developer")
+        assert [r["id"] for r in studio.list_for(partner)] == [team_doc["id"]]
+        assert studio._visible(partner, private) is False
+        with pytest.raises(PermissionError):
+            studio.update(partner, {"id": private["id"], "title": "x"})
+    carla = _view(CONSULTANT, env)
+    assert studio.update(carla, {"id": team_doc["id"], "title": "Aanmaningen v2"})["title"] == "Aanmaningen v2"
+    # A partner runs the Studio steps on a customer's use case; the owner stays the owner.
+    doc = studio.run_step(carla, {"id": team_doc["id"], "step": "discover", "input": "Ik bel elke week facturen na"})
+    assert doc["owner"] == OWNER and [o["id"] for o in doc["opportunities"]] == ["o1", "o2"]
+    # Their own use case without a team is theirs alone.
+    own = studio.update(carla, {"title": "Voorbereiding"})
+    assert {r["id"] for r in studio.list_for(carla)} == {team_doc["id"], own["id"]}
+    assert studio._visible(_view(DEVELOPER, env), own) is False
+    # Deleting a customer's use case stays with the owner and the organisation admin.
+    assert studio._deletable(carla, team_doc) is False and studio._deletable(carla, own) is True
+
+
+def test_qa_partner_reads_only(env):
+    _assign(env, (QA, "qa", {}))
+    doc = studio.update(_view(OWNER, env), {"team": "finance/debiteuren", "title": "Aanmaningen"})
+    qa = _view(QA, env)
+    assert qa.partner_role == "qa" and qa.partner_edits is False and qa.partner_read_only is True
+    assert [r["id"] for r in studio.list_for(qa)] == [doc["id"]]
+    with pytest.raises(PermissionError):
+        studio.update(qa, {"id": doc["id"], "title": "x"})
+    with pytest.raises(PermissionError):
+        studio.run_step(qa, {"id": doc["id"], "step": "discover", "input": "x"})
+
+
+def test_expired_or_removed_partner_loses_rights_at_once(env):
+    import time as _time
+
+    yesterday = _time.strftime("%Y-%m-%d", _time.gmtime(_time.time() - 2 * 86400))
+    tomorrow = _time.strftime("%Y-%m-%d", _time.gmtime(_time.time() + 86400))
+    _assign(env, (CONSULTANT, "consultant", {"ends_at": tomorrow}), (DEVELOPER, "developer", {"ends_at": yesterday}),
+            (QA, "qa", {"starts_at": tomorrow}))
+    doc = studio.update(_view(OWNER, env), {"team": "finance/debiteuren", "title": "Aanmaningen"})
+    assert _view(CONSULTANT, env).partner_role == "consultant"
+    for gone in (DEVELOPER, QA):                       # ended, and not started yet
+        view = _view(gone, env)
+        assert view.partner_role is None and studio.list_for(view) == []
+        with pytest.raises(PermissionError):
+            studio.update(view, {"id": doc["id"], "title": "x"})
+    # Removed: the very next request has nothing.
+    org.apply(org.scope_for(ADMIN, policy=env), {"op": "partner.remove", "email": CONSULTANT})
+    view = _view(CONSULTANT, env)
+    assert view.partner_role is None and studio.list_for(view) == []
+    with pytest.raises(PermissionError):
+        studio.update(view, {"id": doc["id"], "title": "x"})
+
+
+def test_consultant_field_must_be_a_current_partner(env):
+    _assign(env, (CONSULTANT, "consultant", {}))
+    owner = _view(OWNER, env)
+    doc = studio.update(owner, {"team": "finance/debiteuren", "title": "Aanmaningen"})
+    with pytest.raises(ValueError):
+        studio.update(owner, {"id": doc["id"], "consultant": OTHER})          # a colleague is not a partner
+    with pytest.raises(ValueError):
+        studio.update(owner, {"id": doc["id"], "consultant": "not-an-address"})
+    assert studio.update(owner, {"id": doc["id"], "consultant": CONSULTANT})["consultant"] == CONSULTANT
+    assert studio.list_for(owner)[0]["consultant"] == CONSULTANT
+    # A partner and the organisation admin set it too; somebody else cannot.
+    assert studio.update(_view(CONSULTANT, env), {"id": doc["id"], "consultant": ""})["consultant"] == ""
+    assert studio.update(_view(ADMIN, env), {"id": doc["id"], "consultant": CONSULTANT})["consultant"] == CONSULTANT
+    with pytest.raises(PermissionError):
+        studio.update(_view(OTHER, env), {"id": doc["id"], "consultant": CONSULTANT})

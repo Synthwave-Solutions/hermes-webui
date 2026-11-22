@@ -1075,17 +1075,21 @@ async function chApprove(btn, pickerId) {
   } catch (e) { btn.disabled = false; showToast((e && e.message) || _intgT('channels_failed', 'Channel action failed.')); }
 }
 
+// Two labels for the read-only links of the WhatsApp bridge, in the language of the page.
+function _chNl(nl, en) { return String(document.documentElement.lang || 'nl').toLowerCase().startsWith('en') ? en : nl; }
+
 function chRenderPeople() {
   const host = $('intgChannelPeople');
   if (!host || !_chState) return;
   const people = _chState.people || [];
   const platforms = _chState.platforms || [];
   const rows = people.map(r => '<tr>'
-    + '<td>' + _intgEsc(_chLabel(r.platform)) + '</td>'
+    + '<td>' + _intgEsc(r.platform === 'whatsapp_bridge' ? _chNl('WhatsApp (afdelingsnummer)', 'WhatsApp (department number)') : _chLabel(r.platform)) + '</td>'
     + '<td><code>' + _intgEsc(r.user_id) + '</code>' + (r.name ? ' <span class="intg-muted">' + _intgEsc(r.name) + '</span>' : '') + '</td>'
     + '<td class="ch-person">' + (typeof _personAvatarHtml === 'function' ? _personAvatarHtml(r.email, r.email, 22) : '') + '<span>' + _intgEsc(r.email) + '</span></td>'
     + '<td><code>' + _intgEsc(r.profile || 'gateway') + '</code></td>'
-    + '<td><button type="button" class="sm-btn" onclick="chRemovePerson(\'' + _intgEsc(r.platform) + '\',\'' + _intgEsc(r.user_id) + '\')">' + _intgT('channels_remove', 'Remove') + '</button></td>'
+    + '<td>' + (r.read_only ? '<span class="intg-muted">' + _chNl('Gekoppeld met code', 'Verified by code') + '</span>'
+      : '<button type="button" class="sm-btn" onclick="chRemovePerson(\'' + _intgEsc(r.platform) + '\',\'' + _intgEsc(r.user_id) + '\')">' + _intgT('channels_remove', 'Remove') + '</button>') + '</td>'
     + '</tr>').join('');
   host.innerHTML = (people.length
     ? '<div class="intg-table-wrap"><table class="ch-people-table"><thead><tr><th>' + _intgT('channels_platform', 'Platform') + '</th><th>' + _intgT('channels_user_id', 'Platform user id') + '</th><th>' + _intgT('channels_person', 'Person') + '</th><th>' + _intgT('channels_profile', 'Runs as profile') + '</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>'
@@ -1141,6 +1145,8 @@ if (typeof window !== 'undefined') {
 // ── Your bot: one bot per person, self-service ─────────────────────────────
 let _chMine = null;
 async function chLoadMine() {
+  // WhatsApp of the department lives in the same tab; it hides itself when the module is not installed.
+  if (window.SPWhatsApp) void window.SPWhatsApp.load();
   const root = $('intgMine'), body = $('intgMineBody');
   if (!root || !body) return;
   try {

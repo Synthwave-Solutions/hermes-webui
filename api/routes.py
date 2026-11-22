@@ -12452,7 +12452,7 @@ def handle_get(handler, parsed) -> bool:
         from api import bot_screens
         return bot_screens.handle_get(handler, parsed)
 
-    if parsed.path in ("/api/msp/overview", "/api/msp/tickets", "/api/msp/ticket"):
+    if parsed.path in ("/api/msp/overview", "/api/msp/invoices", "/api/msp/tickets", "/api/msp/ticket"):
         from api import msp_service
         return msp_service.handle_get(handler, parsed)
 
@@ -12461,7 +12461,9 @@ def handle_get(handler, parsed) -> bool:
         return org_structure.handle_get(handler, parsed)
 
     if parsed.path in ("/api/studio/usecases", "/api/studio/usecase", "/api/studio/backlog", "/api/studio/playbooks",
-                       "/api/studio/playbook", "/api/studio/media", "/api/studio/prompts", "/api/studio/profile"):
+                       "/api/studio/playbook", "/api/studio/media", "/api/studio/prompts", "/api/studio/profile",
+                       "/api/studio/summary", "/api/studio/roadmap", "/api/studio/roadmap/options",
+                       "/api/studio/hours"):
         from api import studio
         return studio.handle_get(handler, parsed)
 
@@ -14865,7 +14867,7 @@ def handle_post(handler, parsed) -> bool:
     if parsed.path in ("/api/studio/usecase", "/api/studio/step", "/api/studio/delete", "/api/studio/backlog",
                        "/api/studio/backlog/order", "/api/studio/autopilot", "/api/studio/playbook",
                        "/api/studio/playbook/delete", "/api/studio/playbook/draft", "/api/studio/playbook/run", "/api/studio/media",
-                       "/api/studio/prompts", "/api/studio/profile"):
+                       "/api/studio/prompts", "/api/studio/profile", "/api/studio/roadmap"):
         from api import studio
         return studio.handle_post(handler, parsed, body)
 

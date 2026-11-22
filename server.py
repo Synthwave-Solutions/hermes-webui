@@ -733,6 +733,14 @@ def main() -> None:
         print(f'[!!] WARNING: value collector failed to start: {e}', flush=True)
 
     try:
+        # Assigned partners (pull) and the Studio summary (push) for the central Cloud.
+        from api.studio_report import start_thread as start_studio_report_thread
+        if start_studio_report_thread():
+            print('[ok] studio report started', flush=True)
+    except Exception as e:
+        print(f'[!!] WARNING: studio report failed to start: {e}', flush=True)
+
+    try:
         from api.plugins import load_plugins
         load_plugins()
     except Exception as e:

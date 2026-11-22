@@ -825,6 +825,28 @@ def cloud_msp_proof(handler):
         return entry.get('_cloud_msp_proof') if isinstance(entry,dict) and entry.get('method')=='synthpulse_cloud' else None
 
 
+def cloud_msp_proof_for_email(email):
+    """The private MSP proof of this person's newest live personal Cloud session, or None.
+
+    For work that runs for a person outside an HTTP request: an agent tool in
+    their own chat turn has no cookie to read. Only a session that came through
+    the personal Cloud handoff carries a proof, and only the proof of the same
+    address is returned. It never enters the session identity or a tool result.
+    """
+    address = str(email or '').strip().lower()
+    if not address:
+        return None
+    best = None
+    now = time.time()
+    with _SESSIONS_LOCK:
+        for entry in _sessions.values():
+            if (isinstance(entry, dict) and entry.get('method') == 'synthpulse_cloud' and entry.get('_cloud_msp_proof')
+                    and str(entry.get('email') or '').strip().lower() == address and float(entry.get('exp') or 0) > now
+                    and (best is None or float(entry['exp']) > float(best['exp']))):
+                best = entry
+    return best['_cloud_msp_proof'] if best else None
+
+
 def _session_token_from_cookie_value(cookie_value: str) -> str | None:
     """Return the raw server-side session token from a signed cookie value."""
     if not cookie_value or '.' not in cookie_value:

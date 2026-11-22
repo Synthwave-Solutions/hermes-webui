@@ -1172,6 +1172,7 @@
             <button type="button" id="intgTabChannels" role="tab" aria-selected="false" aria-controls="intgPaneChannels" onclick="switchIntegrationTab('channels')" data-i18n="channels_title">Messaging channels</button>
           </div>
           <div id="intgPaneChannels" role="tabpanel" aria-labelledby="intgTabChannels" hidden>
+          <section id="intgWhatsApp" class="intg-channels wa-section" data-tour="whatsapp-link" hidden></section>
           <section id="intgMine" class="intg-channels intg-mine" style="display:none">
             <div class="intg-section-title" data-i18n="mychannels_title">Your bot</div>
             <div id="intgMineBody"><div class="intg-muted" data-i18n="loading">Loading...</div></div>
@@ -1189,6 +1190,7 @@
             <div class="intg-section-title" data-i18n="channels_people_title">People on channels</div>
             <div id="intgChannelPeople"></div>
           </section>
+          <section id="intgWhatsAppAdmin" class="intg-channels wa-section" data-tour="whatsapp-admin" hidden></section>
           </div>
           <div id="intgPaneConnectors" role="tabpanel" aria-labelledby="intgTabConnectors">
           <div id="intgNotice" style="display:none"></div>
@@ -2229,6 +2231,7 @@
 <script src="static/studio.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/studio_library.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/studio_roadmap.js?v=__WEBUI_VERSION__" defer></script>
+<script src="static/studio_plan.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/studio_prompts.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/studio_intake.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/intake_chat.js?v=__WEBUI_VERSION__" defer></script>
@@ -2241,6 +2244,7 @@
 <script src="static/bot-builder.js?v=__WEBUI_VERSION__-bot-editor2" defer></script>
 <script src="static/governance.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/integrations.js?v=__WEBUI_VERSION__" defer></script>
+<script src="static/whatsapp_bridge.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/integration-hub.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/vault.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/projects.js?v=__WEBUI_VERSION__" defer></script>

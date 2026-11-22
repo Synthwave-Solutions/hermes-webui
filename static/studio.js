@@ -44,7 +44,12 @@
     measure_intro: 'Wat deze use case oplevert, zie je per team in Management zodra de taken draaien. Zet ze aan in Taken na een testrun.',
     discuss: 'Bespreek in chat', delete: 'Verwijderen', confirm_delete: 'Use case verwijderen?', empty_list: 'Nog geen use cases. Begin met een gesprek over je werk.',
     components: 'onderdelen', built_n: 'gebouwd', need_input: 'Vertel eerst iets, dan gaat de Super Agent aan de slag.',
-    chat_prompt: 'Ik werk in Studio aan de use case "{t}". Help me verder: {s}'
+    chat_prompt: 'Ik werk in Studio aan de use case "{t}". Help me verder: {s}',
+    consultant: 'Agentic Consultant', consultant_none: 'Nog niemand', nav_progress: 'Voortgang', nav_plan: 'Roadmap',
+    pg_intro: 'Hoe ver elke use case is, wie van Synthwave meewerkt en wat het per week oplevert.',
+    pg_uc: 'Use case', pg_team: 'Team', pg_phase: 'Fase', pg_consultant: 'Agentic Consultant', pg_saved: 'Uren per week bespaard', pg_measured: 'Gemeten, 30 dagen',
+    read_only: 'Je kunt deze use case bekijken, niet wijzigen.',
+    pg_empty: 'Nog geen use cases om te tonen.', pg_total: '{n} use cases, samen {h} uur per week bespaard volgens het ontwerp.', pg_unknown: 'nog bepalen', pg_hours: 'uur'
   };
   const EN = {
     n_goal: 'Desired outcome', n_pain: 'Pain point', n_opp: 'Opportunity', n_sol: 'Solution', untitled: 'Untitled use case', cause: 'Cause', test: 'Smallest test',
@@ -79,7 +84,12 @@
     measure_intro: 'What this use case delivers shows per team in Management once the tasks run. Switch them on in Tasks after a test run.',
     discuss: 'Discuss in chat', delete: 'Delete', confirm_delete: 'Delete this use case?', empty_list: 'No use cases yet. Start with a conversation about your work.',
     components: 'components', built_n: 'built', need_input: 'Tell something first, then the Super Agent gets to work.',
-    chat_prompt: 'I am working in Studio on the use case "{t}". Help me further: {s}'
+    chat_prompt: 'I am working in Studio on the use case "{t}". Help me further: {s}',
+    consultant: 'Agentic Consultant', consultant_none: 'Nobody yet', nav_progress: 'Progress', nav_plan: 'Roadmap',
+    pg_intro: 'How far each use case is, who from Synthwave works on it and what it saves per week.',
+    pg_uc: 'Use case', pg_team: 'Team', pg_phase: 'Phase', pg_consultant: 'Agentic Consultant', pg_saved: 'Hours saved per week', pg_measured: 'Measured, 30 days',
+    read_only: 'You can view this use case, not change it.',
+    pg_empty: 'No use cases to show yet.', pg_total: '{n} use cases, together {h} hours saved per week by design.', pg_unknown: 'to be determined', pg_hours: 'hours'
   };
   const lang = () => ((document.documentElement.lang || 'nl').toLowerCase().startsWith('en') ? 'en' : 'nl');
   const w = (k, v) => { let s = (lang() === 'en' ? EN : NL)[k] || NL[k] || k; if (v) for (const [a, b] of Object.entries(v)) s = s.replace('{' + a + '}', b); return s; };
@@ -91,7 +101,7 @@
   const errMsg = e => (e && e.message) || String(e);
   const PHASES = ['discover', 'design', 'playbook', 'build', 'measure'];
 
-  const St = { list: null, teams: [], doc: null, busy: false, listening: false, rec: null, draft: '', building: false, presetTeam: '', tab: 'home', backTab: '', scope: null, oppView: 'matrix', backlogged: new Set(), counts: {}, me: null,
+  const St = { partners: [], progress: null, list: null, teams: [], doc: null, busy: false, listening: false, rec: null, draft: '', building: false, presetTeam: '', tab: 'home', backTab: '', scope: null, oppView: 'matrix', backlogged: new Set(), counts: {}, me: null,
     convOpen: (() => { try { return localStorage.getItem('sp-studio-conv') !== '0'; } catch (_e) { return true; } })() };
 
   function root(){ return $id('mainStudio'); }
@@ -105,7 +115,11 @@
   }
 
   async function loadList(){
-    try { const d = await call('/api/studio/usecases'); St.list = d.usecases || []; St.teams = d.teams || []; }
+    try {
+      const d = await call('/api/studio/usecases'); St.list = d.usecases || []; St.teams = d.teams || [];
+      St.partners = d.partners || [];
+      if (window.SPPartners) window.SPPartners.set(St.partners);
+    }
     catch (e) { St.list = []; toast(errMsg(e)); }
   }
   // Who the viewer is in the structure; arrives after the first paint and then adds the lens.
@@ -154,13 +168,41 @@
     const org = St.profileEmpty && St.profileEditable && window.SPPrompts ? `<div class="st-setup-row st-org-hint"><span>${H(window.SPPrompts.pfHint())}</span><button type="button" class="sm-btn" data-st-hub-go="profile">${H(window.SPPrompts.pfOpen())}</button></div>` : '';
     return me || org ? `<section class="om-card st-setup" aria-label="${H(w('setup_h'))}"><div class="st-setup-label">${H(w('setup_h'))}</div>${me}${org}</section>` : '';
   }
+  // The partner named on a use case: their badge with the name, or nothing.
+  function consultantBadge(email){
+    const P = window.SPPartners, p = P && email ? P.get(email) : null;
+    return p ? `<span class="om-badge sp-partner" title="${H(P.label(p.role))}">${H(P.label(p.role))} · ${H(P.name(p))}</span>` : '';
+  }
+  const hours = v => (v == null ? '' : Number(v).toLocaleString(lang() === 'en' ? 'en-GB' : 'nl-NL', { maximumFractionDigits: 1 }));
+  // Progress for the customer: use case, phase, consultant, hours saved per week.
+  function progressHtml(){
+    const d = St.progress;
+    if (!d) return `<div class="wp-skeleton" aria-busy="true"><span></span><span></span></div>`;
+    if (d.error) return `<div class="om-empty"><p>${H(d.error)}</p></div>`;
+    const rows = d.use_cases || [];
+    const P = window.SPPartners;
+    if (!rows.length) return `<p class="om-intro">${H(w('pg_intro'))}</p>${P ? P.teamHtml(false) : ''}<div class="om-empty"><p>${H(w('pg_empty'))}</p></div>`;
+    return `<p class="om-intro">${H(w('pg_intro'))}</p>${P ? P.teamHtml(false) : ''}
+      <div class="om-table-wrap st-progress"><table class="om-table"><thead><tr><th>${H(w('pg_uc'))}</th><th>${H(w('pg_phase'))}</th><th>${H(w('pg_consultant'))}</th><th class="num">${H(w('pg_saved'))}</th><th class="num">${H(w('pg_measured'))}</th></tr></thead>
+        <tbody>${rows.map(r => `<tr><td><button type="button" class="om-link st-progress-open" data-st-open="${H(r.id)}">${H(r.title || w('untitled'))}</button><div class="om-small om-muted">${H(r.team_name || w('none'))}${r.owner_name ? ' · ' + H(r.owner_name) : ''}</div></td>
+          <td><span class="om-badge">${H(w('p_' + (r.phase || 'discover')))}</span></td>
+          <td>${r.consultant ? `${H(r.consultant_name || r.consultant)}` : `<span class="om-muted">${H(w('consultant_none'))}</span>`}</td>
+          <td class="num">${r.hours_week_saved == null ? `<span class="om-muted">${H(w('pg_unknown'))}</span>` : H(hours(r.hours_week_saved))}</td>
+          <td class="num">${r.measured_hours_saved_30d ? H(hours(r.measured_hours_saved_30d)) + ' ' + H(w('pg_hours')) : '<span class="om-muted">0</span>'}</td></tr>`).join('')}</tbody></table></div>
+      <p class="om-small om-muted st-progress-total">${H(w('pg_total', { n: String(d.totals.use_cases), h: hours(d.totals.hours_week_saved) }))}</p>`;
+  }
+  async function loadProgress(){
+    try { St.progress = await call('/api/studio/summary'); if (window.SPPartners) window.SPPartners.set(St.progress.partners); }
+    catch (e) { St.progress = { error: errMsg(e) }; }
+    if (St.tab === 'progress' && !St.doc && _currentPanel === 'studio') renderList();
+  }
   function cardHtml(r, sc){
     const teamName = k => (St.teams.find(t => t.key === k) || {}).name || (sc && k ? window.SPScope.teamName(sc, k) : '');
     const other = sc && r.owner && String(r.owner).toLowerCase() !== sc.email;
     return `<button type="button" class="st-card" data-st-open="${H(r.id)}">
           <span class="st-card-title ${r.title ? '' : 'st-side-untitled'}">${H(r.title || w('untitled'))}</span>
           <span class="om-muted om-small">${H(teamName(r.team || (sc && window.SPScope.primaryTeam(sc, r.owner))) || w('none'))} · ${H(w('p_' + (r.phase || 'discover')))}</span>
-          <span class="st-card-meta"><span class="om-badge">${H(r.components || 0)} ${H(w('components'))}</span>${r.built ? `<span class="om-badge ok">${H(r.built)} ${H(w('built_n'))}</span>` : ''}${other ? `<span class="st-card-owner">${window.SPScope.face(sc, r.owner, 'st-face-xs')}${H(window.SPScope.personName(r.owner))}</span>` : ''}</span>
+          <span class="st-card-meta">${consultantBadge(r.consultant)}<span class="om-badge">${H(r.components || 0)} ${H(w('components'))}</span>${r.built ? `<span class="om-badge ok">${H(r.built)} ${H(w('built_n'))}</span>` : ''}${other ? `<span class="st-card-owner">${window.SPScope.face(sc, r.owner, 'st-face-xs')}${H(window.SPScope.personName(r.owner))}</span>` : ''}</span>
         </button>`;
   }
   function renderList(){
@@ -168,6 +210,16 @@
     if (St.tab === 'home') {
       const body = head(`<button type="button" class="sm-btn primary" data-st-new>${H(w('new_uc'))}</button>`, w('nav_home'));
       if (body) window.SPWorkplace.render(body, { setup: setupHtml() });
+      return;
+    }
+    if (St.tab === 'plan' && window.SPPlan) {
+      const body = head('', w('nav_plan'));
+      if (body) void window.SPPlan.render(body);
+      return;
+    }
+    if (St.tab === 'progress') {
+      const body = head('', w('nav_progress'));
+      if (body) body.innerHTML = progressHtml();
       return;
     }
     if ((St.tab === 'me' || St.tab === 'profile') && window.SPIntake) {
@@ -226,7 +278,8 @@
       <div class="st-notes" aria-live="polite">${notes.map(n => `<div class="st-note ${n.role}">${H(n.text)}</div>`).join('')}${St.busy ? `<div class="st-note agent st-thinking">${H(w('thinking'))}</div>` : ''}</div>
       ${St.live ? `<p class="om-small st-live-note">${H(w('live_on'))}</p>` : ''}
       ${St.live && St.live.tasks.length ? `<div class="st-live-tasks">${St.live.tasks.map(tk => `<div class="om-row"><span class="om-dot ${tk.status === 'done' ? 'ok' : tk.status === 'error' ? 'error' : 'new'}"></span><div class="om-row-main"><div class="om-row-title">${H(tk.title || '')}</div><div class="om-row-sub">${H(tk.status || '')}</div></div>${tk.session_id ? `<button type="button" class="sm-btn" data-st-open-session="${H(tk.session_id)}">${H(w('open_work'))}</button>` : ''}</div>`).join('')}</div>` : ''}
-      ${canSend ? `<form class="st-compose" data-st-send>
+      ${doc.editable === false ? `<p class="om-small om-muted st-read-only" data-st-read-only>${H(w('read_only'))}</p>` : ''}
+      ${canSend && doc.editable !== false ? `<form class="st-compose" data-st-send>
         <textarea name="input" rows="4" placeholder="${H(w(ph))}" aria-label="${H(w(ph))}">${H(St.draft)}</textarea>
         <div class="st-compose-actions">
           ${window.synPulseVoice ? `<button type="button" class="sm-btn" data-st-live aria-pressed="${!!St.live}">🎧 ${H(St.live ? w('live_stop') : w('live'))}</button>` : ''}
@@ -367,16 +420,26 @@
     return `<p class="om-intro">${H(w('measure_intro'))}</p><div class="om-card" style="padding:4px 0">${ok.map(b => `<div class="om-row"><span class="om-dot ok"></span><div class="om-row-main"><div class="om-row-title">${H(b.ref)}</div><div class="om-row-sub">${H(w('b_' + b.type))}</div></div></div>`).join('')}</div>
       <div class="om-value-actions"><button type="button" class="sm-btn primary" data-st-make-pb>${H(w('make_pb'))}</button><button type="button" class="sm-btn" data-st-nav="tasks">${H(w('open_task'))}</button><button type="button" class="sm-btn" data-st-nav="management">${H(w('open_mgmt'))}</button></div>`;
   }
+  // Who from the supplier works on this use case. Only assigned partners can be chosen.
+  function consultantPick(doc){
+    const P = window.SPPartners;
+    const workers = St.partners.filter(p => ['consultant', 'developer'].includes(p.role));
+    if (!P || !(workers.length || doc.consultant)) return '';
+    if (!doc.editable) return consultantBadge(doc.consultant);
+    const known = workers.some(p => p.email === doc.consultant);
+    return `<label class="om-inline-form om-small om-muted st-team-pick st-consultant-pick">${H(w('consultant'))} <select class="om-select" data-st-consultant><option value="">${H(w('consultant_none'))}</option>${doc.consultant && !known ? `<option value="${H(doc.consultant)}" selected>${H(window.SPScope ? window.SPScope.personName(doc.consultant) : doc.consultant)}</option>` : ''}${workers.map(p => `<option value="${H(p.email)}" ${doc.consultant === p.email ? 'selected' : ''}>${H(P.name(p))} (${H(P.short(p.role))})</option>`).join('')}</select></label>`;
+  }
   function renderDoc(){
     const doc = St.doc;
-    const body = head(`<button type="button" class="sm-btn" data-st-conv-toggle aria-pressed="${St.convOpen}">${H(St.convOpen ? w('conv_hide') : w('conv_show'))}</button>${doc.editable ? `<button type="button" class="sm-btn st-quiet-danger" data-st-delete>${H(w('delete'))}</button>` : ''}`,
+    const body = head(`<button type="button" class="sm-btn" data-st-conv-toggle aria-pressed="${St.convOpen}">${H(St.convOpen ? w('conv_hide') : w('conv_show'))}</button>${(doc.deletable ?? doc.editable) ? `<button type="button" class="sm-btn st-quiet-danger" data-st-delete>${H(w('delete'))}</button>` : ''}`,
       w('tab_uc'));
     const r = root(); const t = r && r.querySelector('[data-st-title-h]');
     if (t && !(document.activeElement && document.activeElement.matches && document.activeElement.matches('[data-st-title]'))) t.innerHTML = `<button type="button" class="st-crumb" data-st-back>${H(w('back'))}</button><span class="st-crumb-sep" aria-hidden="true">/</span><input class="st-crumb-input" data-st-title value="${H(doc.title)}" placeholder="${H(w('title_ph'))}" aria-label="${H(w('title_ph'))}" ${doc.editable ? '' : 'readonly'}>`;
     if (!body) return;
     const canvas = { discover: discoverHtml, design: designHtml, playbook: playbookHtml, build: buildHtml, measure: measureHtml }[doc.phase || 'discover'](doc);
     body.innerHTML = `<div class="st-top">${stepper(doc)}
-        <label class="om-inline-form om-small om-muted st-team-pick">${H(w('team'))} <select class="om-select" data-st-team><option value="">${H(w('none'))}</option>${St.teams.map(t => `<option value="${H(t.key)}" ${doc.team === t.key ? 'selected' : ''}>${H(t.name)}</option>`).join('')}</select></label></div>
+        <div class="st-picks"><label class="om-inline-form om-small om-muted st-team-pick">${H(w('team'))} <select class="om-select" data-st-team ${doc.editable === false ? 'disabled' : ''}><option value="">${H(w('none'))}</option>${St.teams.map(t => `<option value="${H(t.key)}" ${doc.team === t.key ? 'selected' : ''}>${H(t.name)}</option>`).join('')}</select></label>
+        ${consultantPick(doc)}</div></div>
       <div class="st-layout ${St.convOpen || St.live ? '' : 'conv-closed'}">${St.convOpen || St.live ? convHtml(doc) : ''}<section class="st-canvas" aria-live="polite">${canvas}</section></div>`;
     const notes = body.querySelector('.st-notes');
     if (notes) notes.scrollTop = notes.scrollHeight;
@@ -398,8 +461,9 @@
         if (!b) return;
         const go = b.dataset.stHub;
         if ((go || b.dataset.stSideOpen || b.hasAttribute('data-st-side-new')) && typeof _isDesktopWidth === 'function' && !_isDesktopWidth() && typeof closeMobileSidebar === 'function') closeMobileSidebar();
-        if (go === 'home' || go === 'usecases' || go === 'backlog' || go === 'playbooks' || go === 'prompts' || go === 'profile' || go === 'me') {
+        if (go === 'home' || go === 'usecases' || go === 'backlog' || go === 'playbooks' || go === 'prompts' || go === 'profile' || go === 'me' || go === 'progress' || go === 'plan') {
           St.tab = go; St.doc = null;
+          if (go === 'progress') { St.progress = null; void loadProgress(); }
           if (window.SPLibrary && window.SPLibrary.reset) window.SPLibrary.reset();
           if (_currentPanel !== 'studio' && typeof switchPanel === 'function') await switchPanel('studio'); else { await loadList(); render(); }
           return;
@@ -417,13 +481,16 @@
     }
     const sec = section();
     const me = St.me || {};
+    // A partner with the role qa only reads: the screens offer no new use case that the server would refuse.
+    document.documentElement.classList.toggle('sp-studio-reads-only', !!(me.partner && me.partner.role === 'qa' && me.scope === 'none'));
     const item = (key, label, count, flag) => `<button type="button" data-st-hub="${key}" aria-current="${sec === key && !(key === 'usecases' && St.doc)}">${flag ? '<span class="om-side-flag" aria-hidden="true"></span>' : ''}${H(label)}${count != null ? `<span class="om-side-count">${H(count)}</span>` : ''}</button>`;
     const rows = (St.list || []).slice(0, 5);
     box.setAttribute('aria-label', w('studio'));
     box.innerHTML = `<button type="button" class="st-side-new" data-st-side-new>＋ ${H(w('new_uc'))}</button>
       <div class="om-side-label">${H(w('nav_work'))}</div>
-      ${item('home', w('nav_home'))}${item('me', w('nav_me'), null, St.personEmpty)}${item('usecases', w('tab_uc'), (St.list || []).length || null)}${item('backlog', w('tab_backlog'), St.counts.backlog || null)}${item('playbooks', w('tab_pb'), St.counts.playbooks || null)}${item('prompts', w('nav_prompts'), St.counts.prompts || null)}
-      <div class="om-side-label">${H(w('nav_org'))}</div>${item('profile', w('nav_profile'), null, St.profileEmpty && me.can_manage)}${me.can_view ? item('chart', w('nav_chart')) : ''}${me.can_manage ? item('teams', w('nav_teams')) + item('mgmt', w('nav_mgmt')) : ''}
+      ${item('home', w('nav_home'))}${item('me', w('nav_me'), null, St.personEmpty)}${item('usecases', w('tab_uc'), (St.list || []).length || null)}${item('backlog', w('tab_backlog'), St.counts.backlog || null)}${window.SPPlan ? item('plan', w('nav_plan')) : ''}${item('playbooks', w('tab_pb'), St.counts.playbooks || null)}${item('prompts', w('nav_prompts'), St.counts.prompts || null)}
+      <div class="om-side-label">${H(w('nav_org'))}</div>${item('profile', w('nav_profile'), null, St.profileEmpty && me.can_manage)}${me.can_manage || me.partner ? item('progress', w('nav_progress')) : ''}${me.can_view ? item('chart', w('nav_chart')) : ''}${me.can_manage ? item('teams', w('nav_teams')) + item('mgmt', w('nav_mgmt')) : ''}
+      ${window.SPPartners ? window.SPPartners.teamHtml(true) : ''}
       ${rows.length ? `<div class="om-side-label">${H(w('nav_recent'))}</div>` + rows.map(r => `<button type="button" class="st-side-recent" data-st-side-open="${H(r.id)}" aria-current="${!!(St.doc && St.doc.id === r.id && sec === 'usecases')}"><span class="st-side-recent-title ${r.title ? '' : 'st-side-untitled'}">${H(r.title || w('untitled'))}</span><span class="om-side-count">${H(w('p_' + (r.phase || 'discover')))}</span></button>`).join('') : ''}
       <button type="button" class="st-side-help" data-help-guide="${sec === 'mgmt' ? 'management' : (sec === 'chart' || sec === 'teams') ? 'organisation' : 'studio'}">${H(w('nav_help'))}</button>`;
   }
@@ -469,6 +536,7 @@
             ? { before_minutes: c.before_minutes, review_minutes: Math.min(c.review_minutes || 0, c.before_minutes), per: c.per || 'run', task: c.name, source: 'playbook', confidence: 'estimated' }
             : { unknown: true, unknown_reason: 'Nog in te vullen na de testrun', task: c.name, source: 'playbook' };
           if (doc.team) value.team = doc.team;
+          value.use_case = doc.id;      // measured savings add up per use case
           const prompt = `${c.prompt}\n\nCATEGORY: ${teamName || 'Studio'}`;
           const res = await post('/api/crons/create', { name: c.name, prompt, schedule: c.schedule, deliver: 'local', enabled: false, value, category: teamName || 'Studio' });
           row.ref = (res.job && res.job.name) || c.name;
@@ -607,6 +675,7 @@
       const el = ev.target;
       if (el.hasAttribute('data-st-team')) await save({ team: el.value });
       if (el.hasAttribute('data-st-title')) await save({ title: el.value });
+      if (el.hasAttribute('data-st-consultant')) { await save({ consultant: el.value }); await loadList(); render(); }
     });
     r.addEventListener('submit', async ev => {
       if (!ev.target.hasAttribute('data-st-send')) return;
@@ -644,7 +713,7 @@
       }
       if (b.dataset.stOpen) { await open(b.dataset.stOpen); return; }
       if (b.hasAttribute('data-st-back')) { if (St.live) stopLive(); St.doc = null; if (St.backTab) { St.tab = St.backTab; St.backTab = ''; } if (window.SPWorkplace) window.SPWorkplace.invalidate(); await loadList(); render(); return; }
-      if (b.hasAttribute('data-st-delete')) { if (confirm(w('confirm_delete'))) { try { await post('/api/studio/delete', { id: St.doc.id }); } catch (e) { toast(errMsg(e)); } St.doc = null; await loadList(); render(); } return; }
+      if (b.hasAttribute('data-st-delete')) { if (confirm(w('confirm_delete'))) { try { await post('/api/studio/delete', { id: St.doc.id }); } catch (e) { toast(errMsg(e)); return; } St.doc = null; await loadList(); render(); } return; }
       if (b.dataset.stPhase) { await save({ phase: b.dataset.stPhase }, true); render(); return; }
       if (b.dataset.stGoto) {
         if (b.dataset.stGoto === 'build' && St.doc.phase === 'playbook') await save({ components: collectComponents() }, true);
@@ -676,7 +745,7 @@
 
   window.SPStudio = {
     openUseCase: async (id) => { St.backTab = St.tab === 'home' && _currentPanel === 'studio' ? 'home' : ''; St.tab = 'usecases'; if (typeof switchPanel === 'function') await switchPanel('studio'); await open(id); },
-    setTab: (tab) => { St.tab = tab; St.doc = null; render(); },
+    setTab: (tab) => { St.tab = tab; St.doc = null; if (tab === 'progress') { St.progress = null; void loadProgress(); } render(); },
     load: async () => {
       bind(); loadScope();
       const home = St.tab === 'home' && !St.doc && window.SPWorkplace;

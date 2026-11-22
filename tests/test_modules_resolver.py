@@ -107,7 +107,7 @@ def test_catalogue_fixture_matches_its_pin():
 
 def test_registry_ids_tiers_and_requirements_equal_the_catalogue():
     rows = CATALOG["modules"]
-    assert len(rows) == 10 and len(modules.MODULE_IDS) == 10
+    assert len(rows) == 11 and len(modules.MODULE_IDS) == 11
     assert modules.MODULE_IDS == tuple(row["id"] for row in rows)
     for row in rows:
         spec = modules.REGISTRY[row["id"]]

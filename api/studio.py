@@ -15,6 +15,11 @@ tasks``). This module stores use cases and runs the three model steps.
 Storage: ``STATE_DIR/studio/<id>.json``, one document per use case with its
 owner. A person sees their own use cases; organisation admins see all,
 department admins those of teams in their departments.
+
+Partners (``org_structure`` ``partner_role``): the consultant and developer
+that the supplier assigned to this installation see and work on every use
+case that has a team, and on their own; qa only reads. A use case can name
+its ``consultant``, who must be a current partner.
 """
 from __future__ import annotations
 
@@ -62,12 +67,23 @@ def _load(uc_id: str) -> dict:
         raise KeyError("Use case not found")
 
 
+def _changed() -> None:
+    """Tell the central summary that Studio changed (debounced there; never raises)."""
+    try:
+        from api import studio_report
+
+        studio_report.note_change()
+    except Exception:
+        logger.debug("studio report not notified", exc_info=True)
+
+
 def _save(doc: dict) -> dict:
     doc["updated_at"] = time.time()
     path = _path(doc["id"])
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(doc, ensure_ascii=False, indent=1), encoding="utf-8")
     os.replace(tmp, path)
+    _changed()
     return doc
 
 
@@ -75,11 +91,20 @@ def _visible(view: org_structure.ViewScope, doc: dict) -> bool:
     if view.scope == org_structure.SCOPE_ALL or doc.get("owner") == view.email:
         return True
     team = doc.get("team") or ""
+    if bool(team) and view.is_partner:
+        return True
     return bool(team) and view.scope == org_structure.SCOPE_DEPARTMENTS and view.edits_team(team)
 
 
-def _editable(view, doc) -> bool:
+def _deletable(view, doc) -> bool:
     return doc.get("owner") == view.email or view.scope == org_structure.SCOPE_ALL
+
+
+def _editable(view, doc) -> bool:
+    if _deletable(view, doc):
+        return True
+    # A consultant or developer works on every use case that belongs to a team.
+    return bool(doc.get("team")) and view.partner_edits
 
 
 def list_for(view) -> list[dict]:
@@ -90,7 +115,8 @@ def list_for(view) -> list[dict]:
         except (OSError, ValueError):
             continue
         if _visible(view, doc):
-            rows.append({k: doc.get(k) for k in ("id", "title", "owner", "team", "phase", "updated_at", "created_at", "voice_session")}
+            rows.append({k: doc.get(k) for k in ("id", "title", "owner", "team", "phase", "updated_at", "created_at", "voice_session",
+                                                 "consultant")}
                         | {"components": len(((doc.get("playbook") or {}).get("components") or [])),
                            "built": sum(1 for b in doc.get("build_log") or [] if b.get("status") == "ok")})
     return sorted(rows, key=lambda r: -(r.get("updated_at") or 0))
@@ -270,6 +296,13 @@ def update(view, body: dict) -> dict:
             doc["team"] = team
         if "phase" in body and body.get("phase") in PHASES:
             doc["phase"] = body["phase"]
+        if "consultant" in body:   # empty = nobody named
+            who = org_structure.norm_email(body.get("consultant"))
+            if body.get("consultant") and not who:
+                raise ValueError("The consultant must be an e-mail address")
+            if who and who != doc.get("consultant") and org_structure.partner_for(who) is None:
+                raise ValueError("The consultant must be a partner assigned to this installation")
+            doc["consultant"] = who
         if "notes" in body:
             doc["notes"] = [{"role": n.get("role") if n.get("role") in ("user", "agent") else "user",
                              "text": str(n.get("text") or "")[:MAX_TEXT], "at": n.get("at") or time.time()}
@@ -576,6 +609,15 @@ def handle_get(handler, parsed) -> bool:
                 "/api/studio/prompts", "/api/studio/profile"):
         from api import studio_library
         return studio_library.handle_get(handler, parsed)
+    if path == "/api/studio/summary":
+        from api import studio_report
+        return studio_report.handle_get(handler, parsed)
+    if path in ("/api/studio/roadmap", "/api/studio/roadmap/options"):
+        from api import studio_roadmap
+        return studio_roadmap.handle_get(handler, parsed)
+    if path == "/api/studio/hours":
+        from api import studio_hours
+        return studio_hours.handle_get(handler, parsed)
     if path not in ("/api/studio/usecases", "/api/studio/usecase"):
         return False
     view = org_structure.request_scope(handler)
@@ -585,13 +627,15 @@ def handle_get(handler, parsed) -> bool:
     try:
         if path == "/api/studio/usecases":
             j(handler, {"usecases": list_for(view), "viewer": view.to_dict(),
+                        "partners": [{k: p[k] for k in ("email", "name", "role", "org")}
+                                     for p in org_structure.current_partners()],
                         "teams": [{"key": k, "name": (t or {}).get("name") or k}
                                   for k, t in sorted((org_structure.load().get("teams") or {}).items())]})
             return True
         doc = _load((parse_qs(parsed.query or "").get("id") or [""])[0])
         if not _visible(view, doc):
             raise KeyError("Use case not found")
-        j(handler, dict(doc, editable=_editable(view, doc)))
+        j(handler, dict(doc, editable=_editable(view, doc), deletable=_deletable(view, doc)))
     except KeyError as e:
         j(handler, {"error": str(e).strip("'")}, status=404)
     return True
@@ -604,6 +648,9 @@ def handle_post(handler, parsed, body) -> bool:
                 "/api/studio/prompts", "/api/studio/profile"):
         from api import studio_library
         return studio_library.handle_post(handler, parsed, body)
+    if path == "/api/studio/roadmap":
+        from api import studio_roadmap
+        return studio_roadmap.handle_post(handler, parsed, body)
     if path not in ("/api/studio/usecase", "/api/studio/step", "/api/studio/delete"):
         return False
     view = org_structure.request_scope(handler)
@@ -612,15 +659,20 @@ def handle_post(handler, parsed, body) -> bool:
         j(handler, {"error": "Sign in first"}, status=401)
         return True
     try:
+        if view.partner_read_only:
+            raise PermissionError("This account can only read in Studio")
         if path == "/api/studio/usecase":
-            j(handler, dict(update(view, body), editable=True))
+            doc = update(view, body)
+            j(handler, dict(doc, editable=True, deletable=_deletable(view, doc)))
         elif path == "/api/studio/step":
-            j(handler, dict(run_step(view, body), editable=True))
+            doc = run_step(view, body)
+            j(handler, dict(doc, editable=True, deletable=_deletable(view, doc)))
         else:
             doc = _load(str(body.get("id") or ""))
-            if not _editable(view, doc):
+            if not _deletable(view, doc):
                 raise PermissionError("Only the owner can delete this use case")
             _path(doc["id"]).unlink()
+            _changed()
             j(handler, {"ok": True})
     except PermissionError as e:
         j(handler, {"error": str(e)}, status=403)

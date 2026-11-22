@@ -67,6 +67,7 @@ CATALOG = {'workspace': {'name': {'nl': 'Werkplek en AI-medewerkers', 'en': 'Wor
                'lifecycle': 'pilot',
                'confirmed': False,
                'model_usage': {'level': 'none', 'consumers': 'nothing'}},
+ 'whatsapp_channel': {'name': {'nl': 'WhatsApp per afdeling', 'en': 'WhatsApp per department'}, 'summary': {'nl': "Collega's appen één zakelijk nummer van hun afdeling en werken daar met hun eigen rechten met de AI-assistent.", 'en': 'Colleagues message one business number of their department and work with the AI assistant there under their own rights.'}, 'tier': 'advanced', 'lifecycle': 'pilot', 'confirmed': False, 'model_usage': {'level': 'medium', 'consumers': 'assistant turns started from WhatsApp messages'}},
  'dictation': {'name': {'nl': 'Dicteren in elke applicatie', 'en': 'Dictation in every application'},
                'summary': {'nl': 'Dicteer tekst op je laptop in elke applicatie; je spraak wordt in de EU '
                                  'verwerkt en niet bewaard.',

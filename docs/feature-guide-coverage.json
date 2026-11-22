@@ -3246,6 +3246,24 @@
       ]
     },
     {
+      "id": "webui.studio.quickscan_roadmap",
+      "area": "studio",
+      "status": "available",
+      "source_refs": [
+        "static/studio_plan.js",
+        "api/studio_roadmap.py"
+      ]
+    },
+    {
+      "id": "webui.studio.hours",
+      "area": "studio",
+      "status": "conditional",
+      "source_refs": [
+        "static/workplace.js",
+        "api/studio_hours.py"
+      ]
+    },
+    {
       "id": "webui.studio.playbooks",
       "area": "studio",
       "status": "available",

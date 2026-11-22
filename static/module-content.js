@@ -68,6 +68,10 @@ window.SynthPulseModuleContent = {
           "name": "Digital signing",
           "summary": "Have documents signed digitally with a complete signing record."
         },
+        "whatsapp_channel": {
+          "name": "WhatsApp per department",
+          "summary": "Colleagues message one business number of their department and work with the AI assistant there under their own rights."
+        },
         "dictation": {
           "name": "Dictation in every application",
           "summary": "Dictate text on your laptop in any application; your speech is processed in the EU and not stored."
@@ -148,6 +152,10 @@ window.SynthPulseModuleContent = {
         "e_signing": {
           "name": "Digitaal ondertekenen",
           "summary": "Laat documenten digitaal ondertekenen met een volledig ondertekeningsverslag."
+        },
+        "whatsapp_channel": {
+          "name": "WhatsApp per afdeling",
+          "summary": "Collega's appen één zakelijk nummer van hun afdeling en werken daar met hun eigen rechten met de AI-assistent."
         },
         "dictation": {
           "name": "Dicteren in elke applicatie",
