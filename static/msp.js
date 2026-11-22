@@ -2,7 +2,7 @@
 (function(){
  'use strict';
  let allowed=false,generation=0,overview=null,tickets=[],detail=null,tab='overview',scope='mine',language='',busy=false,error='',notice='';
- const draft={title:'',body:'',need:'question',impact:'me',service:''};let consultantDays=null;let reply='';let orderFilter='';let invoiceFilter='all';
+ const draft={title:'',body:'',need:'question',impact:'me',service:''};let consultantDays=null;let reply='';let orderFilter='';let invoiceFilter='all';let ledger;let ledgerBusy=false;
  const $=id=>document.getElementById(id);
  const words={nl:{title:'Support',intro:'Support en betalingen',overview:'Overzicht',tickets:'Tickets',billing:'Betalingen',refresh:'Vernieuwen',loading:'Laden...',error:'De MSP-verbinding is niet beschikbaar. Probeer opnieuw; je invoer blijft bewaard.',hours:'Supporturen',balance:'Beschikbaar',used:'Deze maand gebruikt',allowance:'Maandbundel',minutes:'minuten',noContract:'Er is nog geen actief supportcontract ingesteld. Je kunt wel een ticket of app-aanvraag indienen.',restricted:'Je beheerder beheert de urenbundels en betalingen.',subscriptions:'Support per app',none:'Urenstrippenkaarten per beheerde app horen bij je jaarlijkse supportafspraak. Kies je gewenste niveau bij Apps.',apps:'Naar Apps',newTicket:'Ticket aanmaken',titleLabel:'Onderwerp',body:'Waarmee kunnen we helpen?',need:'Soort vraag',question:'Vraag',broken:'Iets werkt niet',access:'Toegang nodig',change:'Wijziging of app aanvragen',billingNeed:'Factuurvraag',impact:'Wie heeft er last van?',me:'Alleen ik',team:'Mijn team',everyone:'Iedereen',app:'App (optioneel)',general:'Algemeen',send:'Verstuur naar MSP',mine:'Mijn tickets',org:'Organisatietickets',department:'Afdelingstickets',scope:'Zichtbaarheid',noTickets:'Geen tickets in dit overzicht.',open:'Openstaand',closed:'Afgehandeld',back:'Terug naar tickets',reply:'Reactie',sendReply:'Reactie versturen',created:'Ticket verzonden naar je MSP.',commented:'Reactie toegevoegd.',noInvoices:'Nog geen betaalverzoeken of facturen.',pay:'Betalen via Mollie',waitLink:'Je MSP maakt de betaallink beschikbaar zodra de factuur klaarstaat.',monthly:'per maand excl. btw',quote:'Tarief nog vast te stellen',pending:'Aanvraag in behandeling',active:'Actief',cancel_requested:'Opzegging in behandeling',cancelled:'Opgezegd',rejected:'Afgewezen',requested:'Aangevraagd',approved:'Goedgekeurd',invoiced:'Gefactureerd',paid:'Betaald',new:'Nieuw',triage:'In beoordeling',in_progress:'In behandeling',waiting_client:'Wacht op jouw reactie',needs_quote:'Offerte nodig',resolved:'Opgelost',language:'Taal',private:'Alleen zichtbaar voor mij en MSP',requestLevel:'Aangevraagd niveau',currentLevel:'Huidig niveau'},en:{title:'Support',intro:'Support and payments',overview:'Overview',tickets:'Tickets',billing:'Payments',refresh:'Refresh',loading:'Loading...',error:'The MSP connection is unavailable. Retry; your draft is preserved.',hours:'Support hours',balance:'Available',used:'Used this month',allowance:'Monthly allowance',minutes:'minutes',noContract:'No active support contract is configured yet. You can still submit a ticket or app request.',restricted:'Your administrator manages support allowances and payments.',subscriptions:'Support per app',none:'Managed-app hour bundles are part of your annual support agreement. Choose your preferred level in Apps.',apps:'Go to Apps',newTicket:'Create ticket',titleLabel:'Subject',body:'How can we help?',need:'Request type',question:'Question',broken:'Something is broken',access:'Access needed',change:'Change or app request',billingNeed:'Invoice question',impact:'Who is affected?',me:'Only me',team:'My team',everyone:'Everyone',app:'App (optional)',general:'General',send:'Send to MSP',mine:'My tickets',org:'Organisation tickets',department:'Department tickets',scope:'Visibility',noTickets:'No tickets in this view.',open:'Open',closed:'Closed',back:'Back to tickets',reply:'Reply',sendReply:'Send reply',created:'Ticket sent to your MSP.',commented:'Reply added.',noInvoices:'No payment requests or invoices yet.',pay:'Pay through Mollie',waitLink:'Your MSP will provide a payment link when the invoice is ready.',monthly:'per month excl. VAT',quote:'Price to be agreed',pending:'Request pending',active:'Active',cancel_requested:'Cancellation pending',cancelled:'Cancelled',rejected:'Declined',requested:'Requested',approved:'Approved',invoiced:'Invoiced',paid:'Paid',new:'New',triage:'Under review',in_progress:'In progress',waiting_client:'Waiting for your reply',needs_quote:'Quote needed',resolved:'Resolved',language:'Language',private:'Visible only to me and MSP',requestLevel:'Requested level',currentLevel:'Current level'}};
  function lang(){if(language)return language;try{const x=localStorage.getItem('sp-feature-guide-language');if(words[x])return x;}catch(_){}return document.documentElement.lang.startsWith('nl')?'nl':'en';}
@@ -16,9 +16,9 @@
  function status(value){return c()[value]||value;}
  function failure(exc){let code='';try{code=JSON.parse(exc.body).error?.code||'';}catch(_){}const nl=lang()==='nl';if(code==='support_hours_required')return nl?'Je uren zijn op. Koop eerst uren bij.':'No hours available. Buy hours first.';if(code==='payment_required')return nl?'Betaal eerst en dien daarna je aanvraag in.':'Pay first, then submit your request.';if(code==='mollie_invoice_missing')return nl?'De factuur staat nog niet klaar in Mollie. Je MSP kan dit controleren.':'The invoice is not ready in Mollie yet. Your MSP can check this.';if(code==='mollie_invoice_unavailable')return nl?'De factuur kon niet worden opgehaald. Probeer opnieuw of neem contact op met je MSP.':'Could not retrieve the invoice. Retry or contact your MSP.';if(code==='mollie_config')return nl?'Betalen is nog niet beschikbaar. Je MSP moet de betaalkoppeling instellen.':'Payments are not available yet. Your MSP must configure the payment connection.';if(exc.status===409)return nl?'Controleer de actuele betaalstatus of neem contact op met je MSP.':'Check the current payment status or contact your MSP.';return c().error;}
  async function run(fn){if(busy)return;const mine=generation;busy=true;error='';render();try{await fn(()=>mine===generation);if(mine===generation)await refreshData();}catch(exc){if(mine===generation)error=failure(exc);}finally{if(mine===generation){busy=false;render();}}}
- async function refreshData(){const mine=generation;const [o,t]=await Promise.all([api('/api/msp/overview'),api('/api/msp/tickets?scope='+scope)]);if(mine!==generation)return;overview=o;tickets=t.tickets||[];}
+ async function refreshData(){const mine=generation;const [o,t]=await Promise.all([api('/api/msp/overview'),api('/api/msp/tickets?scope='+scope)]);if(mine!==generation)return;overview=o;tickets=t.tickets||[];ledger=undefined;}
  async function load(){if(!allowed)return false;const mine=++generation;busy=true;error='';render();try{await refreshData();}catch(exc){if(mine===generation)error=failure(exc);}finally{if(mine===generation){busy=false;render();}}return !error;}
- function applyVisible(v){allowed=v===true;generation++;overview=null;tickets=[];detail=null;scope='mine';busy=false;error='';notice='';reply='';consultantDays=null;invoiceFilter='all';for(const key of ['title','body','service'])draft[key]='';if(!allowed)$('mainMsp')?.replaceChildren();}
+ function applyVisible(v){allowed=v===true;generation++;overview=null;tickets=[];detail=null;scope='mine';busy=false;error='';notice='';reply='';consultantDays=null;invoiceFilter='all';ledger=undefined;for(const key of ['title','body','service'])draft[key]='';if(!allowed)$('mainMsp')?.replaceChildren();}
  function fold(title,id){const n=el('details',undefined,'msp-details');if(id)n.id=id;n.append(el('summary',title));return n;}
  function hours(n){return Number(((n||0)/60).toFixed(2));}
  function toOrders(filter=''){orderFilter=filter;tab='billing';detail=null;render();}
@@ -137,8 +137,48 @@
   }
   return row.status==='invoiced'?(nl?'Openstaand':'Outstanding'):status(row.status);
  }
+ // Payments and invoices of the organisation, as the central Cloud keeps them. The server answers organisation
+ // owners and admins only; for everybody else the block stays away.
+ function loadLedger(){
+  if(ledgerBusy||ledger!==undefined)return;const mine=generation;ledgerBusy=true;
+  api('/api/msp/invoices',{timeoutToast:false}).then(d=>{if(mine===generation)ledger=d&&typeof d==='object'&&Array.isArray(d.invoices)?d:null;}).catch(()=>{if(mine===generation)ledger=null;})
+   .finally(()=>{ledgerBusy=false;if(mine===generation&&tab==='billing')render();});
+ }
+ function renderLedger(root){
+  const nl=lang()==='nl';if(ledger===undefined){loadLedger();return;}if(!ledger)return;
+  const box=card(nl?'Betalingen en facturatie':'Payments and invoicing');box.id='mspLedger';
+  if(ledger.notice)box.append(el('p',ledger.notice,'msp-muted'));
+  const day=v=>{if(!v)return '';const d=new Date(v);return Number.isNaN(d.getTime())?'':new Intl.DateTimeFormat(nl?'nl-NL':'en-GB',{dateStyle:'medium'}).format(d);};
+  const names={open:nl?'Openstaand':'Outstanding',paid:c().paid,credited:nl?'Gecrediteerd':'Credited',concept:nl?'Concept':'Draft'};
+  const total=t=>t?.total_cents!=null?amount(t.total_cents)+(nl?' incl. btw':' incl. VAT'):t?.amount_ex_vat_cents!=null?amount(t.amount_ex_vat_cents)+(nl?' excl. btw':' ex VAT'):(nl?'Bedrag volgt':'Amount follows');
+  const lines=(item,row)=>{if(!(row.lines||[]).length)return;const f=fold(nl?'Regels':'Lines');for(const l of row.lines)f.append(el('p',[l.description,l.department,l.quantity>1?l.quantity+' x':'',l.amount_ex_vat_cents==null?'':amount(l.amount_ex_vat_cents)+(nl?' excl. btw':' ex VAT')].filter(Boolean).join(' · ')));
+   if(row.totals?.vat_cents!=null)f.append(el('p',(nl?'Btw: ':'VAT: ')+amount(row.totals.vat_cents)+(row.reverse_charge?(nl?' (btw verlegd)':' (reverse charge)'):''),'msp-muted'));item.append(f);};
+  box.append(el('h3',(nl?'Facturen':'Invoices')+' ('+ledger.invoices.length+')'));
+  if(!ledger.invoices.length)box.append(el('p',nl?'Nog geen facturen.':'No invoices yet.','msp-muted'));
+  for(const r of ledger.invoices){
+   const item=el('article',undefined,'msp-order');item.dataset.ledgerInvoice=r.id;
+   item.append(el('strong',r.number||r.description||r.id));if(r.number&&r.description)item.append(el('p',r.description,'msp-muted'));
+   item.append(el('p',total(r.totals)+' · '+(names[r.status]||status(r.status))));
+   const meta=[day(r.date),r.period?(nl?'periode ':'period ')+r.period:''].filter(Boolean).join(' · ');if(meta)item.append(el('small',meta,'msp-muted'));
+   lines(item,r);
+   if(r.pdf_available)item.append(button(nl?'Factuur (PDF)':'Invoice (PDF)',()=>run(async valid=>{const document=await api('/api/msp/invoice',{method:'POST',body:JSON.stringify({request_id:r.id})});if(valid())downloadInvoice(document);})));
+   box.append(item);
+  }
+  box.append(el('h3',(nl?'Betalingen':'Payments')+' ('+ledger.payments.length+')'));
+  if(!ledger.payments.length)box.append(el('p',nl?'Nog geen betalingen.':'No payments yet.','msp-muted'));
+  for(const r of ledger.payments){
+   const item=el('article',undefined,'msp-order');item.dataset.ledgerPayment=r.id;
+   item.append(el('strong',[r.description,r.department_name].filter(Boolean).join(' · ')||r.id));
+   item.append(el('p',total(r.totals)+' · '+c().paid+(r.under_review?(nl?' · in controle':' · under review'):'')));
+   const span=r.service_from&&r.service_until?(nl?'van ':'from ')+day(r.service_from)+(nl?' tot ':' until ')+day(r.service_until):'';
+   const meta=[day(r.date),span].filter(Boolean).join(' · ');if(meta)item.append(el('small',meta,'msp-muted'));
+   lines(item,r);box.append(item);
+  }
+  root.append(box);
+ }
  function renderBilling(root){
   const w=c(),nl=lang()==='nl';if(!overview.permissions?.billing){root.append(el('p',w.restricted));return;}
+  renderLedger(root);
   const all=overview.billing_requests||[],rows=all.filter(r=>invoiceFilter==='all'||(invoiceFilter==='paid'?r.status==='paid':r.status==='invoiced'));
   const box=card(nl?'Betalingsoverzicht':'Payment overview');box.id='mspInvoices';
   if(all.length)box.append(select(nl?'Betaalstatus':'Payment status',[['all',nl?'Alles':'All'],['open',nl?'Openstaand':'Outstanding'],['paid',w.paid]],invoiceFilter,v=>{invoiceFilter=v;render();}));

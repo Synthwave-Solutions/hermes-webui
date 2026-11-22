@@ -172,8 +172,10 @@ def test_pull_replaces_only_cloud_partners(env):
     env.plane.assignments = {"assignments": [
         {"email": "Carla@Partner.Example", "name": "Carla Jansen", "role": "consultant", "starts_at": "2026-11-01", "ends_at": "2099-01-01"},
         {"email": DEVELOPER, "name": "Dev", "role": "developer", "starts_at": "", "ends_at": None},
-        {"email": "broken", "role": "consultant"}, {"email": "x@partner.example", "role": "owner"}]}
-    assert report.pull_assignments() == {"ok": True, "changed": True, "count": 2, "skipped": 2}
+        {"email": "broken", "role": "consultant"}, {"email": "x@partner.example", "role": "owner"},
+        # qa is no longer a resource centrally: such a row is skipped like any unknown role.
+        {"email": "quinn@partner.example", "name": "Quinn", "role": "qa"}]}
+    assert report.pull_assignments() == {"ok": True, "changed": True, "count": 2, "skipped": 3}
     request = env.plane.sent("GET", report.ASSIGNMENTS_PATH)[0]
     assert request["headers"]["authorization"].startswith("SP-HMAC-SHA256 ")
     assert not any(h.startswith("x-sp-acting") or "organi" in h for h in request["headers"])
@@ -442,10 +444,17 @@ def test_request_enforcement_and_the_login_label_for_a_partner(env, monkeypatch)
 HOURS = {"usage_as_of": 1795000000, "departments": [{
     "department_id": "dep_1", "name": "Finance", "tier": "t2", "tier_name": "Pakket twee", "term_ends_at": "2027-03-31",
     "planned_tier_change": False, "price_cents": 500000, "internal": "x",
-    "roles": [{"role": "consultant", "label": "Consultant", "allocated_minutes": 960, "used_minutes": 420, "remaining_minutes": 540,
+    "roles": [{"role": "consultant", "label": "Consultant", "base_minutes": 720, "increment_minutes": 240, "allocated_minutes": 960,
+               "used_minutes": 420, "remaining_minutes": 540, "card_minutes_used": 60, "uncovered_minutes": 30, "late_minutes": 15, "closed": False,
                "people": [{"name": "Carla Jansen", "used_minutes": 420, "email": "carla@partner.example"}], "rate": 150},
-              {"role": "developer", "label": "Developer", "allocated_minutes": 1920, "used_minutes": None, "remaining_minutes": None, "people": []},
+              {"role": "developer", "label": "Developer", "allocated_minutes": 1920, "used_minutes": None, "remaining_minutes": None,
+               "card_minutes_used": None, "uncovered_minutes": None, "people": []},
+              {"role": "qa", "label": "QA", "allocated_minutes": 60},                  # no longer a resource: dropped
               {"role": "owner", "label": "x", "allocated_minutes": 1}],
+    "increments": {"consultant": {"count": 2, "minutes": 120, "cents": 90000}, "developer": {"count": 0, "minutes": None, "cents": None}},
+    "cards": [{"id": "hc_1", "resource": "developer", "label": "Developer", "purchased_minutes": 1200, "used_minutes": 480, "remaining_minutes": 720,
+               "starts_at": 1790000000, "expires_at": 1805000000, "status": "active", "order_id": "so_x", "created_by_email": "x@example.com"},
+              {"id": "hc_2", "resource": "qa", "purchased_minutes": 60}],
     "team": [{"role": "consultant", "label": "Consultant", "name": "Carla Jansen", "hours_per_week": 4}]}],
     "maintenance": [], "support": None, "productive": {"status": "ok", "token": "secret"}}
 
@@ -463,14 +472,23 @@ def test_hours_are_proxied_cached_and_bounded(env):
     assert not any(h.startswith("x-sp-acting") or "organi" in h for h in request["headers"])
     assert got["configured"] and got["available"] and got["period"] == "2026-11" and got["usage_as_of"] == 1795000000
     dept = got["departments"][0]
-    assert set(dept) == {"department_id", "name", "tier", "tier_name", "term_ends_at", "planned_tier_change", "roles", "team"}
+    assert set(dept) == {"department_id", "name", "tier", "tier_name", "term_ends_at", "planned_tier_change", "roles", "increments", "cards", "team"}
     assert [r["role"] for r in dept["roles"]] == ["consultant", "developer"]                    # an unknown role is dropped
-    assert dept["roles"][0] == {"role": "consultant", "label": "Consultant", "allocated_minutes": 960, "used_minutes": 420,
-                                "remaining_minutes": 540, "people": [{"name": "Carla Jansen", "used_minutes": 420}]}
-    assert dept["roles"][1]["used_minutes"] is None and dept["roles"][1]["remaining_minutes"] is None    # not known yet stays null
+    assert dept["roles"][0] == {"role": "consultant", "label": "Consultant", "base_minutes": 720, "increment_minutes": 240,
+                                "allocated_minutes": 960, "used_minutes": 420, "remaining_minutes": 540, "card_minutes_used": 60,
+                                "uncovered_minutes": 30, "late_minutes": 15, "closed": False,
+                                "people": [{"name": "Carla Jansen", "used_minutes": 420}]}
+    developer = dept["roles"][1]
+    assert developer["used_minutes"] is None and developer["remaining_minutes"] is None                 # not known yet stays null
+    assert developer["card_minutes_used"] is None and developer["uncovered_minutes"] is None
+    assert developer["base_minutes"] == 1920 and developer["increment_minutes"] == 0                    # an older answer without the split
+    # Extra monthly blocks without their price, and the hour cards of the two resources only.
+    assert dept["increments"] == {"consultant": {"count": 2, "minutes": 120}}
+    assert dept["cards"] == [{"id": "hc_1", "resource": "developer", "label": "Developer", "purchased_minutes": 1200, "used_minutes": 480,
+                              "remaining_minutes": 720, "starts_at": 1790000000, "expires_at": 1805000000, "status": "active"}]
     assert dept["team"] == [{"role": "consultant", "label": "Consultant", "name": "Carla Jansen", "hours_per_week": 4}]
     text = json.dumps(got)
-    for leak in ("price_cents", "rate", "secret", "internal", "partner.example", "maintenance", "support"):
+    for leak in ("price_cents", "rate", "secret", "internal", "partner.example", "maintenance", "support", "cents", "so_x", "x@example.com"):
         assert leak not in text, leak
     # Five minutes from the cache, then asked again; another month is its own entry.
     sent = len(env.plane.requests)

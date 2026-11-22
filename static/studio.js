@@ -45,9 +45,9 @@
     discuss: 'Bespreek in chat', delete: 'Verwijderen', confirm_delete: 'Use case verwijderen?', empty_list: 'Nog geen use cases. Begin met een gesprek over je werk.',
     components: 'onderdelen', built_n: 'gebouwd', need_input: 'Vertel eerst iets, dan gaat de Super Agent aan de slag.',
     chat_prompt: 'Ik werk in Studio aan de use case "{t}". Help me verder: {s}',
-    consultant: 'Consultant', consultant_none: 'Nog niemand', nav_progress: 'Voortgang', nav_plan: 'Roadmap',
+    consultant: 'Agentic Consultant', consultant_none: 'Nog niemand', nav_progress: 'Voortgang', nav_plan: 'Roadmap',
     pg_intro: 'Hoe ver elke use case is, wie van Synthwave meewerkt en wat het per week oplevert.',
-    pg_uc: 'Use case', pg_team: 'Team', pg_phase: 'Fase', pg_consultant: 'Consultant', pg_saved: 'Uren per week bespaard', pg_measured: 'Gemeten, 30 dagen',
+    pg_uc: 'Use case', pg_team: 'Team', pg_phase: 'Fase', pg_consultant: 'Agentic Consultant', pg_saved: 'Uren per week bespaard', pg_measured: 'Gemeten, 30 dagen',
     read_only: 'Je kunt deze use case bekijken, niet wijzigen.',
     pg_empty: 'Nog geen use cases om te tonen.', pg_total: '{n} use cases, samen {h} uur per week bespaard volgens het ontwerp.', pg_unknown: 'nog bepalen', pg_hours: 'uur'
   };
@@ -85,9 +85,9 @@
     discuss: 'Discuss in chat', delete: 'Delete', confirm_delete: 'Delete this use case?', empty_list: 'No use cases yet. Start with a conversation about your work.',
     components: 'components', built_n: 'built', need_input: 'Tell something first, then the Super Agent gets to work.',
     chat_prompt: 'I am working in Studio on the use case "{t}". Help me further: {s}',
-    consultant: 'Consultant', consultant_none: 'Nobody yet', nav_progress: 'Progress', nav_plan: 'Roadmap',
+    consultant: 'Agentic Consultant', consultant_none: 'Nobody yet', nav_progress: 'Progress', nav_plan: 'Roadmap',
     pg_intro: 'How far each use case is, who from Synthwave works on it and what it saves per week.',
-    pg_uc: 'Use case', pg_team: 'Team', pg_phase: 'Phase', pg_consultant: 'Consultant', pg_saved: 'Hours saved per week', pg_measured: 'Measured, 30 days',
+    pg_uc: 'Use case', pg_team: 'Team', pg_phase: 'Phase', pg_consultant: 'Agentic Consultant', pg_saved: 'Hours saved per week', pg_measured: 'Measured, 30 days',
     read_only: 'You can view this use case, not change it.',
     pg_empty: 'No use cases to show yet.', pg_total: '{n} use cases, together {h} hours saved per week by design.', pg_unknown: 'to be determined', pg_hours: 'hours'
   };
@@ -423,10 +423,11 @@
   // Who from the supplier works on this use case. Only assigned partners can be chosen.
   function consultantPick(doc){
     const P = window.SPPartners;
-    if (!P || !St.partners.length) return '';
+    const workers = St.partners.filter(p => ['consultant', 'developer'].includes(p.role));
+    if (!P || !(workers.length || doc.consultant)) return '';
     if (!doc.editable) return consultantBadge(doc.consultant);
-    const known = St.partners.some(p => p.email === doc.consultant);
-    return `<label class="om-inline-form om-small om-muted st-team-pick st-consultant-pick">${H(w('consultant'))} <select class="om-select" data-st-consultant><option value="">${H(w('consultant_none'))}</option>${doc.consultant && !known ? `<option value="${H(doc.consultant)}" selected>${H(window.SPScope ? window.SPScope.personName(doc.consultant) : doc.consultant)}</option>` : ''}${St.partners.map(p => `<option value="${H(p.email)}" ${doc.consultant === p.email ? 'selected' : ''}>${H(P.name(p))} (${H(P.label(p.role).replace(/^Synthwave /, ''))})</option>`).join('')}</select></label>`;
+    const known = workers.some(p => p.email === doc.consultant);
+    return `<label class="om-inline-form om-small om-muted st-team-pick st-consultant-pick">${H(w('consultant'))} <select class="om-select" data-st-consultant><option value="">${H(w('consultant_none'))}</option>${doc.consultant && !known ? `<option value="${H(doc.consultant)}" selected>${H(window.SPScope ? window.SPScope.personName(doc.consultant) : doc.consultant)}</option>` : ''}${workers.map(p => `<option value="${H(p.email)}" ${doc.consultant === p.email ? 'selected' : ''}>${H(P.name(p))} (${H(P.short(p.role))})</option>`).join('')}</select></label>`;
   }
   function renderDoc(){
     const doc = St.doc;

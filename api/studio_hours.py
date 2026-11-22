@@ -4,8 +4,9 @@
 ``GET /v1/customer/hours?period=YYYY-MM`` of the control plane (the control
 key binds the organisation; nothing here sends an organisation id) and hands
 the browser a fixed, bounded shape: per department the package, per role the
-allocated, used and remaining minutes with the people behind them, and the
-assigned team. Hours only: no rates and no amounts.
+monthly hours (the package plus extra monthly blocks), used and remaining minutes
+with the people behind them, what was drawn from prepaid hour cards, the card
+balances and the assigned team. Hours only: no rates and no amounts.
 
 For organisation admins, department admins and assigned partners. Answers are
 kept for five minutes per period. Without a configured control plane, or when
@@ -26,7 +27,9 @@ logger = logging.getLogger(__name__)
 
 HOURS_PATH = "/v1/customer/hours"
 CACHE_S = 300.0
-ROLES = ("developer", "consultant", "qa")
+ROLES = ("developer", "consultant")
+CARD_STATUSES = ("active", "used", "expired", "voided")
+MAX_CARDS = 60
 MAX_DEPARTMENTS = 64
 MAX_PEOPLE = 50
 _PERIOD_RE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
@@ -49,15 +52,52 @@ def _minutes(value):
     return int(round(value))
 
 
+def _stamp(value):
+    """A moment as the Cloud sent it (epoch seconds or an ISO text), or None."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return value
+    return _text(value, 40) or None
+
+
 def _role(raw) -> dict | None:
     if not isinstance(raw, dict) or raw.get("role") not in ROLES:
         return None
     people = [{"name": _text(p.get("name"), 80), "used_minutes": _minutes(p.get("used_minutes")) or 0}
               for p in (raw.get("people") if isinstance(raw.get("people"), list) else [])[:MAX_PEOPLE]
               if isinstance(p, dict) and _text(p.get("name"), 80)]
-    return {"role": raw["role"], "label": _text(raw.get("label"), 60), "allocated_minutes": _minutes(raw.get("allocated_minutes")) or 0,
+    allocated = _minutes(raw.get("allocated_minutes")) or 0
+    base = _minutes(raw.get("base_minutes"))
+    return {"role": raw["role"], "label": _text(raw.get("label"), 60),
+            # The month: the hours of the package plus the extra monthly blocks.
+            "base_minutes": allocated if base is None else base, "increment_minutes": _minutes(raw.get("increment_minutes")) or 0,
+            "allocated_minutes": allocated,
             "used_minutes": _minutes(raw.get("used_minutes")), "remaining_minutes": _minutes(raw.get("remaining_minutes")),
+            # Drawn from prepaid hour cards, and what neither the month nor a card covers. None: not known yet.
+            "card_minutes_used": _minutes(raw.get("card_minutes_used")), "uncovered_minutes": _minutes(raw.get("uncovered_minutes")),
+            "late_minutes": _minutes(raw.get("late_minutes")) or 0, "closed": raw.get("closed") is True,
             "people": people}
+
+
+def _card(raw) -> dict | None:
+    if not isinstance(raw, dict) or raw.get("resource") not in ROLES:
+        return None
+    return {"id": _text(raw.get("id"), 80), "resource": raw["resource"], "label": _text(raw.get("label"), 60),
+            "purchased_minutes": _minutes(raw.get("purchased_minutes")) or 0, "used_minutes": _minutes(raw.get("used_minutes")) or 0,
+            "remaining_minutes": _minutes(raw.get("remaining_minutes")) or 0,
+            "starts_at": _stamp(raw.get("starts_at")), "expires_at": _stamp(raw.get("expires_at")),
+            "status": raw.get("status") if raw.get("status") in CARD_STATUSES else ""}
+
+
+def _increments(raw) -> dict:
+    """Extra monthly blocks per role: how many and how long. The price stays in the Cloud."""
+    out = {}
+    for role in ROLES:
+        item = raw.get(role) if isinstance(raw, dict) else None
+        if isinstance(item, dict) and (_minutes(item.get("count")) or 0) > 0:
+            out[role] = {"count": _minutes(item.get("count")), "minutes": _minutes(item.get("minutes"))}
+    return out
 
 
 def _department(raw) -> dict | None:
@@ -68,10 +108,11 @@ def _department(raw) -> dict | None:
              "hours_per_week": t.get("hours_per_week") if isinstance(t.get("hours_per_week"), (int, float)) and not isinstance(t.get("hours_per_week"), bool) else None}
             for t in (raw.get("team") if isinstance(raw.get("team"), list) else [])[:MAX_PEOPLE]
             if isinstance(t, dict) and _text(t.get("name"), 80)]
+    cards = [c for c in (_card(x) for x in (raw.get("cards") if isinstance(raw.get("cards"), list) else [])[:MAX_CARDS]) if c]
     return {"department_id": _text(raw.get("department_id"), 80), "name": _text(raw.get("name"), 120),
             "tier": _text(raw.get("tier"), 40) or None, "tier_name": _text(raw.get("tier_name"), 80) or None,
             "term_ends_at": _text(raw.get("term_ends_at"), 40) or None, "planned_tier_change": bool(raw.get("planned_tier_change")),
-            "roles": roles, "team": team}
+            "roles": roles, "increments": _increments(raw.get("increments")), "cards": cards, "team": team}
 
 
 def clean_hours(data, period: str) -> dict:

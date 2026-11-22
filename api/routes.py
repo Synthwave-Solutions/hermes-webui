@@ -12452,7 +12452,7 @@ def handle_get(handler, parsed) -> bool:
         from api import bot_screens
         return bot_screens.handle_get(handler, parsed)
 
-    if parsed.path in ("/api/msp/overview", "/api/msp/tickets", "/api/msp/ticket"):
+    if parsed.path in ("/api/msp/overview", "/api/msp/invoices", "/api/msp/tickets", "/api/msp/ticket"):
         from api import msp_service
         return msp_service.handle_get(handler, parsed)
 

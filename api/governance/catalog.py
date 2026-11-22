@@ -66,7 +66,7 @@ _SELF_ROUTES: frozenset[str] = frozenset({
     "/api/client-errors",
     "/api/apps",
     "/api/bot-screen", "/api/bot-screen/ws", "/api/bot-screen/status",
-    "/api/msp/invoice", "/api/msp/order", "/api/msp/job-cost", "/api/msp/package", "/api/msp/overview", "/api/msp/tickets", "/api/msp/ticket", "/api/msp/comment",
+    "/api/msp/invoice", "/api/msp/invoices", "/api/msp/order", "/api/msp/job-cost", "/api/msp/package", "/api/msp/overview", "/api/msp/tickets", "/api/msp/ticket", "/api/msp/comment",
     "/api/msp/app-state", "/api/msp/app-request", "/api/msp/app-intake", "/api/msp/app-support",
     # Team structure, organisation chart and Management (8 Nov 2026): every
     # handler decides from org_structure.request_scope itself.

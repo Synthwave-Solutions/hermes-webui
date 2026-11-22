@@ -7,7 +7,7 @@ from api.org_modules import context
 from api.governance import delegation
 from api.helpers import j
 
-ROUTES=('/api/msp/invoice','/api/msp/order','/api/msp/job-cost','/api/msp/package','/api/msp/overview','/api/msp/tickets','/api/msp/ticket','/api/msp/comment',
+ROUTES=('/api/msp/invoice','/api/msp/invoices','/api/msp/order','/api/msp/job-cost','/api/msp/package','/api/msp/overview','/api/msp/tickets','/api/msp/ticket','/api/msp/comment',
         '/api/msp/app-state','/api/msp/app-request','/api/msp/app-intake','/api/msp/app-support')
 
 
@@ -52,6 +52,75 @@ def overview(handler):
     return fetch(handler,'/v1/customer/overview')
 
 
+# ── Payments and invoices of the organisation (organisation owners and admins) ──
+
+LEDGER_PATH='/v1/customer/invoices'
+_LEDGER_MAX=200
+_INVOICE_ID=re.compile(r'br_[A-Za-z0-9_-]{1,80}')
+
+
+def _words(value,limit=200):
+    return ' '.join(str(value).split())[:limit] if isinstance(value,(str,int)) and not isinstance(value,bool) else ''
+
+
+def _cents(value):
+    return int(value) if isinstance(value,(int,float)) and not isinstance(value,bool) else None
+
+
+def _ledger_lines(raw):
+    return [{'kind':_words(line.get('kind'),40),'description':_words(line.get('description')),'department':_words(line.get('department'),120) or None,
+             'quantity':line.get('quantity') if isinstance(line.get('quantity'),(int,float)) and not isinstance(line.get('quantity'),bool) else None,
+             'amount_ex_vat_cents':_cents(line.get('amount_ex_vat_cents'))}
+            for line in (raw if isinstance(raw,list) else [])[:40] if isinstance(line,dict)]
+
+
+def _ledger_row(raw,invoice):
+    row={'id':_words(raw.get('id'),100),'date':_words(raw.get('date'),40) or None,'period':_words(raw.get('period'),20) or None,
+         'status':_words(raw.get('status'),40),'description':_words(raw.get('description')),'lines':_ledger_lines(raw.get('lines')),
+         'totals':{'amount_ex_vat_cents':_cents(raw.get('amount_ex_vat_cents')),'vat_cents':_cents(raw.get('vat_cents')),
+                   'total_cents':_cents(raw.get('total_cents'))},
+         'payment_method':_words(raw.get('payment_method'),40) or None}
+    if isinstance(raw.get('totals'),dict):          # a control plane that already groups the totals
+        for key in row['totals']:
+            if _cents(raw['totals'].get(key)) is not None:row['totals'][key]=_cents(raw['totals'][key])
+    if invoice:
+        # The document is fetched by the invoice id through the existing download route; only ids of that form get one.
+        row.update(number=_words(raw.get('number'),80),reverse_charge=raw.get('reverse_charge') is True,
+                   pdf_available=raw.get('pdf_available') is True and bool(_INVOICE_ID.fullmatch(row['id'])))
+    else:
+        row.update(kind=_words(raw.get('kind'),40),department_name=_words(raw.get('department_name'),120) or None,
+                   service_from=_words(raw.get('service_from'),20) or None,service_until=_words(raw.get('service_until'),20) or None,
+                   under_review=raw.get('under_review') is True)
+    return row
+
+
+def clean_ledger(data):
+    """The bounded shape for the browser from what the control plane answered."""
+    data=data if isinstance(data,dict) else {}
+    rows=lambda key,invoice:[_ledger_row(r,invoice) for r in (data.get(key) if isinstance(data.get(key),list) else [])[:_LEDGER_MAX] if isinstance(r,dict)]
+    return {'title':_words(data.get('title'),120),'currency':_words(data.get('currency'),3) or 'EUR',
+            'invoices_complete':data.get('invoices_complete') is True,'notice':_words(data.get('notice'),600) or None,
+            'invoices':rows('invoices',True),'payments':rows('payments',False)}
+
+
+def ledger(handler):
+    """Payments and invoices, for organisation owners and admins only.
+
+    Checked here as well as centrally: a partner never passes ``identity`` and
+    a normal user is no organisation admin in the team structure. The control
+    plane then decides once more on the person's role in the Cloud.
+    """
+    try:identity(handler)
+    except PermissionError:return 403,{'error':{'code':'forbidden','message':'Organisation sign-in required'}}
+    except Exception:return 503,{'error':{'code':'policy_unavailable','message':'Account permissions unavailable'}}
+    from api import org_structure
+    view=org_structure.request_scope(handler)
+    if view.scope!=org_structure.SCOPE_ALL or view.is_partner:
+        return 403,{'error':{'code':'forbidden','message':'Only organisation owners and admins see payments and invoices'}}
+    status,data=fetch(handler,LEDGER_PATH)
+    return (200,clean_ledger(data)) if status==200 else (status,data)
+
+
 def respond(handler,result):
     status,data=result;j(handler,data,status=status,extra_headers={'Cache-Control':'no-store'});return True
 
@@ -59,6 +128,7 @@ def respond(handler,result):
 def handle_get(handler,parsed):
     query=parse_qs(parsed.query)
     if parsed.path=='/api/msp/overview':return respond(handler,overview(handler))
+    if parsed.path=='/api/msp/invoices':return respond(handler,ledger(handler))
     if parsed.path=='/api/msp/tickets':
         scope=query.get('scope',['mine'])[0]
         if scope not in ('mine','org','department'):return respond(handler,(422,{'error':'Invalid ticket scope'}))

@@ -6,8 +6,9 @@ enforcing policy with a member role and the partner role, and a fake control
 plane on localhost that answers the assignments, the hours, the summary and
 the sign-in handoff. Drives Chromium as four people:
 
-1. organisation admin: the team block and "Uren deze maand" on the overview
-   (rows per person, "Nog niet bekend", "Bijgewerkt tot");
+1. organisation admin: the team block (Agentic Consultant, Agentic Developer)
+   and "Uren deze maand" on the overview (monthly hours with extra blocks,
+   rows per person, hour cards, "Nog niet bekend", "Bijgewerkt tot");
 2. the roadmap is loaded from JSON through the screen; the chart has months,
    weeks, steering stars, dashed foundation bars and the marker for today;
 3. a row is linked to a task, a skill and a use case with the pickers: built;
@@ -18,8 +19,11 @@ the sign-in handoff. Drives Chromium as four people:
 5. a consultant is chosen on a use case: badge on the card, name in Voortgang;
 6. the consultant (partner role) changes the roadmap and reaches no
    Management, rates or admin route, and files no access request;
-7. qa reads only; a team member views the roadmap and cannot change it;
-8. narrow layout: the chart scrolls sideways, the page does not.
+7. an address the Cloud does not assign (qa is no longer a resource) gets
+   nothing; a team member views the roadmap and cannot change it;
+8. narrow layout: the chart scrolls sideways, the page does not;
+9. payments and invoices in Support for the organisation admin, with the
+   download where a document exists; never for a partner or a team member.
 
 Set CHROMIUM_PATH to use a Chromium that Playwright did not install itself.
 
@@ -27,6 +31,7 @@ Set CHROMIUM_PATH to use a Chromium that Playwright did not install itself.
 """
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import os
@@ -45,6 +50,7 @@ from browser_conversation_lifecycle import _terminate_process  # noqa: E402
 from browser_org_management import ADMIN, LEAD, MEMBER, PASSWORD, _iso, hub, ok, seed, start_server  # noqa: E402
 
 CONSULTANT = "carla@partner.example"
+DEVELOPER = "daan@partner.example"
 QA = "quinn@partner.example"
 KEY_ID = "0a1b2c3d4e5f6071"
 SECRET_HEX = "5f" * 16 + "a0" * 16
@@ -55,16 +61,40 @@ GRANTS = {"permissions": ["chat:use", "sessions:read", "sessions:write", "profil
                           "model:read", "files:read", "integrations:read", "cron:read"],
           "routes": ["/api/*"], "profiles": ["default"]}
 
-HOURS = {"usage_as_of": int(time.time()) - 86400, "departments": [
+NOW = int(time.time())
+HOURS = {"usage_as_of": NOW - 86400, "departments": [
     {"department_id": "dep_1", "name": "Finance", "tier": "t2", "tier_name": "Pakket twee", "term_ends_at": "2027-03-31",
-     "roles": [{"role": "consultant", "label": "Consultant", "allocated_minutes": 960, "used_minutes": 425, "remaining_minutes": 535,
+     "roles": [{"role": "consultant", "label": "Consultant", "base_minutes": 720, "increment_minutes": 240, "allocated_minutes": 960,
+                "used_minutes": 425, "remaining_minutes": 535, "card_minutes_used": 0, "uncovered_minutes": 0, "late_minutes": 0, "closed": False,
                 "people": [{"name": "Carla Jansen", "used_minutes": 305}, {"name": "Noor de Wit", "used_minutes": 120}]},
-               {"role": "developer", "label": "Developer", "allocated_minutes": 1920, "used_minutes": None, "remaining_minutes": None, "people": []}],
+               {"role": "developer", "label": "Developer", "base_minutes": 600, "increment_minutes": 0, "allocated_minutes": 600,
+                "used_minutes": 780, "remaining_minutes": 0, "card_minutes_used": 120, "uncovered_minutes": 60, "late_minutes": 0, "closed": False,
+                "people": [{"name": "Daan Visser", "used_minutes": 780}]}],
+     "increments": {"consultant": {"count": 2, "minutes": 120, "cents": 90000}},
+     "cards": [{"id": "hc_1", "resource": "developer", "label": "Developer", "purchased_minutes": 1200, "used_minutes": 480,
+                "remaining_minutes": 720, "starts_at": NOW - 40 * 86400, "expires_at": 1805000000, "status": "active"}],
      "team": [{"role": "consultant", "label": "Consultant", "name": "Carla Jansen", "hours_per_week": 4}]},
     {"department_id": "dep_2", "name": "Sales", "tier": "t1", "tier_name": "Pakket een", "term_ends_at": "2027-01-31",
-     "roles": [{"role": "consultant", "label": "Consultant", "allocated_minutes": 480, "used_minutes": 90, "remaining_minutes": 390,
-                "people": [{"name": "Carla Jansen", "used_minutes": 90}]}],
-     "team": [{"role": "consultant", "label": "Consultant", "name": "Carla Jansen", "hours_per_week": 2}]}]}
+     "roles": [{"role": "consultant", "label": "Consultant", "base_minutes": 480, "increment_minutes": 0, "allocated_minutes": 480,
+                "used_minutes": None, "remaining_minutes": None, "card_minutes_used": None, "uncovered_minutes": None, "people": []}],
+     "increments": {}, "cards": [], "team": []}]}
+
+OVERVIEW = {"org": {"name": "Voorbeeld organisatie"}, "permissions": {"billing": True}, "billing_requests": [], "apps": [],
+            "support_access": {"can_submit": True, "available_minutes": 0}}
+INVOICES = {"title": "Betalingen en facturatie", "currency": "EUR", "invoices_complete": False, "notice": "Nog niet elke betaling heeft hier een factuur.",
+            "invoices": [{"id": "br_voorbeeld1", "number": "F-2026-0012", "date": "2026-11-03T09:00:00+00:00", "period": "2026", "status": "paid",
+                          "description": "Jaarsupport", "lines": [{"kind": "annual_support", "description": "Jaarsupport", "department": None,
+                                                                   "quantity": 1, "amount_ex_vat_cents": 120000}],
+                          "amount_ex_vat_cents": 120000, "vat_cents": 25200, "total_cents": 145200, "pdf_available": True},
+                         {"id": "br_voorbeeld2", "number": "F-2026-0015", "date": "2026-11-18T09:00:00+00:00", "status": "open",
+                          "description": "Strippenkaart 20 uur", "lines": [], "amount_ex_vat_cents": 240000, "vat_cents": 50400,
+                          "total_cents": 290400, "pdf_available": False}],
+            "payments": [{"id": "tr_1", "date": "2026-11-01T08:00:00+00:00", "period": "2026-11", "service_from": "2026-11-01",
+                          "service_until": "2026-12-01", "kind": "subscription", "description": "Pakket twee", "department_name": "Finance",
+                          "lines": [{"kind": "package", "description": "Afdelingsabonnement Pakket twee", "department": "Finance", "quantity": 1,
+                                     "amount_ex_vat_cents": 500000}],
+                          "amount_ex_vat_cents": 500000, "vat_cents": 105000, "total_cents": 605000, "status": "paid", "pdf_available": False}]}
+PDF = base64.b64encode(b"%PDF-1.4\n% voorbeeld\n").decode()
 
 
 def roadmap_doc() -> dict:
@@ -111,12 +141,22 @@ class FakeControlPlane:
                 fake.requests.append((self.command, self.path, body))
                 status = 200
                 if self.command == "GET" and self.path == "/v1/customer/assignments":
+                    # qa is no longer a resource of the Cloud: the installation skips such a row.
                     payload = {"assignments": [{"email": CONSULTANT, "name": "Carla Jansen", "role": "consultant"},
+                                               {"email": DEVELOPER, "name": "Daan Visser", "role": "developer"},
                                                {"email": QA, "name": "Quinn Bakker", "role": "qa"}]}
                 elif self.command == "POST" and self.path == "/v1/customer/studio/summary":
                     payload = {"ok": True}
                 elif self.command == "GET" and re.fullmatch(r"/v1/customer/hours\?period=\d{4}-\d{2}", self.path):
                     payload = dict(HOURS, period=self.path.rsplit("=", 1)[1])
+                elif self.command == "GET" and self.path == "/v1/customer/overview":
+                    payload = OVERVIEW
+                elif self.command == "GET" and self.path.startswith("/v1/tickets"):
+                    payload = {"tickets": []}
+                elif self.command == "GET" and self.path == "/v1/customer/invoices":
+                    payload = INVOICES
+                elif self.command == "POST" and self.path == "/v1/customer/invoices/br_voorbeeld1/download":
+                    payload = {"content_type": "application/pdf", "pdf_base64": PDF, "filename": "factuur-invoice_voorbeeld1.pdf"}
                 elif self.command == "POST" and self.path == "/v1/cloud-session" and (body or {}).get("code") in fake.codes:
                     payload = {"email": fake.codes[body["code"]], "proof": "ab" * 32}
                 else:
@@ -182,7 +222,7 @@ def main() -> int:
     (skill / "SKILL.md").write_text("---\nname: aanmaning-opstellen\ndescription: Aanmaning in drie niveaus\n---\n\n# Aanmaning opstellen\n",
                                     encoding="utf-8")
     plane = FakeControlPlane()
-    codes = {email: plane.code_for(email) for email in (MEMBER, CONSULTANT, QA)}
+    codes = {email: plane.code_for(email) for email in (ADMIN, MEMBER, CONSULTANT, QA)}
     key = state / "control.key"
     key.write_text(f"{KEY_ID}:{SECRET_HEX}\n", encoding="utf-8")
     key.chmod(0o600)
@@ -215,7 +255,7 @@ def main() -> int:
 
             def sign_in(email=None):
                 """A context for the admin (password) or for a person who arrives through the Cloud handoff."""
-                ctx = browser.new_context(base_url=base_url, viewport={"width": 1440, "height": 1000}, locale="nl-NL")
+                ctx = browser.new_context(base_url=base_url, viewport={"width": 1440, "height": 1000}, locale="nl-NL", accept_downloads=True)
                 if email is None:
                     resp = ctx.request.post("/api/auth/login", data={"password": PASSWORD})
                 else:
@@ -246,11 +286,18 @@ def main() -> int:
             hub(page, "home")
             page.wait_for_selector("#mainStudio .sp-hours .sp-hours-person", timeout=20000)
             hours = page.locator("#mainStudio .sp-hours").inner_text()
-            assert "Uren deze maand" in hours and "Bijgewerkt tot" in hours and "Nog niet bekend" in hours, hours
+            assert "Uren deze maand" in hours and "Bijgewerkt tot" in hours and "Nog niet bekend" in hours and "Maanduren" in hours, hours
             assert "Carla Jansen" in hours and "Noor de Wit" in hours and "Pakket twee" in hours and "Sales" in hours, hours
+            assert "Agentic Consultant" in hours and "Agentic Developer" in hours and "QA" not in hours, hours
             assert "7,1 uur" in hours and "31 maart 2027" in hours and "€" not in hours, hours
+            assert "Basis 12 uur, extra blokken 4 uur" in hours and "Uit strippenkaart gebruikt: 2 uur" in hours, hours
+            assert "1 uur valt buiten de maanduren en de strippenkaarten." in hours, hours
+            assert "Strippenkaarten" in hours and "Agentic Developer: 12 van 20 uur over" in hours and "geldig tot" in hours, hours
             team = page.locator("#mainStudio .sp-partners").inner_text()
-            assert "Team van Synthwave" in team and "Carla Jansen" in team and "Synthwave QA" in team, team
+            assert "Team van Synthwave" in team and "Carla Jansen" in team and "Synthwave Agentic Consultant" in team, team
+            assert "Synthwave Agentic Developer" in team and "Quinn" not in team and "QA" not in team, team
+            assert "Agentic Consultant: brengt de processen in kaart, kiest en prioriteert de use cases, traint en draagt over." in team, team
+            assert "Agentic Developer: bouwt en onderhoudt de automations in dit platform." in team, team
             assert page.locator("#panelStudio .sp-partner-list.compact .sp-partner-row").count() == 2
             page.screenshot(path=str(art / "01-overview-team-hours.png"))
             ok("the overview shows the assigned team and the hours of the month per role and per person")
@@ -360,11 +407,13 @@ def main() -> int:
             # 5. a consultant on a use case
             page.evaluate("(id) => window.SPStudio.openUseCase(id)", uc)
             page.wait_for_selector("[data-st-consultant]", timeout=10000)
+            options = page.locator("[data-st-consultant] option").all_inner_texts()
+            assert options == ["Nog niemand", "Carla Jansen (Agentic Consultant)", "Daan Visser (Agentic Developer)"], options
             page.locator("[data-st-consultant]").select_option(CONSULTANT)
             page.wait_for_function("() => document.querySelector('[data-st-consultant]') && document.querySelector('[data-st-consultant]').value.includes('@')", timeout=10000)
             hub(page, "usecases")
             page.wait_for_selector("#mainStudio .st-card .sp-partner", timeout=10000)
-            assert "Synthwave consultant · Carla Jansen" in page.locator("#mainStudio .st-card").first.inner_text()
+            assert "Synthwave Agentic Consultant · Carla Jansen" in page.locator("#mainStudio .st-card").first.inner_text()
             hub(page, "progress")
             page.wait_for_selector("#mainStudio .st-progress tbody tr", timeout=10000)
             assert "Carla Jansen" in page.locator("#mainStudio .st-progress tbody tr").first.inner_text()
@@ -384,7 +433,7 @@ def main() -> int:
             assert c_ctx.request.post("/api/org/structure", data={"op": "department.save", "key": "x", "name": "X"}).status == 403
             hub(c_page, "home")
             c_page.wait_for_selector("#mainStudio .sp-hours", timeout=20000)
-            assert "Synthwave consultant" in c_page.locator("#mainStudio .wp-role").first.inner_text()
+            assert "Synthwave Agentic Consultant" in c_page.locator("#mainStudio .wp-role").first.inner_text()
             nav = c_page.locator("#panelStudio [data-st-hub]").evaluate_all("els => els.map(e => e.dataset.stHub)")
             assert "plan" in nav and "progress" in nav and not {"mgmt", "teams", "chart"} & set(nav), nav
             hub(c_page, "plan")
@@ -396,6 +445,7 @@ def main() -> int:
             c_page.evaluate("(id) => window.SPStudio.openUseCase(id)", uc)
             c_page.wait_for_selector("[data-st-consultant]", timeout=10000)
             assert c_page.locator("[data-st-delete]").count() == 0 and c_page.locator("[data-st-send]").count() == 1
+            assert c_ctx.request.get("/api/msp/invoices").status == 403
             c_page.screenshot(path=str(art / "07-consultant.png"))
             # nothing a partner was refused lands in the customer's approval queue
             pending = ctx.request.get("/api/governance/approvals").json()
@@ -403,19 +453,12 @@ def main() -> int:
             c_ctx.close()
             ok("the consultant changes the roadmap, reaches no Management, rates or admin route, and files no access request")
 
-            # 7. qa reads only; a team member views the roadmap and cannot change it
-            q_ctx, q_page = sign_in(QA)
-            assert q_ctx.request.post("/api/studio/roadmap", data={"op": "update", "target": "row", "id": "kickoff", "note": "x"}).status == 403
-            hub(q_page, "plan")
-            q_page.wait_for_selector("#mainStudio .pl-chart", timeout=10000)
-            open_row(q_page, "b2-fundament")
-            assert q_page.locator("[data-pl-form]").count() == 0 and q_page.locator(".pl-actions").count() == 0
-            assert q_page.locator("[data-pl-panel] .pl-ev").count() == 3
-            q_page.evaluate("(id) => window.SPStudio.openUseCase(id)", uc)
-            q_page.wait_for_selector("[data-st-read-only]", timeout=10000)
-            assert q_page.locator("[data-st-send]").count() == 0 and q_page.locator("[data-st-delete]").count() == 0
-            assert q_page.locator("[data-st-team]").is_disabled() and not q_page.locator("[data-st-side-new]").is_visible()
-            q_page.screenshot(path=str(art / "08-qa-read-only.png"))
+            # 7. an address that is not (or no longer) assigned gets nothing; a team member views and cannot change
+            q_ctx = browser.new_context(base_url=base_url)
+            assert q_ctx.request.post("/api/auth/cloud-session", data={"code": codes[QA]},
+                                      headers={"Origin": "https://" + base_url.split("//", 1)[1], "X-SynthPulse-Login": "1"}).ok
+            for path in ("/api/studio/roadmap", "/api/studio/usecases", "/api/studio/hours", "/api/org/structure"):
+                assert q_ctx.request.get(path).status == 403, path
             q_ctx.close()
             m_ctx, m_page = sign_in(MEMBER)
             assert m_ctx.request.post("/api/studio/roadmap", data={"op": "import", "roadmap": roadmap_doc()}).status == 403
@@ -429,9 +472,10 @@ def main() -> int:
             hub(m_page, "home")
             m_page.wait_for_selector("#mainStudio .sp-partners", timeout=20000)
             assert m_page.locator("#mainStudio .sp-hours").count() == 0
+            assert m_ctx.request.get("/api/msp/invoices").status == 403
             m_page.screenshot(path=str(art / "09-member.png"))
             m_ctx.close()
-            ok("qa reads only, and a team member views the roadmap without the details of what they may not see")
+            ok("somebody the Cloud does not assign gets nothing, and a team member views the roadmap without what they may not see")
 
             # 8. narrow (the page remembers the tab that was open)
             hub(page, "plan")
@@ -447,6 +491,26 @@ def main() -> int:
             assert dims[0] <= dims[1] + 1 and dims[2] > dims[3] and dims[4] <= dims[5] + 1 and dims[6] <= dims[1], dims
             page.screenshot(path=str(art / "10-narrow.png"))
             ok("narrow layout: the chart scrolls sideways, the panel and the tabs fit, the page does not scroll")
+
+            # 9. payments and invoices: the organisation admin, signed in through the personal Cloud link
+            assert ctx.request.get("/api/msp/invoices").status == 403          # the shared password session carries no personal proof
+            a_ctx, a_page = sign_in(ADMIN)
+            a_page.wait_for_selector("#btnMsp:not([hidden])", state="attached", timeout=20000)
+            a_page.evaluate("() => switchPanel('msp', {fromRailClick: true})")
+            a_page.wait_for_selector("#mspBillingTab", timeout=20000)
+            a_page.locator("#mspBillingTab").click()
+            a_page.wait_for_selector("#mspLedger [data-ledger-invoice]", timeout=15000)
+            ledger = a_page.locator("#mspLedger").inner_text()
+            assert "Betalingen en facturatie" in ledger and "Nog niet elke betaling" in ledger and "Facturen (2)" in ledger and "Betalingen (1)" in ledger, ledger
+            assert "F-2026-0012" in ledger and "1.452,00" in ledger and "Betaald" in ledger and "Openstaand" in ledger and "6.050,00" in ledger, ledger
+            assert a_page.locator('[data-ledger-invoice="br_voorbeeld1"] button').count() == 1
+            assert a_page.locator('[data-ledger-invoice="br_voorbeeld2"] button').count() == 0          # no document: no download
+            with a_page.expect_download(timeout=15000) as download:
+                a_page.locator('[data-ledger-invoice="br_voorbeeld1"] button').click()
+            assert download.value.suggested_filename == "factuur-invoice_voorbeeld1.pdf"
+            a_page.screenshot(path=str(art / "11-payments-invoices.png"))
+            a_ctx.close()
+            ok("the organisation admin sees payments and invoices and downloads the invoice that has a document")
 
             assert any(method == "POST" and path == "/v1/cloud-session" for method, path, _b in plane.requests)
             ours = [x for x in console_errors if "pageerror" in x or "studio" in x.lower() or "roadmap" in x.lower()]

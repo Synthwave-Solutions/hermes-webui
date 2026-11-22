@@ -16113,7 +16113,7 @@ window.SynthPulseFeatureCatalog = {
             "Use the tabs Systems and Process diagrams for the systems overview and the process per block.",
             "Choose Load roadmap to replace the roadmap by a new JSON document from the quickscan."
           ],
-          "permissions": "Everybody with a place in the organisation and every assigned partner reads the roadmap. Organisation admins and assigned consultants or developers load a roadmap and change links, status and notes. Details of a linked item you may not see are left out.",
+          "permissions": "Everybody with a place in the organisation and every assigned partner reads the roadmap. Organisation admins and assigned Agentic Consultants or Agentic Developers load a roadmap and change links, status and notes. Details of a linked item you may not see are left out.",
           "limits": "A part counts as running only when a linked task completed a run in the last 30 days or a linked bot was active. With links but without a run it counts as built. Without links the status set by hand is shown. A mark in the chart means the status set by hand claims more than the evidence shows. Loading a roadmap replaces the whole document.",
           "example": "Open Prepare reminders, link the weekly reminder task and its bot, and see the part turn to Running after the first completed run."
         },
@@ -16130,7 +16130,7 @@ window.SynthPulseFeatureCatalog = {
             "Gebruik de tabs Systemen en Procesdiagrammen voor het systeemoverzicht en het proces per blok.",
             "Kies Roadmap laden om de roadmap te vervangen door een nieuw JSON-document uit de quickscan."
           ],
-          "permissions": "Iedereen met een plek in de organisatie en elke toegewezen partner leest de roadmap. Organisatiebeheerders en toegewezen consultants of developers laden een roadmap en wijzigen koppelingen, status en notities. Details van iets gekoppelds dat je niet mag zien blijven weg.",
+          "permissions": "Iedereen met een plek in de organisatie en elke toegewezen partner leest de roadmap. Organisatiebeheerders en toegewezen Agentic Consultants of Agentic Developers laden een roadmap en wijzigen koppelingen, status en notities. Details van iets gekoppelds dat je niet mag zien blijven weg.",
           "limits": "Een onderdeel telt pas als draaiend wanneer een gekoppelde taak in de laatste 30 dagen een run heeft afgerond of een gekoppelde bot actief was. Met koppelingen maar zonder run telt het als gebouwd. Zonder koppelingen zie je de handmatig gezette status. Een markering in de planning betekent dat de handmatige status meer belooft dan het bewijs laat zien. Een roadmap laden vervangt het hele document.",
           "example": "Open Aanmaningen voorbereiden, koppel de wekelijkse aanmaningstaak en de bot, en zie het onderdeel na de eerste afgeronde run op Draait springen."
         }
@@ -16158,31 +16158,31 @@ window.SynthPulseFeatureCatalog = {
       "locales": {
         "en": {
           "title": "Hours this month",
-          "purpose": "Per department the package and, per role, the hours that are allocated, used and remaining this month, with the people behind the used hours and the assigned team with their hours per week. The figures come from the central Cloud.",
+          "purpose": "Per department the package and, per role, the monthly hours (the base plus extra blocks), what is used and what remains, with the people behind the used hours, what was used from an hour card, the balances of the hour cards with their expiry and the assigned team with their hours per week. The figures come from the central Cloud.",
           "when": "To see during the month how much of the agreed hours has been used and what is left, before you plan new work.",
           "steps": [
             "Open Overview in the Studio.",
             "Find the block Hours this month under the assigned team.",
-            "Read per role the allocated, used and remaining hours; the rows below a role show the hours per person.",
+            "Read per role the monthly, used and remaining hours; the rows below a role show the hours per person.",
             "Check Updated until at the top to see up to which day the used hours are counted."
           ],
           "permissions": "Organisation admins, department admins and assigned partners see this block. It shows hours only: no rates and no amounts.",
           "limits": "Not known yet means the Cloud has no used hours for that role yet. The block is read only and is refreshed at most every five minutes. Without a link to the Cloud it says so and shows no figures.",
-          "example": "Consultant: 16 hours allocated, 7.1 used and 8.9 remaining, updated until yesterday."
+          "example": "Agentic Consultant: 16 monthly hours, 7.1 used and 8.9 remaining, updated until yesterday."
         },
         "nl": {
           "title": "Uren deze maand",
-          "purpose": "Per afdeling het pakket en per rol de uren die deze maand zijn toegewezen, verbruikt en nog over zijn, met de mensen achter de verbruikte uren en het toegewezen team met hun uren per week. De cijfers komen uit de centrale Cloud.",
+          "purpose": "Per afdeling het pakket en per rol de maanduren (de basis plus extra blokken), wat is verbruikt en wat resteert, met de mensen achter de verbruikte uren, wat uit een strippenkaart is gebruikt, het saldo van de strippenkaarten met hun einddatum en het toegewezen team met hun uren per week. De cijfers komen uit de centrale Cloud.",
           "when": "Om tijdens de maand te zien hoeveel van de afgesproken uren is gebruikt en wat er over is, voordat je nieuw werk plant.",
           "steps": [
             "Open Overzicht in de Studio.",
             "Zoek het blok Uren deze maand onder het toegewezen team.",
-            "Lees per rol de toegewezen, verbruikte en resterende uren; de regels onder een rol tonen de uren per persoon.",
+            "Lees per rol de maanduren, de verbruikte en de resterende uren; de regels onder een rol tonen de uren per persoon.",
             "Kijk bij Bijgewerkt tot bovenaan tot welke dag de verbruikte uren zijn geteld."
           ],
           "permissions": "Organisatiebeheerders, afdelingsbeheerders en toegewezen partners zien dit blok. Het toont alleen uren: geen tarieven en geen bedragen.",
           "limits": "Nog niet bekend betekent dat de Cloud voor die rol nog geen verbruikte uren heeft. Het blok is alleen lezen en wordt hooguit elke vijf minuten ververst. Zonder koppeling met de Cloud staat dat er en zie je geen cijfers.",
-          "example": "Consultant: 16 uur toegewezen, 7,1 verbruikt en 8,9 over, bijgewerkt tot gisteren."
+          "example": "Agentic Consultant: 16 maanduren, 7,1 verbruikt en 8,9 over, bijgewerkt tot gisteren."
         }
       }
     },

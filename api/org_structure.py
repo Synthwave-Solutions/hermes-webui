@@ -77,6 +77,9 @@ SCOPE_NONE = "none"
 
 PARTNER_ROLES = ("consultant", "developer", "qa")
 PARTNER_EDIT_ROLES = ("consultant", "developer")
+# What the central Cloud assigns. qa is no longer a resource there: such a row from the pull is skipped,
+# and a qa partner that was stored locally before keeps reading only.
+CLOUD_PARTNER_ROLES = ("consultant", "developer")
 PARTNER_ORG = "synthwave"
 PARTNER_SOURCES = ("cloud", "local")
 _PARTNERS_MAX = 50
@@ -317,6 +320,9 @@ def replace_cloud_partners(assignments: list, actor: str = "cloud") -> dict:
         try:
             row = clean_partner(raw, "cloud")
         except ValueError:
+            skipped += 1
+            continue
+        if row["role"] not in CLOUD_PARTNER_ROLES:
             skipped += 1
             continue
         if row["email"] in seen or len(clean) >= _PARTNERS_MAX:
