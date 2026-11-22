@@ -13,10 +13,14 @@ ROUTES=('/api/msp/invoice','/api/msp/invoices','/api/msp/order','/api/msp/job-co
 
 def identity(handler):
     policy,subject,scope=context(handler)
-    email=subject.normalized_email
+    return acting_for(policy,subject.normalized_email,subject.provider)
+
+
+def acting_for(policy,email,provider):
+    """The signed acting headers of one verified person. Raises PermissionError for anybody else."""
     known=set(policy.users)|set(policy.bootstrap_admins)|set(delegation.organization_people(policy))
-    personal = subject.provider=='synthpulse_cloud' and os.environ.get('SP_CLOUD_PERSONAL_MSP')=='1'
-    if not email or subject.provider=='auth_disabled' or (email not in known and not personal):
+    personal = provider=='synthpulse_cloud' and os.environ.get('SP_CLOUD_PERSONAL_MSP')=='1'
+    if not email or provider=='auth_disabled' or (email not in known and not personal):
         raise PermissionError('Sign in with an organisation account')
     if email not in known:
         # The supplier's assigned staff work in Studio; the customer's own account

@@ -8576,6 +8576,20 @@ def _run_agent_streaming(
             # can never re-widen a session that pinned a narrow custom list.
             _toolsets = chat_mode_toolsets(_toolsets, _chat_mode)
 
+            # The AI routes of a Cloud environment (api/ai_routes_tool.py): one
+            # governed tool in its own toolset. It is the only name added here,
+            # and only for the authenticated sender of this turn when that
+            # person is an organisation admin in a personal Cloud session. For
+            # everybody else, and in normal mode, the toolset is taken out, so
+            # a profile that names it grants nothing by itself. The tool checks
+            # the same again on every call and asks approval for every change.
+            try:
+                from api import ai_routes_tool
+                _toolsets = ai_routes_tool.toolsets_for(
+                    _toolsets, sender_identity if _chat_mode != 'normal' and isinstance(sender_identity, dict) else None)
+            except Exception:
+                logger.debug("ai routes toolset skipped", exc_info=True)
+
             # Fallback model chain from profile config (e.g. for rate-limit or
             # provider recovery). Match Hermes CLI/gateway semantics:
             # fallback_providers entries are tried first, then legacy
