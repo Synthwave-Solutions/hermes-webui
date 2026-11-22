@@ -486,7 +486,10 @@ def test_partner_gets_a_role_and_no_structure_edits_or_money(env, monkeypatch):
     monkeypatch.setattr(org, "j", lambda handler, payload, status=200, **_kw: sent.append((status, payload)))
     org.handle_get(None, SimpleNamespace(path="/api/org/structure/me", query=""))
     me = sent[-1][1]
-    assert me["partner"] == {"role": "consultant", "org": "synthwave"} and me["can_view"] and not me["can_manage"]
+    assert me["partner"] == {"role": "consultant", "org": "synthwave"} and not me["can_view"] and not me["can_manage"]
+    monkeypatch.setattr(org, "request_scope", lambda handler: view)
+    org.handle_get(None, SimpleNamespace(path="/api/org/structure", query=""))
+    assert sent[-1][0] == 200 and "hourly_rate" not in json.dumps(sent[-1][1])        # reads the structure, no rates
     org.handle_post(None, SimpleNamespace(path="/api/org/structure", query=""), {"op": "team.delete", "key": "finance/debiteuren"})
     assert sent[-1][0] == 403
 

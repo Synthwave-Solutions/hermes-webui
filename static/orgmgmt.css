@@ -416,3 +416,23 @@ button.om-mini-stat:focus-visible,button.om-saved:focus-visible,button.om-strip-
 .oc-scroll.panning .oc-node{pointer-events:none}
 .oc-node{cursor:default}
 .oc-tools::after{content:attr(data-hint);font-size:11.5px;color:var(--muted);margin-right:auto;order:-1}
+
+/* Partners: the supplier's assigned staff (badge on people and use cases, the team block). */
+.om-badge.sp-partner,.om-badge.wp-role.partner{color:var(--accent-text,var(--accent));border-color:color-mix(in srgb,var(--accent) 40%,transparent);background:var(--accent-bg,rgba(0,157,255,.08))}
+.sp-partner-list{display:flex;flex-wrap:wrap;gap:8px 20px;padding:0 20px 16px}
+.sp-partner-row{display:flex;align-items:center;gap:8px;min-width:0;font-size:13px}
+.sp-partner-name{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sp-partner-list.compact{flex-direction:column;flex-wrap:nowrap;gap:2px;padding:0}
+.sp-partner-list.compact .sp-partner-row{padding:5px 10px}
+.sp-partner-list.compact .sp-partner-name{flex:1;font-weight:500}
+.sp-partner-role{font-size:11.5px;color:var(--muted);white-space:nowrap}
+.sp-partners{margin:0 0 16px}
+.om-partners .om-list{padding:4px 0}
+.st-progress td{vertical-align:top}
+.st-progress-open{all:unset;cursor:pointer;font-weight:600;color:var(--text)}
+.st-progress-open:hover{color:var(--accent-text,var(--accent))}
+.st-progress-open:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+.st-progress-total{margin-top:10px}
+.st-consultant-pick{margin-left:12px}
+@media (max-width:640px){.sp-partner-list{padding:0 16px 14px}.st-consultant-pick{margin-left:0}}
+.st-progress td:first-child{white-space:normal;min-width:220px}

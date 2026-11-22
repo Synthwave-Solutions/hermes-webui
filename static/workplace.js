@@ -30,7 +30,9 @@
     empty_scope: 'In deze weergave staat nog niets. Kies een andere weergave of maak een use case.',
     empty_peek: 'Bekijk {l}', kpi_hint: '{k} openen',
     loading: 'Laden…', failed: 'Laden is niet gelukt. Probeer het opnieuw.', retry: 'Opnieuw', people: 'Mensen', nothing: 'Nog niets',
-    p_discover: 'Ontdekken', p_design: 'Inrichten', p_playbook: 'Bouwplan', p_build: 'Bouwen', p_measure: 'Meten'
+    p_discover: 'Ontdekken', p_design: 'Inrichten', p_playbook: 'Bouwplan', p_build: 'Bouwen', p_measure: 'Meten',
+    partner_consultant: 'Synthwave consultant', partner_developer: 'Synthwave developer', partner_qa: 'Synthwave QA',
+    partner_team: 'Team van Synthwave', partner_team_sub: 'Zij werken met jullie aan de use cases in deze omgeving.'
   };
   const EN = {
     findings:'Findings for you', findings_empty:'When a bot finds something for you, its update appears here.',
@@ -51,7 +53,9 @@
     empty_scope: 'Nothing in this view yet. Choose another view or create a use case.',
     empty_peek: 'View {l}', kpi_hint: 'Open {k}',
     loading: 'Loading…', failed: 'Loading failed. Try again.', retry: 'Retry', people: 'People', nothing: 'Nothing yet',
-    p_discover: 'Discover', p_design: 'Design', p_playbook: 'Build plan', p_build: 'Build', p_measure: 'Measure'
+    p_discover: 'Discover', p_design: 'Design', p_playbook: 'Build plan', p_build: 'Build', p_measure: 'Measure',
+    partner_consultant: 'Synthwave consultant', partner_developer: 'Synthwave developer', partner_qa: 'Synthwave QA',
+    partner_team: 'Synthwave team', partner_team_sub: 'They work with you on the use cases in this environment.'
   };
   const lang = () => ((document.documentElement.lang || 'nl').toLowerCase().startsWith('en') ? 'en' : 'nl');
   const w = (k, v) => { let s = (lang() === 'en' ? EN : NL)[k] || NL[k] || k; if (v) for (const [a, b] of Object.entries(v)) s = s.replace('{' + a + '}', b); return s; };
@@ -70,7 +74,8 @@
   function buildCtx(me, pr, chart){
       const c = { email: norm(me.email), scope: me.scope || 'none', canView: !!me.can_view, canManage: !!me.can_manage,
                   leadTeams: new Set(me.lead_teams || []), memberTeams: new Set(me.member_teams || []), adminDepts: new Set(me.departments || []),
-                  teams: new Map(), depts: new Map(), people: new Map(), jobTeam: new Map(), promptRows: pr ? (pr.prompts || []) : [], chart };
+                  teams: new Map(), depts: new Map(), people: new Map(), jobTeam: new Map(), promptRows: pr ? (pr.prompts || []) : [], chart,
+                  partner: me.partner && me.partner.role ? me.partner : null };
       c.myTeams = new Set([...c.leadTeams, ...c.memberTeams]);
       for (const d of (pr && pr.departments) || []) c.depts.set(d.key, { key: d.key, name: d.name || d.key });
       for (const t of (pr && pr.teams) || []) c.teams.set(t.key, { key: t.key, name: t.name || t.key, department: t.department || t.key.split('/')[0], lead: '', members: [] });
@@ -103,6 +108,8 @@
   function teamName(c, key){ return (c.teams.get(key) || {}).name || (key ? String(key).split('/').pop() : w('no_team')); }
   function deptName(c, key){ return (c.depts.get(key) || {}).name || key || w('no_dept'); }
   function personName(email){
+    const partner = Partners.get(email);
+    if (partner && partner.name) return partner.name;
     const local = String(email || '').replace(/@.*/, '');
     return local.split(/[._-]+/).filter(Boolean).map(p => p[0].toUpperCase() + p.slice(1)).join(' ') || w('no_owner');
   }
@@ -119,6 +126,7 @@
   }
   function roles(c){
     const out = [];
+    if (c.partner) out.push({ label: Partners.label(c.partner.role), cls: 'partner' });
     if (c.scope === 'all') out.push({ label: w('r_admin'), cls: 'admin' });
     else if (c.scope === 'departments') out.push({ label: w('r_dept') + ' ' + [...c.adminDepts].map(k => deptName(c, k)).join(', '), cls: 'admin' });
     if (c.leadTeams.size) out.push({ label: w('r_lead') + ' ' + [...c.leadTeams].map(k => teamName(c, k)).join(', '), cls: 'lead' });
@@ -170,6 +178,31 @@
     store.set('sp-lens-' + surface, b.dataset.spLens);
     document.dispatchEvent(new CustomEvent('sp-lens-change', { detail: { surface, lens: b.dataset.spLens } }));
   });
+  // ── Partners: the supplier's staff assigned to this installation ───────────
+  // One small shared store. Studio, the backlog and the organisation screens fill it from
+  // what the server already sends them and read the badge and the team block from here.
+  const Partners = {
+    rows: [],
+    set(list){ if (Array.isArray(list)) Partners.rows = list.filter(p => p && p.email).map(p => ({ email: norm(p.email), name: p.name || '', role: p.role || '', org: p.org || 'synthwave' })); },
+    list(){ return Partners.rows.slice(); },
+    get(email){ const e = norm(email); return e ? Partners.rows.find(p => p.email === e) || null : null; },
+    label(role){ return ['consultant', 'developer', 'qa'].includes(role) ? w('partner_' + role) : ''; },
+    name(p){ return p.name || String(p.email).replace(/@.*/, '').split(/[._-]+/).filter(Boolean).map(x => x[0].toUpperCase() + x.slice(1)).join(' '); },
+    // Badge for a person (by address) or for a role name. Empty when it is not a partner.
+    badge(who){
+      const role = ['consultant', 'developer', 'qa'].includes(who) ? who : (Partners.get(who) || {}).role;
+      return role ? `<span class="om-badge sp-partner">${H(Partners.label(role))}</span>` : '';
+    },
+    // "Team van Synthwave": who is assigned. `compact` is the sidebar form.
+    teamHtml(compact){
+      if (!Partners.rows.length) return '';
+      const rows = Partners.rows.map(p => `<div class="sp-partner-row"><span class="om-face ${compact ? 'st-face-xs' : ''}" style="--h:${hue(p.email)}" aria-hidden="true">${H(initials(Partners.name(p)))}</span><span class="sp-partner-name">${H(Partners.name(p))}</span>${compact ? `<span class="sp-partner-role">${H(Partners.label(p.role).replace(/^Synthwave /, ''))}</span>` : Partners.badge(p.role)}</div>`).join('');
+      return compact ? `<div class="om-side-label">${H(w('partner_team'))}</div><div class="sp-partner-list compact">${rows}</div>`
+        : `<section class="wp-card sp-partners" aria-label="${H(w('partner_team'))}"><div class="wp-card-head"><h3>${H(w('partner_team'))}</h3><span class="om-muted om-small">${H(w('partner_team_sub'))}</span></div><div class="sp-partner-list">${rows}</div></section>`;
+    }
+  };
+  window.SPPartners = Partners;
+
   window.SPScope = { load: loadCtx, lenses, lensLabel, match, getLens, barHtml, groupByTeam, teamName, deptName, deptKey, personName, primaryTeam, roles,
     face: (c, email, cls) => faceHtml(c, email, cls) };
 
@@ -532,6 +565,7 @@
       <div data-sp-today></div>
       ${findingsSection()}
       <div data-wp-setup>${Wp.setup}</div>
+      ${Partners.teamHtml(false)}
       <div class="wp-bar">${barHtml(c, 'home', Wp.data, lens)}${groupSeg}</div>
       <div class="wp-kpis">${KINDS.filter(k => k === 'task' ? allowed('tasks') : k !== 'bot' || allowed('profiles')).map(k => `<button type="button" class="wp-kpi ${n[k] || pending.has(k) ? '' : 'zero'}" title="${H(w('kpi_hint', { k: w('k_' + k) }))}" data-wp-go="${k}"${k === 'usecase' ? ' data-tour="studio-usecases"' : ''}><span class="wp-kpi-label"><span class="wp-kind-dot k-${k}" aria-hidden="true"></span>${H(short(k))}</span><span class="wp-kpi-value"${pending.has(k) ? ` aria-busy="true" aria-label="${H(w('loading'))}">…` : `>${n[k]}`}</span></button>`).join('')}</div>
       ${shortcuts()}
@@ -558,7 +592,7 @@
       const c = cur();
       if (token !== Wp.token || !c || !Wp.raw.quick) return;
       const items = buildItems(c);
-      const sig = JSON.stringify(items) + '|' + [...pendingKinds()].join() + '|' + c.people.size + '|' + [...c.teams.values()].map(t => t.members.length).join();
+      const sig = JSON.stringify(items) + '|' + [...pendingKinds()].join() + '|' + c.people.size + '|' + [...c.teams.values()].map(t => t.members.length).join() + '|' + Partners.rows.map(p => p.email + p.role).join();
       if (Wp.data && sig === Wp.sig && body.querySelector('.wp-kpis')) return;
       Wp.data = items; Wp.sig = sig;
       paint();
@@ -570,7 +604,7 @@
         full.then(step),
         Promise.all([call('/api/studio/usecases').catch(() => null), call('/api/studio/backlog').catch(() => null), call('/api/studio/playbooks').catch(() => null),
                      call('/api/studio/profile?who=me').catch(() => null)])
-          .then(([uc, bl, pb, me]) => { Object.assign(Wp.raw, { uc, bl, pb, quick: true }); Wp.intake = me; step(); }),
+          .then(([uc, bl, pb, me]) => { Object.assign(Wp.raw, { uc, bl, pb, quick: true }); Wp.intake = me; if (uc) Partners.set(uc.partners); step(); }),
         call('/api/crons?all_profiles=1').catch(() => null).then(cr => { Wp.raw.cr = cr; Wp.runsReadable = Array.isArray(cr?.jobs); step(); }),
         // The fast list skips the alias scan and the skill counts, which this page never shows.
         call('/api/profiles?fast=1&counts=0').catch(() => null).then(pf => { Wp.raw.pf = pf; step(); })]);

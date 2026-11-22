@@ -26,6 +26,7 @@
       suggest_intro: '{n} voorstellen op basis van de bestaande categorie.', apply_suggestions: 'Neem alle voorstellen over', applied_n: '{n} ingedeeld',
       org: 'Organisatie', mgmt: 'Management', chart: 'Organigram', manage: 'Teams beheren', parent: 'Onder team', parent_none: 'Geen, hoofdteam', subteams: 'Subteams', expand_all: 'Alles uitklappen', collapse_all: 'Alles inklappen', s_people: 'Mensen', s_bots: 'Bots', s_tasks: 'Geplande taken', s_conn: 'Koppelingen', s_skills: 'Skills', s_saved: 'Tijd bespaard', s_saved_sub: 'laatste 4 weken', s_conn_hint: 'MCP-servers van de bots plus persoonlijke koppelingen van de mensen', details: 'Details', collapse: 'Inklappen', expand: 'Uitklappen', departments: 'Afdelingen', department_one: 'Afdeling', zoom_in: 'Inzoomen', zoom_out: 'Uitzoomen', zoom_fit: 'Passend maken', pan_hint: 'Sleep om te verschuiven, Ctrl en scrollen om te zoomen', show_which: 'klik om te zien welke', whole_org: 'Hele organisatie', search_in: 'Zoek in {what}', no_match: 'Niets gevonden.', nothing_here: 'Niets om te tonen.', conn_mcp: 'MCP-servers van bots', conn_app: 'Persoonlijke koppelingen', via_bots: 'via {n} bot(s)', via_people: 'van {n} persoon/personen', hierarchy: 'Hiërarchie', h_note: 'Bots zonder bot-manager staan onder de teamlead.', no_lead: 'Geen teamlead', reports: 'rapporteert aan',
       people: 'Mensen', bots: 'Bots', both: 'Samen', tasks: 'Taken', team: 'Team', teams: 'Teams',
+      partner_team: 'Team van Synthwave', partner_hint: 'Toegewezen vanuit de Cloud. Zij werken mee in Studio en zien geen tarieven of managementcijfers.', partner_from: 'vanaf', partner_until: 'tot en met',
       department: 'Afdeling', departments: 'Afdelingen', lead: 'Lead', members: 'Leden', rate: 'Uurtarief',
       org_intro: 'Wie in welk team zit, welke bots en geplande taken voor dat team werken, en hoeveel tijd dat bespaart.',
       mgmt_intro: 'Wat automatisering per team oplevert en kost, en waar een beslissing nodig is. Elk getal is te herleiden: klik erop.',
@@ -97,6 +98,7 @@
       suggest_intro: '{n} suggestions based on the existing category.', apply_suggestions: 'Apply all suggestions', applied_n: '{n} placed',
       org: 'Organisation', mgmt: 'Management', chart: 'Org chart', manage: 'Manage teams', parent: 'Under team', parent_none: 'None, top-level team', subteams: 'Sub-teams', expand_all: 'Expand all', collapse_all: 'Collapse all', s_people: 'People', s_bots: 'Bots', s_tasks: 'Scheduled tasks', s_conn: 'Connections', s_skills: 'Skills', s_saved: 'Time saved', s_saved_sub: 'last 4 weeks', s_conn_hint: 'MCP servers of the bots plus personal connections of the people', details: 'Details', collapse: 'Collapse', expand: 'Expand', departments: 'Departments', department_one: 'Department', zoom_in: 'Zoom in', zoom_out: 'Zoom out', zoom_fit: 'Fit to width', pan_hint: 'Drag to move, Ctrl and scroll to zoom', show_which: 'click to see which', whole_org: 'Whole organisation', search_in: 'Search {what}', no_match: 'Nothing found.', nothing_here: 'Nothing to show.', conn_mcp: 'MCP servers of bots', conn_app: 'Personal connections', via_bots: 'through {n} bot(s)', via_people: 'from {n} person(s)', hierarchy: 'Hierarchy', h_note: 'Bots without a bot manager sit under the team lead.', no_lead: 'No team lead', reports: 'reports to',
       people: 'People', bots: 'Bots', both: 'Both', tasks: 'Tasks', team: 'Team', teams: 'Teams',
+      partner_team: 'Synthwave team', partner_hint: 'Assigned from the Cloud. They work along in Studio and see no rates or management figures.', partner_from: 'from', partner_until: 'until',
       department: 'Department', departments: 'Departments', lead: 'Lead', members: 'Members', rate: 'Hourly rate',
       org_intro: 'Who is in which team, which bots and scheduled tasks work for that team, and how much time that saves.',
       mgmt_intro: 'What automation delivers and costs per team, and where a decision is needed. Every number can be traced: click it.',
@@ -215,6 +217,7 @@
     try {
       const [chart, structure] = await Promise.all([call('/api/org/chart'), call('/api/org/structure')]);
       O.chart = chart; O.structure = structure;
+      if (window.SPPartners && structure) window.SPPartners.set(structure.partners);
     } catch (e) {
       O.chart = null; O.structure = null;
       O.error = e && e.status === 403 ? (me && me.can_manage ? '' : w('empty_member')) : errMsg(e);
@@ -463,7 +466,7 @@
       ${bots.length || jobs.length ? `<div class="om-list">${bots.map(b => botRowHtml(b)).join('')}${jobs.filter(j => !waiting.includes(j)).map(j => jobRowHtml(j)).join('')}</div>` : `<p class="om-muted om-small">${H(w('nothing_runs'))}</p>`}
       <h4>Playbooks</h4><div class="om-list" data-om-team-pbs="${H(team.key)}"><p class="om-muted om-small">…</p></div>
       <h4>${H(w('people'))} (${(team.people || []).length})</h4>
-      <div class="om-list">${(team.people || []).map(p => `<div class="om-row"><span class="om-person">${H(initials(p.email))}</span><div class="om-row-main"><div class="om-row-title">${H(p.email)}${p.email === team.lead ? ' · ' + H(w('lead')) : ''}</div><div class="om-row-sub">${H(p.title || '')}${p.reports_to ? ' → ' + H(p.reports_to) : ''}</div></div></div>`).join('')}</div>
+      <div class="om-list">${(team.people || []).map(p => `<div class="om-row"><span class="om-person">${H(initials(p.email))}</span><div class="om-row-main"><div class="om-row-title">${H(p.email)}${p.email === team.lead ? ' · ' + H(w('lead')) : ''} ${window.SPPartners ? window.SPPartners.badge(p.email) : ''}</div><div class="om-row-sub">${H(p.title || '')}${p.reports_to ? ' → ' + H(p.reports_to) : ''}</div></div></div>`).join('')}</div>
       <div class="om-value-actions" style="margin-top:16px">
         <button type="button" class="sm-btn primary" data-om-new-automation="${H(team.key)}">${H(w('new_automation'))}</button>
         ${me && me.can_manage ? `<button type="button" class="sm-btn" data-om-goto-mgmt>${H(w('open_mgmt'))}</button>` : ''}
@@ -542,7 +545,12 @@
         <label class="om-field">${H(w('rate'))}<input name="hourly_rate" type="number" min="0" step="1" value="${H(t && t.hourly_rate != null ? t.hourly_rate : '')}" placeholder="€"></label>
         <div class="om-row-actions"><button type="submit" class="sm-btn primary">${H(w('save'))}</button>${t ? `<button type="button" class="sm-btn danger" data-om-delete-team="${H(t.key)}">${H(w('delete'))}</button>` : ''}</div>
       </form>`;
+    const partners = s.partners || [];
+    const when = p => [p.starts_at ? w('partner_from') + ' ' + p.starts_at : '', p.ends_at ? w('partner_until') + ' ' + p.ends_at : ''].filter(Boolean).join(' · ');
+    const partnersHtml = partners.length && window.SPPartners ? `<section class="om-dept-block om-partners"><header><h3>${H(w('partner_team'))}</h3><span class="om-muted om-small">${H(w('partner_hint'))}</span></header>
+        <div class="om-list">${partners.map(p => `<div class="om-row"><span class="om-person">${H(initials(p.name || p.email))}</span><div class="om-row-main"><div class="om-row-title">${H(p.name || p.email)} ${window.SPPartners.badge(p.role)}</div><div class="om-row-sub">${H(p.email)}${when(p) ? ' · ' + H(when(p)) : ''}</div></div></div>`).join('')}</div></section>` : '';
     return `<p class="om-intro">${H(w('org_intro'))}</p>
+      ${partnersHtml}
       ${depts.map(d => `<section class="om-dept-block" data-tour="org-teams"><header><h3>${H(d.name)}</h3>
           ${d.editable ? `<label class="om-inline-form om-small om-muted">${H(w('rate'))} <input type="number" min="0" step="1" data-om-dept-rate="${H(d.key)}" value="${H(d.hourly_rate ?? '')}" placeholder="€"></label>` : ''}
           <span class="om-muted om-small">${H(d.source === 'policy' ? 'policy' : '')}</span></header>

@@ -129,6 +129,8 @@
   function editHtml(it){
     const people = new Set([it.made_by, it.owner].filter(Boolean));
     if (R.sc) { for (const e of R.sc.people.keys()) people.add(e); if (R.sc.email) people.add(R.sc.email); }
+    // Assigned partners can take an idea too.
+    if (window.SPPartners) for (const p of window.SPPartners.list()) people.add(p.email);
     const end = addWeeks(day(it.plan.start), it.plan.weeks);
     const facts = `<p class="rm-edit-facts">${H(w('s_' + it.status))} · ${H(personName(it.owner))} · ${H(short(day(it.plan.start)))} ${H(w('until'))} ${H(short(new Date(end - DAY)))}${it.plan.auto ? ' · ' + H(w('proposal')) : ''}${it.saves_hours_week ? ' · ' + H(w('saves')) + ' ' + it.saves_hours_week + ' ' + H(w('hours_week')) : ''}</p>`;
     const uc = it.use_case ? `<button type="button" class="sm-btn" data-rm-open="${H(it.use_case)}">${H(w('open_uc'))}</button>` : '';

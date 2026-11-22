@@ -849,7 +849,7 @@ def handle_get(handler, parsed) -> bool:
     if path == "/api/org/structure/me":
         payload = view.to_dict()
         payload["has_structure"] = bool(load().get("teams"))
-        payload["can_view"] = not view.is_none or view.is_partner
+        payload["can_view"] = not view.is_none
         payload["can_manage"] = view.scope in (SCOPE_ALL, SCOPE_DEPARTMENTS)
         j(handler, payload)
         return True
