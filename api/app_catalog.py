@@ -62,6 +62,8 @@ _ROWS = (
             'Inspect AI traces, usage, costs and evaluations from connected applications.', 'workspace', 'platform', 'platform', requestable=False),
     AppSpec('nod', 'Nod', 'Persoonlijke AI-agent van n8n (pilot): voert taken uit, bouwt n8n-workflows en werkt op de achtergrond.',
             'Personal AI agent by n8n (pilot): runs tasks, builds n8n workflows and works in the background.', 'workspace', 'automation', 'platform', requestable=False),
+    AppSpec('plainboard', 'PlainBoard', 'Team van AI-agents dat software bouwt (pilot): je praat met de manager, de agents bouwen en PlainBoard levert het werk op.',
+            'Team of AI agents that builds software (pilot): you talk to the manager, the agents build and PlainBoard lands the work.', 'workspace', 'automation', 'platform', requestable=False),
     AppSpec('hermes_docs', 'SynthPulse Office Docs (Word)', 'Schrijf en bewerk Word-documenten met opmaak, tabellen en AI-hulp.',
             'Write and edit Word documents with formatting, tables and AI assistance.', 'office_apps', 'productivity', 'platform'),
     AppSpec('hermes_sheets', 'SynthPulse Office Sheets (Excel)', 'Bewerk Excel-werkboeken met cellen, formules en AI-hulp.',
