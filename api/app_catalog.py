@@ -62,6 +62,8 @@ _ROWS = (
             'Inspect AI traces, usage, costs and evaluations from connected applications.', 'workspace', 'platform', 'platform', requestable=False),
     AppSpec('nod', 'Nod', 'Persoonlijke AI-agent van n8n (pilot): voert taken uit, bouwt n8n-workflows en werkt op de achtergrond.',
             'Personal AI agent by n8n (pilot): runs tasks, builds n8n workflows and works in the background.', 'workspace', 'automation', 'platform', requestable=False),
+    AppSpec('nodeterm', 'nodeterm', 'Canvas met terminals en OpenCode 2-agents als nodes, naast elkaar in je browser. Eigen container per persoon.',
+            'Canvas with terminals and OpenCode 2 agents as nodes, side by side in your browser. Own container per person.', 'workspace', 'platform', 'platform', requestable=False),
     AppSpec('opencode', 'OpenCode', 'Codeeragent in je browser (OpenCode 2): projecten openen, laten bouwen, sessies terugkijken. Draait op de VPS via OmniRoute.',
             'Coding agent in your browser (OpenCode 2): open projects, let it build, review sessions. Runs on the VPS through OmniRoute.', 'workspace', 'platform', 'platform', requestable=False),
     AppSpec('plainboard', 'PlainBoard', 'Team van AI-agents dat software bouwt (pilot): je praat met de manager, de agents bouwen en PlainBoard levert het werk op.',
