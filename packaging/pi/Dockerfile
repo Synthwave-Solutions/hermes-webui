@@ -15,6 +15,11 @@ RUN python -m venv /opt/synthpulse/hermes-agent/venv && /opt/synthpulse/hermes-a
 COPY packaging/pi/office-requirements.txt /tmp/office-requirements.txt
 RUN /opt/synthpulse/hermes-agent/venv/bin/pip install --no-cache-dir -r /tmp/office-requirements.txt
 COPY . /opt/synthpulse/hermes-webui
+# The build context has no .git, so the version would resolve to 'unknown' and never change between
+# builds; the service worker cache name and the ?v= asset query then stay the same and browsers keep
+# serving stale CSS/JS after an update. Pass WEBUI_VERSION (e.g. the commit) to make it unique per build.
+ARG WEBUI_VERSION=
+RUN if [ -n "$WEBUI_VERSION" ]; then printf "__version__ = '%s'\n" "$WEBUI_VERSION" > /opt/synthpulse/hermes-webui/api/_version.py; fi
 RUN /opt/synthpulse/hermes-agent/venv/bin/pip install --no-cache-dir -r /opt/synthpulse/hermes-webui/requirements.txt
 ENV HERMES_WEBUI_AGENT_DIR=/opt/synthpulse/hermes-agent HERMES_WEBUI_PYTHON=/opt/synthpulse/hermes-agent/venv/bin/python SP_WEBUI_DIR=/opt/synthpulse/hermes-webui HERMES_WEBUI_DISABLE_LOCAL_VENV=1 HERMES_WEBUI_AUTO_INSTALL=0 HERMES_WEBUI_HOST=0.0.0.0 HERMES_WEBUI_PORT=8787 HERMES_HOME=/home/synthpulse/.synthpulse-engine HERMES_RUNTIME_DIR=/opt/synthpulse/tool-runtime
 ENV PATH=/opt/synthpulse/hermes-agent/venv/bin:$PATH
