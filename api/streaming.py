@@ -2156,6 +2156,13 @@ def _reset_turn_session_identity(tokens) -> None:
     """
     if not tokens:
         return
+    tok = tokens.get("user_id")
+    if tok is not None:
+        try:
+            from gateway.session_context import _SESSION_USER_ID as _SUID
+            _SUID.reset(tok)
+        except Exception:
+            logger.debug("per-turn _SESSION_USER_ID reset failed", exc_info=True)
     tok = tokens.get("session_key")
     if tok is not None:
         try:
@@ -7743,6 +7750,16 @@ def _run_agent_streaming(
             user_message=msg_text if isinstance(msg_text, str) else None,
         )
         _set_thread_env(**_thread_env)
+        # The thread env above is invisible to get_session_env (ContextVar, then os.environ), so
+        # the cronjob tool found no owner and refused every create from a WebUI chat under
+        # enforce ("no owner to run as"). Bind the user here too; _reset_turn_session_identity
+        # undoes it.
+        if _thread_env.get('HERMES_SESSION_USER_ID') and isinstance(_turn_session_identity_tokens, dict):
+            try:
+                from gateway.session_context import _SESSION_USER_ID as _SUID
+                _turn_session_identity_tokens["user_id"] = _SUID.set(_thread_env['HERMES_SESSION_USER_ID'])
+            except Exception:
+                logger.debug("per-turn _SESSION_USER_ID bind failed", exc_info=True)
         # process_complete agent-wakeup wiring (ours-original, Option B): bind
         # this session's HERMES_SESSION_KEY to its WebUI session_id so the
         # drain thread can route notify_on_complete events back to the right
