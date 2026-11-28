@@ -3046,6 +3046,7 @@ window.__registerHermesLocale('en', {
     channels_publish_tech: 'Makes the webhook address reachable from the internet.',
     profile_default_display: 'Standard bot',
     reasoning_opt_default: 'Normal',
+    reasoning_opt_auto: 'Auto',
     reasoning_opt_none: 'Off',
     reasoning_opt_minimal: 'Minimal',
     reasoning_opt_low: 'Quick',

@@ -3681,8 +3681,9 @@ def coerce_reasoning_effort_for_model(
     raw = str(effort or "").strip().lower()
     if not raw:
         return ""
-    if raw == "none":
-        return "none"
+    # Auto is an explicit UI choice. The request parser leaves the wire effort unset.
+    if raw in ("auto", "none"):
+        return raw
     accepts_max_as_xhigh = raw == "max"
     if accepts_max_as_xhigh:
         raw = "xhigh"
@@ -3892,10 +3893,10 @@ def set_reasoning_effort(
     raw = str(effort or "").strip().lower()
     if not raw:
         raise ValueError("effort is required")
-    if raw != "none" and raw not in VALID_REASONING_EFFORTS:
+    if raw not in ("auto", "none") and raw not in VALID_REASONING_EFFORTS:
         raise ValueError(
             f"Unknown reasoning effort '{effort}'. "
-            f"Valid: none, {', '.join(VALID_REASONING_EFFORTS)}."
+            f"Valid: auto, none, {', '.join(VALID_REASONING_EFFORTS)}."
         )
     config_path = _get_config_path()
     with _cfg_lock:

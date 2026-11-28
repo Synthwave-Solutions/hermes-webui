@@ -132,6 +132,8 @@ chips and badges.
 
 ## Composer and controls
 
+In the thinking-level menu, **Auto** lets the model router choose effort for each turn. **Normal** restores the profile preference. A fixed level applies to subsequent turns for that person and profile.
+
 The composer is the command surface. Keep it legible, stable, and focused:
 
 - no theatrical hover scaling for routine controls,

@@ -353,6 +353,19 @@ class TestReasoningConfigHelpers:
         # Case-insensitive + trimmed
         assert parse_reasoning_effort('  HIGH  ') == {'enabled': True, 'effort': 'high'}
 
+    def test_auto_preserves_router_control_even_with_a_fixed_profile_default(self, tmp_path, monkeypatch):
+        from api.config import coerce_reasoning_effort_for_model, parse_reasoning_effort
+        from api import user_prefs
+
+        monkeypatch.setattr(user_prefs, "_dir", lambda: tmp_path)
+        user_prefs.set_reasoning_effort("owner@example.test", "default", "auto")
+        saved = user_prefs.get_reasoning_effort("owner@example.test", "default") or "xhigh"
+        selected = coerce_reasoning_effort_for_model(saved, "synthwave-auto")
+        assert selected == "auto"
+        assert parse_reasoning_effort(selected) is None
+        user_prefs.set_reasoning_effort("owner@example.test", "default", "")
+        assert user_prefs.get_reasoning_effort("owner@example.test", "default") is None
+
     def test_valid_reasoning_efforts_matches_hermes_constants(self):
         """Ensure our mirror stays in sync with hermes_constants."""
         from api.config import VALID_REASONING_EFFORTS
