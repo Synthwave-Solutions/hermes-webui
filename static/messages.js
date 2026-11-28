@@ -5720,14 +5720,10 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
         _completeAutomaticCompressionOnLiveProgress(activeSid);
       }
       if(_freshSegment) appendThinking('', _liveThinkingPlacement());
-      // Once the assistant row exists its creation gate is already satisfied, and
-      // the throttled _doRender re-parses once per frame anyway — so the per-token
-      // full-text parse here is pure waste (O(n)/token -> O(n^2) over the answer).
-      // Still call ensureAssistantRow() every token exactly as before (cheap; it
-      // also starts a new segment on a post-tool _freshSegment). Only the parse is
-      // skipped, and only once the row exists. (#5455 WS2.3)
+      // Reuse the live row within a paint. Recheck it immediately if the DOM
+      // detached it or a tool started a new segment between tokens.
       if(assistantRow){
-        ensureAssistantRow();
+        if(!assistantRow.isConnected || _freshSegment || !_renderPending) ensureAssistantRow();
         _scheduleRender();
       }else{
         const parsed=_parseStreamState();

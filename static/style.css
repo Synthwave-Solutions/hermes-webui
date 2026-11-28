@@ -8994,3 +8994,7 @@ html:not([data-nav-audience="admin"]) #composerMobileContextCost{display:none!im
     .chat-connectors-dialog[open],.composer-mobile-config-panel.open,#composerModelDropdown.open {opacity:0}
   }
 }
+
+@media(prefers-reduced-motion:reduce){
+  .chat-connectors-dialog,.composer-mobile-config-panel,#composerModelDropdown {transition:none!important;animation:none!important}
+}
