@@ -13933,6 +13933,10 @@ def handle_get(handler, parsed) -> bool:
         }
         return j(handler, {"git": info})
 
+    if parsed.path == "/api/session/connectors":
+        from api.chat_connectors import handle
+        return handle(handler, {key: values[0] for key, values in parse_qs(parsed.query).items()})
+
     if parsed.path in {"/api/integrations/hosted/catalog", "/api/integrations/hosted/accounts"}:
         from api.hosted_connectors import handle
         return handle(handler, parsed.path.rsplit("/", 1)[-1])
@@ -15601,6 +15605,10 @@ def handle_post(handler, parsed) -> bool:
         )
         return j(handler, {"ok": True, "participants": list(s.participants or []), "bot_participants": list(s.bot_participants or []), "default_bot": getattr(s, "default_bot", None)})
 
+    if parsed.path == "/api/session/connectors":
+        from api.chat_connectors import handle
+        return handle(handler, body, write=True)
+
     if parsed.path == "/api/session/toolsets":
         """Set or clear per-session toolset override (#493).
 
@@ -16485,7 +16493,8 @@ def handle_post(handler, parsed) -> bool:
         if not provider_config_key:
             return bad(handler, "provider_config_key is required")
         try:
-            result = create_connect_session(owner, provider_config_key, is_admin=is_admin)
+            result = create_connect_session(owner, provider_config_key, is_admin=is_admin,
+                                            **({"connection_id": body["connection_id"]} if "connection_id" in body else {}))
         except ValueError as e:
             return bad(handler, str(e), 400)
         except PermissionError as e:
@@ -23460,7 +23469,7 @@ def _handle_chat_sync(handler, body):
         # binding here scopes the whole turn correctly.
         from api.personal_credentials import scope as personal_credentials_scope
         from api.ownership import _request_identity
-        with personal_credentials_scope(_request_identity(handler)), governed_agent_turn(
+        with personal_credentials_scope(_request_identity(handler), s.session_id), governed_agent_turn(
             _governed_identity,
             active_profile=str(getattr(s, "profile", None) or "default"),
             session_id=s.session_id,

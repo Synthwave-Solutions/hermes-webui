@@ -103,20 +103,21 @@ async function _loadHostedAccounts(epoch = _hubEpoch) {
   } catch (error) { if (epoch === _hubEpoch) _hubStatus('hostedActionStatus', _hubText('integrations_load_retry', 'Connections could not be loaded. Refresh to try again.')); }
 }
 
-async function _connectHosted(row, button) {
+async function _connectHosted(row, button, statusId = 'hostedActionStatus', current = () => true) {
   const epoch = _hubEpoch;
   const popup = window.open('about:blank', '_blank');
   if (popup) popup.opener = null;
   button.disabled = true;
-  _hubStatus('hostedActionStatus', _hubText('integrations_connecting', 'Preparing your connection…'));
+  _hubStatus(statusId, _hubText('integrations_connecting', 'Preparing your connection…'));
   try {
-    const data = await api('/api/integrations/hosted/connect', {method:'POST', body:JSON.stringify({slug:row.slug}), timeoutMs:60000});
-    if (epoch !== _hubEpoch) { if (popup) popup.close(); return; }
+    const data = await api('/api/integrations/hosted/connect', {method:'POST', body:JSON.stringify({slug:row.slug, connection_id:row.connection_id}), timeoutMs:60000});
+    if (epoch !== _hubEpoch || !current()) { if (popup) popup.close(); return; }
     if (data.connect_url && _intgSafeDocsUrl(data.connect_url).startsWith('https://')) {
       if (popup) popup.location.href = data.connect_url;
-      const status = $('hostedActionStatus'); status.replaceChildren();
+      const status = $(statusId); status.replaceChildren();
       const link = _hubNode('a', 'sm-btn', _hubText('integrations_finish_connect', 'Finish connecting your account'));
       link.href = data.connect_url; link.target = '_blank'; link.rel = 'noopener noreferrer'; status.append(link);
+      if (statusId !== 'hostedActionStatus') return;
       let polls = 0;
       const poll = async () => {
         if (epoch !== _hubEpoch) return;
@@ -132,13 +133,13 @@ async function _connectHosted(row, button) {
       clearTimeout(_hostedPoll); _hostedPoll = setTimeout(poll, 5000);
     } else {
       if (popup) popup.close();
-      _hubStatus('hostedActionStatus', data.message || (data.status === 'active'
+      _hubStatus(statusId, data.message || (data.status === 'active'
         ? _hubText('integrations_connected', 'Connected') : _hubText('integrations_pending', 'Waiting for administrator approval.')));
-      await _loadHostedAccounts(epoch);
+      if (statusId === 'hostedActionStatus') await _loadHostedAccounts(epoch);
     }
   } catch (error) {
     if (popup) popup.close();
-    if (epoch === _hubEpoch) _hubStatus('hostedActionStatus', error.message);
+    if (epoch === _hubEpoch && current()) _hubStatus(statusId, error.message);
   } finally { button.disabled = false; }
 }
 

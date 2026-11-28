@@ -69,7 +69,9 @@
 @media(min-width:641px){
   :root:is(:not([data-skin]),[data-skin="synthpulse"]) .rail{background:var(--sw-navy)!important;border-radius:0 18px 18px 0;margin:8px 8px 8px 0;padding-top:14px;padding-bottom:12px}
   :root:is(:not([data-skin]),[data-skin="synthpulse"]) .rail .rail-btn{color:var(--sw-rail-text);font-weight:500}
-  :root:is(:not([data-skin]),[data-skin="synthpulse"]) .rail .rail-btn::after{color:inherit}
+  :root:is(:not([data-skin]),[data-skin="synthpulse"]) .rail .rail-btn::after{color:var(--text)}
+  :root:is(:not([data-skin]),[data-skin="synthpulse"]):is([data-rail-expanded="1"],[data-nav-audience="member"]) .rail .rail-btn::after{color:inherit;background:transparent}
+  :root:is(:not([data-skin]),[data-skin="synthpulse"]) .rail .rail-btn:focus-visible{outline:2px solid var(--sw-rail-text);outline-offset:-3px}
   :root:is(:not([data-skin]),[data-skin="synthpulse"]) .rail .rail-btn:hover{background:var(--sw-rail-hover);color:#fff}
   :root:is(:not([data-skin]),[data-skin="synthpulse"]) .rail .rail-btn.active{background:var(--sw-grad)!important;color:#fff!important;box-shadow:0 8px 18px -8px rgba(0,128,255,.7)}
   :root:is(:not([data-skin]),[data-skin="synthpulse"]) .rail .rail-group span{color:var(--sw-rail-muted);opacity:1;text-transform:uppercase!important;letter-spacing:.08em!important;font-weight:650!important;font-family:var(--sw-heading)}

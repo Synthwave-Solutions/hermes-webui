@@ -1058,7 +1058,7 @@ def test_messages_js_live_assistant_segment_reuses_live_turn_wrapper(cleanup_tes
     assert token_start >= 0 and interim_start > token_start
     token_body = src[token_start:interim_start]
     compact_token_body = token_body.replace(" ", "").replace("\n", "")
-    assert "if(assistantRow){ensureAssistantRow();_scheduleRender();}" in compact_token_body, \
+    assert "if(assistantRow){if(!assistantRow.isConnected||_freshSegment||!_renderPending)ensureAssistantRow();_scheduleRender();}" in compact_token_body, \
         "token handler should skip the per-token full-text parse after the live answer segment exists"
     assert "constparsed=_parseStreamState();if(String((parsed&&parsed.displayText)||'').trim())ensureAssistantRow();_scheduleRender(parsed);" in compact_token_body, \
         "token handler must only create the live answer segment once visible answer text starts"

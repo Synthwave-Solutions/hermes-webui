@@ -108,3 +108,20 @@ print(json.dumps({'ok': True, 'result': {
     assert hosted_connectors._worker(MEMBER, 'token')['token'] is None
     assert probes == [{'root': str(personal_root), 'owner_visible': False, 'token': None}]
     assert json.loads(owner_auth.read_text())['providers']['nous']['access_token'] == 'synthetic-owner-credential'
+
+
+
+def test_reconnect_repairs_only_the_selected_personal_account(monkeypatch):
+    monkeypatch.setattr(hosted_connectors, 'catalog', lambda: [{'slug': 'calendar'}])
+    monkeypatch.setattr(hosted_connectors, 'account_rows', lambda identity: [
+        {'connector': 'calendar', 'connectionId': 'chosen', 'disabled': False}])
+    calls = []
+    def worker(identity, action, **values):
+        calls.append((action, values))
+        return {'results': [{'connector': 'calendar', 'status': 'initiated'}]}
+    monkeypatch.setattr(hosted_connectors, '_worker', worker)
+    with pytest.raises(PermissionError):
+        hosted_connectors.connect(ADMIN, 'calendar', 'unavailable')
+    assert not calls
+    assert hosted_connectors.connect(ADMIN, 'calendar', 'chosen')['status'] == 'initiated'
+    assert calls == [('connect', {'slug': 'calendar', 'connection_id': 'chosen'})]

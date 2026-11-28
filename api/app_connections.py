@@ -122,7 +122,8 @@ def _mcp_url(entry: dict) -> str:
 class Resolver:
     """Bound per turn by api.personal_credentials; one instance per identity."""
 
-    def __init__(self, identity: dict | None):
+    def __init__(self, identity: dict | None, *, disabled=()):
+        self._disabled = frozenset(disabled)
         self._identity = dict(identity or {})
         self._email = str(self._identity.get("email") or "").strip().lower()
         self._admin: bool | None = None
@@ -152,7 +153,7 @@ class Resolver:
             for row in _intg.list_connections(None, is_admin=True):
                 if row.get("end_user") is None:
                     rows.append({**row, "scope": "organization"})
-        return rows
+        return [row for row in rows if row["provider_config_key"] not in self._disabled]
 
     def _integrations(self) -> dict[str, dict]:
         entries = _intg.load_provider_entries()
@@ -251,6 +252,8 @@ class Resolver:
             infos = self._integrations()
             for row in _intg.list_connections(self._email, is_admin=False):
                 key = row["provider_config_key"]
+                if key in self._disabled:
+                    continue
                 provider = (infos.get(key) or {}).get("provider") or key
                 mapping = CLI_ENV.get(provider)
                 if not mapping or row.get("errors"):
@@ -370,10 +373,10 @@ class Resolver:
                 "result": result, "truncated": truncated}
 
 
-def bind(identity):
+def bind(identity, *, disabled=()):
     """Bind the resolver for this identity into the agent's tool context."""
     from tools.app_connections_tool import bind_app_connections
-    return bind_app_connections(Resolver(identity))
+    return bind_app_connections(Resolver(identity, disabled=disabled))
 
 
 def reset(token) -> None:

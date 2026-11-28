@@ -7606,7 +7606,7 @@ def _run_agent_streaming(
                 _turn_identity = {"method": "auth_disabled", "email": ""}
         _personal_root = personal_context.ensure_home(_turn_identity)
         from api.personal_credentials import bind as bind_credentials, reset as reset_credentials
-        _personal_credentials_token = bind_credentials(_turn_identity)
+        _personal_credentials_token = bind_credentials(_turn_identity, session_id)
         _personal_shared = personal_context.shared_conversation(s)
         from tools.memory_tool import bind_personal_memory_dir, reset_personal_memory_dir
         _personal_memory_token = bind_personal_memory_dir(_personal_root / "memories", enabled=not _personal_shared)

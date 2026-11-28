@@ -11557,6 +11557,7 @@ function _topbarMessageMetaText(){
   return t('n_messages',loadedCount);
 }
 function syncTopbar(){
+  window.syncChatConnectorSession?.();
   if(!S.session){
     document.title=assistantDisplayName();
     if(typeof syncWorkspaceDisplays==='function') syncWorkspaceDisplays();

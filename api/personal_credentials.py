@@ -2,17 +2,21 @@
 from contextlib import contextmanager
 
 
-def bind(identity):
-    from api import personal_context
+def bind(identity, session_id=None):
+    from api import personal_context, chat_connectors
     from api.hosted_connectors import personal_token, authorize_connection
     from agent.vault_scope import bind_personal_vault, reset_personal_vault
     from tools.connectors.identity import bind_connector_identity, reset_connector_identity
     captured = dict(identity) if isinstance(identity, dict) else {"email": identity}
+    choices = chat_connectors.disabled(captured, session_id)
+    hosted = {key.removeprefix("hosted:") for key in choices if key.startswith("hosted:")}
+    nango = {key.removeprefix("nango:") for key in choices if key.startswith("nango:")}
     root = personal_context.ensure_home(captured)
     vault = bind_personal_vault(root)
     try:
         connectors = bind_connector_identity(
             lambda: personal_token(captured),
+            **({"disabled_connectors": hosted} if hosted else {}),
             authorize_connection=lambda slugs: authorize_connection(captured, slugs),
         )
     except BaseException:
@@ -20,7 +24,7 @@ def bind(identity):
         raise
     try:
         from api import app_connections
-        apps = app_connections.bind(captured)
+        apps = app_connections.bind(captured, disabled=nango)
     except BaseException:
         reset_connector_identity(connectors)
         reset_personal_vault(vault)
@@ -44,8 +48,8 @@ def reset(tokens):
 
 
 @contextmanager
-def scope(identity):
-    tokens = bind(identity)
+def scope(identity, session_id=None):
+    tokens = bind(identity, session_id)
     try:
         yield
     finally:

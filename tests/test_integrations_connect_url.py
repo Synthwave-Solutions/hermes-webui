@@ -51,7 +51,7 @@ def nango(monkeypatch):
 
     def _request(method, path, *, payload=None, query=None):
         calls.append((method, path, payload))
-        if path == "/connect/sessions":
+        if path in {"/connect/sessions", "/connect/sessions/reconnect"}:
             return {"data": {"token": "session-token", "expires_at": "2026-01-01T00:00:00Z"}}
         return {}
 
@@ -211,3 +211,20 @@ def test_no_hq_address_in_api_or_static():
                 if HQ_HOST_RE.search(line):
                     hits.append(f"{path.relative_to(ROOT)}:{lineno}: {line.strip()[:120]}")
     assert hits == []
+
+
+
+def test_reconnect_binds_the_specific_owned_account(nango, monkeypatch):
+    monkeypatch.setenv("HERMES_WEBUI_NANGO_CONNECT_URL", CONNECT_URL)
+    def personal_connections(owner, *, is_admin):
+        assert owner == ADMIN and not is_admin
+        return [{"connection_id": "personal", "provider_config_key": PROVIDER}]
+    monkeypatch.setattr(integrations, "list_connections", personal_connections)
+    with pytest.raises(PermissionError):
+        integrations.create_connect_session(ADMIN, PROVIDER, is_admin=True, connection_id="other")
+    assert not any(call[0] == "POST" for call in nango)
+    result = integrations.create_connect_session(ADMIN, PROVIDER, is_admin=True, connection_id="personal")
+    assert result["status"] == "ready"
+    _, path, payload = nango[-1]
+    assert path == "/connect/sessions/reconnect"
+    assert payload["connection_id"] == "personal" and payload["integration_id"] == PROVIDER
