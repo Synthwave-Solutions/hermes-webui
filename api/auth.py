@@ -1002,7 +1002,8 @@ def check_auth(handler, parsed) -> bool:
         # safe='/' keeps path separators readable; everything else (including
         # `?`, `&`, `=`) gets percent-encoded.
         _next = _urlparse.quote(_path_with_query, safe='/')
-        handler.send_header('Location', 'login?next=' + _next)
+        _up = '../' * max(0, (parsed.path or '/').count('/') - 1)  # synthpulse: /session/<id> -> ../login
+        handler.send_header('Location', _up + 'login?next=' + _next)
         handler.send_header('Content-Length', '0')
         handler.end_headers()
     return False
