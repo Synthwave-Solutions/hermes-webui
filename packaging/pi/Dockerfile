@@ -6,10 +6,20 @@ COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
 RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm && npm install -g @openai/codex@0.162.1 @anthropic-ai/claude-code@2.1.296 && node /usr/local/lib/node_modules/@anthropic-ai/claude-code/install.cjs && claude --version && npm cache clean --force
 ARG ENGINE_REF=9412abd379ea92418557ffd6beb84bd136dc290f
 RUN git clone https://github.com/Synthwave-Solutions/hermes-agent.git /opt/synthpulse/hermes-agent && cd /opt/synthpulse/hermes-agent && git checkout "$ENGINE_REF" && rm -rf .git
-RUN python -m venv /opt/synthpulse/hermes-agent/venv && /opt/synthpulse/hermes-agent/venv/bin/pip install --no-cache-dir -e "/opt/synthpulse/hermes-agent[computer-use]"
+# The engine resolves its pins with uv overrides ([tool.uv] override-dependencies, e.g. Pillow 13 over
+# browser-harness's pillow==12.3.0); plain pip ignores those and fails. Install with uv and the same overrides.
+RUN python -m venv /opt/synthpulse/hermes-agent/venv && /opt/synthpulse/hermes-agent/venv/bin/pip install --no-cache-dir uv \
+ && cd /opt/synthpulse/hermes-agent && /opt/synthpulse/hermes-agent/venv/bin/python -c "import tomllib;print(chr(10).join(tomllib.load(open('pyproject.toml','rb')).get('tool',{}).get('uv',{}).get('override-dependencies',[])))" > /tmp/uv-overrides.txt \
+ && /opt/synthpulse/hermes-agent/venv/bin/uv pip install --no-cache --python /opt/synthpulse/hermes-agent/venv/bin/python --override /tmp/uv-overrides.txt -e "/opt/synthpulse/hermes-agent[computer-use]" \
+ && rm /tmp/uv-overrides.txt
 COPY packaging/pi/office-requirements.txt /tmp/office-requirements.txt
 RUN /opt/synthpulse/hermes-agent/venv/bin/pip install --no-cache-dir -r /tmp/office-requirements.txt
 COPY . /opt/synthpulse/hermes-webui
+# The build context has no .git, so the version would resolve to 'unknown' and never change between
+# builds; the service worker cache name and the ?v= asset query then stay the same and browsers keep
+# serving stale CSS/JS after an update. Pass WEBUI_VERSION (e.g. the commit) to make it unique per build.
+ARG WEBUI_VERSION=
+RUN if [ -n "$WEBUI_VERSION" ]; then printf "__version__ = '%s'\n" "$WEBUI_VERSION" > /opt/synthpulse/hermes-webui/api/_version.py; fi
 RUN /opt/synthpulse/hermes-agent/venv/bin/pip install --no-cache-dir -r /opt/synthpulse/hermes-webui/requirements.txt
 ENV HERMES_WEBUI_AGENT_DIR=/opt/synthpulse/hermes-agent HERMES_WEBUI_PYTHON=/opt/synthpulse/hermes-agent/venv/bin/python SP_WEBUI_DIR=/opt/synthpulse/hermes-webui HERMES_WEBUI_DISABLE_LOCAL_VENV=1 HERMES_WEBUI_AUTO_INSTALL=0 HERMES_WEBUI_HOST=0.0.0.0 HERMES_WEBUI_PORT=8787 HERMES_HOME=/home/synthpulse/.synthpulse-engine HERMES_RUNTIME_DIR=/opt/synthpulse/tool-runtime
 ENV PATH=/opt/synthpulse/hermes-agent/venv/bin:$PATH
