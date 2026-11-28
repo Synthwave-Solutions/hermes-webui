@@ -15370,7 +15370,7 @@ def handle_post(handler, parsed) -> bool:
                     from api import user_prefs
                     from api.config import VALID_REASONING_EFFORTS
                     _raw = str(effort or "").strip().lower()
-                    if _raw and _raw != "none" and _raw not in VALID_REASONING_EFFORTS:
+                    if _raw and _raw not in ("auto", "none") and _raw not in VALID_REASONING_EFFORTS:
                         return bad(handler, f"Unknown reasoning effort '{effort}'")
                     user_prefs.set_reasoning_effort(_who, get_active_profile_name(), _raw)
                     _status = get_reasoning_status(model_id=model_id, provider_id=provider_id, base_url=base_url)

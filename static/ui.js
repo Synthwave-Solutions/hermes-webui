@@ -5453,6 +5453,7 @@ function _applyReasoningOptions(supportedEfforts){
   const supported=new Set(Array.isArray(supportedEfforts)?supportedEfforts:[]);
   dd.querySelectorAll('.reasoning-option').forEach(function(opt){
     const effort=opt.dataset.effort;
+    // Auto delegates the level to the router, even with a fixed profile default.
     // 'none' (turn thinking off) and '' (Default = clear override, provider
     // default = thinking on) are meta-options outside the effort ladder. They
     // are always shown so a thinking-toggle-only model (GLM-4.5–5.1 on native
@@ -5460,7 +5461,7 @@ function _applyReasoningOptions(supportedEfforts){
     // Default (on) + None (off). Without the Default option the toggle is
     // one-way off-only — the user can disable thinking but cannot re-enable it.
     // (#6219 round-3)
-    if(effort==='none'||effort===''){
+    if(effort==='none'||effort===''||effort==='auto'){
       opt.style.display='';
       return;
     }

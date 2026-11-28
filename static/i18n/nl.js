@@ -2941,6 +2941,7 @@ window.__registerHermesLocale('nl', {
   channels_publish_tech: 'Maakt het webhook-adres bereikbaar vanaf internet.',
   profile_default_display: 'Standaardbot',
   reasoning_opt_default: 'Normaal',
+  reasoning_opt_auto: 'Auto',
   reasoning_opt_none: 'Uit',
   reasoning_opt_minimal: 'Minimaal',
   reasoning_opt_low: 'Snel',
