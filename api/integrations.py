@@ -1253,6 +1253,7 @@ def create_connect_session(
     provider_config_key: str,
     *,
     is_admin: bool = False,
+    connection_id: str | None = None,
 ) -> dict:
     """Mint a Nango connect session for the caller and one integration.
 
@@ -1296,6 +1297,12 @@ def create_connect_session(
     configured = {str(row.get("unique_key") or "") for row in _list_integrations()}
     if key not in configured:
         raise ValueError(f"integration '{key}' is not configured in Nango")
+    if connection_id is not None:
+        if not isinstance(connection_id, str) or not owner_email or not any(
+            row["connection_id"] == connection_id and row["provider_config_key"] == key
+            for row in list_connections(owner_email, is_admin=False)
+        ):
+            raise PermissionError("This account is unavailable for reconnection")
     # An OAuth or MCP integration without a registered client would send the
     # person to Nango's "Connection failed" page. Say so here instead.
     try:
@@ -1334,8 +1341,9 @@ def create_connect_session(
         end_user["display_name"] = email.split("@", 1)[0]
     response = _nango_request(
         "POST",
-        "/connect/sessions",
-        payload={"end_user": end_user, "allowed_integrations": [key]},
+        "/connect/sessions/reconnect" if connection_id else "/connect/sessions",
+        payload=({"end_user": end_user, "connection_id": connection_id, "integration_id": key}
+                 if connection_id else {"end_user": end_user, "allowed_integrations": [key]}),
     )
     data = response.get("data") if isinstance(response.get("data"), dict) else {}
     token = str(data.get("token") or "")

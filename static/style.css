@@ -1470,7 +1470,7 @@
   :root:not(.dark) .token.important,
   :root:not(.dark) .token.bold{font-weight:bold;}
   :root:not(.dark) .token.italic{font-style:italic;}
-  :root:not(.dark) .nav-tab:hover::after{background:var(--surface);border-color:var(--accent-bg-strong);color:var(--accent-text);}
+  :root:not(.dark) .sidebar-nav .nav-tab:hover::after{background:var(--surface);border-color:var(--accent-bg-strong);color:var(--accent-text);}
   :root:not(.dark) .cron-status.disabled{background:rgba(0,0,0,.05);}
   :root:not(.dark) .cron-status.attention{background:rgba(217,119,6,.14);color:#b45309;}
   :root:not(.dark) .cron-btn{background:rgba(0,0,0,.04);}
@@ -1797,7 +1797,7 @@
      fade that ends at .5. The static opacity:.5 on the base rule remains for the
      reduced-motion path (animation:none) below. (@rodboev/greptile review, #4662) */
   .skeleton-group-label{animation:skeletonFadeInDim .22s ease both;}
-  @keyframes skeletonSheen{0%{background-position:200% 0;}100%{background-position:-200% 0;}}
+  @keyframes skeletonSheen{0%,100%{opacity:.55;}50%{opacity:1;}}
   @keyframes skeletonFadeIn{from{opacity:0;}to{opacity:1;}}
   @keyframes skeletonFadeInDim{from{opacity:0;}to{opacity:.5;}}
   :root{--skeleton-base:color-mix(in srgb,var(--text) 8%,transparent);--skeleton-sheen:color-mix(in srgb,var(--text) 22%,transparent);}
@@ -8969,3 +8969,28 @@ html:not([data-nav-audience="admin"]) #composerMobileContextThreshold,
 html:not([data-nav-audience="admin"]) #composerMobileContextCost{display:none!important}
 #chatBotRoster[hidden]{display:none!important}
 @media (max-width:640px){.chat-mode-header button{min-height:44px}}
+
+.chat-connectors-trigger {width:auto;gap:4px;padding-inline:5px;font-size:12px}
+.chat-connectors-dialog {box-sizing:border-box;width:min(540px,calc(100vw - 24px));max-height:min(78dvh,750px);padding:18px;border:1px solid var(--border2);border-radius:12px;background:var(--surface);color:var(--text);box-shadow:0 12px 42px #0003}
+.chat-connectors-dialog[open] {display:flex;flex-direction:column;gap:10px}
+.chat-connectors-dialog::backdrop {background:#0005}
+.chat-connectors-dialog header,.chat-connectors-search {display:flex;gap:8px;align-items:center}
+.chat-connectors-dialog h2 {margin:0;flex:1;font-size:18px}
+.chat-connectors-dialog p,.chat-connectors-dialog small {color:var(--muted);margin:0}
+.chat-connectors-search input {flex:1;min-width:0;padding:8px;background:var(--input-bg);color:var(--text);border:1px solid var(--border2);border-radius:6px}
+#chatConnectorsStatus:empty {display:none}
+#chatConnectorsList {overflow:auto;overscroll-behavior:contain;list-style:none;padding:0;margin:0;min-height:0}
+#chatConnectorsList li {display:flex;align-items:center;gap:7px;padding:9px 1px;border-bottom:1px solid var(--border)}
+#chatConnectorsList li div {flex:1;min-width:0;overflow-wrap:anywhere}
+#chatConnectorsList small {display:block}
+.chat-connector-toggle[aria-pressed="true"] {background:var(--accent-bg);color:var(--accent-text)}
+@media(max-width:720px){.chat-connectors-trigger span{display:none}.chat-connectors-dialog{padding:12px}#chatConnectorsList li{flex-wrap:wrap}#chatConnectorsList li div{min-width:100%}}
+@media(prefers-reduced-motion:no-preference){
+  .chat-connectors-dialog,.composer-mobile-config-panel,#composerModelDropdown {
+    opacity:0;transition:opacity 140ms ease-out,display 140ms allow-discrete,overlay 140ms allow-discrete;
+  }
+  .chat-connectors-dialog[open],.composer-mobile-config-panel.open,#composerModelDropdown.open {opacity:1}
+  @starting-style {
+    .chat-connectors-dialog[open],.composer-mobile-config-panel.open,#composerModelDropdown.open {opacity:0}
+  }
+}

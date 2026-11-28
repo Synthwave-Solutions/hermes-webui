@@ -704,7 +704,11 @@ async function _intgRequestAccess(providerKey) {
   _intgRefreshRequests();
 }
 
-async function _intgConnect(providerConfigKey) {
+async function _intgConnect(providerConfigKey, connectionId, feedback) {
+  const notify = (message, duration, level) => {
+    if (feedback) feedback(message);
+    else if (typeof showToast === 'function') showToast(message, duration, level);
+  };
   // Open the popup SYNCHRONOUSLY, inside the click's user-gesture stack, and
   // navigate it once the session token arrives. Opening it after the await
   // instead is what browsers block by default: the window.open no longer
@@ -729,19 +733,19 @@ async function _intgConnect(providerConfigKey) {
     // session per connect attempt.
     data = await api('/api/integrations/connect', {
       method: 'POST',
-      body: JSON.stringify({ provider_config_key: providerConfigKey }),
+      body: JSON.stringify({ provider_config_key: providerConfigKey, connection_id: connectionId }),
       redirect401: false,
     });
   } catch (e) {
     closePopup();
-    if (typeof showToast === 'function') showToast((e && e.message) || 'connect failed', 5000, 'error');
+    notify((e && e.message) || 'connect failed', 5000, 'error');
     return;
   }
   // 202: the request was queued for an admin instead of minting a session.
   if (data && String(data.status || '') === 'pending_approval') {
     closePopup();
-    if (typeof showToast === 'function') {
-      showToast(_intgT('integrations_access_requested', 'Access requested. An admin has to approve it.'), 5000);
+    {
+      notify(_intgT('integrations_access_requested', 'Access requested. An admin has to approve it.'), 5000);
     }
     _intgMarkPending(providerConfigKey);
     await _intgRefreshRequests();
@@ -750,8 +754,8 @@ async function _intgConnect(providerConfigKey) {
   // No connect address on this platform: nothing was minted, nothing to open.
   if (data && String(data.status || '') === 'not_configured') {
     closePopup();
-    if (typeof showToast === 'function') {
-      showToast(_intgT('integrations_connect_not_configured', 'Connecting apps is not set up on this platform yet. Ask your administrator.'), 6000, 'warning');
+    {
+      notify(_intgT('integrations_connect_not_configured', 'Connecting apps is not set up on this platform yet. Ask your administrator.'), 6000, 'warning');
     }
     return;
   }
@@ -759,7 +763,7 @@ async function _intgConnect(providerConfigKey) {
   const token = String((data && data.token) || '');
   if (!base || !token) {
     closePopup();
-    if (typeof showToast === 'function') showToast(_intgT('integrations_connect_failed', 'Connect session could not be created.'), 5000, 'error');
+    notify(_intgT('integrations_connect_failed', 'Connect session could not be created.'), 5000, 'error');
     return;
   }
   const apiUrl = _intgApiUrlFor(base);
@@ -770,7 +774,7 @@ async function _intgConnect(providerConfigKey) {
     // have the URL, and fall back to telling them rather than failing silently.
     try { popup = window.open(url, 'hermesNangoConnect', 'popup=yes,width=480,height=720'); } catch (_) { popup = null; }
     if (!popup) {
-      if (typeof showToast === 'function') showToast(_intgT('integrations_popup_blocked', 'Popup blocked: allow popups for this site and try again.'), 6000, 'error');
+      notify(_intgT('integrations_popup_blocked', 'Popup blocked: allow popups for this site and try again.'), 6000, 'error');
       return;
     }
   } else {

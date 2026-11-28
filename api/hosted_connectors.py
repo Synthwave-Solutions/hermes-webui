@@ -142,16 +142,20 @@ def authorize_connection(identity, slugs):
         raise _ApprovalRequired(pending)
 
 
-def connect(identity, slug):
+def connect(identity, slug, connection_id=None):
     if not isinstance(slug, str) or not re.fullmatch(r'[a-z0-9][a-z0-9_-]{0,99}', slug):
         raise ValueError('Invalid connector')
     if not any(row['slug'] == slug for row in catalog_for(identity)):
         raise ValueError('Unknown connector')
+    if connection_id is not None and (not isinstance(connection_id, str) or not connection_id or not any(
+            row["connector"] == slug and row["connectionId"] == connection_id and not row["disabled"]
+            for row in account_rows(identity))):
+        raise PermissionError("This account is unavailable for reconnection")
     try:
         authorize_connection(identity, [slug])
     except _ApprovalRequired as exc:
         return exc.requests[0]
-    result = _worker(identity, 'connect', slug=slug)
+    result = _worker(identity, 'connect', slug=slug, connection_id=connection_id)
     rows = result.get('results') or []
     row = next((r for r in rows if r.get('connector') == slug), None)
     if not row or row.get('status') == 'failed':
@@ -182,7 +186,7 @@ def handle(handler, action, body=None):
         if action == 'accounts':
             return j(handler, {'accounts': account_rows(identity)})
         if action == 'connect':
-            value = connect(identity, (body or {}).get('slug'))
+            value = connect(identity, (body or {}).get('slug'), (body or {}).get('connection_id'))
             return j(handler, value, status=202 if value.get('status') == 'pending_approval' else 200)
         if action == 'disconnect':
             return j(handler, disconnect(identity, (body or {}).get('connection_id')))

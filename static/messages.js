@@ -4062,6 +4062,8 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
     const localId=`live-prose:${streamId}:${segmentSeq}`;
     const existing=_findAnchorActivityEventByLocalId(localId,'token');
     if(existing){
+      const status=options.sealed?'completed':'running';
+      if(existing.status===status && existing.payload?.text===text && existing.payload?.activityBurstId===_currentActivityBurstId) return existing;
       const replaced=_replaceAnchorActivityEventByLocalId(localId,'token',{
         status:options.sealed?'completed':'running',
         payload:{text,activitySegmentSeq:segmentSeq,activityBurstId:_currentActivityBurstId},
@@ -5211,7 +5213,11 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
       _streamFadeDomText='';
     }
     const delta=String(next.text||'').slice(_streamFadeDomText.length);
-    if(delta) assistantBody.appendChild(document.createTextNode(delta));
+    if(delta){
+      const tail=assistantBody.lastChild;
+      if(tail && tail.nodeType===Node.TEXT_NODE) tail.appendData(delta);
+      else assistantBody.appendChild(document.createTextNode(delta));
+    }
     _streamFadeDomText=String(next.text||'');
     return next.caughtUp;
   }
@@ -5569,6 +5575,7 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
   }
 
   let _lastRenderMs=0;
+  let _probeCompressionOnNextToken=true;
   // Parse-result cache: _scheduleRender can accept a pre-computed _parseStreamState()
   // from the token event handler, avoiding a duplicate O(n) scan inside _doRender
   // when the rAF fires before the next token arrives.
@@ -5603,6 +5610,7 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
       // writes to suppress Chromium scroll re-anchoring during streaming growth.
       if(typeof window._fixMobileScrollJank==='function') window._fixMobileScrollJank();
       _lastRenderMs=performance.now();
+      _probeCompressionOnNextToken=true;
       const parsed=_cachedParsed&&_cachedParsedText===assistantText&&_cachedParsedReasoning===liveReasoningText ? _cachedParsed : _parseStreamState();
       // Fade frames can advance without a new token. Retain one parse for
       // this stream; either accumulator changing invalidates it above.
@@ -5705,7 +5713,12 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
       assistantText+=d.text;
       syncInflightAssistantMessage();
       if(!S.session||S.session.session_id!==activeSid) return;
-      _completeAutomaticCompressionOnLiveProgress(activeSid);
+      // Several tokens can arrive before the next paint. Check the live DOM once
+      // per frame, or immediately when a new compression starts between tokens.
+      if(_probeCompressionOnNextToken || window._compressionUi?.phase==='running'){
+        _probeCompressionOnNextToken=false;
+        _completeAutomaticCompressionOnLiveProgress(activeSid);
+      }
       if(_freshSegment) appendThinking('', _liveThinkingPlacement());
       // Once the assistant row exists its creation gate is already satisfied, and
       // the throttled _doRender re-parses once per frame anyway — so the per-token

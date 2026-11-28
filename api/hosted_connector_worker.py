@@ -23,7 +23,9 @@ def execute(request):
         return listing.model_dump()
     if action == 'connect':
         from tools.connectors.managed import managed_client, DESKTOP_PAGE
-        return managed_client(creates_guest=True, initiator=DESKTOP_PAGE).connections([request['slug']])
+        account = request.get('connection_id')
+        return managed_client(creates_guest=not account, initiator=DESKTOP_PAGE).connections(
+            [request['slug']], reinitiate=bool(account), connection_id=account)
     if action == 'disconnect':
         return PortalConnectorClient().delete_account(request['connection_id'])
     raise ValueError('Unsupported connector action')

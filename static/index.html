@@ -715,6 +715,7 @@
             <button type="button" class="icon-btn has-tooltip" id="btnAttach" data-tooltip="Attach files" data-i18n-title="composer_control_attach" data-i18n-aria-label="composer_control_attach" aria-label="Attach files" data-tour="chat-attach">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
             </button>
+            <button type="button" class="icon-btn chat-connectors-trigger" id="chatConnectorsButton" aria-haspopup="dialog" aria-controls="chatConnectorsDialog" data-i18n-title="chat_connect_title" data-i18n-aria-label="chat_connect_title" title="Connectors" aria-label="Connectors"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="m8 3 4 4M3 8l4 4m-2 2 9-9 3 3a6.4 6.4 0 0 1-9 9zm11 3 4 4"/></svg><span data-i18n="chat_connect_title">Connectors</span></button>
             <button type="button" class="icon-btn has-tooltip" id="btnSavedPrompts" data-tooltip="Saved prompts" data-i18n-title="composer_control_saved_prompts" data-i18n-aria-label="composer_control_saved_prompts" onclick="toggleSavedPromptsPopup()" aria-haspopup="menu" aria-expanded="false" aria-controls="savedPromptsPopup" aria-label="Saved prompts" data-tour="chat-saved-prompts">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
             </button>
@@ -2244,6 +2245,13 @@
 <script src="static/bot-screens-link.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/bot-builder.js?v=__WEBUI_VERSION__-bot-editor2" defer></script>
 <script src="static/governance.js?v=__WEBUI_VERSION__" defer></script>
+<dialog id="chatConnectorsDialog" class="chat-connectors-dialog" aria-labelledby="chatConnectorsTitle">
+  <header><h2 id="chatConnectorsTitle" data-i18n="chat_connect_title">Connectors</h2><button type="button" class="sm-btn" id="chatConnectorsClose" data-i18n="help_tour_close">Close</button></header>
+  <p data-i18n="chat_connect_intro">Apps open separately. Connectors let the agent use your accounts in a chat. Changes apply to your next turn, subject to tool permissions.</p>
+  <div class="chat-connectors-search"><input type="search" id="chatConnectorsSearch" data-i18n-placeholder="chat_connect_search" data-i18n-aria-label="chat_connect_search" placeholder="Find a connector" aria-label="Find a connector"><button type="button" class="sm-btn" id="chatConnectorsRefresh" data-i18n="refresh">Refresh</button></div>
+  <div id="chatConnectorsStatus" role="status"></div><ul id="chatConnectorsList"></ul>
+</dialog>
+<script src="static/chat-connectors.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/integrations.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/whatsapp_bridge.js?v=__WEBUI_VERSION__" defer></script>
 <script src="static/integration-hub.js?v=__WEBUI_VERSION__" defer></script>
