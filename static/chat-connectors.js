@@ -10,6 +10,7 @@
   const catalogs = new Map();
   const failures = new Set();
   const pending = new Set();
+  const accountChoices = new Map();
   const current = () => dialog.open && sessionId === S.session?.session_id;
   const element = (tag, text) => {
     const node = document.createElement(tag);
@@ -43,6 +44,9 @@
           option.value = account.id;
           accountSelect.append(option);
         }
+        const previous = accountChoices.get(key);
+        if (accounts.some(account => account.id === previous)) accountSelect.value = previous;
+        accountSelect.onchange = () => accountChoices.set(key, accountSelect.value);
         main.append(accountSelect);
       }
       const connect = element('button', t(row.connected || accounts.length ? 'chat_connect_reconnect' : 'integrations_connect'));
@@ -107,7 +111,7 @@
   document.getElementById('chatConnectorsClose').onclick=()=>dialog.close();
   document.getElementById('chatConnectorsRefresh').onclick=refresh;
   search.oninput=render;
-  dialog.addEventListener('close',()=>{generation++;sessionId='';catalogs.clear();failures.clear();list.replaceChildren();notice.textContent='';});
+  dialog.addEventListener('close',()=>{generation++;sessionId='';catalogs.clear();failures.clear();accountChoices.clear();list.replaceChildren();notice.textContent='';});
   window.addEventListener('focus',()=>{if(current() && !pending.size)refresh();});
   window.syncChatConnectorSession=()=>{if(dialog.open && !current())dialog.close();};
 })();

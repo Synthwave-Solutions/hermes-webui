@@ -8970,7 +8970,9 @@ html:not([data-nav-audience="admin"]) #composerMobileContextCost{display:none!im
 #chatBotRoster[hidden]{display:none!important}
 @media (max-width:640px){.chat-mode-header button{min-height:44px}}
 
-.chat-connectors-trigger {width:auto;gap:4px;padding-inline:5px;font-size:12px}
+.chat-connectors-trigger {flex:none;gap:5px;white-space:nowrap}
+.chat-connectors-trigger svg {flex:none}
+.composer-footer:is(.cf-icons,.cf-burger) .chat-connectors-trigger span {display:none}
 .chat-connectors-dialog {box-sizing:border-box;width:min(540px,calc(100vw - 24px));max-height:min(78dvh,750px);padding:18px;border:1px solid var(--border2);border-radius:12px;background:var(--surface);color:var(--text);box-shadow:0 12px 42px #0003}
 .chat-connectors-dialog[open] {display:flex;flex-direction:column;gap:10px}
 .chat-connectors-dialog::backdrop {background:#0005}
