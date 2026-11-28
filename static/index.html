@@ -2247,7 +2247,13 @@
 <script src="static/governance.js?v=__WEBUI_VERSION__" defer></script>
 <dialog id="chatConnectorsDialog" class="chat-connectors-dialog" aria-labelledby="chatConnectorsTitle">
   <header><h2 id="chatConnectorsTitle" data-i18n="chat_connect_title">Connectors</h2><button type="button" class="sm-btn" id="chatConnectorsClose" data-i18n="help_tour_close">Close</button></header>
-  <p data-i18n="chat_connect_intro">Apps open separately. Connectors let the agent use your accounts in a chat. Changes apply to your next turn, subject to tool permissions.</p>
+  <p data-i18n="chat_connect_intro">Browse MCP servers, CLI tools and APIs for this chat. Changes to your chat selection apply from your next turn.</p>
+  <div class="chat-connectors-kinds" id="chatConnectorsKinds" role="group" aria-label="Connection type" data-i18n-aria-label="chat_connect_type">
+    <button type="button" class="sm-btn" data-kind="all" aria-pressed="true"><span data-i18n="chat_connect_all">All</span></button>
+    <button type="button" class="sm-btn" data-kind="mcp" aria-pressed="false">MCP</button>
+    <button type="button" class="sm-btn" data-kind="cli" aria-pressed="false">CLI</button>
+    <button type="button" class="sm-btn" data-kind="api" aria-pressed="false">API</button>
+  </div>
   <div class="chat-connectors-search"><input type="search" id="chatConnectorsSearch" data-i18n-placeholder="chat_connect_search" data-i18n-aria-label="chat_connect_search" placeholder="Find a connector" aria-label="Find a connector"><button type="button" class="sm-btn" id="chatConnectorsRefresh" data-i18n="refresh">Refresh</button></div>
   <div id="chatConnectorsStatus" role="status"></div><ul id="chatConnectorsList"></ul>
 </dialog>

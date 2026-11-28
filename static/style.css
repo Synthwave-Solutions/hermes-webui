@@ -9004,3 +9004,8 @@ html:not([data-nav-audience="admin"]) #composerMobileContextCost{display:none!im
 @media(prefers-reduced-motion:reduce){
   .chat-connectors-dialog,.composer-mobile-config-panel,#composerModelDropdown {transition:none!important;animation:none!important}
 }
+
+.chat-connectors-kinds {display:flex;flex-wrap:wrap;gap:6px}
+.chat-connectors-kinds button[aria-pressed="true"] {border-color:var(--accent-text);color:var(--accent-text);background:var(--accent-bg)}
+.chat-connectors-kinds button small {display:inline;font-variant-numeric:tabular-nums}
+#chatConnectorsList li > span {color:var(--muted);font-size:12px}

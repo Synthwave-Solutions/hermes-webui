@@ -5,7 +5,11 @@
   const search = document.getElementById('chatConnectorsSearch');
   const list = document.getElementById('chatConnectorsList');
   const notice = document.getElementById('chatConnectorsStatus');
-  const sources = ['nango', 'hosted'];
+  const sources = ['nango', 'hosted', 'mcp', 'cli', 'profile_api'];
+  const sourceLabel = source => ({nango:'Nango', mcp:'MCP', cli:'CLI', profile_api:'API'}[source] || t('chat_connect_hosted'));
+  const filters = document.getElementById('chatConnectorsKinds');
+  const pageSize = 60;
+  let kind = 'all', limit = pageSize;
   let sessionId = '', generation = 0;
   const catalogs = new Map();
   const failures = new Set();
@@ -22,18 +26,42 @@
     if (!current()) return;
     const query = search.value.trim().toLocaleLowerCase();
     const rows = [];
-    for (const [source, data] of catalogs)
-      for (const row of data.connectors)
-        if (row.name.toLocaleLowerCase().includes(query) || row.key.toLowerCase().includes(query))
-          rows.push({...row, source, available:data.chat_available});
-    rows.sort((a,b) => Number(b.connected)-Number(a.connected) || a.name.localeCompare(b.name));
+    const counts = {all:0, mcp:0, cli:0, api:0};
+    for (const [source, data] of catalogs) {
+      for (const row of data.connectors) {
+        const kinds = row.kinds || ['api'];
+        const text = [row.name, row.key, sourceLabel(source), ...kinds].join(' ').toLocaleLowerCase();
+        if (!text.includes(query)) continue;
+        counts.all++;
+        for (const type of kinds) counts[type]++;
+        if (kind === 'all' || kinds.includes(kind)) {
+          rows.push({...row, kinds, source, available:row.managed ? row.available : data.chat_available});
+        }
+      }
+    }
+    for (const button of filters.querySelectorAll('button')) {
+      button.setAttribute('aria-pressed', String(button.dataset.kind === kind));
+      let count = button.querySelector('small');
+      if (!count) {count = element('small'); button.append(count);}
+      count.textContent = ' ' + counts[button.dataset.kind];
+    }
+    rows.sort((a,b) => Number(!!b.connected)-Number(!!a.connected) || a.name.localeCompare(b.name) || a.source.localeCompare(b.source));
     const fragment = document.createDocumentFragment();
-    for (const row of rows.slice(0, 80)) {
+    for (const row of rows.slice(0, limit)) {
       const item = element('li'), main = element('div'), name = element('strong', row.name);
       const key = row.source + ':' + row.key;
+      const interfaces = row.kinds.map(value => value.toUpperCase()).join(' / ');
+      if (row.managed) {
+        const origin = t('chat_connect_origin_' + row.origin);
+        main.append(name, element('small', [interfaces, origin].join(' · ')));
+        item.append(main, element('span', t('chat_connect_status_' + row.status)));
+        if (row.available === false) main.append(element('small', t('chat_connect_restricted')));
+        fragment.append(item);
+        continue;
+      }
       const accounts = row.accounts || [];
-      const meta = element('small', [row.source === 'hosted' ? t('chat_connect_hosted') : 'Nango',
-        t(row.connected ? 'chat_connect_linked' : accounts.length ? 'chat_connect_expired' : 'chat_connect_unlinked')].join(' · '));
+      const meta = element('small', [interfaces, sourceLabel(row.source),
+        t(accounts.some(account => account.active) ? 'chat_connect_linked' : row.organization ? 'chat_connect_organization' : accounts.length ? 'chat_connect_expired' : 'chat_connect_unlinked')].join(' · '));
       main.append(name, meta); item.append(main);
       let accountSelect;
       if (accounts.length > 1) {
@@ -49,7 +77,7 @@
         accountSelect.onchange = () => accountChoices.set(key, accountSelect.value);
         main.append(accountSelect);
       }
-      const connect = element('button', t(row.connected || accounts.length ? 'chat_connect_reconnect' : 'integrations_connect'));
+      const connect = element('button', t(accounts.length ? 'chat_connect_reconnect' : 'integrations_connect'));
       connect.type='button'; connect.className='sm-btn'; connect.disabled=pending.has(key);
       connect.onclick = async () => {
         const g=generation; pending.add(key); connect.disabled=true;
@@ -82,9 +110,15 @@
       };
       item.append(toggle); fragment.append(item);
     }
-    if (rows.length>80) fragment.append(element('li',t('chat_connect_filter')));
-    if (!rows.length && catalogs.size===sources.length) fragment.append(element('li',t('chat_connect_empty')));
-    for (const source of failures) fragment.append(element('li',(source==='hosted'?t('chat_connect_hosted'):'Nango')+' · '+t('chat_connect_failed')));
+    if (rows.length > limit) {
+      const item = element('li');
+      const more = element('button', t('chat_connect_more') + ' (' + (rows.length-limit) + ')');
+      more.type='button'; more.className='sm-btn';
+      more.onclick = () => {limit += pageSize; render();};
+      item.append(more); fragment.append(item);
+    }
+    if (!rows.length && catalogs.size + failures.size === sources.length && catalogs.size) fragment.append(element('li',t('chat_connect_empty')));
+    for (const source of failures) fragment.append(element('li',sourceLabel(source)+' · '+t('chat_connect_failed')));
     list.replaceChildren(fragment);
     list.setAttribute('aria-busy',String(catalogs.size+failures.size<sources.length));
   }
@@ -106,11 +140,22 @@
   trigger.onclick=async () => {
     if (!S.session?.session_id) {await newSession(false,{worktree:false});}
     if (!S.session?.session_id) return;
-    sessionId=S.session.session_id;search.value=''; dialog.showModal();search.focus();refresh();
+    sessionId=S.session.session_id;search.value='';kind='all';limit=pageSize; dialog.showModal();search.focus();refresh();
   };
   document.getElementById('chatConnectorsClose').onclick=()=>dialog.close();
+  dialog.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      dialog.close();
+    }
+  });
   document.getElementById('chatConnectorsRefresh').onclick=refresh;
-  search.oninput=render;
+  filters.onclick = event => {
+    const button = event.target.closest('button[data-kind]');
+    if (button) {kind=button.dataset.kind; limit=pageSize; render();}
+  };
+  search.oninput=() => {limit=pageSize; render();};
   dialog.addEventListener('close',()=>{generation++;sessionId='';catalogs.clear();failures.clear();accountChoices.clear();list.replaceChildren();notice.textContent='';});
   window.addEventListener('focus',()=>{if(current() && !pending.size)refresh();});
   window.syncChatConnectorSession=()=>{if(dialog.open && !current())dialog.close();};

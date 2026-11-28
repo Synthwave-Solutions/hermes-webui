@@ -144,7 +144,7 @@ class Resolver:
                 self._admin = False
         return self._admin
 
-    def _rows(self) -> list[dict]:
+    def visible_connections(self) -> list[dict]:
         rows: list[dict] = []
         if self._email:
             for row in _intg.list_connections(self._email, is_admin=False):
@@ -165,7 +165,7 @@ class Resolver:
         return out
 
     def _pick(self, integration: str, connection_id: str | None) -> tuple[dict, dict]:
-        rows = [r for r in self._rows() if r["provider_config_key"] == integration]
+        rows = [r for r in self.visible_connections() if r["provider_config_key"] == integration]
         if connection_id:
             rows = [r for r in rows if r["connection_id"] == connection_id]
         if not rows:
@@ -185,7 +185,7 @@ class Resolver:
     def list(self) -> list[dict]:
         infos = self._integrations()
         out = []
-        for row in self._rows():
+        for row in self.visible_connections():
             info = infos.get(row["provider_config_key"]) or {"provider": row["provider_config_key"], "entry": {}}
             entry = info["entry"]
             proxy = entry.get("proxy") if isinstance(entry.get("proxy"), dict) else {}
