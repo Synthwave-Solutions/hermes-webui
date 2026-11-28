@@ -6030,6 +6030,12 @@ def _csrf_rejection_error(handler) -> str:
 
 def _check_csrf(handler) -> bool:
     """Reject cross-origin or tokenless authenticated browser unsafe requests."""
+    from api import automation_token as _atok
+
+    if _atok.get_ctx(handler):
+        # Bearer service token on an allowlisted route (checked in check_auth):
+        # no cookie, so no CSRF. Cookie requests never reach this branch.
+        return True
     if not _check_same_origin_browser_request(handler):
         return False
     if not _is_browser_unsafe_request(handler):
@@ -15515,6 +15521,10 @@ def handle_post(handler, parsed) -> bool:
         return _channels_me(handler, "POST", parsed.path, body)
 
     if parsed.path == "/api/session/participants":
+        from api import automation_token as _atok_p
+
+        if not _atok_p.session_gate(handler, body.get("session_id")):
+            return bad(handler, "Session not found", 404)
         from api.project_collaboration import project_for as _participants_project
         try:
             _participants_session = get_session(body.get('session_id'))
@@ -15804,6 +15814,10 @@ def handle_post(handler, parsed) -> bool:
             return bad(handler, "session_id is required")
         if not is_safe_session_id(sid):
             return bad(handler, "Invalid session_id", 400)
+        from api import automation_token as _atok_d
+
+        if not _atok_d.session_gate(handler, sid):
+            return bad(handler, "Session not found", 404)
         cli_meta_for_delete = _lookup_cli_session_metadata(sid)
         if cli_meta_for_delete.get("read_only"):
             return bad(handler, "Read-only imported sessions cannot be deleted from WebUI", 400)
@@ -28028,6 +28042,11 @@ def _handle_session_import(handler, body):
         SESSIONS.move_to_end(s.session_id)
         _evict_sessions_over_cap()  # #4765: safe LRU eviction (never active/unsaved)
     s.save()
+    from api import automation_token as _atok_i
+
+    if _atok_i.get_ctx(handler):
+        _atok_i.record_session(s.session_id)
+        _atok_i.audit(handler, "POST", "/api/session/import", "session_created", s.session_id)
     publish_session_list_changed("session_import")
     return j(handler, {"ok": True, "session": s.compact() | {"messages": s.messages}})
 

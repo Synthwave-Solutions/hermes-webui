@@ -93,3 +93,12 @@ def test_fully_redacted_error_does_not_fall_back_to_raw_input(monkeypatch):
     assert payload["message"]
     assert "SYNTHETIC_SECRET" not in str(payload)
     assert "details" not in payload
+
+
+def test_safety_block_is_displayed_as_its_own_terminal_error():
+    from api import streaming
+    detail = "content_policy_blocked: This request was blocked by our safety systems."
+    classification = streaming._classify_provider_error(detail)
+    assert classification["type"] == "content_policy_blocked"
+    payload = streaming._provider_error_payload(detail, classification["type"])
+    assert payload["message"] != detail and payload["details"] == detail

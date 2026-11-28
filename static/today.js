@@ -43,6 +43,14 @@
   const get = url => (typeof api === 'function' ? api(url, { timeoutToast: false, redirect401: false }) : Promise.reject()).catch(() => null);
 
   const state = { items: null, mine: 0, decide: 0, at: 0, loading: null };
+  // The decision queue is admin only. A non-admin got a 403 on every refresh
+  // (about 600 governance denials a day for iFlair, Stephen and Hrishi,
+  // 19-11-2026), so after the first refusal it is not asked again this page.
+  let queueDenied = false;
+  const queueGet = () => queueDenied ? Promise.resolve(null)
+    : (typeof api === 'function' ? api('/api/governance/approvals', { timeoutToast: false, redirect401: false }) : Promise.reject())
+      .catch(e => { const st = e && (e.status || e.statusCode || (e.response && e.response.status));
+        if (st === 403 || /403|forbidden|permission/i.test(String((e && e.message) || ''))) queueDenied = true; return null; });
   let root = null;
 
   function botLabel(name){
@@ -56,7 +64,7 @@
       const board = typeof _botWorkQuery === 'function' ? _botWorkQuery() : '';
       const [tasks, screens, mine, queue] = await Promise.all([
         get('/api/kanban/waiting' + board), get('/api/bot-screen/status'),
-        get('/api/governance/approvals/mine'), get('/api/governance/approvals')]);
+        get('/api/governance/approvals/mine'), queueGet()]);
       const items = [];
       ((screens && screens.screens) || []).filter(r => r && r.state === 'waiting' && r.rights && r.rights.control).forEach(r =>
         items.push({ title: botLabel(r.bot), sub: r.reason || w('wait_screen'), go: 'approvals', bot: botLabel(r.bot) }));

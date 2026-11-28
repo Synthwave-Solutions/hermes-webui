@@ -92,6 +92,8 @@ If after running steps 1-4 the import still fails *and* `pip install -e .` succe
 
 **Why.** Sidecar repair re-checks the run-journal after it detects a stale stream and uses the result as a one-shot signal. On WSL2 (9p / DrvFs) and on some network-backed setups, the run-journal `.jsonl` is written by the stopped worker but the WebUI process reads it through a page-cache state that has not yet seen those writes — recovery returns "empty" and the marker would otherwise be baked permanently. The fix introduces a *lazy* retry path: when sidecar repair cannot read visible output but knows the stream id, it stores a `_pending_journal_recovery` flag on the marker and re-attempts recovery from `get_session()` until the journal becomes readable (or the retry budget is exhausted).
 
+If the server restarts after saving a prompt or a tool call, the chat shows the saved work with an interruption notice. Check the result of any pending action before retrying it.
+
 **Interruption classes.** The WebUI now keeps the user-facing cases separate instead of implying every stale stream was a restart:
 
 - **Browser/SSE connection interrupted** — the live browser `EventSource` transport dropped. The UI reports `Connection interrupted` and tries status/replay/session restore before showing the final browser-side notice. Chat and gateway SSE errors also POST a small sanitized diagnostic event to `/api/client-events/log` (source, session id, stream id, readyState, visibility, online state, path without query string) so server logs can distinguish browser transport loss from backend worker loss.
@@ -199,6 +201,10 @@ If you launched `python3 bootstrap.py` in the foreground, stop it with Ctrl-C an
 
 ---
 
+## An answer stopped mid-sentence
+
+A provider safety block ends the current request. The chat keeps the partial answer and shows the reason under the reply. A temporary rate limit can show a retry countdown while the Super Agent waits for capacity. You can leave the request running or use Stop to cancel it.
+
 ## Other troubleshooting
 
 This document grows over time. If a recurring failure mode isn't covered here yet, add it via PR. The format for each entry: **Symptom → Why → Diagnostic commands → Fix → When to file a bug**.
@@ -209,3 +215,13 @@ Related references:
 - [`docs/docker.md`](docker.md) — Docker compose setup, common failure modes, bind-mount migration.
 - [`docs/wsl-autostart.md`](wsl-autostart.md) — WSL2 auto-start at login on Windows.
 - [`docs/EXTENSIONS.md`](EXTENSIONS.md) — WebUI extension injection, security model, examples.
+
+For an automatic route whose primary and ordinary fallback resolve to the same
+backend, the WebUI also supports a `webui_capacity_fallback` mapping in the
+profile configuration. Set `source_model` to the automatic model ID and specify
+the backup's `provider`, `model`, `base_url` and `key_env`. The WebUI appends
+this route for rate limits, overload, server errors and timeouts. Other selected
+models retain their configured fallback chain.
+Large histories can also use the configured `compression.failover_context_length`
+on the first capacity error, before a successful provider response identifies
+the routed model.

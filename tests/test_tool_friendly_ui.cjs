@@ -86,6 +86,7 @@ assert.equal(ft.processedLine({live:true,duration:'12s',steps:1}),'Bezig · 12s 
 const live=ft.groupSummary([{name:'read_file',args:{},done:true},ft.describe({name:'terminal',args:{command:'pytest'},done:false})]);
 assert.match(live.text,/nu: 💻 Opdracht wordt uitgevoerd/);
 assert.equal(ft.errorCard('Gateway request failed').title,'SynthPulse kon de AI niet bereiken');
+assert.equal(ft.errorCard('Provider safety block').title,'De AI-aanbieder heeft dit antwoord gestopt');
 assert.equal(ft.errorCard('Totally normal heading'),null,'normal bold answers are never restyled');
 ft.setLanguage('en');
 assert.equal(ft.processedLine({duration:'4s',steps:2}),'Processed in 4s · 2 steps');

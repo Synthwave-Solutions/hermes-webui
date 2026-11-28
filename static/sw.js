@@ -62,7 +62,7 @@ const SHELL_ASSETS = [
   './static/memory_dashboard.js' + VQ,
   './static/memory_dashboard.css' + VQ,
   './static/ui.js' + VQ,
-  './static/messages.js' + VQ,
+  './static/messages.js' + VQ + '-provider-recovery',
   './static/sessions.js' + VQ,
   './static/sp-picker.js' + VQ,
   './static/cron-agenda.js' + VQ,
@@ -84,7 +84,7 @@ const SHELL_ASSETS = [
   // integrations, voice) fell through to the network on every PWA start.
   './static/skill_learning_activity.js' + VQ,
   './static/subagent-progress.js' + VQ,
-  './static/tool-friendly.js' + VQ,
+  './static/tool-friendly.js' + VQ + '-provider-recovery',
   './static/subagent-threads.js' + VQ,
   './static/sp-account.js' + VQ,
   './static/sp-ux.js' + VQ,
