@@ -1772,7 +1772,7 @@
       var(--skeleton-sheen,color-mix(in srgb,var(--text) 24%,transparent)) 50%,
       var(--skeleton-base,color-mix(in srgb,var(--text) 8%,transparent)) 72%,
       var(--skeleton-base,color-mix(in srgb,var(--text) 8%,transparent)) 100%);
-    background-size:200% 100%;animation:skeletonSheen 1.25s ease-in-out infinite;}
+    background-size:200% 100%;}
   .skeleton-row .skeleton-title{min-width:0;}
   .skeleton-row .skeleton-stamp{height:8px;width:16px;flex:0 0 auto;opacity:.55;}
   /* Tree-row skeleton for the workspace file panel */
@@ -1783,7 +1783,7 @@
       var(--skeleton-base,color-mix(in srgb,var(--text) 8%,transparent)) 0%,
       var(--skeleton-sheen,color-mix(in srgb,var(--text) 24%,transparent)) 50%,
       var(--skeleton-base,color-mix(in srgb,var(--text) 8%,transparent)) 100%);
-    animation:skeletonSheen 1.25s ease-in-out infinite;background-size:200% 100%;}
+    background-size:200% 100%;}
   .skeleton-tree-row .skeleton-name{min-width:0;}
   .skeleton-tree-row .skeleton-size{height:8px;width:22px;flex:0 0 auto;margin-left:auto;opacity:.5;}
   /* Gentle entrance so the skeleton itself doesn't pop in harshly. The
@@ -1797,6 +1797,10 @@
      fade that ends at .5. The static opacity:.5 on the base rule remains for the
      reduced-motion path (animation:none) below. (@rodboev/greptile review, #4662) */
   .skeleton-group-label{animation:skeletonFadeInDim .22s ease both;}
+  /* One animated layer for the loading list, including on narrow displays. */
+  @media(prefers-reduced-motion:no-preference){
+    .skeleton-list:not(.skeleton-list-empty),.skeleton-tree{animation:skeletonSheen 1.25s ease-in-out infinite;}
+  }
   @keyframes skeletonSheen{0%,100%{opacity:.55;}50%{opacity:1;}}
   @keyframes skeletonFadeIn{from{opacity:0;}to{opacity:1;}}
   @keyframes skeletonFadeInDim{from{opacity:0;}to{opacity:.5;}}
