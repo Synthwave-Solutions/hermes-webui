@@ -143,6 +143,13 @@
     sessionId=S.session.session_id;search.value='';kind='all';limit=pageSize; dialog.showModal();search.focus();refresh();
   };
   document.getElementById('chatConnectorsClose').onclick=()=>dialog.close();
+  dialog.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      dialog.close();
+    }
+  });
   document.getElementById('chatConnectorsRefresh').onclick=refresh;
   filters.onclick = event => {
     const button = event.target.closest('button[data-kind]');
