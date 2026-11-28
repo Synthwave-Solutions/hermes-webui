@@ -395,3 +395,69 @@ def test_preserve_installed_skills_after_catalog_move_without_granting_new_ones(
     monkeypatch.setattr(builder, "_selected_allowed", lambda choices, name: name != "research" and allowed(choices, name))
     with pytest.raises(PermissionError, match="Unavailable selection in skills"):
         builder.save(ADMIN, dict(body, revision=saved["revision"]))
+
+
+def _global_cfg(setup, **extra):
+    cfg = yaml.safe_load((setup / "config.yaml").read_text())
+    cfg.update(extra)
+    (setup / "config.yaml").write_text(yaml.safe_dump(cfg))
+
+
+def _bot_cfg(setup, name="research-bot"):
+    return yaml.safe_load((setup / "profiles" / name / "config.yaml").read_text())
+
+
+def test_new_bot_inherits_providers_style_model_route(setup):
+    _global_cfg(setup,
+                model={"default": "codex/gpt-6-astra", "provider": "custom:omniroute",
+                       "base_url": "http://router:20128/v1"},
+                providers={"custom": {"name": "OmniRoute", "base_url": "http://router:20128/v1",
+                                      "key_env": "OMNIROUTE_API_KEY"}})
+    builder.save(ADMIN, payload())
+    cfg = _bot_cfg(setup)
+    assert cfg["model"]["base_url"] == "http://router:20128/v1"
+    assert cfg["providers"]["custom"]["key_env"] == "OMNIROUTE_API_KEY"
+
+
+def test_edit_repairs_bot_saved_without_route_and_keeps_bot_override(setup):
+    builder.save(ADMIN, payload())
+    _global_cfg(setup,
+                model={"default": "codex/gpt-6-astra", "provider": "custom:omniroute",
+                       "base_url": "http://router:20128/v1", "api_mode": "chat_completions"},
+                providers={"custom": {"base_url": "http://router:20128/v1"}})
+    cfg = _bot_cfg(setup)
+    cfg["providers"] = {"own": {"base_url": "http://bot-only/v1"}}
+    (setup / "profiles/research-bot/config.yaml").write_text(yaml.safe_dump(cfg))
+    body = payload()
+    body["revision"] = 1
+    builder.save(ADMIN, body)
+    cfg = _bot_cfg(setup)
+    assert cfg["model"]["base_url"] == "http://router:20128/v1"
+    assert cfg["model"]["api_mode"] == "chat_completions"
+    assert set(cfg["providers"]) == {"custom", "own"}
+
+
+def test_other_provider_does_not_borrow_installation_endpoint(setup):
+    _global_cfg(setup, model={"default": "codex/gpt-6-astra", "provider": "custom:omniroute",
+                              "base_url": "http://router:20128/v1", "api_key": "sk-installation"})
+    body = payload()
+    body["model_provider"] = "anthropic"
+    builder.save(ADMIN, body)
+    model = _bot_cfg(setup)["model"]
+    assert "base_url" not in model and "api_key" not in model
+
+
+def test_new_bot_form_defaults_to_every_loadable_skill(setup):
+    data = builder.get(ADMIN)
+    assert data["config"]["skills"] == [item["name"] for item in data["catalog"]["skills"]]
+    assert data["config"]["skills"] == ["research"]
+
+
+def test_bot_gets_code_execution_unless_installation_withholds_it(setup):
+    builder.save(ADMIN, payload())
+    assert "code_execution" in _bot_cfg(setup)["platform_toolsets"]["webui"]
+    _global_cfg(setup, platform_toolsets={"webui": ["file", "web"], "cli": ["file", "web"]})
+    body = payload()
+    body.update(name="locked-bot", title="Locked")
+    builder.save(ADMIN, body)
+    assert "code_execution" not in _bot_cfg(setup, "locked-bot")["platform_toolsets"]["webui"]

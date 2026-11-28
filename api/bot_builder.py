@@ -29,6 +29,32 @@ def _home(name):
     return path
 
 
+# Toolsets a bot starts from when the installation sets no platform_toolsets.
+# code_execution lets a bot produce real files (DOCX/XLSX/PPTX/PDF); governance
+# still gates execute_code per actor and on host-restricted installations.
+_DEFAULT_BOT_TOOLSETS = ["file", "web", "memory", "delegation", "skills", "code_execution"]
+# Connection fields a bot inherits from the installation's model block when it
+# routes through the same provider. Without them a bot built on a `providers:`
+# style config has a provider name but no endpoint ("No LLM provider configured").
+_MODEL_ROUTE_KEYS = ("base_url", "api_mode", "api_key", "key_env")
+
+
+def _inherit_model_route(cfg, global_cfg):
+    """Give a bot the installation's routing for its provider; bot-own values win."""
+    model = cfg["model"]
+    global_model = global_cfg.get("model") if isinstance(global_cfg.get("model"), dict) else {}
+    if model.get("provider") and model.get("provider") == global_model.get("provider"):
+        for key in _MODEL_ROUTE_KEYS:
+            if global_model.get(key) and not model.get(key):
+                model[key] = copy.deepcopy(global_model[key])
+    providers = global_cfg.get("providers")
+    if isinstance(providers, dict) and providers:
+        own = cfg.get("providers") if isinstance(cfg.get("providers"), dict) else {}
+        cfg["providers"] = {**copy.deepcopy(providers), **own}
+    if not cfg.get("custom_providers") and global_cfg.get("custom_providers"):
+        cfg["custom_providers"] = copy.deepcopy(global_cfg["custom_providers"])
+
+
 def _yaml(path):
     if path.is_symlink():
         raise PermissionError("Bot configuration cannot use symlinks")
@@ -208,8 +234,12 @@ def get(identity, name=None):
         from api.profiles import _DEFAULT_HERMES_HOME
         model = _yaml(_DEFAULT_HERMES_HOME / "config.yaml").get("model", {})
         model = model if isinstance(model, dict) else {}
+        # A new bot starts with every skill the creator may load, like an
+        # existing profile does; unticking narrows it. Starting empty left
+        # bots without document/branding skills unless the user knew to tick them.
         config = {"name": "", "title": "", "description": "", "system_prompt": "",
-                  "skills": [], "mcp_servers": [], "cli_tools": [], "allowed_users": [],
+                  "skills": [item["name"] for item in choices["skills"]],
+                  "mcp_servers": [], "cli_tools": [], "allowed_users": [],
                   "allowed_groups": [], "default_model": model.get("default", ""),
                   "model_provider": model.get("provider", ""), "avatar_url": ""}
     return {"catalog": choices, "config": config, "can_edit": True}
@@ -323,8 +353,8 @@ def save(identity, body):
                             "default": clean["default_model"], "provider": clean["model_provider"]}
             # Routing definitions contain no personal profile copy. Shared
             # connection definitions stay server-side; APIs never return them.
-            if not exists:
-                cfg["custom_providers"] = copy.deepcopy(global_cfg.get("custom_providers", []))
+            # Re-applied on edit so a bot saved before this existed is repaired.
+            _inherit_model_route(cfg, global_cfg)
             cfg["mcp_servers"] = {key: copy.deepcopy(global_cfg.get("mcp_servers", {})[key])
                                   for key in clean["mcp_servers"]}
             for value in cfg["mcp_servers"].values():
@@ -333,11 +363,20 @@ def save(identity, body):
             platforms = copy.deepcopy(cfg.get("platform_toolsets") or global_cfg.get("platform_toolsets") or {})
             if not isinstance(platforms, dict):
                 platforms = {}
+            global_platforms = global_cfg.get("platform_toolsets")
+            global_platforms = global_platforms if isinstance(global_platforms, dict) else {}
             for surface in ("webui", "cli"):
-                baseline = platforms.get(surface, platforms.get("cli", ["file", "web", "memory", "delegation", "skills"]))
+                baseline = platforms.get(surface, platforms.get("cli", _DEFAULT_BOT_TOOLSETS))
                 baseline = baseline if isinstance(baseline, list) else []
                 selected = [tool for tool in baseline if isinstance(tool, str) and not tool.startswith("mcp-") and tool != "terminal"]
                 selected += ["skills"] + ["mcp-" + n for n in clean["mcp_servers"]]
+                # Follow the installation: a bot may run code unless the admin
+                # left code_execution out of the global toolsets.
+                allowed = global_platforms.get(surface, global_platforms.get("cli", _DEFAULT_BOT_TOOLSETS))
+                if isinstance(allowed, list) and "code_execution" in allowed:
+                    selected.append("code_execution")
+                else:
+                    selected = [tool for tool in selected if tool != "code_execution"]
                 if clean["cli_tools"]:
                     selected.append("terminal")
                 platforms[surface] = list(dict.fromkeys(selected))
