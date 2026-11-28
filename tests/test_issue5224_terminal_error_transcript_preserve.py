@@ -99,6 +99,7 @@ function buildRuntime() {
     '_anchor_stream_id',
     '_anchor_activity_scene',
   ];
+  globalThis._isAttachmentCurrent = () => true;
   globalThis._isActiveSession = () => scenario.isActiveSession !== false;
   globalThis._isSessionCurrentPane = () => scenario.isSessionCurrentPane !== false;
   globalThis._isSessionActivelyViewed = () => !!scenario.isSessionActivelyViewed;
@@ -161,7 +162,6 @@ function buildRuntime() {
     globalThis._anchorRegistry = {};
     globalThis._settledAnchorRetryOwnerKey = () => 'synthetic-owner';
     globalThis._retrySettledAnchorScene = () => {};
-    globalThis._isAttachmentCurrent = () => true;
     let listener;
     globalThis.source = {
       readyState: 1,
@@ -270,6 +270,7 @@ def _run_scenario(driver_path: str, scenario: dict) -> dict:
 
 @pytest.mark.parametrize("raw_error", [
     "HTTP 503 Service Unavailable", "HTTP 529: overloaded_error: server overloaded",
+    "This request was blocked by our safety systems.",
 ])
 def test_provider_error_event_heading_matches_restored_history(driver_path, raw_error):
     from api.streaming import _classify_provider_error, _provider_error_payload

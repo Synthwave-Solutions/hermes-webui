@@ -305,6 +305,8 @@ def _set_owner_context(handler) -> None:
     try:
         from api.ownership import set_request_context
         set_request_context(handler)
+        from api.automation_token import reset_ctx
+        reset_ctx(handler)
     except Exception:
         pass
 

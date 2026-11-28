@@ -1731,6 +1731,15 @@ def _partial_message_signature(message: dict) -> tuple:
     )
 
 
+def _merge_failed_stream_snapshot(previous, partial):
+    """Preserve the agent row's identity and the WebUI's display-only partial metadata."""
+    if (not isinstance(previous, dict) or previous.get('role') != 'assistant'
+            or previous.get('finish_reason') != 'error' or previous.get('_partial')
+            or not partial.get('content') or previous.get('content') != partial['content']):
+        return None
+    return {**partial, **previous, '_partial': True}
+
+
 def _collapse_adjacent_duplicate_partials(messages) -> tuple[list, bool]:
     """Collapse repeated identical partial markers from the same failed turn."""
     if not isinstance(messages, list):
@@ -1744,6 +1753,13 @@ def _collapse_adjacent_duplicate_partials(messages) -> tuple[list, bool]:
             if previous_partial_sig == sig:
                 changed = True
                 continue
+            if collapsed:
+                merged = _merge_failed_stream_snapshot(collapsed[-1], message)
+                if merged is not None:
+                    collapsed[-1] = merged
+                    previous_partial_sig = sig
+                    changed = True
+                    continue
             previous_partial_sig = sig
         else:
             previous_partial_sig = None
@@ -2906,13 +2922,28 @@ def _sync_sidecar_from_state_db_if_newer(session) -> bool:
         # writer's newer record.
         locked.messages = merged_messages
         locked.context_messages = merged_context
-        locked.active_stream_id = None
-        locked.pending_user_message = None
-        locked.pending_attachments = []
-        locked.pending_started_at = None
-        locked.pending_user_source = None
+        # A newer database transcript can end at the prompt or at a tool call.
+        # Preserve the ordinary interruption and journal recovery for that turn.
+        from api.streaming import _turn_transcript_lacks_final_assistant_answer
+
         try:
-            locked.save(touch_updated_at=True)
+            if (locked.pending_user_message
+                    and _turn_transcript_lacks_final_assistant_answer(
+                        merged_messages, [], locked.pending_user_message)
+                    and not locked.pre_compression_snapshot
+                    and not _has_compression_continuation(locked)):
+                core_path = _get_profile_home(locked.profile) / 'sessions' / f'session_{sid}.json'
+                if not _apply_core_sync_or_error_marker(
+                    locked, core_path, stream_id_for_recheck=locked_stream_id,
+                ):
+                    return False
+            else:
+                locked.active_stream_id = None
+                locked.pending_user_message = None
+                locked.pending_attachments = []
+                locked.pending_started_at = None
+                locked.pending_user_source = None
+                locked.save(touch_updated_at=True)
         except Exception:
             logger.debug(
                 "state.db newer-sidecar sync save failed for session %s",
@@ -2922,8 +2953,9 @@ def _sync_sidecar_from_state_db_if_newer(session) -> bool:
 
         # Durable write succeeded — reflect the reconciled state on the caller's
         # shared/cached object so the in-flight read returns the recovered data.
-        session.messages = merged_messages
-        session.context_messages = merged_context
+        session.messages = locked.messages
+        session.context_messages = locked.context_messages
+        session.tool_calls = locked.tool_calls
         session.active_stream_id = None
         session.pending_user_message = None
         session.pending_attachments = []

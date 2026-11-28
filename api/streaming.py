@@ -60,6 +60,7 @@ from api.turn_journal import append_turn_journal_event_for_stream
 from api.usage import prompt_cache_hit_percent
 from api.models import (
     _is_empty_partial_activity_message,
+    _merge_failed_stream_snapshot,
     _evict_sessions_over_cap,
     get_state_db_session_messages,
     reconciled_state_db_messages_for_session,
@@ -737,6 +738,7 @@ def _is_fallback_lifecycle_message(kind: str, message: str) -> bool:
         k == 'lifecycle'
         and (
             'rate limited' in m
+            or m.startswith('⏳ provider temporarily unavailable — retrying automatically')
             or 'switching to fallback' in m
             or 'falling back' in m
             or 'fallback activated' in m
@@ -1522,6 +1524,12 @@ def _classify_provider_error(err_str: str, exc=None, *, silent_failure: bool = F
             'type': 'interrupted',
             'hint': 'The run stopped before a provider response completed. If you did not cancel it, try again.',
         }
+    if 'content_policy_blocked' in _err_lower or 'request was blocked by our safety systems' in _err_lower:
+        return {
+            'label': 'Provider safety block',
+            'type': 'content_policy_blocked',
+            'hint': 'The provider stopped this reply. Your conversation has been saved.',
+        }
     _is_quota = _is_quota_error_text(err_str)
     _is_auth = (
         not _is_quota and (
@@ -1645,6 +1653,7 @@ def _provider_error_payload(message: str, err_type: str, hint: str = '', *, prov
     _message = str(message or '')
     _safe_message = _redact_text(_message).strip() if _message else ''
     _friendly_messages = {
+        'content_policy_blocked': 'The provider stopped the reply because of its safety policy.',
         'quota_exhausted': 'The service has no available capacity right now.',
         'rate_limit': 'The service is receiving too many requests right now.',
         'auth_mismatch': 'The assistant could not sign in to the selected service.',
@@ -6561,6 +6570,11 @@ def _snapshot_and_append_partial_on_error(session, stream_id) -> dict | None:
         return None
     if not isinstance(session.messages, list):
         session.messages = []
+    if session.messages:
+        merged = _merge_failed_stream_snapshot(session.messages[-1], _partial_msg)
+        if merged is not None:
+            session.messages[-1] = merged
+            return merged
     if not _partial_marker_already_present(session.messages, _partial_msg):
         session.messages.append(_partial_msg)
         return _partial_msg
@@ -8675,6 +8689,12 @@ def _run_agent_streaming(
                         continue
                     _fallback_seen.add(_identity)
                     _fallback_chain.append(_fb_entry)
+            # An interactive automatic route may have a separate backup for a
+            # capacity outage. Explicitly selected models retain their own chain.
+            _capacity_backup = _cfg.get('webui_capacity_fallback')
+            if isinstance(_capacity_backup, dict) and _capacity_backup.get('source_model') == resolved_model:
+                for _entry in _fallback_entries(_capacity_backup):
+                    _fallback_chain.append({**_entry, 'capacity_only': True})
             _fallback_resolved = _fallback_chain or None
 
             # Build kwargs defensively — guard newer params so the WebUI
@@ -10717,7 +10737,7 @@ def _run_agent_streaming(
             _exc_label, _exc_type, _exc_hint = (
                 _classification['label'], _classification['type'], _classification['hint'],
             )
-        elif _classification['type'] in {'overloaded', 'service_unavailable'}:
+        elif _classification['type'] in {'overloaded', 'service_unavailable', 'content_policy_blocked'}:
             _exc_label, _exc_type, _exc_hint = (
                 _classification['label'], _classification['type'], _classification['hint'],
             )

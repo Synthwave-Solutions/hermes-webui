@@ -301,6 +301,11 @@ def _request_identity(handler) -> dict | None:
     from api import auth  # late import to avoid cycles
 
     try:
+        from api import automation_token as _atok
+
+        _bearer_identity = _atok.identity(handler)
+        if _bearer_identity:
+            return _bearer_identity
         if not auth.is_auth_enabled():
             return _auth_disabled_identity()
         get_identity = getattr(auth, "get_session_identity", None)

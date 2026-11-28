@@ -31,6 +31,24 @@ def _shared_conversation_clause(actor: str, owner_email: str | None) -> str:
     )
 
 
+_WORKSPACE_DOMAIN = "@synthwave.solutions"
+
+
+def _workspace_route_clause(actor: str) -> str:
+    """Describe the delegated Workspace route for a company account."""
+    if not actor.endswith(_WORKSPACE_DOMAIN):
+        return ""
+    return (
+        f"For this user's company Google Workspace account ({actor}) the working route is the "
+        f"domain delegation CLIs, always with --as {actor} right after the CLI name: "
+        f"`gws-hermes --as {actor} calendar +agenda --today` (also drive, sheets, docs), "
+        f"`gdrive-dwd --as {actor} get <file-id> -o <path>`, `gmail --as {actor} search <query>`, "
+        f"`gchat --as {actor} spaces`. Also add --as for --help. Use that route first. "
+        "The bare `gws` CLI has no login here, so its 401 does not mean access is missing, and the "
+        "personal-connection setup is only needed for a non-company account. "
+    )
+
+
 def actor_identity_prompt(actor_email: str | None, conversation_owner_email: str | None = None) -> str:
     """Accept only the server-selected actor; never resolve a profile fallback."""
     actor = str(actor_email or "").strip().lower()
@@ -47,6 +65,7 @@ def actor_identity_prompt(actor_email: str | None, conversation_owner_email: str
         "account may have a different address. Honor an already specified authorized account; "
         "if several authorized accounts remain plausible, ask which account rather than guessing. "
         "Never fall back to the profile owner's mailbox or a remembered default account. "
+        + _workspace_route_clause(actor) +
         "This identity does not grant access: existing authorization and approval rules still apply. "
         "If the required connection is absent, use the supported own-account connection setup "
         "route when available and explain the concrete step the user needs to complete."

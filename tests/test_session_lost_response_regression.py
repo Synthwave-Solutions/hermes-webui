@@ -979,6 +979,35 @@ def test_sync_persists_recovered_state_db_tail_when_stream_dead(monkeypatch):
     assert reloaded.messages[-1]["content"] == "recovered tail"
 
 
+@pytest.mark.parametrize("tail", [
+    [],
+    [{"role": "assistant", "content": "", "tool_calls": [
+        {"id": "lookup", "type": "function", "function": {"name": "lookup", "arguments": "{}"}}
+    ], "timestamp": 104.0}],
+    [{"role": "tool", "content": "lookup result", "tool_call_id": "lookup", "timestamp": 104.0}],
+])
+def test_newer_state_db_checkpoint_preserves_interruption(monkeypatch, tail):
+    session = Session(session_id="checkpoint_only", messages=[],
+                      pending_user_message="lookup", pending_started_at=100.0,
+                      active_stream_id="lost_worker")
+    session.save()
+    rows = [{"role": "user", "content": "lookup", "timestamp": 103.0}, *tail]
+    monkeypatch.setattr(models, "get_state_db_session_summary", lambda *a, **kw: {
+        "message_count": len(rows), "last_message_at": rows[-1]["timestamp"]
+    })
+    monkeypatch.setattr(models, "get_state_db_session_messages", lambda *a, **kw: list(rows))
+
+    assert models._sync_sidecar_from_state_db_if_newer(session)
+    persisted = Session.load(session.session_id)
+    for repaired in (session, persisted):
+        assert repaired.messages[-1].get("type") == "interrupted"
+        assert repaired.messages[-1]["interruption_cause"] == "process_restart"
+        assert [m["content"] for m in repaired.messages if m["role"] == "user"] == ["lookup"]
+        assert not any(m.get("_error") for m in repaired.context_messages or [])
+        assert not repaired.active_stream_id
+    assert not models._sync_sidecar_from_state_db_if_newer(persisted)
+
+
 def test_sync_skips_during_registration_window_recent_pending(monkeypatch):
     """Registration-window race: a just-submitted, not-yet-registered stream
     must NOT be cleared by the self-heal.

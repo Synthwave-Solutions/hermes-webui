@@ -85,3 +85,24 @@ def test_session_load_collapses_adjacent_duplicate_partials(tmp_path, monkeypatc
     assert sum(1 for message in persisted["messages"] if message.get("_partial")) == 1
     assert persisted["updated_at"] == 200.0
     assert (session_dir / f"{sid}.json.bak").exists()
+
+
+def test_error_fragment_and_its_snapshot_form_one_display_row(tmp_path, monkeypatch):
+    import api.models as models
+
+    monkeypatch.setattr(models, "SESSION_DIR", tmp_path)
+    text = "The unfinished answer"
+    fragment = {"role": "assistant", "content": text, "finish_reason": "error", "message_uid": "raw-id"}
+    partial = {"role": "assistant", "content": text, "_partial": True}
+    error = {"role": "assistant", "_error": True, "content": "Provider stopped"}
+    expected_prefix = [{"role": "user", "content": "first"}, fragment, {"role": "user", "content": "second"}]
+    payload = {"session_id": "trial", "workspace": str(tmp_path), "model": "test", "context_messages": [fragment],
+               "messages": [*expected_prefix, fragment, partial, error]}
+    path = tmp_path / "trial.json"
+    path.write_text(json.dumps(payload))
+    loaded = models.Session.load("trial")
+    assert len(loaded.messages) == len(expected_prefix) + 2
+    assert loaded.messages[:-2] == expected_prefix
+    assert loaded.messages[-2]["_partial"] and loaded.messages[-2]["message_uid"] == "raw-id"
+    assert loaded.messages[-1] == error and loaded.context_messages == [fragment]
+    assert json.loads(path.read_text())["messages"] == loaded.messages

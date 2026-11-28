@@ -395,6 +395,7 @@
     'service unavailable':['🌩️','alert',['De AI-dienst is even niet bereikbaar','The AI service is not available right now'],['Probeer het over een paar minuten opnieuw.','Please try again in a few minutes.']],
     'service busy':['🌩️','alert',['De AI-dienst is het even te druk','The AI service is busy right now'],['Probeer het over een minuut opnieuw.','Please try again in a minute.']],
     'no response from provider':['🌩️','alert',['De AI gaf geen antwoord','The AI did not answer'],['Probeer het opnieuw.','Please try again.']],
+    'provider safety block':['🛡️','alert',['De AI-aanbieder heeft dit antwoord gestopt','The AI provider stopped this reply'],['De aanbieder heeft een veiligheidsregel toegepast. Je gesprek is bewaard.','The provider applied a safety rule. Your conversation has been saved.']],
     'rate limit reached':['⏳','alert',['Even te veel verzoeken tegelijk','Too many requests at once'],['Wacht een minuut en probeer het opnieuw.','Wait a minute and try again.']],
     'out of credits':['💳','alert',['Het AI-tegoed is op','The AI credit has run out'],['Geef het door aan een beheerder.','Please let an administrator know.']],
     'model not found':['🧭','alert',['Dit AI-model is niet beschikbaar','This AI model is not available'],['Kies een ander model onder het tekstvak.','Pick another model below the message box.']],

@@ -952,6 +952,12 @@ def parse_cookie(handler) -> str | None:
 def check_auth(handler, parsed) -> bool:
     """Check if request is authorized. Returns True if OK.
     If not authorized, sends 401 (API) or 302 redirect (page) and returns False."""
+    # Automation service token: a bearer header is judged on its own, before
+    # anything else, and never falls through to the cookie or public paths.
+    from api import automation_token as _atok
+    _atok.reset_ctx(handler)
+    if _atok.has_bearer(handler):
+        return _atok.authenticate(handler, parsed)
     if not is_auth_enabled():
         return True
     from api.share_routes import is_public_share_request
